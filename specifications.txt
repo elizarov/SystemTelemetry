@@ -1,0 +1,183 @@
+﻿System Telemetry
+================
+
+This project is a compact, real-time system monitoring dashboard designed for a small 800×480 secondary display, 
+presenting key PC metrics in a clean, high-contrast interface optimized for quick readability. 
+It combines CPU and GPU performance data with their respective memory usage, alongside network activity, 
+multi-drive storage status, and a clock, all organized into a balanced panel layout. 
+The design emphasizes glanceable visuals—large load indicators, concise numeric stats, and minimal 
+clutter for continuously tracking system health and performance at a glance.
+
+┌─────────────────────────────┬──────────────────────────────┐
+│           CPU               │             GPU              │
+│  Ryzen 9 5900X              │  Radeon RX 6800              │
+│  ○  2%                      │  ○  0%                       │
+│  Temp    65°C               │  Temp    32°C                │
+│  Power   59.7W              │  Power   7.0W                │
+│  Clock   3.23GHz            │  Clock   1.0MHz              │
+│  Fan     2368RPM            │  Fan     0RPM                │
+│  RAM     10.8 / 64 GB       │  VRAM    0.4 / 16 GB         │
+├───────────────┬──────────────────────────────┬─────────────┤
+│   Network     │           Storage            │    Time     │
+│  Up   0.3MB/s │  C: ████░░░░░ 32%  1.2TB     │   10:43     │
+│  Down 24MB/s  │  D: ███████░░ 68%  500GB     │  2026-04-01 │
+│  ▒▒▒▒▒▒▒▒▒▒   │  E: ██░░░░░░░ 18%  2.8TB     │             │
+│  ▒▒▒▒▒▒▒▒▒▒   │                              │             │
+│  192.168.3.60 │                              │             │
+└───────────────┴──────────────────────────────┴─────────────┘
+
+Project Environment and Setup
+=============================
+
+The project is going to run on Windows 11 and will be implementation in C++20 using Visual Studio 2022.
+Use "devenv.cmd" to activate development enviroment and to make compiler tools (like "cl") available.
+Create makefile for nmake to build the project.
+Keep all sources in "src" directory.
+
+Configuration
+=============
+
+Make the system configurable for all the parameters that are numbered in the system and where 
+it is not clear which device/metric information to query, examples (not limited to)
+
+- Display on which to show the system
+- Which temerature sensor and fan to show
+- Which drives to show
+
+Size and placement
+==================
+
+Panel size is 800x480.                                                       
+Place it as a top-level windows at monitor that is specified in configuration.
+Make sure the monitor to show the panel is selected by its name, not number, 
+so it survives plugging/unplugging other monitors into the system.
+
+Style Summary
+=============
+
+Visual Theme
+Background: pure black (#000000)
+Primary text: white (#FFFFFF)
+Accent color: cyan/blue (#00BFFF or similar)
+
+Panels
+Rounded rectangles with thin white borders
+Consistent padding inside all panels
+Subtle spacing between panels (8–12 px)
+
+Typography
+Primary numbers (load, time): large, bold
+Labels: small, minimal (Temp, Power, etc.)
+Units: slightly dimmer than values
+
+Visual Elements
+Circular gauges for CPU/GPU load
+Horizontal bars for usage
+Mini graphs for network activity
+Clean, minimal icons for headers
+
+Design Principles
+High contrast for readability on small screen
+Prioritize large, glanceable values
+Avoid clutter—maximum 4–6 rows per panel
+Consistent alignment across panels
+
+CPU Panel (Top Left)
+====================
+
+Header
+CPU model name
+Optional: small voltage display (top-right)
+Main Indicator
+Large circular gauge:
+CPU Load (%)
+
+Metrics (display as thin bars)
+
+Temp (°C)
+Power (W)
+Clock (GHz)
+Fan / Pump (RPM)
+RAM usage
+Format: used / total
+
+GPU Panel (Top Right)
+=====================
+
+Header
+GPU model name
+Main Indicator
+Large circular gauge:
+GPU Load (%)
+
+Metrics (display as thin bars)
+
+Temp (°C)
+Power (W)
+Clock (MHz or GHz)
+Fan (RPM or %)
+Memory (Integrated)
+VRAM usage
+Eample: 3.2 / 16 GB
+
+Network Panel (Bottom Left)
+===========================
+
+Header
+Network + connection icon
+Primary Values (prominent)
+Upload speed → Up 0.3 MB/s
+Download speed → Down 24.1 MB/s
+Graphs
+Two small scrolling graphs:
+Upload history
+Download history
+Footer
+IP address (e.g., 192.168.3.60)
+
+Storage Panel (Bottom Center)
+=============================
+
+Structure
+
+List all nonremovable drives vertically (C, D, E)
+
+Per Drive Row
+Drive letter
+Usage bar
+Usage %
+Free space
+Example Format
+C: 32% 1.2 TB free
+D: 68% 500 GB free
+E: 18% 2.8 TB free
+Visuals
+Thin horizontal bars
+Consistent alignment
+Compact rows
+
+Time & Date (Bottom Right)
+==========================
+
+Content
+Time (large): 10:43
+Date (small): 2026-04-01
+Layout
+Right-aligned
+Time is dominant visual element
+
+Behavior & Data Refresh
+=======================
+
+Refresh Rates
+CPU/GPU load: 0.5–1 sec
+Temps & power: ~1 sec
+Network: 0.5 sec (for smooth graphs)
+Storage: 5–10 sec
+Clock: 1 sec
+
+Units
+CPU: GHz
+Memory: GB
+Network: MB/s
+Storage: GB/TB
