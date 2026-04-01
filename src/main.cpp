@@ -2,11 +2,13 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
+#include <windowsx.h>
 #include <commctrl.h>
 #include <iphlpapi.h>
 #include <netioapi.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <shellapi.h>
 #include <wbemidl.h>
 
 #include <algorithm>
@@ -23,23 +25,34 @@
 #include <string>
 #include <vector>
 
+#include "config.h"
+
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "pdh.lib")
 #pragma comment(lib, "wbemuuid.lib")
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "shell32.lib")
 
 namespace {
 
 constexpr int kWindowWidth = 800;
 constexpr int kWindowHeight = 480;
 constexpr UINT_PTR kRefreshTimerId = 1;
+constexpr UINT_PTR kMoveTimerId = 2;
 constexpr UINT kRefreshTimerMs = 250;
+constexpr UINT kMoveTimerMs = 16;
 constexpr COLORREF kBlack = RGB(0, 0, 0);
 constexpr COLORREF kWhite = RGB(255, 255, 255);
 constexpr COLORREF kAccent = RGB(0, 191, 255);
 constexpr COLORREF kPanelBorder = RGB(235, 235, 235);
 constexpr COLORREF kMuted = RGB(165, 180, 190);
 constexpr COLORREF kTrack = RGB(45, 52, 58);
+constexpr UINT kTrayMessage = WM_APP + 1;
+constexpr UINT kCommandMove = 1001;
+constexpr UINT kCommandBringOnTop = 1002;
+constexpr UINT kCommandUpdateConfig = 1003;
+constexpr UINT kCommandExit = 1004;
+constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
 
 struct ScalarMetric {
     std::optional<double> value;
@@ -94,24 +107,6 @@ struct SystemSnapshot {
     SYSTEMTIME now{};
 };
 
-struct SensorBinding {
-    std::vector<std::wstring> namespaces;
-    std::wstring matchField;
-    std::wstring matchValue;
-    std::wstring valueField;
-
-    bool IsConfigured() const {
-        return !matchField.empty() && !matchValue.empty() && !valueField.empty();
-    }
-};
-
-struct AppConfig {
-    std::wstring monitorName;
-    std::wstring networkAdapter;
-    std::vector<std::wstring> driveLetters;
-    std::map<std::wstring, SensorBinding> sensors;
-};
-
 std::wstring Trim(const std::wstring& input) {
     const auto first = input.find_first_not_of(L" \t\r\n");
     if (first == std::wstring::npos) {
@@ -128,16 +123,6 @@ std::wstring ToLower(std::wstring value) {
     return value;
 }
 
-std::vector<std::wstring> Split(const std::wstring& input, wchar_t delimiter) {
-    std::vector<std::wstring> parts;
-    std::wstringstream stream(input);
-    std::wstring item;
-    while (std::getline(stream, item, delimiter)) {
-        parts.push_back(Trim(item));
-    }
-    return parts;
-}
-
 std::wstring EscapeWql(const std::wstring& value) {
     std::wstring escaped;
     for (wchar_t ch : value) {
@@ -147,94 +132,6 @@ std::wstring EscapeWql(const std::wstring& value) {
         escaped.push_back(ch);
     }
     return escaped;
-}
-
-std::wstring ReadFileUtf8(const std::filesystem::path& path) {
-    FILE* file = nullptr;
-    if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr) {
-        return L"";
-    }
-    std::string bytes;
-    std::array<char, 4096> buffer{};
-    while (true) {
-        const size_t read = fread(buffer.data(), 1, buffer.size(), file);
-        if (read == 0) {
-            break;
-        }
-        bytes.append(buffer.data(), read);
-    }
-    fclose(file);
-
-    if (bytes.size() >= 3 && static_cast<unsigned char>(bytes[0]) == 0xEF &&
-        static_cast<unsigned char>(bytes[1]) == 0xBB &&
-        static_cast<unsigned char>(bytes[2]) == 0xBF) {
-        bytes.erase(0, 3);
-    }
-    if (bytes.empty()) {
-        return L"";
-    }
-
-    const int required = MultiByteToWideChar(CP_UTF8, 0, bytes.data(),
-        static_cast<int>(bytes.size()), nullptr, 0);
-    std::wstring result(required, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()),
-        result.data(), required);
-    return result;
-}
-
-AppConfig LoadConfig(const std::filesystem::path& path) {
-    AppConfig config;
-    const std::wstring text = ReadFileUtf8(path);
-    std::wstring section;
-    std::wstringstream stream(text);
-    std::wstring line;
-
-    while (std::getline(stream, line)) {
-        line = Trim(line);
-        if (line.empty() || line[0] == L'#' || line[0] == L';') {
-            continue;
-        }
-        if (line.front() == L'[' && line.back() == L']') {
-            section = ToLower(Trim(line.substr(1, line.size() - 2)));
-            continue;
-        }
-
-        const size_t eq = line.find(L'=');
-        if (eq == std::wstring::npos) {
-            continue;
-        }
-
-        const std::wstring key = ToLower(Trim(line.substr(0, eq)));
-        const std::wstring value = Trim(line.substr(eq + 1));
-
-        if (section == L"display" && key == L"monitor_name") {
-            config.monitorName = value;
-        } else if (section == L"network" && key == L"adapter_name") {
-            config.networkAdapter = value;
-        } else if (section == L"storage" && key == L"drives") {
-            config.driveLetters = Split(value, L',');
-        } else if (section == L"sensors") {
-            auto parts = Split(value, L'|');
-            if (parts.size() < 4) {
-                continue;
-            }
-            SensorBinding binding;
-            if (ToLower(parts[0]) == L"auto" || parts[0].empty()) {
-                binding.namespaces = {L"root\\LibreHardwareMonitor", L"root\\OpenHardwareMonitor"};
-            } else {
-                binding.namespaces = Split(parts[0], L',');
-            }
-            binding.matchField = parts[1];
-            binding.matchValue = parts[2];
-            binding.valueField = parts[3];
-            config.sensors[key] = binding;
-        }
-    }
-
-    if (config.driveLetters.empty()) {
-        config.driveLetters = {L"C", L"D", L"E"};
-    }
-    return config;
 }
 
 class WmiSession {
@@ -819,73 +716,181 @@ void TelemetryCollector::UpdateNetworkState(bool initializeOnly) {
     FreeMibTable(table);
 }
 
-struct MonitorTarget {
-    bool found = false;
-    RECT rect{};
-    std::wstring targetDevice;
+struct MonitorPlacementInfo {
+    std::wstring deviceName;
+    std::wstring monitorName = L"Unknown";
+    std::wstring configMonitorName = L"";
+    RECT monitorRect{};
+    POINT relativePosition{};
 };
 
-BOOL CALLBACK EnumMonitorProc(HMONITOR monitor, HDC, LPRECT, LPARAM data) {
-    auto* target = reinterpret_cast<MonitorTarget*>(data);
-    if (target->found) {
-        return FALSE;
-    }
+struct MonitorIdentity {
+    std::wstring displayName;
+    std::wstring configName;
+};
 
-    MONITORINFOEXW info{};
-    info.cbSize = sizeof(info);
-    if (!GetMonitorInfoW(monitor, &info)) {
-        return TRUE;
+std::wstring SimplifyDeviceName(const std::wstring& deviceName) {
+    if (deviceName.rfind(L"\\\\.\\", 0) == 0) {
+        return deviceName.substr(4);
     }
-
-    if (ContainsInsensitive(info.szDevice, target->targetDevice)) {
-        target->rect = info.rcMonitor;
-        target->found = true;
-        return FALSE;
-    }
-    return TRUE;
+    return deviceName;
 }
+
+bool IsUsefulFriendlyName(const std::wstring& name) {
+    const std::wstring lowered = ToLower(name);
+    return !name.empty() &&
+        lowered != L"generic pnp monitor" &&
+        lowered.find(L"\\\\?\\display") != 0;
+}
+
+MonitorIdentity GetMonitorIdentity(const std::wstring& deviceName);
 
 std::optional<RECT> FindTargetMonitor(const std::wstring& requestedName) {
     if (requestedName.empty()) {
         return std::nullopt;
     }
+    struct SearchContext {
+        std::wstring requestedName;
+        std::optional<RECT> result;
+    } context{requestedName, std::nullopt};
 
-    MonitorTarget target;
-    DISPLAY_DEVICEW adapter{};
-    adapter.cb = sizeof(adapter);
-    for (DWORD adapterIndex = 0; EnumDisplayDevicesW(nullptr, adapterIndex, &adapter, 0); ++adapterIndex) {
-        if ((adapter.StateFlags & DISPLAY_DEVICE_ACTIVE) == 0) {
+    EnumDisplayMonitors(
+        nullptr, nullptr,
+        [](HMONITOR monitor, HDC, LPRECT, LPARAM data) -> BOOL {
+            auto* context = reinterpret_cast<SearchContext*>(data);
+            MONITORINFOEXW info{};
+            info.cbSize = sizeof(info);
+            if (!GetMonitorInfoW(monitor, &info)) {
+                return TRUE;
+            }
+
+            const MonitorIdentity identity = GetMonitorIdentity(info.szDevice);
+            if (ContainsInsensitive(identity.displayName, context->requestedName) ||
+                ContainsInsensitive(identity.configName, context->requestedName) ||
+                ContainsInsensitive(info.szDevice, context->requestedName)) {
+                context->result = info.rcMonitor;
+                return FALSE;
+            }
+            return TRUE;
+        },
+        reinterpret_cast<LPARAM>(&context));
+
+    return context.result;
+}
+
+MonitorIdentity GetMonitorIdentity(const std::wstring& deviceName) {
+    MonitorIdentity identity;
+    identity.displayName = SimplifyDeviceName(deviceName);
+    identity.configName = deviceName;
+
+    UINT32 pathCount = 0;
+    UINT32 modeCount = 0;
+    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount) != ERROR_SUCCESS) {
+        return identity;
+    }
+
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(pathCount);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(modeCount);
+    if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, paths.data(), &modeCount, modes.data(), nullptr) !=
+        ERROR_SUCCESS) {
+        return identity;
+    }
+
+    for (UINT32 i = 0; i < pathCount; ++i) {
+        DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName{};
+        sourceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+        sourceName.header.size = sizeof(sourceName);
+        sourceName.header.adapterId = paths[i].sourceInfo.adapterId;
+        sourceName.header.id = paths[i].sourceInfo.id;
+        if (DisplayConfigGetDeviceInfo(&sourceName.header) != ERROR_SUCCESS) {
             continue;
         }
 
-        DISPLAY_DEVICEW monitor{};
-        monitor.cb = sizeof(monitor);
-        for (DWORD monitorIndex = 0; EnumDisplayDevicesW(adapter.DeviceName, monitorIndex, &monitor, 0); ++monitorIndex) {
-            if (ContainsInsensitive(monitor.DeviceString, requestedName)) {
-                target.targetDevice = adapter.DeviceName;
-                break;
-            }
+        if (_wcsicmp(sourceName.viewGdiDeviceName, deviceName.c_str()) != 0) {
+            continue;
         }
-        if (!target.targetDevice.empty()) {
-            break;
+
+        DISPLAYCONFIG_TARGET_DEVICE_NAME targetName{};
+        targetName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
+        targetName.header.size = sizeof(targetName);
+        targetName.header.adapterId = paths[i].targetInfo.adapterId;
+        targetName.header.id = paths[i].targetInfo.id;
+        if (DisplayConfigGetDeviceInfo(&targetName.header) != ERROR_SUCCESS) {
+            continue;
         }
+
+        const std::wstring friendlyName = targetName.monitorFriendlyDeviceName;
+        const std::wstring monitorPath = targetName.monitorDevicePath;
+        if (IsUsefulFriendlyName(friendlyName)) {
+            identity.displayName = friendlyName + L" (" + SimplifyDeviceName(deviceName) + L")";
+            identity.configName = friendlyName;
+        } else if (!monitorPath.empty()) {
+            identity.displayName = SimplifyDeviceName(deviceName);
+            identity.configName = monitorPath;
+        } else {
+            identity.displayName = SimplifyDeviceName(deviceName);
+            identity.configName = deviceName;
+        }
+        return identity;
     }
 
-    if (target.targetDevice.empty()) {
-        return std::nullopt;
-    }
+    return identity;
+}
 
-    EnumDisplayMonitors(nullptr, nullptr, EnumMonitorProc, reinterpret_cast<LPARAM>(&target));
-    if (!target.found) {
-        return std::nullopt;
+MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd) {
+    MonitorPlacementInfo info;
+    RECT windowRect{};
+    GetWindowRect(hwnd, &windowRect);
+
+    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFOEXW monitorInfo{};
+    monitorInfo.cbSize = sizeof(monitorInfo);
+    if (GetMonitorInfoW(monitor, &monitorInfo)) {
+        info.deviceName = monitorInfo.szDevice;
+        const MonitorIdentity identity = GetMonitorIdentity(monitorInfo.szDevice);
+        info.monitorName = identity.displayName;
+        info.configMonitorName = identity.configName;
+        info.monitorRect = monitorInfo.rcMonitor;
+        info.relativePosition.x = windowRect.left - monitorInfo.rcMonitor.left;
+        info.relativePosition.y = windowRect.top - monitorInfo.rcMonitor.top;
     }
-    return target.rect;
+    return info;
 }
 
 HFONT CreateUiFont(int height, int weight, const wchar_t* face) {
     return CreateFontW(-height, 0, 0, 0, weight, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         VARIABLE_PITCH, face);
+}
+
+void ShutdownPreviousInstance() {
+    HWND existing = FindWindowW(kWindowClassName, nullptr);
+    if (existing == nullptr) {
+        return;
+    }
+
+    const DWORD existingProcessId = [&]() {
+        DWORD processId = 0;
+        GetWindowThreadProcessId(existing, &processId);
+        return processId;
+    }();
+
+    if (existingProcessId == GetCurrentProcessId()) {
+        return;
+    }
+
+    PostMessageW(existing, WM_CLOSE, 0, 0);
+    for (int attempt = 0; attempt < 40; ++attempt) {
+        Sleep(100);
+        existing = FindWindowW(kWindowClassName, nullptr);
+        if (existing == nullptr) {
+            return;
+        }
+    }
+}
+
+std::filesystem::path GetRuntimeConfigPath() {
+    return std::filesystem::current_path() / L"config.ini";
 }
 
 class DashboardApp {
@@ -898,6 +903,15 @@ private:
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void Paint();
+    void ShowContextMenu(POINT screenPoint);
+    void BringOnTop();
+    void UpdateConfigFromCurrentPlacement();
+    void StartMoveMode();
+    void StopMoveMode();
+    void UpdateMoveTracking();
+    void DrawMoveOverlay(HDC hdc);
+    bool CreateTrayIcon();
+    void RemoveTrayIcon();
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::wstring& text, HFONT font,
         COLORREF color, UINT format);
@@ -925,11 +939,14 @@ private:
     HWND hwnd_ = nullptr;
     AppConfig config_;
     TelemetryCollector telemetry_;
+    bool isMoving_ = false;
+    NOTIFYICONDATAW trayIcon_{};
+    MonitorPlacementInfo movePlacementInfo_{};
 };
 
 bool DashboardApp::Initialize(HINSTANCE instance) {
     instance_ = instance;
-    config_ = LoadConfig(std::filesystem::path(L"src") / L"config.ini");
+    config_ = LoadConfig(GetRuntimeConfigPath());
     telemetry_.Initialize(config_);
 
     INITCOMMONCONTROLSEX icc{sizeof(icc), ICC_STANDARD_CLASSES};
@@ -938,7 +955,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     WNDCLASSW wc{};
     wc.lpfnWndProc = &DashboardApp::WndProcSetup;
     wc.hInstance = instance;
-    wc.lpszClassName = L"SystemTelemetryDashboard";
+    wc.lpszClassName = kWindowClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = CreateSolidBrush(kBlack);
     if (!RegisterClassW(&wc)) {
@@ -947,12 +964,15 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 
     RECT placement{100, 100, 100 + kWindowWidth, 100 + kWindowHeight};
     if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
-        placement.left = monitor->left;
-        placement.top = monitor->top;
+        placement.left = monitor->left + config_.positionX;
+        placement.top = monitor->top + config_.positionY;
+    } else {
+        placement.left = 100 + config_.positionX;
+        placement.top = 100 + config_.positionY;
     }
 
     hwnd_ = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        WS_EX_TOOLWINDOW,
         wc.lpszClassName,
         L"System Telemetry",
         WS_POPUP,
@@ -965,6 +985,133 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         instance,
         this);
     return hwnd_ != nullptr;
+}
+
+void DashboardApp::BringOnTop() {
+    ShowWindow(hwnd_, SW_SHOWNORMAL);
+    SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    SetForegroundWindow(hwnd_);
+}
+
+void DashboardApp::UpdateConfigFromCurrentPlacement() {
+    const MonitorPlacementInfo placement = GetMonitorPlacementForWindow(hwnd_);
+    const std::filesystem::path configPath = GetRuntimeConfigPath();
+    const std::wstring monitorName = !placement.configMonitorName.empty()
+        ? placement.configMonitorName
+        : placement.deviceName;
+    if (!SaveDisplayConfig(configPath, monitorName, placement.relativePosition.x, placement.relativePosition.y)) {
+        const std::wstring message = L"Failed to update " + configPath.wstring() + L".";
+        MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
+        return;
+    }
+
+    config_.monitorName = monitorName;
+    config_.positionX = placement.relativePosition.x;
+    config_.positionY = placement.relativePosition.y;
+}
+
+bool DashboardApp::CreateTrayIcon() {
+    trayIcon_ = {};
+    trayIcon_.cbSize = sizeof(trayIcon_);
+    trayIcon_.hWnd = hwnd_;
+    trayIcon_.uID = 1;
+    trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+    trayIcon_.uCallbackMessage = kTrayMessage;
+    trayIcon_.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    wcscpy_s(trayIcon_.szTip, L"System Telemetry");
+    return Shell_NotifyIconW(NIM_ADD, &trayIcon_) == TRUE;
+}
+
+void DashboardApp::RemoveTrayIcon() {
+    if (trayIcon_.cbSize != 0) {
+        Shell_NotifyIconW(NIM_DELETE, &trayIcon_);
+    }
+}
+
+void DashboardApp::StartMoveMode() {
+    isMoving_ = true;
+    SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
+    UpdateMoveTracking();
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void DashboardApp::StopMoveMode() {
+    if (!isMoving_) {
+        return;
+    }
+    isMoving_ = false;
+    KillTimer(hwnd_, kMoveTimerId);
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void DashboardApp::UpdateMoveTracking() {
+    POINT cursor{};
+    if (!GetCursorPos(&cursor)) {
+        return;
+    }
+
+    const int x = cursor.x - (kWindowWidth / 2);
+    const int y = cursor.y - 24;
+    SetWindowPos(hwnd_, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+    movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+}
+
+void DashboardApp::ShowContextMenu(POINT screenPoint) {
+    HMENU menu = CreatePopupMenu();
+    AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
+    AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
+    AppendMenuW(menu, MF_STRING, kCommandUpdateConfig, L"Update Config");
+    AppendMenuW(menu, MF_STRING, kCommandExit, L"Exit");
+    SetForegroundWindow(hwnd_);
+    const UINT selected = TrackPopupMenu(
+        menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN,
+        screenPoint.x, screenPoint.y, 0, hwnd_, nullptr);
+    DestroyMenu(menu);
+
+    switch (selected) {
+    case kCommandMove:
+        StartMoveMode();
+        break;
+    case kCommandBringOnTop:
+        BringOnTop();
+        break;
+    case kCommandUpdateConfig:
+        UpdateConfigFromCurrentPlacement();
+        break;
+    case kCommandExit:
+        DestroyWindow(hwnd_);
+        break;
+    default:
+        break;
+    }
+}
+
+void DashboardApp::DrawMoveOverlay(HDC hdc) {
+    RECT overlay{16, 16, 420, 112};
+    HBRUSH fill = CreateSolidBrush(RGB(0, 0, 0));
+    HPEN border = CreatePen(PS_SOLID, 1, kAccent);
+    HGDIOBJ oldBrush = SelectObject(hdc, fill);
+    HGDIOBJ oldPen = SelectObject(hdc, border);
+    RoundRect(hdc, overlay.left, overlay.top, overlay.right, overlay.bottom, 14, 14);
+    SelectObject(hdc, oldPen);
+    SelectObject(hdc, oldBrush);
+    DeleteObject(fill);
+    DeleteObject(border);
+
+    RECT titleRect{overlay.left + 12, overlay.top + 8, overlay.right - 12, overlay.top + 28};
+    RECT monitorRect{overlay.left + 12, overlay.top + 34, overlay.right - 12, overlay.top + 56};
+    RECT positionRect{overlay.left + 12, overlay.top + 58, overlay.right - 12, overlay.top + 80};
+    RECT hintRect{overlay.left + 12, overlay.top + 82, overlay.right - 12, overlay.bottom - 12};
+
+    wchar_t positionText[96];
+    swprintf_s(positionText, L"Pos: x=%ld y=%ld", movePlacementInfo_.relativePosition.x, movePlacementInfo_.relativePosition.y);
+
+    DrawTextBlock(hdc, titleRect, L"Move Mode", fonts_.label, kAccent, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, monitorRect, L"Monitor: " + movePlacementInfo_.monitorName, fonts_.smallFont, kWhite,
+        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+    DrawTextBlock(hdc, positionRect, positionText, fonts_.smallFont, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, hintRect, L"Left-click to place. Copy monitor name and x/y into config.", fonts_.smallFont,
+        kMuted, DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
 }
 
 int DashboardApp::Run() {
@@ -1006,11 +1153,51 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         fonts_.label = CreateUiFont(14, FW_NORMAL, L"Segoe UI");
         fonts_.smallFont = CreateUiFont(12, FW_NORMAL, L"Segoe UI");
         SetTimer(hwnd_, kRefreshTimerId, kRefreshTimerMs, nullptr);
+        CreateTrayIcon();
         return 0;
     case WM_TIMER:
+        if (wParam == kMoveTimerId) {
+            UpdateMoveTracking();
+            InvalidateRect(hwnd_, nullptr, FALSE);
+            return 0;
+        }
         telemetry_.UpdateSnapshot();
         InvalidateRect(hwnd_, nullptr, FALSE);
         return 0;
+    case WM_CONTEXTMENU: {
+        POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+        if (point.x == -1 && point.y == -1) {
+            RECT rect{};
+            GetWindowRect(hwnd_, &rect);
+            point.x = rect.left + 24;
+            point.y = rect.top + 24;
+        }
+        if (isMoving_) {
+            StopMoveMode();
+        }
+        ShowContextMenu(point);
+        return 0;
+    }
+    case WM_LBUTTONUP:
+        if (isMoving_) {
+            StopMoveMode();
+            return 0;
+        }
+        break;
+    case WM_KEYDOWN:
+        if (wParam == VK_ESCAPE && isMoving_) {
+            StopMoveMode();
+            return 0;
+        }
+        break;
+    case kTrayMessage:
+        if (lParam == WM_RBUTTONUP || lParam == WM_CONTEXTMENU) {
+            POINT point{};
+            GetCursorPos(&point);
+            ShowContextMenu(point);
+            return 0;
+        }
+        break;
     case WM_PAINT:
         Paint();
         return 0;
@@ -1018,6 +1205,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         return 1;
     case WM_DESTROY:
         KillTimer(hwnd_, kRefreshTimerId);
+        KillTimer(hwnd_, kMoveTimerId);
+        RemoveTrayIcon();
         DeleteObject(fonts_.title);
         DeleteObject(fonts_.big);
         DeleteObject(fonts_.value);
@@ -1028,6 +1217,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     default:
         return DefWindowProcW(hwnd_, message, wParam, lParam);
     }
+
+    return DefWindowProcW(hwnd_, message, wParam, lParam);
 }
 
 void DashboardApp::Paint() {
@@ -1046,6 +1237,9 @@ void DashboardApp::Paint() {
     SetBkMode(memDc, TRANSPARENT);
 
     DrawLayout(memDc, telemetry_.Snapshot());
+    if (isMoving_) {
+        DrawMoveOverlay(memDc);
+    }
 
     BitBlt(hdc, 0, 0, client.right, client.bottom, memDc, 0, 0, SRCCOPY);
     SelectObject(memDc, oldBitmap);
@@ -1286,6 +1480,8 @@ void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
+    ShutdownPreviousInstance();
+
     DashboardApp app;
     if (!app.Initialize(instance)) {
         MessageBoxW(nullptr, L"Failed to initialize the telemetry dashboard.", L"System Telemetry", MB_ICONERROR);

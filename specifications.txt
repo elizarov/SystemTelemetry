@@ -41,8 +41,13 @@ Make the system configurable for all the parameters that are numbered in the sys
 it is not clear which device/metric information to query, examples (not limited to)
 
 - Display on which to show the system
+- Relative position on the selected display
 - Which temerature sensor and fan to show
 - Which drives to show
+
+At runtime, the application must read `config.ini` from the same folder it was
+started from and write updates back to that same file. The `src/config.ini`
+file in the source tree is only a checked-in example configuration template.
 
 Size and placement
 ==================
@@ -51,6 +56,52 @@ Panel size is 800x480.
 Place it as a top-level windows at monitor that is specified in configuration.
 Make sure the monitor to show the panel is selected by its name, not number, 
 so it survives plugging/unplugging other monitors into the system.
+Support interactive repositioning so the user can discover and copy the monitor
+name plus the relative X/Y placement for configuration.
+
+Window controls
+===============
+
+Add a popup menu on right-click with these actions:
+
+- Move
+- Bring On Top
+- Update Config
+- Exit
+
+When Move is active, the dashboard window should follow the mouse cursor until
+the user places it. While moving, show an overlay in the top-left corner with:
+
+- Monitor friendly name
+- Relative X/Y position on that monitor
+
+The overlay content should be easy to copy into configuration.
+The application must also read the saved relative X/Y coordinates from
+configuration at startup and place the window accordingly.
+Add an "Update Config" action that writes the current display identifier and
+relative X/Y placement back to the config file while preserving all other
+settings.
+
+Tray behavior
+=============
+
+Create a system tray icon with the same popup menu as the dashboard window.
+The tray menu must expose the same actions:
+
+- Move
+- Bring On Top
+- Update Config
+- Exit
+
+The dashboard should use normal window Z-order behavior so other windows may
+cover it. "Bring On Top" should raise the dashboard when it needs to be found.
+
+Single-instance behavior
+========================
+
+At most one dashboard instance may be running at a time.
+Starting a new copy must close the already running copy, then continue startup
+as the remaining instance.
 
 Style Summary
 =============
