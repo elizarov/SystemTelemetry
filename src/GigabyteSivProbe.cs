@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.Win32;
 
-internal static class GigabyteFanProbe
+internal static class GigabyteSivProbe
 {
     private const string EngineEnvironmentControlDll = "Gigabyte.Engine.EnvironmentControl.dll";
     private const string EnvironmentControlCommonDll = "Gigabyte.EnvironmentControl.Common.dll";

@@ -175,14 +175,14 @@ bool StartProbeDaemon(const std::wstring& helperPath, tracing::Trace& trace, Dae
     CloseHandle(writePipe);
     if (!created) {
         CloseHandle(readPipe);
-        diagnostics = "Failed to start GigabyteFanProbe daemon.";
+        diagnostics = "Failed to start GigabyteSivProbe daemon.";
         return false;
     }
 
     daemon.readPipe = readPipe;
     daemon.process = pi.hProcess;
     daemon.thread = pi.hThread;
-    diagnostics = "GigabyteFanProbe daemon started.";
+    diagnostics = "GigabyteSivProbe daemon started.";
     trace.Write("gigabyte_siv:daemon_started path=\"" + Utf8FromWide(helperPath) + "\"");
     return true;
 }
@@ -208,19 +208,19 @@ void ApplyResultField(ProbeResult& result, const std::string& line) {
 bool PumpProbeDaemon(DaemonProcess& daemon, tracing::Trace& trace, std::string& buffer,
     ProbeResult& currentFrame, bool& frameOpen, std::deque<ProbeResult>& completedFrames, std::string& diagnostics) {
     if (daemon.readPipe == nullptr || daemon.process == nullptr) {
-        diagnostics = "GigabyteFanProbe daemon is not running.";
+        diagnostics = "GigabyteSivProbe daemon is not running.";
         return false;
     }
 
     DWORD exitCode = STILL_ACTIVE;
     if (!GetExitCodeProcess(daemon.process, &exitCode) || exitCode != STILL_ACTIVE) {
-        diagnostics = "GigabyteFanProbe daemon exited.";
+        diagnostics = "GigabyteSivProbe daemon exited.";
         return false;
     }
 
     DWORD available = 0;
     if (!PeekNamedPipe(daemon.readPipe, nullptr, 0, nullptr, &available, nullptr)) {
-        diagnostics = "Failed to poll GigabyteFanProbe daemon output.";
+        diagnostics = "Failed to poll GigabyteSivProbe daemon output.";
         return false;
     }
     if (available == 0) {
@@ -231,7 +231,7 @@ bool PumpProbeDaemon(DaemonProcess& daemon, tracing::Trace& trace, std::string& 
     chunk.resize(available);
     DWORD read = 0;
     if (!ReadFile(daemon.readPipe, chunk.data(), available, &read, nullptr) || read == 0) {
-        diagnostics = "Failed to read GigabyteFanProbe daemon output.";
+        diagnostics = "Failed to read GigabyteSivProbe daemon output.";
         return false;
     }
     chunk.resize(read);
@@ -291,9 +291,9 @@ public:
             return false;
         }
 
-        helperPath_ = AbsolutePath(L"GigabyteFanProbe.exe");
+        helperPath_ = AbsolutePath(L"GigabyteSivProbe.exe");
         if (GetFileAttributesW(helperPath_.c_str()) == INVALID_FILE_ATTRIBUTES) {
-            diagnostics_ = "GigabyteFanProbe helper was not built.";
+            diagnostics_ = "GigabyteSivProbe helper was not built.";
             trace().Write("gigabyte_siv:helper_missing path=\"" + Utf8FromWide(helperPath_) + "\"");
             return false;
         }
@@ -427,7 +427,7 @@ private:
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
 
-        diagnostics_ = "GigabyteFanProbe daemon did not emit an initial frame.";
+        diagnostics_ = "GigabyteSivProbe daemon did not emit an initial frame.";
         CloseDaemonProcess(daemon_);
         return false;
     }
@@ -448,7 +448,7 @@ private:
     }
 
     void ApplyProbeFields(const ProbeResult& result) {
-        diagnostics_ = result.diagnostics.empty() ? "GigabyteFanProbe completed." : result.diagnostics;
+        diagnostics_ = result.diagnostics.empty() ? "GigabyteSivProbe completed." : result.diagnostics;
         chipName_.clear();
         controllerType_.clear();
         chipId_.reset();

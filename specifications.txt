@@ -104,7 +104,7 @@ The application must not rely on WMI for telemetry, names, or dump diagnostics.
 
 Vendor telemetry integrations should live in separate source files so each vendor implementation remains isolated.
 Gigabyte motherboard fan telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the CPU fan metric unavailable instead of blocking startup.
-The Gigabyte motherboard telemetry path should identify Gigabyte boards through non-WMI Windows metadata, launch a local helper beside the executable, have that helper discover the installed SIV location from the Windows registry, talk to the Gigabyte SIV hardware-monitor service over the `GigabyteEngine` IPC pipe, collect the available `HwRegister` fan RPM and temperature readings, and report provider diagnostics through `/dump`.
+The Gigabyte motherboard telemetry path should identify Gigabyte boards through non-WMI Windows metadata, launch a local `GigabyteSivProbe.exe` helper beside the executable, have that helper discover the installed SIV location from the Windows registry, talk to the Gigabyte SIV hardware-monitor service over the `GigabyteEngine` IPC pipe, collect the available `HwRegister` fan RPM and temperature readings, and report provider diagnostics through `/dump`.
 The Gigabyte helper must support a `/daemon` mode that keeps one SIV monitor session open and streams fresh fan and temperature snapshots continuously so the dashboard does not need to relaunch the helper process for each sample.
 
 Size and placement
