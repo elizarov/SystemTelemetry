@@ -100,6 +100,15 @@ public:
             gpuName_ = "AMD GPU";
         }
 
+        adlx_uint totalVramMb = 0;
+        const ADLX_RESULT totalVramResult = gpu_->TotalVRAM(&totalVramMb);
+        trace().Write("amd_adlx:get_total_vram " +
+            tracing::Trace::FormatAdlxResult("result", static_cast<int>(totalVramResult)) +
+            " mb=" + std::to_string(totalVramMb));
+        if (ADLX_SUCCEEDED(totalVramResult) && totalVramMb > 0) {
+            totalVramGb_ = static_cast<double>(totalVramMb) / 1024.0;
+        }
+
         trace().Write("amd_adlx:get_supported_metrics_begin");
         result = performanceMonitoring_->GetSupportedGPUMetrics(gpu_, &metricsSupport_);
         trace().Write("amd_adlx:get_supported_metrics_done " +
@@ -135,6 +144,7 @@ public:
         GpuVendorTelemetrySample sample;
         sample.providerName = "AMD ADLX";
         sample.name = gpuName_;
+        sample.totalVramGb = totalVramGb_;
         sample.diagnostics = diagnostics_;
 
         if (!initialized_ || !performanceMonitoring_ || !gpu_ || !metricsSupport_) {
@@ -240,6 +250,7 @@ private:
     tracing::Trace* trace_ = nullptr;
     std::string gpuName_;
     std::string diagnostics_ = "ADLX provider not initialized.";
+    std::optional<double> totalVramGb_;
     bool initialized_ = false;
 };
 

@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <iphlpapi.h>
 #include <netioapi.h>
+#include <dxgi.h>
 #include <pdh.h>
 #include <pdhmsg.h>
 
@@ -72,6 +73,7 @@ struct TelemetryCollector::Impl {
 
     void UpdateCpu();
     void UpdateGpu();
+    void InitializeGpuAdapterInfo();
     void UpdateMemory();
     void ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample);
     void EnumerateDrives();
@@ -203,6 +205,7 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     impl_->trace_.Write(("telemetry:pdh_collect gpu_memory_query " + tracing::Trace::FormatPdhStatus("status", gpuMemoryCollectStatus)).c_str());
 
     impl_->EnumerateDrives();
+    impl_->InitializeGpuAdapterInfo();
     impl_->UpdateNetworkState(true);
     impl_->UpdateMemory();
     impl_->UpdateCpu();
@@ -278,6 +281,70 @@ void TelemetryCollector::Impl::UpdateCpu() {
         (snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(snapshot_.cpu.clock, 2) : std::string("N/A"))).c_str());
 }
 
+void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
+    IDXGIFactory1* factory = nullptr;
+    const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
+    if (FAILED(factoryHr) || factory == nullptr) {
+        char buffer[128];
+        sprintf_s(buffer, "telemetry:gpu_adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
+        Trace(buffer);
+        return;
+    }
+
+    for (UINT adapterIndex = 0;; ++adapterIndex) {
+        IDXGIAdapter1* adapter = nullptr;
+        const HRESULT enumHr = factory->EnumAdapters1(adapterIndex, &adapter);
+        if (enumHr == DXGI_ERROR_NOT_FOUND) {
+            Trace("telemetry:gpu_adapter_enum done");
+            break;
+        }
+        if (FAILED(enumHr) || adapter == nullptr) {
+            char buffer[128];
+            sprintf_s(buffer, "telemetry:gpu_adapter_enum index=%u hr=0x%08X", adapterIndex, static_cast<unsigned int>(enumHr));
+            Trace(buffer);
+            break;
+        }
+
+        DXGI_ADAPTER_DESC1 desc{};
+        const HRESULT descHr = adapter->GetDesc1(&desc);
+        if (SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0) {
+            const std::string adapterName = Utf8FromWide(desc.Description);
+            snapshot_.gpu.vram.totalGb = static_cast<double>(desc.DedicatedVideoMemory) /
+                (1024.0 * 1024.0 * 1024.0);
+            if (snapshot_.gpu.name == "GPU" && !adapterName.empty()) {
+                snapshot_.gpu.name = adapterName;
+            }
+
+            char buffer[256];
+            sprintf_s(buffer,
+                "telemetry:gpu_adapter_selected index=%u hr=0x%08X dedicated_bytes=%llu dedicated_gb=%.2f name=\"%s\"",
+                adapterIndex,
+                static_cast<unsigned int>(descHr),
+                static_cast<unsigned long long>(desc.DedicatedVideoMemory),
+                snapshot_.gpu.vram.totalGb,
+                adapterName.c_str());
+            Trace(buffer);
+            adapter->Release();
+            break;
+        }
+
+        {
+            const std::string adapterName = SUCCEEDED(descHr) ? Utf8FromWide(desc.Description) : std::string();
+            char buffer[256];
+            sprintf_s(buffer,
+                "telemetry:gpu_adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
+                adapterIndex,
+                static_cast<unsigned int>(descHr),
+                tracing::Trace::BoolText(SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0).c_str(),
+                adapterName.c_str());
+            Trace(buffer);
+        }
+        adapter->Release();
+    }
+
+    factory->Release();
+}
+
 double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool require3d) {
     if (counter == nullptr) {
         return 0.0;
@@ -326,6 +393,9 @@ void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySamp
     snapshot_.gpu.clock.value = sample.coreClockMhz;
     snapshot_.gpu.clock.unit = "MHz";
     snapshot_.gpu.fan.value = sample.fanRpm;
+    if (sample.totalVramGb.has_value() && *sample.totalVramGb > 0.0) {
+        snapshot_.gpu.vram.totalGb = *sample.totalVramGb;
+    }
 }
 
 void TelemetryCollector::Impl::UpdateGpu() {

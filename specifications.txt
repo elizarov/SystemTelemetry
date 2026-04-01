@@ -87,6 +87,7 @@ GPU telemetry must use Windows counters for generic metrics and vendor APIs for 
 
 - GPU load from Windows/PDH
 - GPU dedicated VRAM usage from Windows/PDH
+- GPU total dedicated VRAM capacity from Windows adapter information, or from the vendor API when that is the more reliable source for the active GPU
 - AMD GPU temperature, clock, and fan speed from AMD's ADLX API
 
 If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable instead of blocking startup.
