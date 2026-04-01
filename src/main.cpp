@@ -938,6 +938,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             ShowContextMenu(point);
             return 0;
         }
+        if (lParam == WM_LBUTTONDBLCLK) {
+            BringOnTop();
+            return 0;
+        }
         break;
     case WM_PAINT:
         Paint();

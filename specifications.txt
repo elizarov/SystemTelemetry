@@ -142,6 +142,7 @@ The tray menu must expose the same actions:
 
 The dashboard should use normal window Z-order behavior so other windows may
 cover it. `Bring On Top` should raise the dashboard when it needs to be found.
+Double-clicking the tray icon should perform the same `Bring On Top` action.
 
 Single-instance behavior
 ========================
