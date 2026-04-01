@@ -10,12 +10,9 @@ struct AppConfig {
     int positionY = 0;
     std::string networkAdapter;
     std::vector<std::string> driveLetters;
-    int gigabyteFanChannel = 0;
+    std::string gigabyteFanChannelName;
+    std::string gigabyteTemperatureChannelName;
 };
 
 AppConfig LoadConfig(const std::filesystem::path& path);
-bool SaveDisplayConfig(
-    const std::filesystem::path& path,
-    const std::string& monitorName,
-    int positionX,
-    int positionY);
+bool SaveConfig(const std::filesystem::path& path, const AppConfig& config);

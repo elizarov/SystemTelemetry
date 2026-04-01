@@ -70,6 +70,10 @@ bool ContainsInsensitive(const std::string& value, const std::string& needle) {
     return ToLower(value).find(ToLower(needle)) != std::string::npos;
 }
 
+bool EqualsInsensitive(const std::string& left, const std::string& right) {
+    return ToLower(left) == ToLower(right);
+}
+
 std::wstring AbsolutePath(const std::wstring& relativePath) {
     wchar_t modulePath[MAX_PATH];
     GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
@@ -307,14 +311,16 @@ public:
     BoardVendorTelemetrySample Sample() override {
         BoardVendorTelemetrySample sample;
         sample.providerName = "Gigabyte";
-        sample.requestedFanChannel = config_.gigabyteFanChannel;
+        sample.requestedFanChannelName = config_.gigabyteFanChannelName;
+        sample.requestedTemperatureChannelName = config_.gigabyteTemperatureChannelName;
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
         sample.chipName = chipName_;
         sample.controllerType = controllerType_;
         sample.driverLibrary = loadedLibrary_;
-        sample.selectedCpuTemperatureSensor = selectedCpuTemperatureSensor_;
-        sample.selectedFanChannel = selectedChannel_ > 0 ? std::optional<int>(selectedChannel_) : std::nullopt;
+        sample.selectedFanChannelName = selectedFanChannelName_;
+        sample.selectedTemperatureChannelName = selectedTemperatureChannelName_;
+        sample.selectedCpuTemperatureSensor = selectedTemperatureChannelName_;
         sample.chipId = chipId_;
         sample.monitorBaseAddress = monitorBaseAddress_;
         sample.ecMmioRegisterValue = ecMmioRegisterValue_;
@@ -339,11 +345,12 @@ public:
 
         sample.chipName = chipName_;
         sample.controllerType = controllerType_;
-        sample.selectedFanChannel = selectedChannel_ > 0 ? std::optional<int>(selectedChannel_) : std::nullopt;
+        sample.selectedFanChannelName = selectedFanChannelName_;
         sample.chipId = chipId_;
         sample.monitorBaseAddress = monitorBaseAddress_;
         sample.ecMmioRegisterValue = ecMmioRegisterValue_;
-        sample.selectedCpuTemperatureSensor = selectedCpuTemperatureSensor_;
+        sample.selectedTemperatureChannelName = selectedTemperatureChannelName_;
+        sample.selectedCpuTemperatureSensor = selectedTemperatureChannelName_;
         sample.cpuTemperatureC = selectedCpuTemperatureC_;
         sample.diagnostics = diagnostics_;
 
@@ -353,28 +360,17 @@ public:
 
         if (!selectedCpuTemperatureC_.has_value()) {
             SelectCpuTemperature();
-            sample.selectedCpuTemperatureSensor = selectedCpuTemperatureSensor_;
+            sample.selectedTemperatureChannelName = selectedTemperatureChannelName_;
+            sample.selectedCpuTemperatureSensor = selectedTemperatureChannelName_;
             sample.cpuTemperatureC = selectedCpuTemperatureC_;
         }
 
         std::string selectedFanTitle;
-        int chosenIndex = config_.gigabyteFanChannel >= 1 ? (config_.gigabyteFanChannel - 1) : 0;
-        if (chosenIndex < 0 || chosenIndex >= static_cast<int>(fanReadings_.size()) || !fanReadings_[chosenIndex].rpm.has_value()) {
-            chosenIndex = 0;
-            for (int i = 0; i < static_cast<int>(fanReadings_.size()); ++i) {
-                if (fanReadings_[i].rpm.has_value() && *fanReadings_[i].rpm > 0.0) {
-                    chosenIndex = i;
-                    break;
-                }
-            }
-        }
-
-        if (chosenIndex >= 0 && chosenIndex < static_cast<int>(fanReadings_.size()) &&
-            fanReadings_[chosenIndex].rpm.has_value() && *fanReadings_[chosenIndex].rpm > 0.0) {
-            selectedChannel_ = chosenIndex + 1;
-            sample.fanRpm = fanReadings_[chosenIndex].rpm;
-            sample.selectedFanChannel = selectedChannel_;
-            selectedFanTitle = fanReadings_[chosenIndex].title;
+        const FanReading* selectedFan = SelectFanReading();
+        if (selectedFan != nullptr) {
+            sample.fanRpm = selectedFan->rpm;
+            sample.selectedFanChannelName = selectedFanChannelName_;
+            selectedFanTitle = selectedFan->title;
         }
 
         sample.available = sample.cpuTemperatureC.has_value() || sample.fanRpm.has_value();
@@ -382,8 +378,8 @@ public:
         if (!selectedFanTitle.empty()) {
             sample.diagnostics += " sampled_fan_title=" + selectedFanTitle;
         }
-        if (!sample.selectedCpuTemperatureSensor.empty()) {
-            sample.diagnostics += " sampled_temp_title=" + sample.selectedCpuTemperatureSensor;
+        if (!sample.selectedTemperatureChannelName.empty()) {
+            sample.diagnostics += " sampled_temp_title=" + sample.selectedTemperatureChannelName;
         }
         return sample;
     }
@@ -456,7 +452,8 @@ private:
         ecMmioRegisterValue_.reset();
         fanReadings_.clear();
         tempReadings_.clear();
-        selectedCpuTemperatureSensor_.clear();
+        selectedFanChannelName_.clear();
+        selectedTemperatureChannelName_.clear();
         selectedCpuTemperatureC_.reset();
 
         for (const auto& [key, value] : result.fields) {
@@ -522,13 +519,16 @@ private:
         SelectCpuTemperature();
     }
 
-    void SelectCpuTemperature() {
-        auto chooseReading = [this](bool requireCpuTitle) -> const TemperatureReading* {
-            for (const auto& reading : tempReadings_) {
-                if (!reading.celsius.has_value()) {
+    const FanReading* SelectFanReading() {
+        auto chooseReading = [this](const std::string& requestedName, bool requireCpuTitle) -> const FanReading* {
+            for (const auto& reading : fanReadings_) {
+                if (!reading.rpm.has_value() || *reading.rpm <= 0.0) {
                     continue;
                 }
-                if (requireCpuTitle && !ContainsInsensitive(reading.title, "cpu")) {
+                if (!requestedName.empty() && !EqualsInsensitive(reading.title, requestedName)) {
+                    continue;
+                }
+                if (requestedName.empty() && requireCpuTitle && !EqualsInsensitive(reading.title, "CPU")) {
                     continue;
                 }
                 return &reading;
@@ -536,15 +536,56 @@ private:
             return nullptr;
         };
 
-        const TemperatureReading* selected = chooseReading(true);
+        const FanReading* selected = nullptr;
+        if (!config_.gigabyteFanChannelName.empty()) {
+            selected = chooseReading(config_.gigabyteFanChannelName, false);
+        }
         if (selected == nullptr) {
-            selected = chooseReading(false);
+            selected = chooseReading(std::string(), true);
+        }
+        if (selected == nullptr) {
+            selected = chooseReading(std::string(), false);
+        }
+        if (selected == nullptr) {
+            return nullptr;
+        }
+
+        selectedFanChannelName_ = selected->title;
+        return selected;
+    }
+
+    void SelectCpuTemperature() {
+        auto chooseReading = [this](const std::string& requestedName, bool requireCpuTitle) -> const TemperatureReading* {
+            for (const auto& reading : tempReadings_) {
+                if (!reading.celsius.has_value()) {
+                    continue;
+                }
+                if (!requestedName.empty() && !EqualsInsensitive(reading.title, requestedName)) {
+                    continue;
+                }
+                if (requestedName.empty() && requireCpuTitle && !EqualsInsensitive(reading.title, "CPU")) {
+                    continue;
+                }
+                return &reading;
+            }
+            return nullptr;
+        };
+
+        const TemperatureReading* selected = nullptr;
+        if (!config_.gigabyteTemperatureChannelName.empty()) {
+            selected = chooseReading(config_.gigabyteTemperatureChannelName, false);
+        }
+        if (selected == nullptr) {
+            selected = chooseReading(std::string(), true);
+        }
+        if (selected == nullptr) {
+            selected = chooseReading(std::string(), false);
         }
         if (selected == nullptr) {
             return;
         }
 
-        selectedCpuTemperatureSensor_ = selected->title;
+        selectedTemperatureChannelName_ = selected->title;
         selectedCpuTemperatureC_ = selected->celsius;
     }
 
@@ -569,8 +610,8 @@ private:
     std::string daemonBuffer_;
     bool daemonFrameOpen_ = false;
     ULONGLONG lastProbeTick_ = 0;
-    int selectedChannel_ = 0;
-    std::string selectedCpuTemperatureSensor_;
+    std::string selectedFanChannelName_;
+    std::string selectedTemperatureChannelName_;
     std::optional<double> selectedCpuTemperatureC_;
     bool initialized_ = false;
 };

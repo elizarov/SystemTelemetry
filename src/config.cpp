@@ -24,6 +24,10 @@ std::string ToLower(std::string value) {
     return value;
 }
 
+bool IsAutoChannelValue(const std::string& value) {
+    return value.empty() || value == "0" || ToLower(value) == "auto";
+}
+
 std::vector<std::string> Split(const std::string& input, char delimiter) {
     std::vector<std::string> parts;
     std::stringstream stream(input);
@@ -131,7 +135,9 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
         } else if (section == "storage" && key == "drives") {
             config.driveLetters = Split(value, ',');
         } else if (section == "vendor.gigabyte" && key == "fan_channel") {
-            config.gigabyteFanChannel = std::clamp(ParseIntOrDefault(value, 0), 0, 6);
+            config.gigabyteFanChannelName = IsAutoChannelValue(value) ? std::string() : value;
+        } else if (section == "vendor.gigabyte" && key == "temperature_channel") {
+            config.gigabyteTemperatureChannelName = IsAutoChannelValue(value) ? std::string() : value;
         }
     }
 
@@ -141,11 +147,7 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
     return config;
 }
 
-bool SaveDisplayConfig(
-    const std::filesystem::path& path,
-    const std::string& monitorName,
-    int positionX,
-    int positionY) {
+bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
     const std::string text = ReadFileUtf8(path);
     std::vector<std::string> lines;
     {
@@ -161,63 +163,73 @@ bool SaveDisplayConfig(
 
     if (lines.empty()) {
         lines = {
-            "; System Telemetry dashboard configuration example.",
-            "; Keep this file in sync with supported configuration fields.",
-            "; monitor_name matches the display identifier used by the app.",
-            "; position_x and position_y are the window's relative top-left coordinates on that monitor.",
+            "[display]",
+            "monitor_name = ",
+            "position_x = 0",
+            "position_y = 0",
             "",
-            "[display]"
+            "[network]",
+            "adapter_name = ",
+            "",
+            "[storage]",
+            "drives = C,D,E",
+            "",
+            "[vendor.gigabyte]",
+            "fan_channel = ",
+            "temperature_channel = "
         };
     }
 
-    size_t sectionStart = lines.size();
-    size_t sectionEnd = lines.size();
-    for (size_t i = 0; i < lines.size(); ++i) {
-        const std::string trimmed = Trim(lines[i]);
-        if (trimmed == "[display]") {
-            sectionStart = i;
-            sectionEnd = lines.size();
-            for (size_t j = i + 1; j < lines.size(); ++j) {
-                const std::string next = Trim(lines[j]);
-                if (!next.empty() && next.front() == '[' && next.back() == ']') {
-                    sectionEnd = j;
-                    break;
-                }
+    const auto ensureSection = [&lines](const std::string& sectionName) -> size_t {
+        for (size_t i = 0; i < lines.size(); ++i) {
+            if (Trim(lines[i]) == sectionName) {
+                return i;
             }
-            break;
         }
-    }
-
-    if (sectionStart == lines.size()) {
         if (!lines.empty() && !lines.back().empty()) {
             lines.push_back("");
         }
-        sectionStart = lines.size();
-        lines.push_back("[display]");
-        sectionEnd = lines.size();
-    }
+        lines.push_back(sectionName);
+        return lines.size() - 1;
+    };
 
-    ReplaceOrAppendKey(lines, sectionStart, sectionEnd, "monitor_name", monitorName);
-    sectionEnd = lines.size();
-    for (size_t j = sectionStart + 1; j < lines.size(); ++j) {
-        const std::string next = Trim(lines[j]);
-        if (!next.empty() && next.front() == '[' && next.back() == ']') {
-            sectionEnd = j;
-            break;
+    const auto findSectionEnd = [&lines](size_t sectionStart) -> size_t {
+        size_t sectionEnd = lines.size();
+        for (size_t j = sectionStart + 1; j < lines.size(); ++j) {
+            const std::string next = Trim(lines[j]);
+            if (!next.empty() && next.front() == '[' && next.back() == ']') {
+                sectionEnd = j;
+                break;
+            }
         }
-    }
+        return sectionEnd;
+    };
 
-    ReplaceOrAppendKey(lines, sectionStart, sectionEnd, "position_x", std::to_string(positionX));
-    sectionEnd = lines.size();
-    for (size_t j = sectionStart + 1; j < lines.size(); ++j) {
-        const std::string next = Trim(lines[j]);
-        if (!next.empty() && next.front() == '[' && next.back() == ']') {
-            sectionEnd = j;
-            break;
+    auto updateKey = [&lines, &ensureSection, &findSectionEnd](const std::string& sectionName,
+        const std::string& key, const std::string& value) {
+        size_t sectionStart = ensureSection(sectionName);
+        if (Trim(lines[sectionStart]) != sectionName) {
+            lines[sectionStart] = sectionName;
         }
-    }
+        const size_t sectionEnd = findSectionEnd(sectionStart);
+        ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value);
+    };
 
-    ReplaceOrAppendKey(lines, sectionStart, sectionEnd, "position_y", std::to_string(positionY));
+    updateKey("[display]", "monitor_name", config.monitorName);
+    updateKey("[display]", "position_x", std::to_string(config.positionX));
+    updateKey("[display]", "position_y", std::to_string(config.positionY));
+    updateKey("[network]", "adapter_name", config.networkAdapter);
+
+    std::string drives;
+    for (size_t i = 0; i < config.driveLetters.size(); ++i) {
+        if (i > 0) {
+            drives += ",";
+        }
+        drives += config.driveLetters[i];
+    }
+    updateKey("[storage]", "drives", drives);
+    updateKey("[vendor.gigabyte]", "fan_channel", config.gigabyteFanChannelName);
+    updateKey("[vendor.gigabyte]", "temperature_channel", config.gigabyteTemperatureChannelName);
 
     std::string output;
     for (size_t i = 0; i < lines.size(); ++i) {

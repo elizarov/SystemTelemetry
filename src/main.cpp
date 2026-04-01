@@ -744,10 +744,14 @@ void DashboardApp::BringOnTop() {
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
     const MonitorPlacementInfo placement = GetMonitorPlacementForWindow(hwnd_);
     const std::filesystem::path configPath = GetRuntimeConfigPath();
+    AppConfig config = telemetry_.EffectiveConfig();
     const std::string monitorName = !placement.configMonitorName.empty()
         ? placement.configMonitorName
         : placement.deviceName;
-    if (!SaveDisplayConfig(configPath, monitorName, placement.relativePosition.x, placement.relativePosition.y)) {
+    config.monitorName = monitorName;
+    config.positionX = placement.relativePosition.x;
+    config.positionY = placement.relativePosition.y;
+    if (!SaveConfig(configPath, config)) {
         const std::wstring message = WideFromUtf8("Failed to update " + Utf8FromWide(configPath.wstring()) + ".");
         MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
         return;

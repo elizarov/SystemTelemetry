@@ -72,6 +72,7 @@ public:
 
     bool Initialize(const AppConfig& config, std::ostream* traceStream = nullptr);
     const SystemSnapshot& Snapshot() const;
+    AppConfig EffectiveConfig() const;
     void UpdateSnapshot();
     void DumpText(std::ostream& output) const;
 

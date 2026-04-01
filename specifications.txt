@@ -61,15 +61,20 @@ Examples include:
 - Relative position on the selected display
 - Which network adapter to prefer
 - Which drives to show
-- Which Gigabyte motherboard fan channel to prefer when multiple tachometers are exposed
+- Which Gigabyte motherboard fan channel name and temperature channel name to prefer when multiple sensors are exposed
 
 At runtime, the application must read `config.ini` from the same folder it was started from and write updates back to that same file.
 The `src/config.ini` file in the source tree is only a checked-in example configuration template.
+When the runtime writer needs to create a new live `config.ini`, it should write only the active configuration sections and keys, without prepending the source-tree example header text.
 All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
 Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
 Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.
 When `network.adapter_name` is left empty, auto-selection should prefer the active adapter that best represents the routed connection, favoring adapters with a usable default gateway and IPv4 address over host-only or otherwise unrouted virtual adapters.
-When `vendor.gigabyte.fan_channel` is `0`, auto-selection should prefer the first Gigabyte tachometer channel that reports a valid RPM. Values `1` through `6` should force a specific Gigabyte fan channel when the board exposes it.
+When `network.adapter_name` is set to a saved adapter name such as `Ethernet`, adapter selection should prefer an exact case-insensitive alias or description match and only fall back to substring matching when no exact match exists.
+When `vendor.gigabyte.fan_channel` is left empty, auto-selection should prefer a fan channel named `CPU` and only fall back to the first valid RPM source if no `CPU`-named channel is available.
+When `vendor.gigabyte.temperature_channel` is left empty, auto-selection should prefer a temperature channel named `CPU` and only fall back to the first available temperature source if no `CPU`-named channel is available.
+The Gigabyte fan and temperature channel settings must be stored in `config.ini` by channel name, not channel number.
+The `Update Config` action must persist the current auto-selected network adapter name plus the currently selected Gigabyte fan and temperature channel names alongside the display placement.
 
 Command-line dump mode
 ======================

@@ -13,8 +13,6 @@ class Trace;
 struct BoardVendorTelemetrySample {
     std::optional<double> fanRpm;
     std::optional<double> cpuTemperatureC;
-    std::optional<int> requestedFanChannel;
-    std::optional<int> selectedFanChannel;
     std::optional<uint16_t> probePort;
     std::optional<uint16_t> chipId;
     std::optional<uint32_t> monitorBaseAddress;
@@ -25,6 +23,10 @@ struct BoardVendorTelemetrySample {
     std::string chipName;
     std::string controllerType;
     std::string driverLibrary;
+    std::string requestedFanChannelName;
+    std::string selectedFanChannelName;
+    std::string requestedTemperatureChannelName;
+    std::string selectedTemperatureChannelName;
     std::string selectedCpuTemperatureSensor;
     std::string providerName = "None";
     std::string diagnostics;

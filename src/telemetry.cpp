@@ -49,10 +49,6 @@ std::string FormatMemoryMetric(const MemoryMetric& metric) {
     return buffer;
 }
 
-std::string FormatOptionalInt(const std::optional<int>& value) {
-    return value.has_value() ? std::to_string(*value) : "N/A";
-}
-
 std::string FormatOptionalHex16(const std::optional<uint16_t>& value) {
     if (!value.has_value()) {
         return "N/A";
@@ -96,6 +92,13 @@ bool ContainsInsensitive(const std::wstring& value, const std::string& needle) {
         return true;
     }
     return ToLower(Utf8FromWide(value)).find(ToLower(needle)) != std::string::npos;
+}
+
+bool EqualsInsensitive(const std::wstring& value, const std::string& needle) {
+    if (needle.empty()) {
+        return false;
+    }
+    return ToLower(Utf8FromWide(value)) == ToLower(needle);
 }
 
 struct AdapterSelectionInfo {
@@ -347,6 +350,20 @@ void TelemetryCollector::Impl::Trace(const std::string& text) const {
 
 const SystemSnapshot& TelemetryCollector::Snapshot() const {
     return impl_->snapshot_;
+}
+
+AppConfig TelemetryCollector::EffectiveConfig() const {
+    AppConfig config = impl_->config_;
+    if (!impl_->snapshot_.network.adapterName.empty() && impl_->snapshot_.network.adapterName != "Auto") {
+        config.networkAdapter = impl_->snapshot_.network.adapterName;
+    }
+    if (!impl_->boardProviderSample_.selectedFanChannelName.empty()) {
+        config.gigabyteFanChannelName = impl_->boardProviderSample_.selectedFanChannelName;
+    }
+    if (!impl_->boardProviderSample_.selectedTemperatureChannelName.empty()) {
+        config.gigabyteTemperatureChannelName = impl_->boardProviderSample_.selectedTemperatureChannelName;
+    }
+    return config;
 }
 
 void TelemetryCollector::UpdateSnapshot() {
@@ -636,8 +653,10 @@ void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
     output << "EC MMIO Register: " << FormatOptionalHex8(boardProviderSample_.ecMmioRegisterValue) << "\r\n";
     output << "CPU Temperature Sensor: " << (boardProviderSample_.selectedCpuTemperatureSensor.empty() ? "N/A" : boardProviderSample_.selectedCpuTemperatureSensor) << "\r\n";
     output << "CPU Temperature: " << (boardProviderSample_.cpuTemperatureC.has_value() ? FormatScalarMetric(ScalarMetric{boardProviderSample_.cpuTemperatureC, "\xC2\xB0""C"}, 1) : "N/A") << "\r\n";
-    output << "Requested Fan Channel: " << FormatOptionalInt(boardProviderSample_.requestedFanChannel) << "\r\n";
-    output << "Selected Fan Channel: " << FormatOptionalInt(boardProviderSample_.selectedFanChannel) << "\r\n";
+    output << "Requested Fan Channel: " << (boardProviderSample_.requestedFanChannelName.empty() ? "Auto" : boardProviderSample_.requestedFanChannelName) << "\r\n";
+    output << "Selected Fan Channel: " << (boardProviderSample_.selectedFanChannelName.empty() ? "N/A" : boardProviderSample_.selectedFanChannelName) << "\r\n";
+    output << "Requested Temperature Channel: " << (boardProviderSample_.requestedTemperatureChannelName.empty() ? "Auto" : boardProviderSample_.requestedTemperatureChannelName) << "\r\n";
+    output << "Selected Temperature Channel: " << (boardProviderSample_.selectedTemperatureChannelName.empty() ? "N/A" : boardProviderSample_.selectedTemperatureChannelName) << "\r\n";
     output << "Raw Fan Counter: " << FormatOptionalHex16(boardProviderSample_.rawFanCounter) << "\r\n";
     output << "16-bit Fan Mode: " << (boardProviderSample_.fan16BitMode ? "yes" : "no") << "\r\n";
     output << "\r\n";
@@ -759,11 +778,16 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
             continue;
         }
 
-        const bool configuredMatch =
+        const bool configuredExactMatch =
             !config_.networkAdapter.empty() &&
+            (EqualsInsensitive(row.Alias, config_.networkAdapter) ||
+                EqualsInsensitive(row.Description, config_.networkAdapter));
+        const bool configuredPartialMatch =
+            !config_.networkAdapter.empty() &&
+            !configuredExactMatch &&
             (ContainsInsensitive(row.Alias, config_.networkAdapter) ||
                 ContainsInsensitive(row.Description, config_.networkAdapter));
-        if (!config_.networkAdapter.empty() && !configuredMatch) {
+        if (!config_.networkAdapter.empty() && !configuredExactMatch && !configuredPartialMatch) {
             continue;
         }
 
@@ -774,6 +798,8 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
 
         Trace(("telemetry:network_candidate interface=" + std::to_string(row.InterfaceIndex) +
             " alias=\"" + Utf8FromWide(row.Alias) + "\" description=\"" + Utf8FromWide(row.Description) + "\"" +
+            " exact_match=" + tracing::Trace::BoolText(configuredExactMatch) +
+            " partial_match=" + tracing::Trace::BoolText(configuredPartialMatch) +
             " matched=" + tracing::Trace::BoolText(info.matched) +
             " has_ipv4=" + tracing::Trace::BoolText(info.hasIpv4) +
             " has_gateway=" + tracing::Trace::BoolText(info.hasGateway) +
@@ -801,11 +827,19 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
                 selectedTraffic = traffic;
                 selectedInfo = info;
             }
-        } else if (info.hasGateway || info.hasIpv4 || selected == nullptr) {
+        } else if (
+            selected == nullptr ||
+            (configuredExactMatch && !(
+                EqualsInsensitive(selected->Alias, config_.networkAdapter) ||
+                EqualsInsensitive(selected->Description, config_.networkAdapter))) ||
+            (configuredExactMatch ==
+                (EqualsInsensitive(selected->Alias, config_.networkAdapter) ||
+                    EqualsInsensitive(selected->Description, config_.networkAdapter)) &&
+                (info.hasGateway || info.hasIpv4))) {
             selected = &row;
             selectedTraffic = traffic;
             selectedInfo = info;
-            if (info.hasGateway || info.hasIpv4) {
+            if (configuredExactMatch && (info.hasGateway || info.hasIpv4)) {
                 break;
             }
         }
