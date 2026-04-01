@@ -1,0 +1,30 @@
+Development Environment Notes
+=============================
+
+`devenv.cmd` is the local build-environment bootstrap for this project.
+It is expected to prepare all command-line tools that `build.cmd` and `nmake` rely on.
+
+Requirements
+============
+
+- `devenv.cmd` must call the Visual Studio 2022 developer environment script so that tools such as `cl`, `link`, `rc`, and `nmake` are available.
+- `devenv.cmd` must define the `CSC` environment variable to the .NET Framework C# compiler executable used to build `src\GigabyteFanProbe.cs`.
+- `devenv.cmd` should validate that `%CSC%` exists and fail with a clear error if it does not.
+- `build.cmd` should remain a thin wrapper that calls `devenv.cmd` and then runs `nmake`.
+
+Current expectation
+===================
+
+After `devenv.cmd` completes successfully, these commands should be resolvable in the current shell:
+
+- `cl`
+- `link`
+- `rc`
+- `nmake`
+- `%CSC%`
+
+Notes
+=====
+
+- Keep machine-specific paths in `devenv.cmd`, not in `Makefile`.
+- If the .NET compiler path changes on a machine, update `devenv.cmd` rather than the build files.
