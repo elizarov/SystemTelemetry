@@ -3,6 +3,7 @@
 - `src/main.cpp`: Win32 app entry point, single-instance startup, `/dump` handling, monitor identification, tray/menu actions, timer-driven refresh loop, and all GDI rendering/layout.
 - `src/config.h` + `src/config.cpp`: runtime config model plus load/save logic for `config.ini` in the launch directory; saves display name and relative position while preserving other settings.
 - `src/utf8.h` + `src/utf8.cpp`: shared UTF-8 and UTF-16 conversion helpers used only where the UTF-8-first runtime model crosses Win32 or vendor API boundaries.
+- `src/trace.h` + `src/trace.cpp`: shared trace wrapper around an optional output stream plus common trace-formatting helpers for Win32, PDH, ADLX, boolean, and numeric diagnostic fields.
 - `src/telemetry.h` + `src/telemetry.cpp`: shared telemetry snapshot types plus the `TelemetryCollector` implementation that gathers Windows-native PDH, IP Helper, disk, and clock data behind a small public API.
 - `src/gpu_vendor.h` + `src/gpu_vendor.cpp`: vendor GPU provider abstraction plus factory selection.
 - `src/gpu_amd_adl.cpp`: AMD GPU provider implementation using AMD ADLX for GPU name, temperature, clock, and fan speed.
@@ -14,6 +15,7 @@
 - Current vendor coverage: AMD Radeon GPUs use ADLX through `src/gpu_amd_adl.cpp`. Additional vendors can be added as new provider source files without complicating the Windows-native collector.
 - Dump tracing flow: `src/main.cpp` owns the dump file stream and writes high-level `/dump` progress markers as plain UTF-8 without a BOM, then passes that same stream through `TelemetryCollector` into vendor providers such as `src/gpu_amd_adl.cpp` so all trace output and the final snapshot land in one file without custom file-append helpers.
 - Diagnostics tracing flow: `src/telemetry.cpp` traces CPU, GPU, memory, network, storage, and PDH setup/refresh calls with returned Win32 or PDH statuses plus selected values; vendor providers such as `src/gpu_amd_adl.cpp` add matching per-call result tracing for their API interactions.
+- Trace ownership flow: `src/main.cpp` creates the dump-mode top-level trace wrapper for startup markers, `src/telemetry.cpp` owns a shared `Trace` instance for collector diagnostics, and vendor providers receive that same trace wrapper so all trace lines share one output policy and formatting helper set.
 - Text model flow: config values, telemetry names, diagnostics, monitor identifiers, and UI text are stored as UTF-8 `std::string` in the app's own data structures. Wide strings are created only at Win32 or ADLX call sites through `src/utf8.cpp`.
 - Config I/O flow: `src/config.cpp` reads and writes UTF-8 `config.ini` text through standard `std::ifstream` and `std::ofstream` primitives, strips an existing UTF-8 BOM on load for compatibility, and writes UTF-8 directly on save.
 - UI flow: `DashboardApp` owns the native window, tray icon, popup menu, move mode overlay, config update action, and panel rendering.

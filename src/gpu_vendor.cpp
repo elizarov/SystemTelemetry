@@ -1,7 +1,9 @@
 ﻿#include "gpu_vendor.h"
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateAmdGpuTelemetryProvider(std::ostream* traceStream);
+#include "trace.h"
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(std::ostream* traceStream) {
-    return CreateAmdGpuTelemetryProvider(traceStream);
+std::unique_ptr<GpuVendorTelemetryProvider> CreateAmdGpuTelemetryProvider(tracing::Trace* trace);
+
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(tracing::Trace* trace) {
+    return CreateAmdGpuTelemetryProvider(trace);
 }

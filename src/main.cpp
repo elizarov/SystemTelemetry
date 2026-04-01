@@ -17,6 +17,7 @@
 
 #include "config.h"
 #include "telemetry.h"
+#include "trace.h"
 #include "utf8.h"
 
 #pragma comment(lib, "comctl32.lib")
@@ -122,32 +123,29 @@ int RunDumpMode() {
         return 1;
     }
 
-    dumpStream << "[trace] dump:start\n";
-    dumpStream << "[trace] dump:telemetry_initialize_begin\n";
-    dumpStream.flush();
+    tracing::Trace trace(&dumpStream);
+    trace.Write("dump:start");
+    trace.Write("dump:telemetry_initialize_begin");
 
     if (!telemetry.Initialize(config, &dumpStream)) {
-        dumpStream << "[trace] dump:telemetry_initialize_failed\n";
-        dumpStream.flush();
+        trace.Write("dump:telemetry_initialize_failed");
         MessageBoxW(nullptr, L"Failed to initialize telemetry collector.", L"System Telemetry", MB_ICONERROR);
         return 1;
     }
 
-    dumpStream << "[trace] dump:telemetry_initialized\n";
+    trace.Write("dump:telemetry_initialized");
     Sleep(900);
-    dumpStream << "[trace] dump:update_snapshot_1_begin\n";
-    dumpStream.flush();
+    trace.Write("dump:update_snapshot_1_begin");
     telemetry.UpdateSnapshot();
-    dumpStream << "[trace] dump:update_snapshot_1_done\n";
+    trace.Write("dump:update_snapshot_1_done");
     Sleep(1100);
-    dumpStream << "[trace] dump:update_snapshot_2_begin\n";
-    dumpStream.flush();
+    trace.Write("dump:update_snapshot_2_begin");
     telemetry.UpdateSnapshot();
-    dumpStream << "[trace] dump:update_snapshot_2_done\n";
-    dumpStream << "[trace] dump:write_dump_begin\n\n";
+    trace.Write("dump:update_snapshot_2_done");
+    trace.Write("dump:write_dump_begin");
+    dumpStream << "\n";
     telemetry.DumpText(dumpStream);
-    dumpStream << "[trace] dump:done\n";
-    dumpStream.flush();
+    trace.Write("dump:done");
     return 0;
 }
 

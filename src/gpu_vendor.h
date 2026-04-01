@@ -2,8 +2,11 @@
 
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <string>
+
+namespace tracing {
+class Trace;
+}
 
 struct GpuVendorTelemetrySample {
     std::optional<std::string> name;
@@ -22,4 +25,4 @@ public:
     virtual GpuVendorTelemetrySample Sample() = 0;
 };
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(std::ostream* traceStream);
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(tracing::Trace* trace);
