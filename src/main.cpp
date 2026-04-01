@@ -13,10 +13,12 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "../resources/resource.h"
 #include "config.h"
 #include "telemetry.h"
 #include "trace.h"
@@ -115,6 +117,88 @@ int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
     }
 
     return -1;
+}
+
+enum class PanelIcon : size_t {
+    Cpu = 0,
+    Gpu,
+    Network,
+    Storage,
+    Time,
+};
+
+constexpr size_t kPanelIconCount = 5;
+
+UINT GetPanelIconResourceId(PanelIcon icon) {
+    switch (icon) {
+    case PanelIcon::Cpu:
+        return IDR_PANEL_ICON_CPU;
+    case PanelIcon::Gpu:
+        return IDR_PANEL_ICON_GPU;
+    case PanelIcon::Network:
+        return IDR_PANEL_ICON_NETWORK;
+    case PanelIcon::Storage:
+        return IDR_PANEL_ICON_STORAGE;
+    case PanelIcon::Time:
+        return IDR_PANEL_ICON_TIME;
+    }
+    return 0;
+}
+
+std::unique_ptr<Gdiplus::Bitmap> LoadPngResourceBitmap(UINT resourceId) {
+    HMODULE module = GetModuleHandleW(nullptr);
+    if (module == nullptr) {
+        return nullptr;
+    }
+
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), L"PNG");
+    if (resource == nullptr) {
+        return nullptr;
+    }
+
+    const DWORD resourceSize = SizeofResource(module, resource);
+    HGLOBAL loadedResource = LoadResource(module, resource);
+    if (loadedResource == nullptr || resourceSize == 0) {
+        return nullptr;
+    }
+
+    const void* resourceData = LockResource(loadedResource);
+    if (resourceData == nullptr) {
+        return nullptr;
+    }
+
+    HGLOBAL copyHandle = GlobalAlloc(GMEM_MOVEABLE, resourceSize);
+    if (copyHandle == nullptr) {
+        return nullptr;
+    }
+
+    void* copyData = GlobalLock(copyHandle);
+    if (copyData == nullptr) {
+        GlobalFree(copyHandle);
+        return nullptr;
+    }
+
+    memcpy(copyData, resourceData, resourceSize);
+    GlobalUnlock(copyHandle);
+
+    IStream* stream = nullptr;
+    if (CreateStreamOnHGlobal(copyHandle, TRUE, &stream) != S_OK || stream == nullptr) {
+        GlobalFree(copyHandle);
+        return nullptr;
+    }
+
+    std::unique_ptr<Gdiplus::Bitmap> decoded(Gdiplus::Bitmap::FromStream(stream));
+    std::unique_ptr<Gdiplus::Bitmap> bitmap;
+    if (decoded != nullptr && decoded->GetLastStatus() == Gdiplus::Ok) {
+        Gdiplus::Rect rect(0, 0, decoded->GetWidth(), decoded->GetHeight());
+        bitmap.reset(decoded->Clone(rect, PixelFormat32bppARGB));
+        if (bitmap != nullptr && bitmap->GetLastStatus() != Gdiplus::Ok) {
+            bitmap.reset();
+        }
+    }
+
+    stream->Release();
+    return bitmap;
 }
 
 std::filesystem::path GetExecutableDirectory() {
@@ -405,10 +489,15 @@ private:
     void DrawMoveOverlay(HDC hdc);
     bool CreateTrayIcon();
     void RemoveTrayIcon();
+    bool InitializeGdiplus();
+    void ShutdownGdiplus();
+    bool LoadPanelIcons();
+    void ReleasePanelIcons();
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
         COLORREF color, UINT format);
-    void DrawPanel(HDC hdc, const RECT& rect, const std::string& title);
+    void DrawPanel(HDC hdc, const RECT& rect, const std::string& title, PanelIcon icon);
+    void DrawPanelIcon(HDC hdc, PanelIcon icon, const RECT& iconRect);
     POINT PolarPoint(int cx, int cy, int radius, double angleDegrees);
     void DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label);
     void DrawMetricRow(HDC hdc, const RECT& rect, const std::string& label, const std::string& value, double ratio);
@@ -435,6 +524,8 @@ private:
     bool isMoving_ = false;
     NOTIFYICONDATAW trayIcon_{};
     MonitorPlacementInfo movePlacementInfo_{};
+    ULONG_PTR gdiplusToken_ = 0;
+    std::array<std::unique_ptr<Gdiplus::Bitmap>, kPanelIconCount> panelIcons_{};
 };
 
 bool DashboardApp::Initialize(HINSTANCE instance) {
@@ -481,6 +572,10 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 }
 
 bool DashboardApp::InitializeFonts() {
+    if (!InitializeGdiplus() || !LoadPanelIcons()) {
+        return false;
+    }
+
     if (fonts_.title != nullptr) {
         return true;
     }
@@ -509,6 +604,47 @@ void DashboardApp::ReleaseFonts() {
     fonts_.value = nullptr;
     fonts_.label = nullptr;
     fonts_.smallFont = nullptr;
+    ReleasePanelIcons();
+    ShutdownGdiplus();
+}
+
+bool DashboardApp::InitializeGdiplus() {
+    if (gdiplusToken_ != 0) {
+        return true;
+    }
+
+    Gdiplus::GdiplusStartupInput startupInput;
+    return Gdiplus::GdiplusStartup(&gdiplusToken_, &startupInput, nullptr) == Gdiplus::Ok;
+}
+
+void DashboardApp::ShutdownGdiplus() {
+    if (gdiplusToken_ != 0) {
+        Gdiplus::GdiplusShutdown(gdiplusToken_);
+        gdiplusToken_ = 0;
+    }
+}
+
+bool DashboardApp::LoadPanelIcons() {
+    if (panelIcons_[0] != nullptr) {
+        return true;
+    }
+
+    for (size_t index = 0; index < kPanelIconCount; ++index) {
+        const auto icon = static_cast<PanelIcon>(index);
+        panelIcons_[index] = LoadPngResourceBitmap(GetPanelIconResourceId(icon));
+        if (panelIcons_[index] == nullptr) {
+            ReleasePanelIcons();
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void DashboardApp::ReleasePanelIcons() {
+    for (auto& icon : panelIcons_) {
+        icon.reset();
+    }
 }
 
 bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
@@ -846,7 +982,23 @@ void DashboardApp::DrawTextBlock(HDC hdc, const RECT& rect, const std::string& t
     SelectObject(hdc, oldFont);
 }
 
-void DashboardApp::DrawPanel(HDC hdc, const RECT& rect, const std::string& title) {
+void DashboardApp::DrawPanelIcon(HDC hdc, PanelIcon icon, const RECT& iconRect) {
+    const auto& bitmap = panelIcons_[static_cast<size_t>(icon)];
+    if (bitmap == nullptr) {
+        return;
+    }
+
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    graphics.DrawImage(bitmap.get(),
+        static_cast<INT>(iconRect.left),
+        static_cast<INT>(iconRect.top),
+        static_cast<INT>(iconRect.right - iconRect.left),
+        static_cast<INT>(iconRect.bottom - iconRect.top));
+}
+
+void DashboardApp::DrawPanel(HDC hdc, const RECT& rect, const std::string& title, PanelIcon icon) {
     HPEN border = CreatePen(PS_SOLID, 1, kPanelBorder);
     HBRUSH fill = CreateSolidBrush(RGB(6, 8, 11));
     HGDIOBJ oldPen = SelectObject(hdc, border);
@@ -858,10 +1010,15 @@ void DashboardApp::DrawPanel(HDC hdc, const RECT& rect, const std::string& title
     DeleteObject(border);
 
     RECT titleRect = rect;
-    titleRect.left += 14;
+    titleRect.left += 40;
     titleRect.top += 8;
     titleRect.right -= 14;
     titleRect.bottom = titleRect.top + 24;
+
+    const int titleCenterY = (titleRect.top + titleRect.bottom) / 2;
+    RECT iconRect{rect.left + 14, titleCenterY - 10, rect.left + 34, titleCenterY + 10};
+    DrawPanelIcon(hdc, icon, iconRect);
+
     DrawTextBlock(hdc, titleRect, title, fonts_.title, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 }
 
@@ -926,7 +1083,7 @@ void DashboardApp::DrawMetricRow(
 }
 
 void DashboardApp::DrawProcessorPanel(HDC hdc, const RECT& rect, const ProcessorTelemetry& cpu) {
-    DrawPanel(hdc, rect, "CPU");
+    DrawPanel(hdc, rect, "CPU", PanelIcon::Cpu);
     RECT nameRect{rect.left + 16, rect.top + 34, rect.right - 16, rect.top + 58};
     DrawTextBlock(hdc, nameRect, cpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, cpu.loadPercent, "Load");
@@ -941,7 +1098,7 @@ void DashboardApp::DrawProcessorPanel(HDC hdc, const RECT& rect, const Processor
 }
 
 void DashboardApp::DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& gpu) {
-    DrawPanel(hdc, rect, "GPU");
+    DrawPanel(hdc, rect, "GPU", PanelIcon::Gpu);
     RECT nameRect{rect.left + 16, rect.top + 34, rect.right - 16, rect.top + 58};
     DrawTextBlock(hdc, nameRect, gpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, gpu.loadPercent, "Load");
@@ -983,7 +1140,7 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
 }
 
 void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTelemetry& network) {
-    DrawPanel(hdc, rect, "Network");
+    DrawPanel(hdc, rect, "Network", PanelIcon::Network);
     RECT upRect{rect.left + 16, rect.top + 38, rect.right - 16, rect.top + 62};
     RECT downRect{rect.left + 16, rect.top + 64, rect.right - 16, rect.top + 88};
     DrawTextBlock(hdc, upRect, "Up   " + FormatSpeed(network.uploadMbps), fonts_.value, kWhite,
@@ -1004,7 +1161,7 @@ void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTele
 }
 
 void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector<DriveInfo>& drives) {
-    DrawPanel(hdc, rect, "Storage");
+    DrawPanel(hdc, rect, "Storage", PanelIcon::Storage);
     int y = rect.top + 42;
     for (const auto& drive : drives) {
         RECT labelRect{rect.left + 16, y, rect.left + 42, y + 20};
@@ -1033,7 +1190,7 @@ void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector
 }
 
 void DashboardApp::DrawTimePanel(HDC hdc, const RECT& rect, const SYSTEMTIME& now) {
-    DrawPanel(hdc, rect, "Time");
+    DrawPanel(hdc, rect, "Time", PanelIcon::Time);
     char timeBuffer[32];
     char dateBuffer[32];
     sprintf_s(timeBuffer, "%02d:%02d", now.wHour, now.wMinute);

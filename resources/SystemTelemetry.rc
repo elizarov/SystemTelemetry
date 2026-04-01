@@ -1,0 +1,7 @@
+#include "resource.h"
+
+IDR_PANEL_ICON_CPU PNG "cpu.png"
+IDR_PANEL_ICON_GPU PNG "gpu.png"
+IDR_PANEL_ICON_NETWORK PNG "network.png"
+IDR_PANEL_ICON_STORAGE PNG "storage.png"
+IDR_PANEL_ICON_TIME PNG "time.png"
