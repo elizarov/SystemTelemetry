@@ -1150,15 +1150,30 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
 
+    HPEN axisPen = CreatePen(PS_SOLID, 1, RGB(80, 88, 96));
+    HGDIOBJ oldPen = SelectObject(hdc, axisPen);
+    MoveToEx(hdc, rect.left + 18, rect.top, nullptr);
+    LineTo(hdc, rect.left + 18, rect.bottom - 1);
+    MoveToEx(hdc, rect.left + 18, rect.bottom - 1, nullptr);
+    LineTo(hdc, rect.right - 1, rect.bottom - 1);
+    SelectObject(hdc, oldPen);
+    DeleteObject(axisPen);
+
+    char maxLabel[32];
+    sprintf_s(maxLabel, "%.0f", maxValue);
+    RECT maxRect{rect.left, rect.top + 1, rect.left + 18, rect.top + 13};
+    DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, kWhite, DT_CENTER | DT_SINGLELINE | DT_TOP);
+
     HPEN pen = CreatePen(PS_SOLID, 2, kAccent);
-    HGDIOBJ oldPen = SelectObject(hdc, pen);
-    const int width = std::max<int>(1, rect.right - rect.left - 1);
+    oldPen = SelectObject(hdc, pen);
+    const int graphLeft = rect.left + 18;
+    const int width = std::max<int>(1, rect.right - graphLeft - 1);
     const int height = std::max<int>(1, rect.bottom - rect.top - 1);
     for (size_t i = 1; i < history.size(); ++i) {
         const double v1 = std::clamp(history[i - 1] / maxValue, 0.0, 1.0);
         const double v2 = std::clamp(history[i] / maxValue, 0.0, 1.0);
-        const int x1 = rect.left + static_cast<int>((i - 1) * width / std::max<size_t>(1, history.size() - 1));
-        const int x2 = rect.left + static_cast<int>(i * width / std::max<size_t>(1, history.size() - 1));
+        const int x1 = graphLeft + static_cast<int>((i - 1) * width / std::max<size_t>(1, history.size() - 1));
+        const int x2 = graphLeft + static_cast<int>(i * width / std::max<size_t>(1, history.size() - 1));
         const int y1 = rect.bottom - 1 - static_cast<int>(v1 * height);
         const int y2 = rect.bottom - 1 - static_cast<int>(v2 * height);
         MoveToEx(hdc, x1, y1, nullptr);
@@ -1170,23 +1185,32 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
 
 void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTelemetry& network) {
     DrawPanel(hdc, rect, "Network", PanelIcon::Network);
-    RECT upRect{rect.left + 16, rect.top + 38, rect.right - 16, rect.top + 62};
-    RECT downRect{rect.left + 16, rect.top + 64, rect.right - 16, rect.top + 88};
-    DrawTextBlock(hdc, upRect, "Up   " + FormatSpeed(network.uploadMbps), fonts_.value, kWhite,
-        DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, downRect, "Down " + FormatSpeed(network.downloadMbps), fonts_.value, kWhite,
-        DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    RECT upRect{rect.left + 16, rect.top + 38, rect.right - 16, rect.top + 54};
+    RECT uploadGraph{rect.left + 16, rect.top + 56, rect.right - 16, rect.top + 97};
+    RECT downRect{rect.left + 16, rect.top + 102, rect.right - 16, rect.top + 118};
+    RECT downloadGraph{rect.left + 16, rect.top + 120, rect.right - 16, rect.bottom - 28};
+    RECT footerRect{rect.left + 16, rect.bottom - 22, rect.right - 16, rect.bottom - 6};
+    const double maxGraph = std::max(10.0, std::max(network.uploadMbps * 1.5, network.downloadMbps * 1.5));
 
-    const double maxGraph = std::max({10.0, network.uploadMbps * 1.5, network.downloadMbps * 1.5});
-    RECT uploadGraph{rect.left + 16, rect.top + 98, rect.right - 16, rect.top + 128};
-    RECT downloadGraph{rect.left + 16, rect.top + 136, rect.right - 16, rect.top + 166};
+    RECT upLabelRect{upRect.left, upRect.top, upRect.left + 42, upRect.bottom};
+    RECT upValueRect{upRect.left + 44, upRect.top, upRect.right, upRect.bottom};
+    RECT downLabelRect{downRect.left, downRect.top, downRect.left + 54, downRect.bottom};
+    RECT downValueRect{downRect.left + 56, downRect.top, downRect.right, downRect.bottom};
+
+    DrawTextBlock(hdc, upLabelRect, "Up", fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, upValueRect, FormatSpeed(network.uploadMbps), fonts_.label, kWhite,
+        DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
     DrawGraph(hdc, uploadGraph, network.uploadHistory, maxGraph);
+
+    DrawTextBlock(hdc, downLabelRect, "Down", fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, downValueRect, FormatSpeed(network.downloadMbps), fonts_.label, kWhite,
+        DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
     DrawGraph(hdc, downloadGraph, network.downloadHistory, maxGraph);
 
-    RECT nameRect{rect.left + 16, rect.bottom - 46, rect.right - 16, rect.bottom - 24};
-    RECT ipRect{rect.left + 16, rect.bottom - 24, rect.right - 16, rect.bottom - 6};
-    DrawTextBlock(hdc, nameRect, network.adapterName, fonts_.smallFont, kMuted, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    DrawTextBlock(hdc, ipRect, network.ipAddress, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+    const std::string footer = network.adapterName.empty()
+        ? network.ipAddress
+        : network.adapterName + " | " + network.ipAddress;
+    DrawTextBlock(hdc, footerRect, footer, fonts_.smallFont, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
 void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector<DriveInfo>& drives) {
@@ -1227,8 +1251,8 @@ void DashboardApp::DrawTimePanel(HDC hdc, const RECT& rect, const SYSTEMTIME& no
 
     RECT timeRect{rect.left + 16, rect.top + 46, rect.right - 16, rect.top + 116};
     RECT dateRect{rect.left + 16, rect.top + 120, rect.right - 16, rect.top + 148};
-    DrawTextBlock(hdc, timeRect, timeBuffer, fonts_.big, kWhite, DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, dateRect, dateBuffer, fonts_.value, kMuted, DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, timeRect, timeBuffer, fonts_.big, kWhite, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, dateRect, dateBuffer, fonts_.value, kMuted, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 }
 
 void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {

@@ -231,7 +231,10 @@ Two small scrolling graphs:
 Upload history
 Download history
 Footer
-IP address when available
+Show upload speed, then the upload graph directly below it, then download speed, then the download graph directly below it.
+Use smaller text for the Up/Down speed readouts than the main metric text used elsewhere.
+Each graph must include a vertical axis and a small label showing the current max value used to scale that plot.
+Show adapter name and IP address together on the same final footer line when available.
 
 Storage Panel (Bottom Center)
 =============================
@@ -261,7 +264,7 @@ Content
 Time (large): 10:43
 Date (small): 2026-04-01
 Layout
-Right-aligned
+Centered horizontally
 Time is the dominant visual element
 
 Behavior & Data Refresh
