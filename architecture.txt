@@ -1,0 +1,10 @@
+System Telemetry architecture
+
+- `src/main.cpp`: Win32 app entry point, single-instance startup, monitor identification, tray/menu actions, timer-driven refresh loop, and all GDI rendering/layout.
+- `src/config.h` + `src/config.cpp`: runtime config model plus load/save logic for `config.ini` in the launch directory; saves display name and relative position while preserving other settings.
+- `src/telemetry.h` + `src/telemetry.cpp`: shared telemetry snapshot types plus the `TelemetryCollector` implementation that gathers PDH, WMI, IP Helper, disk, and clock data behind a small public API.
+- Telemetry flow: `DashboardApp` asks `TelemetryCollector` for a `SystemSnapshot`, then the window paints directly from that snapshot.
+- Sensor flow: explicit sensor bindings still query individual WMI `Sensor` rows from LibreHardwareMonitor/OpenHardwareMonitor, while missing CPU/GPU temp, power, fan, and clock bindings now fall back to automatic `Sensor` enumeration plus heuristic matching by sensor type and CPU/GPU-oriented names/identifiers.
+- UI flow: `DashboardApp` owns the native window, tray icon, popup menu, move mode overlay, config update action, and panel rendering.
+- Source-tree config: `src/config.ini` is only the checked-in example template; the running app reads/writes `config.ini` beside the launched executable/working directory.
+- Build flow: `build.cmd` boots the VS environment via `devenv.cmd` and runs `nmake`; `Makefile` builds `src/main.cpp` and `src/config.cpp` into `build/SystemTelemetry.exe`.

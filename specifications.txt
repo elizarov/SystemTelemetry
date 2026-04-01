@@ -45,6 +45,11 @@ it is not clear which device/metric information to query, examples (not limited 
 - Which temerature sensor and fan to show
 - Which drives to show
 
+Telemetry sensors should auto-detect CPU/GPU temperature, power, fan, and clock
+from LibreHardwareMonitor/OpenHardwareMonitor WMI data when configuration does
+not provide an explicit binding. Configuration must still allow overriding any
+auto-selected sensor on systems where multiple matching sensors exist.
+
 At runtime, the application must read `config.ini` from the same folder it was
 started from and write updates back to that same file. The `src/config.ini`
 file in the source tree is only a checked-in example configuration template.
@@ -226,6 +231,12 @@ Temps & power: ~1 sec
 Network: 0.5 sec (for smooth graphs)
 Storage: 5–10 sec
 Clock: 1 sec
+
+Sensor Sourcing
+CPU/GPU temperatures, power, fan speed, and fallback clock values should come
+from the `Sensor` WMI class exposed by LibreHardwareMonitor or OpenHardwareMonitor.
+The application should prefer automatic matching by sensor type plus CPU/GPU-related
+names/identifiers, and fall back to explicit `config.ini` bindings when provided.
 
 Units
 CPU: GHz

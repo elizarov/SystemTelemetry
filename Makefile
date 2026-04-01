@@ -1,5 +1,5 @@
 APP=build\SystemTelemetry.exe
-SRC=src\main.cpp src\config.cpp
+SRC=src\main.cpp src\config.cpp src\telemetry.cpp
 CFLAGS=/nologo /std:c++20 /EHsc /W4 /permissive- /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /Zi
 LDFLAGS=user32.lib gdi32.lib pdh.lib iphlpapi.lib wbemuuid.lib comctl32.lib ws2_32.lib ole32.lib oleaut32.lib
 
