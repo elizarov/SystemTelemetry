@@ -68,6 +68,8 @@ Command-line dump mode
 ======================
 
 Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, open `telemetry_dump.txt` beside the executable through a standard C++ output stream, write plain UTF-8 text without a BOM, pass that stream into telemetry collection for trace logging, write the final telemetry snapshot directly into that same stream, close the file, and exit without starting the GUI or affecting any already-running dashboard instance.
+The `/dump` trace must cover all diagnostics collection paths, not only vendor GPU integration.
+Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
 
 Telemetry sources
 =================

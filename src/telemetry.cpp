@@ -46,6 +46,28 @@ std::string FormatMemoryMetric(const MemoryMetric& metric) {
     return buffer;
 }
 
+std::string BoolText(bool value) {
+    return value ? "yes" : "no";
+}
+
+std::string FormatPdhStatus(const char* label, PDH_STATUS status) {
+    char buffer[64];
+    sprintf_s(buffer, "%s=%ld", label, static_cast<long>(status));
+    return buffer;
+}
+
+std::string FormatWin32Status(const char* label, DWORD status) {
+    char buffer[64];
+    sprintf_s(buffer, "%s=%lu", label, static_cast<unsigned long>(status));
+    return buffer;
+}
+
+std::string FormatValueDouble(const char* label, double value, int precision = 3) {
+    char buffer[96];
+    sprintf_s(buffer, "%s=%.*f", label, precision, value);
+    return buffer;
+}
+
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
 
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, const wchar_t* path, PDH_HCOUNTER* counter) {
@@ -136,37 +158,69 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     impl_->snapshot_.network.downloadHistory.assign(60, 0.0);
 
     WSADATA wsaData{};
-    WSAStartup(MAKEWORD(2, 2), &wsaData);
+    const int wsaStartupResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
     impl_->Trace("telemetry:initialize_begin");
+    {
+        char buffer[128];
+        sprintf_s(buffer, "telemetry:wsa_startup result=%d version=%u.%u",
+            wsaStartupResult, LOBYTE(wsaData.wVersion), HIBYTE(wsaData.wVersion));
+        impl_->Trace(buffer);
+    }
     impl_->gpuProvider_ = CreateGpuVendorTelemetryProvider(traceStream);
     if (impl_->gpuProvider_ != nullptr) {
         impl_->Trace("telemetry:gpu_provider_initialize_begin");
         if (impl_->gpuProvider_->Initialize()) {
             impl_->ApplyGpuVendorSample(impl_->gpuProvider_->Sample());
-            impl_->Trace("telemetry:gpu_provider_initialize_done");
+            impl_->Trace(("telemetry:gpu_provider_initialize_done provider=" + impl_->gpuProviderName_ +
+                " available=" + BoolText(impl_->gpuProviderAvailable_) +
+                " diagnostics=\"" + impl_->gpuProviderDiagnostics_ + "\"").c_str());
         } else {
             impl_->gpuProviderName_ = "AMD ADLX";
             impl_->gpuProviderDiagnostics_ = "Provider initialization failed.";
-            impl_->Trace("telemetry:gpu_provider_initialize_failed");
+            impl_->Trace(("telemetry:gpu_provider_initialize_failed provider=" + impl_->gpuProviderName_ +
+                " diagnostics=\"" + impl_->gpuProviderDiagnostics_ + "\"").c_str());
         }
+    } else {
+        impl_->Trace("telemetry:gpu_provider_create result=null");
     }
 
-    PdhOpenQueryW(nullptr, 0, &impl_->cpuQuery_);
-    AddCounterCompat(impl_->cpuQuery_, L"\\Processor Information(_Total)\\% Processor Utility", &impl_->cpuLoadCounter_);
+    const PDH_STATUS cpuQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->cpuQuery_);
+    impl_->Trace(("telemetry:pdh_open cpu_query " + FormatPdhStatus("status", cpuQueryStatus)).c_str());
+    const PDH_STATUS cpuLoadStatus = AddCounterCompat(
+        impl_->cpuQuery_, L"\\Processor Information(_Total)\\% Processor Utility", &impl_->cpuLoadCounter_);
+    impl_->Trace(("telemetry:pdh_add cpu_load path=\"\\\\Processor Information(_Total)\\\\% Processor Utility\" " +
+        FormatPdhStatus("status", cpuLoadStatus)).c_str());
     if (impl_->cpuLoadCounter_ == nullptr) {
-        AddCounterCompat(impl_->cpuQuery_, L"\\Processor(_Total)\\% Processor Time", &impl_->cpuLoadCounter_);
+        const PDH_STATUS cpuLoadFallbackStatus = AddCounterCompat(
+            impl_->cpuQuery_, L"\\Processor(_Total)\\% Processor Time", &impl_->cpuLoadCounter_);
+        impl_->Trace(("telemetry:pdh_add cpu_load_fallback path=\"\\\\Processor(_Total)\\\\% Processor Time\" " +
+            FormatPdhStatus("status", cpuLoadFallbackStatus)).c_str());
     }
-    AddCounterCompat(impl_->cpuQuery_, L"\\Processor Information(_Total)\\Processor Frequency", &impl_->cpuFrequencyCounter_);
-    PdhCollectQueryData(impl_->cpuQuery_);
+    const PDH_STATUS cpuFreqStatus = AddCounterCompat(
+        impl_->cpuQuery_, L"\\Processor Information(_Total)\\Processor Frequency", &impl_->cpuFrequencyCounter_);
+    impl_->Trace(("telemetry:pdh_add cpu_frequency path=\"\\\\Processor Information(_Total)\\\\Processor Frequency\" " +
+        FormatPdhStatus("status", cpuFreqStatus)).c_str());
+    const PDH_STATUS cpuCollectStatus = PdhCollectQueryData(impl_->cpuQuery_);
+    impl_->Trace(("telemetry:pdh_collect cpu_query " + FormatPdhStatus("status", cpuCollectStatus)).c_str());
 
-    PdhOpenQueryW(nullptr, 0, &impl_->gpuQuery_);
-    AddCounterCompat(impl_->gpuQuery_, L"\\GPU Engine(*)\\Utilization Percentage", &impl_->gpuLoadCounter_);
-    PdhCollectQueryData(impl_->gpuQuery_);
+    const PDH_STATUS gpuQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->gpuQuery_);
+    impl_->Trace(("telemetry:pdh_open gpu_query " + FormatPdhStatus("status", gpuQueryStatus)).c_str());
+    const PDH_STATUS gpuLoadStatus = AddCounterCompat(
+        impl_->gpuQuery_, L"\\GPU Engine(*)\\Utilization Percentage", &impl_->gpuLoadCounter_);
+    impl_->Trace(("telemetry:pdh_add gpu_load path=\"\\\\GPU Engine(*)\\\\Utilization Percentage\" " +
+        FormatPdhStatus("status", gpuLoadStatus)).c_str());
+    const PDH_STATUS gpuCollectStatus = PdhCollectQueryData(impl_->gpuQuery_);
+    impl_->Trace(("telemetry:pdh_collect gpu_query " + FormatPdhStatus("status", gpuCollectStatus)).c_str());
 
-    PdhOpenQueryW(nullptr, 0, &impl_->gpuMemoryQuery_);
-    AddCounterCompat(impl_->gpuMemoryQuery_, L"\\GPU Adapter Memory(*)\\Dedicated Usage", &impl_->gpuDedicatedCounter_);
-    PdhCollectQueryData(impl_->gpuMemoryQuery_);
+    const PDH_STATUS gpuMemoryQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->gpuMemoryQuery_);
+    impl_->Trace(("telemetry:pdh_open gpu_memory_query " + FormatPdhStatus("status", gpuMemoryQueryStatus)).c_str());
+    const PDH_STATUS gpuMemoryCounterStatus = AddCounterCompat(
+        impl_->gpuMemoryQuery_, L"\\GPU Adapter Memory(*)\\Dedicated Usage", &impl_->gpuDedicatedCounter_);
+    impl_->Trace(("telemetry:pdh_add gpu_memory path=\"\\\\GPU Adapter Memory(*)\\\\Dedicated Usage\" " +
+        FormatPdhStatus("status", gpuMemoryCounterStatus)).c_str());
+    const PDH_STATUS gpuMemoryCollectStatus = PdhCollectQueryData(impl_->gpuMemoryQuery_);
+    impl_->Trace(("telemetry:pdh_collect gpu_memory_query " + FormatPdhStatus("status", gpuMemoryCollectStatus)).c_str());
 
     impl_->EnumerateDrives();
     impl_->UpdateNetworkState(true);
@@ -220,20 +274,28 @@ void TelemetryCollector::DumpText(std::ostream& output) const {
 
 void TelemetryCollector::Impl::UpdateCpu() {
     if (cpuQuery_ == nullptr) {
+        Trace("telemetry:cpu_update skipped=no_query");
         return;
     }
-    PdhCollectQueryData(cpuQuery_);
+    const PDH_STATUS collectStatus = PdhCollectQueryData(cpuQuery_);
+    Trace(("telemetry:cpu_collect " + FormatPdhStatus("status", collectStatus)).c_str());
 
     PDH_FMT_COUNTERVALUE value{};
+    PDH_STATUS loadStatus = PDH_INVALID_DATA;
     if (cpuLoadCounter_ != nullptr &&
-        PdhGetFormattedCounterValue(cpuLoadCounter_, PDH_FMT_DOUBLE, nullptr, &value) == ERROR_SUCCESS) {
+        (loadStatus = PdhGetFormattedCounterValue(cpuLoadCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
         snapshot_.cpu.loadPercent = std::clamp(value.doubleValue, 0.0, 100.0);
     }
+    Trace(("telemetry:cpu_load " + FormatPdhStatus("status", loadStatus) + " " +
+        FormatValueDouble("value", snapshot_.cpu.loadPercent, 2)).c_str());
+    PDH_STATUS clockStatus = PDH_INVALID_DATA;
     if (cpuFrequencyCounter_ != nullptr &&
-        PdhGetFormattedCounterValue(cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value) == ERROR_SUCCESS) {
+        (clockStatus = PdhGetFormattedCounterValue(cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
         snapshot_.cpu.clock.value = value.doubleValue / 1000.0;
         snapshot_.cpu.clock.unit = "GHz";
     }
+    Trace(("telemetry:cpu_clock " + FormatPdhStatus("status", clockStatus) + " value=" +
+        (snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(snapshot_.cpu.clock, 2) : std::string("N/A"))).c_str());
 }
 
 double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool require3d) {
@@ -244,12 +306,15 @@ double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool requ
     DWORD itemCount = 0;
     PDH_STATUS status = PdhGetFormattedCounterArrayW(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, nullptr);
     if (status != PDH_MORE_DATA) {
+        Trace(("telemetry:pdh_array_prepare " + FormatPdhStatus("status", status) + " require3d=" + BoolText(require3d)).c_str());
         return 0.0;
     }
     std::vector<BYTE> buffer(bufferSize);
     auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W*>(buffer.data());
     status = PdhGetFormattedCounterArrayW(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, items);
     if (status != ERROR_SUCCESS) {
+        Trace(("telemetry:pdh_array_fetch " + FormatPdhStatus("status", status) +
+            " count=" + std::to_string(itemCount) + " require3d=" + BoolText(require3d)).c_str());
         return 0.0;
     }
     double total = 0.0;
@@ -263,6 +328,9 @@ double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool requ
         }
         total += items[i].FmtValue.doubleValue;
     }
+    Trace(("telemetry:pdh_array_done " + FormatPdhStatus("status", status) + " count=" +
+        std::to_string(itemCount) + " require3d=" + BoolText(require3d) + " " +
+        FormatValueDouble("total", total, 2)).c_str());
     return total;
 }
 
@@ -282,29 +350,43 @@ void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySamp
 
 void TelemetryCollector::Impl::UpdateGpu() {
     if (gpuQuery_ != nullptr) {
-        PdhCollectQueryData(gpuQuery_);
+        const PDH_STATUS collectStatus = PdhCollectQueryData(gpuQuery_);
+        Trace(("telemetry:gpu_collect " + FormatPdhStatus("status", collectStatus)).c_str());
         const double load3d = SumCounterArray(gpuLoadCounter_, true);
         const double loadAll = SumCounterArray(gpuLoadCounter_, false);
         snapshot_.gpu.loadPercent = std::clamp(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
+        Trace(("telemetry:gpu_load load3d=" + FormatValueDouble("value", load3d, 2) +
+            " loadAll=" + FormatValueDouble("value", loadAll, 2) +
+            " selected=" + FormatValueDouble("value", snapshot_.gpu.loadPercent, 2)).c_str());
     }
     if (gpuMemoryQuery_ != nullptr) {
-        PdhCollectQueryData(gpuMemoryQuery_);
+        const PDH_STATUS collectStatus = PdhCollectQueryData(gpuMemoryQuery_);
+        Trace(("telemetry:gpu_memory_collect " + FormatPdhStatus("status", collectStatus)).c_str());
         const double bytes = SumCounterArray(gpuDedicatedCounter_, false);
         snapshot_.gpu.vram.usedGb = bytes / (1024.0 * 1024.0 * 1024.0);
+        Trace(("telemetry:gpu_memory bytes=" + FormatValueDouble("value", bytes, 0) +
+            " used_gb=" + FormatValueDouble("value", snapshot_.gpu.vram.usedGb, 2)).c_str());
     }
     if (gpuProvider_ != nullptr) {
         ApplyGpuVendorSample(gpuProvider_->Sample());
+        Trace(("telemetry:gpu_vendor_sample provider=" + gpuProviderName_ +
+            " available=" + BoolText(gpuProviderAvailable_) +
+            " diagnostics=\"" + gpuProviderDiagnostics_ + "\"").c_str());
     }
 }
 
 void TelemetryCollector::Impl::UpdateMemory() {
     MEMORYSTATUSEX memory{};
     memory.dwLength = sizeof(memory);
-    if (GlobalMemoryStatusEx(&memory)) {
+    const BOOL ok = GlobalMemoryStatusEx(&memory);
+    if (ok) {
         snapshot_.cpu.memory.totalGb = memory.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
         snapshot_.cpu.memory.usedGb =
             (memory.ullTotalPhys - memory.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
     }
+    Trace(("telemetry:memory_status ok=" + BoolText(ok != FALSE) +
+        " total_gb=" + FormatValueDouble("value", snapshot_.cpu.memory.totalGb, 2) +
+        " used_gb=" + FormatValueDouble("value", snapshot_.cpu.memory.usedGb, 2)).c_str());
 }
 
 void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
@@ -377,21 +459,28 @@ void TelemetryCollector::Impl::EnumerateDrives() {
     for (const auto& drive : config_.driveLetters) {
         if (!drive.empty()) {
             snapshot_.drives.push_back(DriveInfo{drive.substr(0, 1) + ":"});
+            Trace(("telemetry:drive_config label=" + drive.substr(0, 1) + ":").c_str());
         }
     }
+    Trace(("telemetry:drive_enumerate count=" + std::to_string(snapshot_.drives.size())).c_str());
     RefreshDriveUsage();
 }
 
 void TelemetryCollector::Impl::RefreshDriveUsage() {
     for (auto& drive : snapshot_.drives) {
         const std::wstring root = WideFromUtf8(drive.label + "\\");
-        if (GetDriveTypeW(root.c_str()) != DRIVE_FIXED) {
+        const UINT driveType = GetDriveTypeW(root.c_str());
+        if (driveType != DRIVE_FIXED) {
+            Trace(("telemetry:drive_skip label=" + drive.label + " type=" + std::to_string(driveType)).c_str());
             continue;
         }
 
         ULARGE_INTEGER freeBytes{};
         ULARGE_INTEGER totalBytes{};
-        if (!GetDiskFreeSpaceExW(root.c_str(), &freeBytes, &totalBytes, nullptr) || totalBytes.QuadPart == 0) {
+        const BOOL diskOk = GetDiskFreeSpaceExW(root.c_str(), &freeBytes, &totalBytes, nullptr);
+        if (!diskOk || totalBytes.QuadPart == 0) {
+            Trace(("telemetry:drive_space label=" + drive.label + " ok=" + BoolText(diskOk != FALSE) +
+                " total_bytes=" + std::to_string(totalBytes.QuadPart)).c_str());
             continue;
         }
 
@@ -399,6 +488,11 @@ void TelemetryCollector::Impl::RefreshDriveUsage() {
         const double freeGb = freeBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
         drive.freeGb = freeGb;
         drive.usedPercent = std::clamp((1.0 - (freeGb / totalGb)) * 100.0, 0.0, 100.0);
+        Trace(("telemetry:drive_space label=" + drive.label +
+            " total_bytes=" + std::to_string(totalBytes.QuadPart) +
+            " free_bytes=" + std::to_string(freeBytes.QuadPart) +
+            " used_percent=" + FormatValueDouble("value", drive.usedPercent, 1) +
+            " free_gb=" + FormatValueDouble("value", drive.freeGb, 1)).c_str());
     }
 }
 
@@ -412,11 +506,17 @@ void TelemetryCollector::Impl::PushHistory(std::vector<double>& history, double 
 
 std::string TelemetryCollector::Impl::FindAdapterIp(ULONG interfaceIndex) {
     ULONG size = 0;
-    GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, nullptr, &size);
+    const ULONG probeStatus = GetAdaptersAddresses(
+        AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, nullptr, &size);
+    Trace(("telemetry:network_ip_probe " + FormatWin32Status("status", probeStatus) +
+        " size=" + std::to_string(size) + " interface=" + std::to_string(interfaceIndex)).c_str());
     std::vector<BYTE> buffer(size);
     auto* addresses = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
-    if (GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST,
-            nullptr, addresses, &size) != NO_ERROR) {
+    const ULONG fetchStatus = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST,
+            nullptr, addresses, &size);
+    if (fetchStatus != NO_ERROR) {
+        Trace(("telemetry:network_ip_fetch " + FormatWin32Status("status", fetchStatus) +
+            " interface=" + std::to_string(interfaceIndex)).c_str());
         return "N/A";
     }
 
@@ -427,25 +527,39 @@ std::string TelemetryCollector::Impl::FindAdapterIp(ULONG interfaceIndex) {
         for (auto* unicast = current->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next) {
             wchar_t address[128];
             DWORD length = ARRAYSIZE(address);
-            if (WSAAddressToStringW(
+            const int addressStatus = WSAAddressToStringW(
                     unicast->Address.lpSockaddr, static_cast<DWORD>(unicast->Address.iSockaddrLength),
-                    nullptr, address, &length) == 0) {
+                    nullptr, address, &length);
+            if (addressStatus == 0) {
                 std::wstring ip = address;
                 if (ip.find(L':') == std::wstring::npos) {
-                    return Utf8FromWide(ip);
+                    const std::string utf8Ip = Utf8FromWide(ip);
+                    Trace(("telemetry:network_ip_found interface=" + std::to_string(interfaceIndex) +
+                        " ip=" + utf8Ip).c_str());
+                    return utf8Ip;
                 }
+            } else {
+                Trace(("telemetry:network_ip_stringify interface=" + std::to_string(interfaceIndex) +
+                    " result=" + std::to_string(addressStatus)).c_str());
             }
         }
     }
 
+    Trace(("telemetry:network_ip_missing interface=" + std::to_string(interfaceIndex)).c_str());
     return "N/A";
 }
 
 void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
     PMIB_IF_TABLE2 table = nullptr;
-    if (GetIfTable2(&table) != NO_ERROR || table == nullptr) {
+    const DWORD tableStatus = GetIfTable2(&table);
+    if (tableStatus != NO_ERROR || table == nullptr) {
+        Trace(("telemetry:network_table " + FormatWin32Status("status", tableStatus) +
+            " table=" + BoolText(table != nullptr)).c_str());
         return;
     }
+    Trace(("telemetry:network_table " + FormatWin32Status("status", tableStatus) +
+        " entries=" + std::to_string(table->NumEntries) +
+        " initialize_only=" + BoolText(initializeOnly)).c_str());
 
     const auto now = std::chrono::steady_clock::now();
     MIB_IF_ROW2* selected = nullptr;
@@ -459,6 +573,8 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
                 ContainsInsensitive(row.Description, config_.networkAdapter));
         if (isCandidate) {
             selected = &row;
+            Trace(("telemetry:network_selected interface=" + std::to_string(row.InterfaceIndex) +
+                " alias=\"" + Utf8FromWide(row.Alias) + "\" description=\"" + Utf8FromWide(row.Description) + "\"").c_str());
             break;
         }
     }
@@ -480,6 +596,10 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
                     ((selected->OutOctets - previousOutOctets_) / seconds) / (1024.0 * 1024.0);
                 PushHistory(snapshot_.network.uploadHistory, snapshot_.network.uploadMbps);
                 PushHistory(snapshot_.network.downloadHistory, snapshot_.network.downloadMbps);
+                Trace(("telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
+                    " seconds=" + FormatValueDouble("value", seconds, 3) +
+                    " upload_mbps=" + FormatValueDouble("value", snapshot_.network.uploadMbps, 3) +
+                    " download_mbps=" + FormatValueDouble("value", snapshot_.network.downloadMbps, 3)).c_str());
             }
             previousInOctets_ = selected->InOctets;
             previousOutOctets_ = selected->OutOctets;
@@ -487,7 +607,10 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         }
 
         snapshot_.network.ipAddress = FindAdapterIp(selected->InterfaceIndex);
+    } else {
+        Trace("telemetry:network_selected interface=none");
     }
 
     FreeMibTable(table);
+    Trace("telemetry:network_table_free status=done");
 }
