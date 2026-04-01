@@ -68,7 +68,7 @@ When `network.adapter_name` is left empty, auto-selection should prefer the acti
 Command-line dump mode
 ======================
 
-Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, open `telemetry_dump.txt` beside the executable through a standard C++ output stream, write plain UTF-8 text without a BOM, pass that stream into telemetry collection for trace logging, write the final telemetry snapshot directly into that same stream, close the file, and exit without starting the GUI or affecting any already-running dashboard instance.
+Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, open `telemetry_dump.txt` beside the executable through a standard C++ output stream, write plain UTF-8 text without a BOM, pass that stream into telemetry collection for trace logging, write the final telemetry snapshot directly into that same stream, render that same final snapshot through the dashboard UI into an offscreen buffer, save it beside the executable as `telemetry_screenshot.png`, close outputs, and exit without starting the GUI or affecting any already-running dashboard instance.
 The `/dump` trace must cover all diagnostics collection paths, not only vendor GPU integration.
 Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
 Trace output should go through one shared trace wrapper that safely handles a null output stream and centralizes common trace-formatting helpers.
@@ -175,6 +175,7 @@ Circular gauges for CPU/GPU load
 Horizontal bars for usage
 Mini graphs for network activity
 Clean, minimal headers
+CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
 
 Design Principles
 High contrast for readability on small screen

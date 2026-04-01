@@ -2,6 +2,8 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <commctrl.h>
+#include <objidl.h>
+#include <gdiplus.h>
 #include <shellapi.h>
 
 #include <algorithm>
@@ -21,6 +23,7 @@
 #include "utf8.h"
 
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "shell32.lib")
 
 namespace {
@@ -43,6 +46,10 @@ constexpr UINT kCommandBringOnTop = 1002;
 constexpr UINT kCommandUpdateConfig = 1003;
 constexpr UINT kCommandExit = 1004;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
+
+COLORREF GetUsageFillColor() {
+    return kAccent;
+}
 
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
@@ -84,6 +91,31 @@ std::string FormatDriveFree(double freeGb) {
 }
 
 std::filesystem::path GetRuntimeConfigPath();
+class DashboardApp;
+bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
+
+int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
+    UINT encoderCount = 0;
+    UINT encoderBytes = 0;
+    if (Gdiplus::GetImageEncodersSize(&encoderCount, &encoderBytes) != Gdiplus::Ok || encoderBytes == 0) {
+        return -1;
+    }
+
+    std::vector<BYTE> encoderBuffer(encoderBytes);
+    auto* encoders = reinterpret_cast<Gdiplus::ImageCodecInfo*>(encoderBuffer.data());
+    if (Gdiplus::GetImageEncoders(encoderCount, encoderBytes, encoders) != Gdiplus::Ok) {
+        return -1;
+    }
+
+    for (UINT i = 0; i < encoderCount; ++i) {
+        if (wcscmp(encoders[i].MimeType, mimeType) == 0) {
+            *clsid = encoders[i].Clsid;
+            return static_cast<int>(i);
+        }
+    }
+
+    return -1;
+}
 
 std::filesystem::path GetExecutableDirectory() {
     wchar_t modulePath[MAX_PATH];
@@ -116,6 +148,7 @@ int RunDumpMode() {
     TelemetryCollector telemetry;
     const AppConfig config = LoadConfig(GetRuntimeConfigPath());
     const std::filesystem::path dumpPath = GetExecutableDirectory() / L"telemetry_dump.txt";
+    const std::filesystem::path screenshotPath = GetExecutableDirectory() / L"telemetry_screenshot.png";
     std::ofstream dumpStream(dumpPath, std::ios::binary | std::ios::trunc);
     if (!dumpStream.is_open()) {
         const std::wstring message = WideFromUtf8("Failed to open dump file:\n" + Utf8FromWide(dumpPath.wstring()));
@@ -145,6 +178,18 @@ int RunDumpMode() {
     trace.Write("dump:write_dump_begin");
     dumpStream << "\n";
     telemetry.DumpText(dumpStream);
+    trace.Write("dump:write_dump_done");
+
+    trace.Write("dump:render_screenshot_begin");
+    if (!SaveDumpScreenshot(screenshotPath, telemetry.Snapshot())) {
+        trace.Write("dump:render_screenshot_failed reason=save_png");
+        const std::wstring message =
+            WideFromUtf8("Failed to save dump screenshot:\n" + Utf8FromWide(screenshotPath.wstring()));
+        MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+        return 1;
+    }
+
+    trace.Write("dump:render_screenshot_done");
     trace.Write("dump:done");
     return 0;
 }
@@ -342,6 +387,9 @@ class DashboardApp {
 public:
     bool Initialize(HINSTANCE instance);
     int Run();
+    bool InitializeFonts();
+    void ReleaseFonts();
+    bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
 
 private:
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -430,6 +478,107 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         instance,
         this);
     return hwnd_ != nullptr;
+}
+
+bool DashboardApp::InitializeFonts() {
+    if (fonts_.title != nullptr) {
+        return true;
+    }
+
+    fonts_.title = CreateUiFont(18, FW_BOLD, L"Segoe UI Semibold");
+    fonts_.big = CreateUiFont(40, FW_BOLD, L"Segoe UI Semibold");
+    fonts_.value = CreateUiFont(17, FW_BOLD, L"Segoe UI Semibold");
+    fonts_.label = CreateUiFont(14, FW_NORMAL, L"Segoe UI");
+    fonts_.smallFont = CreateUiFont(12, FW_NORMAL, L"Segoe UI");
+    if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr ||
+        fonts_.label == nullptr || fonts_.smallFont == nullptr) {
+        ReleaseFonts();
+        return false;
+    }
+    return true;
+}
+
+void DashboardApp::ReleaseFonts() {
+    DeleteObject(fonts_.title);
+    DeleteObject(fonts_.big);
+    DeleteObject(fonts_.value);
+    DeleteObject(fonts_.label);
+    DeleteObject(fonts_.smallFont);
+    fonts_.title = nullptr;
+    fonts_.big = nullptr;
+    fonts_.value = nullptr;
+    fonts_.label = nullptr;
+    fonts_.smallFont = nullptr;
+}
+
+bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
+    if (!InitializeFonts()) {
+        return false;
+    }
+
+    HDC screenDc = GetDC(nullptr);
+    if (screenDc == nullptr) {
+        return false;
+    }
+
+    HDC memDc = CreateCompatibleDC(screenDc);
+    if (memDc == nullptr) {
+        ReleaseDC(nullptr, screenDc);
+        return false;
+    }
+
+    BITMAPINFO bitmapInfo{};
+    bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
+    bitmapInfo.bmiHeader.biWidth = kWindowWidth;
+    bitmapInfo.bmiHeader.biHeight = -kWindowHeight;
+    bitmapInfo.bmiHeader.biPlanes = 1;
+    bitmapInfo.bmiHeader.biBitCount = 32;
+    bitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+    void* pixels = nullptr;
+    HBITMAP bitmap = CreateDIBSection(screenDc, &bitmapInfo, DIB_RGB_COLORS, &pixels, nullptr, 0);
+    if (bitmap == nullptr) {
+        DeleteDC(memDc);
+        ReleaseDC(nullptr, screenDc);
+        return false;
+    }
+
+    HGDIOBJ oldBitmap = SelectObject(memDc, bitmap);
+    RECT client{0, 0, kWindowWidth, kWindowHeight};
+    HBRUSH background = CreateSolidBrush(kBlack);
+    FillRect(memDc, &client, background);
+    DeleteObject(background);
+    SetBkMode(memDc, TRANSPARENT);
+    DrawLayout(memDc, snapshot);
+
+    Gdiplus::GdiplusStartupInput startupInput;
+    ULONG_PTR gdiplusToken = 0;
+    bool saved = false;
+    if (Gdiplus::GdiplusStartup(&gdiplusToken, &startupInput, nullptr) == Gdiplus::Ok) {
+        CLSID pngClsid{};
+        if (GetImageEncoderClsid(L"image/png", &pngClsid) >= 0) {
+            Gdiplus::Bitmap image(bitmap, nullptr);
+            saved = image.Save(imagePath.c_str(), &pngClsid, nullptr) == Gdiplus::Ok;
+        }
+        Gdiplus::GdiplusShutdown(gdiplusToken);
+    }
+
+    SelectObject(memDc, oldBitmap);
+    DeleteObject(bitmap);
+    DeleteDC(memDc);
+    ReleaseDC(nullptr, screenDc);
+    return saved;
+}
+
+bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
+    DashboardApp renderer;
+    if (!renderer.InitializeFonts()) {
+        return false;
+    }
+
+    const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot);
+    renderer.ReleaseFonts();
+    return saved;
 }
 
 void DashboardApp::BringOnTop() {
@@ -592,11 +741,9 @@ LRESULT CALLBACK DashboardApp::WndProcThunk(HWND hwnd, UINT message, WPARAM wPar
 LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_CREATE:
-        fonts_.title = CreateUiFont(18, FW_BOLD, L"Segoe UI Semibold");
-        fonts_.big = CreateUiFont(40, FW_BOLD, L"Segoe UI Semibold");
-        fonts_.value = CreateUiFont(17, FW_BOLD, L"Segoe UI Semibold");
-        fonts_.label = CreateUiFont(14, FW_NORMAL, L"Segoe UI");
-        fonts_.smallFont = CreateUiFont(12, FW_NORMAL, L"Segoe UI");
+        if (!InitializeFonts()) {
+            return -1;
+        }
         SetTimer(hwnd_, kRefreshTimerId, kRefreshTimerMs, nullptr);
         CreateTrayIcon();
         return 0;
@@ -652,11 +799,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         KillTimer(hwnd_, kRefreshTimerId);
         KillTimer(hwnd_, kMoveTimerId);
         RemoveTrayIcon();
-        DeleteObject(fonts_.title);
-        DeleteObject(fonts_.big);
-        DeleteObject(fonts_.value);
-        DeleteObject(fonts_.label);
-        DeleteObject(fonts_.smallFont);
+        ReleaseFonts();
         PostQuitMessage(0);
         return 0;
     default:
@@ -732,7 +875,7 @@ POINT DashboardApp::PolarPoint(int cx, int cy, int radius, double angleDegrees) 
 
 void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label) {
     HPEN trackPen = CreatePen(PS_SOLID, 10, kTrack);
-    HPEN accentPen = CreatePen(PS_SOLID, 10, kAccent);
+    HPEN usagePen = CreatePen(PS_SOLID, 10, GetUsageFillColor());
     HGDIOBJ oldPen = SelectObject(hdc, trackPen);
     HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
 
@@ -742,7 +885,7 @@ void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent
     Arc(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom,
         startTrack.x, startTrack.y, endTrack.x, endTrack.y);
 
-    SelectObject(hdc, accentPen);
+    SelectObject(hdc, usagePen);
     const double sweep = 270.0 * std::clamp(percent, 0.0, 100.0) / 100.0;
     const POINT endValue = PolarPoint(cx, cy, radius, 135.0 - sweep);
     Arc(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom,
@@ -751,7 +894,7 @@ void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent
     SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);
     DeleteObject(trackPen);
-    DeleteObject(accentPen);
+    DeleteObject(usagePen);
 
     RECT numberRect{cx - 42, cy - 28, cx + 42, cy + 18};
     char number[16];
@@ -776,7 +919,7 @@ void DashboardApp::DrawMetricRow(
 
     RECT fill = barRect;
     fill.right = fill.left + static_cast<int>((fill.right - fill.left) * std::clamp(ratio, 0.0, 1.0));
-    HBRUSH accent = CreateSolidBrush(kAccent);
+    HBRUSH accent = CreateSolidBrush(GetUsageFillColor());
     FillRect(hdc, &fill, accent);
     DeleteObject(accent);
 }
@@ -875,7 +1018,7 @@ void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector
 
         RECT fill = barRect;
         fill.right = fill.left + static_cast<int>((fill.right - fill.left) * (drive.usedPercent / 100.0));
-        HBRUSH accent = CreateSolidBrush(kAccent);
+        HBRUSH accent = CreateSolidBrush(GetUsageFillColor());
         FillRect(hdc, &fill, accent);
         DeleteObject(accent);
 
