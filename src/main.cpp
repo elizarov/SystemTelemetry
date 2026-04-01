@@ -880,16 +880,17 @@ void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent
     HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
 
     const RECT bounds{cx - radius, cy - radius, cx + radius, cy + radius};
-    const POINT startTrack = PolarPoint(cx, cy, radius, 135.0);
-    const POINT endTrack = PolarPoint(cx, cy, radius, -135.0);
-    Arc(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom,
-        startTrack.x, startTrack.y, endTrack.x, endTrack.y);
+    Ellipse(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom);
 
-    SelectObject(hdc, usagePen);
-    const double sweep = 270.0 * std::clamp(percent, 0.0, 100.0) / 100.0;
-    const POINT endValue = PolarPoint(cx, cy, radius, 135.0 - sweep);
-    Arc(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom,
-        startTrack.x, startTrack.y, endValue.x, endValue.y);
+    const double clampedPercent = std::clamp(percent, 0.0, 100.0);
+    const double sweep = 360.0 * clampedPercent / 100.0;
+    if (sweep > 0.0) {
+        SelectObject(hdc, usagePen);
+        SetArcDirection(hdc, AD_CLOCKWISE);
+        const POINT startValue = PolarPoint(cx, cy, radius, 90.0);
+        MoveToEx(hdc, startValue.x, startValue.y, nullptr);
+        AngleArc(hdc, cx, cy, radius, 90.0f, static_cast<FLOAT>(-sweep));
+    }
 
     SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);

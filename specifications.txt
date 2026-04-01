@@ -171,7 +171,7 @@ Labels: small, minimal (Temp, Clock, RAM, etc.)
 Units: slightly dimmer than values
 
 Visual Elements
-Circular gauges for CPU/GPU load
+Circular gauges for CPU/GPU load with the ring drawn in the track color and only the load-sized sliver overlaid in the shared usage color
 Horizontal bars for usage
 Mini graphs for network activity
 Clean, minimal headers
