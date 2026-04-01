@@ -95,6 +95,7 @@ std::string FormatDriveFree(double freeGb) {
 std::filesystem::path GetRuntimeConfigPath();
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
+bool SaveConfigElevated(const AppConfig& config, HWND owner);
 
 int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
     UINT encoderCount = 0;
@@ -210,22 +211,106 @@ std::filesystem::path GetExecutableDirectory() {
     return std::filesystem::path(modulePath).parent_path();
 }
 
-bool HasSwitch(const std::string& target) {
+std::vector<std::wstring> GetCommandLineArguments() {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argv == nullptr) {
-        return false;
+        return {};
     }
 
-    bool found = false;
+    std::vector<std::wstring> arguments;
+    arguments.reserve(argc > 1 ? static_cast<size_t>(argc - 1) : 0);
     for (int i = 1; i < argc; ++i) {
-        if (_wcsicmp(argv[i], WideFromUtf8(target).c_str()) == 0) {
-            found = true;
-            break;
-        }
+        arguments.emplace_back(argv[i]);
     }
     LocalFree(argv);
-    return found;
+    return arguments;
+}
+
+bool HasSwitch(const std::string& target) {
+    const std::wstring wideTarget = WideFromUtf8(target);
+    for (const std::wstring& argument : GetCommandLineArguments()) {
+        if (_wcsicmp(argument.c_str(), wideTarget.c_str()) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<std::wstring> GetSwitchValue(const std::wstring& target) {
+    const std::vector<std::wstring> arguments = GetCommandLineArguments();
+    for (size_t i = 0; i + 1 < arguments.size(); ++i) {
+        if (_wcsicmp(arguments[i].c_str(), target.c_str()) == 0) {
+            return arguments[i + 1];
+        }
+    }
+    return std::nullopt;
+}
+
+bool CanWriteRuntimeConfig(const std::filesystem::path& path) {
+    const std::wstring widePath = path.wstring();
+    if (std::filesystem::exists(path)) {
+        HANDLE file = CreateFileW(
+            widePath.c_str(),
+            GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr);
+        if (file == INVALID_HANDLE_VALUE) {
+            return false;
+        }
+        CloseHandle(file);
+        return true;
+    }
+
+    const std::filesystem::path parent = path.has_parent_path() ? path.parent_path() : std::filesystem::current_path();
+    const std::wstring probeName =
+        L".config-write-test-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64()) + L".tmp";
+    const std::filesystem::path probePath = parent / probeName;
+    HANDLE probe = CreateFileW(
+        probePath.wstring().c_str(),
+        GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr,
+        CREATE_NEW,
+        FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
+        nullptr);
+    if (probe == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    CloseHandle(probe);
+    return true;
+}
+
+std::filesystem::path CreateElevatedSaveConfigTempPath() {
+    wchar_t tempPathBuffer[MAX_PATH];
+    const DWORD length = GetTempPathW(ARRAYSIZE(tempPathBuffer), tempPathBuffer);
+    if (length == 0 || length >= ARRAYSIZE(tempPathBuffer)) {
+        return {};
+    }
+
+    wchar_t tempFileBuffer[MAX_PATH];
+    if (GetTempFileNameW(tempPathBuffer, L"stc", 0, tempFileBuffer) == 0) {
+        return {};
+    }
+    return std::filesystem::path(tempFileBuffer);
+}
+
+int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath) {
+    if (sourcePath.empty()) {
+        return 2;
+    }
+
+    const AppConfig config = LoadConfig(sourcePath);
+    if (!SaveConfig(GetRuntimeConfigPath(), config)) {
+        return 1;
+    }
+
+    std::error_code ignored;
+    std::filesystem::remove(sourcePath, ignored);
+    return 0;
 }
 
 int RunDumpMode() {
@@ -469,7 +554,7 @@ void ShutdownPreviousInstance() {
 }
 
 std::filesystem::path GetRuntimeConfigPath() {
-    return std::filesystem::current_path() / L"config.ini";
+    return GetExecutableDirectory() / L"config.ini";
 }
 
 class DashboardApp {
@@ -751,7 +836,10 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
     config.monitorName = monitorName;
     config.positionX = placement.relativePosition.x;
     config.positionY = placement.relativePosition.y;
-    if (!SaveConfig(configPath, config)) {
+    const bool saved = CanWriteRuntimeConfig(configPath)
+        ? SaveConfig(configPath, config)
+        : SaveConfigElevated(config, hwnd_);
+    if (!saved) {
         const std::wstring message = WideFromUtf8("Failed to update " + Utf8FromWide(configPath.wstring()) + ".");
         MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
         return;
@@ -760,6 +848,54 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
     config_.monitorName = monitorName;
     config_.positionX = placement.relativePosition.x;
     config_.positionY = placement.relativePosition.y;
+}
+
+bool SaveConfigElevated(const AppConfig& config, HWND owner) {
+    const std::filesystem::path tempPath = CreateElevatedSaveConfigTempPath();
+    if (tempPath.empty()) {
+        return false;
+    }
+
+    if (!SaveConfig(tempPath, config)) {
+        std::error_code ignored;
+        std::filesystem::remove(tempPath, ignored);
+        return false;
+    }
+
+    std::wstring parameters = L"/save-config \"";
+    parameters += tempPath.wstring();
+    parameters += L"\"";
+
+    SHELLEXECUTEINFOW executeInfo{};
+    executeInfo.cbSize = sizeof(executeInfo);
+    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+    executeInfo.hwnd = owner;
+    executeInfo.lpVerb = L"runas";
+    wchar_t modulePath[MAX_PATH];
+    const DWORD length = GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
+    if (length == 0 || length >= ARRAYSIZE(modulePath)) {
+        std::error_code ignored;
+        std::filesystem::remove(tempPath, ignored);
+        return false;
+    }
+    const std::wstring executablePath = modulePath;
+    executeInfo.lpFile = executablePath.c_str();
+    executeInfo.lpParameters = parameters.c_str();
+    executeInfo.nShow = SW_HIDE;
+    if (!ShellExecuteExW(&executeInfo)) {
+        std::error_code ignored;
+        std::filesystem::remove(tempPath, ignored);
+        return false;
+    }
+
+    WaitForSingleObject(executeInfo.hProcess, INFINITE);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(executeInfo.hProcess, &exitCode);
+    CloseHandle(executeInfo.hProcess);
+
+    std::error_code ignored;
+    std::filesystem::remove(tempPath, ignored);
+    return exitCode == 0;
 }
 
 bool DashboardApp::CreateTrayIcon() {
@@ -1299,6 +1435,10 @@ void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
+    if (const auto elevatedSaveSource = GetSwitchValue(L"/save-config"); elevatedSaveSource.has_value()) {
+        return RunElevatedSaveConfigMode(*elevatedSaveSource);
+    }
+
     if (HasSwitch("/dump")) {
         return RunDumpMode();
     }

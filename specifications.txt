@@ -65,7 +65,8 @@ Examples include:
 - Which drives to show
 - Which Gigabyte motherboard fan channel name and temperature channel name to prefer when multiple sensors are exposed
 
-At runtime, the application must read `config.ini` from the same folder it was started from and write updates back to that same file.
+At runtime, the application must read `config.ini` from the same directory as `SystemTelemetry.exe` and write updates back to that same file.
+Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Update Config` must prompt for elevation and complete the save through an elevated helper instance instead of silently failing.
 The `src/config.ini` file in the source tree is only a checked-in example configuration template.
 When the runtime writer needs to create a new live `config.ini`, it should write only the active configuration sections and keys, without prepending the source-tree example header text.
 All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
