@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <vector>
 #include <windows.h>
@@ -67,10 +68,10 @@ public:
     TelemetryCollector(TelemetryCollector&&) noexcept;
     TelemetryCollector& operator=(TelemetryCollector&&) noexcept;
 
-    bool Initialize(const AppConfig& config);
+    bool Initialize(const AppConfig& config, std::ostream* traceStream = nullptr);
     const SystemSnapshot& Snapshot() const;
     void UpdateSnapshot();
-    std::wstring DumpText() const;
+    void DumpText(std::ostream& output) const;
 
 private:
     struct Impl;

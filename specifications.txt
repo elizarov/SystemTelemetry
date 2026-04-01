@@ -64,9 +64,7 @@ The `src/config.ini` file in the source tree is only a checked-in example config
 Command-line dump mode
 ======================
 
-Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, write the current telemetry snapshot to `telemetry_dump.txt` beside the executable, and exit without starting the GUI or affecting any already-running dashboard instance.
-
-For dump debugging, also write `telemetry_dump_trace.txt` beside the executable with step-by-step progress markers so startup stalls in vendor telemetry can be isolated.
+Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, open `telemetry_dump.txt` beside the executable through a standard C++ output stream, write plain UTF-8 text without a BOM, pass that stream into telemetry collection for trace logging, write the final telemetry snapshot directly into that same stream, close the file, and exit without starting the GUI or affecting any already-running dashboard instance.
 
 Telemetry sources
 =================

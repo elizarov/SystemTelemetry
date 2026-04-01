@@ -10,6 +10,7 @@
 #include <cwctype>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <optional>
 #include <string>
 #include <vector>
@@ -100,76 +101,6 @@ std::filesystem::path GetExecutableDirectory() {
     return std::filesystem::path(modulePath).parent_path();
 }
 
-bool WriteUtf8File(const std::filesystem::path& path, const std::wstring& text) {
-    const int required = WideCharToMultiByte(
-        CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
-    if (required <= 0) {
-        return false;
-    }
-
-    std::string bytes(static_cast<size_t>(required), '\0');
-    WideCharToMultiByte(
-        CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), bytes.data(), required, nullptr, nullptr);
-
-    HANDLE file = CreateFileW(
-        path.c_str(),
-        GENERIC_WRITE,
-        FILE_SHARE_READ,
-        nullptr,
-        CREATE_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL,
-        nullptr);
-    if (file == INVALID_HANDLE_VALUE) {
-        return false;
-    }
-
-    const unsigned char bom[] = {0xEF, 0xBB, 0xBF};
-    DWORD written = 0;
-    bool ok = WriteFile(file, bom, sizeof(bom), &written, nullptr) == TRUE && written == sizeof(bom);
-    if (ok) {
-        ok = WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) == TRUE &&
-            written == bytes.size();
-    }
-    CloseHandle(file);
-    return ok;
-}
-
-void AppendUtf8Line(const std::filesystem::path& path, const std::wstring& text) {
-    const std::wstring line = text + L"\r\n";
-    const int required = WideCharToMultiByte(
-        CP_UTF8, 0, line.c_str(), static_cast<int>(line.size()), nullptr, 0, nullptr, nullptr);
-    if (required <= 0) {
-        return;
-    }
-
-    std::string bytes(static_cast<size_t>(required), '\0');
-    WideCharToMultiByte(
-        CP_UTF8, 0, line.c_str(), static_cast<int>(line.size()), bytes.data(), required, nullptr, nullptr);
-
-    HANDLE file = CreateFileW(
-        path.c_str(),
-        FILE_APPEND_DATA,
-        FILE_SHARE_READ,
-        nullptr,
-        OPEN_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL,
-        nullptr);
-    if (file == INVALID_HANDLE_VALUE) {
-        return;
-    }
-
-    LARGE_INTEGER size{};
-    if (GetFileSizeEx(file, &size) && size.QuadPart == 0) {
-        const unsigned char bom[] = {0xEF, 0xBB, 0xBF};
-        DWORD written = 0;
-        WriteFile(file, bom, sizeof(bom), &written, nullptr);
-    }
-
-    DWORD written = 0;
-    WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr);
-    CloseHandle(file);
-}
-
 bool HasSwitch(const std::wstring& target) {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -191,34 +122,40 @@ bool HasSwitch(const std::wstring& target) {
 int RunDumpMode() {
     TelemetryCollector telemetry;
     const AppConfig config = LoadConfig(GetRuntimeConfigPath());
-    const std::filesystem::path tracePath = GetExecutableDirectory() / L"telemetry_dump_trace.txt";
-    DeleteFileW(tracePath.c_str());
-    AppendUtf8Line(tracePath, L"dump:start");
-    AppendUtf8Line(tracePath, L"dump:telemetry_initialize_begin");
-    if (!telemetry.Initialize(config)) {
-        AppendUtf8Line(tracePath, L"dump:telemetry_initialize_failed");
+    const std::filesystem::path dumpPath = GetExecutableDirectory() / L"telemetry_dump.txt";
+    std::ofstream dumpStream(dumpPath, std::ios::binary | std::ios::trunc);
+    if (!dumpStream.is_open()) {
+        const std::wstring message = L"Failed to open dump file:\n" + dumpPath.wstring();
+        MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+        return 1;
+    }
+
+    dumpStream << "[trace] dump:start\n";
+    dumpStream << "[trace] dump:telemetry_initialize_begin\n";
+    dumpStream.flush();
+
+    if (!telemetry.Initialize(config, &dumpStream)) {
+        dumpStream << "[trace] dump:telemetry_initialize_failed\n";
+        dumpStream.flush();
         MessageBoxW(nullptr, L"Failed to initialize telemetry collector.", L"System Telemetry", MB_ICONERROR);
         return 1;
     }
 
-    AppendUtf8Line(tracePath, L"dump:telemetry_initialized");
+    dumpStream << "[trace] dump:telemetry_initialized\n";
     Sleep(900);
-    AppendUtf8Line(tracePath, L"dump:update_snapshot_1_begin");
+    dumpStream << "[trace] dump:update_snapshot_1_begin\n";
+    dumpStream.flush();
     telemetry.UpdateSnapshot();
-    AppendUtf8Line(tracePath, L"dump:update_snapshot_1_done");
+    dumpStream << "[trace] dump:update_snapshot_1_done\n";
     Sleep(1100);
-    AppendUtf8Line(tracePath, L"dump:update_snapshot_2_begin");
+    dumpStream << "[trace] dump:update_snapshot_2_begin\n";
+    dumpStream.flush();
     telemetry.UpdateSnapshot();
-    AppendUtf8Line(tracePath, L"dump:update_snapshot_2_done");
-    const std::filesystem::path dumpPath = GetExecutableDirectory() / L"telemetry_dump.txt";
-    AppendUtf8Line(tracePath, L"dump:write_dump_begin");
-    if (!WriteUtf8File(dumpPath, telemetry.DumpText())) {
-        AppendUtf8Line(tracePath, L"dump:write_dump_failed");
-        const std::wstring message = L"Failed to write dump file:\n" + dumpPath.wstring();
-        MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
-        return 1;
-    }
-    AppendUtf8Line(tracePath, L"dump:done");
+    dumpStream << "[trace] dump:update_snapshot_2_done\n";
+    dumpStream << "[trace] dump:write_dump_begin\n\n";
+    telemetry.DumpText(dumpStream);
+    dumpStream << "[trace] dump:done\n";
+    dumpStream.flush();
     return 0;
 }
 

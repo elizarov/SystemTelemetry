@@ -15,7 +15,7 @@ If AMD GPU metrics are missing:
 1. Install or update AMD Software: Adrenalin Edition for your Radeon GPU.
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
 3. Run `build\SystemTelemetry.exe /dump`.
-4. Check `build\telemetry_dump.txt` for the current values and `build\telemetry_dump_trace.txt` for step-by-step dump/provider tracing.
+4. Check `build\telemetry_dump.txt`, which now contains both step-by-step trace lines and the final telemetry snapshot written through one shared dump file stream.
 
 ## Build
 

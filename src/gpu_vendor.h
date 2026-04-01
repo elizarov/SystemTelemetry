@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <string>
 
 struct GpuVendorTelemetrySample {
@@ -21,4 +22,4 @@ public:
     virtual GpuVendorTelemetrySample Sample() = 0;
 };
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider();
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(std::ostream* traceStream);
