@@ -4,61 +4,115 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
+using Microsoft.Win32;
 
 internal static class GigabyteFanProbe
 {
-    private const string ToolDirectory = @"C:\Program Files (x86)\GIGABYTE\SIV";
     private const string EngineEnvironmentControlDll = "Gigabyte.Engine.EnvironmentControl.dll";
     private const string EnvironmentControlCommonDll = "Gigabyte.EnvironmentControl.Common.dll";
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool SetDllDirectory(string lpPathName);
 
-    private static int Main()
+    private static int Main(string[] args)
     {
         try
         {
-            if (!Directory.Exists(ToolDirectory))
+            var daemonMode = args.Length > 0 && string.Equals(args[0], "/daemon", StringComparison.OrdinalIgnoreCase);
+            Type hardwareMonitorType;
+            Type sourceType;
+            Type sensorType;
+            Type sensorDataType;
+            Type collectionType;
+            var monitor = CreateMonitor(out hardwareMonitorType, out sourceType, out sensorType, out sensorDataType, out collectionType);
+            if (monitor == null)
             {
-                Write("success", "0");
-                Write("diagnostics", "Gigabyte SIV directory was not found.");
                 return 1;
             }
 
-            var engineEnvironmentControlPath = Path.Combine(ToolDirectory, EngineEnvironmentControlDll);
-            var environmentControlCommonPath = Path.Combine(ToolDirectory, EnvironmentControlCommonDll);
+            if (daemonMode)
+            {
+                while (true)
+                {
+                    WriteFrame(CaptureSnapshot(monitor, hardwareMonitorType, sourceType, sensorType, sensorDataType, collectionType), true);
+                    Thread.Sleep(1000);
+                }
+            }
+
+            var snapshot = CaptureSnapshot(monitor, hardwareMonitorType, sourceType, sensorType, sensorDataType, collectionType);
+            WriteFrame(snapshot, false);
+            return snapshot.success && snapshot.fanCount > 0 ? 0 : 2;
+        }
+        catch (Exception ex)
+        {
+            Write("success", "0");
+            Write("diagnostics", ex.ToString());
+            return 1;
+        }
+        finally
+        {
+            SetDllDirectory(null);
+        }
+    }
+
+    private static object CreateMonitor(
+        out Type hardwareMonitorType,
+        out Type sourceType,
+        out Type sensorType,
+        out Type sensorDataType,
+        out Type collectionType)
+    {
+        hardwareMonitorType = null;
+        sourceType = null;
+        sensorType = null;
+        sensorDataType = null;
+        collectionType = null;
+
+        try
+        {
+            var toolDirectory = DiscoverToolDirectory();
+            if (string.IsNullOrEmpty(toolDirectory) || !Directory.Exists(toolDirectory))
+            {
+                Write("success", "0");
+                Write("diagnostics", "Gigabyte SIV directory was not found in the registry.");
+                return null;
+            }
+
+            var engineEnvironmentControlPath = Path.Combine(toolDirectory, EngineEnvironmentControlDll);
+            var environmentControlCommonPath = Path.Combine(toolDirectory, EnvironmentControlCommonDll);
             if (!File.Exists(engineEnvironmentControlPath))
             {
                 Write("success", "0");
                 Write("diagnostics", "Gigabyte.Engine.EnvironmentControl.dll was not found.");
-                return 1;
+                return null;
             }
             if (!File.Exists(environmentControlCommonPath))
             {
                 Write("success", "0");
                 Write("diagnostics", "Gigabyte.EnvironmentControl.Common.dll was not found.");
-                return 1;
+                return null;
             }
 
-            Environment.CurrentDirectory = ToolDirectory;
-            SetDllDirectory(ToolDirectory);
+            Environment.CurrentDirectory = toolDirectory;
+            SetDllDirectory(toolDirectory);
             AppDomain.CurrentDomain.AssemblyResolve += ResolveGigabyteAssembly;
 
             var engineAssembly = Assembly.LoadFrom(engineEnvironmentControlPath);
             var commonAssembly = Assembly.LoadFrom(environmentControlCommonPath);
-            var hardwareMonitorType = engineAssembly.GetType(
+            hardwareMonitorType = engineAssembly.GetType(
                 "Gigabyte.Engine.EnvironmentControl.HardwareMonitor.HardwareMonitorControlModule",
                 true);
-            var sourceType = commonAssembly.GetType(
+            sourceType = commonAssembly.GetType(
                 "Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitorSourceTypes",
                 true);
-            var sensorType = commonAssembly.GetType(
+            sensorType = commonAssembly.GetType(
                 "Gigabyte.EnvironmentControl.Common.HardwareMonitor.SensorTypes",
                 true);
-            var sensorDataType = commonAssembly.GetType(
+            sensorDataType = commonAssembly.GetType(
                 "Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredData",
                 true);
-            var collectionType = commonAssembly.GetType(
+            collectionType = commonAssembly.GetType(
                 "Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredDataCollection",
                 true);
 
@@ -73,57 +127,69 @@ internal static class GigabyteFanProbe
             {
                 Write("success", "0");
                 Write("diagnostics", "Gigabyte hardware-monitor IPC methods were not found.");
-                return 1;
+                return null;
             }
 
             var sourceSelection = Enum.Parse(sourceType, "HwRegister", false);
             initializeMethod.Invoke(monitor, new[] { sourceSelection });
-
-            var sensorCollection = Activator.CreateInstance(collectionType);
-            var arguments = new object[] { Enum.Parse(sensorType, "Fan", false), sensorCollection };
-            getCurrentMethod.Invoke(monitor, arguments);
-            sensorCollection = arguments[1];
-
-            var titleProperty = sensorDataType.GetProperty("Title");
-            var valueProperty = sensorDataType.GetProperty("Value");
-            var unitProperty = sensorDataType.GetProperty("Unit");
-
-            Write("success", "1");
-            Write("diagnostics", "Gigabyte SIV hardware-monitor IPC completed.");
-            Write("controller_type", "Gigabyte Engine HardwareMonitorControlModule");
-            Write("chip_name", "Gigabyte SIV HwRegister");
-
-            var fanIndex = 0;
-            foreach (var sensor in (IEnumerable)sensorCollection)
-            {
-                var unit = Convert.ToString(unitProperty.GetValue(sensor, null), CultureInfo.InvariantCulture) ?? string.Empty;
-                if (!string.Equals(unit, "RPM", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var title = Convert.ToString(titleProperty.GetValue(sensor, null), CultureInfo.InvariantCulture) ?? string.Empty;
-                var value = valueProperty.GetValue(sensor, null);
-                var rpm = Convert.ToSingle(value, CultureInfo.InvariantCulture);
-
-                Write("fan_" + fanIndex.ToString(CultureInfo.InvariantCulture) + "_title", title);
-                Write("fan_" + fanIndex.ToString(CultureInfo.InvariantCulture) + "_rpm", rpm.ToString(CultureInfo.InvariantCulture));
-                fanIndex++;
-            }
-
-            Write("fan_count", fanIndex.ToString(CultureInfo.InvariantCulture));
-            return fanIndex > 0 ? 0 : 2;
+            return monitor;
         }
         catch (Exception ex)
         {
             Write("success", "0");
             Write("diagnostics", ex.ToString());
-            return 1;
+            return null;
         }
-        finally
+    }
+
+    private static Snapshot CaptureSnapshot(
+        object monitor,
+        Type hardwareMonitorType,
+        Type sourceType,
+        Type sensorType,
+        Type sensorDataType,
+        Type collectionType)
+    {
+        var snapshot = new Snapshot
         {
-            SetDllDirectory(null);
+            success = true,
+            diagnostics = "Gigabyte SIV hardware-monitor IPC completed.",
+            controllerType = "Gigabyte Engine HardwareMonitorControlModule",
+            chipName = "Gigabyte SIV HwRegister"
+        };
+
+        var getCurrentMethod = hardwareMonitorType.GetMethod(
+            "GetCurrentMonitoredData",
+            new[] { sensorType, collectionType.MakeByRefType() });
+        var sensorCollection = Activator.CreateInstance(collectionType);
+        var arguments = new object[] { Enum.Parse(sensorType, "Fan", false), sensorCollection };
+        getCurrentMethod.Invoke(monitor, arguments);
+        sensorCollection = arguments[1];
+
+        var titleProperty = sensorDataType.GetProperty("Title");
+        var valueProperty = sensorDataType.GetProperty("Value");
+        var unitProperty = sensorDataType.GetProperty("Unit");
+
+        foreach (var sensor in (IEnumerable)sensorCollection)
+        {
+            var unit = Convert.ToString(unitProperty.GetValue(sensor, null), CultureInfo.InvariantCulture) ?? string.Empty;
+            if (!string.Equals(unit, "RPM", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var title = Convert.ToString(titleProperty.GetValue(sensor, null), CultureInfo.InvariantCulture) ?? string.Empty;
+            var value = valueProperty.GetValue(sensor, null);
+            var rpm = Convert.ToSingle(value, CultureInfo.InvariantCulture);
+            snapshot.fans.Add(new FanSnapshot
+            {
+                title = title,
+                rpm = rpm
+            });
         }
+
+        snapshot.fanCount = snapshot.fans.Count;
+        return snapshot;
     }
 
     private static Assembly ResolveGigabyteAssembly(object sender, ResolveEventArgs args)
@@ -134,12 +200,115 @@ internal static class GigabyteFanProbe
             return null;
         }
 
-        var candidatePath = Path.Combine(ToolDirectory, simpleName + ".dll");
+        var toolDirectory = DiscoverToolDirectory();
+        if (string.IsNullOrEmpty(toolDirectory))
+        {
+            return null;
+        }
+
+        var candidatePath = Path.Combine(toolDirectory, simpleName + ".dll");
         return File.Exists(candidatePath) ? Assembly.LoadFrom(candidatePath) : null;
+    }
+
+    private static string DiscoverToolDirectory()
+    {
+        string installLocation;
+        if (TryReadUninstallInstallLocation(out installLocation))
+        {
+            return installLocation;
+        }
+        return null;
+    }
+
+    private static bool TryReadUninstallInstallLocation(out string installLocation)
+    {
+        installLocation = null;
+        var subKey = @"SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
+        using (var uninstallKey = Registry.LocalMachine.OpenSubKey(subKey))
+        {
+            if (uninstallKey == null)
+            {
+                return false;
+            }
+
+            foreach (var childName in uninstallKey.GetSubKeyNames())
+            {
+                using (var childKey = uninstallKey.OpenSubKey(childName))
+                {
+                    if (childKey == null)
+                    {
+                        continue;
+                    }
+
+                    var displayName = childKey.GetValue("DisplayName") as string;
+                    if (!string.Equals(displayName, "SIV", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(displayName, "System Information Viewer", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var candidate = childKey.GetValue("InstallLocation") as string;
+                    if (string.IsNullOrWhiteSpace(candidate))
+                    {
+                        continue;
+                    }
+
+                    candidate = candidate.Trim();
+                    if (Directory.Exists(candidate))
+                    {
+                        installLocation = candidate;
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     private static void Write(string key, string value)
     {
         Console.WriteLine(key + "=" + value);
+    }
+
+    private static void WriteFrame(Snapshot snapshot, bool framed)
+    {
+        if (framed)
+        {
+            Console.WriteLine("frame_begin");
+        }
+
+        Write("success", snapshot.success ? "1" : "0");
+        Write("diagnostics", snapshot.diagnostics);
+        Write("controller_type", snapshot.controllerType);
+        Write("chip_name", snapshot.chipName);
+        for (var i = 0; i < snapshot.fans.Count; i++)
+        {
+            Write("fan_" + i.ToString(CultureInfo.InvariantCulture) + "_title", snapshot.fans[i].title);
+            Write("fan_" + i.ToString(CultureInfo.InvariantCulture) + "_rpm", snapshot.fans[i].rpm.ToString(CultureInfo.InvariantCulture));
+        }
+        Write("fan_count", snapshot.fanCount.ToString(CultureInfo.InvariantCulture));
+
+        if (framed)
+        {
+            Console.WriteLine("frame_end");
+            Console.Out.Flush();
+        }
+    }
+
+    private sealed class Snapshot
+    {
+        public bool success;
+        public string diagnostics;
+        public string controllerType;
+        public string chipName;
+        public int fanCount;
+        public readonly System.Collections.Generic.List<FanSnapshot> fans = new System.Collections.Generic.List<FanSnapshot>();
+    }
+
+    private sealed class FanSnapshot
+    {
+        public string title;
+        public float rpm;
     }
 }

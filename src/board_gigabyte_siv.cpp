@@ -3,11 +3,14 @@
 #include <winreg.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -115,9 +118,29 @@ std::optional<double> ParseDouble(const std::string& text) {
     return value;
 }
 
-ProbeResult RunProbeHelper(const std::wstring& helperPath, tracing::Trace& trace) {
-    ProbeResult result;
+struct DaemonProcess {
+    HANDLE readPipe = nullptr;
+    HANDLE process = nullptr;
+    HANDLE thread = nullptr;
+};
 
+void CloseDaemonProcess(DaemonProcess& daemon) {
+    if (daemon.readPipe != nullptr) {
+        CloseHandle(daemon.readPipe);
+        daemon.readPipe = nullptr;
+    }
+    if (daemon.thread != nullptr) {
+        CloseHandle(daemon.thread);
+        daemon.thread = nullptr;
+    }
+    if (daemon.process != nullptr) {
+        TerminateProcess(daemon.process, 0);
+        CloseHandle(daemon.process);
+        daemon.process = nullptr;
+    }
+}
+
+bool StartProbeDaemon(const std::wstring& helperPath, tracing::Trace& trace, DaemonProcess& daemon, std::string& diagnostics) {
     SECURITY_ATTRIBUTES sa{};
     sa.nLength = sizeof(sa);
     sa.bInheritHandle = TRUE;
@@ -125,12 +148,12 @@ ProbeResult RunProbeHelper(const std::wstring& helperPath, tracing::Trace& trace
     HANDLE readPipe = nullptr;
     HANDLE writePipe = nullptr;
     if (!CreatePipe(&readPipe, &writePipe, &sa, 0)) {
-        result.diagnostics = "Failed to create helper pipe.";
-        return result;
+        diagnostics = "Failed to create helper pipe.";
+        return false;
     }
     SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
 
-    std::wstring commandLine = L"\"" + helperPath + L"\"";
+    std::wstring commandLine = L"\"" + helperPath + L"\" /daemon";
     STARTUPINFOW si{};
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESTDHANDLES;
@@ -147,64 +170,106 @@ ProbeResult RunProbeHelper(const std::wstring& helperPath, tracing::Trace& trace
     CloseHandle(writePipe);
     if (!created) {
         CloseHandle(readPipe);
-        result.diagnostics = "Failed to start GigabyteFanProbe helper.";
-        return result;
+        diagnostics = "Failed to start GigabyteFanProbe daemon.";
+        return false;
     }
 
-    std::string output;
-    char buffer[512];
-    DWORD read = 0;
-    while (ReadFile(readPipe, buffer, sizeof(buffer), &read, nullptr) && read > 0) {
-        output.append(buffer, buffer + read);
-    }
-    CloseHandle(readPipe);
+    daemon.readPipe = readPipe;
+    daemon.process = pi.hProcess;
+    daemon.thread = pi.hThread;
+    diagnostics = "GigabyteFanProbe daemon started.";
+    trace.Write("gigabyte_siv:daemon_started path=\"" + Utf8FromWide(helperPath) + "\"");
+    return true;
+}
 
-    const DWORD waitResult = WaitForSingleObject(pi.hProcess, 5000);
+void ApplyResultField(ProbeResult& result, const std::string& line) {
+    if (line.empty()) {
+        return;
+    }
+    const size_t equals = line.find('=');
+    if (equals == std::string::npos) {
+        return;
+    }
+    const std::string key = line.substr(0, equals);
+    const std::string value = line.substr(equals + 1);
+    result.fields.emplace_back(key, value);
+    if (key == "success") {
+        result.success = value == "1" || value == "true" || value == "yes";
+    } else if (key == "diagnostics") {
+        result.diagnostics = value;
+    }
+}
+
+bool PumpProbeDaemon(DaemonProcess& daemon, tracing::Trace& trace, std::string& buffer,
+    ProbeResult& currentFrame, bool& frameOpen, std::deque<ProbeResult>& completedFrames, std::string& diagnostics) {
+    if (daemon.readPipe == nullptr || daemon.process == nullptr) {
+        diagnostics = "GigabyteFanProbe daemon is not running.";
+        return false;
+    }
+
     DWORD exitCode = STILL_ACTIVE;
-    GetExitCodeProcess(pi.hProcess, &exitCode);
-    CloseHandle(pi.hThread);
-    CloseHandle(pi.hProcess);
-
-    if (waitResult != WAIT_OBJECT_0) {
-        result.diagnostics = "GigabyteFanProbe helper timed out.";
-        return result;
+    if (!GetExitCodeProcess(daemon.process, &exitCode) || exitCode != STILL_ACTIVE) {
+        diagnostics = "GigabyteFanProbe daemon exited.";
+        return false;
     }
 
-    trace.Write("gigabyte_siv:helper_output_begin");
-    trace.Write(output);
-    trace.Write("gigabyte_siv:helper_output_end exit_code=" + std::to_string(exitCode));
+    DWORD available = 0;
+    if (!PeekNamedPipe(daemon.readPipe, nullptr, 0, nullptr, &available, nullptr)) {
+        diagnostics = "Failed to poll GigabyteFanProbe daemon output.";
+        return false;
+    }
+    if (available == 0) {
+        return true;
+    }
+
+    std::string chunk;
+    chunk.resize(available);
+    DWORD read = 0;
+    if (!ReadFile(daemon.readPipe, chunk.data(), available, &read, nullptr) || read == 0) {
+        diagnostics = "Failed to read GigabyteFanProbe daemon output.";
+        return false;
+    }
+    chunk.resize(read);
+    trace.Write("gigabyte_siv:daemon_chunk_begin");
+    trace.Write(chunk);
+    trace.Write("gigabyte_siv:daemon_chunk_end size=" + std::to_string(read));
+    buffer += chunk;
 
     size_t position = 0;
-    while (position < output.size()) {
-        const size_t end = output.find('\n', position);
-        std::string line = Trim(output.substr(position, end == std::string::npos ? std::string::npos : end - position));
-        position = end == std::string::npos ? output.size() : end + 1;
-        if (line.empty()) {
+    while (position < buffer.size()) {
+        const size_t end = buffer.find('\n', position);
+        if (end == std::string::npos) {
+            break;
+        }
+        const std::string line = Trim(buffer.substr(position, end - position));
+        position = end + 1;
+        if (line == "frame_begin") {
+            currentFrame = ProbeResult{};
+            frameOpen = true;
             continue;
         }
-        const size_t equals = line.find('=');
-        if (equals == std::string::npos) {
+        if (line == "frame_end") {
+            if (frameOpen) {
+                completedFrames.push_back(currentFrame);
+            }
+            currentFrame = ProbeResult{};
+            frameOpen = false;
             continue;
         }
-        result.fields.emplace_back(line.substr(0, equals), line.substr(equals + 1));
-    }
-
-    for (const auto& [key, value] : result.fields) {
-        if (key == "success") {
-            result.success = value == "1" || value == "true" || value == "yes";
-        } else if (key == "diagnostics") {
-            result.diagnostics = value;
+        if (frameOpen) {
+            ApplyResultField(currentFrame, line);
         }
     }
-    if (result.diagnostics.empty() && exitCode != 0) {
-        result.diagnostics = "GigabyteFanProbe helper returned failure.";
-    }
-    return result;
+    buffer.erase(0, position);
+    return true;
 }
 
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
     explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace) : trace_(trace) {}
+    ~GigabyteSivBoardTelemetryProvider() override {
+        CloseDaemonProcess(daemon_);
+    }
 
     bool Initialize(const AppConfig& config) override {
         config_ = config;
@@ -254,11 +319,16 @@ public:
             return sample;
         }
 
-        const ULONGLONG now = GetTickCount64();
-        if (cachedResult_.fields.empty() || now - lastProbeTick_ >= 1000) {
-            cachedResult_ = RunProbeHelper(helperPath_, trace());
-            lastProbeTick_ = now;
-            ApplyProbeFields(cachedResult_);
+        if (!EnsureDaemonRunning()) {
+            sample.diagnostics = diagnostics_;
+            return sample;
+        }
+
+        PumpAndApplyLatestFrame();
+
+        if (cachedResult_.fields.empty()) {
+            sample.diagnostics = diagnostics_;
+            return sample;
         }
 
         sample.chipName = chipName_;
@@ -301,6 +371,59 @@ private:
     tracing::Trace& trace() {
         static tracing::Trace nullTrace;
         return trace_ != nullptr ? *trace_ : nullTrace;
+    }
+
+    bool EnsureDaemonRunning() {
+        DWORD exitCode = STILL_ACTIVE;
+        const bool running = daemon_.process != nullptr && GetExitCodeProcess(daemon_.process, &exitCode) && exitCode == STILL_ACTIVE;
+        if (running) {
+            return true;
+        }
+
+        CloseDaemonProcess(daemon_);
+        daemonBuffer_.clear();
+        daemonFrames_.clear();
+        daemonFrameOpen_ = false;
+        daemonCurrentFrame_ = ProbeResult{};
+
+        if (!StartProbeDaemon(helperPath_, trace(), daemon_, diagnostics_)) {
+            return false;
+        }
+
+        const ULONGLONG deadline = GetTickCount64() + 3000;
+        while (GetTickCount64() < deadline) {
+            if (!PumpProbeDaemon(daemon_, trace(), daemonBuffer_, daemonCurrentFrame_, daemonFrameOpen_, daemonFrames_, diagnostics_)) {
+                CloseDaemonProcess(daemon_);
+                return false;
+            }
+            if (!daemonFrames_.empty()) {
+                cachedResult_ = daemonFrames_.back();
+                daemonFrames_.clear();
+                ApplyProbeFields(cachedResult_);
+                lastProbeTick_ = GetTickCount64();
+                return true;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+
+        diagnostics_ = "GigabyteFanProbe daemon did not emit an initial frame.";
+        CloseDaemonProcess(daemon_);
+        return false;
+    }
+
+    void PumpAndApplyLatestFrame() {
+        if (!PumpProbeDaemon(daemon_, trace(), daemonBuffer_, daemonCurrentFrame_, daemonFrameOpen_, daemonFrames_, diagnostics_)) {
+            CloseDaemonProcess(daemon_);
+            return;
+        }
+        if (daemonFrames_.empty()) {
+            return;
+        }
+
+        cachedResult_ = daemonFrames_.back();
+        daemonFrames_.clear();
+        ApplyProbeFields(cachedResult_);
+        lastProbeTick_ = GetTickCount64();
     }
 
     void ApplyProbeFields(const ProbeResult& result) {
@@ -368,6 +491,11 @@ private:
     std::optional<uint8_t> ecMmioRegisterValue_;
     std::vector<FanReading> fanReadings_;
     ProbeResult cachedResult_{};
+    ProbeResult daemonCurrentFrame_{};
+    DaemonProcess daemon_{};
+    std::deque<ProbeResult> daemonFrames_{};
+    std::string daemonBuffer_;
+    bool daemonFrameOpen_ = false;
     ULONGLONG lastProbeTick_ = 0;
     int selectedChannel_ = 0;
     bool initialized_ = false;
