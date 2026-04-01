@@ -6,13 +6,11 @@
 #include <netioapi.h>
 #include <pdh.h>
 #include <pdhmsg.h>
-#include <wbemidl.h>
 
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cwctype>
-#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -25,24 +23,11 @@
 
 namespace {
 
-struct WmiDiagnostic {
-    std::wstring namespaceName;
-    std::wstring query;
-    HRESULT result = S_OK;
-    std::wstring detail;
-};
-
 std::wstring ToLower(std::wstring value) {
     std::transform(value.begin(), value.end(), value.begin(), [](wchar_t ch) {
         return static_cast<wchar_t>(std::towlower(ch));
     });
     return value;
-}
-
-std::wstring FormatHresult(HRESULT hr) {
-    wchar_t buffer[32];
-    swprintf_s(buffer, L"0x%08X", static_cast<unsigned int>(hr));
-    return buffer;
 }
 
 std::wstring FormatScalarMetric(const ScalarMetric& metric, int precision) {
@@ -64,70 +49,6 @@ void AppendWideLine(std::wstring& output, const std::wstring& text) {
     output += text;
     output += L"\r\n";
 }
-
-std::optional<std::wstring> VariantToString(const VARIANT& value) {
-    if (value.vt == VT_BSTR && value.bstrVal != nullptr) {
-        return std::wstring(value.bstrVal);
-    }
-    return std::nullopt;
-}
-
-std::optional<double> VariantToDouble(const VARIANT& value) {
-    switch (value.vt) {
-    case VT_R4:
-        return value.fltVal;
-    case VT_R8:
-        return value.dblVal;
-    case VT_I4:
-    case VT_INT:
-        return static_cast<double>(value.intVal);
-    case VT_UI4:
-        return static_cast<double>(value.uintVal);
-    case VT_I8:
-        return static_cast<double>(value.llVal);
-    case VT_UI8:
-        return static_cast<double>(value.ullVal);
-    case VT_BSTR:
-        if (value.bstrVal != nullptr) {
-            try {
-                return std::stod(value.bstrVal);
-            } catch (...) {
-                return std::nullopt;
-            }
-        }
-        break;
-    default:
-        break;
-    }
-    return std::nullopt;
-}
-
-class WmiSession {
-public:
-    bool Initialize();
-    ~WmiSession();
-
-    std::optional<std::wstring> QueryFirstString(
-        const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property);
-    std::optional<double> QueryFirstDouble(
-        const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property);
-    std::vector<WmiDiagnostic> Diagnostics() const;
-    void ClearDiagnostics();
-
-private:
-    bool QueryFirstVariant(
-        const std::wstring& namespaceName, const std::wstring& query,
-        const std::wstring& property, VARIANT& value);
-    IWbemServices* GetServices(const std::wstring& namespaceName);
-    void RecordDiagnostic(
-        const std::wstring& namespaceName, const std::wstring& query, HRESULT result, const std::wstring& detail);
-
-    bool initialized_ = false;
-    bool comInitialized_ = false;
-    IWbemLocator* locator_ = nullptr;
-    std::map<std::wstring, IWbemServices*> services_;
-    std::vector<WmiDiagnostic> diagnostics_;
-};
 
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
 
@@ -166,7 +87,6 @@ struct TelemetryCollector::Impl {
 
     AppConfig config_;
     SystemSnapshot snapshot_;
-    WmiSession wmi_;
     std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
     std::wstring gpuProviderName_ = L"None";
     std::wstring gpuProviderDiagnostics_ = L"Provider not initialized.";
@@ -189,150 +109,6 @@ struct TelemetryCollector::Impl {
     std::chrono::steady_clock::time_point lastNetwork_{};
     std::chrono::steady_clock::time_point lastStorage_{};
 };
-
-bool WmiSession::Initialize() {
-    if (initialized_) {
-        return true;
-    }
-    const HRESULT coInit = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    if (FAILED(coInit) && coInit != RPC_E_CHANGED_MODE) {
-        return false;
-    }
-    comInitialized_ = SUCCEEDED(coInit);
-    const HRESULT security = CoInitializeSecurity(
-        nullptr, -1, nullptr, nullptr,
-        RPC_C_AUTHN_LEVEL_DEFAULT, RPC_C_IMP_LEVEL_IMPERSONATE,
-        nullptr, EOAC_NONE, nullptr);
-    if (FAILED(security) && security != RPC_E_TOO_LATE) {
-        return false;
-    }
-    const HRESULT hr = CoCreateInstance(
-        CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_IWbemLocator,
-        reinterpret_cast<void**>(&locator_));
-    if (FAILED(hr)) {
-        return false;
-    }
-    initialized_ = true;
-    return true;
-}
-
-WmiSession::~WmiSession() {
-    for (auto& pair : services_) {
-        if (pair.second != nullptr) {
-            pair.second->Release();
-        }
-    }
-    if (locator_ != nullptr) {
-        locator_->Release();
-    }
-    if (comInitialized_) {
-        CoUninitialize();
-    }
-}
-
-std::vector<WmiDiagnostic> WmiSession::Diagnostics() const {
-    return diagnostics_;
-}
-
-void WmiSession::ClearDiagnostics() {
-    diagnostics_.clear();
-}
-
-std::optional<std::wstring> WmiSession::QueryFirstString(
-    const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property) {
-    VARIANT value{};
-    VariantInit(&value);
-    if (!QueryFirstVariant(namespaceName, query, property, value)) {
-        return std::nullopt;
-    }
-    const std::optional<std::wstring> result = VariantToString(value);
-    VariantClear(&value);
-    return result;
-}
-
-std::optional<double> WmiSession::QueryFirstDouble(
-    const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property) {
-    VARIANT value{};
-    VariantInit(&value);
-    if (!QueryFirstVariant(namespaceName, query, property, value)) {
-        return std::nullopt;
-    }
-    const std::optional<double> result = VariantToDouble(value);
-    VariantClear(&value);
-    return result;
-}
-
-bool WmiSession::QueryFirstVariant(
-    const std::wstring& namespaceName, const std::wstring& query,
-    const std::wstring& property, VARIANT& value) {
-    IWbemServices* services = GetServices(namespaceName);
-    if (services == nullptr) {
-        RecordDiagnostic(namespaceName, query, E_FAIL, L"Failed to open namespace");
-        return false;
-    }
-    BSTR language = SysAllocString(L"WQL");
-    BSTR queryText = SysAllocString(query.c_str());
-    IEnumWbemClassObject* enumerator = nullptr;
-    const HRESULT hr = services->ExecQuery(
-        language, queryText,
-        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
-        nullptr, &enumerator);
-    SysFreeString(language);
-    SysFreeString(queryText);
-    if (FAILED(hr) || enumerator == nullptr) {
-        RecordDiagnostic(namespaceName, query, hr, L"ExecQuery failed");
-        return false;
-    }
-    IWbemClassObject* object = nullptr;
-    ULONG returned = 0;
-    const HRESULT nextHr = enumerator->Next(WBEM_INFINITE, 1, &object, &returned);
-    if (FAILED(nextHr) || returned == 0 || object == nullptr) {
-        enumerator->Release();
-        RecordDiagnostic(
-            namespaceName, query, nextHr,
-            returned == 0 ? L"Query returned no rows" : L"Enumerator Next failed");
-        return false;
-    }
-    const HRESULT getHr = object->Get(property.c_str(), 0, &value, nullptr, nullptr);
-    object->Release();
-    enumerator->Release();
-    RecordDiagnostic(namespaceName, query, getHr, SUCCEEDED(getHr) ? L"OK" : L"Get(property) failed");
-    return SUCCEEDED(getHr);
-}
-
-IWbemServices* WmiSession::GetServices(const std::wstring& namespaceName) {
-    if (!initialized_ && !Initialize()) {
-        RecordDiagnostic(namespaceName, L"", E_FAIL, L"Initialize failed");
-        return nullptr;
-    }
-    const auto found = services_.find(namespaceName);
-    if (found != services_.end()) {
-        return found->second;
-    }
-    BSTR ns = SysAllocString(namespaceName.c_str());
-    IWbemServices* services = nullptr;
-    HRESULT hr = locator_->ConnectServer(ns, nullptr, nullptr, nullptr, 0, nullptr, nullptr, &services);
-    SysFreeString(ns);
-    if (FAILED(hr) || services == nullptr) {
-        RecordDiagnostic(namespaceName, L"", hr, L"ConnectServer failed");
-        return nullptr;
-    }
-    hr = CoSetProxyBlanket(
-        services, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, nullptr,
-        RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, nullptr, EOAC_NONE);
-    if (FAILED(hr)) {
-        services->Release();
-        RecordDiagnostic(namespaceName, L"", hr, L"CoSetProxyBlanket failed");
-        return nullptr;
-    }
-    services_[namespaceName] = services;
-    return services;
-}
-
-void WmiSession::RecordDiagnostic(
-    const std::wstring& namespaceName, const std::wstring& query, HRESULT result, const std::wstring& detail) {
-    diagnostics_.push_back(WmiDiagnostic{namespaceName, query, result, detail});
-}
 
 TelemetryCollector::Impl::~Impl() {
     if (cpuQuery_ != nullptr) {
@@ -357,37 +133,18 @@ TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept
 
 bool TelemetryCollector::Initialize(const AppConfig& config) {
     impl_->config_ = config;
-    impl_->wmi_.ClearDiagnostics();
     impl_->snapshot_.network.uploadHistory.assign(60, 0.0);
     impl_->snapshot_.network.downloadHistory.assign(60, 0.0);
 
     WSADATA wsaData{};
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    const auto cpuName = impl_->wmi_.QueryFirstString(
-        L"root\\cimv2", L"SELECT Name FROM Win32_Processor", L"Name");
-    if (cpuName.has_value()) {
-        impl_->snapshot_.cpu.name = *cpuName;
-    }
-
-    const auto gpuName = impl_->wmi_.QueryFirstString(
-        L"root\\cimv2", L"SELECT Name FROM Win32_VideoController", L"Name");
-    if (gpuName.has_value()) {
-        impl_->snapshot_.gpu.name = *gpuName;
-    }
-
-    const auto gpuRam = impl_->wmi_.QueryFirstDouble(
-        L"root\\cimv2", L"SELECT AdapterRAM FROM Win32_VideoController", L"AdapterRAM");
-    if (gpuRam.has_value() && *gpuRam > 0.0) {
-        impl_->snapshot_.gpu.vram.totalGb = *gpuRam / (1024.0 * 1024.0 * 1024.0);
-    }
-
     impl_->gpuProvider_ = CreateGpuVendorTelemetryProvider();
     if (impl_->gpuProvider_ != nullptr) {
         if (impl_->gpuProvider_->Initialize()) {
             impl_->ApplyGpuVendorSample(impl_->gpuProvider_->Sample());
         } else {
-            impl_->gpuProviderName_ = L"AMD ADL";
+            impl_->gpuProviderName_ = L"AMD ADLX";
             impl_->gpuProviderDiagnostics_ = L"Provider initialization failed.";
         }
     }
@@ -598,24 +355,6 @@ std::wstring TelemetryCollector::Impl::DumpText() const {
             wchar_t buffer[128];
             swprintf_s(buffer, L"%ls used=%.1f%% free=%.1f GB", drive.label.c_str(), drive.usedPercent, drive.freeGb);
             AppendWideLine(output, buffer);
-        }
-    }
-    AppendWideLine(output, L"");
-
-    AppendWideLine(output, L"[WMI Diagnostics]");
-    const auto diagnostics = wmi_.Diagnostics();
-    if (diagnostics.empty()) {
-        AppendWideLine(output, L"(none)");
-    } else {
-        for (const auto& diagnostic : diagnostics) {
-            std::wstringstream line;
-            line << L"ns=" << diagnostic.namespaceName
-                 << L" hr=" << FormatHresult(diagnostic.result)
-                 << L" detail=" << diagnostic.detail;
-            if (!diagnostic.query.empty()) {
-                line << L" query=" << diagnostic.query;
-            }
-            AppendWideLine(output, line.str());
         }
     }
     return output;

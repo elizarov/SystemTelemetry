@@ -82,10 +82,11 @@ CPU package temperature, CPU package power, and motherboard or CPU fan speed are
 GPU telemetry must use Windows counters for generic metrics and vendor APIs for vendor-specific metrics:
 
 - GPU load from Windows/PDH
-- GPU dedicated VRAM usage from Windows/PDH or Windows-reported adapter memory
+- GPU dedicated VRAM usage from Windows/PDH
 - AMD GPU temperature, clock, and fan speed from AMD's ADLX API
 
 If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable instead of blocking startup.
+The application must not rely on WMI for telemetry, names, or dump diagnostics.
 
 Vendor telemetry integrations should live in separate source files so each vendor implementation remains isolated.
 
