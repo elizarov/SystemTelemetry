@@ -3,7 +3,7 @@
 
 This project is a compact, real-time system monitoring dashboard designed for a small 800x480 secondary display,
 presenting only the telemetry that can be collected cleanly through Windows APIs or vendor APIs.
-It combines CPU load, clock, and RAM usage with GPU load, temperature, clock, fan speed, and VRAM usage,
+It combines CPU load, temperature, clock, fan speed, and RAM usage with GPU load, temperature, clock, fan speed, and VRAM usage,
 alongside network activity, multi-drive storage status, and a clock, all organized into a balanced panel layout.
 The design emphasizes glanceable visuals with large load indicators, concise numeric stats, and minimal clutter.
 
@@ -11,10 +11,11 @@ The design emphasizes glanceable visuals with large load indicators, concise num
 │           CPU               │             GPU              │
 │  AMD Ryzen                  │  Radeon RX 6800              │
 │  ○  2%                      │  ○  0%                       │
-│  Clock   3.70GHz            │  Temp    45°C                │
-│  RAM     15.0 / 64 GB       │  Clock   29MHz               │
-│                             │  Fan     0RPM                │
-│                             │  VRAM    3.7 / 16 GB         │
+│  Temp    67°C               │  Temp    45°C                │
+│  Clock   3.70GHz            │  Clock   29MHz               │
+│  Fan     2400RPM            │  Fan     0RPM                │
+│  RAM     15.0 / 64 GB       │  VRAM    3.7 / 16 GB         │
+│                             │                              │
 ├───────────────┬──────────────────────────────┬─────────────┤
 │   Network     │           Storage            │    Time     │
 │  Up   0.3MB/s │  C: ████░░░░░ 32%  2.5TB     │   10:43     │
@@ -33,6 +34,7 @@ Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expe
 Keep all sources in `src`.
 Keep generated build outputs and temporary compiler files inside `build\` so the project root stays clean.
 Keep transient compiler scratch files out of the top level of `build\`; route them into a dedicated `build\tmp\` area so the main build output folder stays readable.
+Use a fresh per-build subdirectory under `build\tmp\` for `TMP` and `TEMP` so stale or externally locked toolchain scratch files do not break later builds.
 Always build through `build.cmd`.
 
 Requirements
@@ -76,7 +78,7 @@ Support a `/dump` command-line switch. When present, the application must initia
 The `/dump` trace must cover all diagnostics collection paths, not only vendor GPU integration.
 Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
 Trace output should go through one shared trace wrapper that safely handles a null output stream and centralizes common trace-formatting helpers.
-The human-readable dump snapshot should include the board-vendor provider status plus Gigabyte debug details such as detected board identity, helper path, controller type, requested and selected fan channel, sampled diagnostics, and any raw chip-register details when that provider exposes them.
+The human-readable dump snapshot should include the board-vendor provider status plus Gigabyte debug details such as detected board identity, helper path, controller type, selected CPU temperature sensor, requested and selected fan channel, sampled diagnostics, and any raw chip-register details when that provider exposes them.
 
 Telemetry sources
 =================
@@ -86,9 +88,9 @@ CPU telemetry must rely only on Windows-accessible metrics that are available in
 - CPU load
 - CPU clock
 - RAM usage
-- Gigabyte motherboard fan speed on the target Gigabyte X570 AORUS system through the installed Gigabyte SIV hardware-monitor stack, without LibreHardwareMonitor or OpenHardwareMonitor
+- Gigabyte motherboard CPU temperature and fan speed on the target Gigabyte X570 AORUS system through the installed Gigabyte SIV hardware-monitor stack, without LibreHardwareMonitor or OpenHardwareMonitor
 
-CPU package temperature and CPU package power are not required and should not rely on LibreHardwareMonitor or OpenHardwareMonitor.
+CPU package power is not required and should not rely on LibreHardwareMonitor or OpenHardwareMonitor.
 
 GPU telemetry must use Windows counters for generic metrics and vendor APIs for vendor-specific metrics:
 
@@ -102,8 +104,8 @@ The application must not rely on WMI for telemetry, names, or dump diagnostics.
 
 Vendor telemetry integrations should live in separate source files so each vendor implementation remains isolated.
 Gigabyte motherboard fan telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the CPU fan metric unavailable instead of blocking startup.
-The Gigabyte motherboard fan path should identify Gigabyte boards through non-WMI Windows metadata, launch a local helper beside the executable, have that helper discover the installed SIV location from the Windows registry, talk to the Gigabyte SIV hardware-monitor service over the `GigabyteEngine` IPC pipe, collect the available fan RPM readings exposed by the `HwRegister` source, and report provider diagnostics through `/dump`.
-The Gigabyte helper must support a `/daemon` mode that keeps one SIV monitor session open and streams fresh fan snapshots continuously so the dashboard does not need to relaunch the helper process for each sample.
+The Gigabyte motherboard telemetry path should identify Gigabyte boards through non-WMI Windows metadata, launch a local helper beside the executable, have that helper discover the installed SIV location from the Windows registry, talk to the Gigabyte SIV hardware-monitor service over the `GigabyteEngine` IPC pipe, collect the available `HwRegister` fan RPM and temperature readings, and report provider diagnostics through `/dump`.
+The Gigabyte helper must support a `/daemon` mode that keeps one SIV monitor session open and streams fresh fan and temperature snapshots continuously so the dashboard does not need to relaunch the helper process for each sample.
 
 Size and placement
 ==================
@@ -207,6 +209,7 @@ CPU Load (%)
 Metrics (display as thin bars)
 
 Clock (GHz)
+Temp (°C)
 Fan (RPM)
 RAM usage
 Format: used / total

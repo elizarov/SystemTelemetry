@@ -531,6 +531,8 @@ void TelemetryCollector::Impl::ApplyBoardVendorSample(const BoardVendorTelemetry
     boardProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
     boardProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
     boardProviderAvailable_ = sample.available;
+    snapshot_.cpu.temperature.value = sample.cpuTemperatureC;
+    snapshot_.cpu.temperature.unit = "\xC2\xB0""C";
     snapshot_.cpu.fan.value = sample.fanRpm;
     snapshot_.cpu.fan.unit = "RPM";
 }
@@ -595,6 +597,7 @@ void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
         output << buffer << "\r\n";
     }
     output << "Clock: " << FormatScalarMetric(snapshot_.cpu.clock, 2) << "\r\n";
+    output << "Temperature: " << FormatScalarMetric(snapshot_.cpu.temperature, 1) << "\r\n";
     output << "Fan: " << FormatScalarMetric(snapshot_.cpu.fan, 0) << "\r\n";
     output << "Memory: " << FormatMemoryMetric(snapshot_.cpu.memory) << "\r\n";
     output << "\r\n";
@@ -631,6 +634,8 @@ void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
     output << "Chip ID: " << FormatOptionalHex16(boardProviderSample_.chipId) << "\r\n";
     output << "Monitor Base: " << FormatOptionalHex32(boardProviderSample_.monitorBaseAddress) << "\r\n";
     output << "EC MMIO Register: " << FormatOptionalHex8(boardProviderSample_.ecMmioRegisterValue) << "\r\n";
+    output << "CPU Temperature Sensor: " << (boardProviderSample_.selectedCpuTemperatureSensor.empty() ? "N/A" : boardProviderSample_.selectedCpuTemperatureSensor) << "\r\n";
+    output << "CPU Temperature: " << (boardProviderSample_.cpuTemperatureC.has_value() ? FormatScalarMetric(ScalarMetric{boardProviderSample_.cpuTemperatureC, "\xC2\xB0""C"}, 1) : "N/A") << "\r\n";
     output << "Requested Fan Channel: " << FormatOptionalInt(boardProviderSample_.requestedFanChannel) << "\r\n";
     output << "Selected Fan Channel: " << FormatOptionalInt(boardProviderSample_.selectedFanChannel) << "\r\n";
     output << "Raw Fan Counter: " << FormatOptionalHex16(boardProviderSample_.rawFanCounter) << "\r\n";

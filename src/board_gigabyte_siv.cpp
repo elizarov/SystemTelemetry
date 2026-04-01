@@ -31,6 +31,11 @@ struct FanReading {
     std::optional<double> rpm;
 };
 
+struct TemperatureReading {
+    std::string title;
+    std::optional<double> celsius;
+};
+
 std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
     DWORD type = 0;
     DWORD bytes = 0;
@@ -308,6 +313,7 @@ public:
         sample.chipName = chipName_;
         sample.controllerType = controllerType_;
         sample.driverLibrary = loadedLibrary_;
+        sample.selectedCpuTemperatureSensor = selectedCpuTemperatureSensor_;
         sample.selectedFanChannel = selectedChannel_ > 0 ? std::optional<int>(selectedChannel_) : std::nullopt;
         sample.chipId = chipId_;
         sample.monitorBaseAddress = monitorBaseAddress_;
@@ -337,12 +343,21 @@ public:
         sample.chipId = chipId_;
         sample.monitorBaseAddress = monitorBaseAddress_;
         sample.ecMmioRegisterValue = ecMmioRegisterValue_;
+        sample.selectedCpuTemperatureSensor = selectedCpuTemperatureSensor_;
+        sample.cpuTemperatureC = selectedCpuTemperatureC_;
         sample.diagnostics = diagnostics_;
 
-        if (!cachedResult_.success || fanReadings_.empty()) {
+        if (!cachedResult_.success) {
             return sample;
         }
 
+        if (!selectedCpuTemperatureC_.has_value()) {
+            SelectCpuTemperature();
+            sample.selectedCpuTemperatureSensor = selectedCpuTemperatureSensor_;
+            sample.cpuTemperatureC = selectedCpuTemperatureC_;
+        }
+
+        std::string selectedFanTitle;
         int chosenIndex = config_.gigabyteFanChannel >= 1 ? (config_.gigabyteFanChannel - 1) : 0;
         if (chosenIndex < 0 || chosenIndex >= static_cast<int>(fanReadings_.size()) || !fanReadings_[chosenIndex].rpm.has_value()) {
             chosenIndex = 0;
@@ -354,16 +369,22 @@ public:
             }
         }
 
-        if (chosenIndex < 0 || chosenIndex >= static_cast<int>(fanReadings_.size()) ||
-            !fanReadings_[chosenIndex].rpm.has_value() || *fanReadings_[chosenIndex].rpm <= 0.0) {
-            return sample;
+        if (chosenIndex >= 0 && chosenIndex < static_cast<int>(fanReadings_.size()) &&
+            fanReadings_[chosenIndex].rpm.has_value() && *fanReadings_[chosenIndex].rpm > 0.0) {
+            selectedChannel_ = chosenIndex + 1;
+            sample.fanRpm = fanReadings_[chosenIndex].rpm;
+            sample.selectedFanChannel = selectedChannel_;
+            selectedFanTitle = fanReadings_[chosenIndex].title;
         }
 
-        selectedChannel_ = chosenIndex + 1;
-        sample.available = true;
-        sample.fanRpm = fanReadings_[chosenIndex].rpm;
-        sample.selectedFanChannel = selectedChannel_;
-        sample.diagnostics = diagnostics_ + " sampled_title=" + fanReadings_[chosenIndex].title;
+        sample.available = sample.cpuTemperatureC.has_value() || sample.fanRpm.has_value();
+        sample.diagnostics = diagnostics_;
+        if (!selectedFanTitle.empty()) {
+            sample.diagnostics += " sampled_fan_title=" + selectedFanTitle;
+        }
+        if (!sample.selectedCpuTemperatureSensor.empty()) {
+            sample.diagnostics += " sampled_temp_title=" + sample.selectedCpuTemperatureSensor;
+        }
         return sample;
     }
 
@@ -434,6 +455,9 @@ private:
         monitorBaseAddress_.reset();
         ecMmioRegisterValue_.reset();
         fanReadings_.clear();
+        tempReadings_.clear();
+        selectedCpuTemperatureSensor_.clear();
+        selectedCpuTemperatureC_.reset();
 
         for (const auto& [key, value] : result.fields) {
             if (key == "controller_type") {
@@ -469,12 +493,59 @@ private:
                 } else if (suffix == "rpm") {
                     fanReadings_[index].rpm = ParseDouble(value);
                 }
+            } else if (key.rfind("temp_", 0) == 0) {
+                const size_t secondUnderscore = key.find('_', 5);
+                if (secondUnderscore == std::string::npos) {
+                    continue;
+                }
+                const auto parsedIndex = ParseUnsigned(key.substr(5, secondUnderscore - 5));
+                if (!parsedIndex.has_value()) {
+                    continue;
+                }
+                const int index = static_cast<int>(*parsedIndex);
+                if (index >= static_cast<int>(tempReadings_.size())) {
+                    tempReadings_.resize(index + 1);
+                }
+                const std::string suffix = key.substr(secondUnderscore + 1);
+                if (suffix == "title") {
+                    tempReadings_[index].title = value;
+                } else if (suffix == "c") {
+                    tempReadings_[index].celsius = ParseDouble(value);
+                }
             }
         }
 
         if (chipName_.empty() && !controllerType_.empty()) {
             chipName_ = controllerType_;
         }
+
+        SelectCpuTemperature();
+    }
+
+    void SelectCpuTemperature() {
+        auto chooseReading = [this](bool requireCpuTitle) -> const TemperatureReading* {
+            for (const auto& reading : tempReadings_) {
+                if (!reading.celsius.has_value()) {
+                    continue;
+                }
+                if (requireCpuTitle && !ContainsInsensitive(reading.title, "cpu")) {
+                    continue;
+                }
+                return &reading;
+            }
+            return nullptr;
+        };
+
+        const TemperatureReading* selected = chooseReading(true);
+        if (selected == nullptr) {
+            selected = chooseReading(false);
+        }
+        if (selected == nullptr) {
+            return;
+        }
+
+        selectedCpuTemperatureSensor_ = selected->title;
+        selectedCpuTemperatureC_ = selected->celsius;
     }
 
     tracing::Trace* trace_ = nullptr;
@@ -490,6 +561,7 @@ private:
     std::optional<uint32_t> monitorBaseAddress_;
     std::optional<uint8_t> ecMmioRegisterValue_;
     std::vector<FanReading> fanReadings_;
+    std::vector<TemperatureReading> tempReadings_;
     ProbeResult cachedResult_{};
     ProbeResult daemonCurrentFrame_{};
     DaemonProcess daemon_{};
@@ -498,6 +570,8 @@ private:
     bool daemonFrameOpen_ = false;
     ULONGLONG lastProbeTick_ = 0;
     int selectedChannel_ = 0;
+    std::string selectedCpuTemperatureSensor_;
+    std::optional<double> selectedCpuTemperatureC_;
     bool initialized_ = false;
 };
 

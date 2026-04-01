@@ -42,7 +42,7 @@ internal static class GigabyteFanProbe
 
             var snapshot = CaptureSnapshot(monitor, hardwareMonitorType, sourceType, sensorType, sensorDataType, collectionType);
             WriteFrame(snapshot, false);
-            return snapshot.success && snapshot.fanCount > 0 ? 0 : 2;
+            return snapshot.success && (snapshot.fanCount > 0 || snapshot.temperatureCount > 0) ? 0 : 2;
         }
         catch (Exception ex)
         {
@@ -161,16 +161,11 @@ internal static class GigabyteFanProbe
         var getCurrentMethod = hardwareMonitorType.GetMethod(
             "GetCurrentMonitoredData",
             new[] { sensorType, collectionType.MakeByRefType() });
-        var sensorCollection = Activator.CreateInstance(collectionType);
-        var arguments = new object[] { Enum.Parse(sensorType, "Fan", false), sensorCollection };
-        getCurrentMethod.Invoke(monitor, arguments);
-        sensorCollection = arguments[1];
-
         var titleProperty = sensorDataType.GetProperty("Title");
         var valueProperty = sensorDataType.GetProperty("Value");
         var unitProperty = sensorDataType.GetProperty("Unit");
 
-        foreach (var sensor in (IEnumerable)sensorCollection)
+        foreach (var sensor in ReadSensors(getCurrentMethod, monitor, sensorType, collectionType, "Fan"))
         {
             var unit = Convert.ToString(unitProperty.GetValue(sensor, null), CultureInfo.InvariantCulture) ?? string.Empty;
             if (!string.Equals(unit, "RPM", StringComparison.OrdinalIgnoreCase))
@@ -188,8 +183,41 @@ internal static class GigabyteFanProbe
             });
         }
 
+        foreach (var sensor in ReadSensors(getCurrentMethod, monitor, sensorType, collectionType, "Temperature"))
+        {
+            var unit = Convert.ToString(unitProperty.GetValue(sensor, null), CultureInfo.InvariantCulture) ?? string.Empty;
+            if (!string.Equals(unit, "\u2103", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(unit, "\u00B0C", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var title = Convert.ToString(titleProperty.GetValue(sensor, null), CultureInfo.InvariantCulture) ?? string.Empty;
+            var value = valueProperty.GetValue(sensor, null);
+            var temperatureC = Convert.ToSingle(value, CultureInfo.InvariantCulture);
+            snapshot.temperatures.Add(new TemperatureSnapshot
+            {
+                title = title,
+                celsius = temperatureC
+            });
+        }
+
         snapshot.fanCount = snapshot.fans.Count;
+        snapshot.temperatureCount = snapshot.temperatures.Count;
         return snapshot;
+    }
+
+    private static IEnumerable ReadSensors(
+        MethodInfo getCurrentMethod,
+        object monitor,
+        Type sensorType,
+        Type collectionType,
+        string sensorName)
+    {
+        var sensorCollection = Activator.CreateInstance(collectionType);
+        var arguments = new object[] { Enum.Parse(sensorType, sensorName, false), sensorCollection };
+        getCurrentMethod.Invoke(monitor, arguments);
+        return (IEnumerable)arguments[1];
     }
 
     private static Assembly ResolveGigabyteAssembly(object sender, ResolveEventArgs args)
@@ -288,6 +316,12 @@ internal static class GigabyteFanProbe
             Write("fan_" + i.ToString(CultureInfo.InvariantCulture) + "_rpm", snapshot.fans[i].rpm.ToString(CultureInfo.InvariantCulture));
         }
         Write("fan_count", snapshot.fanCount.ToString(CultureInfo.InvariantCulture));
+        for (var i = 0; i < snapshot.temperatures.Count; i++)
+        {
+            Write("temp_" + i.ToString(CultureInfo.InvariantCulture) + "_title", snapshot.temperatures[i].title);
+            Write("temp_" + i.ToString(CultureInfo.InvariantCulture) + "_c", snapshot.temperatures[i].celsius.ToString(CultureInfo.InvariantCulture));
+        }
+        Write("temp_count", snapshot.temperatureCount.ToString(CultureInfo.InvariantCulture));
 
         if (framed)
         {
@@ -303,12 +337,20 @@ internal static class GigabyteFanProbe
         public string controllerType;
         public string chipName;
         public int fanCount;
+        public int temperatureCount;
         public readonly System.Collections.Generic.List<FanSnapshot> fans = new System.Collections.Generic.List<FanSnapshot>();
+        public readonly System.Collections.Generic.List<TemperatureSnapshot> temperatures = new System.Collections.Generic.List<TemperatureSnapshot>();
     }
 
     private sealed class FanSnapshot
     {
         public string title;
         public float rpm;
+    }
+
+    private sealed class TemperatureSnapshot
+    {
+        public string title;
+        public float celsius;
     }
 }
