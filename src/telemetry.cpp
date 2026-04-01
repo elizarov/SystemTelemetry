@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
@@ -12,26 +12,18 @@
 #include <chrono>
 #include <cstdint>
 #include <cwctype>
-#include <limits>
 #include <map>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <cstdio>
 #include <string>
 #include <vector>
 
+#include "gpu_vendor.h"
 #include "telemetry.h"
 
 namespace {
-
-struct SensorRecord {
-    std::wstring sensorNamespace;
-    std::wstring name;
-    std::wstring identifier;
-    std::wstring parent;
-    std::wstring sensorType;
-    double value = 0.0;
-};
 
 struct WmiDiagnostic {
     std::wstring namespaceName;
@@ -47,44 +39,31 @@ std::wstring ToLower(std::wstring value) {
     return value;
 }
 
-std::wstring EscapeWql(const std::wstring& value) {
-    std::wstring escaped;
-    for (wchar_t ch : value) {
-        if (ch == L'\\' || ch == L'\'') {
-            escaped.push_back(L'\\');
-        }
-        escaped.push_back(ch);
-    }
-    return escaped;
+std::wstring FormatHresult(HRESULT hr) {
+    wchar_t buffer[32];
+    swprintf_s(buffer, L"0x%08X", static_cast<unsigned int>(hr));
+    return buffer;
 }
 
-class WmiSession {
-public:
-    bool Initialize();
-    ~WmiSession();
+std::wstring FormatScalarMetric(const ScalarMetric& metric, int precision) {
+    if (!metric.value.has_value()) {
+        return L"N/A";
+    }
+    wchar_t buffer[64];
+    swprintf_s(buffer, L"%.*f %ls", precision, *metric.value, metric.unit.c_str());
+    return buffer;
+}
 
-    std::optional<std::wstring> QueryFirstString(
-        const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property);
-    std::optional<double> QueryFirstDouble(
-        const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property);
-    std::vector<SensorRecord> EnumerateSensors(const std::wstring& namespaceName);
-    std::vector<WmiDiagnostic> Diagnostics() const;
-    void ClearDiagnostics();
+std::wstring FormatMemoryMetric(const MemoryMetric& metric) {
+    wchar_t buffer[64];
+    swprintf_s(buffer, L"%.1f / %.1f GB", metric.usedGb, metric.totalGb);
+    return buffer;
+}
 
-private:
-    bool QueryFirstVariant(
-        const std::wstring& namespaceName, const std::wstring& query,
-        const std::wstring& property, VARIANT& value);
-    IWbemServices* GetServices(const std::wstring& namespaceName);
-    void RecordDiagnostic(
-        const std::wstring& namespaceName, const std::wstring& query, HRESULT result, const std::wstring& detail);
-
-    bool initialized_ = false;
-    bool comInitialized_ = false;
-    IWbemLocator* locator_ = nullptr;
-    std::map<std::wstring, IWbemServices*> services_;
-    std::vector<WmiDiagnostic> diagnostics_;
-};
+void AppendWideLine(std::wstring& output, const std::wstring& text) {
+    output += text;
+    output += L"\r\n";
+}
 
 std::optional<std::wstring> VariantToString(const VARIANT& value) {
     if (value.vt == VT_BSTR && value.bstrVal != nullptr) {
@@ -123,6 +102,33 @@ std::optional<double> VariantToDouble(const VARIANT& value) {
     return std::nullopt;
 }
 
+class WmiSession {
+public:
+    bool Initialize();
+    ~WmiSession();
+
+    std::optional<std::wstring> QueryFirstString(
+        const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property);
+    std::optional<double> QueryFirstDouble(
+        const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property);
+    std::vector<WmiDiagnostic> Diagnostics() const;
+    void ClearDiagnostics();
+
+private:
+    bool QueryFirstVariant(
+        const std::wstring& namespaceName, const std::wstring& query,
+        const std::wstring& property, VARIANT& value);
+    IWbemServices* GetServices(const std::wstring& namespaceName);
+    void RecordDiagnostic(
+        const std::wstring& namespaceName, const std::wstring& query, HRESULT result, const std::wstring& detail);
+
+    bool initialized_ = false;
+    bool comInitialized_ = false;
+    IWbemLocator* locator_ = nullptr;
+    std::map<std::wstring, IWbemServices*> services_;
+    std::vector<WmiDiagnostic> diagnostics_;
+};
+
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
 
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, const std::wstring& path, PDH_HCOUNTER* counter) {
@@ -141,128 +147,18 @@ bool ContainsInsensitive(const std::wstring& value, const std::wstring& needle) 
     return ToLower(value).find(ToLower(needle)) != std::wstring::npos;
 }
 
-bool ContainsAnyInsensitive(const std::wstring& value, const std::vector<std::wstring>& needles) {
-    for (const auto& needle : needles) {
-        if (ContainsInsensitive(value, needle)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-std::wstring CombinedSensorText(const SensorRecord& sensor) {
-    return ToLower(sensor.name + L" " + sensor.identifier + L" " + sensor.parent);
-}
-
-std::wstring FormatHresult(HRESULT hr) {
-    wchar_t buffer[32];
-    swprintf_s(buffer, L"0x%08X", static_cast<unsigned int>(hr));
-    return buffer;
-}
-
-std::vector<std::wstring> DefaultSensorNamespaces() {
-    return {L"root\\LibreHardwareMonitor"};
-}
-
-std::vector<std::wstring> GatherSensorNamespaces(const AppConfig& config) {
-    std::vector<std::wstring> namespaces = DefaultSensorNamespaces();
-    for (const auto& pair : config.sensors) {
-        for (const auto& ns : pair.second.namespaces) {
-            if (ns.empty()) {
-                continue;
-            }
-            const auto found = std::find(namespaces.begin(), namespaces.end(), ns);
-            if (found == namespaces.end()) {
-                namespaces.push_back(ns);
-            }
-        }
-    }
-    return namespaces;
-}
-
-std::optional<double> FindBestAutoSensorValue(
-    const std::vector<SensorRecord>& sensors,
-    const std::wstring& requiredType,
-    const std::vector<std::wstring>& mustContain,
-    const std::vector<std::wstring>& preferred,
-    const std::vector<std::wstring>& discouraged,
-    const std::vector<std::wstring>& forbidden) {
-    const std::wstring normalizedType = ToLower(requiredType);
-    double bestScore = -std::numeric_limits<double>::infinity();
-    std::optional<double> bestValue;
-
-    for (const auto& sensor : sensors) {
-        if (ToLower(sensor.sensorType) != normalizedType) {
-            continue;
-        }
-
-        const std::wstring text = CombinedSensorText(sensor);
-        if (!mustContain.empty() && !ContainsAnyInsensitive(text, mustContain)) {
-            continue;
-        }
-        if (ContainsAnyInsensitive(text, forbidden)) {
-            continue;
-        }
-
-        double score = 0.0;
-        for (const auto& token : preferred) {
-            if (ContainsInsensitive(text, token)) {
-                score += 10.0;
-            }
-        }
-        for (const auto& token : mustContain) {
-            if (ContainsInsensitive(text, token)) {
-                score += 4.0;
-            }
-        }
-        for (const auto& token : discouraged) {
-            if (ContainsInsensitive(text, token)) {
-                score -= 8.0;
-            }
-        }
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestValue = sensor.value;
-        }
-    }
-
-    return bestValue;
-}
-
-std::wstring FormatScalarMetric(const ScalarMetric& metric, int precision) {
-    if (!metric.value.has_value()) {
-        return L"N/A";
-    }
-    wchar_t buffer[64];
-    swprintf_s(buffer, L"%.*f %ls", precision, *metric.value, metric.unit.c_str());
-    return buffer;
-}
-
-std::wstring FormatMemoryMetric(const MemoryMetric& metric) {
-    wchar_t buffer[64];
-    swprintf_s(buffer, L"%.1f / %.1f GB", metric.usedGb, metric.totalGb);
-    return buffer;
-}
-
-void AppendWideLine(std::wstring& output, const std::wstring& text) {
-    output += text;
-    output += L"\r\n";
-}
-
 }  // namespace
 
 struct TelemetryCollector::Impl {
+    ~Impl();
+
     void UpdateCpu();
     void UpdateGpu();
     void UpdateMemory();
-    void UpdateSensors();
+    void ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample);
     void EnumerateDrives();
     void RefreshDriveUsage();
     void UpdateNetworkState(bool initializeOnly);
-    std::optional<double> QuerySensor(const std::wstring& key);
-    std::optional<double> QueryAutoSensor(const std::wstring& key, const std::vector<SensorRecord>& sensors);
-    std::vector<SensorRecord> LoadSensors();
     std::wstring DumpText() const;
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
     std::wstring FindAdapterIp(ULONG interfaceIndex);
@@ -271,6 +167,10 @@ struct TelemetryCollector::Impl {
     AppConfig config_;
     SystemSnapshot snapshot_;
     WmiSession wmi_;
+    std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
+    std::wstring gpuProviderName_ = L"None";
+    std::wstring gpuProviderDiagnostics_ = L"Provider not initialized.";
+    bool gpuProviderAvailable_ = false;
 
     PDH_HQUERY cpuQuery_ = nullptr;
     PDH_HCOUNTER cpuLoadCounter_ = nullptr;
@@ -285,7 +185,7 @@ struct TelemetryCollector::Impl {
     uint64_t previousOutOctets_ = 0;
     std::chrono::steady_clock::time_point previousNetworkTick_{};
     std::chrono::steady_clock::time_point lastFast_{};
-    std::chrono::steady_clock::time_point lastSensors_{};
+    std::chrono::steady_clock::time_point lastDetails_{};
     std::chrono::steady_clock::time_point lastNetwork_{};
     std::chrono::steady_clock::time_point lastStorage_{};
 };
@@ -306,8 +206,9 @@ bool WmiSession::Initialize() {
     if (FAILED(security) && security != RPC_E_TOO_LATE) {
         return false;
     }
-    const HRESULT hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER,
-        IID_IWbemLocator, reinterpret_cast<void**>(&locator_));
+    const HRESULT hr = CoCreateInstance(
+        CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_IWbemLocator,
+        reinterpret_cast<void**>(&locator_));
     if (FAILED(hr)) {
         return false;
     }
@@ -344,10 +245,7 @@ std::optional<std::wstring> WmiSession::QueryFirstString(
     if (!QueryFirstVariant(namespaceName, query, property, value)) {
         return std::nullopt;
     }
-    std::optional<std::wstring> result;
-    if (value.vt == VT_BSTR && value.bstrVal != nullptr) {
-        result = std::wstring(value.bstrVal);
-    }
+    const std::optional<std::wstring> result = VariantToString(value);
     VariantClear(&value);
     return result;
 }
@@ -362,72 +260,6 @@ std::optional<double> WmiSession::QueryFirstDouble(
     const std::optional<double> result = VariantToDouble(value);
     VariantClear(&value);
     return result;
-}
-
-std::vector<SensorRecord> WmiSession::EnumerateSensors(const std::wstring& namespaceName) {
-    std::vector<SensorRecord> sensors;
-    const std::wstring query = L"SELECT Name, Identifier, Parent, SensorType, Value FROM Sensor";
-    IWbemServices* services = GetServices(namespaceName);
-    if (services == nullptr) {
-        RecordDiagnostic(namespaceName, query, E_FAIL, L"Failed to open namespace");
-        return sensors;
-    }
-    BSTR language = SysAllocString(L"WQL");
-    BSTR queryText = SysAllocString(query.c_str());
-    IEnumWbemClassObject* enumerator = nullptr;
-    const HRESULT hr = services->ExecQuery(
-        language, queryText,
-        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
-        nullptr, &enumerator);
-    SysFreeString(language);
-    SysFreeString(queryText);
-    if (FAILED(hr) || enumerator == nullptr) {
-        RecordDiagnostic(namespaceName, query, hr, L"ExecQuery failed");
-        return sensors;
-    }
-    while (true) {
-        IWbemClassObject* object = nullptr;
-        ULONG returned = 0;
-        const HRESULT nextHr = enumerator->Next(WBEM_INFINITE, 1, &object, &returned);
-        if (FAILED(nextHr) || returned == 0 || object == nullptr) {
-            break;
-        }
-        VARIANT name{};
-        VARIANT identifier{};
-        VARIANT parent{};
-        VARIANT sensorType{};
-        VARIANT value{};
-        VariantInit(&name);
-        VariantInit(&identifier);
-        VariantInit(&parent);
-        VariantInit(&sensorType);
-        VariantInit(&value);
-        object->Get(L"Name", 0, &name, nullptr, nullptr);
-        object->Get(L"Identifier", 0, &identifier, nullptr, nullptr);
-        object->Get(L"Parent", 0, &parent, nullptr, nullptr);
-        object->Get(L"SensorType", 0, &sensorType, nullptr, nullptr);
-        object->Get(L"Value", 0, &value, nullptr, nullptr);
-        const auto numericValue = VariantToDouble(value);
-        if (numericValue.has_value()) {
-            SensorRecord sensor;
-            sensor.sensorNamespace = namespaceName;
-            sensor.name = VariantToString(name).value_or(L"");
-            sensor.identifier = VariantToString(identifier).value_or(L"");
-            sensor.parent = VariantToString(parent).value_or(L"");
-            sensor.sensorType = VariantToString(sensorType).value_or(L"");
-            sensor.value = *numericValue;
-            sensors.push_back(std::move(sensor));
-        }
-        VariantClear(&name);
-        VariantClear(&identifier);
-        VariantClear(&parent);
-        VariantClear(&sensorType);
-        VariantClear(&value);
-        object->Release();
-    }
-    enumerator->Release();
-    RecordDiagnostic(namespaceName, query, S_OK, sensors.empty() ? L"Query succeeded but returned no rows" : L"OK");
-    return sensors;
 }
 
 bool WmiSession::QueryFirstVariant(
@@ -456,7 +288,9 @@ bool WmiSession::QueryFirstVariant(
     const HRESULT nextHr = enumerator->Next(WBEM_INFINITE, 1, &object, &returned);
     if (FAILED(nextHr) || returned == 0 || object == nullptr) {
         enumerator->Release();
-        RecordDiagnostic(namespaceName, query, nextHr, returned == 0 ? L"Query returned no rows" : L"Enumerator Next failed");
+        RecordDiagnostic(
+            namespaceName, query, nextHr,
+            returned == 0 ? L"Query returned no rows" : L"Enumerator Next failed");
         return false;
     }
     const HRESULT getHr = object->Get(property.c_str(), 0, &value, nullptr, nullptr);
@@ -485,8 +319,7 @@ IWbemServices* WmiSession::GetServices(const std::wstring& namespaceName) {
     }
     hr = CoSetProxyBlanket(
         services, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, nullptr,
-        RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
-        nullptr, EOAC_NONE);
+        RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, nullptr, EOAC_NONE);
     if (FAILED(hr)) {
         services->Release();
         RecordDiagnostic(namespaceName, L"", hr, L"CoSetProxyBlanket failed");
@@ -499,6 +332,19 @@ IWbemServices* WmiSession::GetServices(const std::wstring& namespaceName) {
 void WmiSession::RecordDiagnostic(
     const std::wstring& namespaceName, const std::wstring& query, HRESULT result, const std::wstring& detail) {
     diagnostics_.push_back(WmiDiagnostic{namespaceName, query, result, detail});
+}
+
+TelemetryCollector::Impl::~Impl() {
+    if (cpuQuery_ != nullptr) {
+        PdhCloseQuery(cpuQuery_);
+    }
+    if (gpuQuery_ != nullptr) {
+        PdhCloseQuery(gpuQuery_);
+    }
+    if (gpuMemoryQuery_ != nullptr) {
+        PdhCloseQuery(gpuMemoryQuery_);
+    }
+    WSACleanup();
 }
 
 TelemetryCollector::TelemetryCollector() : impl_(std::make_unique<Impl>()) {}
@@ -514,20 +360,36 @@ bool TelemetryCollector::Initialize(const AppConfig& config) {
     impl_->wmi_.ClearDiagnostics();
     impl_->snapshot_.network.uploadHistory.assign(60, 0.0);
     impl_->snapshot_.network.downloadHistory.assign(60, 0.0);
+
     WSADATA wsaData{};
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    const auto cpuName = impl_->wmi_.QueryFirstString(L"root\\cimv2", L"SELECT Name FROM Win32_Processor", L"Name");
+    const auto cpuName = impl_->wmi_.QueryFirstString(
+        L"root\\cimv2", L"SELECT Name FROM Win32_Processor", L"Name");
     if (cpuName.has_value()) {
         impl_->snapshot_.cpu.name = *cpuName;
     }
-    const auto gpuName = impl_->wmi_.QueryFirstString(L"root\\cimv2", L"SELECT Name FROM Win32_VideoController", L"Name");
+
+    const auto gpuName = impl_->wmi_.QueryFirstString(
+        L"root\\cimv2", L"SELECT Name FROM Win32_VideoController", L"Name");
     if (gpuName.has_value()) {
         impl_->snapshot_.gpu.name = *gpuName;
     }
-    const auto gpuRam = impl_->wmi_.QueryFirstDouble(L"root\\cimv2", L"SELECT AdapterRAM FROM Win32_VideoController", L"AdapterRAM");
+
+    const auto gpuRam = impl_->wmi_.QueryFirstDouble(
+        L"root\\cimv2", L"SELECT AdapterRAM FROM Win32_VideoController", L"AdapterRAM");
     if (gpuRam.has_value() && *gpuRam > 0.0) {
         impl_->snapshot_.gpu.vram.totalGb = *gpuRam / (1024.0 * 1024.0 * 1024.0);
+    }
+
+    impl_->gpuProvider_ = CreateGpuVendorTelemetryProvider();
+    if (impl_->gpuProvider_ != nullptr) {
+        if (impl_->gpuProvider_->Initialize()) {
+            impl_->ApplyGpuVendorSample(impl_->gpuProvider_->Sample());
+        } else {
+            impl_->gpuProviderName_ = L"AMD ADL";
+            impl_->gpuProviderDiagnostics_ = L"Provider initialization failed.";
+        }
     }
 
     PdhOpenQueryW(nullptr, 0, &impl_->cpuQuery_);
@@ -549,7 +411,8 @@ bool TelemetryCollector::Initialize(const AppConfig& config) {
     impl_->EnumerateDrives();
     impl_->UpdateNetworkState(true);
     impl_->UpdateMemory();
-    impl_->UpdateSensors();
+    impl_->UpdateCpu();
+    impl_->UpdateGpu();
     GetLocalTime(&impl_->snapshot_.now);
     return true;
 }
@@ -569,10 +432,9 @@ void TelemetryCollector::UpdateSnapshot() {
         impl_->UpdateNetworkState(false);
         impl_->lastNetwork_ = now;
     }
-    if (now - impl_->lastSensors_ >= std::chrono::seconds(1)) {
-        impl_->UpdateSensors();
+    if (now - impl_->lastDetails_ >= std::chrono::seconds(1)) {
         impl_->UpdateMemory();
-        impl_->lastSensors_ = now;
+        impl_->lastDetails_ = now;
     }
     if (now - impl_->lastStorage_ >= std::chrono::seconds(8)) {
         impl_->RefreshDriveUsage();
@@ -633,6 +495,20 @@ double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool requ
     return total;
 }
 
+void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample) {
+    gpuProviderName_ = sample.providerName.empty() ? L"None" : sample.providerName;
+    gpuProviderDiagnostics_ = sample.diagnostics.empty() ? L"(none)" : sample.diagnostics;
+    gpuProviderAvailable_ = sample.available;
+
+    if (sample.name.has_value() && !sample.name->empty()) {
+        snapshot_.gpu.name = *sample.name;
+    }
+    snapshot_.gpu.temperature.value = sample.temperatureC;
+    snapshot_.gpu.clock.value = sample.coreClockMhz;
+    snapshot_.gpu.clock.unit = L"MHz";
+    snapshot_.gpu.fan.value = sample.fanRpm;
+}
+
 void TelemetryCollector::Impl::UpdateGpu() {
     if (gpuQuery_ != nullptr) {
         PdhCollectQueryData(gpuQuery_);
@@ -645,6 +521,9 @@ void TelemetryCollector::Impl::UpdateGpu() {
         const double bytes = SumCounterArray(gpuDedicatedCounter_, false);
         snapshot_.gpu.vram.usedGb = bytes / (1024.0 * 1024.0 * 1024.0);
     }
+    if (gpuProvider_ != nullptr) {
+        ApplyGpuVendorSample(gpuProvider_->Sample());
+    }
 }
 
 void TelemetryCollector::Impl::UpdateMemory() {
@@ -655,34 +534,6 @@ void TelemetryCollector::Impl::UpdateMemory() {
         snapshot_.cpu.memory.usedGb =
             (memory.ullTotalPhys - memory.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
     }
-}
-
-std::optional<double> TelemetryCollector::Impl::QuerySensor(const std::wstring& key) {
-    const auto found = config_.sensors.find(ToLower(key));
-    if (found == config_.sensors.end() || !found->second.IsConfigured()) {
-        return std::nullopt;
-    }
-    const auto& binding = found->second;
-    for (const auto& ns : binding.namespaces) {
-        const std::wstring query = L"SELECT " + binding.valueField + L" FROM Sensor WHERE " +
-            binding.matchField + L"='" + EscapeWql(binding.matchValue) + L"'";
-        const auto value = wmi_.QueryFirstDouble(ns, query, binding.valueField);
-        if (value.has_value()) {
-            return value;
-        }
-    }
-    return std::nullopt;
-}
-
-std::vector<SensorRecord> TelemetryCollector::Impl::LoadSensors() {
-    const auto namespaces = GatherSensorNamespaces(config_);
-    for (const auto& ns : namespaces) {
-        auto sensors = wmi_.EnumerateSensors(ns);
-        if (!sensors.empty()) {
-            return sensors;
-        }
-    }
-    return {};
 }
 
 std::wstring TelemetryCollector::Impl::DumpText() const {
@@ -704,10 +555,7 @@ std::wstring TelemetryCollector::Impl::DumpText() const {
         swprintf_s(buffer, L"Load: %.2f%%", snapshot_.cpu.loadPercent);
         AppendWideLine(output, buffer);
     }
-    AppendWideLine(output, std::wstring(L"Temperature: ") + FormatScalarMetric(snapshot_.cpu.temperature, 1));
-    AppendWideLine(output, std::wstring(L"Power: ") + FormatScalarMetric(snapshot_.cpu.power, 1));
     AppendWideLine(output, std::wstring(L"Clock: ") + FormatScalarMetric(snapshot_.cpu.clock, 2));
-    AppendWideLine(output, std::wstring(L"Fan: ") + FormatScalarMetric(snapshot_.cpu.fan, 0));
     AppendWideLine(output, std::wstring(L"Memory: ") + FormatMemoryMetric(snapshot_.cpu.memory));
     AppendWideLine(output, L"");
 
@@ -719,10 +567,15 @@ std::wstring TelemetryCollector::Impl::DumpText() const {
         AppendWideLine(output, buffer);
     }
     AppendWideLine(output, std::wstring(L"Temperature: ") + FormatScalarMetric(snapshot_.gpu.temperature, 1));
-    AppendWideLine(output, std::wstring(L"Power: ") + FormatScalarMetric(snapshot_.gpu.power, 1));
     AppendWideLine(output, std::wstring(L"Clock: ") + FormatScalarMetric(snapshot_.gpu.clock, 0));
     AppendWideLine(output, std::wstring(L"Fan: ") + FormatScalarMetric(snapshot_.gpu.fan, 0));
     AppendWideLine(output, std::wstring(L"VRAM: ") + FormatMemoryMetric(snapshot_.gpu.vram));
+    AppendWideLine(output, L"");
+
+    AppendWideLine(output, L"[GPU Vendor Provider]");
+    AppendWideLine(output, std::wstring(L"Name: ") + gpuProviderName_);
+    AppendWideLine(output, std::wstring(L"Available: ") + (gpuProviderAvailable_ ? L"yes" : L"no"));
+    AppendWideLine(output, std::wstring(L"Diagnostics: ") + gpuProviderDiagnostics_);
     AppendWideLine(output, L"");
 
     AppendWideLine(output, L"[Network]");
@@ -749,46 +602,6 @@ std::wstring TelemetryCollector::Impl::DumpText() const {
     }
     AppendWideLine(output, L"");
 
-    AppendWideLine(output, L"[Configured Sensor Bindings]");
-    if (config_.sensors.empty()) {
-        AppendWideLine(output, L"(none)");
-    } else {
-        for (const auto& pair : config_.sensors) {
-            std::wstringstream line;
-            line << pair.first << L": ";
-            for (size_t i = 0; i < pair.second.namespaces.size(); ++i) {
-                if (i > 0) {
-                    line << L",";
-                }
-                line << pair.second.namespaces[i];
-            }
-            line << L" | " << pair.second.matchField << L" | " << pair.second.matchValue
-                 << L" | " << pair.second.valueField;
-            AppendWideLine(output, line.str());
-        }
-    }
-    AppendWideLine(output, L"");
-
-    AppendWideLine(output, L"[Discovered Sensors]");
-    const auto sensors = const_cast<Impl*>(this)->LoadSensors();
-    if (sensors.empty()) {
-        AppendWideLine(output, L"(none)");
-    } else {
-        for (const auto& sensor : sensors) {
-            wchar_t valueBuffer[64];
-            swprintf_s(valueBuffer, L"%.3f", sensor.value);
-            std::wstringstream line;
-            line << L"ns=" << sensor.sensorNamespace
-                 << L" type=" << sensor.sensorType
-                 << L" name=" << sensor.name
-                 << L" id=" << sensor.identifier
-                 << L" parent=" << sensor.parent
-                 << L" value=" << valueBuffer;
-            AppendWideLine(output, line.str());
-        }
-    }
-    AppendWideLine(output, L"");
-
     AppendWideLine(output, L"[WMI Diagnostics]");
     const auto diagnostics = wmi_.Diagnostics();
     if (diagnostics.empty()) {
@@ -806,67 +619,6 @@ std::wstring TelemetryCollector::Impl::DumpText() const {
         }
     }
     return output;
-}
-
-std::optional<double> TelemetryCollector::Impl::QueryAutoSensor(
-    const std::wstring& key, const std::vector<SensorRecord>& sensors) {
-    if (key == L"cpu_temp") {
-        return FindBestAutoSensorValue(sensors, L"Temperature", {L"cpu"}, {L"package", L"tctl", L"tdie", L"core average"}, {L"vrm", L"gpu"}, {});
-    }
-    if (key == L"cpu_power") {
-        return FindBestAutoSensorValue(sensors, L"Power", {L"cpu"}, {L"package", L"total"}, {L"core #", L"gpu"}, {});
-    }
-    if (key == L"cpu_fan") {
-        auto value = FindBestAutoSensorValue(sensors, L"Fan", {L"cpu"}, {L"fan", L"pump"}, {L"gpu", L"case", L"chassis"}, {});
-        if (!value.has_value()) {
-            value = FindBestAutoSensorValue(sensors, L"Fan", {}, {L"cpu fan", L"pump"}, {L"gpu", L"case", L"chassis"}, {});
-        }
-        return value;
-    }
-    if (key == L"cpu_clock") {
-        return FindBestAutoSensorValue(sensors, L"Clock", {L"cpu"}, {L"core average", L"cpu core", L"core #1", L"bus speed"}, {L"gpu", L"memory"}, {});
-    }
-    if (key == L"gpu_temp") {
-        return FindBestAutoSensorValue(sensors, L"Temperature", {L"gpu"}, {L"core", L"hot spot", L"hotspot", L"edge"}, {L"cpu", L"memory"}, {});
-    }
-    if (key == L"gpu_power") {
-        return FindBestAutoSensorValue(sensors, L"Power", {L"gpu"}, {L"package", L"board", L"asic", L"core"}, {L"cpu"}, {});
-    }
-    if (key == L"gpu_fan") {
-        return FindBestAutoSensorValue(sensors, L"Fan", {L"gpu"}, {L"fan"}, {L"cpu", L"case", L"chassis"}, {});
-    }
-    if (key == L"gpu_clock") {
-        return FindBestAutoSensorValue(sensors, L"Clock", {L"gpu"}, {L"core", L"graphics"}, {L"cpu", L"memory"}, {});
-    }
-    return std::nullopt;
-}
-
-void TelemetryCollector::Impl::UpdateSensors() {
-    const auto sensors = LoadSensors();
-    auto resolve = [&](const std::wstring& key) -> std::optional<double> {
-        if (const auto configured = QuerySensor(key); configured.has_value()) {
-            return configured;
-        }
-        return QueryAutoSensor(key, sensors);
-    };
-
-    snapshot_.cpu.temperature.value = resolve(L"cpu_temp");
-    snapshot_.cpu.power.value = resolve(L"cpu_power");
-    snapshot_.cpu.fan.value = resolve(L"cpu_fan");
-    if (!snapshot_.cpu.clock.value.has_value()) {
-        if (const auto cpuClock = resolve(L"cpu_clock"); cpuClock.has_value()) {
-            snapshot_.cpu.clock.value = *cpuClock / 1000.0;
-            snapshot_.cpu.clock.unit = L"GHz";
-        }
-    }
-
-    snapshot_.gpu.temperature.value = resolve(L"gpu_temp");
-    snapshot_.gpu.power.value = resolve(L"gpu_power");
-    snapshot_.gpu.fan.value = resolve(L"gpu_fan");
-    if (const auto gpuClock = resolve(L"gpu_clock"); gpuClock.has_value()) {
-        snapshot_.gpu.clock.value = *gpuClock;
-        snapshot_.gpu.clock.unit = L"MHz";
-    }
 }
 
 void TelemetryCollector::Impl::EnumerateDrives() {
@@ -923,8 +675,8 @@ std::wstring TelemetryCollector::Impl::FindAdapterIp(ULONG interfaceIndex) {
         for (auto* unicast = current->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next) {
             wchar_t address[128];
             DWORD length = ARRAYSIZE(address);
-            if (WSAAddressToStringW(unicast->Address.lpSockaddr,
-                    static_cast<DWORD>(unicast->Address.iSockaddrLength),
+            if (WSAAddressToStringW(
+                    unicast->Address.lpSockaddr, static_cast<DWORD>(unicast->Address.iSockaddrLength),
                     nullptr, address, &length) == 0) {
                 std::wstring ip = address;
                 if (ip.find(L':') == std::wstring::npos) {

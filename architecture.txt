@@ -1,11 +1,17 @@
-System Telemetry architecture
+﻿System Telemetry architecture
 
-- `src/main.cpp`: Win32 app entry point, single-instance startup, monitor identification, tray/menu actions, timer-driven refresh loop, and all GDI rendering/layout.
+- `src/main.cpp`: Win32 app entry point, single-instance startup, `/dump` handling, monitor identification, tray/menu actions, timer-driven refresh loop, and all GDI rendering/layout.
 - `src/config.h` + `src/config.cpp`: runtime config model plus load/save logic for `config.ini` in the launch directory; saves display name and relative position while preserving other settings.
-- `src/telemetry.h` + `src/telemetry.cpp`: shared telemetry snapshot types plus the `TelemetryCollector` implementation that gathers PDH, WMI, IP Helper, disk, and clock data behind a small public API.
-- Startup flow: `wWinMain` checks for `/dump` first; dump mode initializes `TelemetryCollector`, writes the current snapshot plus discovered sensors to `telemetry_dump.txt` beside the executable, and exits without entering the single-instance GUI path.
+- `src/telemetry.h` + `src/telemetry.cpp`: shared telemetry snapshot types plus the `TelemetryCollector` implementation that gathers Windows-native PDH, WMI, IP Helper, disk, and clock data behind a small public API.
+- `src/gpu_vendor.h` + `src/gpu_vendor.cpp`: vendor GPU provider abstraction plus factory selection.
+- `src/gpu_amd_adl.cpp`: AMD GPU provider implementation using AMD ADLX for GPU name, temperature, clock, and fan speed.
+- `src/vendor/adlx/...`: vendored AMD ADLX headers/helper/runtime glue used by the AMD GPU provider.
+- Startup flow: `wWinMain` checks for `/dump` first; dump mode initializes `TelemetryCollector`, writes `telemetry_dump.txt` beside the executable, writes `telemetry_dump_trace.txt` with step-by-step trace markers, and exits without entering the single-instance GUI path.
 - Telemetry flow: `DashboardApp` asks `TelemetryCollector` for a `SystemSnapshot`, then the window paints directly from that snapshot.
-- Sensor flow: explicit sensor bindings query WMI `Sensor` rows from LibreHardwareMonitor, while missing CPU/GPU temp, power, fan, and clock bindings fall back to automatic `Sensor` enumeration plus heuristic matching by sensor type and CPU/GPU-oriented names/identifiers.
+- Provider flow: `TelemetryCollector` owns a vendor GPU provider. Windows collects generic metrics such as CPU load, CPU clock, GPU load, VRAM usage, network, drives, and time; vendor-specific GPU telemetry is delegated to a provider implementation in its own source file.
+- Windows/WMI fallback flow: `src/telemetry.cpp` still uses WMI only for optional CPU/GPU naming and adapter-RAM fallback queries. Those lookups are diagnostic/fallback only and must not block the dashboard when denied.
+- Current vendor coverage: AMD Radeon GPUs use ADLX through `src/gpu_amd_adl.cpp`. Additional vendors can be added as new provider source files without complicating the Windows-native collector.
+- Dump tracing flow: `src/main.cpp` appends high-level `/dump` progress markers to `telemetry_dump_trace.txt`, and `src/gpu_amd_adl.cpp` appends finer-grained ADLX provider markers so vendor startup/sampling stalls can be isolated from the rest of the telemetry path.
 - UI flow: `DashboardApp` owns the native window, tray icon, popup menu, move mode overlay, config update action, and panel rendering.
 - Source-tree config: `src/config.ini` is only the checked-in example template; the running app reads/writes `config.ini` beside the launched executable/working directory.
-- Build flow: `build.cmd` boots the VS environment via `devenv.cmd` and runs `nmake`; `Makefile` builds `src/main.cpp`, `src/config.cpp`, and `src/telemetry.cpp` into `build/SystemTelemetry.exe` and keeps compiler/linker byproducts such as `.obj`, `.pdb`, and `.ilk` under `build\`.
+- Build flow: `build.cmd` boots the VS environment via `devenv.cmd` and runs `nmake`; `Makefile` builds the Win32 app, telemetry sources, vendor provider sources, and vendored ADLX helper sources into `build/SystemTelemetry.exe` and keeps compiler/linker byproducts such as `.obj`, `.pdb`, and `.ilk` under `build\`.

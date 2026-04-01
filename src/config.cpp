@@ -160,22 +160,6 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
             config.networkAdapter = value;
         } else if (section == L"storage" && key == L"drives") {
             config.driveLetters = Split(value, L',');
-        } else if (section == L"sensors") {
-            auto parts = Split(value, L'|');
-            if (parts.size() < 4) {
-                continue;
-            }
-
-            SensorBinding binding;
-            if (ToLower(parts[0]) == L"auto" || parts[0].empty()) {
-                binding.namespaces = {L"root\\LibreHardwareMonitor"};
-            } else {
-                binding.namespaces = Split(parts[0], L',');
-            }
-            binding.matchField = parts[1];
-            binding.matchValue = parts[2];
-            binding.valueField = parts[3];
-            config.sensors[key] = binding;
         }
     }
 

@@ -1,27 +1,25 @@
 ﻿System Telemetry
 ================
 
-This project is a compact, real-time system monitoring dashboard designed for a small 800×480 secondary display, 
-presenting key PC metrics in a clean, high-contrast interface optimized for quick readability. 
-It combines CPU and GPU performance data with their respective memory usage, alongside network activity, 
-multi-drive storage status, and a clock, all organized into a balanced panel layout. 
-The design emphasizes glanceable visuals—large load indicators, concise numeric stats, and minimal 
-clutter for continuously tracking system health and performance at a glance.
+This project is a compact, real-time system monitoring dashboard designed for a small 800x480 secondary display,
+presenting only the telemetry that can be collected cleanly through Windows APIs or vendor APIs.
+It combines CPU load, clock, and RAM usage with GPU load, temperature, clock, fan speed, and VRAM usage,
+alongside network activity, multi-drive storage status, and a clock, all organized into a balanced panel layout.
+The design emphasizes glanceable visuals with large load indicators, concise numeric stats, and minimal clutter.
 
 ┌─────────────────────────────┬──────────────────────────────┐
 │           CPU               │             GPU              │
-│  Ryzen 9 5900X              │  Radeon RX 6800              │
+│  AMD Ryzen                  │  Radeon RX 6800              │
 │  ○  2%                      │  ○  0%                       │
-│  Temp    65°C               │  Temp    32°C                │
-│  Power   59.7W              │  Power   7.0W                │
-│  Clock   3.23GHz            │  Clock   1.0MHz              │
-│  Fan     2368RPM            │  Fan     0RPM                │
-│  RAM     10.8 / 64 GB       │  VRAM    0.4 / 16 GB         │
+│  Clock   3.70GHz            │  Temp    45°C                │
+│  RAM     15.0 / 64 GB       │  Clock   29MHz               │
+│                             │  Fan     0RPM                │
+│                             │  VRAM    3.7 / 16 GB         │
 ├───────────────┬──────────────────────────────┬─────────────┤
 │   Network     │           Storage            │    Time     │
-│  Up   0.3MB/s │  C: ████░░░░░ 32%  1.2TB     │   10:43     │
-│  Down 24MB/s  │  D: ███████░░ 68%  500GB     │  2026-04-01 │
-│  ▒▒▒▒▒▒▒▒▒▒   │  E: ██░░░░░░░ 18%  2.8TB     │             │
+│  Up   0.3MB/s │  C: ████░░░░░ 32%  2.5TB     │   10:43     │
+│  Down 24MB/s  │  D: ███████░░ 44%  534GB     │  2026-04-01 │
+│  ▒▒▒▒▒▒▒▒▒▒   │  E: ███░░░░░░ 32%  5.0TB     │             │
 │  ▒▒▒▒▒▒▒▒▒▒   │                              │             │
 │  192.168.3.60 │                              │             │
 └───────────────┴──────────────────────────────┴─────────────┘
@@ -29,47 +27,74 @@ clutter for continuously tracking system health and performance at a glance.
 Project Environment and Setup
 =============================
 
-The project is going to run on Windows 11 and will be implementation in C++20 using Visual Studio 2022.
-Use "devenv.cmd" to activate development enviroment and to make compiler tools (like "cl") available.
-Create makefile for nmake to build the project.
-Keep all sources in "src" directory.
+The project runs on Windows 11 and is implemented in C++20 using Visual Studio 2022.
+Use `devenv.cmd` to activate the development environment when needed.
+Keep all sources in `src`.
 Keep generated build outputs and temporary compiler files inside `build\` so the project root stays clean.
+Always build through `build.cmd`.
+
+Requirements
+============
+
+Runtime requirements:
+
+- Windows 11
+- AMD Software: Adrenalin Edition, including the ADLX runtime, for AMD GPU telemetry
+
+Development requirements:
+
+- Visual Studio 2022 Build Tools
+
+The application must not depend on LibreHardwareMonitor or OpenHardwareMonitor.
 
 Configuration
 =============
 
-Make the system configurable for all the parameters that are numbered in the system and where 
-it is not clear which device/metric information to query, examples (not limited to)
+Make the system configurable for display placement and the subset of data sources that still require runtime choice.
+Examples include:
 
 - Display on which to show the system
 - Relative position on the selected display
-- Which temerature sensor and fan to show
+- Which network adapter to prefer
 - Which drives to show
 
-Telemetry sensors should auto-detect CPU/GPU temperature, power, fan, and clock
-from LibreHardwareMonitor WMI data when configuration does
-not provide an explicit binding. Configuration must still allow overriding any
-auto-selected sensor on systems where multiple matching sensors exist.
-
-At runtime, the application must read `config.ini` from the same folder it was
-started from and write updates back to that same file. The `src/config.ini`
-file in the source tree is only a checked-in example configuration template.
+At runtime, the application must read `config.ini` from the same folder it was started from and write updates back to that same file.
+The `src/config.ini` file in the source tree is only a checked-in example configuration template.
 
 Command-line dump mode
 ======================
 
-Support a `/dump` command-line switch. When present, the application must
-initialize telemetry using the same runtime `config.ini`, dump the current
-telemetry snapshot plus discovered sensor rows to `telemetry_dump.txt` beside
-the executable, and exit without starting the GUI or affecting any already-
-running dashboard instance.
+Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, write the current telemetry snapshot to `telemetry_dump.txt` beside the executable, and exit without starting the GUI or affecting any already-running dashboard instance.
+
+For dump debugging, also write `telemetry_dump_trace.txt` beside the executable with step-by-step progress markers so startup stalls in vendor telemetry can be isolated.
+
+Telemetry sources
+=================
+
+CPU telemetry must rely only on Windows-accessible metrics that are available in a straightforward way:
+
+- CPU load
+- CPU clock
+- RAM usage
+
+CPU package temperature, CPU package power, and motherboard or CPU fan speed are not required and should not rely on LibreHardwareMonitor or OpenHardwareMonitor.
+
+GPU telemetry must use Windows counters for generic metrics and vendor APIs for vendor-specific metrics:
+
+- GPU load from Windows/PDH
+- GPU dedicated VRAM usage from Windows/PDH or Windows-reported adapter memory
+- AMD GPU temperature, clock, and fan speed from AMD's ADLX API
+
+If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable instead of blocking startup.
+
+Vendor telemetry integrations should live in separate source files so each vendor implementation remains isolated.
 
 Size and placement
 ==================
 
-Panel size is 800x480.                                                       
-Place it as a top-level windows at monitor that is specified in configuration.
-Make sure the monitor to show the panel is selected by its name, not number, 
+Panel size is 800x480.
+Place it as a top-level window at the monitor that is specified in configuration.
+Make sure the monitor to show the panel is selected by its name, not number,
 so it survives plugging/unplugging other monitors into the system.
 Support interactive repositioning so the user can discover and copy the monitor
 name plus the relative X/Y placement for configuration.
@@ -93,7 +118,7 @@ the user places it. While moving, show an overlay in the top-left corner with:
 The overlay content should be easy to copy into configuration.
 The application must also read the saved relative X/Y coordinates from
 configuration at startup and place the window accordingly.
-Add an "Update Config" action that writes the current display identifier and
+Add an `Update Config` action that writes the current display identifier and
 relative X/Y placement back to the config file while preserving all other
 settings.
 
@@ -109,7 +134,7 @@ The tray menu must expose the same actions:
 - Exit
 
 The dashboard should use normal window Z-order behavior so other windows may
-cover it. "Bring On Top" should raise the dashboard when it needs to be found.
+cover it. `Bring On Top` should raise the dashboard when it needs to be found.
 
 Single-instance behavior
 ========================
@@ -118,7 +143,7 @@ At most one dashboard instance may be running at a time.
 Starting a new copy must close the already running copy, then continue startup
 as the remaining instance.
 The `/dump` command-line mode is exempt from this behavior and should run as an
-independent one-shot console command.
+independent one-shot command.
 
 Style Summary
 =============
@@ -131,23 +156,23 @@ Accent color: cyan/blue (#00BFFF or similar)
 Panels
 Rounded rectangles with thin white borders
 Consistent padding inside all panels
-Subtle spacing between panels (8–12 px)
+Subtle spacing between panels (8-12 px)
 
 Typography
 Primary numbers (load, time): large, bold
-Labels: small, minimal (Temp, Power, etc.)
+Labels: small, minimal (Temp, Clock, RAM, etc.)
 Units: slightly dimmer than values
 
 Visual Elements
 Circular gauges for CPU/GPU load
 Horizontal bars for usage
 Mini graphs for network activity
-Clean, minimal icons for headers
+Clean, minimal headers
 
 Design Principles
 High contrast for readability on small screen
 Prioritize large, glanceable values
-Avoid clutter—maximum 4–6 rows per panel
+Avoid clutter
 Consistent alignment across panels
 
 CPU Panel (Top Left)
@@ -155,17 +180,13 @@ CPU Panel (Top Left)
 
 Header
 CPU model name
-Optional: small voltage display (top-right)
 Main Indicator
 Large circular gauge:
 CPU Load (%)
 
 Metrics (display as thin bars)
 
-Temp (°C)
-Power (W)
 Clock (GHz)
-Fan / Pump (RPM)
 RAM usage
 Format: used / total
 
@@ -181,34 +202,32 @@ GPU Load (%)
 Metrics (display as thin bars)
 
 Temp (°C)
-Power (W)
-Clock (MHz or GHz)
-Fan (RPM or %)
-Memory (Integrated)
+Clock (MHz)
+Fan (RPM)
 VRAM usage
-Eample: 3.2 / 16 GB
+Example: 3.2 / 16 GB
 
 Network Panel (Bottom Left)
 ===========================
 
 Header
-Network + connection icon
+Network
 Primary Values (prominent)
-Upload speed → Up 0.3 MB/s
-Download speed → Down 24.1 MB/s
+Upload speed -> Up 0.3 MB/s
+Download speed -> Down 24.1 MB/s
 Graphs
 Two small scrolling graphs:
 Upload history
 Download history
 Footer
-IP address (e.g., 192.168.3.60)
+IP address when available
 
 Storage Panel (Bottom Center)
 =============================
 
 Structure
 
-List all nonremovable drives vertically (C, D, E)
+List configured fixed drives vertically (C, D, E)
 
 Per Drive Row
 Drive letter
@@ -216,9 +235,9 @@ Usage bar
 Usage %
 Free space
 Example Format
-C: 32% 1.2 TB free
-D: 68% 500 GB free
-E: 18% 2.8 TB free
+C: 32% 2.5 TB free
+D: 44% 534 GB free
+E: 32% 5.0 TB free
 Visuals
 Thin horizontal bars
 Consistent alignment
@@ -232,23 +251,17 @@ Time (large): 10:43
 Date (small): 2026-04-01
 Layout
 Right-aligned
-Time is dominant visual element
+Time is the dominant visual element
 
 Behavior & Data Refresh
 =======================
 
 Refresh Rates
-CPU/GPU load: 0.5–1 sec
-Temps & power: ~1 sec
-Network: 0.5 sec (for smooth graphs)
-Storage: 5–10 sec
+CPU/GPU load: 0.5-1 sec
+GPU vendor metrics: about 1 sec
+Network: 0.5 sec
+Storage: 5-10 sec
 Clock: 1 sec
-
-Sensor Sourcing
-CPU/GPU temperatures, power, fan speed, and fallback clock values should come
-from the `Sensor` WMI class exposed by LibreHardwareMonitor.
-The application should prefer automatic matching by sensor type plus CPU/GPU-related
-names/identifiers, and fall back to explicit `config.ini` bindings when provided.
 
 Units
 CPU: GHz

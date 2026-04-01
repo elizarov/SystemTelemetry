@@ -1,18 +1,21 @@
-System Telemetry is a compact Windows 11 dashboard for an 800x480 secondary display that shows CPU and GPU activity, memory, network throughput, storage usage, and time in a high-contrast Win32 interface designed for quick glanceability. It is built in C++20 with Visual Studio 2022 and includes a `/dump` mode for writing the current telemetry snapshot and raw sensor discovery details to `telemetry_dump.txt` for debugging.
+System Telemetry is a compact Windows 11 dashboard for an 800x480 secondary display that shows the telemetry this app can collect cleanly from Windows and vendor APIs: CPU load, clock, and RAM usage; GPU load, temperature, clock, fan speed, and VRAM usage; plus network throughput, storage usage, and time, all rendered in a high-contrast Win32 interface built in C++20.
 
 ## Requirements
 
 - Windows 11
 - Visual Studio 2022 Build Tools
-- LibreHardwareMonitor running with WMI enabled so the app can read CPU/GPU temperatures, power, clocks, and fan sensors
+- AMD Software: Adrenalin Edition with ADLX runtime available for AMD GPU telemetry
 
-## LibreHardwareMonitor Installation
+## AMD GPU Telemetry
 
-1. Download the latest LibreHardwareMonitor release from the official releases page: [LibreHardwareMonitor Releases](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases)
-2. Extract the release zip to a stable folder on your machine.
-3. Start `LibreHardwareMonitor.exe`.
-4. In LibreHardwareMonitor, enable WMI support and keep the app running while System Telemetry is running.
-5. If sensor access is still missing, restart LibreHardwareMonitor as Administrator and run `build\SystemTelemetry.exe /dump` to verify that `telemetry_dump.txt` shows `root\LibreHardwareMonitor` sensors instead of missing namespace errors.
+AMD GPU metrics come from AMD's ADLX runtime instead of LibreHardwareMonitor or OpenHardwareMonitor. On supported Radeon systems, this is typically installed with current AMD graphics drivers and provides GPU temperature, clock, and fan speed directly from AMD's API.
+
+If AMD GPU metrics are missing:
+
+1. Install or update AMD Software: Adrenalin Edition for your Radeon GPU.
+2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
+3. Run `build\SystemTelemetry.exe /dump`.
+4. Check `build\telemetry_dump.txt` for the current values and `build\telemetry_dump_trace.txt` for step-by-step dump/provider tracing.
 
 ## Build
 

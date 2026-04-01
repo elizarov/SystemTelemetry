@@ -27,10 +27,7 @@ struct DriveInfo {
 struct ProcessorTelemetry {
     std::wstring name = L"CPU";
     double loadPercent = 0.0;
-    ScalarMetric temperature{std::nullopt, L"\x00B0""C"};
-    ScalarMetric power{std::nullopt, L"W"};
     ScalarMetric clock{std::nullopt, L"GHz"};
-    ScalarMetric fan{std::nullopt, L"RPM"};
     MemoryMetric memory;
 };
 
@@ -38,7 +35,6 @@ struct GpuTelemetry {
     std::wstring name = L"GPU";
     double loadPercent = 0.0;
     ScalarMetric temperature{std::nullopt, L"\x00B0""C"};
-    ScalarMetric power{std::nullopt, L"W"};
     ScalarMetric clock{std::nullopt, L"MHz"};
     ScalarMetric fan{std::nullopt, L"RPM"};
     MemoryMetric vram;

@@ -134,6 +134,42 @@ bool WriteUtf8File(const std::filesystem::path& path, const std::wstring& text) 
     return ok;
 }
 
+void AppendUtf8Line(const std::filesystem::path& path, const std::wstring& text) {
+    const std::wstring line = text + L"\r\n";
+    const int required = WideCharToMultiByte(
+        CP_UTF8, 0, line.c_str(), static_cast<int>(line.size()), nullptr, 0, nullptr, nullptr);
+    if (required <= 0) {
+        return;
+    }
+
+    std::string bytes(static_cast<size_t>(required), '\0');
+    WideCharToMultiByte(
+        CP_UTF8, 0, line.c_str(), static_cast<int>(line.size()), bytes.data(), required, nullptr, nullptr);
+
+    HANDLE file = CreateFileW(
+        path.c_str(),
+        FILE_APPEND_DATA,
+        FILE_SHARE_READ,
+        nullptr,
+        OPEN_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    LARGE_INTEGER size{};
+    if (GetFileSizeEx(file, &size) && size.QuadPart == 0) {
+        const unsigned char bom[] = {0xEF, 0xBB, 0xBF};
+        DWORD written = 0;
+        WriteFile(file, bom, sizeof(bom), &written, nullptr);
+    }
+
+    DWORD written = 0;
+    WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr);
+    CloseHandle(file);
+}
+
 bool HasSwitch(const std::wstring& target) {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -155,21 +191,34 @@ bool HasSwitch(const std::wstring& target) {
 int RunDumpMode() {
     TelemetryCollector telemetry;
     const AppConfig config = LoadConfig(GetRuntimeConfigPath());
+    const std::filesystem::path tracePath = GetExecutableDirectory() / L"telemetry_dump_trace.txt";
+    DeleteFileW(tracePath.c_str());
+    AppendUtf8Line(tracePath, L"dump:start");
+    AppendUtf8Line(tracePath, L"dump:telemetry_initialize_begin");
     if (!telemetry.Initialize(config)) {
+        AppendUtf8Line(tracePath, L"dump:telemetry_initialize_failed");
         MessageBoxW(nullptr, L"Failed to initialize telemetry collector.", L"System Telemetry", MB_ICONERROR);
         return 1;
     }
 
+    AppendUtf8Line(tracePath, L"dump:telemetry_initialized");
     Sleep(900);
+    AppendUtf8Line(tracePath, L"dump:update_snapshot_1_begin");
     telemetry.UpdateSnapshot();
+    AppendUtf8Line(tracePath, L"dump:update_snapshot_1_done");
     Sleep(1100);
+    AppendUtf8Line(tracePath, L"dump:update_snapshot_2_begin");
     telemetry.UpdateSnapshot();
+    AppendUtf8Line(tracePath, L"dump:update_snapshot_2_done");
     const std::filesystem::path dumpPath = GetExecutableDirectory() / L"telemetry_dump.txt";
+    AppendUtf8Line(tracePath, L"dump:write_dump_begin");
     if (!WriteUtf8File(dumpPath, telemetry.DumpText())) {
+        AppendUtf8Line(tracePath, L"dump:write_dump_failed");
         const std::wstring message = L"Failed to write dump file:\n" + dumpPath.wstring();
         MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
         return 1;
     }
+    AppendUtf8Line(tracePath, L"dump:done");
     return 0;
 }
 
@@ -808,16 +857,10 @@ void DashboardApp::DrawProcessorPanel(HDC hdc, const RECT& rect, const Processor
     DrawTextBlock(hdc, nameRect, cpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, cpu.loadPercent, L"Load");
 
-    int y = rect.top + 76;
+    int y = rect.top + 110;
     const int rowHeight = 34;
     RECT rows{rect.left + 164, y, rect.right - 18, y + rowHeight};
-    DrawMetricRow(hdc, rows, L"Temp", FormatValue(cpu.temperature, 0), cpu.temperature.value.value_or(0.0) / 100.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, L"Power", FormatValue(cpu.power, 1), cpu.power.value.value_or(0.0) / 150.0);
-    OffsetRect(&rows, 0, rowHeight);
     DrawMetricRow(hdc, rows, L"Clock", FormatValue(cpu.clock, 2), cpu.clock.value.value_or(0.0) / 5.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, L"Fan", FormatValue(cpu.fan, 0), cpu.fan.value.value_or(0.0) / 4000.0);
     OffsetRect(&rows, 0, rowHeight);
     DrawMetricRow(hdc, rows, L"RAM", FormatMemory(cpu.memory.usedGb, cpu.memory.totalGb),
         cpu.memory.totalGb > 0.0 ? cpu.memory.usedGb / cpu.memory.totalGb : 0.0);
@@ -829,12 +872,10 @@ void DashboardApp::DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& g
     DrawTextBlock(hdc, nameRect, gpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, gpu.loadPercent, L"Load");
 
-    int y = rect.top + 76;
+    int y = rect.top + 92;
     const int rowHeight = 34;
     RECT rows{rect.left + 164, y, rect.right - 18, y + rowHeight};
     DrawMetricRow(hdc, rows, L"Temp", FormatValue(gpu.temperature, 0), gpu.temperature.value.value_or(0.0) / 100.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, L"Power", FormatValue(gpu.power, 1), gpu.power.value.value_or(0.0) / 350.0);
     OffsetRect(&rows, 0, rowHeight);
     DrawMetricRow(hdc, rows, L"Clock", FormatValue(gpu.clock, 0), gpu.clock.value.value_or(0.0) / 2600.0);
     OffsetRect(&rows, 0, rowHeight);
