@@ -36,6 +36,7 @@ Keep generated build outputs and temporary compiler files inside `build\` so the
 Keep transient compiler scratch files out of the top level of `build\`; route them into a dedicated `build\tmp\` area so the main build output folder stays readable.
 Use a fresh per-build subdirectory under `build\tmp\` for `TMP` and `TEMP` so stale or externally locked toolchain scratch files do not break later builds.
 Always build through `build.cmd`.
+Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies both `SystemTelemetry.exe` and the required `GigabyteSivProbe.exe` helper there, creates a live `config.ini` from the checked-in template when one is not already present, grants standard users modify access to that installed `config.ini` so runtime `Update Config` saves still work from Program Files, and registers `SystemTelemetry.exe` under `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` so the dashboard starts automatically for every user who signs into the machine.
 
 Requirements
 ============
