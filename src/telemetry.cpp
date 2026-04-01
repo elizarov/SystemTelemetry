@@ -5,10 +5,12 @@
 #include <iphlpapi.h>
 #include <netioapi.h>
 #include <dxgi.h>
+#include <intrin.h>
 #include <pdh.h>
 #include <pdhmsg.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cctype>
 #include <cstdint>
@@ -99,6 +101,99 @@ bool EqualsInsensitive(const std::wstring& value, const std::string& needle) {
         return false;
     }
     return ToLower(Utf8FromWide(value)) == ToLower(needle);
+}
+
+std::string TrimAsciiWhitespace(std::string value) {
+    auto notSpace = [](unsigned char ch) {
+        return !std::isspace(ch);
+    };
+
+    const auto begin = std::find_if(value.begin(), value.end(), notSpace);
+    if (begin == value.end()) {
+        return "";
+    }
+
+    const auto end = std::find_if(value.rbegin(), value.rend(), notSpace).base();
+    return std::string(begin, end);
+}
+
+std::string CollapseAsciiWhitespace(std::string value) {
+    std::string collapsed;
+    collapsed.reserve(value.size());
+
+    bool pendingSpace = false;
+    for (unsigned char ch : value) {
+        if (std::isspace(ch)) {
+            pendingSpace = !collapsed.empty();
+            continue;
+        }
+        if (pendingSpace) {
+            collapsed.push_back(' ');
+            pendingSpace = false;
+        }
+        collapsed.push_back(static_cast<char>(ch));
+    }
+    return collapsed;
+}
+
+std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
+    DWORD type = 0;
+    DWORD bytes = 0;
+    const LONG probe = RegGetValueW(root, subKey, valueName, RRF_RT_REG_SZ, &type, nullptr, &bytes);
+    if (probe != ERROR_SUCCESS || bytes < sizeof(wchar_t)) {
+        return std::nullopt;
+    }
+
+    std::wstring value(bytes / sizeof(wchar_t), L'\0');
+    const LONG status = RegGetValueW(root, subKey, valueName, RRF_RT_REG_SZ, &type, value.data(), &bytes);
+    if (status != ERROR_SUCCESS) {
+        return std::nullopt;
+    }
+
+    if (!value.empty() && value.back() == L'\0') {
+        value.pop_back();
+    }
+    return Utf8FromWide(value);
+}
+
+std::string DetectCpuNameFromCpuid() {
+    int maxExtendedLeaf[4]{};
+    __cpuid(maxExtendedLeaf, 0x80000000);
+    if (static_cast<unsigned int>(maxExtendedLeaf[0]) < 0x80000004) {
+        return "";
+    }
+
+    std::array<int, 12> brandWords{};
+    for (int i = 0; i < 3; ++i) {
+        int leafData[4]{};
+        __cpuid(leafData, 0x80000002 + i);
+        for (int j = 0; j < 4; ++j) {
+            brandWords[static_cast<size_t>(i) * 4 + static_cast<size_t>(j)] = leafData[j];
+        }
+    }
+
+    std::string brand(reinterpret_cast<const char*>(brandWords.data()), brandWords.size() * sizeof(int));
+    const size_t terminator = brand.find('\0');
+    if (terminator != std::string::npos) {
+        brand.resize(terminator);
+    }
+    return CollapseAsciiWhitespace(TrimAsciiWhitespace(brand));
+}
+
+std::string DetectCpuName() {
+    const std::string cpuidName = DetectCpuNameFromCpuid();
+    if (!cpuidName.empty()) {
+        return cpuidName;
+    }
+
+    const auto registryName = ReadRegistryString(
+        HKEY_LOCAL_MACHINE,
+        L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+        L"ProcessorNameString");
+    if (registryName.has_value()) {
+        return CollapseAsciiWhitespace(TrimAsciiWhitespace(*registryName));
+    }
+    return "";
 }
 
 struct AdapterSelectionInfo {
@@ -247,6 +342,9 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     impl_->trace_.SetOutput(traceStream);
     impl_->snapshot_.network.uploadHistory.assign(60, 0.0);
     impl_->snapshot_.network.downloadHistory.assign(60, 0.0);
+    if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {
+        impl_->snapshot_.cpu.name = cpuName;
+    }
 
     WSADATA wsaData{};
     const int wsaStartupResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -258,6 +356,7 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
             wsaStartupResult, LOBYTE(wsaData.wVersion), HIBYTE(wsaData.wVersion));
         impl_->trace_.Write(buffer);
     }
+    impl_->trace_.Write("telemetry:cpu_name value=\"" + impl_->snapshot_.cpu.name + "\"");
     impl_->gpuProvider_ = CreateGpuVendorTelemetryProvider(&impl_->trace_);
     impl_->boardProvider_ = CreateBoardVendorTelemetryProvider(&impl_->trace_);
     if (impl_->gpuProvider_ != nullptr) {

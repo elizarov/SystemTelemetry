@@ -90,6 +90,7 @@ Telemetry sources
 
 CPU telemetry must rely only on Windows-accessible metrics that are available in a straightforward way:
 
+- CPU model name from native CPU brand-string discovery, with a non-WMI Windows fallback when the direct brand string is unavailable
 - CPU load
 - CPU clock
 - RAM usage
