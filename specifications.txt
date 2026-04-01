@@ -33,6 +33,7 @@ The project is going to run on Windows 11 and will be implementation in C++20 us
 Use "devenv.cmd" to activate development enviroment and to make compiler tools (like "cl") available.
 Create makefile for nmake to build the project.
 Keep all sources in "src" directory.
+Keep generated build outputs and temporary compiler files inside `build\` so the project root stays clean.
 
 Configuration
 =============
@@ -53,6 +54,15 @@ auto-selected sensor on systems where multiple matching sensors exist.
 At runtime, the application must read `config.ini` from the same folder it was
 started from and write updates back to that same file. The `src/config.ini`
 file in the source tree is only a checked-in example configuration template.
+
+Command-line dump mode
+======================
+
+Support a `/dump` command-line switch. When present, the application must
+initialize telemetry using the same runtime `config.ini`, dump the current
+telemetry snapshot plus discovered sensor rows to `telemetry_dump.txt` beside
+the executable, and exit without starting the GUI or affecting any already-
+running dashboard instance.
 
 Size and placement
 ==================
@@ -107,6 +117,8 @@ Single-instance behavior
 At most one dashboard instance may be running at a time.
 Starting a new copy must close the already running copy, then continue startup
 as the remaining instance.
+The `/dump` command-line mode is exempt from this behavior and should run as an
+independent one-shot console command.
 
 Style Summary
 =============

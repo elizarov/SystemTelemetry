@@ -89,6 +89,90 @@ std::wstring FormatDriveFree(double freeGb) {
     return buffer;
 }
 
+std::filesystem::path GetRuntimeConfigPath();
+
+std::filesystem::path GetExecutableDirectory() {
+    wchar_t modulePath[MAX_PATH];
+    const DWORD length = GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
+    if (length == 0 || length >= ARRAYSIZE(modulePath)) {
+        return std::filesystem::current_path();
+    }
+    return std::filesystem::path(modulePath).parent_path();
+}
+
+bool WriteUtf8File(const std::filesystem::path& path, const std::wstring& text) {
+    const int required = WideCharToMultiByte(
+        CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+    if (required <= 0) {
+        return false;
+    }
+
+    std::string bytes(static_cast<size_t>(required), '\0');
+    WideCharToMultiByte(
+        CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), bytes.data(), required, nullptr, nullptr);
+
+    HANDLE file = CreateFileW(
+        path.c_str(),
+        GENERIC_WRITE,
+        FILE_SHARE_READ,
+        nullptr,
+        CREATE_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    const unsigned char bom[] = {0xEF, 0xBB, 0xBF};
+    DWORD written = 0;
+    bool ok = WriteFile(file, bom, sizeof(bom), &written, nullptr) == TRUE && written == sizeof(bom);
+    if (ok) {
+        ok = WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) == TRUE &&
+            written == bytes.size();
+    }
+    CloseHandle(file);
+    return ok;
+}
+
+bool HasSwitch(const std::wstring& target) {
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (argv == nullptr) {
+        return false;
+    }
+
+    bool found = false;
+    for (int i = 1; i < argc; ++i) {
+        if (_wcsicmp(argv[i], target.c_str()) == 0) {
+            found = true;
+            break;
+        }
+    }
+    LocalFree(argv);
+    return found;
+}
+
+int RunDumpMode() {
+    TelemetryCollector telemetry;
+    const AppConfig config = LoadConfig(GetRuntimeConfigPath());
+    if (!telemetry.Initialize(config)) {
+        MessageBoxW(nullptr, L"Failed to initialize telemetry collector.", L"System Telemetry", MB_ICONERROR);
+        return 1;
+    }
+
+    Sleep(900);
+    telemetry.UpdateSnapshot();
+    Sleep(1100);
+    telemetry.UpdateSnapshot();
+    const std::filesystem::path dumpPath = GetExecutableDirectory() / L"telemetry_dump.txt";
+    if (!WriteUtf8File(dumpPath, telemetry.DumpText())) {
+        const std::wstring message = L"Failed to write dump file:\n" + dumpPath.wstring();
+        MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+        return 1;
+    }
+    return 0;
+}
+
 std::wstring FormatSpeed(double mbps) {
     wchar_t buffer[64];
     if (mbps >= 100.0) {
@@ -863,6 +947,10 @@ void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
+    if (HasSwitch(L"/dump")) {
+        return RunDumpMode();
+    }
+
     ShutdownPreviousInstance();
 
     DashboardApp app;

@@ -4,7 +4,6 @@
 #include <optional>
 #include <string>
 #include <vector>
-
 #include <windows.h>
 
 #include "config.h"
@@ -75,6 +74,7 @@ public:
     bool Initialize(const AppConfig& config);
     const SystemSnapshot& Snapshot() const;
     void UpdateSnapshot();
+    std::wstring DumpText() const;
 
 private:
     struct Impl;

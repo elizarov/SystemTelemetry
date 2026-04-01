@@ -15,6 +15,8 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <sstream>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -210,6 +212,26 @@ std::optional<double> FindBestAutoSensorValue(
     return bestValue;
 }
 
+std::wstring FormatScalarMetric(const ScalarMetric& metric, int precision) {
+    if (!metric.value.has_value()) {
+        return L"N/A";
+    }
+    wchar_t buffer[64];
+    swprintf_s(buffer, L"%.*f %ls", precision, *metric.value, metric.unit.c_str());
+    return buffer;
+}
+
+std::wstring FormatMemoryMetric(const MemoryMetric& metric) {
+    wchar_t buffer[64];
+    swprintf_s(buffer, L"%.1f / %.1f GB", metric.usedGb, metric.totalGb);
+    return buffer;
+}
+
+void AppendWideLine(std::wstring& output, const std::wstring& text) {
+    output += text;
+    output += L"\r\n";
+}
+
 }  // namespace
 
 struct TelemetryCollector::Impl {
@@ -223,6 +245,7 @@ struct TelemetryCollector::Impl {
     std::optional<double> QuerySensor(const std::wstring& key);
     std::optional<double> QueryAutoSensor(const std::wstring& key, const std::vector<SensorRecord>& sensors);
     std::vector<SensorRecord> LoadSensors();
+    std::wstring DumpText() const;
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
     std::wstring FindAdapterIp(ULONG interfaceIndex);
     static void PushHistory(std::vector<double>& history, double value);
@@ -515,6 +538,10 @@ void TelemetryCollector::UpdateSnapshot() {
     GetLocalTime(&impl_->snapshot_.now);
 }
 
+std::wstring TelemetryCollector::DumpText() const {
+    return impl_->DumpText();
+}
+
 void TelemetryCollector::Impl::UpdateCpu() {
     if (cpuQuery_ == nullptr) {
         return;
@@ -613,6 +640,111 @@ std::vector<SensorRecord> TelemetryCollector::Impl::LoadSensors() {
         }
     }
     return {};
+}
+
+std::wstring TelemetryCollector::Impl::DumpText() const {
+    std::wstring output;
+    const auto now = snapshot_.now;
+    wchar_t dateTime[64];
+    swprintf_s(dateTime, L"%04d-%02d-%02d %02d:%02d:%02d",
+        now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond);
+
+    AppendWideLine(output, L"System Telemetry Dump");
+    AppendWideLine(output, L"=====================");
+    AppendWideLine(output, std::wstring(L"Timestamp: ") + dateTime);
+    AppendWideLine(output, L"");
+
+    AppendWideLine(output, L"[CPU]");
+    AppendWideLine(output, std::wstring(L"Name: ") + snapshot_.cpu.name);
+    {
+        wchar_t buffer[64];
+        swprintf_s(buffer, L"Load: %.2f%%", snapshot_.cpu.loadPercent);
+        AppendWideLine(output, buffer);
+    }
+    AppendWideLine(output, std::wstring(L"Temperature: ") + FormatScalarMetric(snapshot_.cpu.temperature, 1));
+    AppendWideLine(output, std::wstring(L"Power: ") + FormatScalarMetric(snapshot_.cpu.power, 1));
+    AppendWideLine(output, std::wstring(L"Clock: ") + FormatScalarMetric(snapshot_.cpu.clock, 2));
+    AppendWideLine(output, std::wstring(L"Fan: ") + FormatScalarMetric(snapshot_.cpu.fan, 0));
+    AppendWideLine(output, std::wstring(L"Memory: ") + FormatMemoryMetric(snapshot_.cpu.memory));
+    AppendWideLine(output, L"");
+
+    AppendWideLine(output, L"[GPU]");
+    AppendWideLine(output, std::wstring(L"Name: ") + snapshot_.gpu.name);
+    {
+        wchar_t buffer[64];
+        swprintf_s(buffer, L"Load: %.2f%%", snapshot_.gpu.loadPercent);
+        AppendWideLine(output, buffer);
+    }
+    AppendWideLine(output, std::wstring(L"Temperature: ") + FormatScalarMetric(snapshot_.gpu.temperature, 1));
+    AppendWideLine(output, std::wstring(L"Power: ") + FormatScalarMetric(snapshot_.gpu.power, 1));
+    AppendWideLine(output, std::wstring(L"Clock: ") + FormatScalarMetric(snapshot_.gpu.clock, 0));
+    AppendWideLine(output, std::wstring(L"Fan: ") + FormatScalarMetric(snapshot_.gpu.fan, 0));
+    AppendWideLine(output, std::wstring(L"VRAM: ") + FormatMemoryMetric(snapshot_.gpu.vram));
+    AppendWideLine(output, L"");
+
+    AppendWideLine(output, L"[Network]");
+    AppendWideLine(output, std::wstring(L"Adapter: ") + snapshot_.network.adapterName);
+    AppendWideLine(output, std::wstring(L"IP: ") + snapshot_.network.ipAddress);
+    {
+        wchar_t buffer[64];
+        swprintf_s(buffer, L"Upload: %.3f MB/s", snapshot_.network.uploadMbps);
+        AppendWideLine(output, buffer);
+        swprintf_s(buffer, L"Download: %.3f MB/s", snapshot_.network.downloadMbps);
+        AppendWideLine(output, buffer);
+    }
+    AppendWideLine(output, L"");
+
+    AppendWideLine(output, L"[Storage]");
+    if (snapshot_.drives.empty()) {
+        AppendWideLine(output, L"(none)");
+    } else {
+        for (const auto& drive : snapshot_.drives) {
+            wchar_t buffer[128];
+            swprintf_s(buffer, L"%ls used=%.1f%% free=%.1f GB", drive.label.c_str(), drive.usedPercent, drive.freeGb);
+            AppendWideLine(output, buffer);
+        }
+    }
+    AppendWideLine(output, L"");
+
+    AppendWideLine(output, L"[Configured Sensor Bindings]");
+    if (config_.sensors.empty()) {
+        AppendWideLine(output, L"(none)");
+    } else {
+        for (const auto& pair : config_.sensors) {
+            std::wstringstream line;
+            line << pair.first << L": ";
+            for (size_t i = 0; i < pair.second.namespaces.size(); ++i) {
+                if (i > 0) {
+                    line << L",";
+                }
+                line << pair.second.namespaces[i];
+            }
+            line << L" | " << pair.second.matchField << L" | " << pair.second.matchValue
+                 << L" | " << pair.second.valueField;
+            AppendWideLine(output, line.str());
+        }
+    }
+    AppendWideLine(output, L"");
+
+    AppendWideLine(output, L"[Discovered Sensors]");
+    const auto sensors = const_cast<Impl*>(this)->LoadSensors();
+    if (sensors.empty()) {
+        AppendWideLine(output, L"(none)");
+    } else {
+        for (const auto& sensor : sensors) {
+            wchar_t valueBuffer[64];
+            swprintf_s(valueBuffer, L"%.3f", sensor.value);
+            std::wstringstream line;
+            line << L"ns=" << sensor.sensorNamespace
+                 << L" type=" << sensor.sensorType
+                 << L" name=" << sensor.name
+                 << L" id=" << sensor.identifier
+                 << L" parent=" << sensor.parent
+                 << L" value=" << valueBuffer;
+            AppendWideLine(output, line.str());
+        }
+    }
+    return output;
 }
 
 std::optional<double> TelemetryCollector::Impl::QueryAutoSensor(
