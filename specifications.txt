@@ -32,6 +32,7 @@ Use `devenv.cmd` to activate the development environment when needed.
 Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.txt`.
 Keep all sources in `src`.
 Keep generated build outputs and temporary compiler files inside `build\` so the project root stays clean.
+Keep transient compiler scratch files out of the top level of `build\`; route them into a dedicated `build\tmp\` area so the main build output folder stays readable.
 Always build through `build.cmd`.
 
 Requirements
