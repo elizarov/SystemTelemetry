@@ -288,6 +288,11 @@ std::string FormatSpeed(double mbps) {
     return buffer;
 }
 
+double GetNetworkGraphMax(double uploadMbps, double downloadMbps) {
+    const double rawMax = std::max(10.0, std::max(uploadMbps, downloadMbps));
+    return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
+}
+
 struct MonitorPlacementInfo {
     std::string deviceName;
     std::string monitorName = "Unknown";
@@ -1150,8 +1155,25 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
 
+    const int graphLeft = rect.left + 18;
+    const int width = std::max<int>(1, rect.right - graphLeft - 1);
+    const int height = std::max<int>(1, rect.bottom - rect.top - 1);
+    const int graphRight = graphLeft + width;
+    const int graphBottom = rect.bottom - 1;
+
+    HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(42, 48, 54));
+    HGDIOBJ oldPen = SelectObject(hdc, gridPen);
+    for (double tick = 5.0; tick < maxValue; tick += 5.0) {
+        const double ratio = tick / maxValue;
+        const int y = graphBottom - static_cast<int>(std::round(ratio * height));
+        MoveToEx(hdc, graphLeft, y, nullptr);
+        LineTo(hdc, graphRight, y);
+    }
+    SelectObject(hdc, oldPen);
+    DeleteObject(gridPen);
+
     HPEN axisPen = CreatePen(PS_SOLID, 1, RGB(80, 88, 96));
-    HGDIOBJ oldPen = SelectObject(hdc, axisPen);
+    oldPen = SelectObject(hdc, axisPen);
     MoveToEx(hdc, rect.left + 18, rect.top, nullptr);
     LineTo(hdc, rect.left + 18, rect.bottom - 1);
     MoveToEx(hdc, rect.left + 18, rect.bottom - 1, nullptr);
@@ -1166,9 +1188,6 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
 
     HPEN pen = CreatePen(PS_SOLID, 2, kAccent);
     oldPen = SelectObject(hdc, pen);
-    const int graphLeft = rect.left + 18;
-    const int width = std::max<int>(1, rect.right - graphLeft - 1);
-    const int height = std::max<int>(1, rect.bottom - rect.top - 1);
     for (size_t i = 1; i < history.size(); ++i) {
         const double v1 = std::clamp(history[i - 1] / maxValue, 0.0, 1.0);
         const double v2 = std::clamp(history[i] / maxValue, 0.0, 1.0);
@@ -1190,7 +1209,7 @@ void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTele
     RECT downRect{rect.left + 16, rect.top + 102, rect.right - 16, rect.top + 118};
     RECT downloadGraph{rect.left + 16, rect.top + 120, rect.right - 16, rect.bottom - 28};
     RECT footerRect{rect.left + 16, rect.bottom - 22, rect.right - 16, rect.bottom - 6};
-    const double maxGraph = std::max(10.0, std::max(network.uploadMbps * 1.5, network.downloadMbps * 1.5));
+    const double maxGraph = GetNetworkGraphMax(network.uploadMbps, network.downloadMbps);
 
     RECT upLabelRect{upRect.left, upRect.top, upRect.left + 42, upRect.bottom};
     RECT upValueRect{upRect.left + 44, upRect.top, upRect.right, upRect.bottom};
