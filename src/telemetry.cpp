@@ -66,6 +66,75 @@ bool ContainsInsensitive(const std::wstring& value, const std::string& needle) {
     return ToLower(Utf8FromWide(value)).find(ToLower(needle)) != std::string::npos;
 }
 
+struct AdapterSelectionInfo {
+    bool matched = false;
+    bool hasIpv4 = false;
+    bool hasGateway = false;
+    std::string ipAddress = "N/A";
+};
+
+bool AdapterMatchesRow(const IP_ADAPTER_ADDRESSES& adapter, const MIB_IF_ROW2& row) {
+    return adapter.Luid.Value == row.InterfaceLuid.Value ||
+        adapter.IfIndex == row.InterfaceIndex ||
+        adapter.Ipv6IfIndex == row.InterfaceIndex ||
+        (adapter.FriendlyName != nullptr && _wcsicmp(adapter.FriendlyName, row.Alias) == 0) ||
+        (adapter.Description != nullptr && _wcsicmp(adapter.Description, row.Description) == 0);
+}
+
+bool HasUsableGateway(const IP_ADAPTER_ADDRESSES& adapter) {
+    for (auto* gateway = adapter.FirstGatewayAddress; gateway != nullptr; gateway = gateway->Next) {
+        const sockaddr* address = gateway->Address.lpSockaddr;
+        if (address == nullptr) {
+            continue;
+        }
+        if (address->sa_family == AF_INET) {
+            const auto* ipv4 = reinterpret_cast<const sockaddr_in*>(address);
+            if (ipv4->sin_addr.S_un.S_addr != 0) {
+                return true;
+            }
+        } else if (address->sa_family == AF_INET6) {
+            const auto* ipv6 = reinterpret_cast<const sockaddr_in6*>(address);
+            static const IN6_ADDR zeroAddress{};
+            if (memcmp(&ipv6->sin6_addr, &zeroAddress, sizeof(zeroAddress)) != 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+AdapterSelectionInfo BuildAdapterSelectionInfo(const MIB_IF_ROW2& row, const IP_ADAPTER_ADDRESSES* addresses) {
+    AdapterSelectionInfo info;
+    for (auto* current = addresses; current != nullptr; current = current->Next) {
+        if (!AdapterMatchesRow(*current, row)) {
+            continue;
+        }
+
+        info.matched = true;
+        info.hasGateway = HasUsableGateway(*current);
+        for (auto* unicast = current->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next) {
+            if (unicast->Address.lpSockaddr == nullptr || unicast->Address.lpSockaddr->sa_family != AF_INET) {
+                continue;
+            }
+
+            wchar_t address[128];
+            DWORD length = ARRAYSIZE(address);
+            if (WSAAddressToStringW(
+                    unicast->Address.lpSockaddr,
+                    static_cast<DWORD>(unicast->Address.iSockaddrLength),
+                    nullptr,
+                    address,
+                    &length) == 0) {
+                info.hasIpv4 = true;
+                info.ipAddress = Utf8FromWide(address);
+                break;
+            }
+        }
+        break;
+    }
+    return info;
+}
+
 }  // namespace
 
 struct TelemetryCollector::Impl {
@@ -81,7 +150,6 @@ struct TelemetryCollector::Impl {
     void UpdateNetworkState(bool initializeOnly);
     void DumpText(std::ostream& output) const;
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
-    std::string FindAdapterIp(ULONG interfaceIndex);
     static void PushHistory(std::vector<double>& history, double value);
     void Trace(const char* text) const;
     void Trace(const std::string& text) const;
@@ -554,51 +622,6 @@ void TelemetryCollector::Impl::PushHistory(std::vector<double>& history, double 
     history.push_back(value);
 }
 
-std::string TelemetryCollector::Impl::FindAdapterIp(ULONG interfaceIndex) {
-    ULONG size = 0;
-    const ULONG probeStatus = GetAdaptersAddresses(
-        AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, nullptr, &size);
-    Trace(("telemetry:network_ip_probe " + tracing::Trace::FormatWin32Status("status", probeStatus) +
-        " size=" + std::to_string(size) + " interface=" + std::to_string(interfaceIndex)).c_str());
-    std::vector<BYTE> buffer(size);
-    auto* addresses = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
-    const ULONG fetchStatus = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST,
-            nullptr, addresses, &size);
-    if (fetchStatus != NO_ERROR) {
-        Trace(("telemetry:network_ip_fetch " + tracing::Trace::FormatWin32Status("status", fetchStatus) +
-            " interface=" + std::to_string(interfaceIndex)).c_str());
-        return "N/A";
-    }
-
-    for (auto* current = addresses; current != nullptr; current = current->Next) {
-        if (current->IfIndex != interfaceIndex) {
-            continue;
-        }
-        for (auto* unicast = current->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next) {
-            wchar_t address[128];
-            DWORD length = ARRAYSIZE(address);
-            const int addressStatus = WSAAddressToStringW(
-                    unicast->Address.lpSockaddr, static_cast<DWORD>(unicast->Address.iSockaddrLength),
-                    nullptr, address, &length);
-            if (addressStatus == 0) {
-                std::wstring ip = address;
-                if (ip.find(L':') == std::wstring::npos) {
-                    const std::string utf8Ip = Utf8FromWide(ip);
-                    Trace(("telemetry:network_ip_found interface=" + std::to_string(interfaceIndex) +
-                        " ip=" + utf8Ip).c_str());
-                    return utf8Ip;
-                }
-            } else {
-                Trace(("telemetry:network_ip_stringify interface=" + std::to_string(interfaceIndex) +
-                    " result=" + std::to_string(addressStatus)).c_str());
-            }
-        }
-    }
-
-    Trace(("telemetry:network_ip_missing interface=" + std::to_string(interfaceIndex)).c_str());
-    return "N/A";
-}
-
 void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
     PMIB_IF_TABLE2 table = nullptr;
     const DWORD tableStatus = GetIfTable2(&table);
@@ -611,25 +634,96 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         " entries=" + std::to_string(table->NumEntries) +
         " initialize_only=" + tracing::Trace::BoolText(initializeOnly)).c_str());
 
+    ULONG addressBufferSize = 0;
+    const ULONG addressProbeStatus = GetAdaptersAddresses(
+        AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, nullptr, &addressBufferSize);
+    Trace(("telemetry:network_ip_probe " + tracing::Trace::FormatWin32Status("status", addressProbeStatus) +
+        " size=" + std::to_string(addressBufferSize)).c_str());
+
+    std::vector<BYTE> addressBuffer;
+    IP_ADAPTER_ADDRESSES* addresses = nullptr;
+    ULONG addressFetchStatus = addressProbeStatus;
+    if (addressProbeStatus == ERROR_BUFFER_OVERFLOW && addressBufferSize > 0) {
+        addressBuffer.resize(addressBufferSize);
+        addresses = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(addressBuffer.data());
+        addressFetchStatus = GetAdaptersAddresses(
+            AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, addresses, &addressBufferSize);
+    }
+    Trace(("telemetry:network_ip_fetch " + tracing::Trace::FormatWin32Status("status", addressFetchStatus) +
+        " size=" + std::to_string(addressBufferSize)).c_str());
+    if (addressFetchStatus != NO_ERROR) {
+        addresses = nullptr;
+    }
+
     const auto now = std::chrono::steady_clock::now();
     MIB_IF_ROW2* selected = nullptr;
+    uint64_t selectedTraffic = 0;
+    AdapterSelectionInfo selectedInfo;
     for (ULONG i = 0; i < table->NumEntries; ++i) {
         auto& row = table->Table[i];
-        const bool isCandidate =
-            row.Type != IF_TYPE_SOFTWARE_LOOPBACK &&
-            row.OperStatus == IfOperStatusUp &&
-            (config_.networkAdapter.empty() ||
-                ContainsInsensitive(row.Alias, config_.networkAdapter) ||
+        if (row.Type == IF_TYPE_SOFTWARE_LOOPBACK || row.OperStatus != IfOperStatusUp) {
+            continue;
+        }
+
+        const bool configuredMatch =
+            !config_.networkAdapter.empty() &&
+            (ContainsInsensitive(row.Alias, config_.networkAdapter) ||
                 ContainsInsensitive(row.Description, config_.networkAdapter));
-        if (isCandidate) {
+        if (!config_.networkAdapter.empty() && !configuredMatch) {
+            continue;
+        }
+
+        const AdapterSelectionInfo info = BuildAdapterSelectionInfo(row, addresses);
+        const uint64_t traffic = row.InOctets + row.OutOctets;
+        const bool hardwareInterface = row.InterfaceAndOperStatusFlags.HardwareInterface != FALSE;
+        const bool connectorPresent = row.InterfaceAndOperStatusFlags.ConnectorPresent != FALSE;
+
+        Trace(("telemetry:network_candidate interface=" + std::to_string(row.InterfaceIndex) +
+            " alias=\"" + Utf8FromWide(row.Alias) + "\" description=\"" + Utf8FromWide(row.Description) + "\"" +
+            " matched=" + tracing::Trace::BoolText(info.matched) +
+            " has_ipv4=" + tracing::Trace::BoolText(info.hasIpv4) +
+            " has_gateway=" + tracing::Trace::BoolText(info.hasGateway) +
+            " hardware=" + tracing::Trace::BoolText(hardwareInterface) +
+            " connector=" + tracing::Trace::BoolText(connectorPresent) +
+            " traffic=" + std::to_string(traffic) +
+            " ip=" + info.ipAddress).c_str());
+
+        if (config_.networkAdapter.empty()) {
+            const bool candidatePreferred =
+                selected == nullptr ||
+                (info.hasGateway && !selectedInfo.hasGateway) ||
+                (info.hasGateway == selectedInfo.hasGateway && info.hasIpv4 && !selectedInfo.hasIpv4) ||
+                (info.hasGateway == selectedInfo.hasGateway && info.hasIpv4 == selectedInfo.hasIpv4 &&
+                    hardwareInterface && !selected->InterfaceAndOperStatusFlags.HardwareInterface) ||
+                (info.hasGateway == selectedInfo.hasGateway && info.hasIpv4 == selectedInfo.hasIpv4 &&
+                    hardwareInterface == (selected->InterfaceAndOperStatusFlags.HardwareInterface != FALSE) &&
+                    connectorPresent && !selected->InterfaceAndOperStatusFlags.ConnectorPresent) ||
+                (info.hasGateway == selectedInfo.hasGateway && info.hasIpv4 == selectedInfo.hasIpv4 &&
+                    hardwareInterface == (selected->InterfaceAndOperStatusFlags.HardwareInterface != FALSE) &&
+                    connectorPresent == (selected->InterfaceAndOperStatusFlags.ConnectorPresent != FALSE) &&
+                    traffic > selectedTraffic);
+            if (candidatePreferred) {
+                selected = &row;
+                selectedTraffic = traffic;
+                selectedInfo = info;
+            }
+        } else if (info.hasGateway || info.hasIpv4 || selected == nullptr) {
             selected = &row;
-            Trace(("telemetry:network_selected interface=" + std::to_string(row.InterfaceIndex) +
-                " alias=\"" + Utf8FromWide(row.Alias) + "\" description=\"" + Utf8FromWide(row.Description) + "\"").c_str());
-            break;
+            selectedTraffic = traffic;
+            selectedInfo = info;
+            if (info.hasGateway || info.hasIpv4) {
+                break;
+            }
         }
     }
 
     if (selected != nullptr) {
+        Trace(("telemetry:network_selected interface=" + std::to_string(selected->InterfaceIndex) +
+            " alias=\"" + Utf8FromWide(selected->Alias) + "\" description=\"" + Utf8FromWide(selected->Description) +
+            "\" has_ipv4=" + tracing::Trace::BoolText(selectedInfo.hasIpv4) +
+            " has_gateway=" + tracing::Trace::BoolText(selectedInfo.hasGateway) +
+            " traffic=" + std::to_string(selectedTraffic) +
+            " ip=" + selectedInfo.ipAddress).c_str());
         snapshot_.network.adapterName = Utf8FromWide(
             selected->Alias[0] != L'\0' ? std::wstring_view(selected->Alias) : std::wstring_view(selected->Description));
         if (selectedIndex_ != selected->InterfaceIndex) {
@@ -656,7 +750,13 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
             previousNetworkTick_ = now;
         }
 
-        snapshot_.network.ipAddress = FindAdapterIp(selected->InterfaceIndex);
+        snapshot_.network.ipAddress = selectedInfo.ipAddress;
+        if (selectedInfo.hasIpv4) {
+            Trace(("telemetry:network_ip_found interface=" + std::to_string(selected->InterfaceIndex) +
+                " ip=" + selectedInfo.ipAddress).c_str());
+        } else {
+            Trace(("telemetry:network_ip_missing interface=" + std::to_string(selected->InterfaceIndex)).c_str());
+        }
     } else {
         Trace("telemetry:network_selected interface=none");
     }
