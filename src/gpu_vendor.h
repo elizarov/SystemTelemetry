@@ -6,12 +6,12 @@
 #include <string>
 
 struct GpuVendorTelemetrySample {
-    std::optional<std::wstring> name;
+    std::optional<std::string> name;
     std::optional<double> temperatureC;
     std::optional<double> coreClockMhz;
     std::optional<double> fanRpm;
-    std::wstring providerName = L"None";
-    std::wstring diagnostics;
+    std::string providerName = "None";
+    std::string diagnostics;
     bool available = false;
 };
 

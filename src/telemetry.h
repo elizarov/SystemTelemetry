@@ -11,7 +11,7 @@
 
 struct ScalarMetric {
     std::optional<double> value;
-    std::wstring unit;
+    std::string unit;
 };
 
 struct MemoryMetric {
@@ -20,32 +20,32 @@ struct MemoryMetric {
 };
 
 struct DriveInfo {
-    std::wstring label;
+    std::string label;
     double usedPercent = 0.0;
     double freeGb = 0.0;
 };
 
 struct ProcessorTelemetry {
-    std::wstring name = L"CPU";
+    std::string name = "CPU";
     double loadPercent = 0.0;
-    ScalarMetric clock{std::nullopt, L"GHz"};
+    ScalarMetric clock{std::nullopt, "GHz"};
     MemoryMetric memory;
 };
 
 struct GpuTelemetry {
-    std::wstring name = L"GPU";
+    std::string name = "GPU";
     double loadPercent = 0.0;
-    ScalarMetric temperature{std::nullopt, L"\x00B0""C"};
-    ScalarMetric clock{std::nullopt, L"MHz"};
-    ScalarMetric fan{std::nullopt, L"RPM"};
+    ScalarMetric temperature{std::nullopt, "\xC2\xB0""C"};
+    ScalarMetric clock{std::nullopt, "MHz"};
+    ScalarMetric fan{std::nullopt, "RPM"};
     MemoryMetric vram;
 };
 
 struct NetworkTelemetry {
-    std::wstring adapterName = L"Auto";
+    std::string adapterName = "Auto";
     double uploadMbps = 0.0;
     double downloadMbps = 0.0;
-    std::wstring ipAddress = L"N/A";
+    std::string ipAddress = "N/A";
     std::vector<double> uploadHistory;
     std::vector<double> downloadHistory;
 };

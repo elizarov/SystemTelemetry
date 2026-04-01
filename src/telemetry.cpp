@@ -9,72 +9,59 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cstdint>
-#include <cwctype>
+#include <cstdio>
 #include <memory>
 #include <optional>
 #include <ostream>
-#include <sstream>
-#include <cstdio>
 #include <string>
 #include <vector>
 
 #include "gpu_vendor.h"
 #include "telemetry.h"
+#include "utf8.h"
 
 namespace {
 
-std::wstring ToLower(std::wstring value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](wchar_t ch) {
-        return static_cast<wchar_t>(std::towlower(ch));
+std::string ToLower(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
     });
     return value;
 }
 
-std::wstring FormatScalarMetric(const ScalarMetric& metric, int precision) {
+std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
     if (!metric.value.has_value()) {
-        return L"N/A";
+        return "N/A";
     }
-    wchar_t buffer[64];
-    swprintf_s(buffer, L"%.*f %ls", precision, *metric.value, metric.unit.c_str());
+    char buffer[64];
+    sprintf_s(buffer, "%.*f %s", precision, *metric.value, metric.unit.c_str());
     return buffer;
 }
 
-std::wstring FormatMemoryMetric(const MemoryMetric& metric) {
-    wchar_t buffer[64];
-    swprintf_s(buffer, L"%.1f / %.1f GB", metric.usedGb, metric.totalGb);
+std::string FormatMemoryMetric(const MemoryMetric& metric) {
+    char buffer[64];
+    sprintf_s(buffer, "%.1f / %.1f GB", metric.usedGb, metric.totalGb);
     return buffer;
-}
-
-std::string Utf8FromWide(const std::wstring& text) {
-    const int required = WideCharToMultiByte(
-        CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
-    if (required <= 0) {
-        return {};
-    }
-
-    std::string bytes(static_cast<size_t>(required), '\0');
-    WideCharToMultiByte(
-        CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), bytes.data(), required, nullptr, nullptr);
-    return bytes;
 }
 
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
 
-PDH_STATUS AddCounterCompat(PDH_HQUERY query, const std::wstring& path, PDH_HCOUNTER* counter) {
+PDH_STATUS AddCounterCompat(PDH_HQUERY query, const wchar_t* path, PDH_HCOUNTER* counter) {
     static PdhAddEnglishCounterWFn addEnglish = reinterpret_cast<PdhAddEnglishCounterWFn>(
         GetProcAddress(GetModuleHandleW(L"pdh.dll"), "PdhAddEnglishCounterW"));
     if (addEnglish != nullptr) {
-        return addEnglish(query, path.c_str(), 0, counter);
+        return addEnglish(query, path, 0, counter);
     }
-    return PdhAddCounterW(query, path.c_str(), 0, counter);
+    return PdhAddCounterW(query, path, 0, counter);
 }
 
-bool ContainsInsensitive(const std::wstring& value, const std::wstring& needle) {
+bool ContainsInsensitive(const std::wstring& value, const std::string& needle) {
     if (needle.empty()) {
         return true;
     }
-    return ToLower(value).find(ToLower(needle)) != std::wstring::npos;
+    return ToLower(Utf8FromWide(value)).find(ToLower(needle)) != std::string::npos;
 }
 
 }  // namespace
@@ -91,7 +78,7 @@ struct TelemetryCollector::Impl {
     void UpdateNetworkState(bool initializeOnly);
     void DumpText(std::ostream& output) const;
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
-    std::wstring FindAdapterIp(ULONG interfaceIndex);
+    std::string FindAdapterIp(ULONG interfaceIndex);
     static void PushHistory(std::vector<double>& history, double value);
     void Trace(const char* text) const;
 
@@ -99,8 +86,8 @@ struct TelemetryCollector::Impl {
     SystemSnapshot snapshot_;
     std::ostream* traceStream_ = nullptr;
     std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
-    std::wstring gpuProviderName_ = L"None";
-    std::wstring gpuProviderDiagnostics_ = L"Provider not initialized.";
+    std::string gpuProviderName_ = "None";
+    std::string gpuProviderDiagnostics_ = "Provider not initialized.";
     bool gpuProviderAvailable_ = false;
 
     PDH_HQUERY cpuQuery_ = nullptr;
@@ -159,8 +146,8 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
             impl_->ApplyGpuVendorSample(impl_->gpuProvider_->Sample());
             impl_->Trace("telemetry:gpu_provider_initialize_done");
         } else {
-            impl_->gpuProviderName_ = L"AMD ADLX";
-            impl_->gpuProviderDiagnostics_ = L"Provider initialization failed.";
+            impl_->gpuProviderName_ = "AMD ADLX";
+            impl_->gpuProviderDiagnostics_ = "Provider initialization failed.";
             impl_->Trace("telemetry:gpu_provider_initialize_failed");
         }
     }
@@ -245,7 +232,7 @@ void TelemetryCollector::Impl::UpdateCpu() {
     if (cpuFrequencyCounter_ != nullptr &&
         PdhGetFormattedCounterValue(cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value) == ERROR_SUCCESS) {
         snapshot_.cpu.clock.value = value.doubleValue / 1000.0;
-        snapshot_.cpu.clock.unit = L"GHz";
+        snapshot_.cpu.clock.unit = "GHz";
     }
 }
 
@@ -280,8 +267,8 @@ double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool requ
 }
 
 void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample) {
-    gpuProviderName_ = sample.providerName.empty() ? L"None" : sample.providerName;
-    gpuProviderDiagnostics_ = sample.diagnostics.empty() ? L"(none)" : sample.diagnostics;
+    gpuProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
+    gpuProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
     gpuProviderAvailable_ = sample.available;
 
     if (sample.name.has_value() && !sample.name->empty()) {
@@ -289,7 +276,7 @@ void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySamp
     }
     snapshot_.gpu.temperature.value = sample.temperatureC;
     snapshot_.gpu.clock.value = sample.coreClockMhz;
-    snapshot_.gpu.clock.unit = L"MHz";
+    snapshot_.gpu.clock.unit = "MHz";
     snapshot_.gpu.fan.value = sample.fanRpm;
 }
 
@@ -322,54 +309,54 @@ void TelemetryCollector::Impl::UpdateMemory() {
 
 void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
     const auto now = snapshot_.now;
-    wchar_t dateTime[64];
-    swprintf_s(dateTime, L"%04d-%02d-%02d %02d:%02d:%02d",
+    char dateTime[64];
+    sprintf_s(dateTime, "%04d-%02d-%02d %02d:%02d:%02d",
         now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond);
 
     output << "System Telemetry Dump\r\n";
     output << "=====================\r\n";
-    output << Utf8FromWide(std::wstring(L"Timestamp: ") + dateTime) << "\r\n";
+    output << "Timestamp: " << dateTime << "\r\n";
     output << "\r\n";
 
     output << "[CPU]\r\n";
-    output << Utf8FromWide(std::wstring(L"Name: ") + snapshot_.cpu.name) << "\r\n";
+    output << "Name: " << snapshot_.cpu.name << "\r\n";
     {
-        wchar_t buffer[64];
-        swprintf_s(buffer, L"Load: %.2f%%", snapshot_.cpu.loadPercent);
-        output << Utf8FromWide(buffer) << "\r\n";
+        char buffer[64];
+        sprintf_s(buffer, "Load: %.2f%%", snapshot_.cpu.loadPercent);
+        output << buffer << "\r\n";
     }
-    output << Utf8FromWide(std::wstring(L"Clock: ") + FormatScalarMetric(snapshot_.cpu.clock, 2)) << "\r\n";
-    output << Utf8FromWide(std::wstring(L"Memory: ") + FormatMemoryMetric(snapshot_.cpu.memory)) << "\r\n";
+    output << "Clock: " << FormatScalarMetric(snapshot_.cpu.clock, 2) << "\r\n";
+    output << "Memory: " << FormatMemoryMetric(snapshot_.cpu.memory) << "\r\n";
     output << "\r\n";
 
     output << "[GPU]\r\n";
-    output << Utf8FromWide(std::wstring(L"Name: ") + snapshot_.gpu.name) << "\r\n";
+    output << "Name: " << snapshot_.gpu.name << "\r\n";
     {
-        wchar_t buffer[64];
-        swprintf_s(buffer, L"Load: %.2f%%", snapshot_.gpu.loadPercent);
-        output << Utf8FromWide(buffer) << "\r\n";
+        char buffer[64];
+        sprintf_s(buffer, "Load: %.2f%%", snapshot_.gpu.loadPercent);
+        output << buffer << "\r\n";
     }
-    output << Utf8FromWide(std::wstring(L"Temperature: ") + FormatScalarMetric(snapshot_.gpu.temperature, 1)) << "\r\n";
-    output << Utf8FromWide(std::wstring(L"Clock: ") + FormatScalarMetric(snapshot_.gpu.clock, 0)) << "\r\n";
-    output << Utf8FromWide(std::wstring(L"Fan: ") + FormatScalarMetric(snapshot_.gpu.fan, 0)) << "\r\n";
-    output << Utf8FromWide(std::wstring(L"VRAM: ") + FormatMemoryMetric(snapshot_.gpu.vram)) << "\r\n";
+    output << "Temperature: " << FormatScalarMetric(snapshot_.gpu.temperature, 1) << "\r\n";
+    output << "Clock: " << FormatScalarMetric(snapshot_.gpu.clock, 0) << "\r\n";
+    output << "Fan: " << FormatScalarMetric(snapshot_.gpu.fan, 0) << "\r\n";
+    output << "VRAM: " << FormatMemoryMetric(snapshot_.gpu.vram) << "\r\n";
     output << "\r\n";
 
     output << "[GPU Vendor Provider]\r\n";
-    output << Utf8FromWide(std::wstring(L"Name: ") + gpuProviderName_) << "\r\n";
-    output << Utf8FromWide(std::wstring(L"Available: ") + (gpuProviderAvailable_ ? L"yes" : L"no")) << "\r\n";
-    output << Utf8FromWide(std::wstring(L"Diagnostics: ") + gpuProviderDiagnostics_) << "\r\n";
+    output << "Name: " << gpuProviderName_ << "\r\n";
+    output << "Available: " << (gpuProviderAvailable_ ? "yes" : "no") << "\r\n";
+    output << "Diagnostics: " << gpuProviderDiagnostics_ << "\r\n";
     output << "\r\n";
 
     output << "[Network]\r\n";
-    output << Utf8FromWide(std::wstring(L"Adapter: ") + snapshot_.network.adapterName) << "\r\n";
-    output << Utf8FromWide(std::wstring(L"IP: ") + snapshot_.network.ipAddress) << "\r\n";
+    output << "Adapter: " << snapshot_.network.adapterName << "\r\n";
+    output << "IP: " << snapshot_.network.ipAddress << "\r\n";
     {
-        wchar_t buffer[64];
-        swprintf_s(buffer, L"Upload: %.3f MB/s", snapshot_.network.uploadMbps);
-        output << Utf8FromWide(buffer) << "\r\n";
-        swprintf_s(buffer, L"Download: %.3f MB/s", snapshot_.network.downloadMbps);
-        output << Utf8FromWide(buffer) << "\r\n";
+        char buffer[64];
+        sprintf_s(buffer, "Upload: %.3f MB/s", snapshot_.network.uploadMbps);
+        output << buffer << "\r\n";
+        sprintf_s(buffer, "Download: %.3f MB/s", snapshot_.network.downloadMbps);
+        output << buffer << "\r\n";
     }
     output << "\r\n";
 
@@ -378,9 +365,9 @@ void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
         output << "(none)\r\n";
     } else {
         for (const auto& drive : snapshot_.drives) {
-            wchar_t buffer[128];
-            swprintf_s(buffer, L"%ls used=%.1f%% free=%.1f GB", drive.label.c_str(), drive.usedPercent, drive.freeGb);
-            output << Utf8FromWide(buffer) << "\r\n";
+            char buffer[128];
+            sprintf_s(buffer, "%s used=%.1f%% free=%.1f GB", drive.label.c_str(), drive.usedPercent, drive.freeGb);
+            output << buffer << "\r\n";
         }
     }
     output.flush();
@@ -389,7 +376,7 @@ void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
 void TelemetryCollector::Impl::EnumerateDrives() {
     for (const auto& drive : config_.driveLetters) {
         if (!drive.empty()) {
-            snapshot_.drives.push_back(DriveInfo{drive.substr(0, 1) + L":"});
+            snapshot_.drives.push_back(DriveInfo{drive.substr(0, 1) + ":"});
         }
     }
     RefreshDriveUsage();
@@ -397,7 +384,7 @@ void TelemetryCollector::Impl::EnumerateDrives() {
 
 void TelemetryCollector::Impl::RefreshDriveUsage() {
     for (auto& drive : snapshot_.drives) {
-        const std::wstring root = drive.label + L"\\";
+        const std::wstring root = WideFromUtf8(drive.label + "\\");
         if (GetDriveTypeW(root.c_str()) != DRIVE_FIXED) {
             continue;
         }
@@ -423,14 +410,14 @@ void TelemetryCollector::Impl::PushHistory(std::vector<double>& history, double 
     history.push_back(value);
 }
 
-std::wstring TelemetryCollector::Impl::FindAdapterIp(ULONG interfaceIndex) {
+std::string TelemetryCollector::Impl::FindAdapterIp(ULONG interfaceIndex) {
     ULONG size = 0;
     GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, nullptr, &size);
     std::vector<BYTE> buffer(size);
     auto* addresses = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
     if (GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST,
             nullptr, addresses, &size) != NO_ERROR) {
-        return L"N/A";
+        return "N/A";
     }
 
     for (auto* current = addresses; current != nullptr; current = current->Next) {
@@ -445,13 +432,13 @@ std::wstring TelemetryCollector::Impl::FindAdapterIp(ULONG interfaceIndex) {
                     nullptr, address, &length) == 0) {
                 std::wstring ip = address;
                 if (ip.find(L':') == std::wstring::npos) {
-                    return ip;
+                    return Utf8FromWide(ip);
                 }
             }
         }
     }
 
-    return L"N/A";
+    return "N/A";
 }
 
 void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
@@ -477,7 +464,8 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
     }
 
     if (selected != nullptr) {
-        snapshot_.network.adapterName = selected->Alias[0] != L'\0' ? selected->Alias : selected->Description;
+        snapshot_.network.adapterName = Utf8FromWide(
+            selected->Alias[0] != L'\0' ? std::wstring_view(selected->Alias) : std::wstring_view(selected->Description));
         if (selectedIndex_ != selected->InterfaceIndex) {
             selectedIndex_ = selected->InterfaceIndex;
             previousInOctets_ = selected->InOctets;

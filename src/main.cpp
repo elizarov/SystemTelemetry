@@ -6,8 +6,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
-#include <cwctype>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -17,6 +17,7 @@
 
 #include "config.h"
 #include "telemetry.h"
+#include "utf8.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
@@ -42,50 +43,41 @@ constexpr UINT kCommandUpdateConfig = 1003;
 constexpr UINT kCommandExit = 1004;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
 
-std::wstring Trim(const std::wstring& input) {
-    const auto first = input.find_first_not_of(L" \t\r\n");
-    if (first == std::wstring::npos) {
-        return L"";
-    }
-    const auto last = input.find_last_not_of(L" \t\r\n");
-    return input.substr(first, last - first + 1);
-}
-
-std::wstring ToLower(std::wstring value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](wchar_t ch) {
-        return static_cast<wchar_t>(std::towlower(ch));
+std::string ToLower(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
     });
     return value;
 }
 
-bool ContainsInsensitive(const std::wstring& value, const std::wstring& needle) {
+bool ContainsInsensitive(const std::string& value, const std::string& needle) {
     if (needle.empty()) {
         return true;
     }
-    return ToLower(value).find(ToLower(needle)) != std::wstring::npos;
+    return ToLower(value).find(ToLower(needle)) != std::string::npos;
 }
 
-std::wstring FormatValue(const ScalarMetric& metric, int precision = 1) {
+std::string FormatValue(const ScalarMetric& metric, int precision = 1) {
     if (!metric.value.has_value()) {
-        return L"N/A";
+        return "N/A";
     }
-    wchar_t buffer[64];
-    swprintf_s(buffer, L"%.*f %ls", precision, *metric.value, metric.unit.c_str());
+    char buffer[64];
+    sprintf_s(buffer, "%.*f %s", precision, *metric.value, metric.unit.c_str());
     return buffer;
 }
 
-std::wstring FormatMemory(double usedGb, double totalGb) {
-    wchar_t buffer[64];
-    swprintf_s(buffer, L"%.1f / %.0f GB", usedGb, totalGb);
+std::string FormatMemory(double usedGb, double totalGb) {
+    char buffer[64];
+    sprintf_s(buffer, "%.1f / %.0f GB", usedGb, totalGb);
     return buffer;
 }
 
-std::wstring FormatDriveFree(double freeGb) {
-    wchar_t buffer[64];
+std::string FormatDriveFree(double freeGb) {
+    char buffer[64];
     if (freeGb >= 1024.0) {
-        swprintf_s(buffer, L"%.1f TB free", freeGb / 1024.0);
+        sprintf_s(buffer, "%.1f TB free", freeGb / 1024.0);
     } else {
-        swprintf_s(buffer, L"%.0f GB free", freeGb);
+        sprintf_s(buffer, "%.0f GB free", freeGb);
     }
     return buffer;
 }
@@ -101,7 +93,7 @@ std::filesystem::path GetExecutableDirectory() {
     return std::filesystem::path(modulePath).parent_path();
 }
 
-bool HasSwitch(const std::wstring& target) {
+bool HasSwitch(const std::string& target) {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argv == nullptr) {
@@ -110,7 +102,7 @@ bool HasSwitch(const std::wstring& target) {
 
     bool found = false;
     for (int i = 1; i < argc; ++i) {
-        if (_wcsicmp(argv[i], target.c_str()) == 0) {
+        if (_wcsicmp(argv[i], WideFromUtf8(target).c_str()) == 0) {
             found = true;
             break;
         }
@@ -125,7 +117,7 @@ int RunDumpMode() {
     const std::filesystem::path dumpPath = GetExecutableDirectory() / L"telemetry_dump.txt";
     std::ofstream dumpStream(dumpPath, std::ios::binary | std::ios::trunc);
     if (!dumpStream.is_open()) {
-        const std::wstring message = L"Failed to open dump file:\n" + dumpPath.wstring();
+        const std::wstring message = WideFromUtf8("Failed to open dump file:\n" + Utf8FromWide(dumpPath.wstring()));
         MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
         return 1;
     }
@@ -159,51 +151,51 @@ int RunDumpMode() {
     return 0;
 }
 
-std::wstring FormatSpeed(double mbps) {
-    wchar_t buffer[64];
+std::string FormatSpeed(double mbps) {
+    char buffer[64];
     if (mbps >= 100.0) {
-        swprintf_s(buffer, L"%.0f MB/s", mbps);
+        sprintf_s(buffer, "%.0f MB/s", mbps);
     } else {
-        swprintf_s(buffer, L"%.1f MB/s", mbps);
+        sprintf_s(buffer, "%.1f MB/s", mbps);
     }
     return buffer;
 }
 
 struct MonitorPlacementInfo {
-    std::wstring deviceName;
-    std::wstring monitorName = L"Unknown";
-    std::wstring configMonitorName = L"";
+    std::string deviceName;
+    std::string monitorName = "Unknown";
+    std::string configMonitorName;
     RECT monitorRect{};
     POINT relativePosition{};
 };
 
 struct MonitorIdentity {
-    std::wstring displayName;
-    std::wstring configName;
+    std::string displayName;
+    std::string configName;
 };
 
-std::wstring SimplifyDeviceName(const std::wstring& deviceName) {
-    if (deviceName.rfind(L"\\\\.\\", 0) == 0) {
+std::string SimplifyDeviceName(const std::string& deviceName) {
+    if (deviceName.rfind("\\\\.\\", 0) == 0) {
         return deviceName.substr(4);
     }
     return deviceName;
 }
 
-bool IsUsefulFriendlyName(const std::wstring& name) {
-    const std::wstring lowered = ToLower(name);
+bool IsUsefulFriendlyName(const std::string& name) {
+    const std::string lowered = ToLower(name);
     return !name.empty() &&
-        lowered != L"generic pnp monitor" &&
-        lowered.find(L"\\\\?\\display") != 0;
+        lowered != "generic pnp monitor" &&
+        lowered.find("\\\\?\\display") != 0;
 }
 
-MonitorIdentity GetMonitorIdentity(const std::wstring& deviceName);
+MonitorIdentity GetMonitorIdentity(const std::string& deviceName);
 
-std::optional<RECT> FindTargetMonitor(const std::wstring& requestedName) {
+std::optional<RECT> FindTargetMonitor(const std::string& requestedName) {
     if (requestedName.empty()) {
         return std::nullopt;
     }
     struct SearchContext {
-        std::wstring requestedName;
+        std::string requestedName;
         std::optional<RECT> result;
     } context{requestedName, std::nullopt};
 
@@ -217,10 +209,11 @@ std::optional<RECT> FindTargetMonitor(const std::wstring& requestedName) {
                 return TRUE;
             }
 
-            const MonitorIdentity identity = GetMonitorIdentity(info.szDevice);
+            const std::string deviceName = Utf8FromWide(info.szDevice);
+            const MonitorIdentity identity = GetMonitorIdentity(deviceName);
             if (ContainsInsensitive(identity.displayName, context->requestedName) ||
                 ContainsInsensitive(identity.configName, context->requestedName) ||
-                ContainsInsensitive(info.szDevice, context->requestedName)) {
+                ContainsInsensitive(deviceName, context->requestedName)) {
                 context->result = info.rcMonitor;
                 return FALSE;
             }
@@ -231,7 +224,7 @@ std::optional<RECT> FindTargetMonitor(const std::wstring& requestedName) {
     return context.result;
 }
 
-MonitorIdentity GetMonitorIdentity(const std::wstring& deviceName) {
+MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
     MonitorIdentity identity;
     identity.displayName = SimplifyDeviceName(deviceName);
     identity.configName = deviceName;
@@ -259,7 +252,8 @@ MonitorIdentity GetMonitorIdentity(const std::wstring& deviceName) {
             continue;
         }
 
-        if (_wcsicmp(sourceName.viewGdiDeviceName, deviceName.c_str()) != 0) {
+        const std::wstring wideDeviceName = WideFromUtf8(deviceName);
+        if (_wcsicmp(sourceName.viewGdiDeviceName, wideDeviceName.c_str()) != 0) {
             continue;
         }
 
@@ -272,10 +266,10 @@ MonitorIdentity GetMonitorIdentity(const std::wstring& deviceName) {
             continue;
         }
 
-        const std::wstring friendlyName = targetName.monitorFriendlyDeviceName;
-        const std::wstring monitorPath = targetName.monitorDevicePath;
+        const std::string friendlyName = Utf8FromWide(targetName.monitorFriendlyDeviceName);
+        const std::string monitorPath = Utf8FromWide(targetName.monitorDevicePath);
         if (IsUsefulFriendlyName(friendlyName)) {
-            identity.displayName = friendlyName + L" (" + SimplifyDeviceName(deviceName) + L")";
+            identity.displayName = friendlyName + " (" + SimplifyDeviceName(deviceName) + ")";
             identity.configName = friendlyName;
         } else if (!monitorPath.empty()) {
             identity.displayName = SimplifyDeviceName(deviceName);
@@ -299,8 +293,8 @@ MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd) {
     MONITORINFOEXW monitorInfo{};
     monitorInfo.cbSize = sizeof(monitorInfo);
     if (GetMonitorInfoW(monitor, &monitorInfo)) {
-        info.deviceName = monitorInfo.szDevice;
-        const MonitorIdentity identity = GetMonitorIdentity(monitorInfo.szDevice);
+        info.deviceName = Utf8FromWide(monitorInfo.szDevice);
+        const MonitorIdentity identity = GetMonitorIdentity(info.deviceName);
         info.monitorName = identity.displayName;
         info.configMonitorName = identity.configName;
         info.monitorRect = monitorInfo.rcMonitor;
@@ -366,12 +360,12 @@ private:
     bool CreateTrayIcon();
     void RemoveTrayIcon();
 
-    void DrawTextBlock(HDC hdc, const RECT& rect, const std::wstring& text, HFONT font,
+    void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
         COLORREF color, UINT format);
-    void DrawPanel(HDC hdc, const RECT& rect, const std::wstring& title);
+    void DrawPanel(HDC hdc, const RECT& rect, const std::string& title);
     POINT PolarPoint(int cx, int cy, int radius, double angleDegrees);
-    void DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::wstring& label);
-    void DrawMetricRow(HDC hdc, const RECT& rect, const std::wstring& label, const std::wstring& value, double ratio);
+    void DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label);
+    void DrawMetricRow(HDC hdc, const RECT& rect, const std::string& label, const std::string& value, double ratio);
     void DrawProcessorPanel(HDC hdc, const RECT& rect, const ProcessorTelemetry& cpu);
     void DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& gpu);
     void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue);
@@ -449,11 +443,11 @@ void DashboardApp::BringOnTop() {
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
     const MonitorPlacementInfo placement = GetMonitorPlacementForWindow(hwnd_);
     const std::filesystem::path configPath = GetRuntimeConfigPath();
-    const std::wstring monitorName = !placement.configMonitorName.empty()
+    const std::string monitorName = !placement.configMonitorName.empty()
         ? placement.configMonitorName
         : placement.deviceName;
     if (!SaveDisplayConfig(configPath, monitorName, placement.relativePosition.x, placement.relativePosition.y)) {
-        const std::wstring message = L"Failed to update " + configPath.wstring() + L".";
+        const std::wstring message = WideFromUtf8("Failed to update " + Utf8FromWide(configPath.wstring()) + ".");
         MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
         return;
     }
@@ -556,14 +550,14 @@ void DashboardApp::DrawMoveOverlay(HDC hdc) {
     RECT positionRect{overlay.left + 12, overlay.top + 58, overlay.right - 12, overlay.top + 80};
     RECT hintRect{overlay.left + 12, overlay.top + 82, overlay.right - 12, overlay.bottom - 12};
 
-    wchar_t positionText[96];
-    swprintf_s(positionText, L"Pos: x=%ld y=%ld", movePlacementInfo_.relativePosition.x, movePlacementInfo_.relativePosition.y);
+    char positionText[96];
+    sprintf_s(positionText, "Pos: x=%ld y=%ld", movePlacementInfo_.relativePosition.x, movePlacementInfo_.relativePosition.y);
 
-    DrawTextBlock(hdc, titleRect, L"Move Mode", fonts_.label, kAccent, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, monitorRect, L"Monitor: " + movePlacementInfo_.monitorName, fonts_.smallFont, kWhite,
+    DrawTextBlock(hdc, titleRect, "Move Mode", fonts_.label, kAccent, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, monitorRect, "Monitor: " + movePlacementInfo_.monitorName, fonts_.smallFont, kWhite,
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawTextBlock(hdc, positionRect, positionText, fonts_.smallFont, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, hintRect, L"Left-click to place. Copy monitor name and x/y into config.", fonts_.smallFont,
+    DrawTextBlock(hdc, hintRect, "Left-click to place. Copy monitor name and x/y into config.", fonts_.smallFont,
         kMuted, DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
 }
 
@@ -701,16 +695,17 @@ void DashboardApp::Paint() {
     EndPaint(hwnd_, &ps);
 }
 
-void DashboardApp::DrawTextBlock(HDC hdc, const RECT& rect, const std::wstring& text, HFONT font,
+void DashboardApp::DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
     COLORREF color, UINT format) {
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
     RECT copy = rect;
-    DrawTextW(hdc, text.c_str(), -1, &copy, format);
+    const std::wstring wideText = WideFromUtf8(text);
+    DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
     SelectObject(hdc, oldFont);
 }
 
-void DashboardApp::DrawPanel(HDC hdc, const RECT& rect, const std::wstring& title) {
+void DashboardApp::DrawPanel(HDC hdc, const RECT& rect, const std::string& title) {
     HPEN border = CreatePen(PS_SOLID, 1, kPanelBorder);
     HBRUSH fill = CreateSolidBrush(RGB(6, 8, 11));
     HGDIOBJ oldPen = SelectObject(hdc, border);
@@ -737,7 +732,7 @@ POINT DashboardApp::PolarPoint(int cx, int cy, int radius, double angleDegrees) 
     };
 }
 
-void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::wstring& label) {
+void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label) {
     HPEN trackPen = CreatePen(PS_SOLID, 10, kTrack);
     HPEN accentPen = CreatePen(PS_SOLID, 10, kAccent);
     HGDIOBJ oldPen = SelectObject(hdc, trackPen);
@@ -761,8 +756,8 @@ void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent
     DeleteObject(accentPen);
 
     RECT numberRect{cx - 42, cy - 28, cx + 42, cy + 18};
-    wchar_t number[16];
-    swprintf_s(number, L"%.0f%%", percent);
+    char number[16];
+    sprintf_s(number, "%.0f%%", percent);
     DrawTextBlock(hdc, numberRect, number, fonts_.big, kWhite, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 
     RECT labelRect{cx - 42, cy + 18, cx + 42, cy + 42};
@@ -770,7 +765,7 @@ void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent
 }
 
 void DashboardApp::DrawMetricRow(
-    HDC hdc, const RECT& rect, const std::wstring& label, const std::wstring& value, double ratio) {
+    HDC hdc, const RECT& rect, const std::string& label, const std::string& value, double ratio) {
     RECT labelRect{rect.left, rect.top, rect.left + 74, rect.bottom};
     RECT valueRect{rect.left + 82, rect.top, rect.right, rect.bottom};
     DrawTextBlock(hdc, labelRect, label, fonts_.label, kMuted, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
@@ -789,36 +784,36 @@ void DashboardApp::DrawMetricRow(
 }
 
 void DashboardApp::DrawProcessorPanel(HDC hdc, const RECT& rect, const ProcessorTelemetry& cpu) {
-    DrawPanel(hdc, rect, L"CPU");
+    DrawPanel(hdc, rect, "CPU");
     RECT nameRect{rect.left + 16, rect.top + 34, rect.right - 16, rect.top + 58};
     DrawTextBlock(hdc, nameRect, cpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, cpu.loadPercent, L"Load");
+    DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, cpu.loadPercent, "Load");
 
     int y = rect.top + 110;
     const int rowHeight = 34;
     RECT rows{rect.left + 164, y, rect.right - 18, y + rowHeight};
-    DrawMetricRow(hdc, rows, L"Clock", FormatValue(cpu.clock, 2), cpu.clock.value.value_or(0.0) / 5.0);
+    DrawMetricRow(hdc, rows, "Clock", FormatValue(cpu.clock, 2), cpu.clock.value.value_or(0.0) / 5.0);
     OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, L"RAM", FormatMemory(cpu.memory.usedGb, cpu.memory.totalGb),
+    DrawMetricRow(hdc, rows, "RAM", FormatMemory(cpu.memory.usedGb, cpu.memory.totalGb),
         cpu.memory.totalGb > 0.0 ? cpu.memory.usedGb / cpu.memory.totalGb : 0.0);
 }
 
 void DashboardApp::DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& gpu) {
-    DrawPanel(hdc, rect, L"GPU");
+    DrawPanel(hdc, rect, "GPU");
     RECT nameRect{rect.left + 16, rect.top + 34, rect.right - 16, rect.top + 58};
     DrawTextBlock(hdc, nameRect, gpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, gpu.loadPercent, L"Load");
+    DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, gpu.loadPercent, "Load");
 
     int y = rect.top + 92;
     const int rowHeight = 34;
     RECT rows{rect.left + 164, y, rect.right - 18, y + rowHeight};
-    DrawMetricRow(hdc, rows, L"Temp", FormatValue(gpu.temperature, 0), gpu.temperature.value.value_or(0.0) / 100.0);
+    DrawMetricRow(hdc, rows, "Temp", FormatValue(gpu.temperature, 0), gpu.temperature.value.value_or(0.0) / 100.0);
     OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, L"Clock", FormatValue(gpu.clock, 0), gpu.clock.value.value_or(0.0) / 2600.0);
+    DrawMetricRow(hdc, rows, "Clock", FormatValue(gpu.clock, 0), gpu.clock.value.value_or(0.0) / 2600.0);
     OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, L"Fan", FormatValue(gpu.fan, 0), gpu.fan.value.value_or(0.0) / 3000.0);
+    DrawMetricRow(hdc, rows, "Fan", FormatValue(gpu.fan, 0), gpu.fan.value.value_or(0.0) / 3000.0);
     OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, L"VRAM", FormatMemory(gpu.vram.usedGb, std::max(1.0, gpu.vram.totalGb)),
+    DrawMetricRow(hdc, rows, "VRAM", FormatMemory(gpu.vram.usedGb, std::max(1.0, gpu.vram.totalGb)),
         gpu.vram.totalGb > 0.0 ? gpu.vram.usedGb / gpu.vram.totalGb : 0.0);
 }
 
@@ -846,12 +841,12 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
 }
 
 void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTelemetry& network) {
-    DrawPanel(hdc, rect, L"Network");
+    DrawPanel(hdc, rect, "Network");
     RECT upRect{rect.left + 16, rect.top + 38, rect.right - 16, rect.top + 62};
     RECT downRect{rect.left + 16, rect.top + 64, rect.right - 16, rect.top + 88};
-    DrawTextBlock(hdc, upRect, L"Up   " + FormatSpeed(network.uploadMbps), fonts_.value, kWhite,
+    DrawTextBlock(hdc, upRect, "Up   " + FormatSpeed(network.uploadMbps), fonts_.value, kWhite,
         DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, downRect, L"Down " + FormatSpeed(network.downloadMbps), fonts_.value, kWhite,
+    DrawTextBlock(hdc, downRect, "Down " + FormatSpeed(network.downloadMbps), fonts_.value, kWhite,
         DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
     const double maxGraph = std::max({10.0, network.uploadMbps * 1.5, network.downloadMbps * 1.5});
@@ -867,7 +862,7 @@ void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTele
 }
 
 void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector<DriveInfo>& drives) {
-    DrawPanel(hdc, rect, L"Storage");
+    DrawPanel(hdc, rect, "Storage");
     int y = rect.top + 42;
     for (const auto& drive : drives) {
         RECT labelRect{rect.left + 16, y, rect.left + 42, y + 20};
@@ -886,8 +881,8 @@ void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector
         FillRect(hdc, &fill, accent);
         DeleteObject(accent);
 
-        wchar_t percent[16];
-        swprintf_s(percent, L"%.0f%%", drive.usedPercent);
+        char percent[16];
+        sprintf_s(percent, "%.0f%%", drive.usedPercent);
         DrawTextBlock(hdc, pctRect, percent, fonts_.label, kWhite, DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
         DrawTextBlock(hdc, freeRect, FormatDriveFree(drive.freeGb), fonts_.smallFont, kMuted,
             DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
@@ -896,11 +891,11 @@ void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector
 }
 
 void DashboardApp::DrawTimePanel(HDC hdc, const RECT& rect, const SYSTEMTIME& now) {
-    DrawPanel(hdc, rect, L"Time");
-    wchar_t timeBuffer[32];
-    wchar_t dateBuffer[32];
-    swprintf_s(timeBuffer, L"%02d:%02d", now.wHour, now.wMinute);
-    swprintf_s(dateBuffer, L"%04d-%02d-%02d", now.wYear, now.wMonth, now.wDay);
+    DrawPanel(hdc, rect, "Time");
+    char timeBuffer[32];
+    char dateBuffer[32];
+    sprintf_s(timeBuffer, "%02d:%02d", now.wHour, now.wMinute);
+    sprintf_s(dateBuffer, "%04d-%02d-%02d", now.wYear, now.wMonth, now.wDay);
 
     RECT timeRect{rect.left + 16, rect.top + 46, rect.right - 16, rect.top + 116};
     RECT dateRect{rect.left + 16, rect.top + 120, rect.right - 16, rect.top + 148};
@@ -925,7 +920,7 @@ void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
-    if (HasSwitch(L"/dump")) {
+    if (HasSwitch("/dump")) {
         return RunDumpMode();
     }
 

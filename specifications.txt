@@ -60,6 +60,9 @@ Examples include:
 
 At runtime, the application must read `config.ini` from the same folder it was started from and write updates back to that same file.
 The `src/config.ini` file in the source tree is only a checked-in example configuration template.
+All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
+Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
+Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.
 
 Command-line dump mode
 ======================

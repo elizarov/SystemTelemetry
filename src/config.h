@@ -5,16 +5,16 @@
 #include <vector>
 
 struct AppConfig {
-    std::wstring monitorName;
+    std::string monitorName;
     int positionX = 0;
     int positionY = 0;
-    std::wstring networkAdapter;
-    std::vector<std::wstring> driveLetters;
+    std::string networkAdapter;
+    std::vector<std::string> driveLetters;
 };
 
 AppConfig LoadConfig(const std::filesystem::path& path);
 bool SaveDisplayConfig(
     const std::filesystem::path& path,
-    const std::wstring& monitorName,
+    const std::string& monitorName,
     int positionX,
     int positionY);

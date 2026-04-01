@@ -9,6 +9,7 @@
 #include "vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.h"
 #include "vendor/adlx/SDK/Include/IPerformanceMonitoring.h"
 #include "gpu_vendor.h"
+#include "utf8.h"
 
 namespace {
 
@@ -22,22 +23,16 @@ void AppendTrace(std::ostream* traceStream, const char* text) {
     traceStream->flush();
 }
 
-std::wstring WideFromAnsi(const char* text) {
+std::string Utf8FromAnsi(const char* text) {
     if (text == nullptr || text[0] == '\0') {
-        return L"";
+        return {};
     }
-    const int required = MultiByteToWideChar(CP_ACP, 0, text, -1, nullptr, 0);
-    if (required <= 1) {
-        return L"";
-    }
-    std::wstring result(static_cast<size_t>(required - 1), L'\0');
-    MultiByteToWideChar(CP_ACP, 0, text, -1, result.data(), required);
-    return result;
+    return Utf8FromCodePage(text, CP_ACP);
 }
 
-std::wstring FormatResult(const wchar_t* label, ADLX_RESULT result) {
-    wchar_t buffer[64];
-    swprintf_s(buffer, L"%ls=%d", label, static_cast<int>(result));
+std::string FormatResult(const char* label, ADLX_RESULT result) {
+    char buffer[64];
+    sprintf_s(buffer, "%s=%d", label, static_cast<int>(result));
     return buffer;
 }
 
@@ -62,7 +57,7 @@ public:
             AppendTrace(traceStream_, "amd_adlx:helper_initialize_incompatible_done");
         }
         if (ADLX_FAILED(result) || helper_.GetSystemServices() == nullptr) {
-            diagnostics_ = L"ADLX initialization failed: " + FormatResult(L"init", result);
+            diagnostics_ = "ADLX initialization failed: " + FormatResult("init", result);
             AppendTrace(traceStream_, "amd_adlx:initialize_failed");
             return false;
         }
@@ -71,7 +66,7 @@ public:
         result = helper_.GetSystemServices()->GetPerformanceMonitoringServices(&performanceMonitoring_);
         AppendTrace(traceStream_, "amd_adlx:get_performance_monitoring_done");
         if (ADLX_FAILED(result) || !performanceMonitoring_) {
-            diagnostics_ = L"Failed to get ADLX performance monitoring services: " + FormatResult(L"perf", result);
+            diagnostics_ = "Failed to get ADLX performance monitoring services: " + FormatResult("perf", result);
             return false;
         }
 
@@ -80,7 +75,7 @@ public:
         result = helper_.GetSystemServices()->GetGPUs(&gpus);
         AppendTrace(traceStream_, "amd_adlx:get_gpus_done");
         if (ADLX_FAILED(result) || !gpus || gpus->Empty()) {
-            diagnostics_ = L"Failed to get AMD GPU list: " + FormatResult(L"gpus", result);
+            diagnostics_ = "Failed to get AMD GPU list: " + FormatResult("gpus", result);
             return false;
         }
 
@@ -88,23 +83,23 @@ public:
         result = gpus->At(gpus->Begin(), &gpu_);
         AppendTrace(traceStream_, "amd_adlx:get_first_gpu_done");
         if (ADLX_FAILED(result) || !gpu_) {
-            diagnostics_ = L"Failed to open first AMD GPU: " + FormatResult(L"gpu", result);
+            diagnostics_ = "Failed to open first AMD GPU: " + FormatResult("gpu", result);
             return false;
         }
 
         const char* name = nullptr;
         if (ADLX_SUCCEEDED(gpu_->Name(&name))) {
-            gpuName_ = WideFromAnsi(name);
+            gpuName_ = Utf8FromAnsi(name);
         }
         if (gpuName_.empty()) {
-            gpuName_ = L"AMD GPU";
+            gpuName_ = "AMD GPU";
         }
 
         AppendTrace(traceStream_, "amd_adlx:get_supported_metrics_begin");
         result = performanceMonitoring_->GetSupportedGPUMetrics(gpu_, &metricsSupport_);
         AppendTrace(traceStream_, "amd_adlx:get_supported_metrics_done");
         if (ADLX_FAILED(result) || !metricsSupport_) {
-            diagnostics_ = L"Failed to query supported AMD GPU metrics: " + FormatResult(L"support", result);
+            diagnostics_ = "Failed to query supported AMD GPU metrics: " + FormatResult("support", result);
             return false;
         }
 
@@ -115,11 +110,11 @@ public:
         const ADLX_RESULT clockResult = metricsSupport_->IsSupportedGPUClockSpeed(&clockSupported);
         const ADLX_RESULT fanResult = metricsSupport_->IsSupportedGPUFanSpeed(&fanSupported);
 
-        std::wstringstream diag;
-        diag << L"ADLX GPU=" << gpuName_
-             << L" temp_supported=" << (tempSupported ? L"yes" : L"no") << L"(" << static_cast<int>(tempResult) << L")"
-             << L" clock_supported=" << (clockSupported ? L"yes" : L"no") << L"(" << static_cast<int>(clockResult) << L")"
-             << L" fan_supported=" << (fanSupported ? L"yes" : L"no") << L"(" << static_cast<int>(fanResult) << L")";
+        std::ostringstream diag;
+        diag << "ADLX GPU=" << gpuName_
+             << " temp_supported=" << (tempSupported ? "yes" : "no") << "(" << static_cast<int>(tempResult) << ")"
+             << " clock_supported=" << (clockSupported ? "yes" : "no") << "(" << static_cast<int>(clockResult) << ")"
+             << " fan_supported=" << (fanSupported ? "yes" : "no") << "(" << static_cast<int>(fanResult) << ")";
         diagnostics_ = diag.str();
         initialized_ = true;
         AppendTrace(traceStream_, "amd_adlx:initialize_done");
@@ -129,7 +124,7 @@ public:
     GpuVendorTelemetrySample Sample() override {
         AppendTrace(traceStream_, "amd_adlx:sample_begin");
         GpuVendorTelemetrySample sample;
-        sample.providerName = L"AMD ADLX";
+        sample.providerName = "AMD ADLX";
         sample.name = gpuName_;
         sample.diagnostics = diagnostics_;
 
@@ -143,24 +138,24 @@ public:
         const ADLX_RESULT metricsResult = performanceMonitoring_->GetCurrentGPUMetrics(gpu_, &metrics);
         AppendTrace(traceStream_, "amd_adlx:get_current_metrics_done");
         if (ADLX_FAILED(metricsResult) || !metrics) {
-            sample.diagnostics = diagnostics_ + L" " + FormatResult(L"current_metrics", metricsResult);
+            sample.diagnostics = diagnostics_ + " " + FormatResult("current_metrics", metricsResult);
             sample.available = false;
             return sample;
         }
 
-        std::wstringstream status;
-        status << diagnostics_ << L" sample:";
+        std::ostringstream status;
+        status << diagnostics_ << " sample:";
         bool hasAnyMetric = false;
 
         adlx_bool supported = false;
         ADLX_RESULT result = metricsSupport_->IsSupportedGPUTemperature(&supported);
-        status << L" temp_support=" << static_cast<int>(result);
+        status << " temp_support=" << static_cast<int>(result);
         if (ADLX_SUCCEEDED(result) && supported) {
             adlx_double temperature = 0.0;
             AppendTrace(traceStream_, "amd_adlx:get_temperature_begin");
             result = metrics->GPUTemperature(&temperature);
             AppendTrace(traceStream_, "amd_adlx:get_temperature_done");
-            status << L" temp=" << static_cast<int>(result);
+            status << " temp=" << static_cast<int>(result);
             if (ADLX_SUCCEEDED(result)) {
                 sample.temperatureC = temperature;
                 hasAnyMetric = true;
@@ -169,13 +164,13 @@ public:
 
         supported = false;
         result = metricsSupport_->IsSupportedGPUClockSpeed(&supported);
-        status << L" clock_support=" << static_cast<int>(result);
+        status << " clock_support=" << static_cast<int>(result);
         if (ADLX_SUCCEEDED(result) && supported) {
             adlx_int clockMhz = 0;
             AppendTrace(traceStream_, "amd_adlx:get_clock_begin");
             result = metrics->GPUClockSpeed(&clockMhz);
             AppendTrace(traceStream_, "amd_adlx:get_clock_done");
-            status << L" clock=" << static_cast<int>(result);
+            status << " clock=" << static_cast<int>(result);
             if (ADLX_SUCCEEDED(result)) {
                 sample.coreClockMhz = static_cast<double>(clockMhz);
                 hasAnyMetric = true;
@@ -184,13 +179,13 @@ public:
 
         supported = false;
         result = metricsSupport_->IsSupportedGPUFanSpeed(&supported);
-        status << L" fan_support=" << static_cast<int>(result);
+        status << " fan_support=" << static_cast<int>(result);
         if (ADLX_SUCCEEDED(result) && supported) {
             adlx_int fanRpm = 0;
             AppendTrace(traceStream_, "amd_adlx:get_fan_begin");
             result = metrics->GPUFanSpeed(&fanRpm);
             AppendTrace(traceStream_, "amd_adlx:get_fan_done");
-            status << L" fan=" << static_cast<int>(result);
+            status << " fan=" << static_cast<int>(result);
             if (ADLX_SUCCEEDED(result)) {
                 sample.fanRpm = static_cast<double>(fanRpm);
                 hasAnyMetric = true;
@@ -209,8 +204,8 @@ private:
     IADLXPerformanceMonitoringServicesPtr performanceMonitoring_;
     IADLXGPUMetricsSupportPtr metricsSupport_;
     std::ostream* traceStream_ = nullptr;
-    std::wstring gpuName_;
-    std::wstring diagnostics_ = L"ADLX provider not initialized.";
+    std::string gpuName_;
+    std::string diagnostics_ = "ADLX provider not initialized.";
     bool initialized_ = false;
 };
 
