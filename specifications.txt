@@ -195,6 +195,7 @@ Clean, minimal headers
 CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
 Each top-level panel header must show a small monochrome icon derived from the dashboard sketch for CPU, GPU, Network, Storage, and Time, with those icon assets stored under `resources\` and compiled into the executable.
 The application must define a custom app icon asset under `resources\`, embed it into the executable, and use that embedded icon for the executable and the tray icon instead of the default Windows icon.
+The CPU metrics stack must use the same vertical spacing and bar rhythm as the GPU metrics stack so both top cards read as a matched pair.
 
 Design Principles
 High contrast for readability on small screen

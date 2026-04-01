@@ -1126,8 +1126,8 @@ void DashboardApp::DrawProcessorPanel(HDC hdc, const RECT& rect, const Processor
     DrawTextBlock(hdc, nameRect, cpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, cpu.loadPercent, "Load");
 
-    int y = rect.top + 88;
-    const int rowHeight = 26;
+    int y = rect.top + 92;
+    const int rowHeight = 34;
     RECT rows{rect.left + 164, y, rect.right - 18, y + rowHeight};
     DrawMetricRow(hdc, rows, "Temp", FormatValue(cpu.temperature, 0), cpu.temperature.value.value_or(0.0) / 100.0);
     OffsetRect(&rows, 0, rowHeight);
