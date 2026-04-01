@@ -12,10 +12,8 @@ if not defined INSTALL_ROOT set "INSTALL_ROOT=%ProgramFiles%"
 set "INSTALL_DIR=%INSTALL_ROOT%\SystemTelemetry"
 set "SOURCE_EXE=%~dp0build\SystemTelemetry.exe"
 set "SOURCE_PROBE=%~dp0build\GigabyteSivProbe.exe"
-set "SOURCE_CONFIG=%~dp0src\config.ini"
 set "TARGET_EXE=%INSTALL_DIR%\SystemTelemetry.exe"
 set "TARGET_PROBE=%INSTALL_DIR%\GigabyteSivProbe.exe"
-set "TARGET_CONFIG=%INSTALL_DIR%\config.ini"
 set "RUN_KEY=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 set "RUN_VALUE=SystemTelemetry"
 
@@ -52,20 +50,6 @@ if errorlevel 1 (
 copy /y "%SOURCE_PROBE%" "%TARGET_PROBE%" >nul
 if errorlevel 1 (
     echo Failed to copy "%SOURCE_PROBE%" to "%TARGET_PROBE%".
-    exit /b 1
-)
-
-if not exist "%TARGET_CONFIG%" (
-    copy /y "%SOURCE_CONFIG%" "%TARGET_CONFIG%" >nul
-    if errorlevel 1 (
-        echo Failed to create "%TARGET_CONFIG%".
-        exit /b 1
-    )
-)
-
-icacls "%TARGET_CONFIG%" /grant *S-1-5-32-545:(M) >nul
-if errorlevel 1 (
-    echo Failed to grant Users modify access to "%TARGET_CONFIG%".
     exit /b 1
 )
 

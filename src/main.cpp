@@ -95,7 +95,7 @@ std::string FormatDriveFree(double freeGb) {
 std::filesystem::path GetRuntimeConfigPath();
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
-bool SaveConfigElevated(const AppConfig& config, HWND owner);
+bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
 
 int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
     UINT encoderCount = 0;
@@ -298,13 +298,13 @@ std::filesystem::path CreateElevatedSaveConfigTempPath() {
     return std::filesystem::path(tempFileBuffer);
 }
 
-int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath) {
-    if (sourcePath.empty()) {
+int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath) {
+    if (sourcePath.empty() || targetPath.empty()) {
         return 2;
     }
 
     const AppConfig config = LoadConfig(sourcePath);
-    if (!SaveConfig(GetRuntimeConfigPath(), config)) {
+    if (!SaveConfig(targetPath, config)) {
         return 1;
     }
 
@@ -836,9 +836,13 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
     config.monitorName = monitorName;
     config.positionX = placement.relativePosition.x;
     config.positionY = placement.relativePosition.y;
-    const bool saved = CanWriteRuntimeConfig(configPath)
-        ? SaveConfig(configPath, config)
-        : SaveConfigElevated(config, hwnd_);
+    bool saved = false;
+    if (CanWriteRuntimeConfig(configPath)) {
+        saved = SaveConfig(configPath, config);
+    }
+    if (!saved) {
+        saved = SaveConfigElevated(configPath, config, hwnd_);
+    }
     if (!saved) {
         const std::wstring message = WideFromUtf8("Failed to update " + Utf8FromWide(configPath.wstring()) + ".");
         MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
@@ -850,9 +854,9 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
     config_.positionY = placement.relativePosition.y;
 }
 
-bool SaveConfigElevated(const AppConfig& config, HWND owner) {
+bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {
     const std::filesystem::path tempPath = CreateElevatedSaveConfigTempPath();
-    if (tempPath.empty()) {
+    if (tempPath.empty() || targetPath.empty()) {
         return false;
     }
 
@@ -864,6 +868,8 @@ bool SaveConfigElevated(const AppConfig& config, HWND owner) {
 
     std::wstring parameters = L"/save-config \"";
     parameters += tempPath.wstring();
+    parameters += L"\" /save-config-target \"";
+    parameters += targetPath.wstring();
     parameters += L"\"";
 
     SHELLEXECUTEINFOW executeInfo{};
@@ -1436,7 +1442,8 @@ void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     if (const auto elevatedSaveSource = GetSwitchValue(L"/save-config"); elevatedSaveSource.has_value()) {
-        return RunElevatedSaveConfigMode(*elevatedSaveSource);
+        const auto elevatedSaveTarget = GetSwitchValue(L"/save-config-target");
+        return RunElevatedSaveConfigMode(*elevatedSaveSource, elevatedSaveTarget.value_or(std::filesystem::path{}));
     }
 
     if (HasSwitch("/dump")) {
