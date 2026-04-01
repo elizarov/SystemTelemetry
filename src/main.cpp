@@ -493,6 +493,7 @@ private:
     void ShutdownGdiplus();
     bool LoadPanelIcons();
     void ReleasePanelIcons();
+    HICON LoadAppIcon(int width, int height);
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
         COLORREF color, UINT format);
@@ -526,6 +527,8 @@ private:
     MonitorPlacementInfo movePlacementInfo_{};
     ULONG_PTR gdiplusToken_ = 0;
     std::array<std::unique_ptr<Gdiplus::Bitmap>, kPanelIconCount> panelIcons_{};
+    HICON appIconLarge_ = nullptr;
+    HICON appIconSmall_ = nullptr;
 };
 
 bool DashboardApp::Initialize(HINSTANCE instance) {
@@ -536,13 +539,18 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     INITCOMMONCONTROLSEX icc{sizeof(icc), ICC_STANDARD_CLASSES};
     InitCommonControlsEx(&icc);
 
-    WNDCLASSW wc{};
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = &DashboardApp::WndProcSetup;
     wc.hInstance = instance;
     wc.lpszClassName = kWindowClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = CreateSolidBrush(kBlack);
-    if (!RegisterClassW(&wc)) {
+    appIconLarge_ = LoadAppIcon(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+    appIconSmall_ = LoadAppIcon(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+    wc.hIcon = appIconLarge_;
+    wc.hIconSm = appIconSmall_;
+    if (!RegisterClassExW(&wc)) {
         return false;
     }
 
@@ -647,6 +655,11 @@ void DashboardApp::ReleasePanelIcons() {
     }
 }
 
+HICON DashboardApp::LoadAppIcon(int width, int height) {
+    return static_cast<HICON>(LoadImageW(instance_, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
+        width, height, LR_DEFAULTCOLOR));
+}
+
 bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
     if (!InitializeFonts()) {
         return false;
@@ -747,7 +760,7 @@ bool DashboardApp::CreateTrayIcon() {
     trayIcon_.uID = 1;
     trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     trayIcon_.uCallbackMessage = kTrayMessage;
-    trayIcon_.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    trayIcon_.hIcon = appIconSmall_ != nullptr ? appIconSmall_ : LoadIconW(nullptr, IDI_APPLICATION);
     wcscpy_s(trayIcon_.szTip, L"System Telemetry");
     return Shell_NotifyIconW(NIM_ADD, &trayIcon_) == TRUE;
 }
@@ -936,6 +949,18 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         KillTimer(hwnd_, kMoveTimerId);
         RemoveTrayIcon();
         ReleaseFonts();
+        {
+            HICON largeIcon = appIconLarge_;
+            HICON smallIcon = appIconSmall_;
+            appIconLarge_ = nullptr;
+            appIconSmall_ = nullptr;
+            if (largeIcon != nullptr) {
+                DestroyIcon(largeIcon);
+            }
+            if (smallIcon != nullptr && smallIcon != largeIcon) {
+                DestroyIcon(smallIcon);
+            }
+        }
         PostQuitMessage(0);
         return 0;
     default:

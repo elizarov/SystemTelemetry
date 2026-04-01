@@ -6,7 +6,7 @@ LDFLAGS=user32.lib gdi32.lib pdh.lib iphlpapi.lib dxgi.lib comctl32.lib ws2_32.l
 
 all: $(APP)
 
-$(APP): $(SRC) src\config.h src\config.ini resources\SystemTelemetry.rc resources\resource.h resources\cpu.png resources\gpu.png resources\network.png resources\storage.png resources\time.png
+$(APP): $(SRC) src\config.h src\config.ini resources\SystemTelemetry.rc resources\resource.h resources\app.ico resources\app_icon.png resources\cpu.png resources\gpu.png resources\network.png resources\storage.png resources\time.png
 	if not exist build mkdir build
 	rc /nologo /fo$(RES) resources\SystemTelemetry.rc
 	cl $(CFLAGS) /Fe$(APP) /Fobuild\\ $(SRC) $(RES) /link /PDB:build\SystemTelemetry.pdb /ILK:build\SystemTelemetry.ilk $(LDFLAGS)
