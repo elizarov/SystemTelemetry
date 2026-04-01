@@ -168,7 +168,7 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
 
             SensorBinding binding;
             if (ToLower(parts[0]) == L"auto" || parts[0].empty()) {
-                binding.namespaces = {L"root\\LibreHardwareMonitor", L"root\\OpenHardwareMonitor"};
+                binding.namespaces = {L"root\\LibreHardwareMonitor"};
             } else {
                 binding.namespaces = Split(parts[0], L',');
             }

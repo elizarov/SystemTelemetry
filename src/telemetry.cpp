@@ -33,6 +33,13 @@ struct SensorRecord {
     double value = 0.0;
 };
 
+struct WmiDiagnostic {
+    std::wstring namespaceName;
+    std::wstring query;
+    HRESULT result = S_OK;
+    std::wstring detail;
+};
+
 std::wstring ToLower(std::wstring value) {
     std::transform(value.begin(), value.end(), value.begin(), [](wchar_t ch) {
         return static_cast<wchar_t>(std::towlower(ch));
@@ -61,17 +68,22 @@ public:
     std::optional<double> QueryFirstDouble(
         const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property);
     std::vector<SensorRecord> EnumerateSensors(const std::wstring& namespaceName);
+    std::vector<WmiDiagnostic> Diagnostics() const;
+    void ClearDiagnostics();
 
 private:
     bool QueryFirstVariant(
         const std::wstring& namespaceName, const std::wstring& query,
         const std::wstring& property, VARIANT& value);
     IWbemServices* GetServices(const std::wstring& namespaceName);
+    void RecordDiagnostic(
+        const std::wstring& namespaceName, const std::wstring& query, HRESULT result, const std::wstring& detail);
 
     bool initialized_ = false;
     bool comInitialized_ = false;
     IWbemLocator* locator_ = nullptr;
     std::map<std::wstring, IWbemServices*> services_;
+    std::vector<WmiDiagnostic> diagnostics_;
 };
 
 std::optional<std::wstring> VariantToString(const VARIANT& value) {
@@ -142,8 +154,14 @@ std::wstring CombinedSensorText(const SensorRecord& sensor) {
     return ToLower(sensor.name + L" " + sensor.identifier + L" " + sensor.parent);
 }
 
+std::wstring FormatHresult(HRESULT hr) {
+    wchar_t buffer[32];
+    swprintf_s(buffer, L"0x%08X", static_cast<unsigned int>(hr));
+    return buffer;
+}
+
 std::vector<std::wstring> DefaultSensorNamespaces() {
-    return {L"root\\LibreHardwareMonitor", L"root\\OpenHardwareMonitor"};
+    return {L"root\\LibreHardwareMonitor"};
 }
 
 std::vector<std::wstring> GatherSensorNamespaces(const AppConfig& config) {
@@ -311,6 +329,14 @@ WmiSession::~WmiSession() {
     }
 }
 
+std::vector<WmiDiagnostic> WmiSession::Diagnostics() const {
+    return diagnostics_;
+}
+
+void WmiSession::ClearDiagnostics() {
+    diagnostics_.clear();
+}
+
 std::optional<std::wstring> WmiSession::QueryFirstString(
     const std::wstring& namespaceName, const std::wstring& query, const std::wstring& property) {
     VARIANT value{};
@@ -340,12 +366,14 @@ std::optional<double> WmiSession::QueryFirstDouble(
 
 std::vector<SensorRecord> WmiSession::EnumerateSensors(const std::wstring& namespaceName) {
     std::vector<SensorRecord> sensors;
+    const std::wstring query = L"SELECT Name, Identifier, Parent, SensorType, Value FROM Sensor";
     IWbemServices* services = GetServices(namespaceName);
     if (services == nullptr) {
+        RecordDiagnostic(namespaceName, query, E_FAIL, L"Failed to open namespace");
         return sensors;
     }
     BSTR language = SysAllocString(L"WQL");
-    BSTR queryText = SysAllocString(L"SELECT Name, Identifier, Parent, SensorType, Value FROM Sensor");
+    BSTR queryText = SysAllocString(query.c_str());
     IEnumWbemClassObject* enumerator = nullptr;
     const HRESULT hr = services->ExecQuery(
         language, queryText,
@@ -354,6 +382,7 @@ std::vector<SensorRecord> WmiSession::EnumerateSensors(const std::wstring& names
     SysFreeString(language);
     SysFreeString(queryText);
     if (FAILED(hr) || enumerator == nullptr) {
+        RecordDiagnostic(namespaceName, query, hr, L"ExecQuery failed");
         return sensors;
     }
     while (true) {
@@ -397,6 +426,7 @@ std::vector<SensorRecord> WmiSession::EnumerateSensors(const std::wstring& names
         object->Release();
     }
     enumerator->Release();
+    RecordDiagnostic(namespaceName, query, S_OK, sensors.empty() ? L"Query succeeded but returned no rows" : L"OK");
     return sensors;
 }
 
@@ -405,6 +435,7 @@ bool WmiSession::QueryFirstVariant(
     const std::wstring& property, VARIANT& value) {
     IWbemServices* services = GetServices(namespaceName);
     if (services == nullptr) {
+        RecordDiagnostic(namespaceName, query, E_FAIL, L"Failed to open namespace");
         return false;
     }
     BSTR language = SysAllocString(L"WQL");
@@ -417,6 +448,7 @@ bool WmiSession::QueryFirstVariant(
     SysFreeString(language);
     SysFreeString(queryText);
     if (FAILED(hr) || enumerator == nullptr) {
+        RecordDiagnostic(namespaceName, query, hr, L"ExecQuery failed");
         return false;
     }
     IWbemClassObject* object = nullptr;
@@ -424,16 +456,19 @@ bool WmiSession::QueryFirstVariant(
     const HRESULT nextHr = enumerator->Next(WBEM_INFINITE, 1, &object, &returned);
     if (FAILED(nextHr) || returned == 0 || object == nullptr) {
         enumerator->Release();
+        RecordDiagnostic(namespaceName, query, nextHr, returned == 0 ? L"Query returned no rows" : L"Enumerator Next failed");
         return false;
     }
     const HRESULT getHr = object->Get(property.c_str(), 0, &value, nullptr, nullptr);
     object->Release();
     enumerator->Release();
+    RecordDiagnostic(namespaceName, query, getHr, SUCCEEDED(getHr) ? L"OK" : L"Get(property) failed");
     return SUCCEEDED(getHr);
 }
 
 IWbemServices* WmiSession::GetServices(const std::wstring& namespaceName) {
     if (!initialized_ && !Initialize()) {
+        RecordDiagnostic(namespaceName, L"", E_FAIL, L"Initialize failed");
         return nullptr;
     }
     const auto found = services_.find(namespaceName);
@@ -445,6 +480,7 @@ IWbemServices* WmiSession::GetServices(const std::wstring& namespaceName) {
     HRESULT hr = locator_->ConnectServer(ns, nullptr, nullptr, nullptr, 0, nullptr, nullptr, &services);
     SysFreeString(ns);
     if (FAILED(hr) || services == nullptr) {
+        RecordDiagnostic(namespaceName, L"", hr, L"ConnectServer failed");
         return nullptr;
     }
     hr = CoSetProxyBlanket(
@@ -453,10 +489,16 @@ IWbemServices* WmiSession::GetServices(const std::wstring& namespaceName) {
         nullptr, EOAC_NONE);
     if (FAILED(hr)) {
         services->Release();
+        RecordDiagnostic(namespaceName, L"", hr, L"CoSetProxyBlanket failed");
         return nullptr;
     }
     services_[namespaceName] = services;
     return services;
+}
+
+void WmiSession::RecordDiagnostic(
+    const std::wstring& namespaceName, const std::wstring& query, HRESULT result, const std::wstring& detail) {
+    diagnostics_.push_back(WmiDiagnostic{namespaceName, query, result, detail});
 }
 
 TelemetryCollector::TelemetryCollector() : impl_(std::make_unique<Impl>()) {}
@@ -469,6 +511,7 @@ TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept
 
 bool TelemetryCollector::Initialize(const AppConfig& config) {
     impl_->config_ = config;
+    impl_->wmi_.ClearDiagnostics();
     impl_->snapshot_.network.uploadHistory.assign(60, 0.0);
     impl_->snapshot_.network.downloadHistory.assign(60, 0.0);
     WSADATA wsaData{};
@@ -741,6 +784,24 @@ std::wstring TelemetryCollector::Impl::DumpText() const {
                  << L" id=" << sensor.identifier
                  << L" parent=" << sensor.parent
                  << L" value=" << valueBuffer;
+            AppendWideLine(output, line.str());
+        }
+    }
+    AppendWideLine(output, L"");
+
+    AppendWideLine(output, L"[WMI Diagnostics]");
+    const auto diagnostics = wmi_.Diagnostics();
+    if (diagnostics.empty()) {
+        AppendWideLine(output, L"(none)");
+    } else {
+        for (const auto& diagnostic : diagnostics) {
+            std::wstringstream line;
+            line << L"ns=" << diagnostic.namespaceName
+                 << L" hr=" << FormatHresult(diagnostic.result)
+                 << L" detail=" << diagnostic.detail;
+            if (!diagnostic.query.empty()) {
+                line << L" query=" << diagnostic.query;
+            }
             AppendWideLine(output, line.str());
         }
     }
