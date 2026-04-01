@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 
+#include "board_vendor.h"
 #include "gpu_vendor.h"
 #include "telemetry.h"
 #include "trace.h"
@@ -45,6 +46,37 @@ std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
 std::string FormatMemoryMetric(const MemoryMetric& metric) {
     char buffer[64];
     sprintf_s(buffer, "%.1f / %.1f GB", metric.usedGb, metric.totalGb);
+    return buffer;
+}
+
+std::string FormatOptionalInt(const std::optional<int>& value) {
+    return value.has_value() ? std::to_string(*value) : "N/A";
+}
+
+std::string FormatOptionalHex16(const std::optional<uint16_t>& value) {
+    if (!value.has_value()) {
+        return "N/A";
+    }
+    char buffer[16];
+    sprintf_s(buffer, "0x%04X", static_cast<unsigned int>(*value));
+    return buffer;
+}
+
+std::string FormatOptionalHex32(const std::optional<uint32_t>& value) {
+    if (!value.has_value()) {
+        return "N/A";
+    }
+    char buffer[16];
+    sprintf_s(buffer, "0x%08X", static_cast<unsigned int>(*value));
+    return buffer;
+}
+
+std::string FormatOptionalHex8(const std::optional<uint8_t>& value) {
+    if (!value.has_value()) {
+        return "N/A";
+    }
+    char buffer[16];
+    sprintf_s(buffer, "0x%02X", static_cast<unsigned int>(*value));
     return buffer;
 }
 
@@ -144,6 +176,7 @@ struct TelemetryCollector::Impl {
     void UpdateGpu();
     void InitializeGpuAdapterInfo();
     void UpdateMemory();
+    void ApplyBoardVendorSample(const BoardVendorTelemetrySample& sample);
     void ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample);
     void EnumerateDrives();
     void RefreshDriveUsage();
@@ -158,9 +191,14 @@ struct TelemetryCollector::Impl {
     SystemSnapshot snapshot_;
     tracing::Trace trace_;
     std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
+    std::unique_ptr<BoardVendorTelemetryProvider> boardProvider_;
     std::string gpuProviderName_ = "None";
     std::string gpuProviderDiagnostics_ = "Provider not initialized.";
     bool gpuProviderAvailable_ = false;
+    std::string boardProviderName_ = "None";
+    std::string boardProviderDiagnostics_ = "Provider not initialized.";
+    BoardVendorTelemetrySample boardProviderSample_{};
+    bool boardProviderAvailable_ = false;
 
     PDH_HQUERY cpuQuery_ = nullptr;
     PDH_HCOUNTER cpuLoadCounter_ = nullptr;
@@ -218,6 +256,7 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
         impl_->trace_.Write(buffer);
     }
     impl_->gpuProvider_ = CreateGpuVendorTelemetryProvider(&impl_->trace_);
+    impl_->boardProvider_ = CreateBoardVendorTelemetryProvider(&impl_->trace_);
     if (impl_->gpuProvider_ != nullptr) {
         impl_->trace_.Write("telemetry:gpu_provider_initialize_begin");
         if (impl_->gpuProvider_->Initialize()) {
@@ -233,6 +272,21 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
         }
     } else {
         impl_->trace_.Write("telemetry:gpu_provider_create result=null");
+    }
+    if (impl_->boardProvider_ != nullptr) {
+        impl_->trace_.Write("telemetry:board_provider_initialize_begin");
+        if (impl_->boardProvider_->Initialize(config)) {
+            impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
+            impl_->trace_.Write("telemetry:board_provider_initialize_done provider=" + impl_->boardProviderName_ +
+                " available=" + tracing::Trace::BoolText(impl_->boardProviderAvailable_) +
+                " diagnostics=\"" + impl_->boardProviderDiagnostics_ + "\"");
+        } else {
+            impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
+            impl_->trace_.Write("telemetry:board_provider_initialize_failed provider=" + impl_->boardProviderName_ +
+                " diagnostics=\"" + impl_->boardProviderDiagnostics_ + "\"");
+        }
+    } else {
+        impl_->trace_.Write("telemetry:board_provider_create result=null");
     }
 
     const PDH_STATUS cpuQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->cpuQuery_);
@@ -347,6 +401,12 @@ void TelemetryCollector::Impl::UpdateCpu() {
     }
     Trace(("telemetry:cpu_clock " + tracing::Trace::FormatPdhStatus("status", clockStatus) + " value=" +
         (snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(snapshot_.cpu.clock, 2) : std::string("N/A"))).c_str());
+    if (boardProvider_ != nullptr) {
+        ApplyBoardVendorSample(boardProvider_->Sample());
+        Trace(("telemetry:board_vendor_sample provider=" + boardProviderName_ +
+            " available=" + tracing::Trace::BoolText(boardProviderAvailable_) +
+            " diagnostics=\"" + boardProviderDiagnostics_ + "\"").c_str());
+    }
 }
 
 void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
@@ -466,6 +526,15 @@ void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySamp
     }
 }
 
+void TelemetryCollector::Impl::ApplyBoardVendorSample(const BoardVendorTelemetrySample& sample) {
+    boardProviderSample_ = sample;
+    boardProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
+    boardProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
+    boardProviderAvailable_ = sample.available;
+    snapshot_.cpu.fan.value = sample.fanRpm;
+    snapshot_.cpu.fan.unit = "RPM";
+}
+
 void TelemetryCollector::Impl::UpdateGpu() {
     if (gpuQuery_ != nullptr) {
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuQuery_);
@@ -526,6 +595,7 @@ void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
         output << buffer << "\r\n";
     }
     output << "Clock: " << FormatScalarMetric(snapshot_.cpu.clock, 2) << "\r\n";
+    output << "Fan: " << FormatScalarMetric(snapshot_.cpu.fan, 0) << "\r\n";
     output << "Memory: " << FormatMemoryMetric(snapshot_.cpu.memory) << "\r\n";
     output << "\r\n";
 
@@ -546,6 +616,25 @@ void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
     output << "Name: " << gpuProviderName_ << "\r\n";
     output << "Available: " << (gpuProviderAvailable_ ? "yes" : "no") << "\r\n";
     output << "Diagnostics: " << gpuProviderDiagnostics_ << "\r\n";
+    output << "\r\n";
+
+    output << "[Board Vendor Provider]\r\n";
+    output << "Name: " << boardProviderName_ << "\r\n";
+    output << "Available: " << (boardProviderAvailable_ ? "yes" : "no") << "\r\n";
+    output << "Diagnostics: " << boardProviderDiagnostics_ << "\r\n";
+    output << "Board Manufacturer: " << (boardProviderSample_.boardManufacturer.empty() ? "N/A" : boardProviderSample_.boardManufacturer) << "\r\n";
+    output << "Board Product: " << (boardProviderSample_.boardProduct.empty() ? "N/A" : boardProviderSample_.boardProduct) << "\r\n";
+    output << "Chip: " << (boardProviderSample_.chipName.empty() ? "N/A" : boardProviderSample_.chipName) << "\r\n";
+    output << "Controller Type: " << (boardProviderSample_.controllerType.empty() ? "N/A" : boardProviderSample_.controllerType) << "\r\n";
+    output << "Driver/Helper: " << (boardProviderSample_.driverLibrary.empty() ? "N/A" : boardProviderSample_.driverLibrary) << "\r\n";
+    output << "Probe Port: " << FormatOptionalHex16(boardProviderSample_.probePort) << "\r\n";
+    output << "Chip ID: " << FormatOptionalHex16(boardProviderSample_.chipId) << "\r\n";
+    output << "Monitor Base: " << FormatOptionalHex32(boardProviderSample_.monitorBaseAddress) << "\r\n";
+    output << "EC MMIO Register: " << FormatOptionalHex8(boardProviderSample_.ecMmioRegisterValue) << "\r\n";
+    output << "Requested Fan Channel: " << FormatOptionalInt(boardProviderSample_.requestedFanChannel) << "\r\n";
+    output << "Selected Fan Channel: " << FormatOptionalInt(boardProviderSample_.selectedFanChannel) << "\r\n";
+    output << "Raw Fan Counter: " << FormatOptionalHex16(boardProviderSample_.rawFanCounter) << "\r\n";
+    output << "16-bit Fan Mode: " << (boardProviderSample_.fan16BitMode ? "yes" : "no") << "\r\n";
     output << "\r\n";
 
     output << "[Network]\r\n";

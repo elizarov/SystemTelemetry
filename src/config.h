@@ -10,6 +10,7 @@ struct AppConfig {
     int positionY = 0;
     std::string networkAdapter;
     std::vector<std::string> driveLetters;
+    int gigabyteFanChannel = 0;
 };
 
 AppConfig LoadConfig(const std::filesystem::path& path);

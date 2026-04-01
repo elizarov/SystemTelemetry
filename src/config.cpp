@@ -130,6 +130,8 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
             config.networkAdapter = value;
         } else if (section == "storage" && key == "drives") {
             config.driveLetters = Split(value, ',');
+        } else if (section == "vendor.gigabyte" && key == "fan_channel") {
+            config.gigabyteFanChannel = std::clamp(ParseIntOrDefault(value, 0), 0, 6);
         }
     }
 

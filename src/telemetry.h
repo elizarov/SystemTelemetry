@@ -29,6 +29,7 @@ struct ProcessorTelemetry {
     std::string name = "CPU";
     double loadPercent = 0.0;
     ScalarMetric clock{std::nullopt, "GHz"};
+    ScalarMetric fan{std::nullopt, "RPM"};
     MemoryMetric memory;
 };
 
