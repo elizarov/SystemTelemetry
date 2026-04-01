@@ -45,6 +45,7 @@ Runtime requirements:
 
 - Windows 11
 - AMD Software: Adrenalin Edition, including the ADLX runtime, for AMD GPU telemetry
+- Gigabyte SIV installed on supported Gigabyte motherboards when CPU temperature and fan telemetry are desired
 
 Development requirements:
 
