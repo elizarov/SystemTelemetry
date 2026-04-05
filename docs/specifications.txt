@@ -270,6 +270,7 @@ Each graph must include a vertical axis and a small label showing the current ma
 Network and storage throughput plot scaling must be derived from the maximum value present in the retained history shown by that panel.
 The throughput plots should render a simple moving average over the most recent two readings so the line reflects a 1-second smoothing window while the numeric throughput readout continues to show the latest sampled value.
 Throughput plot scaling must use a minimum max of 10 MB/s, round the averaged max up in 5 MB/s steps through 100 MB/s, and then round it up in 50 MB/s steps above 100 MB/s.
+Throughput plots must reserve the configured `[throughput] plot_stroke_width` as top inset in the plotted area so a sample equal to the computed graph max still renders fully inside the chart bounds.
 Network plots should draw thin horizontal guide lines every 5 MB/s.
 Storage throughput plots should use the same averaged-history scaling, draw horizontal guide lines every 5 MB/s while the averaged max stays at or below 50 MB/s, and switch those guide lines to every 50 MB/s once the averaged max exceeds 50 MB/s.
 All throughput plots should also draw synchronized vertical time markers every 10 seconds, with marker placement driven from one shared snapshot-time phase so the markers line up and scroll in sync across network and storage.
