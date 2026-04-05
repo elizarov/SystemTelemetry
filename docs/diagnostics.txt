@@ -15,7 +15,7 @@ The dump format must be stable, text-based, and editable by hand so the same fil
 The dump must include all telemetry fields needed by the dashboard plus provider diagnostics, a single retained-history-series collection for throughput, metric rows, and load gauges, configured drive rows, and the full dumped local date/time including seconds and milliseconds.
 The dump schema must reflect the current runtime model directly; obsolete compatibility keys should be removed instead of being kept as null placeholders.
 `/screenshot` must enable writing only the rendered dashboard screenshot to `telemetry_screenshot.png` beside the executable.
-When `/exit` is not present, the application must still start the normal dashboard UI and keep running normally while any requested diagnostics outputs are produced in parallel.
+When `/exit` is not present, the application must start the normal dashboard UI and keep running while any requested diagnostics outputs are produced in parallel.
 Without `/exit`, trace logging must continue for the lifetime of the process, while dump and screenshot outputs must refresh once per second using the latest snapshot, with trace appending and dump/screenshot overwriting their existing files each refresh.
 When `/exit` is present, the application must initialize telemetry using the same runtime `config.ini`, perform the first data update, optionally write the requested dump and screenshot once, close outputs, and exit without starting the GUI or affecting any already-running dashboard instance.
 Headless `/screenshot /exit` rendering must use `1.0` scale by default and multiply the logical layout size by `/scale:<value>` when that switch is present, so the exported PNG dimensions and all measured UI geometry increase together.
@@ -25,8 +25,8 @@ When `/fake` is present, the application must not initialize live telemetry prov
 The diagnostics trace must cover all diagnostics collection paths, not only vendor GPU integration.
 Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
 Diagnostics output failures such as trace/dump/screenshot file-open errors, dump write failures, and screenshot export failures must be written to `telemetry_trace.txt` before any error dialog is shown.
-When `/trace` is enabled, diagnostics failures must prefer trace logging over modal UI and should complete with a failure exit code instead of blocking on a dialog.
-Required `/fake` load failures must follow that same rule, so `/fake /exit` returns promptly with trace output instead of stalling behind a modal parse/open dialog.
+When `/trace` is enabled, diagnostics failures must prefer trace logging over modal UI and should complete with a failure exit code.
+Required `/fake` load failures must follow that same rule, so `/fake /exit` returns promptly with trace output.
 When `/trace` is enabled and the renderer initializes, the trace must also include measured font heights plus computed layout heights and resolved widget/card rectangles to aid layout tuning.
 The dumped board-provider block must include Gigabyte debug details such as detected board identity, helper path, controller type, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, and sampled diagnostics.
 
@@ -34,15 +34,15 @@ Single-instance interaction
 ===========================
 
 The `/exit` diagnostics mode is exempt from the normal single-instance behavior and should run as an independent one-shot command.
-Diagnostics switches without `/exit` must stay attached to the normal UI startup path and therefore still follow the usual single-instance replacement behavior.
-`/fake` by itself must stay on the normal UI startup path and therefore still follow the usual single-instance replacement behavior.
+Diagnostics switches without `/exit` must stay attached to the normal UI startup path and follow the single-instance replacement behavior.
+`/fake` by itself must stay on the normal UI startup path and follow the single-instance replacement behavior.
 
 Validation guide
 ================
 
 Always rebuild through `build.cmd` before validating diagnostics changes.
 For UI-attached diagnostics, verify `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot` while the dashboard is running.
-For headless diagnostics, verify `/trace /dump /screenshot /exit` and `/trace /reload /screenshot /exit`, and confirm the process exits after the requested first-update or reload-export path without entering the normal GUI path.
+For headless diagnostics, verify `/trace /dump /screenshot /exit` and `/trace /reload /screenshot /exit`, and confirm the process exits after the requested first-update or reload-export path.
 When `/scale:<value>` is involved, also verify that `telemetry_screenshot.png` uses the expected multiplied pixel dimensions while preserving the same logical composition.
 Always include `/trace` in diagnostics validation and inspect `telemetry_trace.txt`, even when the primary change is dump or screenshot behavior.
 For trace changes, inspect `telemetry_trace.txt` for timestamp format, append behavior, expected provider/status details, and explicit diagnostics failure markers.

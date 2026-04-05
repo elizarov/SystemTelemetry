@@ -11,7 +11,7 @@ The language is static:
 - coordinates are computed once after config load or reload
 - rendering uses those precomputed coordinates until the next reload
 
-The language is centered around the dashboard's current shape:
+The language is centered around the dashboard shape:
 
 - the dashboard-level `cards` layout places cards through generic containers
 - cards contain a small static composition of known widget kinds
@@ -39,7 +39,7 @@ The language has three levels:
 Widget sections
 ===============
 
-Widget-specific sizing now lives in dedicated sections named exactly after the widget.
+Widget-specific sizing lives in dedicated sections named exactly after the widget.
 
 Supported widget geometry keys:
 
@@ -158,7 +158,7 @@ Meaning:
 
 `metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + [metric_list].vertical_gap + [metric_list].bar_height`.
 `drive_usage_list(...)` rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].vertical_gap` when placed inside a top-packed stack.
-Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching widget-section `*_padding` keys instead of by buried renderer literals.
+Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching widget-section `*_padding` keys.
 
 Nested layout expressions are allowed.
 
@@ -256,7 +256,7 @@ Card sections define relative structure only:
 Static sizing rules
 ===================
 
-Layout is resolved without using current telemetry values.
+Layout is resolved without using live telemetry values.
 
 Static sizing rules:
 
@@ -279,5 +279,5 @@ Reference
 =========
 
 See [resources/config.ini](/D:/Projects/SystemTelemetry/resources/config.ini) for the maintained example of the
-language in use. That file is the single source of truth for the current checked-in layout shape and supported
+language in use. That file is the single source of truth for the checked-in layout shape and supported
 spelling of the shipped configuration.

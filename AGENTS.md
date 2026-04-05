@@ -4,6 +4,7 @@ Keep `docs/architecture.txt` in sync with structural/code-organization changes b
 Keep `docs/project.txt` in sync with project-environment, build/setup, and engineering-constraint changes before finishing work.
 Keep a single source of truth for every example, format description, and configuration-language reference; when one file is designated as the maintained source, update other docs to refer to it instead of duplicating the same example or format details.
 Document new requirements briefly in the same style as the existing spec.
+Keep docs/specs in present-tense steady-state language; describe only the intended behavior and structure, not transitions, historical notes, removals, or migration context.
 Always use `build.cmd` for builds.
 Run `build.cmd` outside the sandbox; CMake incremental generation/builds need file deletes, renames, and timestamp updates in `build\` that the sandbox denies with `Access is denied`.
 Keep all build artifacts and temporary compiler files in `build\` so the repository root stays clean.
