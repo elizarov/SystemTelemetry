@@ -1162,16 +1162,26 @@ void DashboardApp::BringOnTop() {
 
 bool DashboardApp::ReloadConfigFromDisk() {
     const AppConfig reloadedConfig = LoadConfig(GetRuntimeConfigPath());
-    std::unique_ptr<TelemetryRuntime> reloadedTelemetry =
-        CreateTelemetryRuntime(diagnosticsOptions_, GetExecutableDirectory());
-    if (reloadedTelemetry == nullptr) {
-        return false;
-    }
-
     if (diagnostics_ != nullptr) {
         diagnostics_->WriteTraceMarker("diagnostics:reload_config_begin");
     }
-    if (!reloadedTelemetry->Initialize(reloadedConfig, diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr)) {
+
+    const auto initializeRuntime = [&](const AppConfig& runtimeConfig) -> std::unique_ptr<TelemetryRuntime> {
+        std::unique_ptr<TelemetryRuntime> runtime =
+            CreateTelemetryRuntime(diagnosticsOptions_, GetExecutableDirectory());
+        if (runtime == nullptr) {
+            return nullptr;
+        }
+        if (!runtime->Initialize(runtimeConfig, diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr)) {
+            return nullptr;
+        }
+        return runtime;
+    };
+
+    telemetry_.reset();
+    std::unique_ptr<TelemetryRuntime> reloadedTelemetry = initializeRuntime(reloadedConfig);
+    if (reloadedTelemetry == nullptr) {
+        telemetry_ = initializeRuntime(config_);
         if (diagnostics_ != nullptr) {
             diagnostics_->WriteTraceMarker("diagnostics:reload_config_failed");
         }
