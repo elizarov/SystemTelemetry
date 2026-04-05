@@ -4,26 +4,26 @@
 This project is a compact, real-time system monitoring dashboard designed for a small 800x480 secondary display,
 presenting only the telemetry that can be collected cleanly through Windows APIs or vendor APIs.
 It combines CPU load, temperature, clock, fan speed, and RAM usage with GPU load, temperature, clock, fan speed, and VRAM usage,
-alongside network activity, multi-drive storage status, and a clock, all organized into a balanced panel layout.
+alongside network activity, system-wide storage throughput, multi-drive storage status, and a clock, all organized into a balanced panel layout.
 The design emphasizes glanceable visuals with large load indicators, concise numeric stats, and minimal clutter.
 
-┌─────────────────────────────┬──────────────────────────────┐
-│           CPU               │             GPU              │
-│  AMD Ryzen                  │  Radeon RX 6800              │
-│  ○  2%                      │  ○  0%                       │
-│  Temp    67°C               │  Temp    45°C                │
-│  Clock   3.70GHz            │  Clock   29MHz               │
-│  Fan     2400RPM            │  Fan     0RPM                │
-│  RAM     15.0 / 64 GB       │  VRAM    3.7 / 16 GB         │
-│                             │                              │
-├───────────────┬──────────────────────────────┬─────────────┤
-│   Network     │           Storage            │    Time     │
-│  Up   0.3MB/s │  C: ████░░░░░ 32%  2.5TB     │   10:43     │
-│  Down 24MB/s  │  D: ███████░░ 44%  534GB     │  2026-04-01 │
-│  ▒▒▒▒▒▒▒▒▒▒   │  E: ███░░░░░░ 32%  5.0TB     │             │
-│  ▒▒▒▒▒▒▒▒▒▒   │                              │             │
-│  192.168.3.60 │                              │             │
-└───────────────┴──────────────────────────────┴─────────────┘
+┌──────────────────────────────┬───────────────────────────────┐
+│           CPU                │             GPU               │
+│  AMD Ryzen                   │  Radeon RX 6800               │
+│  ○  2%                       │  ○  0%                        │
+│  Temp    67°C                │  Temp    45°C                 │
+│  Clock   3.70GHz             │  Clock   29MHz                │
+│  Fan     2400RPM             │  Fan     0RPM                 │
+│  RAM     15.0 / 64 GB        │  VRAM    3.7 / 16 GB          │
+│                              │                               │
+├───────────────┬──────────────────────────────────┬───────────┤
+│   Network     │             Storage              │   Time    │
+│  Up   0.3MB/s │  Read  0.8MB/s  C: ████░░░░ 32%  │   10:43   │
+│  Down 24MB/s  │  Write 1.2MB/s D: ██████░░ 44%   │ 2026-04-01│
+│  ▒▒▒▒▒▒▒▒▒▒   │  ▒▒▒▒▒▒▒▒▒▒    E: ███░░░░░ 32%   │           │
+│  ▒▒▒▒▒▒▒▒▒▒   │  ▒▒▒▒▒▒▒▒▒▒                      │           │
+│  192.168.3.60 │                                  │           │
+└───────────────┴──────────────────────────────────┴───────────┘
 
 Project Environment and Setup
 =============================
@@ -111,6 +111,7 @@ GPU telemetry must use Windows counters for generic metrics and vendor APIs for 
 
 If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable instead of blocking startup.
 The application must not rely on WMI for telemetry, names, or dump diagnostics.
+Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
 
 Vendor telemetry integrations should live in separate source files so each vendor implementation remains isolated.
 Gigabyte motherboard fan telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the CPU fan metric unavailable instead of blocking startup.
@@ -195,12 +196,13 @@ Units: slightly dimmer than values
 Visual Elements
 Circular gauges for CPU/GPU load with the ring drawn in the track color and only the load-sized sliver overlaid in the shared usage color
 Horizontal bars for usage
-Mini graphs for network activity
+Mini graphs for network and storage throughput activity
 Clean, minimal headers
 CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
 Each top-level panel header must show a small monochrome icon derived from the dashboard sketch for CPU, GPU, Network, Storage, and Time, with those icon assets stored under `resources\` and compiled into the executable.
 The application must define a custom app icon asset under `resources\`, embed it into the executable, and use that embedded icon for the executable and the tray icon instead of the default Windows icon.
 The CPU metrics stack must use the same vertical spacing and bar rhythm as the GPU metrics stack so both top cards read as a matched pair.
+The bottom row should keep enough width in the time card to avoid clipping the clock text, while giving most reclaimed horizontal space to the storage card and using slightly narrower network and storage throughput plot areas so the storage drive-usage section has more room.
 
 Design Principles
 High contrast for readability on small screen
@@ -266,7 +268,13 @@ Storage Panel (Bottom Center)
 
 Structure
 
-List configured fixed drives vertically (C, D, E)
+Stack read and write throughput sections on the left, with the same vertical rhythm and plot behavior used by the network panel, but at a slightly narrower width so the drive-usage list has more room.
+List configured fixed drives vertically on the right (C, D, E).
+
+Throughput
+Read throughput
+Write throughput
+These throughput values should come from total system disk I/O counters rather than only from the configured drives shown in the usage list.
 
 Per Drive Row
 Drive letter
@@ -299,7 +307,8 @@ Refresh Rates
 CPU/GPU load: 0.5-1 sec
 GPU vendor metrics: about 1 sec
 Network: 0.5 sec
-Storage: 5-10 sec
+Storage throughput: 0.5 sec
+Storage drive usage: 5-10 sec
 Clock: 1 sec
 
 Units

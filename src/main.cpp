@@ -11,6 +11,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -378,6 +379,11 @@ double GetNetworkGraphMax(double uploadMbps, double downloadMbps) {
     return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
 }
 
+double GetThroughputGraphMax(double firstMbps, double secondMbps) {
+    const double rawMax = std::max(10.0, std::max(firstMbps, secondMbps));
+    return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
+}
+
 struct MonitorPlacementInfo {
     std::string deviceName;
     std::string monitorName = "Unknown";
@@ -595,8 +601,10 @@ private:
     void DrawProcessorPanel(HDC hdc, const RECT& rect, const ProcessorTelemetry& cpu);
     void DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& gpu);
     void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue);
+    void DrawThroughputSection(HDC hdc, const RECT& valueRect, const RECT& graphRect, const char* label,
+        double valueMbps, const std::vector<double>& history, double maxGraph);
     void DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTelemetry& network);
-    void DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector<DriveInfo>& drives);
+    void DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTelemetry& storage, const std::vector<DriveInfo>& drives);
     void DrawTimePanel(HDC hdc, const RECT& rect, const SYSTEMTIME& now);
     void DrawLayout(HDC hdc, const SystemSnapshot& snapshot);
 
@@ -1352,29 +1360,28 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
     DeleteObject(pen);
 }
 
+void DashboardApp::DrawThroughputSection(HDC hdc, const RECT& valueRect, const RECT& graphRect, const char* label,
+    double valueMbps, const std::vector<double>& history, double maxGraph) {
+    const int labelWidth = strcmp(label, "Write") == 0 ? 42 : 54;
+    RECT labelRect{valueRect.left, valueRect.top, valueRect.left + labelWidth, valueRect.bottom};
+    RECT numberRect{labelRect.right + 2, valueRect.top, valueRect.right, valueRect.bottom};
+    DrawTextBlock(hdc, labelRect, label, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, numberRect, FormatSpeed(valueMbps), fonts_.label, kWhite, DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+    DrawGraph(hdc, graphRect, history, maxGraph);
+}
+
 void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTelemetry& network) {
     DrawPanel(hdc, rect, "Network", PanelIcon::Network);
-    RECT upRect{rect.left + 16, rect.top + 38, rect.right - 16, rect.top + 54};
-    RECT uploadGraph{rect.left + 16, rect.top + 56, rect.right - 16, rect.top + 97};
-    RECT downRect{rect.left + 16, rect.top + 102, rect.right - 16, rect.top + 118};
-    RECT downloadGraph{rect.left + 16, rect.top + 120, rect.right - 16, rect.bottom - 28};
+    const int chartRight = rect.right - 28;
+    RECT upRect{rect.left + 16, rect.top + 38, chartRight, rect.top + 54};
+    RECT uploadGraph{rect.left + 16, rect.top + 56, chartRight, rect.top + 97};
+    RECT downRect{rect.left + 16, rect.top + 102, chartRight, rect.top + 118};
+    RECT downloadGraph{rect.left + 16, rect.top + 120, chartRight, rect.bottom - 28};
     RECT footerRect{rect.left + 16, rect.bottom - 22, rect.right - 16, rect.bottom - 6};
-    const double maxGraph = GetNetworkGraphMax(network.uploadMbps, network.downloadMbps);
+    const double maxGraph = GetThroughputGraphMax(network.uploadMbps, network.downloadMbps);
 
-    RECT upLabelRect{upRect.left, upRect.top, upRect.left + 42, upRect.bottom};
-    RECT upValueRect{upRect.left + 44, upRect.top, upRect.right, upRect.bottom};
-    RECT downLabelRect{downRect.left, downRect.top, downRect.left + 54, downRect.bottom};
-    RECT downValueRect{downRect.left + 56, downRect.top, downRect.right, downRect.bottom};
-
-    DrawTextBlock(hdc, upLabelRect, "Up", fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, upValueRect, FormatSpeed(network.uploadMbps), fonts_.label, kWhite,
-        DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-    DrawGraph(hdc, uploadGraph, network.uploadHistory, maxGraph);
-
-    DrawTextBlock(hdc, downLabelRect, "Down", fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, downValueRect, FormatSpeed(network.downloadMbps), fonts_.label, kWhite,
-        DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-    DrawGraph(hdc, downloadGraph, network.downloadHistory, maxGraph);
+    DrawThroughputSection(hdc, upRect, uploadGraph, "Up", network.uploadMbps, network.uploadHistory, maxGraph);
+    DrawThroughputSection(hdc, downRect, downloadGraph, "Down", network.downloadMbps, network.downloadHistory, maxGraph);
 
     const std::string footer = network.adapterName.empty()
         ? network.ipAddress
@@ -1382,14 +1389,24 @@ void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTele
     DrawTextBlock(hdc, footerRect, footer, fonts_.smallFont, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
-void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const std::vector<DriveInfo>& drives) {
+void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTelemetry& storage, const std::vector<DriveInfo>& drives) {
     DrawPanel(hdc, rect, "Storage", PanelIcon::Storage);
+    const int chartRight = rect.left + 176;
+    const RECT readValueRect{rect.left + 16, rect.top + 38, chartRight, rect.top + 54};
+    const RECT readGraphRect{rect.left + 16, rect.top + 56, chartRight, rect.top + 97};
+    const RECT writeValueRect{rect.left + 16, rect.top + 102, chartRight, rect.top + 118};
+    const RECT writeGraphRect{rect.left + 16, rect.top + 120, chartRight, rect.bottom - 28};
+    const double maxGraph = GetThroughputGraphMax(storage.readMbps, storage.writeMbps);
+    DrawThroughputSection(hdc, readValueRect, readGraphRect, "Read", storage.readMbps, storage.readHistory, maxGraph);
+    DrawThroughputSection(hdc, writeValueRect, writeGraphRect, "Write", storage.writeMbps, storage.writeHistory, maxGraph);
+
+    const int usageLeft = rect.left + 192;
     int y = rect.top + 42;
     for (const auto& drive : drives) {
-        RECT labelRect{rect.left + 16, y, rect.left + 42, y + 20};
+        RECT labelRect{usageLeft, y, usageLeft + 26, y + 20};
         RECT pctRect{rect.right - 140, y, rect.right - 94, y + 20};
         RECT freeRect{rect.right - 92, y, rect.right - 16, y + 20};
-        RECT barRect{rect.left + 48, y + 4, rect.right - 150, y + 16};
+        RECT barRect{usageLeft + 32, y + 4, rect.right - 150, y + 16};
 
         DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         HBRUSH track = CreateSolidBrush(kTrack);
@@ -1428,13 +1445,13 @@ void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
     const RECT cpuRect{10, 10, 395, 270};
     const RECT gpuRect{405, 10, 790, 270};
     const RECT networkRect{10, 280, 210, 470};
-    const RECT storageRect{220, 280, 618, 470};
-    const RECT timeRect{628, 280, 790, 470};
+    const RECT storageRect{220, 280, 654, 470};
+    const RECT timeRect{664, 280, 790, 470};
 
     DrawProcessorPanel(hdc, cpuRect, snapshot.cpu);
     DrawGpuPanel(hdc, gpuRect, snapshot.gpu);
     DrawNetworkPanel(hdc, networkRect, snapshot.network);
-    DrawStoragePanel(hdc, storageRect, snapshot.drives);
+    DrawStoragePanel(hdc, storageRect, snapshot.storage, snapshot.drives);
     DrawTimePanel(hdc, timeRect, snapshot.now);
 }
 

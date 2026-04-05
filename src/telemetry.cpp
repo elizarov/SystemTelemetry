@@ -277,6 +277,7 @@ struct TelemetryCollector::Impl {
     void ApplyBoardVendorSample(const BoardVendorTelemetrySample& sample);
     void ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample);
     void EnumerateDrives();
+    void UpdateStorageThroughput(bool initializeOnly);
     void RefreshDriveUsage();
     void UpdateNetworkState(bool initializeOnly);
     void DumpText(std::ostream& output) const;
@@ -305,6 +306,9 @@ struct TelemetryCollector::Impl {
     PDH_HCOUNTER gpuLoadCounter_ = nullptr;
     PDH_HQUERY gpuMemoryQuery_ = nullptr;
     PDH_HCOUNTER gpuDedicatedCounter_ = nullptr;
+    PDH_HQUERY storageQuery_ = nullptr;
+    PDH_HCOUNTER storageReadCounter_ = nullptr;
+    PDH_HCOUNTER storageWriteCounter_ = nullptr;
 
     ULONG selectedIndex_ = 0;
     uint64_t previousInOctets_ = 0;
@@ -326,6 +330,9 @@ TelemetryCollector::Impl::~Impl() {
     if (gpuMemoryQuery_ != nullptr) {
         PdhCloseQuery(gpuMemoryQuery_);
     }
+    if (storageQuery_ != nullptr) {
+        PdhCloseQuery(storageQuery_);
+    }
     WSACleanup();
 }
 
@@ -342,6 +349,8 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     impl_->trace_.SetOutput(traceStream);
     impl_->snapshot_.network.uploadHistory.assign(60, 0.0);
     impl_->snapshot_.network.downloadHistory.assign(60, 0.0);
+    impl_->snapshot_.storage.readHistory.assign(60, 0.0);
+    impl_->snapshot_.storage.writeHistory.assign(60, 0.0);
     if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {
         impl_->snapshot_.cpu.name = cpuName;
     }
@@ -428,9 +437,23 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     const PDH_STATUS gpuMemoryCollectStatus = PdhCollectQueryData(impl_->gpuMemoryQuery_);
     impl_->trace_.Write(("telemetry:pdh_collect gpu_memory_query " + tracing::Trace::FormatPdhStatus("status", gpuMemoryCollectStatus)).c_str());
 
+    const PDH_STATUS storageQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->storageQuery_);
+    impl_->trace_.Write(("telemetry:pdh_open storage_query " + tracing::Trace::FormatPdhStatus("status", storageQueryStatus)).c_str());
+    const PDH_STATUS storageReadStatus = AddCounterCompat(
+        impl_->storageQuery_, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &impl_->storageReadCounter_);
+    impl_->trace_.Write(("telemetry:pdh_add storage_read path=\"\\\\PhysicalDisk(_Total)\\\\Disk Read Bytes/sec\" " +
+        tracing::Trace::FormatPdhStatus("status", storageReadStatus)).c_str());
+    const PDH_STATUS storageWriteStatus = AddCounterCompat(
+        impl_->storageQuery_, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &impl_->storageWriteCounter_);
+    impl_->trace_.Write(("telemetry:pdh_add storage_write path=\"\\\\PhysicalDisk(_Total)\\\\Disk Write Bytes/sec\" " +
+        tracing::Trace::FormatPdhStatus("status", storageWriteStatus)).c_str());
+    const PDH_STATUS storageCollectStatus = PdhCollectQueryData(impl_->storageQuery_);
+    impl_->trace_.Write(("telemetry:pdh_collect storage_query " + tracing::Trace::FormatPdhStatus("status", storageCollectStatus)).c_str());
+
     impl_->EnumerateDrives();
     impl_->InitializeGpuAdapterInfo();
     impl_->UpdateNetworkState(true);
+    impl_->UpdateStorageThroughput(true);
     impl_->UpdateMemory();
     impl_->UpdateCpu();
     impl_->UpdateGpu();
@@ -475,6 +498,7 @@ void TelemetryCollector::UpdateSnapshot() {
     }
     if (now - impl_->lastNetwork_ >= std::chrono::milliseconds(500)) {
         impl_->UpdateNetworkState(false);
+        impl_->UpdateStorageThroughput(false);
         impl_->lastNetwork_ = now;
     }
     if (now - impl_->lastDetails_ >= std::chrono::seconds(1)) {
@@ -773,6 +797,13 @@ void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
     output << "\r\n";
 
     output << "[Storage]\r\n";
+    {
+        char buffer[64];
+        sprintf_s(buffer, "Read: %.3f MB/s", snapshot_.storage.readMbps);
+        output << buffer << "\r\n";
+        sprintf_s(buffer, "Write: %.3f MB/s", snapshot_.storage.writeMbps);
+        output << buffer << "\r\n";
+    }
     if (snapshot_.drives.empty()) {
         output << "(none)\r\n";
     } else {
@@ -794,6 +825,45 @@ void TelemetryCollector::Impl::EnumerateDrives() {
     }
     Trace(("telemetry:drive_enumerate count=" + std::to_string(snapshot_.drives.size())).c_str());
     RefreshDriveUsage();
+}
+
+void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
+    if (storageQuery_ == nullptr) {
+        Trace("telemetry:storage_rates skipped=no_query");
+        return;
+    }
+
+    const PDH_STATUS collectStatus = PdhCollectQueryData(storageQuery_);
+    Trace(("telemetry:storage_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
+
+    PDH_FMT_COUNTERVALUE value{};
+    PDH_STATUS readStatus = PDH_INVALID_DATA;
+    PDH_STATUS writeStatus = PDH_INVALID_DATA;
+
+    if (storageReadCounter_ != nullptr &&
+        (readStatus = PdhGetFormattedCounterValue(storageReadCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
+        snapshot_.storage.readMbps = std::max(0.0, value.doubleValue / (1024.0 * 1024.0));
+    } else if (!initializeOnly) {
+        snapshot_.storage.readMbps = 0.0;
+    }
+
+    if (storageWriteCounter_ != nullptr &&
+        (writeStatus = PdhGetFormattedCounterValue(storageWriteCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
+        snapshot_.storage.writeMbps = std::max(0.0, value.doubleValue / (1024.0 * 1024.0));
+    } else if (!initializeOnly) {
+        snapshot_.storage.writeMbps = 0.0;
+    }
+
+    if (!initializeOnly) {
+        PushHistory(snapshot_.storage.readHistory, snapshot_.storage.readMbps);
+        PushHistory(snapshot_.storage.writeHistory, snapshot_.storage.writeMbps);
+    }
+
+    Trace(("telemetry:storage_rates " +
+        tracing::Trace::FormatPdhStatus("read_status", readStatus) + " " +
+        tracing::Trace::FormatPdhStatus("write_status", writeStatus) +
+        " read_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.storage.readMbps, 3) +
+        " write_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.storage.writeMbps, 3)).c_str());
 }
 
 void TelemetryCollector::Impl::RefreshDriveUsage() {

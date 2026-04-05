@@ -52,10 +52,18 @@ struct NetworkTelemetry {
     std::vector<double> downloadHistory;
 };
 
+struct StorageTelemetry {
+    double readMbps = 0.0;
+    double writeMbps = 0.0;
+    std::vector<double> readHistory;
+    std::vector<double> writeHistory;
+};
+
 struct SystemSnapshot {
     ProcessorTelemetry cpu;
     GpuTelemetry gpu;
     NetworkTelemetry network;
+    StorageTelemetry storage;
     std::vector<DriveInfo> drives;
     SYSTEMTIME now{};
 };
