@@ -454,13 +454,14 @@ std::string FormatSpeed(double mbps) {
     return buffer;
 }
 
-double GetNetworkGraphMax(double uploadMbps, double downloadMbps) {
-    const double rawMax = std::max(10.0, std::max(uploadMbps, downloadMbps));
-    return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
-}
-
-double GetThroughputGraphMax(double firstMbps, double secondMbps) {
-    const double rawMax = std::max(10.0, std::max(firstMbps, secondMbps));
+double GetThroughputGraphMax(const std::vector<double>& firstHistory, const std::vector<double>& secondHistory) {
+    double rawMax = 10.0;
+    for (double value : firstHistory) {
+        rawMax = std::max(rawMax, value);
+    }
+    for (double value : secondHistory) {
+        rawMax = std::max(rawMax, value);
+    }
     return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
 }
 
@@ -1504,7 +1505,7 @@ void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTele
     RECT downRect{rect.left + 16, rect.top + 102, chartRight, rect.top + 118};
     RECT downloadGraph{rect.left + 16, rect.top + 120, chartRight, rect.bottom - 28};
     RECT footerRect{rect.left + 16, rect.bottom - 22, rect.right - 16, rect.bottom - 6};
-    const double maxGraph = GetThroughputGraphMax(network.uploadMbps, network.downloadMbps);
+    const double maxGraph = GetThroughputGraphMax(network.uploadHistory, network.downloadHistory);
 
     DrawThroughputSection(hdc, upRect, uploadGraph, "Up", network.uploadMbps, network.uploadHistory, maxGraph);
     DrawThroughputSection(hdc, downRect, downloadGraph, "Down", network.downloadMbps, network.downloadHistory, maxGraph);
@@ -1522,7 +1523,7 @@ void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTele
     const RECT readGraphRect{rect.left + 16, rect.top + 56, chartRight, rect.top + 97};
     const RECT writeValueRect{rect.left + 16, rect.top + 102, chartRight, rect.top + 118};
     const RECT writeGraphRect{rect.left + 16, rect.top + 120, chartRight, rect.bottom - 28};
-    const double maxGraph = GetThroughputGraphMax(storage.readMbps, storage.writeMbps);
+    const double maxGraph = GetThroughputGraphMax(storage.readHistory, storage.writeHistory);
     DrawThroughputSection(hdc, readValueRect, readGraphRect, "Read", storage.readMbps, storage.readHistory, maxGraph);
     DrawThroughputSection(hdc, writeValueRect, writeGraphRect, "Write", storage.writeMbps, storage.writeHistory, maxGraph);
 

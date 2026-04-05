@@ -228,6 +228,7 @@ Footer
 Show upload speed, then the upload graph directly below it, then download speed, then the download graph directly below it.
 Use smaller text for the Up/Down speed readouts than the main metric text used elsewhere.
 Each graph must include a vertical axis and a small label showing the current max value used to scale that plot.
+Network and storage throughput plot scaling must be derived from the maximum value present in the retained history shown by that panel rather than only from the latest sample.
 Network plot scaling must use a minimum max of 10 MB/s, increase only in 5 MB/s steps, and draw thin horizontal guide lines every 5 MB/s.
 Show adapter name and IP address together on the same final footer line when available.
 
