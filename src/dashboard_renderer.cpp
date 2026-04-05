@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <objidl.h>
 #include <optional>
@@ -39,6 +40,27 @@ std::string Trim(std::string value) {
     return std::string(first, last);
 }
 
+std::string FormatWin32Error(DWORD error) {
+    if (error == 0) {
+        return "win32=0";
+    }
+    LPWSTR buffer = nullptr;
+    const DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    const DWORD length = FormatMessageW(flags, nullptr, error, 0, reinterpret_cast<LPWSTR>(&buffer), 0, nullptr);
+    std::string message = "win32=" + std::to_string(error);
+    if (length != 0 && buffer != nullptr) {
+        message += " ";
+        message += Utf8FromWide(std::wstring(buffer, length));
+        while (!message.empty() && (message.back() == '\r' || message.back() == '\n' || message.back() == ' ')) {
+            message.pop_back();
+        }
+    }
+    if (buffer != nullptr) {
+        LocalFree(buffer);
+    }
+    return message;
+}
+
 std::vector<std::string> Split(const std::string& input, char delimiter) {
     std::vector<std::string> parts;
     std::stringstream stream(input);
@@ -65,6 +87,11 @@ UINT GetPanelIconResourceId(const std::string& iconName) {
 bool IsContainerNode(const LayoutNodeConfig& node) {
     const std::string lowered = ToLower(node.name);
     return lowered == "columns" || lowered == "stack" || lowered == "stack_top" || lowered == "center";
+}
+
+bool IsDashboardContainerNode(const LayoutNodeConfig& node) {
+    const std::string lowered = ToLower(node.name);
+    return lowered == "rows" || lowered == "columns";
 }
 
 std::optional<std::string> GetNodeParameter(const LayoutNodeConfig& node, const std::string& key) {
@@ -181,6 +208,10 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     config_ = config;
 }
 
+const std::string& DashboardRenderer::LastError() const {
+    return lastError_;
+}
+
 int DashboardRenderer::WindowWidth() const {
     return std::max(1, config_.layout.windowWidth);
 }
@@ -215,6 +246,7 @@ HFONT DashboardRenderer::SmallFont() const {
 
 bool DashboardRenderer::Initialize(HWND hwnd) {
     hwnd_ = hwnd;
+    lastError_.clear();
     if (!InitializeGdiplus() || !LoadPanelIcons()) {
         return false;
     }
@@ -227,6 +259,7 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
     }
     if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr ||
         fonts_.label == nullptr || fonts_.smallFont == nullptr) {
+        lastError_ = "renderer:font_create_failed";
         Shutdown();
         return false;
     }
@@ -255,7 +288,12 @@ bool DashboardRenderer::InitializeGdiplus() {
         return true;
     }
     Gdiplus::GdiplusStartupInput startupInput;
-    return Gdiplus::GdiplusStartup(&gdiplusToken_, &startupInput, nullptr) == Gdiplus::Ok;
+    const Gdiplus::Status status = Gdiplus::GdiplusStartup(&gdiplusToken_, &startupInput, nullptr);
+    if (status != Gdiplus::Ok) {
+        lastError_ = "renderer:gdiplus_startup_failed status=" + std::to_string(static_cast<int>(status));
+        return false;
+    }
+    return true;
 }
 
 void DashboardRenderer::ShutdownGdiplus() {
@@ -276,11 +314,13 @@ bool DashboardRenderer::LoadPanelIcons() {
     for (const auto& iconName : uniqueIcons) {
         const UINT resourceId = GetPanelIconResourceId(iconName);
         if (resourceId == 0) {
+            lastError_ = "renderer:icon_unknown name=\"" + iconName + "\"";
             ReleasePanelIcons();
             return false;
         }
         auto bitmap = LoadPngResourceBitmap(resourceId);
         if (bitmap == nullptr) {
+            lastError_ = "renderer:icon_load_failed name=\"" + iconName + "\" resource=" + std::to_string(resourceId);
             ReleasePanelIcons();
             return false;
         }
@@ -296,6 +336,7 @@ void DashboardRenderer::ReleasePanelIcons() {
 bool DashboardRenderer::MeasureFonts() {
     HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
     if (hdc == nullptr) {
+        lastError_ = "renderer:measure_fonts_failed " + FormatWin32Error(GetLastError());
         return false;
     }
     const auto measure = [&](HFONT font) {
@@ -513,95 +554,102 @@ bool DashboardRenderer::ResolveLayout() {
         WindowHeight() - config_.layout.outerMargin
     };
 
-    int totalRowWeight = 0;
-    for (const auto& row : config_.layout.rows) {
-        totalRowWeight += std::max(1, row.weight);
-    }
-    if (totalRowWeight <= 0) {
+    if (config_.layout.cardsLayout.name.empty()) {
+        lastError_ = "renderer:layout_missing_cards_root";
         return false;
     }
 
-    const int rowGap = config_.layout.rowGap;
-    const int totalHeight = (dashboardRect.bottom - dashboardRect.top) -
-        rowGap * static_cast<int>(std::max<size_t>(0, config_.layout.rows.size() - 1));
-    int remainingHeight = totalHeight;
-    int rowTop = dashboardRect.top;
-    int remainingRowWeight = totalRowWeight;
-
-    for (size_t rowIndex = 0; rowIndex < config_.layout.rows.size(); ++rowIndex) {
-        const auto& row = config_.layout.rows[rowIndex];
-        const int rowWeight = std::max(1, row.weight);
-        const int rowHeight = (rowIndex + 1 == config_.layout.rows.size())
-            ? (dashboardRect.bottom - rowTop)
-            : std::max(0, remainingHeight * rowWeight / remainingRowWeight);
-
-        int totalCardWeight = 0;
-        for (const auto& cardRef : row.cards) {
-            totalCardWeight += std::max(1, cardRef.weight);
+    const auto resolveCard = [&](const LayoutNodeConfig& node, const RECT& rect) {
+        const auto cardIt = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
+            return ToLower(card.id) == ToLower(node.name);
+        });
+        if (cardIt == config_.layout.cards.end()) {
+            return;
         }
 
-        const int cardGap = config_.layout.cardGap;
-        const int totalWidth = (dashboardRect.right - dashboardRect.left) -
-            cardGap * static_cast<int>(std::max<size_t>(0, row.cards.size() - 1));
-        int remainingWidth = totalWidth;
-        int cardLeft = dashboardRect.left;
-        int remainingCardWeight = std::max(1, totalCardWeight);
+        ResolvedCardLayout card;
+        card.id = cardIt->id;
+        card.title = cardIt->title;
+        card.iconName = cardIt->icon;
+        card.rect = rect;
 
-        for (size_t cardIndex = 0; cardIndex < row.cards.size(); ++cardIndex) {
-            const auto& cardRef = row.cards[cardIndex];
-            const auto cardIt = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
-                return ToLower(card.id) == ToLower(cardRef.cardId);
-            });
-            if (cardIt == config_.layout.cards.end()) {
-                continue;
+        const int padding = config_.layout.cardPadding;
+        const int headerHeight = EffectiveHeaderHeight();
+        card.iconRect = RECT{
+            card.rect.left + padding,
+            card.rect.top + padding + std::max(0, (headerHeight - config_.layout.headerIconSize) / 2),
+            card.rect.left + padding + config_.layout.headerIconSize,
+            card.rect.top + padding + std::max(0, (headerHeight - config_.layout.headerIconSize) / 2) + config_.layout.headerIconSize
+        };
+        card.titleRect = RECT{
+            card.iconRect.right + config_.layout.headerGap,
+            card.rect.top + padding,
+            card.rect.right - padding,
+            card.rect.top + padding + headerHeight
+        };
+        card.contentRect = RECT{
+            card.rect.left + padding,
+            card.rect.top + padding + headerHeight + config_.layout.contentGap,
+            card.rect.right - padding,
+            card.rect.bottom - padding
+        };
+
+        ResolveNodeWidgets(cardIt->layout, card.contentRect, card.widgets);
+        resolvedLayout_.cards.push_back(std::move(card));
+    };
+
+    std::function<void(const LayoutNodeConfig&, const RECT&)> resolveDashboardNode =
+        [&](const LayoutNodeConfig& node, const RECT& rect) {
+            if (!IsDashboardContainerNode(node)) {
+                resolveCard(node, rect);
+                return;
             }
 
-            const int cardWeight = std::max(1, cardRef.weight);
-            const int cardWidth = (cardIndex + 1 == row.cards.size())
-                ? (dashboardRect.right - cardLeft)
-                : std::max(0, remainingWidth * cardWeight / remainingCardWeight);
+            const bool horizontal = ToLower(node.name) == "columns";
+            const int gap = horizontal ? config_.layout.cardGap : config_.layout.rowGap;
+            int totalWeight = 0;
+            for (const auto& child : node.children) {
+                totalWeight += std::max(1, child.weight);
+            }
+            if (totalWeight <= 0) {
+                return;
+            }
 
-            ResolvedCardLayout card;
-            card.id = cardIt->id;
-            card.title = cardIt->title;
-            card.iconName = cardIt->icon;
-            card.rect = RECT{cardLeft, rowTop, cardLeft + cardWidth, rowTop + rowHeight};
+            const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
+                gap * static_cast<int>(std::max<size_t>(0, node.children.size() - 1));
+            int remainingAvailable = totalAvailable;
+            int cursor = horizontal ? rect.left : rect.top;
+            int remainingWeight = totalWeight;
+            for (size_t i = 0; i < node.children.size(); ++i) {
+                const auto& child = node.children[i];
+                const int childWeight = std::max(1, child.weight);
+                const int size = (i + 1 == node.children.size())
+                    ? ((horizontal ? rect.right : rect.bottom) - cursor)
+                    : std::max(0, remainingAvailable * childWeight / std::max(1, remainingWeight));
 
-            const int padding = config_.layout.cardPadding;
-            const int headerHeight = EffectiveHeaderHeight();
-            card.iconRect = RECT{
-                card.rect.left + padding,
-                card.rect.top + padding + std::max(0, (headerHeight - config_.layout.headerIconSize) / 2),
-                card.rect.left + padding + config_.layout.headerIconSize,
-                card.rect.top + padding + std::max(0, (headerHeight - config_.layout.headerIconSize) / 2) + config_.layout.headerIconSize
-            };
-            card.titleRect = RECT{
-                card.iconRect.right + config_.layout.headerGap,
-                card.rect.top + padding,
-                card.rect.right - padding,
-                card.rect.top + padding + headerHeight
-            };
-            card.contentRect = RECT{
-                card.rect.left + padding,
-                card.rect.top + padding + headerHeight + config_.layout.contentGap,
-                card.rect.right - padding,
-                card.rect.bottom - padding
-            };
+                RECT childRect = rect;
+                if (horizontal) {
+                    childRect.left = cursor;
+                    childRect.right = cursor + size;
+                } else {
+                    childRect.top = cursor;
+                    childRect.bottom = cursor + size;
+                }
 
-            ResolveNodeWidgets(cardIt->layout, card.contentRect, card.widgets);
-            resolvedLayout_.cards.push_back(std::move(card));
+                resolveDashboardNode(child, childRect);
+                cursor += size + gap;
+                remainingAvailable -= size;
+                remainingWeight -= childWeight;
+            }
+        };
 
-            cardLeft += cardWidth + cardGap;
-            remainingWidth -= cardWidth;
-            remainingCardWeight -= cardWeight;
-        }
+    resolveDashboardNode(config_.layout.cardsLayout, dashboardRect);
 
-        rowTop += rowHeight + rowGap;
-        remainingHeight -= rowHeight;
-        remainingRowWeight -= rowWeight;
+    if (resolvedLayout_.cards.empty()) {
+        lastError_ = "renderer:layout_resolve_failed cards=0 root=\"" + config_.layout.cardsLayout.name + "\"";
+        return false;
     }
-
-    return !resolvedLayout_.cards.empty();
+    return true;
 }
 
 void DashboardRenderer::DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
@@ -889,10 +937,12 @@ bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, 
 
     HDC screenDc = GetDC(nullptr);
     if (screenDc == nullptr) {
+        lastError_ = "renderer:screenshot_getdc_failed " + FormatWin32Error(GetLastError());
         return false;
     }
     HDC memDc = CreateCompatibleDC(screenDc);
     if (memDc == nullptr) {
+        lastError_ = "renderer:screenshot_create_compatible_dc_failed " + FormatWin32Error(GetLastError());
         ReleaseDC(nullptr, screenDc);
         return false;
     }
@@ -908,6 +958,7 @@ bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, 
     void* pixels = nullptr;
     HBITMAP bitmap = CreateDIBSection(screenDc, &bitmapInfo, DIB_RGB_COLORS, &pixels, nullptr, 0);
     if (bitmap == nullptr) {
+        lastError_ = "renderer:screenshot_create_dib_failed " + FormatWin32Error(GetLastError());
         DeleteDC(memDc);
         ReleaseDC(nullptr, screenDc);
         return false;
@@ -923,12 +974,25 @@ bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, 
 
     CLSID pngClsid{};
     Gdiplus::Bitmap image(bitmap, nullptr);
-    const bool saved = GetImageEncoderClsid(L"image/png", &pngClsid) >= 0 &&
-        image.Save(imagePath.c_str(), &pngClsid, nullptr) == Gdiplus::Ok;
+    const int encoderIndex = GetImageEncoderClsid(L"image/png", &pngClsid);
+    Gdiplus::Status saveStatus = Gdiplus::GenericError;
+    bool saved = false;
+    if (encoderIndex >= 0) {
+        saveStatus = image.Save(imagePath.c_str(), &pngClsid, nullptr);
+        saved = saveStatus == Gdiplus::Ok;
+    }
 
     SelectObject(memDc, oldBitmap);
     DeleteObject(bitmap);
     DeleteDC(memDc);
     ReleaseDC(nullptr, screenDc);
+    if (!saved) {
+        if (encoderIndex < 0) {
+            lastError_ = "renderer:screenshot_encoder_missing mime=\"image/png\"";
+        } else {
+            lastError_ = "renderer:screenshot_save_failed status=" + std::to_string(static_cast<int>(saveStatus)) +
+                " path=\"" + Utf8FromWide(imagePath.wstring()) + "\"";
+        }
+    }
     return saved;
 }

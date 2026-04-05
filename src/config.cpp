@@ -266,7 +266,8 @@ public:
 private:
     static bool IsContainer(const std::string& name) {
         const std::string lowered = ToLower(name);
-        return lowered == "columns" || lowered == "stack" || lowered == "stack_top" || lowered == "center";
+        return lowered == "rows" || lowered == "columns" || lowered == "stack" ||
+            lowered == "stack_top" || lowered == "center";
     }
 
     void SkipWhitespace() {
@@ -369,54 +370,12 @@ bool LayoutExpressionParser::ParseParameters(std::vector<std::pair<std::string, 
 }
 
 bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
+    node = {};
     LayoutExpressionParser parser(text);
     if (!parser.ParseNode(node)) {
         return false;
     }
     return parser.AtEnd();
-}
-
-bool ParseRowExpression(const std::string& text, std::vector<LayoutRowConfig>& rows) {
-    rows.clear();
-    for (const std::string& rowText : SplitTopLevel(text, ',')) {
-        const size_t open = rowText.find('(');
-        const size_t close = rowText.rfind(')');
-        if (open == std::string::npos || close == std::string::npos || close <= open) {
-            return false;
-        }
-
-        LayoutRowConfig row;
-        const std::string header = Trim(rowText.substr(0, open));
-        const size_t star = header.find('*');
-        if (star == std::string::npos) {
-            row.id = header;
-        } else {
-            row.id = Trim(header.substr(0, star));
-            row.weight = ParseIntOrDefault(Trim(header.substr(star + 1)), row.weight);
-        }
-        if (row.id.empty()) {
-            return false;
-        }
-
-        for (const std::string& cardText : SplitTopLevel(rowText.substr(open + 1, close - open - 1), ',')) {
-            LayoutRowCardConfig card;
-            const size_t cardStar = cardText.find('*');
-            if (cardStar == std::string::npos) {
-                card.cardId = Trim(cardText);
-            } else {
-                card.cardId = Trim(cardText.substr(0, cardStar));
-                card.weight = ParseIntOrDefault(Trim(cardText.substr(cardStar + 1)), card.weight);
-            }
-            if (!card.cardId.empty()) {
-                row.cards.push_back(std::move(card));
-            }
-        }
-        if (row.cards.empty()) {
-            return false;
-        }
-        rows.push_back(std::move(row));
-    }
-    return !rows.empty();
 }
 
 LayoutCardConfig* FindCardConfig(LayoutConfig& layout, const std::string& id) {
@@ -523,8 +482,13 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.throughputGraphHeight = ParseIntOrDefault(value, layout.throughputGraphHeight);
     } else if (key == "gauge_preferred_size") {
         layout.gaugePreferredSize = ParseIntOrDefault(value, layout.gaugePreferredSize);
+    } else if (key == "cards") {
+        ParseLayoutExpression(value, layout.cardsLayout);
     } else if (key == "rows") {
-        ParseRowExpression(value, layout.rows);
+        LayoutNodeConfig parsed;
+        if (ParseLayoutExpression("rows(" + value + ")", parsed)) {
+            layout.cardsLayout = std::move(parsed);
+        }
     } else if (key == "font.title") {
         ParseFontSpec(layout.titleFont, value);
     } else if (key == "font.big") {
@@ -669,8 +633,8 @@ void CollectDriveLettersRecursive(const LayoutNodeConfig& node, std::vector<std:
 }
 
 void EnsureDefaultLayout(LayoutConfig& layout) {
-    if (layout.rows.empty()) {
-        ParseRowExpression("top*3(cpu,gpu), bottom*2(network*4,storage*9,time*3)", layout.rows);
+    if (layout.cardsLayout.name.empty()) {
+        ParseLayoutExpression("rows(columns(cpu,gpu)*3,columns(network*4,storage*9,time*3)*2)", layout.cardsLayout);
     }
 
     const auto ensureCard = [&layout](const std::string& id, const std::string& title, const std::string& icon,

@@ -13,7 +13,7 @@ The language is static:
 
 The language is centered around the dashboard's current shape:
 
-- rows contain cards
+- the dashboard-level `cards` layout places cards through generic containers
 - cards contain a small static composition of known widget kinds
 
 Compact rules
@@ -32,13 +32,13 @@ Structure
 
 The language has two levels:
 
-1. Dashboard-level geometry, rows, palette, and fonts in `[layout]`
+1. Dashboard-level geometry, card-placement layout, palette, and fonts in `[layout]`
 2. Card-local title, icon, and content composition in `[card.<id>]`
 
 Dashboard section
 =================
 
-`[layout]` owns the shared geometry, row declaration, palette, and fonts.
+`[layout]` owns the shared geometry, dashboard card-placement layout, palette, and fonts.
 
 Supported geometry keys:
 
@@ -71,13 +71,13 @@ Supported geometry keys:
 - `throughput_graph_height = pixels`
 - `gauge_preferred_size = pixels`
 
-Supported row key:
+Supported dashboard layout key:
 
-- `rows = row*weight(card*weight,...)`
+- `cards = rows(columns(card*weight,...)*weight, ...)`
 
 Example:
 
-- `rows = top*3(cpu,gpu), bottom*2(network*4,storage*9,time*3)`
+- `cards = rows(columns(cpu,gpu)*3, columns(network*4,storage*9,time*3)*2)`
 
 Color keys stay in `[layout]` and use `#RRGGBB`:
 
@@ -141,6 +141,7 @@ Layout expressions
 
 Supported layout kinds:
 
+- `rows(...)`
 - `columns(...)`
 - `stack(...)`
 - `stack_top(...)`
@@ -148,6 +149,7 @@ Supported layout kinds:
 
 Meaning:
 
+- `rows(...)` splits dashboard cards vertically into weighted row groups
 - `columns(...)` splits content horizontally into weighted children
 - `stack(...)` splits content vertically into weighted children
 - `stack_top(...)` packs children from the top using their preferred heights and leaves any remaining space below
@@ -260,9 +262,8 @@ Static sizing rules:
 Validation rules
 ================
 
-- every row weight must be positive
-- every card weight must be positive
-- every card referenced from `rows` must have a matching `[card.<id>]` section
+- every dashboard container weight must be positive
+- every card referenced from `cards` must have a matching `[card.<id>]` section
 - every icon name must resolve to a supported embedded resource
 - every widget name must resolve to a supported hard-coded widget kind
 

@@ -13,6 +13,7 @@ struct DiagnosticsOptions {
     bool screenshot = false;
     bool exit = false;
     bool fake = false;
+    bool reload = false;
 
     bool HasAnyOutput() const {
         return trace || dump || screenshot;

@@ -42,6 +42,7 @@ public:
 
     void Draw(HDC hdc, const SystemSnapshot& snapshot);
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
+    const std::string& LastError() const;
 
 private:
     struct WidgetBinding {
@@ -130,4 +131,5 @@ private:
     Fonts fonts_{};
     FontHeights fontHeights_{};
     ResolvedDashboardLayout resolvedLayout_{};
+    std::string lastError_;
 };

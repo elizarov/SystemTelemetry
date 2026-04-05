@@ -52,7 +52,7 @@ At runtime, the application must first load an embedded default `config.ini` res
 The embedded `config.ini` resource must be the only self-documented source of truth for the config file format and supported entries; the rest of the repository does not need to duplicate per-entry config documentation.
 Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance instead of silently failing.
 The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
-The `[layout]` section in `config.ini` must control the dashboard window size, shared spacing metrics, row and card weights, color palette, and UI font faces, sizes, and weights.
+The `[layout]` section in `config.ini` must control the dashboard window size, shared spacing metrics, the generic dashboard card-placement layout, color palette, and UI font faces, sizes, and weights.
 Each dashboard card must have its own `[card.<id>]` section in `config.ini` that provides the card title, icon name, and widget layout expression.
 Generic widget types such as `text(...)`, `gauge(...)`, `metric_list(...)`, and `throughput(...)` must bind to telemetry through explicit metric names in layout config instead of through card-specific hard-coded widget implementations.
 The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
@@ -75,6 +75,7 @@ The `Save Config` action must persist the current auto-selected network adapter 
 When `Save Config` creates `config.ini` beside the executable for the first time, it must begin from the embedded resource copy verbatim so the saved file keeps the same comments and documentation text before updating values in place.
 
 Diagnostics requirements live in `docs/diagnostics.txt`.
+The config overlay path must replace parsed layout expressions instead of appending onto previously loaded embedded defaults, so `config.ini` can safely override `[layout]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.
 
 Telemetry sources
 =================

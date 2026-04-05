@@ -71,7 +71,8 @@ bool ContainsInsensitive(const std::string& value, const std::string& needle) {
 
 std::filesystem::path GetRuntimeConfigPath();
 class DashboardApp;
-bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config);
+bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
+    std::string* errorText = nullptr);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
 
 DiagnosticsOptions GetDiagnosticsOptions();
@@ -81,12 +82,14 @@ public:
     explicit DiagnosticsSession(const DiagnosticsOptions& options);
 
     bool Initialize();
+    bool ShouldShowDialogs() const;
     std::ostream* TraceStream();
     void WriteTraceMarker(const std::string& text);
     bool WriteOutputs(const TelemetryDump& dump, const AppConfig& config);
 
 private:
-    static void ShowFileOpenError(const char* label, const std::filesystem::path& path);
+    void ReportError(const std::string& traceText, const std::wstring& message);
+    void ShowFileOpenError(const char* label, const std::filesystem::path& path);
 
     DiagnosticsOptions options_;
     std::filesystem::path tracePath_;
@@ -147,6 +150,7 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.screenshot = HasSwitch("/screenshot");
     options.exit = HasSwitch("/exit");
     options.fake = HasSwitch("/fake");
+    options.reload = HasSwitch("/reload");
     return options;
 }
 
@@ -171,6 +175,10 @@ bool DiagnosticsSession::Initialize() {
     return true;
 }
 
+bool DiagnosticsSession::ShouldShowDialogs() const {
+    return !options_.trace;
+}
+
 std::ostream* DiagnosticsSession::TraceStream() {
     return traceStream_.is_open() ? &traceStream_ : nullptr;
 }
@@ -183,6 +191,13 @@ void DiagnosticsSession::WriteTraceMarker(const std::string& text) {
     trace.Write(text);
 }
 
+void DiagnosticsSession::ReportError(const std::string& traceText, const std::wstring& message) {
+    WriteTraceMarker(traceText);
+    if (ShouldShowDialogs()) {
+        MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    }
+}
+
 bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig& config) {
     if (options_.dump) {
         std::ofstream dumpStream(dumpPath_, std::ios::binary | std::ios::trunc);
@@ -193,15 +208,20 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
         if (!WriteTelemetryDump(dumpStream, dump)) {
             const std::wstring message =
                 WideFromUtf8("Failed to write dump file:\n" + Utf8FromWide(dumpPath_.wstring()));
-            MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+            ReportError("diagnostics:dump_write_failed path=\"" + Utf8FromWide(dumpPath_.wstring()) + "\"", message);
             return false;
         }
     }
 
-    if (options_.screenshot && !SaveDumpScreenshot(screenshotPath_, dump.snapshot, config)) {
+    std::string screenshotError;
+    if (options_.screenshot && !SaveDumpScreenshot(screenshotPath_, dump.snapshot, config, &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
-        MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+        std::string traceText = "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
+        if (!screenshotError.empty()) {
+            traceText += " detail=\"" + screenshotError + "\"";
+        }
+        ReportError(traceText, message);
         return false;
     }
 
@@ -211,7 +231,8 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
 void DiagnosticsSession::ShowFileOpenError(const char* label, const std::filesystem::path& path) {
     const std::wstring message = WideFromUtf8(
         std::string("Failed to open ") + label + ":\n" + Utf8FromWide(path.wstring()));
-    MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    ReportError("diagnostics:file_open_failed label=\"" + std::string(label) + "\" path=\"" +
+        Utf8FromWide(path.wstring()) + "\"", message);
 }
 
 bool CanWriteRuntimeConfig(const std::filesystem::path& path) {
@@ -280,9 +301,55 @@ int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std
     return 0;
 }
 
+std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
+    const AppConfig& runtimeConfig,
+    const DiagnosticsOptions& diagnosticsOptions,
+    std::ostream* traceStream) {
+    std::unique_ptr<TelemetryRuntime> runtime =
+        CreateTelemetryRuntime(diagnosticsOptions, GetExecutableDirectory());
+    if (runtime == nullptr) {
+        return nullptr;
+    }
+    if (!runtime->Initialize(runtimeConfig, traceStream)) {
+        return nullptr;
+    }
+    return runtime;
+}
+
+bool ReloadTelemetryRuntimeFromDisk(
+    const std::filesystem::path& configPath,
+    AppConfig& activeConfig,
+    std::unique_ptr<TelemetryRuntime>& telemetry,
+    const DiagnosticsOptions& diagnosticsOptions,
+    DiagnosticsSession* diagnostics) {
+    const AppConfig reloadedConfig = LoadConfig(configPath);
+    if (diagnostics != nullptr) {
+        diagnostics->WriteTraceMarker("diagnostics:reload_config_begin");
+    }
+
+    telemetry.reset();
+    std::unique_ptr<TelemetryRuntime> reloadedTelemetry = InitializeTelemetryRuntimeInstance(
+        reloadedConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
+    if (reloadedTelemetry == nullptr) {
+        telemetry = InitializeTelemetryRuntimeInstance(
+            activeConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
+        if (diagnostics != nullptr) {
+            diagnostics->WriteTraceMarker("diagnostics:reload_config_failed");
+        }
+        return false;
+    }
+
+    activeConfig = reloadedConfig;
+    telemetry = std::move(reloadedTelemetry);
+    telemetry->UpdateSnapshot();
+    if (diagnostics != nullptr) {
+        diagnostics->WriteTraceMarker("diagnostics:reload_config_done");
+    }
+    return true;
+}
+
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
-    std::unique_ptr<TelemetryRuntime> telemetry = CreateTelemetryRuntime(diagnosticsOptions, GetExecutableDirectory());
-    const AppConfig config = LoadConfig(GetRuntimeConfigPath());
+    AppConfig config = LoadConfig(GetRuntimeConfigPath());
     DiagnosticsSession diagnostics(diagnosticsOptions);
     if (!diagnostics.Initialize()) {
         return 1;
@@ -291,9 +358,13 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     diagnostics.WriteTraceMarker("diagnostics:headless_start");
     diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_begin");
 
-    if (!telemetry->Initialize(config, diagnostics.TraceStream())) {
+    std::unique_ptr<TelemetryRuntime> telemetry =
+        InitializeTelemetryRuntimeInstance(config, diagnosticsOptions, diagnostics.TraceStream());
+    if (telemetry == nullptr) {
         diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_failed");
-        MessageBoxW(nullptr, L"Failed to initialize telemetry collector.", L"System Telemetry", MB_ICONERROR);
+        if (diagnostics.ShouldShowDialogs()) {
+            MessageBoxW(nullptr, L"Failed to initialize telemetry collector.", L"System Telemetry", MB_ICONERROR);
+        }
         return 1;
     }
 
@@ -302,8 +373,13 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     diagnostics.WriteTraceMarker("diagnostics:update_snapshot_begin");
     telemetry->UpdateSnapshot();
     diagnostics.WriteTraceMarker("diagnostics:update_snapshot_done");
+    if (diagnosticsOptions.reload) {
+        if (!ReloadTelemetryRuntimeFromDisk(GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, &diagnostics)) {
+            return 1;
+        }
+    }
     diagnostics.WriteTraceMarker("diagnostics:write_outputs_begin");
-    if (!diagnostics.WriteOutputs(telemetry->Dump(), telemetry->EffectiveConfig())) {
+    if (!diagnostics.WriteOutputs(telemetry->Dump(), config)) {
         diagnostics.WriteTraceMarker("diagnostics:write_outputs_failed");
         return 1;
     }
@@ -707,13 +783,21 @@ bool DashboardApp::WriteDiagnosticsOutputs() {
     return ok;
 }
 
-bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config) {
+bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
+    std::string* errorText) {
     DashboardRenderer renderer;
     renderer.SetConfig(config);
     if (!renderer.Initialize()) {
+        if (errorText != nullptr) {
+            *errorText = renderer.LastError();
+        }
         return false;
     }
-    return renderer.SaveSnapshotPng(imagePath, snapshot);
+    const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot);
+    if (!saved && errorText != nullptr) {
+        *errorText = renderer.LastError();
+    }
+    return saved;
 }
 
 void DashboardApp::BringOnTop() {
@@ -723,36 +807,11 @@ void DashboardApp::BringOnTop() {
 }
 
 bool DashboardApp::ReloadConfigFromDisk() {
-    const AppConfig reloadedConfig = LoadConfig(GetRuntimeConfigPath());
-    if (diagnostics_ != nullptr) {
-        diagnostics_->WriteTraceMarker("diagnostics:reload_config_begin");
-    }
-
-    const auto initializeRuntime = [&](const AppConfig& runtimeConfig) -> std::unique_ptr<TelemetryRuntime> {
-        std::unique_ptr<TelemetryRuntime> runtime =
-            CreateTelemetryRuntime(diagnosticsOptions_, GetExecutableDirectory());
-        if (runtime == nullptr) {
-            return nullptr;
-        }
-        if (!runtime->Initialize(runtimeConfig, diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr)) {
-            return nullptr;
-        }
-        return runtime;
-    };
-
-    telemetry_.reset();
-    std::unique_ptr<TelemetryRuntime> reloadedTelemetry = initializeRuntime(reloadedConfig);
-    if (reloadedTelemetry == nullptr) {
-        telemetry_ = initializeRuntime(config_);
-        if (diagnostics_ != nullptr) {
-            diagnostics_->WriteTraceMarker("diagnostics:reload_config_failed");
-        }
+    if (!ReloadTelemetryRuntimeFromDisk(GetRuntimeConfigPath(), config_, telemetry_, diagnosticsOptions_, diagnostics_.get())) {
+        ReleaseFonts();
+        InitializeFonts();
         return false;
     }
-
-    config_ = reloadedConfig;
-    telemetry_ = std::move(reloadedTelemetry);
-    telemetry_->UpdateSnapshot();
     ReleaseFonts();
     if (!InitializeFonts()) {
         if (diagnostics_ != nullptr) {
@@ -763,9 +822,6 @@ bool DashboardApp::ReloadConfigFromDisk() {
     ApplyConfigPlacement();
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
     InvalidateRect(hwnd_, nullptr, FALSE);
-    if (diagnostics_ != nullptr) {
-        diagnostics_->WriteTraceMarker("diagnostics:reload_config_done");
-    }
     return true;
 }
 

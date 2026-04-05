@@ -25,17 +25,6 @@ struct LayoutCardConfig {
     LayoutNodeConfig layout;
 };
 
-struct LayoutRowCardConfig {
-    std::string cardId;
-    int weight = 1;
-};
-
-struct LayoutRowConfig {
-    std::string id;
-    int weight = 1;
-    std::vector<LayoutRowCardConfig> cards;
-};
-
 struct LayoutConfig {
     int windowWidth = 800;
     int windowHeight = 480;
@@ -86,7 +75,7 @@ struct LayoutConfig {
     UiFontConfig labelFont{"Segoe UI", 14, 400};
     UiFontConfig smallFont{"Segoe UI", 12, 400};
 
-    std::vector<LayoutRowConfig> rows;
+    LayoutNodeConfig cardsLayout;
     std::vector<LayoutCardConfig> cards;
 };
 
