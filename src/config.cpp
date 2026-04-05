@@ -440,18 +440,16 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.contentGap = ParseIntOrDefault(value, layout.contentGap);
     } else if (key == "column_gap") {
         layout.columnGap = ParseIntOrDefault(value, layout.columnGap);
-    } else if (key == "metric_row_height") {
-        layout.metricRowHeight = ParseIntOrDefault(value, layout.metricRowHeight);
     } else if (key == "metric_label_width") {
         layout.metricLabelWidth = ParseIntOrDefault(value, layout.metricLabelWidth);
     } else if (key == "metric_value_gap") {
         layout.metricValueGap = ParseIntOrDefault(value, layout.metricValueGap);
     } else if (key == "metric_bar_height") {
         layout.metricBarHeight = ParseIntOrDefault(value, layout.metricBarHeight);
+    } else if (key == "metric_vertical_gap") {
+        layout.metricVerticalGap = ParseIntOrDefault(value, layout.metricVerticalGap);
     } else if (key == "widget_line_gap") {
         layout.widgetLineGap = ParseIntOrDefault(value, layout.widgetLineGap);
-    } else if (key == "drive_row_height") {
-        layout.driveRowHeight = ParseIntOrDefault(value, layout.driveRowHeight);
     } else if (key == "drive_label_width") {
         layout.driveLabelWidth = ParseIntOrDefault(value, layout.driveLabelWidth);
     } else if (key == "drive_percent_width") {
@@ -464,6 +462,8 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.driveValueGap = ParseIntOrDefault(value, layout.driveValueGap);
     } else if (key == "drive_bar_height") {
         layout.driveBarHeight = ParseIntOrDefault(value, layout.driveBarHeight);
+    } else if (key == "drive_vertical_gap") {
+        layout.driveVerticalGap = ParseIntOrDefault(value, layout.driveVerticalGap);
     } else if (key == "throughput_axis_width") {
         layout.throughputAxisWidth = ParseIntOrDefault(value, layout.throughputAxisWidth);
     } else if (key == "throughput_header_gap") {

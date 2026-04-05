@@ -15,6 +15,7 @@
 #include <gdiplus.h>
 
 #include "../resources/resource.h"
+#include "trace.h"
 #include "utf8.h"
 
 namespace {
@@ -235,6 +236,11 @@ POINT PolarPoint(int cx, int cy, int radius, double angleDegrees) {
     };
 }
 
+std::string FormatRect(const RECT& rect) {
+    return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," +
+        std::to_string(rect.right) + "," + std::to_string(rect.bottom) + ")";
+}
+
 }  // namespace
 
 DashboardRenderer::DashboardRenderer() = default;
@@ -281,6 +287,10 @@ HFONT DashboardRenderer::LabelFont() const {
 
 HFONT DashboardRenderer::SmallFont() const {
     return fonts_.smallFont;
+}
+
+void DashboardRenderer::SetTraceOutput(std::ostream* traceOutput) {
+    traceOutput_ = traceOutput;
 }
 
 bool DashboardRenderer::Initialize(HWND hwnd) {
@@ -372,6 +382,14 @@ void DashboardRenderer::ReleasePanelIcons() {
     panelIcons_.clear();
 }
 
+void DashboardRenderer::WriteTrace(const std::string& text) const {
+    if (traceOutput_ == nullptr) {
+        return;
+    }
+    tracing::Trace trace(traceOutput_);
+    trace.Write(text);
+}
+
 bool DashboardRenderer::MeasureFonts() {
     HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
     if (hdc == nullptr) {
@@ -391,17 +409,45 @@ bool DashboardRenderer::MeasureFonts() {
     fontHeights_.label = measure(fonts_.label);
     fontHeights_.smallText = measure(fonts_.smallFont);
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
+    WriteTrace("renderer:font_metrics title=" + std::to_string(fontHeights_.title) +
+        " big=" + std::to_string(fontHeights_.big) +
+        " value=" + std::to_string(fontHeights_.value) +
+        " label=" + std::to_string(fontHeights_.label) +
+        " small=" + std::to_string(fontHeights_.smallText));
     return true;
 }
 
 int DashboardRenderer::EffectiveHeaderHeight() const {
     const int titleHeight = std::max(fontHeights_.title, config_.layout.headerIconSize);
-    return std::max(config_.layout.headerHeight, titleHeight);
+    const int computed = std::max(config_.layout.headerHeight, titleHeight);
+    WriteTrace("renderer:layout_header_height configured=" + std::to_string(config_.layout.headerHeight) +
+        " title_or_icon=" + std::to_string(titleHeight) +
+        " effective=" + std::to_string(computed));
+    return computed;
 }
 
 int DashboardRenderer::EffectiveMetricRowHeight() const {
-    return std::max(config_.layout.metricRowHeight,
-        std::max(fontHeights_.label, fontHeights_.value) + std::max(8, config_.layout.widgetLineGap));
+    const int textHeight = std::max(fontHeights_.label, fontHeights_.value);
+    const int barHeight = std::max(1, config_.layout.metricBarHeight);
+    const int verticalGap = std::max(0, config_.layout.metricVerticalGap);
+    const int computed = textHeight + verticalGap + barHeight;
+    WriteTrace("renderer:layout_metric_row_height text=" + std::to_string(textHeight) +
+        " bar=" + std::to_string(barHeight) +
+        " gap=" + std::to_string(verticalGap) +
+        " effective=" + std::to_string(computed));
+    return computed;
+}
+
+int DashboardRenderer::EffectiveDriveRowHeight() const {
+    const int textHeight = std::max(fontHeights_.label, fontHeights_.smallText);
+    const int barHeight = std::max(2, config_.layout.driveBarHeight);
+    const int verticalGap = std::max(0, config_.layout.driveVerticalGap);
+    const int computed = std::max(textHeight, barHeight) + verticalGap;
+    WriteTrace("renderer:layout_drive_row_height text=" + std::to_string(textHeight) +
+        " bar=" + std::to_string(barHeight) +
+        " gap=" + std::to_string(verticalGap) +
+        " effective=" + std::to_string(computed));
+    return computed;
 }
 
 int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) const {
@@ -414,42 +460,64 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
                 total += config_.layout.widgetLineGap;
             }
         }
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(total));
         return total;
     }
     if (lowered == "text" || lowered == "cpu_name" || lowered == "gpu_name") {
-        return fontHeights_.label + 2;
+        const int height = fontHeights_.label + 2;
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
+        return height;
     }
     if (lowered == "network_footer") {
-        return fontHeights_.smallText + 2;
+        const int height = fontHeights_.smallText + 2;
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
+        return height;
     }
     if (lowered == "metric_list" || lowered == "metric_list_cpu" || lowered == "metric_list_gpu") {
         const std::string param = node.parameter;
         const int count = std::max<int>(1, static_cast<int>(param.empty() ? 4 : Split(param, ',').size()));
-        return count * EffectiveMetricRowHeight();
+        const int height = count * EffectiveMetricRowHeight();
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
+            " value=" + std::to_string(height));
+        return height;
     }
     if (lowered == "drive_usage_list") {
         const std::string param = node.parameter;
         const int count = std::max<int>(1, static_cast<int>(param.empty() ? 3 : Split(param, ',').size()));
-        return count * std::max(1, config_.layout.driveRowHeight);
+        const int height = count * EffectiveDriveRowHeight();
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
+            " value=" + std::to_string(height));
+        return height;
     }
     if (lowered == "throughput" || lowered == "throughput_upload" || lowered == "throughput_download" ||
         lowered == "throughput_read" || lowered == "throughput_write") {
-        return fontHeights_.smallText + config_.layout.throughputHeaderGap +
+        const int height = fontHeights_.smallText + config_.layout.throughputHeaderGap +
             std::max(1, config_.layout.throughputGraphHeight);
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
+        return height;
     }
     if (lowered == "clock_time") {
-        return fontHeights_.big + 8;
+        const int height = fontHeights_.big + 8;
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
+        return height;
     }
     if (lowered == "clock_date") {
-        return fontHeights_.value + 6;
+        const int height = fontHeights_.value + 6;
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
+        return height;
     }
     if (lowered == "gauge" || lowered == "gauge_cpu_load" || lowered == "gauge_gpu_load") {
-        return std::max(1, config_.layout.gaugePreferredSize);
+        const int height = std::max(1, config_.layout.gaugePreferredSize);
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
+        return height;
     }
+    WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=0");
     return 0;
 }
 
 void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
+    WriteTrace("renderer:layout_resolve_node name=\"" + node.name + "\" weight=" + std::to_string(node.weight) +
+        " " + FormatRect(rect) + " children=" + std::to_string(node.children.size()));
     if (!IsContainerNode(node)) {
         ResolvedWidgetLayout widget;
         const std::string lowered = ToLower(node.name);
@@ -515,6 +583,9 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
             }
         }
         widget.rect = rect;
+        WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
+            (widget.binding.metric.empty() ? "" : " metric=\"" + widget.binding.metric + "\"") +
+            (widget.binding.param.empty() ? "" : " param=\"" + widget.binding.param + "\""));
         widgets.push_back(std::move(widget));
         return;
     }
@@ -534,6 +605,9 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
                 break;
             }
             RECT childRect{rect.left, cursor, rect.right, std::min(static_cast<int>(rect.bottom), cursor + preferred)};
+            WriteTrace("renderer:layout_top_packed_child parent=\"" + node.name + "\" child=\"" + child.name +
+                "\" preferred=" + std::to_string(preferred) + " gap=" + std::to_string(gap) +
+                " " + FormatRect(childRect));
             ResolveNodeWidgets(child, childRect, widgets);
             cursor = static_cast<int>(childRect.bottom) + gap;
         }
@@ -569,6 +643,11 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
             childRect.bottom = cursor + size;
         }
 
+        WriteTrace("renderer:layout_weighted_child parent=\"" + node.name + "\" child=\"" + child.name +
+            "\" weight=" + std::to_string(childWeight) +
+            " gap=" + std::to_string(gap) +
+            " size=" + std::to_string(size) +
+            " " + FormatRect(childRect));
         ResolveNodeWidgets(child, childRect, widgets);
         cursor += size + gap;
         remainingAvailable -= size;
@@ -592,6 +671,10 @@ bool DashboardRenderer::ResolveLayout() {
         lastError_ = "renderer:layout_missing_cards_root";
         return false;
     }
+
+    WriteTrace("renderer:layout_begin window=" + std::to_string(resolvedLayout_.windowWidth) + "x" +
+        std::to_string(resolvedLayout_.windowHeight) + " " + FormatRect(dashboardRect) +
+        " cards_root=\"" + config_.layout.cardsLayout.name + "\"");
 
     const auto resolveCard = [&](const LayoutNodeConfig& node, const RECT& rect) {
         const auto cardIt = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
@@ -628,6 +711,10 @@ bool DashboardRenderer::ResolveLayout() {
             card.rect.bottom - padding
         };
 
+        WriteTrace("renderer:layout_card id=\"" + card.id + "\" " + FormatRect(card.rect) +
+            " title=" + FormatRect(card.titleRect) +
+            " icon=" + FormatRect(card.iconRect) +
+            " content=" + FormatRect(card.contentRect));
         ResolveNodeWidgets(cardIt->layout, card.contentRect, card.widgets);
         resolvedLayout_.cards.push_back(std::move(card));
     };
@@ -670,6 +757,11 @@ bool DashboardRenderer::ResolveLayout() {
                     childRect.bottom = cursor + size;
                 }
 
+                WriteTrace("renderer:layout_dashboard_child parent=\"" + node.name + "\" child=\"" + child.name +
+                    "\" weight=" + std::to_string(childWeight) +
+                    " gap=" + std::to_string(gap) +
+                    " size=" + std::to_string(size) +
+                    " " + FormatRect(childRect));
                 resolveDashboardNode(child, childRect);
                 cursor += size + gap;
                 remainingAvailable -= size;
@@ -683,6 +775,7 @@ bool DashboardRenderer::ResolveLayout() {
         lastError_ = "renderer:layout_resolve_failed cards=0 root=\"" + config_.layout.cardsLayout.name + "\"";
         return false;
     }
+    WriteTrace("renderer:layout_done cards=" + std::to_string(resolvedLayout_.cards.size()));
     return true;
 }
 
@@ -760,6 +853,7 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double pe
 }
 
 void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const DashboardMetricRow& row) {
+    const int rowHeight = EffectiveMetricRowHeight();
     const int labelWidth = std::max(1, config_.layout.metricLabelWidth);
     const int valueGap = std::max(0, config_.layout.metricValueGap);
     RECT labelRect{rect.left, rect.top, std::min(rect.right, rect.left + labelWidth), rect.bottom};
@@ -768,7 +862,7 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const Dashboard
     DrawTextBlock(hdc, valueRect, row.valueText, fonts_.value, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
     const int metricBarHeight = std::max(1, config_.layout.metricBarHeight);
-    const int barBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(rect.top) + EffectiveMetricRowHeight());
+    const int barBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(rect.top) + rowHeight);
     const int barTop = std::max(static_cast<int>(rect.top), barBottom - metricBarHeight);
     RECT barRect{valueRect.left, barTop, rect.right, barBottom};
     HBRUSH track = CreateSolidBrush(ToColorRef(config_.layout.trackColor));
@@ -873,7 +967,7 @@ void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const Da
 }
 
 void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows) {
-    const int rowHeight = std::max(1, config_.layout.driveRowHeight);
+    const int rowHeight = EffectiveDriveRowHeight();
     RECT row{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + rowHeight)};
     for (const auto& drive : rows) {
         const int labelWidth = std::max(1, config_.layout.driveLabelWidth);

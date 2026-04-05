@@ -10,6 +10,8 @@ Ignore the stray `$null` file at the repository root when it appears; it is a Co
 This project has a single deployment target; do not preserve backwards compatibility for legacy configs unless the user explicitly asks for it.
 Do not run build steps and validation runs in parallel; always finish the build first, then run validation commands sequentially against the freshly built artifacts.
 If you trip over a project-specific pitfall and then resolve it, add a short note here for future work so the mistake is less likely to repeat.
+Pitfall note: keep fake-runtime startup failures aligned with the diagnostics dialog policy; a direct modal dialog in `/fake /exit` can look like `/exit` is broken because the headless process waits behind it.
+Pitfall note: if rebuilt defaults seem unchanged, check the executable-side `config.ini` first; it overlays the embedded `resources/config.ini` template and `Save Config` preserves that live file.
 
 After changing diagnostics behavior, update `docs/diagnostics.txt` instead of restating those rules here.
 

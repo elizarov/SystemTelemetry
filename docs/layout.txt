@@ -52,18 +52,18 @@ Supported geometry keys:
 - `header = height,icon_size,icon_gap`
 - `content_gap = pixels`
 - `column_gap = pixels`
-- `metric_row_height = pixels`
 - `metric_label_width = pixels`
 - `metric_value_gap = pixels`
 - `metric_bar_height = pixels`
+- `metric_vertical_gap = pixels`
 - `widget_line_gap = pixels`
-- `drive_row_height = pixels`
 - `drive_label_width = pixels`
 - `drive_percent_width = pixels`
 - `drive_free_width = pixels`
 - `drive_bar_gap = pixels`
 - `drive_value_gap = pixels`
 - `drive_bar_height = pixels`
+- `drive_vertical_gap = pixels`
 - `throughput_axis_width = pixels`
 - `throughput_header_gap = pixels`
 - `throughput_read_label_width = pixels`
@@ -156,7 +156,8 @@ Meaning:
 - `stack_top(...)` packs children from the top using their preferred heights and leaves any remaining space below
 - `center(...)` creates a centered vertical stack
 
-`drive_usage_list(...)` rows use `drive_row_height` as their packed row height when placed inside a top-packed stack.
+`metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + metric_vertical_gap + metric_bar_height`.
+`drive_usage_list(...)` rows use a computed row height of `max(label_font_height,small_font_height,drive_bar_height) + drive_vertical_gap` when placed inside a top-packed stack.
 
 Nested layout expressions are allowed.
 
@@ -238,7 +239,7 @@ Shared absolute geometry belongs only in `[layout]`, including:
 - card padding
 - header metrics
 - shared content spacing
-- shared metric row height
+- shared metric-row gap and bar sizing
 - widget-specific widths and bar thicknesses when a hard-coded widget shape needs to stay configurable
 
 Card sections define relative structure only:
@@ -257,7 +258,7 @@ Layout is resolved without using current telemetry values.
 Static sizing rules:
 
 - header height comes from config
-- metric rows share one configured height
+- metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
 - metric bars, drive row columns, throughput plot chrome, and gauge preferred size come from config
 - throughput sections follow the configured vertical rhythm
 - centered time/date widgets use weighted slots from `center(...)`

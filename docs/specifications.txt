@@ -63,10 +63,11 @@ The layout engine must resolve row, card, and widget coordinates once after conf
 The list of rendered cards must come from layout config instead of from a hard-coded card list.
 The storage drive list must come from the layout config through the storage card's `drive_usage_list(...)` widget binding instead of from a separate top-level storage section.
 The layout language must support a non-rendering spacer widget so cards may reserve matching vertical or horizontal space when neighboring cards need to keep plot or metric regions aligned.
-The layout section must provide a dedicated drive-usage row height setting so storage drive rows can pack tightly without changing the shared CPU/GPU metric row rhythm.
+The layout section must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments can preserve or intentionally retune the existing visual rhythm.
 The layout section must provide a dedicated drive-usage bar thickness setting so storage usage bars can be tuned independently from row height and from the thinner CPU/GPU metric bars.
 The layout section must also own the widget-level geometry that affects visual rhythm, including metric bar thickness, throughput plot chrome sizes, gauge preferred size, and the fixed widths used by the storage drive row columns.
 The layout language must support a top-aligned stack mode that packs children at their preferred heights and leaves any remaining space below them, so lists such as drive usage rows do not have to stretch to fill the whole card column.
+When diagnostics trace logging is enabled, renderer startup must trace the measured font heights plus the computed layout heights and resolved rectangles so layout tuning can be calibrated from exact numbers instead of screenshots alone.
 The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
 The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
 The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.

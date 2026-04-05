@@ -72,7 +72,7 @@ bool ContainsInsensitive(const std::string& value, const std::string& needle) {
 std::filesystem::path GetRuntimeConfigPath();
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    std::string* errorText = nullptr);
+    std::ostream* traceStream = nullptr, std::string* errorText = nullptr);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
 
 DiagnosticsOptions GetDiagnosticsOptions();
@@ -214,7 +214,8 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     }
 
     std::string screenshotError;
-    if (options_.screenshot && !SaveDumpScreenshot(screenshotPath_, dump.snapshot, config, &screenshotError)) {
+    if (options_.screenshot && !SaveDumpScreenshot(
+            screenshotPath_, dump.snapshot, config, TraceStream(), &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
         std::string traceText = "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
@@ -662,6 +663,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     instance_ = instance;
     config_ = LoadConfig(GetRuntimeConfigPath());
     renderer_.SetConfig(config_);
+    renderer_.SetTraceOutput(nullptr);
     telemetry_ = CreateTelemetryRuntime(diagnosticsOptions_, GetExecutableDirectory());
     if (diagnosticsOptions_.HasAnyOutput()) {
         diagnostics_ = std::make_unique<DiagnosticsSession>(diagnosticsOptions_);
@@ -679,6 +681,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     }
     if (diagnostics_ != nullptr) {
         diagnostics_->WriteTraceMarker("diagnostics:telemetry_initialized");
+        renderer_.SetTraceOutput(diagnostics_->TraceStream());
         lastDiagnosticsOutput_ = std::chrono::steady_clock::now();
     }
 
@@ -737,6 +740,7 @@ void DashboardApp::ApplyConfigPlacement() {
 
 bool DashboardApp::InitializeFonts() {
     renderer_.SetConfig(config_);
+    renderer_.SetTraceOutput(diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr);
     return renderer_.Initialize(hwnd_);
 }
 
@@ -767,6 +771,7 @@ HICON DashboardApp::LoadAppIcon(int width, int height) {
 
 bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
     renderer_.SetConfig(config_);
+    renderer_.SetTraceOutput(diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr);
     if (!renderer_.Initialize(hwnd_)) {
         return false;
     }
@@ -784,9 +789,10 @@ bool DashboardApp::WriteDiagnosticsOutputs() {
 }
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    std::string* errorText) {
+    std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
     renderer.SetConfig(config);
+    renderer.SetTraceOutput(traceStream);
     if (!renderer.Initialize()) {
         if (errorText != nullptr) {
             *errorText = renderer.LastError();

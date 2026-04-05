@@ -9,6 +9,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -36,6 +37,7 @@ public:
     COLORREF MutedTextColor() const;
     HFONT LabelFont() const;
     HFONT SmallFont() const;
+    void SetTraceOutput(std::ostream* traceOutput);
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -123,9 +125,12 @@ private:
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
     int EffectiveHeaderHeight() const;
     int EffectiveMetricRowHeight() const;
+    int EffectiveDriveRowHeight() const;
+    void WriteTrace(const std::string& text) const;
 
     AppConfig config_;
     HWND hwnd_ = nullptr;
+    std::ostream* traceOutput_ = nullptr;
     ULONG_PTR gdiplusToken_ = 0;
     std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
     Fonts fonts_{};
