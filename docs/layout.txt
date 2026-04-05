@@ -176,6 +176,8 @@ Supported widget names:
 - `clock_time`
 - `clock_date`
 
+Legacy widget aliases are not supported. Bind telemetry through the documented generic widget names and explicit parameters, for example `text(cpu.name)`, `gauge(cpu.load)`, or `throughput(network.upload)`.
+
 Widget parameters
 =================
 

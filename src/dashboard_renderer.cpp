@@ -75,17 +75,6 @@ std::vector<std::string> Split(const std::string& input, char delimiter) {
     return parts;
 }
 
-std::string Join(const std::vector<std::string>& parts, const std::string& delimiter) {
-    std::string joined;
-    for (size_t i = 0; i < parts.size(); ++i) {
-        if (i != 0) {
-            joined += delimiter;
-        }
-        joined += parts[i];
-    }
-    return joined;
-}
-
 DashboardMetricListEntry ParseMetricListEntry(std::string item) {
     DashboardMetricListEntry entry;
     const size_t equals = item.find('=');
@@ -108,19 +97,6 @@ std::vector<DashboardMetricListEntry> ParseMetricListEntries(const std::string& 
         }
     }
     return entries;
-}
-
-std::string PrefixMetricListItem(const std::string& item, const std::string& prefix) {
-    DashboardMetricListEntry entry = ParseMetricListEntry(item);
-    if (entry.metricRef.empty()) {
-        return "";
-    }
-
-    std::string result = prefix + entry.metricRef;
-    if (!entry.labelOverride.empty()) {
-        result += "=" + entry.labelOverride;
-    }
-    return result;
 }
 
 UINT GetPanelIconResourceId(const std::string& iconName) {
@@ -505,7 +481,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(total));
         return total;
     }
-    if (lowered == "text" || lowered == "cpu_name" || lowered == "gpu_name") {
+    if (lowered == "text") {
         const int height = fontHeights_.label + ScaleLogical(2);
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
@@ -515,7 +491,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "metric_list" || lowered == "metric_list_cpu" || lowered == "metric_list_gpu") {
+    if (lowered == "metric_list") {
         const std::string param = node.parameter;
         const int count = std::max<int>(1, static_cast<int>(param.empty() ? 4 : Split(param, ',').size()));
         const int height = count * EffectiveMetricRowHeight();
@@ -531,8 +507,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
             " value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "throughput" || lowered == "throughput_upload" || lowered == "throughput_download" ||
-        lowered == "throughput_read" || lowered == "throughput_write") {
+    if (lowered == "throughput") {
         const int height = fontHeights_.smallText + ScaleLogical(config_.layout.throughputHeaderGap) +
             std::max(1, ScaleLogical(config_.layout.throughputGraphHeight));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
@@ -548,7 +523,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "gauge" || lowered == "gauge_cpu_load" || lowered == "gauge_gpu_load") {
+    if (lowered == "gauge") {
         const int height = std::max(1, ScaleLogical(config_.layout.gaugePreferredSize));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
@@ -586,43 +561,6 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
             widget.kind = WidgetKind::ClockTime;
         } else if (lowered == "clock_date") {
             widget.kind = WidgetKind::ClockDate;
-        } else if (lowered == "cpu_name") {
-            widget.kind = WidgetKind::Text;
-            widget.binding.metric = "cpu.name";
-        } else if (lowered == "gpu_name") {
-            widget.kind = WidgetKind::Text;
-            widget.binding.metric = "gpu.name";
-        } else if (lowered == "gauge_cpu_load") {
-            widget.kind = WidgetKind::Gauge;
-            widget.binding.metric = "cpu.load";
-        } else if (lowered == "gauge_gpu_load") {
-            widget.kind = WidgetKind::Gauge;
-            widget.binding.metric = "gpu.load";
-        } else if (lowered == "throughput_upload") {
-            widget.kind = WidgetKind::Throughput;
-            widget.binding.metric = "network.upload";
-        } else if (lowered == "throughput_download") {
-            widget.kind = WidgetKind::Throughput;
-            widget.binding.metric = "network.download";
-        } else if (lowered == "throughput_read") {
-            widget.kind = WidgetKind::Throughput;
-            widget.binding.metric = "storage.read";
-        } else if (lowered == "throughput_write") {
-            widget.kind = WidgetKind::Throughput;
-            widget.binding.metric = "storage.write";
-        } else if (lowered == "metric_list_cpu" || lowered == "metric_list_gpu") {
-            widget.kind = WidgetKind::MetricList;
-            if (const std::string items = node.parameter; !items.empty()) {
-                const std::string prefix = lowered == "metric_list_cpu" ? "cpu." : "gpu.";
-                std::vector<std::string> prefixedItems;
-                for (const auto& item : Split(items, ',')) {
-                    const std::string prefixed = PrefixMetricListItem(item, prefix);
-                    if (!prefixed.empty()) {
-                        prefixedItems.push_back(prefixed);
-                    }
-                }
-                widget.binding.param = Join(prefixedItems, ",");
-            }
         }
         widget.rect = rect;
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +

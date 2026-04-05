@@ -61,6 +61,7 @@ Layout-expression weights in `config.ini` must use the `name:weight(...)` form s
 Generic widget types such as `text(...)`, `gauge(...)`, `metric_list(...)`, and `throughput(...)` must bind to telemetry through explicit metric names in layout config instead of through card-specific hard-coded widget implementations.
 Widgets that need multiple values, such as `metric_list(...)` and `drive_usage_list(...)`, must take a widget-specific plain comma-separated parameter body instead of named `items=` or `drives=` parameters.
 `metric_list(...)` items may append `=Label` so the UI row caption can be customized without changing the underlying metric binding.
+The layout language must accept only the documented generic widget names and explicit metric bindings; removed legacy aliases such as `cpu_name`, `gauge_cpu_load`, or `throughput_upload` must not be recognized implicitly.
 The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
 The list of rendered cards must come from layout config instead of from a hard-coded card list.
 The storage drive list must come from the layout config through the storage card's `drive_usage_list(...)` widget binding instead of from a separate top-level storage section.
