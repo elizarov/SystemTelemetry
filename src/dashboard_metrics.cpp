@@ -83,6 +83,13 @@ std::string BuildBoardMetricLabel(const std::string& name, const char* suffix) {
     return name + " " + suffix;
 }
 
+double ResolveScaleRatio(double value, double scale) {
+    if (scale <= 0.0) {
+        return 0.0;
+    }
+    return value / scale;
+}
+
 const std::vector<double>* FindMetricHistory(const SystemSnapshot& snapshot, const std::string& metricRef) {
     const auto it = std::find_if(snapshot.metricHistories.begin(), snapshot.metricHistories.end(),
         [&](const MetricHistorySeries& history) {
@@ -113,7 +120,7 @@ std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<Name
         if (ToLower(metric.name) != ToLower(name)) {
             continue;
         }
-        const double ratio = metric.metric.value.value_or(0.0) / scale;
+        const double ratio = ResolveScaleRatio(metric.metric.value.value_or(0.0), scale);
         return DashboardMetricRow{BuildBoardMetricLabel(metric.name, suffix), FormatScalarValue(metric.metric, 0),
             ratio, ResolvePeakRatio(snapshot, metricHistoryRef, ratio)};
     }
@@ -123,10 +130,11 @@ std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<Name
         ResolvePeakRatio(snapshot, metricHistoryRef, 0.0)};
 }
 
-std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapshot, const std::string& metricRef) {
+std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales,
+    const std::string& metricRef) {
     const std::string lowered = ToLower(metricRef);
     if (lowered == "cpu.clock") {
-        const double ratio = snapshot.cpu.clock.value.value_or(0.0) / 5.0;
+        const double ratio = ResolveScaleRatio(snapshot.cpu.clock.value.value_or(0.0), metricScales.cpuClockGHz);
         return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.cpu.clock, 2),
             ratio, ResolvePeakRatio(snapshot, "cpu.clock", ratio)};
     }
@@ -137,17 +145,17 @@ std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapsho
             ratio, ResolvePeakRatio(snapshot, "cpu.memory", ratio)};
     }
     if (lowered == "gpu.temp" || lowered == "gpu.temperature") {
-        const double ratio = snapshot.gpu.temperature.value.value_or(0.0) / 100.0;
+        const double ratio = ResolveScaleRatio(snapshot.gpu.temperature.value.value_or(0.0), metricScales.gpuTemperatureC);
         return DashboardMetricRow{"Temp", FormatScalarValue(snapshot.gpu.temperature, 0),
             ratio, ResolvePeakRatio(snapshot, "gpu.temperature", ratio)};
     }
     if (lowered == "gpu.clock") {
-        const double ratio = snapshot.gpu.clock.value.value_or(0.0) / 2600.0;
+        const double ratio = ResolveScaleRatio(snapshot.gpu.clock.value.value_or(0.0), metricScales.gpuClockMHz);
         return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.gpu.clock, 0),
             ratio, ResolvePeakRatio(snapshot, "gpu.clock", ratio)};
     }
     if (lowered == "gpu.fan") {
-        const double ratio = snapshot.gpu.fan.value.value_or(0.0) / 3000.0;
+        const double ratio = ResolveScaleRatio(snapshot.gpu.fan.value.value_or(0.0), metricScales.gpuFanRpm);
         return DashboardMetricRow{"Fan", FormatScalarValue(snapshot.gpu.fan, 0),
             ratio, ResolvePeakRatio(snapshot, "gpu.fan", ratio)};
     }
@@ -159,11 +167,11 @@ std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapsho
     }
     if (lowered.rfind("board.temp.", 0) == 0) {
         return ResolveNamedBoardMetric(snapshot.boardTemperatures, snapshot, lowered,
-            metricRef.substr(std::string("board.temp.").size()), "Temp", 100.0);
+            metricRef.substr(std::string("board.temp.").size()), "Temp", metricScales.boardTemperatureC);
     }
     if (lowered.rfind("board.fan.", 0) == 0) {
         return ResolveNamedBoardMetric(snapshot.boardFans, snapshot, lowered,
-            metricRef.substr(std::string("board.fan.").size()), "Fan", 3000.0);
+            metricRef.substr(std::string("board.fan.").size()), "Fan", metricScales.boardFanRpm);
     }
     return std::nullopt;
 }
@@ -176,7 +184,8 @@ void ApplyMetricLabelOverride(DashboardMetricRow& row, const std::string& labelO
 
 }  // namespace
 
-DashboardMetricSource::DashboardMetricSource(const SystemSnapshot& snapshot) : snapshot_(snapshot) {}
+DashboardMetricSource::DashboardMetricSource(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales)
+    : snapshot_(snapshot), metricScales_(metricScales) {}
 
 std::string DashboardMetricSource::ResolveText(const std::string& metricRef) const {
     const std::string lowered = ToLower(metricRef);
@@ -203,7 +212,7 @@ double DashboardMetricSource::ResolveGaugePercent(const std::string& metricRef) 
 std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const {
     std::vector<DashboardMetricRow> rows;
     for (const auto& metricRef : metricRefs) {
-        if (auto row = ResolveMetricRow(snapshot_, metricRef.metricRef); row.has_value()) {
+        if (auto row = ResolveMetricRow(snapshot_, metricScales_, metricRef.metricRef); row.has_value()) {
             ApplyMetricLabelOverride(*row, metricRef.labelOverride);
             rows.push_back(*row);
         }

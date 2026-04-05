@@ -25,6 +25,15 @@ struct LayoutCardConfig {
     LayoutNodeConfig layout;
 };
 
+struct MetricScaleConfig {
+    double cpuClockGHz = 0.0;
+    double gpuTemperatureC = 0.0;
+    double gpuClockMHz = 0.0;
+    double gpuFanRpm = 0.0;
+    double boardTemperatureC = 0.0;
+    double boardFanRpm = 0.0;
+};
+
 struct LayoutConfig {
     int windowWidth = 0;
     int windowHeight = 0;
@@ -104,6 +113,7 @@ struct AppConfig {
     std::vector<std::string> driveLetters;
     std::vector<std::string> boardTemperatureNames;
     std::vector<std::string> boardFanNames;
+    MetricScaleConfig metricScales;
     LayoutConfig layout;
 };
 

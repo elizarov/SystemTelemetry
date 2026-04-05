@@ -54,6 +54,7 @@ Display placement in `config.ini` must use the compact `position = x,y` form for
 Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance instead of silently failing.
 The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
 The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.
+Metric-list normalization ceilings for non-capacity rows such as CPU clock, GPU temperature, GPU clock, GPU fan, and requested board temperatures and fans must come from a dedicated `[metric_scales]` section in `config.ini` that appears before `[layout]`, so those visual maxima can be tuned without code changes.
 The `[layout]` section in `config.ini` must control the dashboard window size, shared spacing metrics, the generic dashboard card-placement layout, color palette, and UI font faces, sizes, and weights.
 The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using the current monitor DPI before rendering.
 Each dashboard card must have its own `[card.<id>]` section in `config.ini` that provides the card title, icon name, and widget layout expression.
@@ -83,6 +84,7 @@ The board provider must receive the set of requested board temperature and fan n
 The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
 When `Save Config` creates `config.ini` beside the executable for the first time, it must begin from the embedded resource copy verbatim so the saved file keeps the same comments and documentation text before updating values in place.
 The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults instead of synthesizing fallback cards, widgets, or drive lists in C++ config-loading code.
+Metric-list rows and their retained recent-peak histories must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
 
 Diagnostics requirements live in `docs/diagnostics.txt`.
 The config overlay path must replace parsed layout expressions instead of appending onto previously loaded embedded defaults, so `config.ini` can safely override `[layout]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.

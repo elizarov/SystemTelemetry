@@ -1106,7 +1106,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
 }
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
-    DashboardMetricSource metrics(snapshot);
+    DashboardMetricSource metrics(snapshot, config_.metricScales);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
         for (const auto& widget : card.widgets) {

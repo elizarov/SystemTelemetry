@@ -42,7 +42,7 @@ struct DashboardDriveRow {
 
 class DashboardMetricSource {
 public:
-    explicit DashboardMetricSource(const SystemSnapshot& snapshot);
+    DashboardMetricSource(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales);
 
     std::string ResolveText(const std::string& metricRef) const;
     double ResolveGaugePercent(const std::string& metricRef) const;
@@ -55,4 +55,5 @@ public:
 
 private:
     const SystemSnapshot& snapshot_;
+    const MetricScaleConfig& metricScales_;
 };

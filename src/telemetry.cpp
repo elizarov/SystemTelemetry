@@ -64,6 +64,13 @@ MetricHistorySeries CreateMetricHistorySeries(const std::string& metricRef) {
     return history;
 }
 
+double ResolveScaleRatio(double value, double scale) {
+    if (scale <= 0.0) {
+        return 0.0;
+    }
+    return value / scale;
+}
+
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
 
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, const wchar_t* path, PDH_HCOUNTER* counter) {
@@ -528,7 +535,8 @@ void TelemetryCollector::Impl::UpdateCpu() {
             " available=" + tracing::Trace::BoolText(boardProviderAvailable_) +
             " diagnostics=\"" + boardProviderDiagnostics_ + "\"").c_str());
     }
-    PushMetricHistorySample("cpu.clock", snapshot_.cpu.clock.value.value_or(0.0) / 5.0);
+    PushMetricHistorySample("cpu.clock",
+        ResolveScaleRatio(snapshot_.cpu.clock.value.value_or(0.0), config_.metricScales.cpuClockGHz));
     PushBoardMetricHistorySamples();
 }
 
@@ -683,9 +691,12 @@ void TelemetryCollector::Impl::UpdateGpu() {
             " available=" + tracing::Trace::BoolText(gpuProviderAvailable_) +
             " diagnostics=\"" + gpuProviderDiagnostics_ + "\"").c_str());
     }
-    PushMetricHistorySample("gpu.temperature", snapshot_.gpu.temperature.value.value_or(0.0) / 100.0);
-    PushMetricHistorySample("gpu.clock", snapshot_.gpu.clock.value.value_or(0.0) / 2600.0);
-    PushMetricHistorySample("gpu.fan", snapshot_.gpu.fan.value.value_or(0.0) / 3000.0);
+    PushMetricHistorySample("gpu.temperature",
+        ResolveScaleRatio(snapshot_.gpu.temperature.value.value_or(0.0), config_.metricScales.gpuTemperatureC));
+    PushMetricHistorySample("gpu.clock",
+        ResolveScaleRatio(snapshot_.gpu.clock.value.value_or(0.0), config_.metricScales.gpuClockMHz));
+    PushMetricHistorySample("gpu.fan",
+        ResolveScaleRatio(snapshot_.gpu.fan.value.value_or(0.0), config_.metricScales.gpuFanRpm));
     const double totalVram = snapshot_.gpu.vram.totalGb;
     PushMetricHistorySample("gpu.vram", totalVram > 0.0 ? snapshot_.gpu.vram.usedGb / totalVram : 0.0);
 }
@@ -824,10 +835,12 @@ void TelemetryCollector::Impl::PushMetricHistorySample(const std::string& metric
 
 void TelemetryCollector::Impl::PushBoardMetricHistorySamples() {
     for (const auto& metric : snapshot_.boardTemperatures) {
-        PushMetricHistorySample("board.temp." + metric.name, metric.metric.value.value_or(0.0) / 100.0);
+        PushMetricHistorySample("board.temp." + metric.name,
+            ResolveScaleRatio(metric.metric.value.value_or(0.0), config_.metricScales.boardTemperatureC));
     }
     for (const auto& metric : snapshot_.boardFans) {
-        PushMetricHistorySample("board.fan." + metric.name, metric.metric.value.value_or(0.0) / 3000.0);
+        PushMetricHistorySample("board.fan." + metric.name,
+            ResolveScaleRatio(metric.metric.value.value_or(0.0), config_.metricScales.boardFanRpm));
     }
 }
 

@@ -89,6 +89,16 @@ int ParseIntOrDefault(const std::string& value, int fallback) {
     }
 }
 
+double ParseDoubleOrDefault(const std::string& value, double fallback) {
+    try {
+        size_t consumed = 0;
+        const double parsed = std::stod(value, &consumed);
+        return consumed == value.size() ? parsed : fallback;
+    } catch (...) {
+        return fallback;
+    }
+}
+
 unsigned int ParseHexColorOrDefault(const std::string& value, unsigned int fallback) {
     std::string text = Trim(value);
     if (!text.empty() && text.front() == '#') {
@@ -558,6 +568,22 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
     }
 }
 
+void ApplyMetricScaleValue(MetricScaleConfig& metricScales, const std::string& key, const std::string& value) {
+    if (key == "cpu_clock_ghz") {
+        metricScales.cpuClockGHz = ParseDoubleOrDefault(value, metricScales.cpuClockGHz);
+    } else if (key == "gpu_temperature_c") {
+        metricScales.gpuTemperatureC = ParseDoubleOrDefault(value, metricScales.gpuTemperatureC);
+    } else if (key == "gpu_clock_mhz") {
+        metricScales.gpuClockMHz = ParseDoubleOrDefault(value, metricScales.gpuClockMHz);
+    } else if (key == "gpu_fan_rpm") {
+        metricScales.gpuFanRpm = ParseDoubleOrDefault(value, metricScales.gpuFanRpm);
+    } else if (key == "board_temperature_c") {
+        metricScales.boardTemperatureC = ParseDoubleOrDefault(value, metricScales.boardTemperatureC);
+    } else if (key == "board_fan_rpm") {
+        metricScales.boardFanRpm = ParseDoubleOrDefault(value, metricScales.boardFanRpm);
+    }
+}
+
 void ApplyCardValue(LayoutConfig& layout, const std::string& section, const std::string& key, const std::string& value) {
     const std::string id = section.substr(std::string("card.").size());
     LayoutCardConfig& card = EnsureCardConfig(layout, id);
@@ -602,6 +628,8 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             ParseIntPair(value, config.positionX, config.positionY);
         } else if (section == "network" && key == "adapter_name") {
             config.networkAdapter = value;
+        } else if (section == "metric_scales") {
+            ApplyMetricScaleValue(config.metricScales, key, value);
         } else if (section == "layout") {
             ApplyLayoutValue(config.layout, key, value);
         } else if (section.rfind("card.", 0) == 0) {
