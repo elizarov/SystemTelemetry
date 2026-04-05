@@ -30,10 +30,27 @@ Compact rules
 Structure
 =========
 
-The language has two levels:
+The language has three levels:
 
-1. Dashboard-level geometry, card-placement layout, palette, and fonts in `[layout]`
-2. Card-local title, icon, and content composition in `[card.<id>]`
+1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, `[clock_time]`, and `[clock_date]`
+2. Dashboard-level shared geometry, card-placement layout, palette, and fonts in `[layout]`
+3. Card-local title, icon, and content composition in `[card.<id>]`
+
+Widget sections
+===============
+
+Widget-specific sizing now lives in dedicated sections named exactly after the widget.
+
+Supported widget geometry keys:
+
+- `[metric_list]`: `label_width`, `value_gap`, `bar_height`, `vertical_gap`
+- `[drive_usage_list]`: `free_width`, `bar_gap`, `value_gap`, `bar_height`, `vertical_gap`, `label_padding`, `percent_padding`
+- `[throughput]`: `header_gap`, `graph_height`, `value_padding`, `label_padding`, `axis_padding`, `scale_label_padding`, `scale_label_min_height`, `guide_stroke_width`, `plot_stroke_width`
+- `[gauge]`: `preferred_size`, `outer_padding`, `min_radius`, `stroke_width`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`
+- `[text]`: `preferred_padding`
+- `[network_footer]`: `preferred_padding`
+- `[clock_time]`: `padding`
+- `[clock_date]`: `padding`
 
 Dashboard section
 =================
@@ -52,40 +69,7 @@ Supported geometry keys:
 - `header = height,icon_size,icon_gap`
 - `content_gap = pixels`
 - `column_gap = pixels`
-- `metric_label_width = pixels`
-- `metric_value_gap = pixels`
-- `metric_bar_height = pixels`
-- `metric_vertical_gap = pixels`
 - `widget_line_gap = pixels`
-- `drive_free_width = pixels`
-- `drive_bar_gap = pixels`
-- `drive_value_gap = pixels`
-- `drive_bar_height = pixels`
-- `drive_vertical_gap = pixels`
-- `throughput_header_gap = pixels`
-- `throughput_graph_height = pixels`
-- `gauge_preferred_size = pixels`
-- `text_preferred_padding = pixels`
-- `footer_preferred_padding = pixels`
-- `clock_time_padding = pixels`
-- `clock_date_padding = pixels`
-- `throughput_value_padding = pixels`
-- `throughput_label_padding = pixels`
-- `throughput_axis_padding = pixels`
-- `drive_label_padding = pixels`
-- `drive_percent_padding = pixels`
-- `graph_label_padding = pixels`
-- `graph_label_min_height = pixels`
-- `graph_stroke_width = pixels`
-- `graph_plot_stroke_width = pixels`
-- `gauge_outer_padding = pixels`
-- `gauge_min_radius = pixels`
-- `gauge_stroke_width = pixels`
-- `gauge_text_half_width = pixels`
-- `gauge_value_top = pixels`
-- `gauge_value_bottom = pixels`
-- `gauge_label_top = pixels`
-- `gauge_label_bottom = pixels`
 
 Supported dashboard layout key:
 
@@ -172,9 +156,9 @@ Meaning:
 - `stack_top(...)` packs children from the top using their preferred heights and leaves any remaining space below
 - `center(...)` creates a centered vertical stack
 
-`metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + metric_vertical_gap + metric_bar_height`.
-`drive_usage_list(...)` rows use a computed row height of `max(label_font_height,small_font_height,drive_bar_height) + drive_vertical_gap` when placed inside a top-packed stack.
-Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching `*_padding` layout keys instead of by buried renderer literals.
+`metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + [metric_list].vertical_gap + [metric_list].bar_height`.
+`drive_usage_list(...)` rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].vertical_gap` when placed inside a top-packed stack.
+Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching widget-section `*_padding` keys instead of by buried renderer literals.
 
 Nested layout expressions are allowed.
 
@@ -258,8 +242,8 @@ Shared absolute geometry belongs only in `[layout]`, including:
 - card padding
 - header metrics
 - shared content spacing
-- shared metric-row gap and bar sizing
-- widget-specific spacing and the widths that still vary independently from measured text
+- `widget_line_gap`
+- colors and fonts
 
 Card sections define relative structure only:
 
@@ -278,7 +262,7 @@ Static sizing rules:
 
 - header height comes from config
 - metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
-- metric bars, text/footer/clock preferred-height padding, throughput plot chrome, gauge geometry, and the remaining drive-row spacing/free-space width come from config, while fixed text columns derive from measured text widths plus their matching config padding
+- widget-specific heights, paddings, widths, and gauge/throughput chrome come from their matching widget sections, while fixed text columns derive from measured text widths plus their matching widget-section padding
 - throughput sections follow the configured vertical rhythm
 - centered time/date widgets use weighted slots from `center(...)`
 - repeated lists such as drives divide their assigned area using the item count from config

@@ -34,6 +34,63 @@ struct MetricScaleConfig {
     double boardFanRpm = 0.0;
 };
 
+struct MetricListWidgetConfig {
+    int labelWidth = 0;
+    int valueGap = 0;
+    int barHeight = 0;
+    int verticalGap = 0;
+};
+
+struct DriveUsageListWidgetConfig {
+    int freeWidth = 0;
+    int barGap = 0;
+    int valueGap = 0;
+    int barHeight = 0;
+    int verticalGap = 0;
+    int labelPadding = 0;
+    int percentPadding = 0;
+};
+
+struct ThroughputWidgetConfig {
+    int headerGap = 0;
+    int graphHeight = 0;
+    int valuePadding = 0;
+    int labelPadding = 0;
+    int axisPadding = 0;
+    int scaleLabelPadding = 0;
+    int scaleLabelMinHeight = 0;
+    int guideStrokeWidth = 0;
+    int plotStrokeWidth = 0;
+};
+
+struct GaugeWidgetConfig {
+    int preferredSize = 0;
+    int outerPadding = 0;
+    int minRadius = 0;
+    int strokeWidth = 0;
+    int textHalfWidth = 0;
+    int valueTop = 0;
+    int valueBottom = 0;
+    int labelTop = 0;
+    int labelBottom = 0;
+};
+
+struct TextWidgetConfig {
+    int preferredPadding = 0;
+};
+
+struct NetworkFooterWidgetConfig {
+    int preferredPadding = 0;
+};
+
+struct ClockTimeWidgetConfig {
+    int padding = 0;
+};
+
+struct ClockDateWidgetConfig {
+    int padding = 0;
+};
+
 struct LayoutConfig {
     int windowWidth = 0;
     int windowHeight = 0;
@@ -60,40 +117,16 @@ struct LayoutConfig {
     int headerGap = 0;
     int contentGap = 0;
     int columnGap = 0;
-    int metricLabelWidth = 0;
-    int metricValueGap = 0;
-    int metricBarHeight = 0;
-    int metricVerticalGap = 0;
     int widgetLineGap = 0;
-    int driveFreeWidth = 0;
-    int driveBarGap = 0;
-    int driveValueGap = 0;
-    int driveBarHeight = 0;
-    int driveVerticalGap = 0;
-    int throughputHeaderGap = 0;
-    int throughputGraphHeight = 0;
-    int gaugePreferredSize = 0;
-    int textPreferredPadding = 0;
-    int footerPreferredPadding = 0;
-    int clockTimePadding = 0;
-    int clockDatePadding = 0;
-    int throughputValuePadding = 0;
-    int throughputLabelPadding = 0;
-    int throughputAxisPadding = 0;
-    int driveLabelPadding = 0;
-    int drivePercentPadding = 0;
-    int graphLabelPadding = 0;
-    int graphLabelMinHeight = 0;
-    int graphStrokeWidth = 0;
-    int graphPlotStrokeWidth = 0;
-    int gaugeOuterPadding = 0;
-    int gaugeMinRadius = 0;
-    int gaugeStrokeWidth = 0;
-    int gaugeTextHalfWidth = 0;
-    int gaugeValueTop = 0;
-    int gaugeValueBottom = 0;
-    int gaugeLabelTop = 0;
-    int gaugeLabelBottom = 0;
+
+    MetricListWidgetConfig metricList{};
+    DriveUsageListWidgetConfig driveUsageList{};
+    ThroughputWidgetConfig throughput{};
+    GaugeWidgetConfig gauge{};
+    TextWidgetConfig text{};
+    NetworkFooterWidgetConfig networkFooter{};
+    ClockTimeWidgetConfig clockTime{};
+    ClockDateWidgetConfig clockDate{};
 
     UiFontConfig titleFont{};
     UiFontConfig bigFont{};
