@@ -96,6 +96,13 @@ private:
         int smallText = 0;
     };
 
+    struct MeasuredWidths {
+        int throughputLabel = 0;
+        int throughputAxis = 0;
+        int driveLabel = 0;
+        int drivePercent = 0;
+    };
+
     struct Fonts {
         HFONT title = nullptr;
         HFONT big = nullptr;
@@ -135,6 +142,7 @@ private:
     std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
     Fonts fonts_{};
     FontHeights fontHeights_{};
+    MeasuredWidths measuredWidths_{};
     ResolvedDashboardLayout resolvedLayout_{};
     std::string lastError_;
 };

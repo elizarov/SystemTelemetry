@@ -450,10 +450,6 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.metricVerticalGap = ParseIntOrDefault(value, layout.metricVerticalGap);
     } else if (key == "widget_line_gap") {
         layout.widgetLineGap = ParseIntOrDefault(value, layout.widgetLineGap);
-    } else if (key == "drive_label_width") {
-        layout.driveLabelWidth = ParseIntOrDefault(value, layout.driveLabelWidth);
-    } else if (key == "drive_percent_width") {
-        layout.drivePercentWidth = ParseIntOrDefault(value, layout.drivePercentWidth);
     } else if (key == "drive_free_width") {
         layout.driveFreeWidth = ParseIntOrDefault(value, layout.driveFreeWidth);
     } else if (key == "drive_bar_gap") {
@@ -464,14 +460,8 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.driveBarHeight = ParseIntOrDefault(value, layout.driveBarHeight);
     } else if (key == "drive_vertical_gap") {
         layout.driveVerticalGap = ParseIntOrDefault(value, layout.driveVerticalGap);
-    } else if (key == "throughput_axis_width") {
-        layout.throughputAxisWidth = ParseIntOrDefault(value, layout.throughputAxisWidth);
     } else if (key == "throughput_header_gap") {
         layout.throughputHeaderGap = ParseIntOrDefault(value, layout.throughputHeaderGap);
-    } else if (key == "throughput_read_label_width") {
-        layout.throughputReadLabelWidth = ParseIntOrDefault(value, layout.throughputReadLabelWidth);
-    } else if (key == "throughput_write_label_width") {
-        layout.throughputWriteLabelWidth = ParseIntOrDefault(value, layout.throughputWriteLabelWidth);
     } else if (key == "throughput_graph_height") {
         layout.throughputGraphHeight = ParseIntOrDefault(value, layout.throughputGraphHeight);
     } else if (key == "gauge_preferred_size") {

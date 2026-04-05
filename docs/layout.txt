@@ -57,17 +57,12 @@ Supported geometry keys:
 - `metric_bar_height = pixels`
 - `metric_vertical_gap = pixels`
 - `widget_line_gap = pixels`
-- `drive_label_width = pixels`
-- `drive_percent_width = pixels`
 - `drive_free_width = pixels`
 - `drive_bar_gap = pixels`
 - `drive_value_gap = pixels`
 - `drive_bar_height = pixels`
 - `drive_vertical_gap = pixels`
-- `throughput_axis_width = pixels`
 - `throughput_header_gap = pixels`
-- `throughput_read_label_width = pixels`
-- `throughput_write_label_width = pixels`
 - `throughput_graph_height = pixels`
 - `gauge_preferred_size = pixels`
 
@@ -158,6 +153,7 @@ Meaning:
 
 `metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + metric_vertical_gap + metric_bar_height`.
 `drive_usage_list(...)` rows use a computed row height of `max(label_font_height,small_font_height,drive_bar_height) + drive_vertical_gap` when placed inside a top-packed stack.
+Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load instead of being configured as separate width keys.
 
 Nested layout expressions are allowed.
 
@@ -240,7 +236,7 @@ Shared absolute geometry belongs only in `[layout]`, including:
 - header metrics
 - shared content spacing
 - shared metric-row gap and bar sizing
-- widget-specific widths and bar thicknesses when a hard-coded widget shape needs to stay configurable
+- widget-specific spacing and the widths that still vary independently from measured text
 
 Card sections define relative structure only:
 
@@ -259,7 +255,7 @@ Static sizing rules:
 
 - header height comes from config
 - metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
-- metric bars, drive row columns, throughput plot chrome, and gauge preferred size come from config
+- metric bars, the remaining drive-row spacing/free-space width, throughput plot chrome, and gauge preferred size come from config, while fixed text columns derive from measured text widths
 - throughput sections follow the configured vertical rhythm
 - centered time/date widgets use weighted slots from `center(...)`
 - repeated lists such as drives divide their assigned area using the item count from config

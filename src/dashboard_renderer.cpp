@@ -241,6 +241,17 @@ std::string FormatRect(const RECT& rect) {
         std::to_string(rect.right) + "," + std::to_string(rect.bottom) + ")";
 }
 
+SIZE MeasureTextSize(HDC hdc, HFONT font, const std::string& text) {
+    SIZE size{};
+    const std::wstring wide = WideFromUtf8(text);
+    HGDIOBJ oldFont = SelectObject(hdc, font);
+    if (!wide.empty()) {
+        GetTextExtentPoint32W(hdc, wide.c_str(), static_cast<int>(wide.size()), &size);
+    }
+    SelectObject(hdc, oldFont);
+    return size;
+}
+
 }  // namespace
 
 DashboardRenderer::DashboardRenderer() = default;
@@ -327,6 +338,7 @@ void DashboardRenderer::Shutdown() {
     DeleteObject(fonts_.smallFont);
     fonts_ = {};
     fontHeights_ = {};
+    measuredWidths_ = {};
     resolvedLayout_ = {};
     ReleasePanelIcons();
     ShutdownGdiplus();
@@ -408,12 +420,22 @@ bool DashboardRenderer::MeasureFonts() {
     fontHeights_.value = measure(fonts_.value);
     fontHeights_.label = measure(fonts_.label);
     fontHeights_.smallText = measure(fonts_.smallFont);
+    measuredWidths_.throughputLabel = std::max(
+        MeasureTextSize(hdc, fonts_.smallFont, "Read").cx,
+        MeasureTextSize(hdc, fonts_.smallFont, "Write").cx) + 4;
+    measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx + 6;
+    measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx + 4;
+    measuredWidths_.drivePercent = MeasureTextSize(hdc, fonts_.label, "100%").cx + 4;
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
     WriteTrace("renderer:font_metrics title=" + std::to_string(fontHeights_.title) +
         " big=" + std::to_string(fontHeights_.big) +
         " value=" + std::to_string(fontHeights_.value) +
         " label=" + std::to_string(fontHeights_.label) +
-        " small=" + std::to_string(fontHeights_.smallText));
+        " small=" + std::to_string(fontHeights_.smallText) +
+        " throughput_label_width=" + std::to_string(measuredWidths_.throughputLabel) +
+        " throughput_axis_width=" + std::to_string(measuredWidths_.throughputAxis) +
+        " drive_label_width=" + std::to_string(measuredWidths_.driveLabel) +
+        " drive_percent_width=" + std::to_string(measuredWidths_.drivePercent));
     return true;
 }
 
@@ -882,7 +904,7 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
 
-    const int axisWidth = std::max(1, config_.layout.throughputAxisWidth);
+    const int axisWidth = std::max(1, measuredWidths_.throughputAxis);
     const int graphLeft = rect.left + axisWidth;
     const int width = std::max<int>(1, rect.right - graphLeft - 1);
     const int height = std::max<int>(1, rect.bottom - rect.top - 1);
@@ -949,9 +971,7 @@ void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const Da
     const int lineHeight = fontHeights_.smallText + 2;
     RECT valueRect{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + lineHeight)};
     RECT graphRect{rect.left, std::min(rect.bottom, valueRect.bottom + std::max(0, config_.layout.throughputHeaderGap)), rect.right, rect.bottom};
-    const int labelWidth = metric.label == "Write"
-        ? std::max(1, config_.layout.throughputWriteLabelWidth)
-        : std::max(1, config_.layout.throughputReadLabelWidth);
+    const int labelWidth = std::max(1, measuredWidths_.throughputLabel);
     RECT labelRect{valueRect.left, valueRect.top, std::min(valueRect.right, valueRect.left + labelWidth), valueRect.bottom};
     RECT numberRect{std::min(valueRect.right, labelRect.right + std::max(0, config_.layout.throughputHeaderGap)), valueRect.top, valueRect.right, valueRect.bottom};
     char buffer[64];
@@ -970,8 +990,8 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
     const int rowHeight = EffectiveDriveRowHeight();
     RECT row{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + rowHeight)};
     for (const auto& drive : rows) {
-        const int labelWidth = std::max(1, config_.layout.driveLabelWidth);
-        const int percentWidth = std::max(1, config_.layout.drivePercentWidth);
+        const int labelWidth = std::max(1, measuredWidths_.driveLabel);
+        const int percentWidth = std::max(1, measuredWidths_.drivePercent);
         const int freeWidth = std::max(1, config_.layout.driveFreeWidth);
         const int barGap = std::max(0, config_.layout.driveBarGap);
         const int valueGap = std::max(0, config_.layout.driveValueGap);

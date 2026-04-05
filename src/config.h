@@ -56,17 +56,12 @@ struct LayoutConfig {
     int metricBarHeight = 0;
     int metricVerticalGap = 0;
     int widgetLineGap = 0;
-    int driveLabelWidth = 0;
-    int drivePercentWidth = 0;
     int driveFreeWidth = 0;
     int driveBarGap = 0;
     int driveValueGap = 0;
     int driveBarHeight = 0;
     int driveVerticalGap = 0;
-    int throughputAxisWidth = 0;
     int throughputHeaderGap = 0;
-    int throughputReadLabelWidth = 0;
-    int throughputWriteLabelWidth = 0;
     int throughputGraphHeight = 0;
     int gaugePreferredSize = 0;
 
