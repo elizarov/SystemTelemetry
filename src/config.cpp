@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 
 namespace {
@@ -52,6 +53,42 @@ int ParseIntOrDefault(const std::string& value, int fallback) {
         return consumed == value.size() ? parsed : fallback;
     } catch (...) {
         return fallback;
+    }
+}
+
+unsigned int ParseHexColorOrDefault(const std::string& value, unsigned int fallback) {
+    std::string text = Trim(value);
+    if (!text.empty() && text.front() == '#') {
+        text.erase(text.begin());
+    }
+    if (text.size() != 6) {
+        return fallback;
+    }
+    for (unsigned char ch : text) {
+        if (!std::isxdigit(ch)) {
+            return fallback;
+        }
+    }
+    try {
+        return static_cast<unsigned int>(std::stoul(text, nullptr, 16));
+    } catch (...) {
+        return fallback;
+    }
+}
+
+std::string FormatHexColor(unsigned int color) {
+    std::ostringstream stream;
+    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(6) << (color & 0xFFFFFFu);
+    return stream.str();
+}
+
+void ApplyFontValue(UiFontConfig& font, const std::string& key, const std::string& value) {
+    if (key == "face") {
+        font.face = value;
+    } else if (key == "size") {
+        font.size = ParseIntOrDefault(value, font.size);
+    } else if (key == "weight") {
+        font.weight = ParseIntOrDefault(value, font.weight);
     }
 }
 
@@ -156,6 +193,56 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             config.gigabyteFanChannelName = IsAutoChannelValue(value) ? std::string() : value;
         } else if (section == "vendor.gigabyte" && key == "temperature_channel") {
             config.gigabyteTemperatureChannelName = IsAutoChannelValue(value) ? std::string() : value;
+        } else if (section == "layout" && key == "background_color") {
+            config.layout.backgroundColor = ParseHexColorOrDefault(value, config.layout.backgroundColor);
+        } else if (section == "layout" && key == "foreground_color") {
+            config.layout.foregroundColor = ParseHexColorOrDefault(value, config.layout.foregroundColor);
+        } else if (section == "layout" && key == "accent_color") {
+            config.layout.accentColor = ParseHexColorOrDefault(value, config.layout.accentColor);
+        } else if (section == "layout" && key == "panel_border_color") {
+            config.layout.panelBorderColor = ParseHexColorOrDefault(value, config.layout.panelBorderColor);
+        } else if (section == "layout" && key == "muted_text_color") {
+            config.layout.mutedTextColor = ParseHexColorOrDefault(value, config.layout.mutedTextColor);
+        } else if (section == "layout" && key == "track_color") {
+            config.layout.trackColor = ParseHexColorOrDefault(value, config.layout.trackColor);
+        } else if (section == "layout" && key == "panel_fill_color") {
+            config.layout.panelFillColor = ParseHexColorOrDefault(value, config.layout.panelFillColor);
+        } else if (section == "layout" && key == "graph_background_color") {
+            config.layout.graphBackgroundColor = ParseHexColorOrDefault(value, config.layout.graphBackgroundColor);
+        } else if (section == "layout" && key == "graph_grid_color") {
+            config.layout.graphGridColor = ParseHexColorOrDefault(value, config.layout.graphGridColor);
+        } else if (section == "layout" && key == "graph_axis_color") {
+            config.layout.graphAxisColor = ParseHexColorOrDefault(value, config.layout.graphAxisColor);
+        } else if (section == "layout" && key == "title_font_face") {
+            ApplyFontValue(config.layout.titleFont, "face", value);
+        } else if (section == "layout" && key == "title_font_size") {
+            ApplyFontValue(config.layout.titleFont, "size", value);
+        } else if (section == "layout" && key == "title_font_weight") {
+            ApplyFontValue(config.layout.titleFont, "weight", value);
+        } else if (section == "layout" && key == "big_font_face") {
+            ApplyFontValue(config.layout.bigFont, "face", value);
+        } else if (section == "layout" && key == "big_font_size") {
+            ApplyFontValue(config.layout.bigFont, "size", value);
+        } else if (section == "layout" && key == "big_font_weight") {
+            ApplyFontValue(config.layout.bigFont, "weight", value);
+        } else if (section == "layout" && key == "value_font_face") {
+            ApplyFontValue(config.layout.valueFont, "face", value);
+        } else if (section == "layout" && key == "value_font_size") {
+            ApplyFontValue(config.layout.valueFont, "size", value);
+        } else if (section == "layout" && key == "value_font_weight") {
+            ApplyFontValue(config.layout.valueFont, "weight", value);
+        } else if (section == "layout" && key == "label_font_face") {
+            ApplyFontValue(config.layout.labelFont, "face", value);
+        } else if (section == "layout" && key == "label_font_size") {
+            ApplyFontValue(config.layout.labelFont, "size", value);
+        } else if (section == "layout" && key == "label_font_weight") {
+            ApplyFontValue(config.layout.labelFont, "weight", value);
+        } else if (section == "layout" && key == "small_font_face") {
+            ApplyFontValue(config.layout.smallFont, "face", value);
+        } else if (section == "layout" && key == "small_font_size") {
+            ApplyFontValue(config.layout.smallFont, "size", value);
+        } else if (section == "layout" && key == "small_font_weight") {
+            ApplyFontValue(config.layout.smallFont, "weight", value);
         }
     }
 }
@@ -227,6 +314,33 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
             "",
             "[storage]",
             "drives = C,D,E",
+            "",
+            "[layout]",
+            "background_color = " + FormatHexColor(config.layout.backgroundColor),
+            "foreground_color = " + FormatHexColor(config.layout.foregroundColor),
+            "accent_color = " + FormatHexColor(config.layout.accentColor),
+            "panel_border_color = " + FormatHexColor(config.layout.panelBorderColor),
+            "muted_text_color = " + FormatHexColor(config.layout.mutedTextColor),
+            "track_color = " + FormatHexColor(config.layout.trackColor),
+            "panel_fill_color = " + FormatHexColor(config.layout.panelFillColor),
+            "graph_background_color = " + FormatHexColor(config.layout.graphBackgroundColor),
+            "graph_grid_color = " + FormatHexColor(config.layout.graphGridColor),
+            "graph_axis_color = " + FormatHexColor(config.layout.graphAxisColor),
+            "title_font_face = " + config.layout.titleFont.face,
+            "title_font_size = " + std::to_string(config.layout.titleFont.size),
+            "title_font_weight = " + std::to_string(config.layout.titleFont.weight),
+            "big_font_face = " + config.layout.bigFont.face,
+            "big_font_size = " + std::to_string(config.layout.bigFont.size),
+            "big_font_weight = " + std::to_string(config.layout.bigFont.weight),
+            "value_font_face = " + config.layout.valueFont.face,
+            "value_font_size = " + std::to_string(config.layout.valueFont.size),
+            "value_font_weight = " + std::to_string(config.layout.valueFont.weight),
+            "label_font_face = " + config.layout.labelFont.face,
+            "label_font_size = " + std::to_string(config.layout.labelFont.size),
+            "label_font_weight = " + std::to_string(config.layout.labelFont.weight),
+            "small_font_face = " + config.layout.smallFont.face,
+            "small_font_size = " + std::to_string(config.layout.smallFont.size),
+            "small_font_weight = " + std::to_string(config.layout.smallFont.weight),
             "",
             "[vendor.gigabyte]",
             "fan_channel = ",

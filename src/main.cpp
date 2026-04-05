@@ -40,21 +40,20 @@ constexpr UINT_PTR kRefreshTimerId = 1;
 constexpr UINT_PTR kMoveTimerId = 2;
 constexpr UINT kRefreshTimerMs = 250;
 constexpr UINT kMoveTimerMs = 16;
-constexpr COLORREF kBlack = RGB(0, 0, 0);
-constexpr COLORREF kWhite = RGB(255, 255, 255);
-constexpr COLORREF kAccent = RGB(0, 191, 255);
-constexpr COLORREF kPanelBorder = RGB(235, 235, 235);
-constexpr COLORREF kMuted = RGB(165, 180, 190);
-constexpr COLORREF kTrack = RGB(45, 52, 58);
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kCommandMove = 1001;
 constexpr UINT kCommandBringOnTop = 1002;
-constexpr UINT kCommandSaveConfig = 1003;
-constexpr UINT kCommandExit = 1004;
+constexpr UINT kCommandReloadConfig = 1003;
+constexpr UINT kCommandSaveConfig = 1004;
+constexpr UINT kCommandExit = 1005;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
 
-COLORREF GetUsageFillColor() {
-    return kAccent;
+COLORREF ToColorRef(unsigned int color) {
+    return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
+}
+
+COLORREF GetUsageFillColor(const AppConfig& config) {
+    return ToColorRef(config.layout.accentColor);
 }
 
 std::string ToLower(std::string value) {
@@ -98,7 +97,7 @@ std::string FormatDriveFree(double freeGb) {
 
 std::filesystem::path GetRuntimeConfigPath();
 class DashboardApp;
-bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
+bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
 
 DiagnosticsOptions GetDiagnosticsOptions();
@@ -110,7 +109,7 @@ public:
     bool Initialize();
     std::ostream* TraceStream();
     void WriteTraceMarker(const std::string& text);
-    bool WriteOutputs(const TelemetryDump& dump);
+    bool WriteOutputs(const TelemetryDump& dump, const AppConfig& config);
 
 private:
     static void ShowFileOpenError(const char* label, const std::filesystem::path& path);
@@ -315,7 +314,7 @@ void DiagnosticsSession::WriteTraceMarker(const std::string& text) {
     trace.Write(text);
 }
 
-bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump) {
+bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig& config) {
     if (options_.dump) {
         std::ofstream dumpStream(dumpPath_, std::ios::binary | std::ios::trunc);
         if (!dumpStream.is_open()) {
@@ -330,7 +329,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump) {
         }
     }
 
-    if (options_.screenshot && !SaveDumpScreenshot(screenshotPath_, dump.snapshot)) {
+    if (options_.screenshot && !SaveDumpScreenshot(screenshotPath_, dump.snapshot, config)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
         MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
@@ -435,7 +434,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     telemetry->UpdateSnapshot();
     diagnostics.WriteTraceMarker("diagnostics:update_snapshot_done");
     diagnostics.WriteTraceMarker("diagnostics:write_outputs_begin");
-    if (!diagnostics.WriteOutputs(telemetry->Dump())) {
+    if (!diagnostics.WriteOutputs(telemetry->Dump(), telemetry->EffectiveConfig())) {
         diagnostics.WriteTraceMarker("diagnostics:write_outputs_failed");
         return 1;
     }
@@ -608,10 +607,11 @@ MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd) {
     return info;
 }
 
-HFONT CreateUiFont(int height, int weight, const wchar_t* face) {
-    return CreateFontW(-height, 0, 0, 0, weight, FALSE, FALSE, FALSE,
+HFONT CreateUiFont(const UiFontConfig& font) {
+    const std::wstring face = WideFromUtf8(font.face);
+    return CreateFontW(-font.size, 0, 0, 0, font.weight, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-        VARIABLE_PITCH, face);
+        VARIABLE_PITCH, face.c_str());
 }
 
 void ShutdownPreviousInstance() {
@@ -650,6 +650,7 @@ public:
     bool Initialize(HINSTANCE instance);
     int Run();
     bool InitializeFonts();
+    void SetRenderConfig(const AppConfig& config);
     void ReleaseFonts();
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
     bool WriteDiagnosticsOutputs();
@@ -661,7 +662,9 @@ private:
     void Paint();
     void ShowContextMenu(POINT screenPoint);
     void BringOnTop();
+    bool ReloadConfigFromDisk();
     void UpdateConfigFromCurrentPlacement();
+    void ApplyConfigPlacement();
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -673,6 +676,17 @@ private:
     bool LoadPanelIcons();
     void ReleasePanelIcons();
     HICON LoadAppIcon(int width, int height);
+    COLORREF BackgroundColor() const;
+    COLORREF ForegroundColor() const;
+    COLORREF AccentColor() const;
+    COLORREF PanelBorderColor() const;
+    COLORREF MutedTextColor() const;
+    COLORREF TrackColor() const;
+    COLORREF PanelFillColor() const;
+    COLORREF GraphBackgroundColor() const;
+    COLORREF GraphGridColor() const;
+    COLORREF GraphAxisColor() const;
+    COLORREF UsageFillColor() const;
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
         COLORREF color, UINT format);
@@ -717,6 +731,10 @@ private:
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
 
+void DashboardApp::SetRenderConfig(const AppConfig& config) {
+    config_ = config;
+}
+
 bool DashboardApp::Initialize(HINSTANCE instance) {
     instance_ = instance;
     config_ = LoadConfig(GetRuntimeConfigPath());
@@ -749,7 +767,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     wc.hInstance = instance;
     wc.lpszClassName = kWindowClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    wc.hbrBackground = CreateSolidBrush(kBlack);
+    wc.hbrBackground = CreateSolidBrush(BackgroundColor());
     appIconLarge_ = LoadAppIcon(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
     appIconSmall_ = LoadAppIcon(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
     wc.hIcon = appIconLarge_;
@@ -783,6 +801,16 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     return hwnd_ != nullptr;
 }
 
+void DashboardApp::ApplyConfigPlacement() {
+    int left = 100 + config_.positionX;
+    int top = 100 + config_.positionY;
+    if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
+        left = monitor->left + config_.positionX;
+        top = monitor->top + config_.positionY;
+    }
+    SetWindowPos(hwnd_, HWND_TOP, left, top, kWindowWidth, kWindowHeight, SWP_NOACTIVATE);
+}
+
 bool DashboardApp::InitializeFonts() {
     if (!InitializeGdiplus() || !LoadPanelIcons()) {
         return false;
@@ -792,11 +820,11 @@ bool DashboardApp::InitializeFonts() {
         return true;
     }
 
-    fonts_.title = CreateUiFont(18, FW_BOLD, L"Segoe UI Semibold");
-    fonts_.big = CreateUiFont(40, FW_BOLD, L"Segoe UI Semibold");
-    fonts_.value = CreateUiFont(17, FW_BOLD, L"Segoe UI Semibold");
-    fonts_.label = CreateUiFont(14, FW_NORMAL, L"Segoe UI");
-    fonts_.smallFont = CreateUiFont(12, FW_NORMAL, L"Segoe UI");
+    fonts_.title = CreateUiFont(config_.layout.titleFont);
+    fonts_.big = CreateUiFont(config_.layout.bigFont);
+    fonts_.value = CreateUiFont(config_.layout.valueFont);
+    fonts_.label = CreateUiFont(config_.layout.labelFont);
+    fonts_.smallFont = CreateUiFont(config_.layout.smallFont);
     if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr ||
         fonts_.label == nullptr || fonts_.smallFont == nullptr) {
         ReleaseFonts();
@@ -859,6 +887,50 @@ void DashboardApp::ReleasePanelIcons() {
     }
 }
 
+COLORREF DashboardApp::BackgroundColor() const {
+    return ToColorRef(config_.layout.backgroundColor);
+}
+
+COLORREF DashboardApp::ForegroundColor() const {
+    return ToColorRef(config_.layout.foregroundColor);
+}
+
+COLORREF DashboardApp::AccentColor() const {
+    return ToColorRef(config_.layout.accentColor);
+}
+
+COLORREF DashboardApp::PanelBorderColor() const {
+    return ToColorRef(config_.layout.panelBorderColor);
+}
+
+COLORREF DashboardApp::MutedTextColor() const {
+    return ToColorRef(config_.layout.mutedTextColor);
+}
+
+COLORREF DashboardApp::TrackColor() const {
+    return ToColorRef(config_.layout.trackColor);
+}
+
+COLORREF DashboardApp::PanelFillColor() const {
+    return ToColorRef(config_.layout.panelFillColor);
+}
+
+COLORREF DashboardApp::GraphBackgroundColor() const {
+    return ToColorRef(config_.layout.graphBackgroundColor);
+}
+
+COLORREF DashboardApp::GraphGridColor() const {
+    return ToColorRef(config_.layout.graphGridColor);
+}
+
+COLORREF DashboardApp::GraphAxisColor() const {
+    return ToColorRef(config_.layout.graphAxisColor);
+}
+
+COLORREF DashboardApp::UsageFillColor() const {
+    return GetUsageFillColor(config_);
+}
+
 HICON DashboardApp::LoadAppIcon(int width, int height) {
     return static_cast<HICON>(LoadImageW(instance_, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
         width, height, LR_DEFAULTCOLOR));
@@ -898,7 +970,7 @@ bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const
 
     HGDIOBJ oldBitmap = SelectObject(memDc, bitmap);
     RECT client{0, 0, kWindowWidth, kWindowHeight};
-    HBRUSH background = CreateSolidBrush(kBlack);
+    HBRUSH background = CreateSolidBrush(BackgroundColor());
     FillRect(memDc, &client, background);
     DeleteObject(background);
     SetBkMode(memDc, TRANSPARENT);
@@ -928,13 +1000,14 @@ bool DashboardApp::WriteDiagnosticsOutputs() {
         return true;
     }
     diagnostics_->WriteTraceMarker("diagnostics:write_outputs_begin");
-    const bool ok = diagnostics_->WriteOutputs(telemetry_->Dump());
+    const bool ok = diagnostics_->WriteOutputs(telemetry_->Dump(), telemetry_->EffectiveConfig());
     diagnostics_->WriteTraceMarker(ok ? "diagnostics:write_outputs_done" : "diagnostics:write_outputs_failed");
     return ok;
 }
 
-bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
+bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config) {
     DashboardApp renderer;
+    renderer.SetRenderConfig(config);
     if (!renderer.InitializeFonts()) {
         return false;
     }
@@ -948,6 +1021,43 @@ void DashboardApp::BringOnTop() {
     ShowWindow(hwnd_, SW_SHOWNORMAL);
     SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     SetForegroundWindow(hwnd_);
+}
+
+bool DashboardApp::ReloadConfigFromDisk() {
+    const AppConfig reloadedConfig = LoadConfig(GetRuntimeConfigPath());
+    std::unique_ptr<TelemetryRuntime> reloadedTelemetry =
+        CreateTelemetryRuntime(diagnosticsOptions_, GetExecutableDirectory());
+    if (reloadedTelemetry == nullptr) {
+        return false;
+    }
+
+    if (diagnostics_ != nullptr) {
+        diagnostics_->WriteTraceMarker("diagnostics:reload_config_begin");
+    }
+    if (!reloadedTelemetry->Initialize(reloadedConfig, diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr)) {
+        if (diagnostics_ != nullptr) {
+            diagnostics_->WriteTraceMarker("diagnostics:reload_config_failed");
+        }
+        return false;
+    }
+
+    config_ = reloadedConfig;
+    telemetry_ = std::move(reloadedTelemetry);
+    telemetry_->UpdateSnapshot();
+    ReleaseFonts();
+    if (!InitializeFonts()) {
+        if (diagnostics_ != nullptr) {
+            diagnostics_->WriteTraceMarker("diagnostics:reload_config_failed");
+        }
+        return false;
+    }
+    ApplyConfigPlacement();
+    movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+    InvalidateRect(hwnd_, nullptr, FALSE);
+    if (diagnostics_ != nullptr) {
+        diagnostics_->WriteTraceMarker("diagnostics:reload_config_done");
+    }
+    return true;
 }
 
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
@@ -1078,6 +1188,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
+    AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
     AppendMenuW(menu, MF_STRING, kCommandExit, L"Exit");
     SetForegroundWindow(hwnd_);
@@ -1093,6 +1204,11 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     case kCommandBringOnTop:
         BringOnTop();
         break;
+    case kCommandReloadConfig:
+        if (!ReloadConfigFromDisk()) {
+            MessageBoxW(hwnd_, L"Failed to reload config.ini.", L"System Telemetry", MB_ICONERROR);
+        }
+        break;
     case kCommandSaveConfig:
         UpdateConfigFromCurrentPlacement();
         break;
@@ -1106,8 +1222,8 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
 
 void DashboardApp::DrawMoveOverlay(HDC hdc) {
     RECT overlay{16, 16, 420, 112};
-    HBRUSH fill = CreateSolidBrush(RGB(0, 0, 0));
-    HPEN border = CreatePen(PS_SOLID, 1, kAccent);
+    HBRUSH fill = CreateSolidBrush(BackgroundColor());
+    HPEN border = CreatePen(PS_SOLID, 1, AccentColor());
     HGDIOBJ oldBrush = SelectObject(hdc, fill);
     HGDIOBJ oldPen = SelectObject(hdc, border);
     RoundRect(hdc, overlay.left, overlay.top, overlay.right, overlay.bottom, 14, 14);
@@ -1124,12 +1240,12 @@ void DashboardApp::DrawMoveOverlay(HDC hdc) {
     char positionText[96];
     sprintf_s(positionText, "Pos: x=%ld y=%ld", movePlacementInfo_.relativePosition.x, movePlacementInfo_.relativePosition.y);
 
-    DrawTextBlock(hdc, titleRect, "Move Mode", fonts_.label, kAccent, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, monitorRect, "Monitor: " + movePlacementInfo_.monitorName, fonts_.smallFont, kWhite,
+    DrawTextBlock(hdc, titleRect, "Move Mode", fonts_.label, AccentColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, monitorRect, "Monitor: " + movePlacementInfo_.monitorName, fonts_.smallFont, ForegroundColor(),
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    DrawTextBlock(hdc, positionRect, positionText, fonts_.smallFont, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, positionRect, positionText, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     DrawTextBlock(hdc, hintRect, "Left-click to place. Copy monitor name and x/y into config.", fonts_.smallFont,
-        kMuted, DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
+        MutedTextColor(), DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
 }
 
 int DashboardApp::Run() {
@@ -1270,7 +1386,7 @@ void DashboardApp::Paint() {
     HBITMAP bitmap = CreateCompatibleBitmap(hdc, client.right, client.bottom);
     HGDIOBJ oldBitmap = SelectObject(memDc, bitmap);
 
-    HBRUSH background = CreateSolidBrush(kBlack);
+    HBRUSH background = CreateSolidBrush(BackgroundColor());
     FillRect(memDc, &client, background);
     DeleteObject(background);
     SetBkMode(memDc, TRANSPARENT);
@@ -1314,8 +1430,8 @@ void DashboardApp::DrawPanelIcon(HDC hdc, PanelIcon icon, const RECT& iconRect) 
 }
 
 void DashboardApp::DrawPanel(HDC hdc, const RECT& rect, const std::string& title, PanelIcon icon) {
-    HPEN border = CreatePen(PS_SOLID, 1, kPanelBorder);
-    HBRUSH fill = CreateSolidBrush(RGB(6, 8, 11));
+    HPEN border = CreatePen(PS_SOLID, 1, PanelBorderColor());
+    HBRUSH fill = CreateSolidBrush(PanelFillColor());
     HGDIOBJ oldPen = SelectObject(hdc, border);
     HGDIOBJ oldBrush = SelectObject(hdc, fill);
     RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, 18, 18);
@@ -1334,7 +1450,7 @@ void DashboardApp::DrawPanel(HDC hdc, const RECT& rect, const std::string& title
     RECT iconRect{rect.left + 14, titleCenterY - 10, rect.left + 34, titleCenterY + 10};
     DrawPanelIcon(hdc, icon, iconRect);
 
-    DrawTextBlock(hdc, titleRect, title, fonts_.title, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, titleRect, title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 }
 
 POINT DashboardApp::PolarPoint(int cx, int cy, int radius, double angleDegrees) {
@@ -1346,8 +1462,8 @@ POINT DashboardApp::PolarPoint(int cx, int cy, int radius, double angleDegrees) 
 }
 
 void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label) {
-    HPEN trackPen = CreatePen(PS_SOLID, 10, kTrack);
-    HPEN usagePen = CreatePen(PS_SOLID, 10, GetUsageFillColor());
+    HPEN trackPen = CreatePen(PS_SOLID, 10, TrackColor());
+    HPEN usagePen = CreatePen(PS_SOLID, 10, UsageFillColor());
     HGDIOBJ oldPen = SelectObject(hdc, trackPen);
     HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
 
@@ -1372,27 +1488,27 @@ void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent
     RECT numberRect{cx - 42, cy - 28, cx + 42, cy + 18};
     char number[16];
     sprintf_s(number, "%.0f%%", percent);
-    DrawTextBlock(hdc, numberRect, number, fonts_.big, kWhite, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, numberRect, number, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 
     RECT labelRect{cx - 42, cy + 18, cx + 42, cy + 42};
-    DrawTextBlock(hdc, labelRect, label, fonts_.smallFont, kMuted, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, labelRect, label, fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 }
 
 void DashboardApp::DrawMetricRow(
     HDC hdc, const RECT& rect, const std::string& label, const std::string& value, double ratio) {
     RECT labelRect{rect.left, rect.top, rect.left + 74, rect.bottom};
     RECT valueRect{rect.left + 82, rect.top, rect.right, rect.bottom};
-    DrawTextBlock(hdc, labelRect, label, fonts_.label, kMuted, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, valueRect, value, fonts_.value, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, labelRect, label, fonts_.label, MutedTextColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, valueRect, value, fonts_.value, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
     RECT barRect{rect.left + 82, rect.bottom - 5, rect.right, rect.bottom - 1};
-    HBRUSH track = CreateSolidBrush(kTrack);
+    HBRUSH track = CreateSolidBrush(TrackColor());
     FillRect(hdc, &barRect, track);
     DeleteObject(track);
 
     RECT fill = barRect;
     fill.right = fill.left + static_cast<int>((fill.right - fill.left) * std::clamp(ratio, 0.0, 1.0));
-    HBRUSH accent = CreateSolidBrush(GetUsageFillColor());
+    HBRUSH accent = CreateSolidBrush(UsageFillColor());
     FillRect(hdc, &fill, accent);
     DeleteObject(accent);
 }
@@ -1400,7 +1516,7 @@ void DashboardApp::DrawMetricRow(
 void DashboardApp::DrawProcessorPanel(HDC hdc, const RECT& rect, const ProcessorTelemetry& cpu) {
     DrawPanel(hdc, rect, "CPU", PanelIcon::Cpu);
     RECT nameRect{rect.left + 16, rect.top + 34, rect.right - 16, rect.top + 58};
-    DrawTextBlock(hdc, nameRect, cpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+    DrawTextBlock(hdc, nameRect, cpu.name, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, cpu.loadPercent, "Load");
 
     int y = rect.top + 92;
@@ -1419,7 +1535,7 @@ void DashboardApp::DrawProcessorPanel(HDC hdc, const RECT& rect, const Processor
 void DashboardApp::DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& gpu) {
     DrawPanel(hdc, rect, "GPU", PanelIcon::Gpu);
     RECT nameRect{rect.left + 16, rect.top + 34, rect.right - 16, rect.top + 58};
-    DrawTextBlock(hdc, nameRect, gpu.name, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+    DrawTextBlock(hdc, nameRect, gpu.name, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, gpu.loadPercent, "Load");
 
     int y = rect.top + 92;
@@ -1436,7 +1552,7 @@ void DashboardApp::DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& g
 }
 
 void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue) {
-    HBRUSH bg = CreateSolidBrush(RGB(10, 12, 15));
+    HBRUSH bg = CreateSolidBrush(GraphBackgroundColor());
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
 
@@ -1446,7 +1562,7 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
     const int graphRight = graphLeft + width;
     const int graphBottom = rect.bottom - 1;
 
-    HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(42, 48, 54));
+    HPEN gridPen = CreatePen(PS_SOLID, 1, GraphGridColor());
     HGDIOBJ oldPen = SelectObject(hdc, gridPen);
     for (double tick = 5.0; tick < maxValue; tick += 5.0) {
         const double ratio = tick / maxValue;
@@ -1457,7 +1573,7 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
     SelectObject(hdc, oldPen);
     DeleteObject(gridPen);
 
-    HPEN axisPen = CreatePen(PS_SOLID, 1, RGB(80, 88, 96));
+    HPEN axisPen = CreatePen(PS_SOLID, 1, GraphAxisColor());
     oldPen = SelectObject(hdc, axisPen);
     MoveToEx(hdc, rect.left + 18, rect.top, nullptr);
     LineTo(hdc, rect.left + 18, rect.bottom - 1);
@@ -1469,9 +1585,9 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
     char maxLabel[32];
     sprintf_s(maxLabel, "%.0f", maxValue);
     RECT maxRect{rect.left, rect.top + 1, rect.left + 18, rect.top + 13};
-    DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, kWhite, DT_CENTER | DT_SINGLELINE | DT_TOP);
+    DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_TOP);
 
-    HPEN pen = CreatePen(PS_SOLID, 2, kAccent);
+    HPEN pen = CreatePen(PS_SOLID, 2, AccentColor());
     oldPen = SelectObject(hdc, pen);
     for (size_t i = 1; i < history.size(); ++i) {
         const double v1 = std::clamp(history[i - 1] / maxValue, 0.0, 1.0);
@@ -1492,8 +1608,8 @@ void DashboardApp::DrawThroughputSection(HDC hdc, const RECT& valueRect, const R
     const int labelWidth = strcmp(label, "Write") == 0 ? 42 : 54;
     RECT labelRect{valueRect.left, valueRect.top, valueRect.left + labelWidth, valueRect.bottom};
     RECT numberRect{labelRect.right + 2, valueRect.top, valueRect.right, valueRect.bottom};
-    DrawTextBlock(hdc, labelRect, label, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, numberRect, FormatSpeed(valueMbps), fonts_.label, kWhite, DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, labelRect, label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, numberRect, FormatSpeed(valueMbps), fonts_.label, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
     DrawGraph(hdc, graphRect, history, maxGraph);
 }
 
@@ -1513,7 +1629,7 @@ void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTele
     const std::string footer = network.adapterName.empty()
         ? network.ipAddress
         : network.adapterName + " | " + network.ipAddress;
-    DrawTextBlock(hdc, footerRect, footer, fonts_.smallFont, kWhite, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+    DrawTextBlock(hdc, footerRect, footer, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
 }
 
 void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTelemetry& storage, const std::vector<DriveInfo>& drives) {
@@ -1535,21 +1651,21 @@ void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTele
         RECT freeRect{rect.right - 92, y, rect.right - 16, y + 20};
         RECT barRect{usageLeft + 32, y + 4, rect.right - 150, y + 16};
 
-        DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, kWhite, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        HBRUSH track = CreateSolidBrush(kTrack);
+        DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        HBRUSH track = CreateSolidBrush(TrackColor());
         FillRect(hdc, &barRect, track);
         DeleteObject(track);
 
         RECT fill = barRect;
         fill.right = fill.left + static_cast<int>((fill.right - fill.left) * (drive.usedPercent / 100.0));
-        HBRUSH accent = CreateSolidBrush(GetUsageFillColor());
+        HBRUSH accent = CreateSolidBrush(UsageFillColor());
         FillRect(hdc, &fill, accent);
         DeleteObject(accent);
 
         char percent[16];
         sprintf_s(percent, "%.0f%%", drive.usedPercent);
-        DrawTextBlock(hdc, pctRect, percent, fonts_.label, kWhite, DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-        DrawTextBlock(hdc, freeRect, FormatDriveFree(drive.freeGb), fonts_.smallFont, kMuted,
+        DrawTextBlock(hdc, pctRect, percent, fonts_.label, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(hdc, freeRect, FormatDriveFree(drive.freeGb), fonts_.smallFont, MutedTextColor(),
             DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
         y += 34;
     }
@@ -1564,8 +1680,8 @@ void DashboardApp::DrawTimePanel(HDC hdc, const RECT& rect, const SYSTEMTIME& no
 
     RECT timeRect{rect.left + 16, rect.top + 46, rect.right - 16, rect.top + 116};
     RECT dateRect{rect.left + 16, rect.top + 120, rect.right - 16, rect.top + 148};
-    DrawTextBlock(hdc, timeRect, timeBuffer, fonts_.big, kWhite, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, dateRect, dateBuffer, fonts_.value, kMuted, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, timeRect, timeBuffer, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, dateRect, dateBuffer, fonts_.value, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 }
 
 void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
