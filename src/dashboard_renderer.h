@@ -47,8 +47,7 @@ public:
 private:
     struct WidgetBinding {
         std::string metric;
-        std::vector<std::string> items;
-        std::vector<std::string> drives;
+        std::string param;
     };
 
     enum class WidgetKind {

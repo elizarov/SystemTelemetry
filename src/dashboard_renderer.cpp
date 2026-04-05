@@ -74,6 +74,17 @@ std::vector<std::string> Split(const std::string& input, char delimiter) {
     return parts;
 }
 
+std::string Join(const std::vector<std::string>& parts, const std::string& delimiter) {
+    std::string joined;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i != 0) {
+            joined += delimiter;
+        }
+        joined += parts[i];
+    }
+    return joined;
+}
+
 UINT GetPanelIconResourceId(const std::string& iconName) {
     const std::string lowered = ToLower(iconName);
     if (lowered == "cpu") return IDR_PANEL_ICON_CPU;
@@ -101,6 +112,18 @@ std::optional<std::string> GetNodeParameter(const LayoutNodeConfig& node, const 
         }
     }
     return std::nullopt;
+}
+
+std::string GetPrimaryWidgetParameter(const LayoutNodeConfig& node, const std::string& legacyKey = {}) {
+    if (const auto value = GetNodeParameter(node, "value"); value.has_value()) {
+        return *value;
+    }
+    if (!legacyKey.empty()) {
+        if (const auto legacy = GetNodeParameter(node, legacyKey); legacy.has_value()) {
+            return *legacy;
+        }
+    }
+    return {};
 }
 
 HFONT CreateUiFont(const UiFontConfig& font) {
@@ -384,13 +407,13 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return fontHeights_.smallText + 2;
     }
     if (lowered == "metric_list" || lowered == "metric_list_cpu" || lowered == "metric_list_gpu") {
-        const int count = std::max<int>(1, static_cast<int>(GetNodeParameter(node, "items").has_value()
-            ? Split(*GetNodeParameter(node, "items"), ',') .size() : 4));
+        const std::string param = GetPrimaryWidgetParameter(node, "items");
+        const int count = std::max<int>(1, static_cast<int>(param.empty() ? 4 : Split(param, ',').size()));
         return count * EffectiveMetricRowHeight();
     }
     if (lowered == "drive_usage_list") {
-        const int count = std::max<int>(1, static_cast<int>(GetNodeParameter(node, "drives").has_value()
-            ? Split(*GetNodeParameter(node, "drives"), ',').size() : 3));
+        const std::string param = GetPrimaryWidgetParameter(node, "drives");
+        const int count = std::max<int>(1, static_cast<int>(param.empty() ? 3 : Split(param, ',').size()));
         return count * std::max(1, config_.layout.driveRowHeight);
     }
     if (lowered == "throughput" || lowered == "throughput_upload" || lowered == "throughput_download" ||
@@ -416,33 +439,23 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
         const std::string lowered = ToLower(node.name);
         if (lowered == "text") {
             widget.kind = WidgetKind::Text;
-            if (const auto value = GetNodeParameter(node, "value"); value.has_value()) {
-                widget.binding.metric = *value;
-            }
+            widget.binding.metric = GetPrimaryWidgetParameter(node);
         } else if (lowered == "gauge") {
             widget.kind = WidgetKind::Gauge;
-            if (const auto value = GetNodeParameter(node, "value"); value.has_value()) {
-                widget.binding.metric = *value;
-            }
+            widget.binding.metric = GetPrimaryWidgetParameter(node);
         } else if (lowered == "metric_list") {
             widget.kind = WidgetKind::MetricList;
-            if (const auto items = GetNodeParameter(node, "items"); items.has_value()) {
-                widget.binding.items = Split(*items, ',');
-            }
+            widget.binding.param = GetPrimaryWidgetParameter(node, "items");
         } else if (lowered == "throughput") {
             widget.kind = WidgetKind::Throughput;
-            if (const auto value = GetNodeParameter(node, "value"); value.has_value()) {
-                widget.binding.metric = *value;
-            }
+            widget.binding.metric = GetPrimaryWidgetParameter(node);
         } else if (lowered == "network_footer") {
             widget.kind = WidgetKind::NetworkFooter;
         } else if (lowered == "spacer") {
             widget.kind = WidgetKind::Spacer;
         } else if (lowered == "drive_usage_list") {
             widget.kind = WidgetKind::DriveUsageList;
-            if (const auto drives = GetNodeParameter(node, "drives"); drives.has_value()) {
-                widget.binding.drives = Split(*drives, ',');
-            }
+            widget.binding.param = GetPrimaryWidgetParameter(node, "drives");
         } else if (lowered == "clock_time") {
             widget.kind = WidgetKind::ClockTime;
         } else if (lowered == "clock_date") {
@@ -473,11 +486,13 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
             widget.binding.metric = "storage.write";
         } else if (lowered == "metric_list_cpu" || lowered == "metric_list_gpu") {
             widget.kind = WidgetKind::MetricList;
-            if (const auto items = GetNodeParameter(node, "items"); items.has_value()) {
+            if (const std::string items = GetPrimaryWidgetParameter(node, "items"); !items.empty()) {
                 const std::string prefix = lowered == "metric_list_cpu" ? "cpu." : "gpu.";
-                for (const auto& item : Split(*items, ',')) {
-                    widget.binding.items.push_back(prefix + item);
+                std::vector<std::string> prefixedItems;
+                for (const auto& item : Split(items, ',')) {
+                    prefixedItems.push_back(prefix + item);
                 }
+                widget.binding.param = Join(prefixedItems, ",");
             }
         }
         widget.rect = rect;
@@ -885,7 +900,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
     case WidgetKind::MetricList: {
         const int rowHeight = EffectiveMetricRowHeight();
         RECT rowRect{widget.rect.left, widget.rect.top, widget.rect.right, std::min(widget.rect.bottom, widget.rect.top + rowHeight)};
-        for (const auto& row : metrics.ResolveMetricList(widget.binding.items)) {
+        for (const auto& row : metrics.ResolveMetricList(Split(widget.binding.param, ','))) {
             DrawMetricRow(hdc, rowRect, row);
             OffsetRect(&rowRect, 0, rowHeight);
             rowRect.bottom = std::min(widget.rect.bottom, rowRect.top + rowHeight);
@@ -905,7 +920,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
     case WidgetKind::Spacer:
         return;
     case WidgetKind::DriveUsageList:
-        DrawDriveUsageWidget(hdc, widget.rect, metrics.ResolveDriveRows(widget.binding.drives));
+        DrawDriveUsageWidget(hdc, widget.rect, metrics.ResolveDriveRows(Split(widget.binding.param, ',')));
         return;
     case WidgetKind::ClockTime:
         DrawTextBlock(hdc, widget.rect, metrics.ResolveClockTime(), fonts_.big, ForegroundColor(),

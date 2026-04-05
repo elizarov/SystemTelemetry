@@ -57,6 +57,7 @@ The `[layout]` section in `config.ini` must control the dashboard window size, s
 Each dashboard card must have its own `[card.<id>]` section in `config.ini` that provides the card title, icon name, and widget layout expression.
 Layout-expression weights in `config.ini` must use the `name:weight(...)` form so the relative size is visually attached to the container or widget name it affects.
 Generic widget types such as `text(...)`, `gauge(...)`, `metric_list(...)`, and `throughput(...)` must bind to telemetry through explicit metric names in layout config instead of through card-specific hard-coded widget implementations.
+Widgets that need multiple values, such as `metric_list(...)` and `drive_usage_list(...)`, must take a widget-specific plain comma-separated parameter body instead of named `items=` or `drives=` parameters.
 The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
 The list of rendered cards must come from layout config instead of from a hard-coded card list.
 The storage drive list must come from the layout config through the storage card's `drive_usage_list(...)` widget binding instead of from a separate top-level storage section.

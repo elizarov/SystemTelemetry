@@ -161,7 +161,7 @@ Nested layout expressions are allowed.
 
 Example:
 
-- `columns(stack:5(throughput:4(storage.read),throughput:4(storage.write)), drive_usage_list:7(drives=C,D,E))`
+- `columns(stack:5(throughput:4(storage.read),throughput:4(storage.write)), drive_usage_list:7(C,D,E))`
 
 Widget names
 ============
@@ -181,15 +181,15 @@ Supported widget names:
 Widget parameters
 =================
 
-Widgets may bind data inline.
+Widgets may bind data inline. For widgets that accept a list, the plain comma-separated body is passed through as that widget's parameter string.
 
 Examples:
 
 - `text(cpu.name)`
 - `gauge(gpu.load)`
-- `metric_list(items=cpu.temp,cpu.clock,cpu.fan,cpu.ram)`
+- `metric_list(cpu.temp,cpu.clock,cpu.fan,cpu.ram)`
 - `throughput(network.upload)`
-- `drive_usage_list(drives=C,D,E)`
+- `drive_usage_list(C,D,E)`
 
 `spacer` reserves layout space without drawing content.
 
@@ -219,7 +219,7 @@ Rendering-oriented selection lives in the layout language when it changes what i
 
 Example:
 
-- `drive_usage_list(drives=C,D,E)`
+- `drive_usage_list(C,D,E)`
 
 This defines a vertical list of drive-usage widgets and their order.
 

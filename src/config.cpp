@@ -645,7 +645,7 @@ void RemoveKey(std::vector<std::string>& lines, size_t sectionStart, size_t sect
 void CollectDriveLettersRecursive(const LayoutNodeConfig& node, std::vector<std::string>& drives) {
     if (ToLower(node.name) == "drive_usage_list") {
         for (const auto& parameter : node.parameters) {
-            if (parameter.first == "drives") {
+            if (parameter.first == "value" || parameter.first == "drives") {
                 for (const std::string& drive : Split(parameter.second, ',')) {
                     const std::string normalized = ToLower(drive.substr(0, 1));
                     if (std::find(drives.begin(), drives.end(), normalized) == drives.end()) {
@@ -681,13 +681,13 @@ void EnsureDefaultLayout(LayoutConfig& layout) {
     };
 
     ensureCard("cpu", "CPU", "cpu",
-        "stack(text(cpu.name),columns:7(gauge:5(cpu.load),metric_list:7(items=cpu.temp,cpu.clock,cpu.fan,cpu.ram)))");
+        "stack(text(cpu.name),columns:7(gauge:5(cpu.load),metric_list:7(cpu.temp,cpu.clock,cpu.fan,cpu.ram)))");
     ensureCard("gpu", "GPU", "gpu",
-        "stack(text(gpu.name),columns:7(gauge:5(gpu.load),metric_list:7(items=gpu.temp,gpu.clock,gpu.fan,gpu.vram)))");
+        "stack(text(gpu.name),columns:7(gauge:5(gpu.load),metric_list:7(gpu.temp,gpu.clock,gpu.fan,gpu.vram)))");
     ensureCard("network", "Network", "network",
         "stack(throughput:4(network.upload),throughput:4(network.download),network_footer)");
     ensureCard("storage", "Storage", "storage",
-        "columns(stack:5(throughput:4(storage.read),throughput:4(storage.write),spacer),stack_top:7(drive_usage_list(drives=C,D,E)))");
+        "columns(stack:5(throughput:4(storage.read),throughput:4(storage.write),spacer),stack_top:7(drive_usage_list(C,D,E)))");
     ensureCard("time", "Time", "time",
         "center(clock_time:5,clock_date:2)");
 }
