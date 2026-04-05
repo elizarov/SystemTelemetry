@@ -53,7 +53,9 @@ The embedded `config.ini` resource must be the only self-documented source of tr
 Display placement in `config.ini` must use the compact `position = x,y` form for consistency with the rest of the pair-based config syntax.
 Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance instead of silently failing.
 The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
+The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.
 The `[layout]` section in `config.ini` must control the dashboard window size, shared spacing metrics, the generic dashboard card-placement layout, color palette, and UI font faces, sizes, and weights.
+The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using the current monitor DPI before rendering.
 Each dashboard card must have its own `[card.<id>]` section in `config.ini` that provides the card title, icon name, and widget layout expression.
 Layout-expression weights in `config.ini` must use the `name:weight(...)` form so the relative size is visually attached to the container or widget name it affects.
 Generic widget types such as `text(...)`, `gauge(...)`, `metric_list(...)`, and `throughput(...)` must bind to telemetry through explicit metric names in layout config instead of through card-specific hard-coded widget implementations.
@@ -114,6 +116,8 @@ Size and placement
 
 Panel size must come from the configured `layout.window` value.
 Place it as a top-level window at the monitor that is specified in configuration.
+Render the live dashboard at the native device-pixel size implied by the current monitor DPI instead of letting Windows upscale a fixed 800x480 render target after the fact.
+When the window moves onto a monitor with a different DPI, or when Windows reassigns it because monitors are connected or disconnected, the dashboard must recompute its device-pixel size and rerender at the new monitor scale automatically.
 Make sure the monitor to show the panel is selected by its name, not number,
 so it survives plugging/unplugging other monitors into the system.
 Support interactive repositioning so the user can discover and copy the monitor
@@ -133,8 +137,10 @@ When Move is active, the dashboard window should follow the mouse cursor until
 the user places it. While moving, show an overlay in the top-left corner with:
 
 - Monitor friendly name
+- Current monitor scale
 - Relative X/Y position on that monitor
 
+The move overlay should size and space itself from the actual current UI font metrics and monitor scale rather than from a separate fixed pixel layout.
 The overlay content should be easy to copy into configuration.
 The application must also read the saved relative X/Y coordinates from
 configuration at startup and place the window accordingly.

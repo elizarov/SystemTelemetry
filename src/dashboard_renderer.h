@@ -28,6 +28,8 @@ public:
     ~DashboardRenderer();
 
     void SetConfig(const AppConfig& config);
+    void SetRenderScale(double scale);
+    double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
 
@@ -133,6 +135,7 @@ private:
     int EffectiveHeaderHeight() const;
     int EffectiveMetricRowHeight() const;
     int EffectiveDriveRowHeight() const;
+    int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
 
     AppConfig config_;
@@ -142,7 +145,8 @@ private:
     std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
     Fonts fonts_{};
     FontHeights fontHeights_{};
-    MeasuredWidths measuredWidths_{};
+    MeasuredWidths measuredWidths_{}; 
     ResolvedDashboardLayout resolvedLayout_{};
     std::string lastError_;
+    double renderScale_ = 1.0;
 };

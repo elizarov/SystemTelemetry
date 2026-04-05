@@ -14,6 +14,7 @@ struct DiagnosticsOptions {
     bool exit = false;
     bool fake = false;
     bool reload = false;
+    double scale = 1.0;
 
     bool HasAnyOutput() const {
         return trace || dump || screenshot;

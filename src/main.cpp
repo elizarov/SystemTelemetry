@@ -6,8 +6,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -62,6 +64,34 @@ std::string Trim(std::string value) {
     return std::string(first, last);
 }
 
+SIZE MeasureTextSize(HDC hdc, HFONT font, const std::string& text) {
+    SIZE size{};
+    const std::wstring wide = WideFromUtf8(text);
+    HGDIOBJ oldFont = SelectObject(hdc, font);
+    if (!wide.empty()) {
+        GetTextExtentPoint32W(hdc, wide.c_str(), static_cast<int>(wide.size()), &size);
+    }
+    SelectObject(hdc, oldFont);
+    return size;
+}
+
+int MeasureFontHeight(HDC hdc, HFONT font) {
+    TEXTMETRICW metrics{};
+    HGDIOBJ oldFont = SelectObject(hdc, font);
+    GetTextMetricsW(hdc, &metrics);
+    SelectObject(hdc, oldFont);
+    return static_cast<int>(metrics.tmHeight);
+}
+
+int MeasureWrappedTextHeight(HDC hdc, HFONT font, const std::string& text, int width) {
+    RECT rect{0, 0, std::max(1, width), 0};
+    const std::wstring wide = WideFromUtf8(text);
+    HGDIOBJ oldFont = SelectObject(hdc, font);
+    DrawTextW(hdc, wide.c_str(), -1, &rect, DT_LEFT | DT_WORDBREAK | DT_CALCRECT);
+    SelectObject(hdc, oldFont);
+    return rect.bottom - rect.top;
+}
+
 bool ContainsInsensitive(const std::string& value, const std::string& needle) {
     if (needle.empty()) {
         return true;
@@ -72,7 +102,7 @@ bool ContainsInsensitive(const std::string& value, const std::string& needle) {
 std::filesystem::path GetRuntimeConfigPath();
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    std::ostream* traceStream = nullptr, std::string* errorText = nullptr);
+    double scale, std::ostream* traceStream = nullptr, std::string* errorText = nullptr);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
 
 DiagnosticsOptions GetDiagnosticsOptions();
@@ -143,6 +173,33 @@ std::optional<std::wstring> GetSwitchValue(const std::wstring& target) {
     return std::nullopt;
 }
 
+std::optional<double> TryParseScaleValue(const std::wstring& text) {
+    if (text.empty()) {
+        return std::nullopt;
+    }
+
+    std::string narrow = Utf8FromWide(text);
+    std::replace(narrow.begin(), narrow.end(), ',', '.');
+    char* end = nullptr;
+    const double value = std::strtod(narrow.c_str(), &end);
+    if (end == narrow.c_str() || end == nullptr || *end != '\0' || !std::isfinite(value) || value <= 0.0) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::optional<double> GetScaleSwitchValue() {
+    for (const std::wstring& argument : GetCommandLineArguments()) {
+        if (argument.size() > 7 && _wcsnicmp(argument.c_str(), L"/scale:", 7) == 0) {
+            return TryParseScaleValue(argument.substr(7));
+        }
+    }
+    if (const auto value = GetSwitchValue(L"/scale"); value.has_value()) {
+        return TryParseScaleValue(*value);
+    }
+    return std::nullopt;
+}
+
 DiagnosticsOptions GetDiagnosticsOptions() {
     DiagnosticsOptions options;
     options.trace = HasSwitch("/trace");
@@ -151,6 +208,9 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.exit = HasSwitch("/exit");
     options.fake = HasSwitch("/fake");
     options.reload = HasSwitch("/reload");
+    if (const auto scale = GetScaleSwitchValue(); scale.has_value()) {
+        options.scale = *scale;
+    }
     return options;
 }
 
@@ -215,7 +275,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
 
     std::string screenshotError;
     if (options_.screenshot && !SaveDumpScreenshot(
-            screenshotPath_, dump.snapshot, config, TraceStream(), &screenshotError)) {
+            screenshotPath_, dump.snapshot, config, options_.exit ? options_.scale : 1.0, TraceStream(), &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
         std::string traceText = "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
@@ -356,7 +416,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         return 1;
     }
 
-    diagnostics.WriteTraceMarker("diagnostics:headless_start");
+    diagnostics.WriteTraceMarker("diagnostics:headless_start scale=" + std::to_string(diagnosticsOptions.scale));
     diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_begin");
 
     std::unique_ptr<TelemetryRuntime> telemetry =
@@ -410,17 +470,68 @@ double GetThroughputGraphMax(const std::vector<double>& firstHistory, const std:
     return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
 }
 
+constexpr UINT kDefaultDpi = USER_DEFAULT_SCREEN_DPI;
+
+using GetDpiForMonitorFn = HRESULT(WINAPI*)(HMONITOR, int, UINT*, UINT*);
+
+UINT GetMonitorDpi(HMONITOR monitor) {
+    if (monitor == nullptr) {
+        return kDefaultDpi;
+    }
+
+    static GetDpiForMonitorFn getDpiForMonitor = []() -> GetDpiForMonitorFn {
+        HMODULE module = LoadLibraryW(L"Shcore.dll");
+        if (module == nullptr) {
+            return nullptr;
+        }
+        return reinterpret_cast<GetDpiForMonitorFn>(GetProcAddress(module, "GetDpiForMonitor"));
+    }();
+
+    if (getDpiForMonitor != nullptr) {
+        UINT dpiX = kDefaultDpi;
+        UINT dpiY = kDefaultDpi;
+        if (SUCCEEDED(getDpiForMonitor(monitor, 0, &dpiX, &dpiY))) {
+            return dpiX;
+        }
+    }
+    return kDefaultDpi;
+}
+
+double ScaleFromDpi(UINT dpi) {
+    return static_cast<double>(std::max(kDefaultDpi, dpi)) / static_cast<double>(kDefaultDpi);
+}
+
+int ScaleLogicalToPhysical(int logicalValue, UINT dpi) {
+    if (logicalValue == 0) {
+        return 0;
+    }
+    return static_cast<int>(std::lround(static_cast<double>(logicalValue) * ScaleFromDpi(dpi)));
+}
+
+int ScalePhysicalToLogical(int physicalValue, UINT dpi) {
+    if (physicalValue == 0) {
+        return 0;
+    }
+    return static_cast<int>(std::lround(static_cast<double>(physicalValue) / ScaleFromDpi(dpi)));
+}
+
 struct MonitorPlacementInfo {
     std::string deviceName;
     std::string monitorName = "Unknown";
     std::string configMonitorName;
     RECT monitorRect{};
     POINT relativePosition{};
+    UINT dpi = kDefaultDpi;
 };
 
 struct MonitorIdentity {
     std::string displayName;
     std::string configName;
+};
+
+struct TargetMonitorInfo {
+    RECT rect{};
+    UINT dpi = kDefaultDpi;
 };
 
 std::string SimplifyDeviceName(const std::string& deviceName) {
@@ -439,13 +550,13 @@ bool IsUsefulFriendlyName(const std::string& name) {
 
 MonitorIdentity GetMonitorIdentity(const std::string& deviceName);
 
-std::optional<RECT> FindTargetMonitor(const std::string& requestedName) {
+std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName) {
     if (requestedName.empty()) {
         return std::nullopt;
     }
     struct SearchContext {
         std::string requestedName;
-        std::optional<RECT> result;
+        std::optional<TargetMonitorInfo> result;
     } context{requestedName, std::nullopt};
 
     EnumDisplayMonitors(
@@ -463,7 +574,7 @@ std::optional<RECT> FindTargetMonitor(const std::string& requestedName) {
             if (ContainsInsensitive(identity.displayName, context->requestedName) ||
                 ContainsInsensitive(identity.configName, context->requestedName) ||
                 ContainsInsensitive(deviceName, context->requestedName)) {
-                context->result = info.rcMonitor;
+                context->result = TargetMonitorInfo{info.rcMonitor, GetMonitorDpi(monitor)};
                 return FALSE;
             }
             return TRUE;
@@ -547,8 +658,9 @@ MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd) {
         info.monitorName = identity.displayName;
         info.configMonitorName = identity.configName;
         info.monitorRect = monitorInfo.rcMonitor;
-        info.relativePosition.x = windowRect.left - monitorInfo.rcMonitor.left;
-        info.relativePosition.y = windowRect.top - monitorInfo.rcMonitor.top;
+        info.dpi = GetMonitorDpi(monitor);
+        info.relativePosition.x = ScalePhysicalToLogical(windowRect.left - monitorInfo.rcMonitor.left, info.dpi);
+        info.relativePosition.y = ScalePhysicalToLogical(windowRect.top - monitorInfo.rcMonitor.top, info.dpi);
     }
     return info;
 }
@@ -611,6 +723,9 @@ private:
     bool ReloadConfigFromDisk();
     void UpdateConfigFromCurrentPlacement();
     void ApplyConfigPlacement();
+    bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
+    void UpdateRendererScale(double scale);
+    UINT CurrentWindowDpi() const;
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -642,6 +757,7 @@ private:
     DiagnosticsOptions diagnosticsOptions_;
     std::unique_ptr<DiagnosticsSession> diagnostics_;
     std::chrono::steady_clock::time_point lastDiagnosticsOutput_{};
+    UINT currentDpi_ = kDefaultDpi;
 };
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -649,6 +765,17 @@ DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagn
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
     config_ = config;
     renderer_.SetConfig(config);
+}
+
+void DashboardApp::UpdateRendererScale(double scale) {
+    renderer_.SetRenderScale(scale);
+}
+
+UINT DashboardApp::CurrentWindowDpi() const {
+    if (hwnd_ != nullptr) {
+        return GetDpiForWindow(hwnd_);
+    }
+    return currentDpi_;
 }
 
 int DashboardApp::WindowWidth() const {
@@ -704,13 +831,19 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     }
 
     RECT placement{100, 100, 100 + WindowWidth(), 100 + WindowHeight()};
+    currentDpi_ = GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
     if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
-        placement.left = monitor->left + config_.positionX;
-        placement.top = monitor->top + config_.positionY;
+        currentDpi_ = monitor->dpi;
+        UpdateRendererScale(ScaleFromDpi(currentDpi_));
+        placement.left = monitor->rect.left + ScaleLogicalToPhysical(config_.positionX, currentDpi_);
+        placement.top = monitor->rect.top + ScaleLogicalToPhysical(config_.positionY, currentDpi_);
     } else {
-        placement.left = 100 + config_.positionX;
-        placement.top = 100 + config_.positionY;
+        UpdateRendererScale(ScaleFromDpi(currentDpi_));
+        placement.left = 100 + ScaleLogicalToPhysical(config_.positionX, currentDpi_);
+        placement.top = 100 + ScaleLogicalToPhysical(config_.positionY, currentDpi_);
     }
+    placement.right = placement.left + WindowWidth();
+    placement.bottom = placement.top + WindowHeight();
 
     hwnd_ = CreateWindowExW(
         WS_EX_TOOLWINDOW,
@@ -729,11 +862,16 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 }
 
 void DashboardApp::ApplyConfigPlacement() {
-    int left = 100 + config_.positionX;
-    int top = 100 + config_.positionY;
+    UINT targetDpi = hwnd_ != nullptr ? CurrentWindowDpi() : GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
+    int left = 100 + ScaleLogicalToPhysical(config_.positionX, targetDpi);
+    int top = 100 + ScaleLogicalToPhysical(config_.positionY, targetDpi);
     if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
-        left = monitor->left + config_.positionX;
-        top = monitor->top + config_.positionY;
+        targetDpi = monitor->dpi;
+        left = monitor->rect.left + ScaleLogicalToPhysical(config_.positionX, targetDpi);
+        top = monitor->rect.top + ScaleLogicalToPhysical(config_.positionY, targetDpi);
+    }
+    if (!ApplyWindowDpi(targetDpi)) {
+        return;
     }
     SetWindowPos(hwnd_, HWND_TOP, left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE);
 }
@@ -778,6 +916,30 @@ bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const
     return renderer_.SaveSnapshotPng(imagePath, snapshot);
 }
 
+bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
+    const UINT targetDpi = std::max(kDefaultDpi, dpi);
+    if (currentDpi_ == targetDpi && suggestedRect == nullptr) {
+        return true;
+    }
+
+    currentDpi_ = targetDpi;
+    ReleaseFonts();
+    UpdateRendererScale(ScaleFromDpi(currentDpi_));
+    if (!InitializeFonts()) {
+        return false;
+    }
+
+    if (suggestedRect != nullptr) {
+        SetWindowPos(hwnd_, nullptr,
+            suggestedRect->left,
+            suggestedRect->top,
+            suggestedRect->right - suggestedRect->left,
+            suggestedRect->bottom - suggestedRect->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    return true;
+}
+
 bool DashboardApp::WriteDiagnosticsOutputs() {
     if (diagnostics_ == nullptr) {
         return true;
@@ -789,9 +951,10 @@ bool DashboardApp::WriteDiagnosticsOutputs() {
 }
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    std::ostream* traceStream, std::string* errorText) {
+    double scale, std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
     renderer.SetConfig(config);
+    renderer.SetRenderScale(scale);
     renderer.SetTraceOutput(traceStream);
     if (!renderer.Initialize()) {
         if (errorText != nullptr) {
@@ -949,8 +1112,15 @@ void DashboardApp::UpdateMoveTracking() {
         return;
     }
 
+    HDC hdc = GetDC(hwnd_);
+    int cursorOffset = ScaleLogicalToPhysical(24, CurrentWindowDpi());
+    if (hdc != nullptr) {
+        cursorOffset = std::max(cursorOffset, MeasureFontHeight(hdc, renderer_.SmallFont()) + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
+        ReleaseDC(hwnd_, hdc);
+    }
+
     const int x = cursor.x - (WindowWidth() / 2);
-    const int y = cursor.y - 24;
+    const int y = cursor.y - cursorOffset;
     SetWindowPos(hwnd_, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
 }
@@ -992,30 +1162,65 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
 }
 
 void DashboardApp::DrawMoveOverlay(HDC hdc) {
-    RECT overlay{16, 16, 420, 112};
+    const int margin = ScaleLogicalToPhysical(16, CurrentWindowDpi());
+    const int padding = ScaleLogicalToPhysical(12, CurrentWindowDpi());
+    const int lineGap = ScaleLogicalToPhysical(6, CurrentWindowDpi());
+    const int cornerRadius = ScaleLogicalToPhysical(14, CurrentWindowDpi());
+    const int borderWidth = std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi()));
+
+    char positionText[96];
+    sprintf_s(positionText, "Pos: x=%ld y=%ld", movePlacementInfo_.relativePosition.x, movePlacementInfo_.relativePosition.y);
+    char scaleText[96];
+    const double scale = ScaleFromDpi(movePlacementInfo_.dpi);
+    sprintf_s(scaleText, "Scale: %.0f%% (%.2fx)", scale * 100.0, scale);
+
+    const std::string titleText = "Move Mode";
+    const std::string monitorText = "Monitor: " + movePlacementInfo_.monitorName;
+    const std::string hintText = "Left-click to place. Copy monitor name, scale, and x/y into config.";
+
+    const int titleHeight = MeasureFontHeight(hdc, renderer_.LabelFont());
+    const int bodyHeight = MeasureFontHeight(hdc, renderer_.SmallFont());
+    const int minContentWidth = ScaleLogicalToPhysical(220, CurrentWindowDpi());
+    const int maxContentWidth = std::max(minContentWidth, WindowWidth() - margin * 2 - padding * 2);
+    int preferredContentWidth = minContentWidth;
+    preferredContentWidth = std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, renderer_.LabelFont(), titleText).cx));
+    preferredContentWidth = std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, renderer_.SmallFont(), monitorText).cx));
+    preferredContentWidth = std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, renderer_.SmallFont(), positionText).cx));
+    preferredContentWidth = std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, renderer_.SmallFont(), scaleText).cx));
+    const int contentWidth = std::min(maxContentWidth, preferredContentWidth);
+    const int hintHeight = MeasureWrappedTextHeight(hdc, renderer_.SmallFont(), hintText, contentWidth);
+    const int overlayWidth = contentWidth + padding * 2;
+    const int overlayHeight = padding * 2 + titleHeight + lineGap + bodyHeight + lineGap +
+        bodyHeight + lineGap + bodyHeight + lineGap + hintHeight;
+    RECT overlay{margin, margin, margin + overlayWidth, margin + overlayHeight};
+
     HBRUSH fill = CreateSolidBrush(BackgroundColor());
-    HPEN border = CreatePen(PS_SOLID, 1, AccentColor());
+    HPEN border = CreatePen(PS_SOLID, borderWidth, AccentColor());
     HGDIOBJ oldBrush = SelectObject(hdc, fill);
     HGDIOBJ oldPen = SelectObject(hdc, border);
-    RoundRect(hdc, overlay.left, overlay.top, overlay.right, overlay.bottom, 14, 14);
+    RoundRect(hdc, overlay.left, overlay.top, overlay.right, overlay.bottom, cornerRadius, cornerRadius);
     SelectObject(hdc, oldPen);
     SelectObject(hdc, oldBrush);
     DeleteObject(fill);
     DeleteObject(border);
 
-    RECT titleRect{overlay.left + 12, overlay.top + 8, overlay.right - 12, overlay.top + 28};
-    RECT monitorRect{overlay.left + 12, overlay.top + 34, overlay.right - 12, overlay.top + 56};
-    RECT positionRect{overlay.left + 12, overlay.top + 58, overlay.right - 12, overlay.top + 80};
-    RECT hintRect{overlay.left + 12, overlay.top + 82, overlay.right - 12, overlay.bottom - 12};
+    int y = overlay.top + padding;
+    RECT titleRect{overlay.left + padding, y, overlay.right - padding, y + titleHeight};
+    y = titleRect.bottom + lineGap;
+    RECT monitorRect{overlay.left + padding, y, overlay.right - padding, y + bodyHeight};
+    y = monitorRect.bottom + lineGap;
+    RECT positionRect{overlay.left + padding, y, overlay.right - padding, y + bodyHeight};
+    y = positionRect.bottom + lineGap;
+    RECT scaleRect{overlay.left + padding, y, overlay.right - padding, y + bodyHeight};
+    y = scaleRect.bottom + lineGap;
+    RECT hintRect{overlay.left + padding, y, overlay.right - padding, overlay.bottom - padding};
 
-    char positionText[96];
-    sprintf_s(positionText, "Pos: x=%ld y=%ld", movePlacementInfo_.relativePosition.x, movePlacementInfo_.relativePosition.y);
-
-    DrawTextBlock(hdc, titleRect, "Move Mode", renderer_.LabelFont(), AccentColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, monitorRect, "Monitor: " + movePlacementInfo_.monitorName, renderer_.SmallFont(), ForegroundColor(),
+    DrawTextBlock(hdc, titleRect, titleText, renderer_.LabelFont(), AccentColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, monitorRect, monitorText, renderer_.SmallFont(), ForegroundColor(),
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     DrawTextBlock(hdc, positionRect, positionText, renderer_.SmallFont(), ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, hintRect, "Left-click to place. Copy monitor name and x/y into config.", renderer_.SmallFont(),
+    DrawTextBlock(hdc, scaleRect, scaleText, renderer_.SmallFont(), ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, hintRect, hintText, renderer_.SmallFont(),
         MutedTextColor(), DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
 }
 
@@ -1052,9 +1257,12 @@ LRESULT CALLBACK DashboardApp::WndProcThunk(HWND hwnd, UINT message, WPARAM wPar
 LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_CREATE:
+        currentDpi_ = CurrentWindowDpi();
+        UpdateRendererScale(ScaleFromDpi(currentDpi_));
         if (!InitializeFonts()) {
             return -1;
         }
+        ApplyConfigPlacement();
         SetTimer(hwnd_, kRefreshTimerId, kRefreshTimerMs, nullptr);
         CreateTrayIcon();
         return 0;
@@ -1115,6 +1323,20 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         break;
     case WM_PAINT:
         Paint();
+        return 0;
+    case WM_DPICHANGED:
+        if (!ApplyWindowDpi(HIWORD(wParam), reinterpret_cast<const RECT*>(lParam))) {
+            return -1;
+        }
+        movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+        InvalidateRect(hwnd_, nullptr, FALSE);
+        return 0;
+    case WM_DISPLAYCHANGE:
+        if (!ApplyWindowDpi(CurrentWindowDpi())) {
+            return -1;
+        }
+        movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+        InvalidateRect(hwnd_, nullptr, FALSE);
         return 0;
     case WM_ERASEBKGND:
         return 1;
@@ -1191,6 +1413,8 @@ void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
     const DiagnosticsOptions diagnosticsOptions = GetDiagnosticsOptions();
 
     if (const auto elevatedSaveSource = GetSwitchValue(L"/save-config"); elevatedSaveSource.has_value()) {
