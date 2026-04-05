@@ -91,6 +91,7 @@ Color keys stay in `[layout]` and use `#RRGGBB`:
 - `graph_background_color`
 - `graph_grid_color`
 - `graph_axis_color`
+- `graph_marker_color`
 
 Font keys stay in `[layout]`:
 

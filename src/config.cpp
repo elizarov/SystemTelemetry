@@ -414,6 +414,8 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.graphGridColor = ParseHexColorOrDefault(value, layout.graphGridColor);
     } else if (key == "graph_axis_color") {
         layout.graphAxisColor = ParseHexColorOrDefault(value, layout.graphAxisColor);
+    } else if (key == "graph_marker_color") {
+        layout.graphMarkerColor = ParseHexColorOrDefault(value, layout.graphMarkerColor);
     } else if (key == "outer_margin") {
         layout.outerMargin = ParseIntOrDefault(value, layout.outerMargin);
     } else if (key == "row_gap") {

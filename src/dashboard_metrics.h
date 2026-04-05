@@ -29,6 +29,8 @@ struct DashboardThroughputMetric {
     std::vector<double> history;
     double maxGraph = 10.0;
     double guideStepMbps = 5.0;
+    double timeMarkerOffsetSamples = 0.0;
+    double timeMarkerIntervalSamples = 20.0;
 };
 
 struct DashboardDriveRow {

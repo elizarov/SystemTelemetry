@@ -69,6 +69,12 @@ double GetStorageGuideStep(double maxGraph) {
     return maxGraph > 50.0 ? 50.0 : 5.0;
 }
 
+double GetTimeMarkerOffsetSamples(const SYSTEMTIME& now) {
+    const double secondsIntoTenSecondWindow =
+        std::fmod(static_cast<double>(now.wSecond) + (static_cast<double>(now.wMilliseconds) / 1000.0), 10.0);
+    return secondsIntoTenSecondWindow / 0.5;
+}
+
 std::string BuildBoardMetricLabel(const std::string& name, const char* suffix) {
     if (name.empty()) {
         return suffix;
@@ -180,19 +186,22 @@ DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::st
     const auto storageWriteHistory = SmoothThroughputHistory(snapshot_.storage.writeHistory);
     const double networkMaxGraph = GetThroughputGraphMax(networkUploadHistory, networkDownloadHistory);
     const double storageMaxGraph = GetThroughputGraphMax(storageReadHistory, storageWriteHistory);
+    const double timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot_.now);
     if (lowered == "network.upload") {
-        return DashboardThroughputMetric{"Up", snapshot_.network.uploadMbps, networkUploadHistory, networkMaxGraph, 5.0};
+        return DashboardThroughputMetric{
+            "Up", snapshot_.network.uploadMbps, networkUploadHistory, networkMaxGraph, 5.0, timeMarkerOffsetSamples, 20.0};
     }
     if (lowered == "network.download") {
-        return DashboardThroughputMetric{"Down", snapshot_.network.downloadMbps, networkDownloadHistory, networkMaxGraph, 5.0};
+        return DashboardThroughputMetric{
+            "Down", snapshot_.network.downloadMbps, networkDownloadHistory, networkMaxGraph, 5.0, timeMarkerOffsetSamples, 20.0};
     }
     if (lowered == "storage.read") {
         return DashboardThroughputMetric{"Read", snapshot_.storage.readMbps, storageReadHistory,
-            storageMaxGraph, GetStorageGuideStep(storageMaxGraph)};
+            storageMaxGraph, GetStorageGuideStep(storageMaxGraph), timeMarkerOffsetSamples, 20.0};
     }
     if (lowered == "storage.write") {
         return DashboardThroughputMetric{"Write", snapshot_.storage.writeMbps, storageWriteHistory,
-            storageMaxGraph, GetStorageGuideStep(storageMaxGraph)};
+            storageMaxGraph, GetStorageGuideStep(storageMaxGraph), timeMarkerOffsetSamples, 20.0};
     }
     return DashboardThroughputMetric{};
 }

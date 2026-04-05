@@ -38,6 +38,7 @@ struct LayoutConfig {
     unsigned int graphBackgroundColor = 0x0A0C0F;
     unsigned int graphGridColor = 0x2A3036;
     unsigned int graphAxisColor = 0x505860;
+    unsigned int graphMarkerColor = 0x1C2228;
 
     int outerMargin = 10;
     int rowGap = 10;

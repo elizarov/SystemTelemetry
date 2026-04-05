@@ -783,7 +783,7 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const Dashboard
 }
 
 void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
-    double guideStepMbps) {
+    double guideStepMbps, double timeMarkerOffsetSamples, double timeMarkerIntervalSamples) {
     HBRUSH bg = CreateSolidBrush(ToColorRef(config_.layout.graphBackgroundColor));
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
@@ -795,7 +795,7 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     const int graphRight = graphLeft + width;
     const int graphBottom = rect.bottom - 1;
 
-    HPEN gridPen = CreatePen(PS_SOLID, 1, ToColorRef(config_.layout.graphGridColor));
+    HPEN gridPen = CreatePen(PS_SOLID, 1, ToColorRef(config_.layout.graphMarkerColor));
     HGDIOBJ oldPen = SelectObject(hdc, gridPen);
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
@@ -806,6 +806,20 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     }
     SelectObject(hdc, oldPen);
     DeleteObject(gridPen);
+
+    const double markerInterval = timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
+    HPEN timePen = CreatePen(PS_SOLID, 1, ToColorRef(config_.layout.graphMarkerColor));
+    oldPen = SelectObject(hdc, timePen);
+    for (double sampleOffset = timeMarkerOffsetSamples; sampleOffset <= static_cast<double>(history.size() - 1) + markerInterval;
+         sampleOffset += markerInterval) {
+        const double clampedOffset = std::clamp(sampleOffset, 0.0, static_cast<double>(history.size() - 1));
+        const int x = graphRight - static_cast<int>(std::round(
+            clampedOffset * width / std::max<size_t>(1, history.size() - 1)));
+        MoveToEx(hdc, x, rect.top, nullptr);
+        LineTo(hdc, x, rect.bottom - 1);
+    }
+    SelectObject(hdc, oldPen);
+    DeleteObject(timePen);
 
     HPEN axisPen = CreatePen(PS_SOLID, 1, ToColorRef(config_.layout.graphAxisColor));
     oldPen = SelectObject(hdc, axisPen);
@@ -854,7 +868,8 @@ void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const Da
     }
     DrawTextBlock(hdc, labelRect, metric.label, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     DrawTextBlock(hdc, numberRect, buffer, fonts_.smallFont, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-    DrawGraph(hdc, graphRect, metric.history, metric.maxGraph, metric.guideStepMbps);
+    DrawGraph(hdc, graphRect, metric.history, metric.maxGraph, metric.guideStepMbps,
+        metric.timeMarkerOffsetSamples, metric.timeMarkerIntervalSamples);
 }
 
 void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows) {
