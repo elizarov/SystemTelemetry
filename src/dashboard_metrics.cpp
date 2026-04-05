@@ -119,7 +119,7 @@ std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<Name
     const SystemSnapshot& snapshot, const std::string& metricHistoryRef, const std::string& name,
     const char* suffix, double scale) {
     for (const auto& metric : metrics) {
-        if (ToLower(metric.name) != ToLower(name)) {
+        if (metric.name != name) {
             continue;
         }
         const double ratio = ResolveScaleRatio(metric.metric.value.value_or(0.0), scale);
@@ -134,45 +134,44 @@ std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<Name
 
 std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales,
     const std::string& metricRef) {
-    const std::string lowered = ToLower(metricRef);
-    if (lowered == "cpu.clock") {
+    if (metricRef == "cpu.clock") {
         const double ratio = ResolveScaleRatio(snapshot.cpu.clock.value.value_or(0.0), metricScales.cpuClockGHz);
         return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.cpu.clock, 2),
-            ratio, ResolvePeakRatio(snapshot, "cpu.clock", ratio)};
+            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
-    if (lowered == "cpu.ram" || lowered == "cpu.memory") {
+    if (metricRef == "cpu.ram") {
         const double total = snapshot.cpu.memory.totalGb;
         const double ratio = total > 0.0 ? snapshot.cpu.memory.usedGb / total : 0.0;
         return DashboardMetricRow{"RAM", FormatMemory(snapshot.cpu.memory.usedGb, total),
-            ratio, ResolvePeakRatio(snapshot, "cpu.memory", ratio)};
+            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
-    if (lowered == "gpu.temp" || lowered == "gpu.temperature") {
+    if (metricRef == "gpu.temp") {
         const double ratio = ResolveScaleRatio(snapshot.gpu.temperature.value.value_or(0.0), metricScales.gpuTemperatureC);
         return DashboardMetricRow{"Temp", FormatScalarValue(snapshot.gpu.temperature, 0),
-            ratio, ResolvePeakRatio(snapshot, "gpu.temperature", ratio)};
+            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
-    if (lowered == "gpu.clock") {
+    if (metricRef == "gpu.clock") {
         const double ratio = ResolveScaleRatio(snapshot.gpu.clock.value.value_or(0.0), metricScales.gpuClockMHz);
         return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.gpu.clock, 0),
-            ratio, ResolvePeakRatio(snapshot, "gpu.clock", ratio)};
+            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
-    if (lowered == "gpu.fan") {
+    if (metricRef == "gpu.fan") {
         const double ratio = ResolveScaleRatio(snapshot.gpu.fan.value.value_or(0.0), metricScales.gpuFanRpm);
         return DashboardMetricRow{"Fan", FormatScalarValue(snapshot.gpu.fan, 0),
-            ratio, ResolvePeakRatio(snapshot, "gpu.fan", ratio)};
+            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
-    if (lowered == "gpu.vram" || lowered == "gpu.memory") {
+    if (metricRef == "gpu.vram") {
         const double total = std::max(1.0, snapshot.gpu.vram.totalGb);
         const double ratio = snapshot.gpu.vram.totalGb > 0.0 ? snapshot.gpu.vram.usedGb / snapshot.gpu.vram.totalGb : 0.0;
         return DashboardMetricRow{"VRAM", FormatMemory(snapshot.gpu.vram.usedGb, total),
-            ratio, ResolvePeakRatio(snapshot, "gpu.vram", ratio)};
+            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
-    if (lowered.rfind("board.temp.", 0) == 0) {
-        return ResolveNamedBoardMetric(snapshot.boardTemperatures, snapshot, lowered,
+    if (metricRef.rfind("board.temp.", 0) == 0) {
+        return ResolveNamedBoardMetric(snapshot.boardTemperatures, snapshot, metricRef,
             metricRef.substr(std::string("board.temp.").size()), "Temp", metricScales.boardTemperatureC);
     }
-    if (lowered.rfind("board.fan.", 0) == 0) {
-        return ResolveNamedBoardMetric(snapshot.boardFans, snapshot, lowered,
+    if (metricRef.rfind("board.fan.", 0) == 0) {
+        return ResolveNamedBoardMetric(snapshot.boardFans, snapshot, metricRef,
             metricRef.substr(std::string("board.fan.").size()), "Fan", metricScales.boardFanRpm);
     }
     return std::nullopt;
@@ -190,23 +189,21 @@ DashboardMetricSource::DashboardMetricSource(const SystemSnapshot& snapshot, con
     : snapshot_(snapshot), metricScales_(metricScales) {}
 
 std::string DashboardMetricSource::ResolveText(const std::string& metricRef) const {
-    const std::string lowered = ToLower(metricRef);
-    if (lowered == "cpu.name") {
+    if (metricRef == "cpu.name") {
         return snapshot_.cpu.name;
     }
-    if (lowered == "gpu.name") {
+    if (metricRef == "gpu.name") {
         return snapshot_.gpu.name;
     }
     return "N/A";
 }
 
 DashboardGaugeMetric DashboardMetricSource::ResolveGauge(const std::string& metricRef) const {
-    const std::string lowered = ToLower(metricRef);
-    if (lowered == "cpu.load" || lowered == "cpu.load_percent") {
+    if (metricRef == "cpu.load" || metricRef == "cpu.load_percent") {
         const double percent = std::clamp(snapshot_.cpu.loadPercent, 0.0, 100.0);
         return DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "cpu.load", percent / 100.0)};
     }
-    if (lowered == "gpu.load" || lowered == "gpu.load_percent") {
+    if (metricRef == "gpu.load" || metricRef == "gpu.load_percent") {
         const double percent = std::clamp(snapshot_.gpu.loadPercent, 0.0, 100.0);
         return DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "gpu.load", percent / 100.0)};
     }
@@ -225,7 +222,6 @@ std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const s
 }
 
 DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::string& metricRef) const {
-    const std::string lowered = ToLower(metricRef);
     const auto networkUploadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.upload"));
     const auto networkDownloadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.download"));
     const auto storageReadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.read"));
@@ -233,19 +229,19 @@ DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::st
     const double networkMaxGraph = GetThroughputGraphMax(networkUploadHistory, networkDownloadHistory);
     const double storageMaxGraph = GetThroughputGraphMax(storageReadHistory, storageWriteHistory);
     const double timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot_.now);
-    if (lowered == "network.upload") {
+    if (metricRef == "network.upload") {
         return DashboardThroughputMetric{
             "Up", snapshot_.network.uploadMbps, networkUploadHistory, networkMaxGraph, 5.0, timeMarkerOffsetSamples, 20.0};
     }
-    if (lowered == "network.download") {
+    if (metricRef == "network.download") {
         return DashboardThroughputMetric{
             "Down", snapshot_.network.downloadMbps, networkDownloadHistory, networkMaxGraph, 5.0, timeMarkerOffsetSamples, 20.0};
     }
-    if (lowered == "storage.read") {
+    if (metricRef == "storage.read") {
         return DashboardThroughputMetric{"Read", snapshot_.storage.readMbps, storageReadHistory,
             storageMaxGraph, GetStorageGuideStep(storageMaxGraph), timeMarkerOffsetSamples, 20.0};
     }
-    if (lowered == "storage.write") {
+    if (metricRef == "storage.write") {
         return DashboardThroughputMetric{"Write", snapshot_.storage.writeMbps, storageWriteHistory,
             storageMaxGraph, GetStorageGuideStep(storageMaxGraph), timeMarkerOffsetSamples, 20.0};
     }

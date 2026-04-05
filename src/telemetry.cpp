@@ -689,7 +689,7 @@ void TelemetryCollector::Impl::UpdateGpu() {
             " available=" + tracing::Trace::BoolText(gpuProviderAvailable_) +
             " diagnostics=\"" + gpuProviderDiagnostics_ + "\"").c_str());
     }
-    PushRetainedHistorySample("gpu.temperature",
+    PushRetainedHistorySample("gpu.temp",
         ResolveScaleRatio(snapshot_.gpu.temperature.value.value_or(0.0), config_.metricScales.gpuTemperatureC));
     PushRetainedHistorySample("gpu.clock",
         ResolveScaleRatio(snapshot_.gpu.clock.value.value_or(0.0), config_.metricScales.gpuClockMHz));
@@ -711,7 +711,7 @@ void TelemetryCollector::Impl::UpdateMemory() {
     Trace(("telemetry:memory_status ok=" + tracing::Trace::BoolText(ok != FALSE) +
         " total_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.totalGb, 2) +
         " used_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.usedGb, 2)).c_str());
-    PushRetainedHistorySample("cpu.memory",
+    PushRetainedHistorySample("cpu.ram",
         snapshot_.cpu.memory.totalGb > 0.0 ? snapshot_.cpu.memory.usedGb / snapshot_.cpu.memory.totalGb : 0.0);
 }
 
