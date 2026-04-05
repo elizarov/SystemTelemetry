@@ -23,7 +23,7 @@ Compact rules
 - layout containers are written as `kind(...)`
 - size pairs are written as `x,y`
 - font specs are written as `face,size,weight`
-- widget parameters are written inline as `widget(key=value)`
+- widget parameters are written inline as `widget(key=value)` or `widget(metric.ref)`
 - omitted weights default to `1`
 - whitespace around commas is ignored
 
@@ -151,31 +151,25 @@ Meaning:
 - `columns(...)` splits content horizontally into weighted children
 - `stack(...)` splits content vertically into weighted children
 - `stack_top(...)` packs children from the top using their preferred heights and leaves any remaining space below
+- `center(...)` creates a centered vertical stack
 
 `drive_usage_list(...)` rows use `drive_row_height` as their packed row height when placed inside a top-packed stack.
-- `center(...)` creates a centered vertical stack
 
 Nested layout expressions are allowed.
 
 Example:
 
-- `columns(stack(throughput_read*4,throughput_write*4)*5, drive_usage_list(drives=C,D,E)*7)`
+- `columns(stack(throughput(storage.read)*4,throughput(storage.write)*4)*5, drive_usage_list(drives=C,D,E)*7)`
 
 Widget names
 ============
 
 Supported widget names:
 
-- `cpu_name`
-- `gpu_name`
-- `gauge_cpu_load`
-- `gauge_gpu_load`
-- `metric_list_cpu`
-- `metric_list_gpu`
-- `throughput_upload`
-- `throughput_download`
-- `throughput_read`
-- `throughput_write`
+- `text`
+- `gauge`
+- `metric_list`
+- `throughput`
 - `network_footer`
 - `spacer`
 - `drive_usage_list`
@@ -189,11 +183,32 @@ Widgets may bind data inline.
 
 Examples:
 
-- `metric_list_cpu(items=temp,clock,fan,ram)`
-- `metric_list_gpu(items=temp,clock,fan,vram)`
+- `text(cpu.name)`
+- `gauge(gpu.load)`
+- `metric_list(items=cpu.temp,cpu.clock,cpu.fan,cpu.ram)`
+- `throughput(network.upload)`
 - `drive_usage_list(drives=C,D,E)`
 
 `spacer` reserves layout space without drawing content.
+
+Supported metric references include:
+
+- `cpu.name`
+- `cpu.load`
+- `cpu.temp`
+- `cpu.clock`
+- `cpu.fan`
+- `cpu.ram`
+- `gpu.name`
+- `gpu.load`
+- `gpu.temp`
+- `gpu.clock`
+- `gpu.fan`
+- `gpu.vram`
+- `network.upload`
+- `network.download`
+- `storage.read`
+- `storage.write`
 
 Drive and sensor selection
 ==========================

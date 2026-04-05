@@ -688,13 +688,13 @@ void EnsureDefaultLayout(LayoutConfig& layout) {
     };
 
     ensureCard("cpu", "CPU", "cpu",
-        "stack(cpu_name,columns(gauge_cpu_load*5,metric_list_cpu(items=temp,clock,fan,ram)*7)*7)");
+        "stack(text(cpu.name),columns(gauge(cpu.load)*5,metric_list(items=cpu.temp,cpu.clock,cpu.fan,cpu.ram)*7)*7)");
     ensureCard("gpu", "GPU", "gpu",
-        "stack(gpu_name,columns(gauge_gpu_load*5,metric_list_gpu(items=temp,clock,fan,vram)*7)*7)");
+        "stack(text(gpu.name),columns(gauge(gpu.load)*5,metric_list(items=gpu.temp,gpu.clock,gpu.fan,gpu.vram)*7)*7)");
     ensureCard("network", "Network", "network",
-        "stack(throughput_upload*4,throughput_download*4,network_footer)");
+        "stack(throughput(network.upload)*4,throughput(network.download)*4,network_footer)");
     ensureCard("storage", "Storage", "storage",
-        "columns(stack(throughput_read*4,throughput_write*4,spacer)*5,stack_top(drive_usage_list(drives=C,D,E))*7)");
+        "columns(stack(throughput(storage.read)*4,throughput(storage.write)*4,spacer)*5,stack_top(drive_usage_list(drives=C,D,E))*7)");
     ensureCard("time", "Time", "time",
         "center(clock_time*5,clock_date*2)");
 }

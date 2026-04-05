@@ -1,9 +1,9 @@
 APP=build\SystemTelemetry.exe
 RES=build\SystemTelemetry.res
 PROBE=build\GigabyteSivProbe.exe
-SRC=src\main.cpp src\config.cpp src\telemetry.cpp src\telemetry_runtime.cpp src\telemetry_runtime_fake.cpp src\snapshot_dump.cpp src\gpu_vendor.cpp src\gpu_amd_adl.cpp src\board_vendor.cpp src\board_gigabyte_siv.cpp src\utf8.cpp src\trace.cpp src\vendor\adlx\SDK\ADLXHelper\Windows\Cpp\ADLXHelper.cpp src\vendor\adlx\SDK\Platform\Windows\WinAPIs.cpp
+SRC=src\main.cpp src\config.cpp src\telemetry.cpp src\telemetry_runtime.cpp src\telemetry_runtime_fake.cpp src\snapshot_dump.cpp src\gpu_vendor.cpp src\gpu_amd_adl.cpp src\board_vendor.cpp src\board_gigabyte_siv.cpp src\dashboard_metrics.cpp src\dashboard_renderer.cpp src\utf8.cpp src\trace.cpp src\vendor\adlx\SDK\ADLXHelper\Windows\Cpp\ADLXHelper.cpp src\vendor\adlx\SDK\Platform\Windows\WinAPIs.cpp
 CFLAGS=/nologo /std:c++20 /EHsc /W4 /permissive- /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /Zi /Isrc /Isrc\\vendor\\adlx /Fdbuild\\vc140.pdb
-LDFLAGS=user32.lib gdi32.lib pdh.lib iphlpapi.lib dxgi.lib comctl32.lib ws2_32.lib ole32.lib oleaut32.lib advapi32.lib
+LDFLAGS=user32.lib gdi32.lib gdiplus.lib pdh.lib iphlpapi.lib dxgi.lib comctl32.lib ws2_32.lib ole32.lib oleaut32.lib advapi32.lib
 
 all: $(APP) $(PROBE)
 
