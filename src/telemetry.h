@@ -23,8 +23,8 @@ struct DriveInfo {
     double freeGb = 0.0;
 };
 
-struct MetricHistorySeries {
-    std::string metricRef;
+struct RetainedHistorySeries {
+    std::string seriesRef;
     std::vector<double> samples;
 };
 
@@ -49,15 +49,11 @@ struct NetworkTelemetry {
     double uploadMbps = 0.0;
     double downloadMbps = 0.0;
     std::string ipAddress = "N/A";
-    std::vector<double> uploadHistory;
-    std::vector<double> downloadHistory;
 };
 
 struct StorageTelemetry {
     double readMbps = 0.0;
     double writeMbps = 0.0;
-    std::vector<double> readHistory;
-    std::vector<double> writeHistory;
 };
 
 struct SystemSnapshot {
@@ -65,7 +61,7 @@ struct SystemSnapshot {
     GpuTelemetry gpu;
     std::vector<NamedScalarMetric> boardTemperatures;
     std::vector<NamedScalarMetric> boardFans;
-    std::vector<MetricHistorySeries> metricHistories;
+    std::vector<RetainedHistorySeries> retainedHistories;
     NetworkTelemetry network;
     StorageTelemetry storage;
     std::vector<DriveInfo> drives;

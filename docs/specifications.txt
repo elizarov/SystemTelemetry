@@ -86,7 +86,7 @@ The board provider must receive the set of requested board temperature and fan n
 The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
 When `Save Config` creates `config.ini` beside the executable for the first time, it must begin from the embedded resource copy verbatim so the saved file keeps the same comments and documentation text before updating values in place.
 The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults instead of synthesizing fallback cards, widgets, or drive lists in C++ config-loading code.
-Metric-list rows and their retained recent-peak histories must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
+Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
 
 Diagnostics requirements live in `docs/diagnostics.txt`.
 The config overlay path must replace parsed layout expressions instead of appending onto previously loaded embedded defaults, so `config.ini` can safely override `[layout]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.
@@ -232,7 +232,7 @@ Clock (GHz)
 Fan (RPM)
 System Fan (RPM)
 Each CPU and GPU metric row bar must render with rounded leading and trailing ends, with the straight middle section proportional to the current value so the bar naturally collapses to a circle at zero, and overlay a small translucent vertical capsule marker at the highest bar ratio seen in the retained recent metric history.
-Metric-row peak ghosts must use the same shared 0.5 second update cadence and 60-sample retained history as the current network throughput history, for a 30 second recent-max window.
+Metric-row peak ghosts must use the same shared retained-history-series path, 0.5 second update cadence, and 60-sample depth as the network and storage throughput plots, for a 30 second recent-max window.
 
 GPU Panel (Top Right)
 =====================

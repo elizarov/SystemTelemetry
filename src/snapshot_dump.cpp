@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v3";
+constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v4";
 
 std::string TrimAsciiWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");
@@ -160,11 +160,11 @@ void WriteNamedScalarMetrics(std::ostream& output, const std::string& prefix, co
     }
 }
 
-void WriteMetricHistories(std::ostream& output, const std::string& prefix, const std::vector<MetricHistorySeries>& histories) {
+void WriteRetainedHistories(std::ostream& output, const std::string& prefix, const std::vector<RetainedHistorySeries>& histories) {
     WriteInteger(output, prefix + ".count", histories.size());
     for (size_t i = 0; i < histories.size(); ++i) {
         const std::string historyPrefix = prefix + "." + std::to_string(i);
-        WriteString(output, historyPrefix + ".metric_ref", histories[i].metricRef);
+        WriteString(output, historyPrefix + ".series_ref", histories[i].seriesRef);
         WriteDoubleArray(output, historyPrefix + ".samples", histories[i].samples);
     }
 }
@@ -397,8 +397,8 @@ bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values, co
     return true;
 }
 
-bool LoadMetricHistories(const std::map<std::string, std::string>& values, const std::string& prefix,
-    std::vector<MetricHistorySeries>& field, std::string* error) {
+bool LoadRetainedHistories(const std::map<std::string, std::string>& values, const std::string& prefix,
+    std::vector<RetainedHistorySeries>& field, std::string* error) {
     size_t count = 0;
     if (!LoadUnsigned(values, prefix + ".count", count, error)) {
         return false;
@@ -407,9 +407,9 @@ bool LoadMetricHistories(const std::map<std::string, std::string>& values, const
     field.clear();
     field.reserve(count);
     for (size_t i = 0; i < count; ++i) {
-        MetricHistorySeries history;
+        RetainedHistorySeries history;
         const std::string historyPrefix = prefix + "." + std::to_string(i);
-        if (!LoadString(values, historyPrefix + ".metric_ref", history.metricRef, error) ||
+        if (!LoadString(values, historyPrefix + ".series_ref", history.seriesRef, error) ||
             !LoadDoubleArrayField(values, historyPrefix + ".samples", history.samples, error)) {
             return false;
         }
@@ -431,7 +431,7 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteDouble(output, "cpu.memory.total_gb", dump.snapshot.cpu.memory.totalGb, 6);
     WriteNamedScalarMetrics(output, "board.temperatures", dump.snapshot.boardTemperatures);
     WriteNamedScalarMetrics(output, "board.fans", dump.snapshot.boardFans);
-    WriteMetricHistories(output, "metric_histories", dump.snapshot.metricHistories);
+    WriteRetainedHistories(output, "retained_histories", dump.snapshot.retainedHistories);
 
     WriteString(output, "gpu.name", dump.snapshot.gpu.name);
     WriteDouble(output, "gpu.load_percent", dump.snapshot.gpu.loadPercent, 6);
@@ -465,13 +465,8 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteDouble(output, "network.upload_mbps", dump.snapshot.network.uploadMbps, 6);
     WriteDouble(output, "network.download_mbps", dump.snapshot.network.downloadMbps, 6);
     WriteString(output, "network.ip_address", dump.snapshot.network.ipAddress);
-    WriteDoubleArray(output, "network.upload_history", dump.snapshot.network.uploadHistory);
-    WriteDoubleArray(output, "network.download_history", dump.snapshot.network.downloadHistory);
-
     WriteDouble(output, "storage.read_mbps", dump.snapshot.storage.readMbps, 6);
     WriteDouble(output, "storage.write_mbps", dump.snapshot.storage.writeMbps, 6);
-    WriteDoubleArray(output, "storage.read_history", dump.snapshot.storage.readHistory);
-    WriteDoubleArray(output, "storage.write_history", dump.snapshot.storage.writeHistory);
 
     WriteInteger(output, "drives.count", dump.snapshot.drives.size());
     for (size_t i = 0; i < dump.snapshot.drives.size(); ++i) {
@@ -533,7 +528,7 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadDouble(values, "cpu.memory.total_gb", parsed.snapshot.cpu.memory.totalGb, error) ||
         !LoadNamedScalarMetrics(values, "board.temperatures", parsed.snapshot.boardTemperatures, error) ||
         !LoadNamedScalarMetrics(values, "board.fans", parsed.snapshot.boardFans, error) ||
-        !LoadMetricHistories(values, "metric_histories", parsed.snapshot.metricHistories, error) ||
+        !LoadRetainedHistories(values, "retained_histories", parsed.snapshot.retainedHistories, error) ||
         !LoadString(values, "gpu.name", parsed.snapshot.gpu.name, error) ||
         !LoadDouble(values, "gpu.load_percent", parsed.snapshot.gpu.loadPercent, error) ||
         !LoadOptionalDouble(values, "gpu.temperature.value", parsed.snapshot.gpu.temperature.value, error) ||
@@ -563,12 +558,8 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadDouble(values, "network.upload_mbps", parsed.snapshot.network.uploadMbps, error) ||
         !LoadDouble(values, "network.download_mbps", parsed.snapshot.network.downloadMbps, error) ||
         !LoadString(values, "network.ip_address", parsed.snapshot.network.ipAddress, error) ||
-        !LoadDoubleArrayField(values, "network.upload_history", parsed.snapshot.network.uploadHistory, error) ||
-        !LoadDoubleArrayField(values, "network.download_history", parsed.snapshot.network.downloadHistory, error) ||
         !LoadDouble(values, "storage.read_mbps", parsed.snapshot.storage.readMbps, error) ||
-        !LoadDouble(values, "storage.write_mbps", parsed.snapshot.storage.writeMbps, error) ||
-        !LoadDoubleArrayField(values, "storage.read_history", parsed.snapshot.storage.readHistory, error) ||
-        !LoadDoubleArrayField(values, "storage.write_history", parsed.snapshot.storage.writeHistory, error)) {
+        !LoadDouble(values, "storage.write_mbps", parsed.snapshot.storage.writeMbps, error)) {
         return false;
     }
 

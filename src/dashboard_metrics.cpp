@@ -90,19 +90,19 @@ double ResolveScaleRatio(double value, double scale) {
     return value / scale;
 }
 
-const std::vector<double>* FindMetricHistory(const SystemSnapshot& snapshot, const std::string& metricRef) {
-    const auto it = std::find_if(snapshot.metricHistories.begin(), snapshot.metricHistories.end(),
-        [&](const MetricHistorySeries& history) {
-            return history.metricRef == metricRef;
+const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, const std::string& seriesRef) {
+    const auto it = std::find_if(snapshot.retainedHistories.begin(), snapshot.retainedHistories.end(),
+        [&](const RetainedHistorySeries& history) {
+            return history.seriesRef == seriesRef;
         });
-    if (it == snapshot.metricHistories.end()) {
+    if (it == snapshot.retainedHistories.end()) {
         return nullptr;
     }
     return &it->samples;
 }
 
 double ResolvePeakRatio(const SystemSnapshot& snapshot, const std::string& metricRef, double fallbackRatio) {
-    const auto* history = FindMetricHistory(snapshot, metricRef);
+    const auto* history = FindRetainedHistory(snapshot, metricRef);
     if (history == nullptr || history->empty()) {
         return std::clamp(fallbackRatio, 0.0, 1.0);
     }
@@ -111,6 +111,11 @@ double ResolvePeakRatio(const SystemSnapshot& snapshot, const std::string& metri
         peak = std::max(peak, value);
     }
     return std::clamp(peak, 0.0, 1.0);
+}
+
+std::vector<double> ResolveRetainedHistorySamples(const SystemSnapshot& snapshot, const std::string& seriesRef) {
+    const auto* history = FindRetainedHistory(snapshot, ToLower(seriesRef));
+    return history != nullptr ? *history : std::vector<double>{};
 }
 
 std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<NamedScalarMetric>& metrics,
@@ -224,10 +229,10 @@ std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const s
 
 DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::string& metricRef) const {
     const std::string lowered = ToLower(metricRef);
-    const auto networkUploadHistory = SmoothThroughputHistory(snapshot_.network.uploadHistory);
-    const auto networkDownloadHistory = SmoothThroughputHistory(snapshot_.network.downloadHistory);
-    const auto storageReadHistory = SmoothThroughputHistory(snapshot_.storage.readHistory);
-    const auto storageWriteHistory = SmoothThroughputHistory(snapshot_.storage.writeHistory);
+    const auto networkUploadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.upload"));
+    const auto networkDownloadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.download"));
+    const auto storageReadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.read"));
+    const auto storageWriteHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.write"));
     const double networkMaxGraph = GetThroughputGraphMax(networkUploadHistory, networkDownloadHistory);
     const double storageMaxGraph = GetThroughputGraphMax(storageReadHistory, storageWriteHistory);
     const double timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot_.now);
