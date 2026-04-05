@@ -62,7 +62,8 @@ double GetThroughputGraphMax(const std::vector<double>& firstHistory, const std:
     for (double value : secondHistory) {
         rawMax = std::max(rawMax, value);
     }
-    return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
+    const double roundingStep = rawMax > 100.0 ? 50.0 : 5.0;
+    return std::max(10.0, std::ceil(rawMax / roundingStep) * roundingStep);
 }
 
 double GetStorageGuideStep(double maxGraph) {
