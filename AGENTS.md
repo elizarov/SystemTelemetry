@@ -8,6 +8,8 @@ Always use `build.cmd` for builds.
 Keep all build artifacts and temporary compiler files in `build\` so the repository root stays clean.
 Ignore the stray `$null` file at the repository root when it appears; it is a Codex sandbox artifact, not a project file.
 This project has a single deployment target; do not preserve backwards compatibility for legacy configs unless the user explicitly asks for it.
+Do not run build steps and validation runs in parallel; always finish the build first, then run validation commands sequentially against the freshly built artifacts.
+If you trip over a project-specific pitfall and then resolve it, add a short note here for future work so the mistake is less likely to repeat.
 
 After changing diagnostics behavior, update `docs/diagnostics.txt` instead of restating those rules here.
 

@@ -13,11 +13,6 @@ class Trace;
 }
 
 struct BoardVendorTelemetrySample {
-    std::optional<uint16_t> probePort;
-    std::optional<uint16_t> chipId;
-    std::optional<uint32_t> monitorBaseAddress;
-    std::optional<uint16_t> rawFanCounter;
-    std::optional<uint8_t> ecMmioRegisterValue;
     std::string boardManufacturer;
     std::string boardProduct;
     std::string chipName;
@@ -29,7 +24,6 @@ struct BoardVendorTelemetrySample {
     std::vector<NamedScalarMetric> temperatures;
     std::string providerName = "None";
     std::string diagnostics;
-    bool fan16BitMode = false;
     bool available = false;
 };
 

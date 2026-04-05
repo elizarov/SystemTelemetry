@@ -343,10 +343,6 @@ public:
         sample.chipName = chipName_;
         sample.controllerType = controllerType_;
         sample.driverLibrary = loadedLibrary_;
-        sample.chipId = chipId_;
-        sample.monitorBaseAddress = monitorBaseAddress_;
-        sample.ecMmioRegisterValue = ecMmioRegisterValue_;
-        sample.fan16BitMode = true;
         sample.temperatures = BuildRequestedTemperatures();
         sample.fans = BuildRequestedFans();
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
@@ -370,9 +366,6 @@ public:
 
         sample.chipName = chipName_;
         sample.controllerType = controllerType_;
-        sample.chipId = chipId_;
-        sample.monitorBaseAddress = monitorBaseAddress_;
-        sample.ecMmioRegisterValue = ecMmioRegisterValue_;
         sample.diagnostics = diagnostics_;
 
         if (!cachedResult_.success) {
@@ -455,9 +448,6 @@ private:
         diagnostics_ = result.diagnostics.empty() ? "GigabyteSivProbe completed." : result.diagnostics;
         chipName_.clear();
         controllerType_.clear();
-        chipId_.reset();
-        monitorBaseAddress_.reset();
-        ecMmioRegisterValue_.reset();
         fanReadings_.clear();
         tempReadings_.clear();
 
@@ -466,16 +456,6 @@ private:
                 controllerType_ = value;
             } else if (key == "chip_name") {
                 chipName_ = value;
-            } else if (key == "chip_id") {
-                if (auto parsed = ParseUnsigned(value)) {
-                    chipId_ = static_cast<uint16_t>(*parsed);
-                }
-            } else if (key == "ecmmio_base") {
-                monitorBaseAddress_ = ParseUnsigned(value);
-            } else if (key == "ecmmio_register") {
-                if (auto parsed = ParseUnsigned(value)) {
-                    ecMmioRegisterValue_ = static_cast<uint8_t>(*parsed);
-                }
             } else if (key.rfind("fan_", 0) == 0) {
                 const size_t secondUnderscore = key.find('_', 4);
                 if (secondUnderscore == std::string::npos) {
@@ -570,9 +550,6 @@ private:
     std::string controllerType_;
     std::string loadedLibrary_;
     std::string diagnostics_ = "Gigabyte provider not initialized.";
-    std::optional<uint16_t> chipId_;
-    std::optional<uint32_t> monitorBaseAddress_;
-    std::optional<uint8_t> ecMmioRegisterValue_;
     std::vector<FanReading> fanReadings_;
     std::vector<TemperatureReading> tempReadings_;
     ProbeResult cachedResult_{};

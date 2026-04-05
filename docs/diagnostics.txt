@@ -11,6 +11,7 @@ Trace lines must use the compact prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`
 `/dump` must enable writing a machine-parseable UTF-8 snapshot dump to `telemetry_dump.txt` beside the executable without a BOM.
 The dump format must be stable, text-based, and editable by hand so the same file contents can be copied directly into `telemetry_fake.txt`.
 The dump must include all telemetry fields needed by the dashboard plus provider diagnostics, history arrays, configured drive rows, and the full dumped local date/time including seconds and milliseconds.
+The dump schema must reflect the current runtime model directly; obsolete compatibility keys should be removed instead of being kept as null placeholders.
 `/screenshot` must enable writing only the rendered dashboard screenshot to `telemetry_screenshot.png` beside the executable.
 When `/exit` is not present, the application must still start the normal dashboard UI and keep running normally while any requested diagnostics outputs are produced in parallel.
 Without `/exit`, trace logging must continue for the lifetime of the process, while dump and screenshot outputs must refresh once per second using the latest snapshot, with trace appending and dump/screenshot overwriting their existing files each refresh.
@@ -22,7 +23,7 @@ The diagnostics trace must cover all diagnostics collection paths, not only vend
 Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
 Diagnostics output failures such as trace/dump/screenshot file-open errors, dump write failures, and screenshot export failures must be written to `telemetry_trace.txt` before any error dialog is shown.
 When `/trace` is enabled, diagnostics failures must prefer trace logging over modal UI and should complete with a failure exit code instead of blocking on a dialog.
-The dumped board-provider block must include Gigabyte debug details such as detected board identity, helper path, controller type, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, sampled diagnostics, and any raw chip-register details when that provider exposes them.
+The dumped board-provider block must include Gigabyte debug details such as detected board identity, helper path, controller type, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, and sampled diagnostics.
 
 Single-instance interaction
 ===========================

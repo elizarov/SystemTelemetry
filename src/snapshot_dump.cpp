@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v1";
+constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v3";
 
 std::string TrimAsciiWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");
@@ -395,12 +395,8 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
 
     WriteString(output, "cpu.name", dump.snapshot.cpu.name);
     WriteDouble(output, "cpu.load_percent", dump.snapshot.cpu.loadPercent, 6);
-    WriteOptionalDouble(output, "cpu.temperature.value", dump.snapshot.cpu.temperature.value, 6);
-    WriteString(output, "cpu.temperature.unit", dump.snapshot.cpu.temperature.unit);
     WriteOptionalDouble(output, "cpu.clock.value", dump.snapshot.cpu.clock.value, 6);
     WriteString(output, "cpu.clock.unit", dump.snapshot.cpu.clock.unit);
-    WriteOptionalDouble(output, "cpu.fan.value", dump.snapshot.cpu.fan.value, 6);
-    WriteString(output, "cpu.fan.unit", dump.snapshot.cpu.fan.unit);
     WriteDouble(output, "cpu.memory.used_gb", dump.snapshot.cpu.memory.usedGb, 6);
     WriteDouble(output, "cpu.memory.total_gb", dump.snapshot.cpu.memory.totalGb, 6);
     WriteNamedScalarMetrics(output, "board.temperatures", dump.snapshot.boardTemperatures);
@@ -424,11 +420,6 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteString(output, "board_provider.name", dump.boardProvider.providerName);
     WriteString(output, "board_provider.diagnostics", dump.boardProvider.diagnostics);
     WriteBool(output, "board_provider.available", dump.boardProvider.available);
-    WriteOptionalInteger(output, "board_provider.probe_port", dump.boardProvider.probePort);
-    WriteOptionalInteger(output, "board_provider.chip_id", dump.boardProvider.chipId);
-    WriteOptionalInteger(output, "board_provider.monitor_base_address", dump.boardProvider.monitorBaseAddress);
-    WriteOptionalInteger(output, "board_provider.raw_fan_counter", dump.boardProvider.rawFanCounter);
-    WriteOptionalInteger(output, "board_provider.ec_mmio_register_value", dump.boardProvider.ecMmioRegisterValue);
     WriteString(output, "board_provider.board_manufacturer", dump.boardProvider.boardManufacturer);
     WriteString(output, "board_provider.board_product", dump.boardProvider.boardProduct);
     WriteString(output, "board_provider.chip_name", dump.boardProvider.chipName);
@@ -438,7 +429,6 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteStringList(output, "board_provider.requested_temperatures", dump.boardProvider.requestedTemperatureNames);
     WriteNamedScalarMetrics(output, "board_provider.fans", dump.boardProvider.fans);
     WriteNamedScalarMetrics(output, "board_provider.temperatures", dump.boardProvider.temperatures);
-    WriteBool(output, "board_provider.fan_16_bit_mode", dump.boardProvider.fan16BitMode);
 
     WriteString(output, "network.adapter_name", dump.snapshot.network.adapterName);
     WriteDouble(output, "network.upload_mbps", dump.snapshot.network.uploadMbps, 6);
@@ -506,12 +496,8 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
 
     if (!LoadString(values, "cpu.name", parsed.snapshot.cpu.name, error) ||
         !LoadDouble(values, "cpu.load_percent", parsed.snapshot.cpu.loadPercent, error) ||
-        !LoadOptionalDouble(values, "cpu.temperature.value", parsed.snapshot.cpu.temperature.value, error) ||
-        !LoadString(values, "cpu.temperature.unit", parsed.snapshot.cpu.temperature.unit, error) ||
         !LoadOptionalDouble(values, "cpu.clock.value", parsed.snapshot.cpu.clock.value, error) ||
         !LoadString(values, "cpu.clock.unit", parsed.snapshot.cpu.clock.unit, error) ||
-        !LoadOptionalDouble(values, "cpu.fan.value", parsed.snapshot.cpu.fan.value, error) ||
-        !LoadString(values, "cpu.fan.unit", parsed.snapshot.cpu.fan.unit, error) ||
         !LoadDouble(values, "cpu.memory.used_gb", parsed.snapshot.cpu.memory.usedGb, error) ||
         !LoadDouble(values, "cpu.memory.total_gb", parsed.snapshot.cpu.memory.totalGb, error) ||
         !LoadNamedScalarMetrics(values, "board.temperatures", parsed.snapshot.boardTemperatures, error) ||
@@ -532,11 +518,6 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadString(values, "board_provider.name", parsed.boardProvider.providerName, error) ||
         !LoadString(values, "board_provider.diagnostics", parsed.boardProvider.diagnostics, error) ||
         !LoadBool(values, "board_provider.available", parsed.boardProvider.available, error) ||
-        !LoadOptionalUnsigned(values, "board_provider.probe_port", parsed.boardProvider.probePort, error) ||
-        !LoadOptionalUnsigned(values, "board_provider.chip_id", parsed.boardProvider.chipId, error) ||
-        !LoadOptionalUnsigned(values, "board_provider.monitor_base_address", parsed.boardProvider.monitorBaseAddress, error) ||
-        !LoadOptionalUnsigned(values, "board_provider.raw_fan_counter", parsed.boardProvider.rawFanCounter, error) ||
-        !LoadOptionalUnsigned(values, "board_provider.ec_mmio_register_value", parsed.boardProvider.ecMmioRegisterValue, error) ||
         !LoadString(values, "board_provider.board_manufacturer", parsed.boardProvider.boardManufacturer, error) ||
         !LoadString(values, "board_provider.board_product", parsed.boardProvider.boardProduct, error) ||
         !LoadString(values, "board_provider.chip_name", parsed.boardProvider.chipName, error) ||
@@ -546,7 +527,6 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadStringList(values, "board_provider.requested_temperatures", parsed.boardProvider.requestedTemperatureNames, error) ||
         !LoadNamedScalarMetrics(values, "board_provider.fans", parsed.boardProvider.fans, error) ||
         !LoadNamedScalarMetrics(values, "board_provider.temperatures", parsed.boardProvider.temperatures, error) ||
-        !LoadBool(values, "board_provider.fan_16_bit_mode", parsed.boardProvider.fan16BitMode, error) ||
         !LoadString(values, "network.adapter_name", parsed.snapshot.network.adapterName, error) ||
         !LoadDouble(values, "network.upload_mbps", parsed.snapshot.network.uploadMbps, error) ||
         !LoadDouble(values, "network.download_mbps", parsed.snapshot.network.downloadMbps, error) ||
