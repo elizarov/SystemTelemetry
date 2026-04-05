@@ -13,6 +13,7 @@ Do not run build steps and validation runs in parallel; always finish the build 
 If you trip over a project-specific pitfall and then resolve it, add a short note here for future work so the mistake is less likely to repeat.
 Pitfall note: keep fake-runtime startup failures aligned with the diagnostics dialog policy; a direct modal dialog in `/fake /exit` can look like `/exit` is broken because the headless process waits behind it.
 Pitfall note: if rebuilt defaults seem unchanged, check the executable-side `config.ini` first; it overlays the embedded `resources/config.ini` template and `Save Config` preserves that live file.
+Pitfall note: when restoring saved placement across monitors with different DPI scales, do not pre-scale the destination window size before the move; let `WM_DPICHANGED` apply the monitor transition first or the bounds can be double-scaled.
 
 After changing diagnostics behavior, update `docs/diagnostics.txt` instead of restating those rules here.
 

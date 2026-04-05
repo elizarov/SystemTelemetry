@@ -870,7 +870,19 @@ void DashboardApp::ApplyConfigPlacement() {
         left = monitor->rect.left + ScaleLogicalToPhysical(config_.positionX, targetDpi);
         top = monitor->rect.top + ScaleLogicalToPhysical(config_.positionY, targetDpi);
     }
-    if (!ApplyWindowDpi(targetDpi)) {
+
+    const UINT currentDpi = CurrentWindowDpi();
+    if (targetDpi != currentDpi) {
+        RECT currentRect{};
+        if (GetWindowRect(hwnd_, &currentRect)) {
+            SetWindowPos(hwnd_, HWND_TOP, left, top,
+                currentRect.right - currentRect.left,
+                currentRect.bottom - currentRect.top,
+                SWP_NOACTIVATE);
+        }
+    }
+
+    if (CurrentWindowDpi() != targetDpi && !ApplyWindowDpi(targetDpi)) {
         return;
     }
     SetWindowPos(hwnd_, HWND_TOP, left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE);
