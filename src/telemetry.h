@@ -4,6 +4,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <windows.h>
 
@@ -62,11 +63,20 @@ struct SystemSnapshot {
     std::vector<NamedScalarMetric> boardTemperatures;
     std::vector<NamedScalarMetric> boardFans;
     std::vector<RetainedHistorySeries> retainedHistories;
+    std::unordered_map<std::string, size_t> retainedHistoryIndexByRef;
     NetworkTelemetry network;
     StorageTelemetry storage;
     std::vector<DriveInfo> drives;
     SYSTEMTIME now{};
 };
+
+inline void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
+    snapshot.retainedHistoryIndexByRef.clear();
+    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
+    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
+        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
+    }
+}
 
 struct GpuProviderTelemetryState {
     std::string providerName = "None";

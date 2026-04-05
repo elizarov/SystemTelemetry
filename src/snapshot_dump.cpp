@@ -590,6 +590,7 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         return false;
     }
 
+    RebuildRetainedHistoryIndex(parsed.snapshot);
     dump = std::move(parsed);
     return true;
 }

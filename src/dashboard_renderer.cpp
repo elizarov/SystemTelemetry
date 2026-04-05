@@ -1032,14 +1032,17 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
         FillRect(hdc, &lineRect, markerBrush);
     }
 
-    const double markerInterval = timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
-    for (double sampleOffset = timeMarkerOffsetSamples; sampleOffset <= static_cast<double>(history.size() - 1) + markerInterval;
-         sampleOffset += markerInterval) {
-        const double clampedOffset = std::clamp(sampleOffset, 0.0, static_cast<double>(history.size() - 1));
-        const int x = graphRight - static_cast<int>(std::round(
-            clampedOffset * width / std::max<size_t>(1, history.size() - 1)));
-        RECT lineRect{x, rect.top, std::min(graphRight + 1, x + strokeWidth), rect.bottom};
-        FillRect(hdc, &lineRect, markerBrush);
+    if (!history.empty()) {
+        const double markerInterval = timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
+        for (double sampleOffset = timeMarkerOffsetSamples;
+             sampleOffset <= static_cast<double>(history.size() - 1) + markerInterval;
+             sampleOffset += markerInterval) {
+            const double clampedOffset = std::clamp(sampleOffset, 0.0, static_cast<double>(history.size() - 1));
+            const int x = graphRight - static_cast<int>(std::round(
+                clampedOffset * width / std::max<size_t>(1, history.size() - 1)));
+            RECT lineRect{x, rect.top, std::min(graphRight + 1, x + strokeWidth), rect.bottom};
+            FillRect(hdc, &lineRect, markerBrush);
+        }
     }
 
     DeleteObject(markerBrush);

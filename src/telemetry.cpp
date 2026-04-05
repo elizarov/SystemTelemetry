@@ -59,7 +59,7 @@ std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(const std::vector<std
 
 RetainedHistorySeries CreateRetainedHistorySeries(const std::string& seriesRef) {
     RetainedHistorySeries history;
-    history.seriesRef = ToLower(seriesRef);
+    history.seriesRef = seriesRef;
     history.samples.assign(kRecentHistorySamples, 0.0);
     return history;
 }
@@ -273,7 +273,6 @@ struct TelemetryCollector::Impl {
     void UpdateStorageThroughput(bool initializeOnly);
     void RefreshDriveUsage();
     void UpdateNetworkState(bool initializeOnly);
-    void InitializeRetainedHistories();
     void PushRetainedHistorySample(const std::string& seriesRef, double value);
     void PushBoardMetricHistorySamples();
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
@@ -340,7 +339,8 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     impl_->trace_.SetOutput(traceStream);
     impl_->snapshot_.boardTemperatures = CreateRequestedBoardMetrics(config.boardTemperatureNames, "\xC2\xB0""C");
     impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(config.boardFanNames, "RPM");
-    impl_->InitializeRetainedHistories();
+    impl_->snapshot_.retainedHistories.clear();
+    impl_->snapshot_.retainedHistoryIndexByRef.clear();
     if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {
         impl_->snapshot_.cpu.name = cpuName;
     }
@@ -803,38 +803,15 @@ void TelemetryCollector::Impl::PushHistorySample(std::vector<double>& history, d
     history.push_back(value);
 }
 
-void TelemetryCollector::Impl::InitializeRetainedHistories() {
-    snapshot_.retainedHistories.clear();
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("cpu.load"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("cpu.clock"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("cpu.memory"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("gpu.load"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("gpu.temperature"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("gpu.clock"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("gpu.fan"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("gpu.vram"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("network.upload"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("network.download"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("storage.read"));
-    snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("storage.write"));
-    for (const auto& name : config_.boardTemperatureNames) {
-        snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("board.temp." + name));
-    }
-    for (const auto& name : config_.boardFanNames) {
-        snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries("board.fan." + name));
-    }
-}
-
 void TelemetryCollector::Impl::PushRetainedHistorySample(const std::string& seriesRef, double value) {
-    const std::string lowered = ToLower(seriesRef);
-    const auto it = std::find_if(snapshot_.retainedHistories.begin(), snapshot_.retainedHistories.end(),
-        [&](const RetainedHistorySeries& history) {
-            return history.seriesRef == lowered;
-        });
-    if (it == snapshot_.retainedHistories.end()) {
-        return;
+    auto it = snapshot_.retainedHistoryIndexByRef.find(seriesRef);
+    if (it == snapshot_.retainedHistoryIndexByRef.end()) {
+        const size_t index = snapshot_.retainedHistories.size();
+        snapshot_.retainedHistories.push_back(CreateRetainedHistorySeries(seriesRef));
+        snapshot_.retainedHistoryIndexByRef.emplace(seriesRef, index);
+        it = snapshot_.retainedHistoryIndexByRef.find(seriesRef);
     }
-    PushHistorySample(it->samples, value);
+    PushHistorySample(snapshot_.retainedHistories[it->second].samples, value);
 }
 
 void TelemetryCollector::Impl::PushBoardMetricHistorySamples() {

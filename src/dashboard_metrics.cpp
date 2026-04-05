@@ -91,14 +91,11 @@ double ResolveScaleRatio(double value, double scale) {
 }
 
 const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, const std::string& seriesRef) {
-    const auto it = std::find_if(snapshot.retainedHistories.begin(), snapshot.retainedHistories.end(),
-        [&](const RetainedHistorySeries& history) {
-            return history.seriesRef == seriesRef;
-        });
-    if (it == snapshot.retainedHistories.end()) {
+    const auto indexIt = snapshot.retainedHistoryIndexByRef.find(seriesRef);
+    if (indexIt == snapshot.retainedHistoryIndexByRef.end() || indexIt->second >= snapshot.retainedHistories.size()) {
         return nullptr;
     }
-    return &it->samples;
+    return &snapshot.retainedHistories[indexIt->second].samples;
 }
 
 double ResolvePeakRatio(const SystemSnapshot& snapshot, const std::string& metricRef, double fallbackRatio) {
@@ -114,7 +111,7 @@ double ResolvePeakRatio(const SystemSnapshot& snapshot, const std::string& metri
 }
 
 std::vector<double> ResolveRetainedHistorySamples(const SystemSnapshot& snapshot, const std::string& seriesRef) {
-    const auto* history = FindRetainedHistory(snapshot, ToLower(seriesRef));
+    const auto* history = FindRetainedHistory(snapshot, seriesRef);
     return history != nullptr ? *history : std::vector<double>{};
 }
 
