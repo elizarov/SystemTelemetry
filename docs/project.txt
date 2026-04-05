@@ -9,15 +9,17 @@ Use `devenv.cmd` to activate the development environment when needed.
 Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.txt`.
 Keep all sources in `src`.
 Keep generated build outputs inside `build\` so the project root stays clean.
+Keep the CMake build tree under `build\cmake\` so generated project files, dependency state, and object directories stay inside `build\` as well.
 When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
 Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
 Always build through `build.cmd`.
+Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
 Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies both `SystemTelemetry.exe` and the required `GigabyteSivProbe.exe` helper there, and registers `SystemTelemetry.exe` under `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` so the dashboard starts automatically for every user who signs into the machine.
 
 Development requirements
 ========================
 
-- Visual Studio 2022 Build Tools
+- Visual Studio 2022 Build Tools with CMake support
 
 Repository conventions
 ======================
