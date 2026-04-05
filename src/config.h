@@ -14,5 +14,6 @@ struct AppConfig {
     std::string gigabyteTemperatureChannelName;
 };
 
+std::string LoadEmbeddedConfigTemplate();
 AppConfig LoadConfig(const std::filesystem::path& path);
 bool SaveConfig(const std::filesystem::path& path, const AppConfig& config);

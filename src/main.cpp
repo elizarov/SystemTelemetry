@@ -46,7 +46,7 @@ constexpr COLORREF kTrack = RGB(45, 52, 58);
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kCommandMove = 1001;
 constexpr UINT kCommandBringOnTop = 1002;
-constexpr UINT kCommandUpdateConfig = 1003;
+constexpr UINT kCommandSaveConfig = 1003;
 constexpr UINT kCommandExit = 1004;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
 
@@ -852,7 +852,7 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
         saved = SaveConfigElevated(configPath, config, hwnd_);
     }
     if (!saved) {
-        const std::wstring message = WideFromUtf8("Failed to update " + Utf8FromWide(configPath.wstring()) + ".");
+        const std::wstring message = WideFromUtf8("Failed to save " + Utf8FromWide(configPath.wstring()) + ".");
         MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
         return;
     }
@@ -962,7 +962,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
-    AppendMenuW(menu, MF_STRING, kCommandUpdateConfig, L"Update Config");
+    AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
     AppendMenuW(menu, MF_STRING, kCommandExit, L"Exit");
     SetForegroundWindow(hwnd_);
     const UINT selected = TrackPopupMenu(
@@ -977,7 +977,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     case kCommandBringOnTop:
         BringOnTop();
         break;
-    case kCommandUpdateConfig:
+    case kCommandSaveConfig:
         UpdateConfigFromCurrentPlacement();
         break;
     case kCommandExit:

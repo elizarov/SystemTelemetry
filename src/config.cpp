@@ -1,5 +1,12 @@
 #include "config.h"
 
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+
+#include "../resources/resource.h"
+
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -76,32 +83,43 @@ bool WriteFileUtf8(const std::filesystem::path& path, const std::string& text) {
     return output.good();
 }
 
-void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, size_t sectionEnd,
-    const std::string& key, const std::string& value) {
-    const std::string normalizedKey = ToLower(key);
-    for (size_t i = sectionStart + 1; i < sectionEnd; ++i) {
-        const std::string trimmed = Trim(lines[i]);
-        if (trimmed.empty() || trimmed[0] == ';' || trimmed[0] == '#') {
-            continue;
-        }
-        const size_t eq = trimmed.find('=');
-        if (eq == std::string::npos) {
-            continue;
-        }
-        if (ToLower(Trim(trimmed.substr(0, eq))) == normalizedKey) {
-            lines[i] = key + " = " + value;
-            return;
-        }
+std::string LoadUtf8Resource(WORD resourceId, const wchar_t* resourceType) {
+    HMODULE module = GetModuleHandleW(nullptr);
+    if (module == nullptr) {
+        return {};
     }
 
-    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), resourceType);
+    if (resource == nullptr) {
+        return {};
+    }
+
+    HGLOBAL loadedResource = LoadResource(module, resource);
+    if (loadedResource == nullptr) {
+        return {};
+    }
+
+    const DWORD resourceSize = SizeofResource(module, resource);
+    if (resourceSize == 0) {
+        return {};
+    }
+
+    const void* resourceData = LockResource(loadedResource);
+    if (resourceData == nullptr) {
+        return {};
+    }
+
+    std::string text(static_cast<const char*>(resourceData), static_cast<size_t>(resourceSize));
+    if (text.size() >= 3 &&
+        static_cast<unsigned char>(text[0]) == 0xEF &&
+        static_cast<unsigned char>(text[1]) == 0xBB &&
+        static_cast<unsigned char>(text[2]) == 0xBF) {
+        text.erase(0, 3);
+    }
+    return text;
 }
 
-}  // namespace
-
-AppConfig LoadConfig(const std::filesystem::path& path) {
-    AppConfig config;
-    const std::string text = ReadFileUtf8(path);
+void ApplyConfigText(const std::string& text, AppConfig& config) {
     std::string section;
     std::stringstream stream(text);
     std::string line;
@@ -140,6 +158,39 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
             config.gigabyteTemperatureChannelName = IsAutoChannelValue(value) ? std::string() : value;
         }
     }
+}
+
+void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, size_t sectionEnd,
+    const std::string& key, const std::string& value) {
+    const std::string normalizedKey = ToLower(key);
+    for (size_t i = sectionStart + 1; i < sectionEnd; ++i) {
+        const std::string trimmed = Trim(lines[i]);
+        if (trimmed.empty() || trimmed[0] == ';' || trimmed[0] == '#') {
+            continue;
+        }
+        const size_t eq = trimmed.find('=');
+        if (eq == std::string::npos) {
+            continue;
+        }
+        if (ToLower(Trim(trimmed.substr(0, eq))) == normalizedKey) {
+            lines[i] = key + " = " + value;
+            return;
+        }
+    }
+
+    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
+}
+
+}  // namespace
+
+std::string LoadEmbeddedConfigTemplate() {
+    return LoadUtf8Resource(IDR_CONFIG_TEMPLATE, RT_RCDATA);
+}
+
+AppConfig LoadConfig(const std::filesystem::path& path) {
+    AppConfig config;
+    ApplyConfigText(LoadEmbeddedConfigTemplate(), config);
+    ApplyConfigText(ReadFileUtf8(path), config);
 
     if (config.driveLetters.empty()) {
         config.driveLetters = {"C", "D", "E"};
@@ -148,7 +199,10 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
 }
 
 bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
-    const std::string text = ReadFileUtf8(path);
+    std::string text = ReadFileUtf8(path);
+    if (text.empty() && !std::filesystem::exists(path)) {
+        text = LoadEmbeddedConfigTemplate();
+    }
     std::vector<std::string> lines;
     {
         std::stringstream stream(text);

@@ -11,7 +11,7 @@ all: $(APP) $(PROBE)
 !error CSC is not set. Run build.cmd or configure CSC in devenv.cmd.
 !endif
 
-$(APP): $(SRC) src\config.h src\config.ini resources\SystemTelemetry.rc resources\resource.h resources\app.ico resources\app_icon.png resources\cpu.png resources\gpu.png resources\network.png resources\storage.png resources\time.png
+$(APP): $(SRC) src\config.h resources\config.ini resources\SystemTelemetry.rc resources\resource.h resources\app.ico resources\app_icon.png resources\cpu.png resources\gpu.png resources\network.png resources\storage.png resources\time.png
 	if not exist build mkdir build
 	rc /nologo /fo$(RES) resources\SystemTelemetry.rc
 	cl $(CFLAGS) /Fe$(APP) /Fobuild\\ $(SRC) $(RES) /link /PDB:build\SystemTelemetry.pdb /ILK:build\SystemTelemetry.ilk $(LDFLAGS)
