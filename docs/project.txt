@@ -22,7 +22,8 @@ Development requirements
 Repository conventions
 ======================
 
-`docs/specifications.txt` should keep only user-visible behavior requirements.
+`docs/specifications.txt` should keep only the core user-visible dashboard behavior requirements that are not diagnostics-specific.
+`docs/diagnostics.txt` should capture command-line diagnostics behavior, trace/dump/screenshot output requirements, and diagnostics-specific verification expectations.
 `docs/project.txt` should capture project environment, build/setup expectations, and other engineering constraints that are not direct user-visible behavior.
 `docs/architecture.txt` should capture structural and code-organization details.
 

@@ -1,8 +1,29 @@
 #include "trace.h"
 
 #include <cstdio>
+#include <windows.h>
 
 namespace tracing {
+
+namespace {
+
+std::string FormatTraceTimestamp() {
+    SYSTEMTIME localTime{};
+    GetLocalTime(&localTime);
+
+    char buffer[40];
+    sprintf_s(buffer, "%04u-%02u-%02u %02u:%02u:%02u.%03u",
+        static_cast<unsigned>(localTime.wYear),
+        static_cast<unsigned>(localTime.wMonth),
+        static_cast<unsigned>(localTime.wDay),
+        static_cast<unsigned>(localTime.wHour),
+        static_cast<unsigned>(localTime.wMinute),
+        static_cast<unsigned>(localTime.wSecond),
+        static_cast<unsigned>(localTime.wMilliseconds));
+    return buffer;
+}
+
+}  // namespace
 
 Trace::Trace(std::ostream* output) : output_(output) {}
 
@@ -22,7 +43,7 @@ void Trace::Write(const char* text) const {
     if (output_ == nullptr) {
         return;
     }
-    (*output_) << "[trace] " << text << '\n';
+    (*output_) << "[trace " << FormatTraceTimestamp() << "] " << text << '\n';
     output_->flush();
 }
 

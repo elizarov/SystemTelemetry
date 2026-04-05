@@ -60,13 +60,7 @@ The Gigabyte fan and temperature channel settings must be stored in `config.ini`
 The `Save Config` action must persist the current auto-selected network adapter name plus the currently selected Gigabyte fan and temperature channel names alongside the display placement.
 When `Save Config` creates `config.ini` beside the executable for the first time, it must begin from the embedded resource copy verbatim so the saved file keeps the same comments and documentation text before updating values in place.
 
-Command-line dump mode
-======================
-
-Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, open `telemetry_dump.txt` beside the executable, write plain UTF-8 text without a BOM, write the final telemetry snapshot into that same file, render that same final snapshot through the dashboard UI into an offscreen buffer, save it beside the executable as `telemetry_screenshot.png`, close outputs, and exit without starting the GUI or affecting any already-running dashboard instance.
-The `/dump` trace must cover all diagnostics collection paths, not only vendor GPU integration.
-Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
-The human-readable dump snapshot should include the board-vendor provider status plus Gigabyte debug details such as detected board identity, helper path, controller type, selected CPU temperature sensor, requested and selected fan channel, sampled diagnostics, and any raw chip-register details when that provider exposes them.
+Diagnostics requirements live in `docs/diagnostics.txt`.
 
 Telemetry sources
 =================
@@ -148,8 +142,6 @@ Single-instance behavior
 At most one dashboard instance may be running at a time.
 Starting a new copy must close the already running copy, then continue startup
 as the remaining instance.
-The `/dump` command-line mode is exempt from this behavior and should run as an
-independent one-shot command.
 
 Style Summary
 =============
