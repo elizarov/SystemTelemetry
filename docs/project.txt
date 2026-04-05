@@ -32,6 +32,7 @@ Implementation constraints
 
 Keep the checked-in config template at `resources/config.ini` so it can be embedded into the executable as the default configuration resource.
 Treat `resources/config.ini` as the single maintained source of truth for config-file entry documentation instead of duplicating that format documentation elsewhere in the repo.
+Do not add C++-side synthesized fallback layout/card/widget defaults that duplicate the embedded config template; shipped defaults must come only from `resources/config.ini`.
 All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
 Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
 Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.

@@ -105,27 +105,6 @@ bool IsDashboardContainerNode(const LayoutNodeConfig& node) {
     return lowered == "rows" || lowered == "columns";
 }
 
-std::optional<std::string> GetNodeParameter(const LayoutNodeConfig& node, const std::string& key) {
-    for (const auto& parameter : node.parameters) {
-        if (ToLower(parameter.first) == ToLower(key)) {
-            return parameter.second;
-        }
-    }
-    return std::nullopt;
-}
-
-std::string GetPrimaryWidgetParameter(const LayoutNodeConfig& node, const std::string& legacyKey = {}) {
-    if (const auto value = GetNodeParameter(node, "value"); value.has_value()) {
-        return *value;
-    }
-    if (!legacyKey.empty()) {
-        if (const auto legacy = GetNodeParameter(node, legacyKey); legacy.has_value()) {
-            return *legacy;
-        }
-    }
-    return {};
-}
-
 HFONT CreateUiFont(const UiFontConfig& font) {
     const std::wstring face = WideFromUtf8(font.face);
     return CreateFontW(-font.size, 0, 0, 0, font.weight, FALSE, FALSE, FALSE,
@@ -407,12 +386,12 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return fontHeights_.smallText + 2;
     }
     if (lowered == "metric_list" || lowered == "metric_list_cpu" || lowered == "metric_list_gpu") {
-        const std::string param = GetPrimaryWidgetParameter(node, "items");
+        const std::string param = node.parameter;
         const int count = std::max<int>(1, static_cast<int>(param.empty() ? 4 : Split(param, ',').size()));
         return count * EffectiveMetricRowHeight();
     }
     if (lowered == "drive_usage_list") {
-        const std::string param = GetPrimaryWidgetParameter(node, "drives");
+        const std::string param = node.parameter;
         const int count = std::max<int>(1, static_cast<int>(param.empty() ? 3 : Split(param, ',').size()));
         return count * std::max(1, config_.layout.driveRowHeight);
     }
@@ -439,23 +418,23 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
         const std::string lowered = ToLower(node.name);
         if (lowered == "text") {
             widget.kind = WidgetKind::Text;
-            widget.binding.metric = GetPrimaryWidgetParameter(node);
+            widget.binding.metric = node.parameter;
         } else if (lowered == "gauge") {
             widget.kind = WidgetKind::Gauge;
-            widget.binding.metric = GetPrimaryWidgetParameter(node);
+            widget.binding.metric = node.parameter;
         } else if (lowered == "metric_list") {
             widget.kind = WidgetKind::MetricList;
-            widget.binding.param = GetPrimaryWidgetParameter(node, "items");
+            widget.binding.param = node.parameter;
         } else if (lowered == "throughput") {
             widget.kind = WidgetKind::Throughput;
-            widget.binding.metric = GetPrimaryWidgetParameter(node);
+            widget.binding.metric = node.parameter;
         } else if (lowered == "network_footer") {
             widget.kind = WidgetKind::NetworkFooter;
         } else if (lowered == "spacer") {
             widget.kind = WidgetKind::Spacer;
         } else if (lowered == "drive_usage_list") {
             widget.kind = WidgetKind::DriveUsageList;
-            widget.binding.param = GetPrimaryWidgetParameter(node, "drives");
+            widget.binding.param = node.parameter;
         } else if (lowered == "clock_time") {
             widget.kind = WidgetKind::ClockTime;
         } else if (lowered == "clock_date") {
@@ -486,7 +465,7 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
             widget.binding.metric = "storage.write";
         } else if (lowered == "metric_list_cpu" || lowered == "metric_list_gpu") {
             widget.kind = WidgetKind::MetricList;
-            if (const std::string items = GetPrimaryWidgetParameter(node, "items"); !items.empty()) {
+            if (const std::string items = node.parameter; !items.empty()) {
                 const std::string prefix = lowered == "metric_list_cpu" ? "cpu." : "gpu.";
                 std::vector<std::string> prefixedItems;
                 for (const auto& item : Split(items, ',')) {

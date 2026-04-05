@@ -245,7 +245,7 @@ public:
                     return false;
                 }
             } else {
-                if (!ParseParameters(node.parameters)) {
+                if (!ParseParameter(node.parameter)) {
                     return false;
                 }
             }
@@ -315,7 +315,7 @@ private:
     }
 
     bool ParseChildren(std::vector<LayoutNodeConfig>& children);
-    bool ParseParameters(std::vector<std::pair<std::string, std::string>>& parameters);
+    bool ParseParameter(std::string& parameter);
 
     std::string text_;
     size_t index_ = 0;
@@ -339,7 +339,7 @@ bool LayoutExpressionParser::ParseChildren(std::vector<LayoutNodeConfig>& childr
     }
 }
 
-bool LayoutExpressionParser::ParseParameters(std::vector<std::pair<std::string, std::string>>& parameters) {
+bool LayoutExpressionParser::ParseParameter(std::string& parameter) {
     SkipWhitespace();
     if (index_ >= text_.size() || text_[index_] == ')') {
         return true;
@@ -361,16 +361,7 @@ bool LayoutExpressionParser::ParseParameters(std::vector<std::pair<std::string, 
     }
 
     const std::string body = Trim(text_.substr(begin, index_ - begin));
-    if (body.empty()) {
-        return true;
-    }
-
-    const size_t eq = body.find('=');
-    if (eq == std::string::npos) {
-        parameters.emplace_back("value", body);
-    } else {
-        parameters.emplace_back(ToLower(Trim(body.substr(0, eq))), Trim(body.substr(eq + 1)));
-    }
+    parameter = body;
     return true;
 }
 
@@ -579,14 +570,8 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             config.monitorName = value;
         } else if (section == "display" && key == "position") {
             ParseIntPair(value, config.positionX, config.positionY);
-        } else if (section == "display" && key == "position_x") {
-            config.positionX = ParseIntOrDefault(value, 0);
-        } else if (section == "display" && key == "position_y") {
-            config.positionY = ParseIntOrDefault(value, 0);
         } else if (section == "network" && key == "adapter_name") {
             config.networkAdapter = value;
-        } else if (section == "storage" && key == "drives") {
-            config.driveLetters = Split(value, ',');
         } else if (section == "vendor.gigabyte" && key == "fan_channel") {
             config.gigabyteFanChannelName = IsAutoChannelValue(value) ? std::string() : value;
         } else if (section == "vendor.gigabyte" && key == "temperature_channel") {
@@ -620,38 +605,12 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, si
     lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
 }
 
-void RemoveKey(std::vector<std::string>& lines, size_t sectionStart, size_t sectionEnd, const std::string& key) {
-    const std::string normalizedKey = ToLower(key);
-    for (size_t i = sectionStart + 1; i < sectionEnd;) {
-        const std::string trimmed = Trim(lines[i]);
-        if (trimmed.empty() || trimmed[0] == ';' || trimmed[0] == '#') {
-            ++i;
-            continue;
-        }
-        const size_t eq = trimmed.find('=');
-        if (eq == std::string::npos) {
-            ++i;
-            continue;
-        }
-        if (ToLower(Trim(trimmed.substr(0, eq))) == normalizedKey) {
-            lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(i));
-            --sectionEnd;
-            continue;
-        }
-        ++i;
-    }
-}
-
 void CollectDriveLettersRecursive(const LayoutNodeConfig& node, std::vector<std::string>& drives) {
     if (ToLower(node.name) == "drive_usage_list") {
-        for (const auto& parameter : node.parameters) {
-            if (parameter.first == "value" || parameter.first == "drives") {
-                for (const std::string& drive : Split(parameter.second, ',')) {
-                    const std::string normalized = ToLower(drive.substr(0, 1));
-                    if (std::find(drives.begin(), drives.end(), normalized) == drives.end()) {
-                        drives.push_back(normalized);
-                    }
-                }
+        for (const std::string& drive : Split(node.parameter, ',')) {
+            const std::string normalized = ToLower(drive.substr(0, 1));
+            if (std::find(drives.begin(), drives.end(), normalized) == drives.end()) {
+                drives.push_back(normalized);
             }
         }
     }
@@ -661,44 +620,13 @@ void CollectDriveLettersRecursive(const LayoutNodeConfig& node, std::vector<std:
     }
 }
 
-void EnsureDefaultLayout(LayoutConfig& layout) {
-    if (layout.cardsLayout.name.empty()) {
-        ParseLayoutExpression("rows(columns:3(cpu,gpu),columns:2(network:4,storage:9,time:3))", layout.cardsLayout);
-    }
-
-    const auto ensureCard = [&layout](const std::string& id, const std::string& title, const std::string& icon,
-                                  const std::string& expression) {
-        LayoutCardConfig& card = EnsureCardConfig(layout, id);
-        if (card.title.empty()) {
-            card.title = title;
-        }
-        if (card.icon.empty()) {
-            card.icon = icon;
-        }
-        if (card.layout.name.empty()) {
-            ParseLayoutExpression(expression, card.layout);
-        }
-    };
-
-    ensureCard("cpu", "CPU", "cpu",
-        "stack(text(cpu.name),columns:7(gauge:5(cpu.load),metric_list:7(cpu.temp,cpu.clock,cpu.fan,cpu.ram)))");
-    ensureCard("gpu", "GPU", "gpu",
-        "stack(text(gpu.name),columns:7(gauge:5(gpu.load),metric_list:7(gpu.temp,gpu.clock,gpu.fan,gpu.vram)))");
-    ensureCard("network", "Network", "network",
-        "stack(throughput:4(network.upload),throughput:4(network.download),network_footer)");
-    ensureCard("storage", "Storage", "storage",
-        "columns(stack:5(throughput:4(storage.read),throughput:4(storage.write),spacer),stack_top:7(drive_usage_list(C,D,E)))");
-    ensureCard("time", "Time", "time",
-        "center(clock_time:5,clock_date:2)");
-}
-
 }  // namespace
 
 std::string LoadEmbeddedConfigTemplate() {
     return LoadUtf8Resource(IDR_CONFIG_TEMPLATE, RT_RCDATA);
 }
 
-std::vector<std::string> CollectLayoutDriveLetters(const LayoutConfig& layout) {
+static std::vector<std::string> CollectLayoutDriveLetters(const LayoutConfig& layout) {
     std::vector<std::string> drives;
     for (const auto& card : layout.cards) {
         CollectDriveLettersRecursive(card.layout, drives);
@@ -718,14 +646,10 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config);
     ApplyConfigText(ReadFileUtf8(path), config);
-    EnsureDefaultLayout(config.layout);
 
     const std::vector<std::string> layoutDrives = CollectLayoutDriveLetters(config.layout);
     if (!layoutDrives.empty()) {
         config.driveLetters = layoutDrives;
-    }
-    if (config.driveLetters.empty()) {
-        config.driveLetters = {"C", "D", "E"};
     }
     return config;
 }
@@ -793,16 +717,8 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
         ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value);
     };
 
-    auto removeKey = [&lines, &ensureSection, &findSectionEnd](const std::string& sectionName, const std::string& key) {
-        size_t sectionStart = ensureSection(sectionName);
-        const size_t sectionEnd = findSectionEnd(sectionStart);
-        RemoveKey(lines, sectionStart, sectionEnd, key);
-    };
-
     updateKey("[display]", "monitor_name", config.monitorName);
     updateKey("[display]", "position", std::to_string(config.positionX) + "," + std::to_string(config.positionY));
-    removeKey("[display]", "position_x");
-    removeKey("[display]", "position_y");
     updateKey("[network]", "adapter_name", config.networkAdapter);
     updateKey("[vendor.gigabyte]", "fan_channel", config.gigabyteFanChannelName);
     updateKey("[vendor.gigabyte]", "temperature_channel", config.gigabyteTemperatureChannelName);

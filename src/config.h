@@ -14,7 +14,7 @@ struct UiFontConfig {
 struct LayoutNodeConfig {
     std::string name;
     int weight = 1;
-    std::vector<std::pair<std::string, std::string>> parameters;
+    std::string parameter;
     std::vector<LayoutNodeConfig> children;
 };
 
@@ -93,4 +93,3 @@ struct AppConfig {
 std::string LoadEmbeddedConfigTemplate();
 AppConfig LoadConfig(const std::filesystem::path& path);
 bool SaveConfig(const std::filesystem::path& path, const AppConfig& config);
-std::vector<std::string> CollectLayoutDriveLetters(const LayoutConfig& layout);
