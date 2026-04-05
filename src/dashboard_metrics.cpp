@@ -51,19 +51,32 @@ double GetThroughputGraphMax(const std::vector<double>& firstHistory, const std:
     return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
 }
 
+std::string BuildBoardMetricLabel(const std::string& name, const char* suffix) {
+    if (name.empty()) {
+        return suffix;
+    }
+    return name + " " + suffix;
+}
+
+std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<NamedScalarMetric>& metrics,
+    const std::string& name, const char* suffix, double scale) {
+    for (const auto& metric : metrics) {
+        if (ToLower(metric.name) != ToLower(name)) {
+            continue;
+        }
+        return DashboardMetricRow{BuildBoardMetricLabel(metric.name, suffix), FormatScalarValue(metric.metric, 0),
+            metric.metric.value.value_or(0.0) / scale};
+    }
+
+    ScalarMetric unavailable{std::nullopt, std::string(suffix) == "Temp" ? "\xC2\xB0""C" : "RPM"};
+    return DashboardMetricRow{BuildBoardMetricLabel(name, suffix), FormatScalarValue(unavailable, 0), 0.0};
+}
+
 std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapshot, const std::string& metricRef) {
     const std::string lowered = ToLower(metricRef);
-    if (lowered == "cpu.temp" || lowered == "cpu.temperature") {
-        return DashboardMetricRow{"Temp", FormatScalarValue(snapshot.cpu.temperature, 0),
-            snapshot.cpu.temperature.value.value_or(0.0) / 100.0};
-    }
     if (lowered == "cpu.clock") {
         return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.cpu.clock, 2),
             snapshot.cpu.clock.value.value_or(0.0) / 5.0};
-    }
-    if (lowered == "cpu.fan") {
-        return DashboardMetricRow{"Fan", FormatScalarValue(snapshot.cpu.fan, 0),
-            snapshot.cpu.fan.value.value_or(0.0) / 3000.0};
     }
     if (lowered == "cpu.ram" || lowered == "cpu.memory") {
         const double total = snapshot.cpu.memory.totalGb;
@@ -87,7 +100,21 @@ std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapsho
         return DashboardMetricRow{"VRAM", FormatMemory(snapshot.gpu.vram.usedGb, total),
             snapshot.gpu.vram.totalGb > 0.0 ? snapshot.gpu.vram.usedGb / snapshot.gpu.vram.totalGb : 0.0};
     }
+    if (lowered.rfind("board.temp.", 0) == 0) {
+        return ResolveNamedBoardMetric(snapshot.boardTemperatures, metricRef.substr(std::string("board.temp.").size()),
+            "Temp", 100.0);
+    }
+    if (lowered.rfind("board.fan.", 0) == 0) {
+        return ResolveNamedBoardMetric(snapshot.boardFans, metricRef.substr(std::string("board.fan.").size()),
+            "Fan", 3000.0);
+    }
     return std::nullopt;
+}
+
+void ApplyMetricLabelOverride(DashboardMetricRow& row, const std::string& labelOverride) {
+    if (!labelOverride.empty()) {
+        row.label = labelOverride;
+    }
 }
 
 }  // namespace
@@ -116,10 +143,11 @@ double DashboardMetricSource::ResolveGaugePercent(const std::string& metricRef) 
     return 0.0;
 }
 
-std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const std::vector<std::string>& metricRefs) const {
+std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const {
     std::vector<DashboardMetricRow> rows;
     for (const auto& metricRef : metricRefs) {
-        if (const auto row = ResolveMetricRow(snapshot_, metricRef); row.has_value()) {
+        if (auto row = ResolveMetricRow(snapshot_, metricRef.metricRef); row.has_value()) {
+            ApplyMetricLabelOverride(*row, metricRef.labelOverride);
             rows.push_back(*row);
         }
     }

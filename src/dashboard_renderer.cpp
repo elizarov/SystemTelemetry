@@ -85,6 +85,43 @@ std::string Join(const std::vector<std::string>& parts, const std::string& delim
     return joined;
 }
 
+DashboardMetricListEntry ParseMetricListEntry(std::string item) {
+    DashboardMetricListEntry entry;
+    const size_t equals = item.find('=');
+    if (equals == std::string::npos) {
+        entry.metricRef = Trim(item);
+        return entry;
+    }
+
+    entry.metricRef = Trim(item.substr(0, equals));
+    entry.labelOverride = Trim(item.substr(equals + 1));
+    return entry;
+}
+
+std::vector<DashboardMetricListEntry> ParseMetricListEntries(const std::string& parameter) {
+    std::vector<DashboardMetricListEntry> entries;
+    for (const auto& item : Split(parameter, ',')) {
+        DashboardMetricListEntry entry = ParseMetricListEntry(item);
+        if (!entry.metricRef.empty()) {
+            entries.push_back(std::move(entry));
+        }
+    }
+    return entries;
+}
+
+std::string PrefixMetricListItem(const std::string& item, const std::string& prefix) {
+    DashboardMetricListEntry entry = ParseMetricListEntry(item);
+    if (entry.metricRef.empty()) {
+        return "";
+    }
+
+    std::string result = prefix + entry.metricRef;
+    if (!entry.labelOverride.empty()) {
+        result += "=" + entry.labelOverride;
+    }
+    return result;
+}
+
 UINT GetPanelIconResourceId(const std::string& iconName) {
     const std::string lowered = ToLower(iconName);
     if (lowered == "cpu") return IDR_PANEL_ICON_CPU;
@@ -469,7 +506,10 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
                 const std::string prefix = lowered == "metric_list_cpu" ? "cpu." : "gpu.";
                 std::vector<std::string> prefixedItems;
                 for (const auto& item : Split(items, ',')) {
-                    prefixedItems.push_back(prefix + item);
+                    const std::string prefixed = PrefixMetricListItem(item, prefix);
+                    if (!prefixed.empty()) {
+                        prefixedItems.push_back(prefixed);
+                    }
                 }
                 widget.binding.param = Join(prefixedItems, ",");
             }
@@ -879,7 +919,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
     case WidgetKind::MetricList: {
         const int rowHeight = EffectiveMetricRowHeight();
         RECT rowRect{widget.rect.left, widget.rect.top, widget.rect.right, std::min(widget.rect.bottom, widget.rect.top + rowHeight)};
-        for (const auto& row : metrics.ResolveMetricList(Split(widget.binding.param, ','))) {
+        for (const auto& row : metrics.ResolveMetricList(ParseMetricListEntries(widget.binding.param))) {
             DrawMetricRow(hdc, rowRect, row);
             OffsetRect(&rowRect, 0, rowHeight);
             rowRect.bottom = std::min(widget.rect.bottom, rowRect.top + rowHeight);

@@ -7,6 +7,7 @@ Document new requirements briefly in the same style as the existing spec.
 Always use `build.cmd` for builds.
 Keep all build artifacts and temporary compiler files in `build\` so the repository root stays clean.
 Ignore the stray `$null` file at the repository root when it appears; it is a Codex sandbox artifact, not a project file.
+This project has a single deployment target; do not preserve backwards compatibility for legacy configs unless the user explicitly asks for it.
 
 After changing diagnostics behavior, update `docs/diagnostics.txt` instead of restating those rules here.
 

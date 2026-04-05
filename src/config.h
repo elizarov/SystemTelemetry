@@ -85,8 +85,8 @@ struct AppConfig {
     int positionY = 0;
     std::string networkAdapter;
     std::vector<std::string> driveLetters;
-    std::string gigabyteFanChannelName;
-    std::string gigabyteTemperatureChannelName;
+    std::vector<std::string> boardTemperatureNames;
+    std::vector<std::string> boardFanNames;
     LayoutConfig layout;
 };
 

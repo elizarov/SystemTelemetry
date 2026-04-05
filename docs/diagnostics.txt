@@ -22,7 +22,7 @@ The diagnostics trace must cover all diagnostics collection paths, not only vend
 Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
 Diagnostics output failures such as trace/dump/screenshot file-open errors, dump write failures, and screenshot export failures must be written to `telemetry_trace.txt` before any error dialog is shown.
 When `/trace` is enabled, diagnostics failures must prefer trace logging over modal UI and should complete with a failure exit code instead of blocking on a dialog.
-The dumped board-provider block must include Gigabyte debug details such as detected board identity, helper path, controller type, selected CPU temperature sensor, requested and selected fan channel, sampled diagnostics, and any raw chip-register details when that provider exposes them.
+The dumped board-provider block must include Gigabyte debug details such as detected board identity, helper path, controller type, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, sampled diagnostics, and any raw chip-register details when that provider exposes them.
 
 Single-instance interaction
 ===========================

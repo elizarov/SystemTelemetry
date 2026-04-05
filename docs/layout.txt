@@ -182,12 +182,13 @@ Widget parameters
 =================
 
 Widgets may bind data inline. For widgets that accept a list, the plain comma-separated body is passed through as that widget's parameter string.
+`metric_list(...)` items may append `=Label` to override the rendered row label for that metric.
 
 Examples:
 
 - `text(cpu.name)`
 - `gauge(gpu.load)`
-- `metric_list(cpu.temp,cpu.clock,cpu.fan,cpu.ram)`
+- `metric_list(board.temp.CPU=Temp,cpu.clock,board.fan.CPU=Fan,cpu.ram)`
 - `throughput(network.upload)`
 - `drive_usage_list(C,D,E)`
 
@@ -197,10 +198,10 @@ Supported metric references include:
 
 - `cpu.name`
 - `cpu.load`
-- `cpu.temp`
 - `cpu.clock`
-- `cpu.fan`
 - `cpu.ram`
+- `board.temp.CPU`
+- `board.fan.CPU`
 - `gpu.name`
 - `gpu.load`
 - `gpu.temp`
@@ -220,8 +221,10 @@ Rendering-oriented selection lives in the layout language when it changes what i
 Example:
 
 - `drive_usage_list(C,D,E)`
+- `metric_list(board.temp.CPU=Temp,board.temp.VRM=VRM,board.fan.CPU=Fan)`
 
-This defines a vertical list of drive-usage widgets and their order.
+This defines a vertical list of drive-usage widgets and their order, and it also makes the layout the source of
+truth for which named board temperature and fan sensors are requested from the board provider.
 
 Consistency rules
 =================

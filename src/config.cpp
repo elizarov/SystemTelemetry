@@ -36,10 +36,6 @@ std::string ToLower(std::string value) {
     return value;
 }
 
-bool IsAutoChannelValue(const std::string& value) {
-    return value.empty() || value == "0" || ToLower(value) == "auto";
-}
-
 std::vector<std::string> Split(const std::string& input, char delimiter) {
     std::vector<std::string> parts;
     std::stringstream stream(input);
@@ -572,10 +568,6 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             ParseIntPair(value, config.positionX, config.positionY);
         } else if (section == "network" && key == "adapter_name") {
             config.networkAdapter = value;
-        } else if (section == "vendor.gigabyte" && key == "fan_channel") {
-            config.gigabyteFanChannelName = IsAutoChannelValue(value) ? std::string() : value;
-        } else if (section == "vendor.gigabyte" && key == "temperature_channel") {
-            config.gigabyteTemperatureChannelName = IsAutoChannelValue(value) ? std::string() : value;
         } else if (section == "layout") {
             ApplyLayoutValue(config.layout, key, value);
         } else if (section.rfind("card.", 0) == 0) {
@@ -605,18 +597,46 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, si
     lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
 }
 
-void CollectDriveLettersRecursive(const LayoutNodeConfig& node, std::vector<std::string>& drives) {
+void AddUniqueValue(std::vector<std::string>& values, const std::string& value) {
+    if (value.empty()) {
+        return;
+    }
+
+    const std::string lowered = ToLower(value);
+    for (const auto& existing : values) {
+        if (ToLower(existing) == lowered) {
+            return;
+        }
+    }
+    values.push_back(value);
+}
+
+std::string ExtractMetricReference(const std::string& token) {
+    const size_t equals = token.find('=');
+    return Trim(token.substr(0, equals));
+}
+
+void CollectLayoutBindingsRecursive(const LayoutNodeConfig& node, std::vector<std::string>& drives,
+    std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
     if (ToLower(node.name) == "drive_usage_list") {
         for (const std::string& drive : Split(node.parameter, ',')) {
             const std::string normalized = ToLower(drive.substr(0, 1));
-            if (std::find(drives.begin(), drives.end(), normalized) == drives.end()) {
-                drives.push_back(normalized);
-            }
+            AddUniqueValue(drives, normalized);
+        }
+    }
+
+    for (const std::string& token : Split(node.parameter, ',')) {
+        const std::string metricRef = ExtractMetricReference(token);
+        const std::string lowered = ToLower(metricRef);
+        if (lowered.rfind("board.temp.", 0) == 0) {
+            AddUniqueValue(boardTemperatures, metricRef.substr(std::string("board.temp.").size()));
+        } else if (lowered.rfind("board.fan.", 0) == 0) {
+            AddUniqueValue(boardFans, metricRef.substr(std::string("board.fan.").size()));
         }
     }
 
     for (const auto& child : node.children) {
-        CollectDriveLettersRecursive(child, drives);
+        CollectLayoutBindingsRecursive(child, drives, boardTemperatures, boardFans);
     }
 }
 
@@ -626,19 +646,29 @@ std::string LoadEmbeddedConfigTemplate() {
     return LoadUtf8Resource(IDR_CONFIG_TEMPLATE, RT_RCDATA);
 }
 
-static std::vector<std::string> CollectLayoutDriveLetters(const LayoutConfig& layout) {
+struct LayoutBindingSelection {
+    std::vector<std::string> driveLetters;
+    std::vector<std::string> boardTemperatureNames;
+    std::vector<std::string> boardFanNames;
+};
+
+static LayoutBindingSelection CollectLayoutBindings(const LayoutConfig& layout) {
     std::vector<std::string> drives;
+    std::vector<std::string> boardTemperatures;
+    std::vector<std::string> boardFans;
     for (const auto& card : layout.cards) {
-        CollectDriveLettersRecursive(card.layout, drives);
+        CollectLayoutBindingsRecursive(card.layout, drives, boardTemperatures, boardFans);
     }
 
-    std::vector<std::string> result;
-    result.reserve(drives.size());
+    LayoutBindingSelection result;
+    result.driveLetters.reserve(drives.size());
     for (const std::string& drive : drives) {
         if (!drive.empty()) {
-            result.push_back(std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(drive[0])))));
+            result.driveLetters.push_back(std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(drive[0])))));
         }
     }
+    result.boardTemperatureNames = std::move(boardTemperatures);
+    result.boardFanNames = std::move(boardFans);
     return result;
 }
 
@@ -647,10 +677,12 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config);
     ApplyConfigText(ReadFileUtf8(path), config);
 
-    const std::vector<std::string> layoutDrives = CollectLayoutDriveLetters(config.layout);
-    if (!layoutDrives.empty()) {
-        config.driveLetters = layoutDrives;
+    const LayoutBindingSelection layoutBindings = CollectLayoutBindings(config.layout);
+    if (!layoutBindings.driveLetters.empty()) {
+        config.driveLetters = layoutBindings.driveLetters;
     }
+    config.boardTemperatureNames = layoutBindings.boardTemperatureNames;
+    config.boardFanNames = layoutBindings.boardFanNames;
     return config;
 }
 
@@ -720,8 +752,6 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
     updateKey("[display]", "monitor_name", config.monitorName);
     updateKey("[display]", "position", std::to_string(config.positionX) + "," + std::to_string(config.positionY));
     updateKey("[network]", "adapter_name", config.networkAdapter);
-    updateKey("[vendor.gigabyte]", "fan_channel", config.gigabyteFanChannelName);
-    updateKey("[vendor.gigabyte]", "temperature_channel", config.gigabyteTemperatureChannelName);
 
     std::string output;
     for (size_t i = 0; i < lines.size(); ++i) {

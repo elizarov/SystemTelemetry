@@ -74,6 +74,20 @@ bool EqualsInsensitive(const std::string& left, const std::string& right) {
     return ToLower(left) == ToLower(right);
 }
 
+template <typename Reading>
+const Reading* FindReadingByName(const std::vector<Reading>& readings, const std::string& requestedName) {
+    if (requestedName.empty()) {
+        return nullptr;
+    }
+
+    for (const auto& reading : readings) {
+        if (EqualsInsensitive(reading.title, requestedName)) {
+            return &reading;
+        }
+    }
+    return nullptr;
+}
+
 std::wstring AbsolutePath(const std::wstring& relativePath) {
     wchar_t modulePath[MAX_PATH];
     GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
@@ -125,6 +139,17 @@ std::optional<double> ParseDouble(const std::string& text) {
         return std::nullopt;
     }
     return value;
+}
+
+std::string JoinNames(const std::vector<std::string>& names) {
+    std::string joined;
+    for (size_t i = 0; i < names.size(); ++i) {
+        if (i != 0) {
+            joined += ",";
+        }
+        joined += names[i];
+    }
+    return joined;
 }
 
 struct DaemonProcess {
@@ -311,20 +336,20 @@ public:
     BoardVendorTelemetrySample Sample() override {
         BoardVendorTelemetrySample sample;
         sample.providerName = "Gigabyte";
-        sample.requestedFanChannelName = config_.gigabyteFanChannelName;
-        sample.requestedTemperatureChannelName = config_.gigabyteTemperatureChannelName;
+        sample.requestedFanNames = config_.boardFanNames;
+        sample.requestedTemperatureNames = config_.boardTemperatureNames;
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
         sample.chipName = chipName_;
         sample.controllerType = controllerType_;
         sample.driverLibrary = loadedLibrary_;
-        sample.selectedFanChannelName = selectedFanChannelName_;
-        sample.selectedTemperatureChannelName = selectedTemperatureChannelName_;
-        sample.selectedCpuTemperatureSensor = selectedTemperatureChannelName_;
         sample.chipId = chipId_;
         sample.monitorBaseAddress = monitorBaseAddress_;
         sample.ecMmioRegisterValue = ecMmioRegisterValue_;
         sample.fan16BitMode = true;
+        sample.temperatures = BuildRequestedTemperatures();
+        sample.fans = BuildRequestedFans();
+        sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         sample.diagnostics = diagnostics_;
 
         if (!initialized_) {
@@ -345,41 +370,24 @@ public:
 
         sample.chipName = chipName_;
         sample.controllerType = controllerType_;
-        sample.selectedFanChannelName = selectedFanChannelName_;
         sample.chipId = chipId_;
         sample.monitorBaseAddress = monitorBaseAddress_;
         sample.ecMmioRegisterValue = ecMmioRegisterValue_;
-        sample.selectedTemperatureChannelName = selectedTemperatureChannelName_;
-        sample.selectedCpuTemperatureSensor = selectedTemperatureChannelName_;
-        sample.cpuTemperatureC = selectedCpuTemperatureC_;
         sample.diagnostics = diagnostics_;
 
         if (!cachedResult_.success) {
             return sample;
         }
 
-        if (!selectedCpuTemperatureC_.has_value()) {
-            SelectCpuTemperature();
-            sample.selectedTemperatureChannelName = selectedTemperatureChannelName_;
-            sample.selectedCpuTemperatureSensor = selectedTemperatureChannelName_;
-            sample.cpuTemperatureC = selectedCpuTemperatureC_;
-        }
-
-        std::string selectedFanTitle;
-        const FanReading* selectedFan = SelectFanReading();
-        if (selectedFan != nullptr) {
-            sample.fanRpm = selectedFan->rpm;
-            sample.selectedFanChannelName = selectedFanChannelName_;
-            selectedFanTitle = selectedFan->title;
-        }
-
-        sample.available = sample.cpuTemperatureC.has_value() || sample.fanRpm.has_value();
+        sample.temperatures = BuildRequestedTemperatures();
+        sample.fans = BuildRequestedFans();
+        sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         sample.diagnostics = diagnostics_;
-        if (!selectedFanTitle.empty()) {
-            sample.diagnostics += " sampled_fan_title=" + selectedFanTitle;
+        if (!sample.requestedTemperatureNames.empty()) {
+            sample.diagnostics += " requested_temps=" + JoinNames(sample.requestedTemperatureNames);
         }
-        if (!sample.selectedTemperatureChannelName.empty()) {
-            sample.diagnostics += " sampled_temp_title=" + sample.selectedTemperatureChannelName;
+        if (!sample.requestedFanNames.empty()) {
+            sample.diagnostics += " requested_fans=" + JoinNames(sample.requestedFanNames);
         }
         return sample;
     }
@@ -452,9 +460,6 @@ private:
         ecMmioRegisterValue_.reset();
         fanReadings_.clear();
         tempReadings_.clear();
-        selectedFanChannelName_.clear();
-        selectedTemperatureChannelName_.clear();
-        selectedCpuTemperatureC_.reset();
 
         for (const auto& [key, value] : result.fields) {
             if (key == "controller_type") {
@@ -515,78 +520,45 @@ private:
         if (chipName_.empty() && !controllerType_.empty()) {
             chipName_ = controllerType_;
         }
-
-        SelectCpuTemperature();
     }
 
-    const FanReading* SelectFanReading() {
-        auto chooseReading = [this](const std::string& requestedName, bool requireCpuTitle) -> const FanReading* {
-            for (const auto& reading : fanReadings_) {
-                if (!reading.rpm.has_value() || *reading.rpm <= 0.0) {
-                    continue;
-                }
-                if (!requestedName.empty() && !EqualsInsensitive(reading.title, requestedName)) {
-                    continue;
-                }
-                if (requestedName.empty() && requireCpuTitle && !EqualsInsensitive(reading.title, "CPU")) {
-                    continue;
-                }
-                return &reading;
+    static bool HasAvailableMetricValue(const std::vector<NamedScalarMetric>& metrics) {
+        for (const auto& metric : metrics) {
+            if (metric.metric.value.has_value()) {
+                return true;
             }
-            return nullptr;
-        };
-
-        const FanReading* selected = nullptr;
-        if (!config_.gigabyteFanChannelName.empty()) {
-            selected = chooseReading(config_.gigabyteFanChannelName, false);
         }
-        if (selected == nullptr) {
-            selected = chooseReading(std::string(), true);
-        }
-        if (selected == nullptr) {
-            selected = chooseReading(std::string(), false);
-        }
-        if (selected == nullptr) {
-            return nullptr;
-        }
-
-        selectedFanChannelName_ = selected->title;
-        return selected;
+        return false;
     }
 
-    void SelectCpuTemperature() {
-        auto chooseReading = [this](const std::string& requestedName, bool requireCpuTitle) -> const TemperatureReading* {
-            for (const auto& reading : tempReadings_) {
-                if (!reading.celsius.has_value()) {
-                    continue;
-                }
-                if (!requestedName.empty() && !EqualsInsensitive(reading.title, requestedName)) {
-                    continue;
-                }
-                if (requestedName.empty() && requireCpuTitle && !EqualsInsensitive(reading.title, "CPU")) {
-                    continue;
-                }
-                return &reading;
+    std::vector<NamedScalarMetric> BuildRequestedTemperatures() const {
+        std::vector<NamedScalarMetric> metrics;
+        metrics.reserve(config_.boardTemperatureNames.size());
+        for (const auto& requestedName : config_.boardTemperatureNames) {
+            NamedScalarMetric metric;
+            metric.name = requestedName;
+            metric.metric.unit = "\xC2\xB0""C";
+            if (const TemperatureReading* reading = FindReadingByName(tempReadings_, requestedName); reading != nullptr) {
+                metric.metric.value = reading->celsius;
             }
-            return nullptr;
-        };
+            metrics.push_back(std::move(metric));
+        }
+        return metrics;
+    }
 
-        const TemperatureReading* selected = nullptr;
-        if (!config_.gigabyteTemperatureChannelName.empty()) {
-            selected = chooseReading(config_.gigabyteTemperatureChannelName, false);
+    std::vector<NamedScalarMetric> BuildRequestedFans() const {
+        std::vector<NamedScalarMetric> metrics;
+        metrics.reserve(config_.boardFanNames.size());
+        for (const auto& requestedName : config_.boardFanNames) {
+            NamedScalarMetric metric;
+            metric.name = requestedName;
+            metric.metric.unit = "RPM";
+            if (const FanReading* reading = FindReadingByName(fanReadings_, requestedName); reading != nullptr) {
+                metric.metric.value = reading->rpm;
+            }
+            metrics.push_back(std::move(metric));
         }
-        if (selected == nullptr) {
-            selected = chooseReading(std::string(), true);
-        }
-        if (selected == nullptr) {
-            selected = chooseReading(std::string(), false);
-        }
-        if (selected == nullptr) {
-            return;
-        }
-
-        selectedTemperatureChannelName_ = selected->title;
-        selectedCpuTemperatureC_ = selected->celsius;
+        return metrics;
     }
 
     tracing::Trace* trace_ = nullptr;
@@ -610,9 +582,6 @@ private:
     std::string daemonBuffer_;
     bool daemonFrameOpen_ = false;
     ULONGLONG lastProbeTick_ = 0;
-    std::string selectedFanChannelName_;
-    std::string selectedTemperatureChannelName_;
-    std::optional<double> selectedCpuTemperatureC_;
     bool initialized_ = false;
 };
 

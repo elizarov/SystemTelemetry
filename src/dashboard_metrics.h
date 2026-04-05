@@ -18,6 +18,11 @@ struct DashboardMetricRow {
     double ratio = 0.0;
 };
 
+struct DashboardMetricListEntry {
+    std::string metricRef;
+    std::string labelOverride;
+};
+
 struct DashboardThroughputMetric {
     std::string label;
     double valueMbps = 0.0;
@@ -37,7 +42,7 @@ public:
 
     std::string ResolveText(const std::string& metricRef) const;
     double ResolveGaugePercent(const std::string& metricRef) const;
-    std::vector<DashboardMetricRow> ResolveMetricList(const std::vector<std::string>& metricRefs) const;
+    std::vector<DashboardMetricRow> ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const;
     DashboardThroughputMetric ResolveThroughput(const std::string& metricRef) const;
     std::string ResolveNetworkFooter() const;
     std::vector<DashboardDriveRow> ResolveDriveRows(const std::vector<std::string>& drives) const;

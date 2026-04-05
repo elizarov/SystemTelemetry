@@ -10,11 +10,7 @@
 #include "board_vendor.h"
 #include "config.h"
 #include "gpu_vendor.h"
-
-struct ScalarMetric {
-    std::optional<double> value;
-    std::string unit;
-};
+#include "metric_types.h"
 
 struct MemoryMetric {
     double usedGb = 0.0;
@@ -64,6 +60,8 @@ struct StorageTelemetry {
 struct SystemSnapshot {
     ProcessorTelemetry cpu;
     GpuTelemetry gpu;
+    std::vector<NamedScalarMetric> boardTemperatures;
+    std::vector<NamedScalarMetric> boardFans;
     NetworkTelemetry network;
     StorageTelemetry storage;
     std::vector<DriveInfo> drives;

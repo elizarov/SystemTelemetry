@@ -46,6 +46,15 @@ std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
     return buffer;
 }
 
+std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(const std::vector<std::string>& names, const char* unit) {
+    std::vector<NamedScalarMetric> metrics;
+    metrics.reserve(names.size());
+    for (const auto& name : names) {
+        metrics.push_back(NamedScalarMetric{name, ScalarMetric{std::nullopt, unit}});
+    }
+    return metrics;
+}
+
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
 
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, const wchar_t* path, PDH_HCOUNTER* counter) {
@@ -314,6 +323,8 @@ TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept
 bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* traceStream) {
     impl_->config_ = config;
     impl_->trace_.SetOutput(traceStream);
+    impl_->snapshot_.boardTemperatures = CreateRequestedBoardMetrics(config.boardTemperatureNames, "\xC2\xB0""C");
+    impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(config.boardFanNames, "RPM");
     impl_->snapshot_.network.uploadHistory.assign(60, 0.0);
     impl_->snapshot_.network.downloadHistory.assign(60, 0.0);
     impl_->snapshot_.storage.readHistory.assign(60, 0.0);
@@ -458,12 +469,6 @@ AppConfig TelemetryCollector::EffectiveConfig() const {
     AppConfig config = impl_->config_;
     if (!impl_->snapshot_.network.adapterName.empty() && impl_->snapshot_.network.adapterName != "Auto") {
         config.networkAdapter = impl_->snapshot_.network.adapterName;
-    }
-    if (!impl_->boardProviderSample_.selectedFanChannelName.empty()) {
-        config.gigabyteFanChannelName = impl_->boardProviderSample_.selectedFanChannelName;
-    }
-    if (!impl_->boardProviderSample_.selectedTemperatureChannelName.empty()) {
-        config.gigabyteTemperatureChannelName = impl_->boardProviderSample_.selectedTemperatureChannelName;
     }
     return config;
 }
@@ -651,10 +656,8 @@ void TelemetryCollector::Impl::ApplyBoardVendorSample(const BoardVendorTelemetry
     boardProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
     boardProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
     boardProviderAvailable_ = sample.available;
-    snapshot_.cpu.temperature.value = sample.cpuTemperatureC;
-    snapshot_.cpu.temperature.unit = "\xC2\xB0""C";
-    snapshot_.cpu.fan.value = sample.fanRpm;
-    snapshot_.cpu.fan.unit = "RPM";
+    snapshot_.boardTemperatures = sample.temperatures;
+    snapshot_.boardFans = sample.fans;
 }
 
 void TelemetryCollector::Impl::UpdateGpu() {

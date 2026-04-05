@@ -143,6 +143,23 @@ void WriteDoubleArray(std::ostream& output, const std::string& key, const std::v
     output << "]\n";
 }
 
+void WriteStringList(std::ostream& output, const std::string& prefix, const std::vector<std::string>& values) {
+    WriteInteger(output, prefix + ".count", values.size());
+    for (size_t i = 0; i < values.size(); ++i) {
+        WriteString(output, prefix + "." + std::to_string(i) + ".name", values[i]);
+    }
+}
+
+void WriteNamedScalarMetrics(std::ostream& output, const std::string& prefix, const std::vector<NamedScalarMetric>& metrics) {
+    WriteInteger(output, prefix + ".count", metrics.size());
+    for (size_t i = 0; i < metrics.size(); ++i) {
+        const std::string metricPrefix = prefix + "." + std::to_string(i);
+        WriteString(output, metricPrefix + ".name", metrics[i].name);
+        WriteOptionalDouble(output, metricPrefix + ".value", metrics[i].metric.value, 6);
+        WriteString(output, metricPrefix + ".unit", metrics[i].metric.unit);
+    }
+}
+
 bool ParseStrictDouble(const std::string& text, double& value) {
     char* end = nullptr;
     errno = 0;
@@ -330,6 +347,47 @@ bool LoadDoubleArrayField(const std::map<std::string, std::string>& values, cons
     return true;
 }
 
+bool LoadStringList(const std::map<std::string, std::string>& values, const std::string& prefix,
+    std::vector<std::string>& field, std::string* error) {
+    size_t count = 0;
+    if (!LoadUnsigned(values, prefix + ".count", count, error)) {
+        return false;
+    }
+
+    field.clear();
+    field.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        std::string value;
+        if (!LoadString(values, prefix + "." + std::to_string(i) + ".name", value, error)) {
+            return false;
+        }
+        field.push_back(std::move(value));
+    }
+    return true;
+}
+
+bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values, const std::string& prefix,
+    std::vector<NamedScalarMetric>& field, std::string* error) {
+    size_t count = 0;
+    if (!LoadUnsigned(values, prefix + ".count", count, error)) {
+        return false;
+    }
+
+    field.clear();
+    field.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        NamedScalarMetric metric;
+        const std::string metricPrefix = prefix + "." + std::to_string(i);
+        if (!LoadString(values, metricPrefix + ".name", metric.name, error) ||
+            !LoadOptionalDouble(values, metricPrefix + ".value", metric.metric.value, error) ||
+            !LoadString(values, metricPrefix + ".unit", metric.metric.unit, error)) {
+            return false;
+        }
+        field.push_back(std::move(metric));
+    }
+    return true;
+}
+
 }  // namespace
 
 bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
@@ -345,6 +403,8 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteString(output, "cpu.fan.unit", dump.snapshot.cpu.fan.unit);
     WriteDouble(output, "cpu.memory.used_gb", dump.snapshot.cpu.memory.usedGb, 6);
     WriteDouble(output, "cpu.memory.total_gb", dump.snapshot.cpu.memory.totalGb, 6);
+    WriteNamedScalarMetrics(output, "board.temperatures", dump.snapshot.boardTemperatures);
+    WriteNamedScalarMetrics(output, "board.fans", dump.snapshot.boardFans);
 
     WriteString(output, "gpu.name", dump.snapshot.gpu.name);
     WriteDouble(output, "gpu.load_percent", dump.snapshot.gpu.loadPercent, 6);
@@ -364,8 +424,6 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteString(output, "board_provider.name", dump.boardProvider.providerName);
     WriteString(output, "board_provider.diagnostics", dump.boardProvider.diagnostics);
     WriteBool(output, "board_provider.available", dump.boardProvider.available);
-    WriteOptionalDouble(output, "board_provider.fan_rpm", dump.boardProvider.fanRpm, 6);
-    WriteOptionalDouble(output, "board_provider.cpu_temperature_c", dump.boardProvider.cpuTemperatureC, 6);
     WriteOptionalInteger(output, "board_provider.probe_port", dump.boardProvider.probePort);
     WriteOptionalInteger(output, "board_provider.chip_id", dump.boardProvider.chipId);
     WriteOptionalInteger(output, "board_provider.monitor_base_address", dump.boardProvider.monitorBaseAddress);
@@ -376,11 +434,10 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteString(output, "board_provider.chip_name", dump.boardProvider.chipName);
     WriteString(output, "board_provider.controller_type", dump.boardProvider.controllerType);
     WriteString(output, "board_provider.driver_library", dump.boardProvider.driverLibrary);
-    WriteString(output, "board_provider.requested_fan_channel_name", dump.boardProvider.requestedFanChannelName);
-    WriteString(output, "board_provider.selected_fan_channel_name", dump.boardProvider.selectedFanChannelName);
-    WriteString(output, "board_provider.requested_temperature_channel_name", dump.boardProvider.requestedTemperatureChannelName);
-    WriteString(output, "board_provider.selected_temperature_channel_name", dump.boardProvider.selectedTemperatureChannelName);
-    WriteString(output, "board_provider.selected_cpu_temperature_sensor", dump.boardProvider.selectedCpuTemperatureSensor);
+    WriteStringList(output, "board_provider.requested_fans", dump.boardProvider.requestedFanNames);
+    WriteStringList(output, "board_provider.requested_temperatures", dump.boardProvider.requestedTemperatureNames);
+    WriteNamedScalarMetrics(output, "board_provider.fans", dump.boardProvider.fans);
+    WriteNamedScalarMetrics(output, "board_provider.temperatures", dump.boardProvider.temperatures);
     WriteBool(output, "board_provider.fan_16_bit_mode", dump.boardProvider.fan16BitMode);
 
     WriteString(output, "network.adapter_name", dump.snapshot.network.adapterName);
@@ -457,6 +514,8 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadString(values, "cpu.fan.unit", parsed.snapshot.cpu.fan.unit, error) ||
         !LoadDouble(values, "cpu.memory.used_gb", parsed.snapshot.cpu.memory.usedGb, error) ||
         !LoadDouble(values, "cpu.memory.total_gb", parsed.snapshot.cpu.memory.totalGb, error) ||
+        !LoadNamedScalarMetrics(values, "board.temperatures", parsed.snapshot.boardTemperatures, error) ||
+        !LoadNamedScalarMetrics(values, "board.fans", parsed.snapshot.boardFans, error) ||
         !LoadString(values, "gpu.name", parsed.snapshot.gpu.name, error) ||
         !LoadDouble(values, "gpu.load_percent", parsed.snapshot.gpu.loadPercent, error) ||
         !LoadOptionalDouble(values, "gpu.temperature.value", parsed.snapshot.gpu.temperature.value, error) ||
@@ -473,8 +532,6 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadString(values, "board_provider.name", parsed.boardProvider.providerName, error) ||
         !LoadString(values, "board_provider.diagnostics", parsed.boardProvider.diagnostics, error) ||
         !LoadBool(values, "board_provider.available", parsed.boardProvider.available, error) ||
-        !LoadOptionalDouble(values, "board_provider.fan_rpm", parsed.boardProvider.fanRpm, error) ||
-        !LoadOptionalDouble(values, "board_provider.cpu_temperature_c", parsed.boardProvider.cpuTemperatureC, error) ||
         !LoadOptionalUnsigned(values, "board_provider.probe_port", parsed.boardProvider.probePort, error) ||
         !LoadOptionalUnsigned(values, "board_provider.chip_id", parsed.boardProvider.chipId, error) ||
         !LoadOptionalUnsigned(values, "board_provider.monitor_base_address", parsed.boardProvider.monitorBaseAddress, error) ||
@@ -485,11 +542,10 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadString(values, "board_provider.chip_name", parsed.boardProvider.chipName, error) ||
         !LoadString(values, "board_provider.controller_type", parsed.boardProvider.controllerType, error) ||
         !LoadString(values, "board_provider.driver_library", parsed.boardProvider.driverLibrary, error) ||
-        !LoadString(values, "board_provider.requested_fan_channel_name", parsed.boardProvider.requestedFanChannelName, error) ||
-        !LoadString(values, "board_provider.selected_fan_channel_name", parsed.boardProvider.selectedFanChannelName, error) ||
-        !LoadString(values, "board_provider.requested_temperature_channel_name", parsed.boardProvider.requestedTemperatureChannelName, error) ||
-        !LoadString(values, "board_provider.selected_temperature_channel_name", parsed.boardProvider.selectedTemperatureChannelName, error) ||
-        !LoadString(values, "board_provider.selected_cpu_temperature_sensor", parsed.boardProvider.selectedCpuTemperatureSensor, error) ||
+        !LoadStringList(values, "board_provider.requested_fans", parsed.boardProvider.requestedFanNames, error) ||
+        !LoadStringList(values, "board_provider.requested_temperatures", parsed.boardProvider.requestedTemperatureNames, error) ||
+        !LoadNamedScalarMetrics(values, "board_provider.fans", parsed.boardProvider.fans, error) ||
+        !LoadNamedScalarMetrics(values, "board_provider.temperatures", parsed.boardProvider.temperatures, error) ||
         !LoadBool(values, "board_provider.fan_16_bit_mode", parsed.boardProvider.fan16BitMode, error) ||
         !LoadString(values, "network.adapter_name", parsed.snapshot.network.adapterName, error) ||
         !LoadDouble(values, "network.upload_mbps", parsed.snapshot.network.uploadMbps, error) ||

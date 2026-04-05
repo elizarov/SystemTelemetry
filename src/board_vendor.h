@@ -3,16 +3,16 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "config.h"
+#include "metric_types.h"
 
 namespace tracing {
 class Trace;
 }
 
 struct BoardVendorTelemetrySample {
-    std::optional<double> fanRpm;
-    std::optional<double> cpuTemperatureC;
     std::optional<uint16_t> probePort;
     std::optional<uint16_t> chipId;
     std::optional<uint32_t> monitorBaseAddress;
@@ -23,11 +23,10 @@ struct BoardVendorTelemetrySample {
     std::string chipName;
     std::string controllerType;
     std::string driverLibrary;
-    std::string requestedFanChannelName;
-    std::string selectedFanChannelName;
-    std::string requestedTemperatureChannelName;
-    std::string selectedTemperatureChannelName;
-    std::string selectedCpuTemperatureSensor;
+    std::vector<std::string> requestedFanNames;
+    std::vector<std::string> requestedTemperatureNames;
+    std::vector<NamedScalarMetric> fans;
+    std::vector<NamedScalarMetric> temperatures;
     std::string providerName = "None";
     std::string diagnostics;
     bool fan16BitMode = false;
