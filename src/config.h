@@ -61,6 +61,7 @@ struct ThroughputWidgetConfig {
     int scaleLabelMinHeight = 0;
     int guideStrokeWidth = 0;
     int plotStrokeWidth = 0;
+    int leaderDiameter = 0;
 };
 
 struct GaugeWidgetConfig {

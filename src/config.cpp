@@ -552,6 +552,8 @@ void ApplyThroughputWidgetValue(ThroughputWidgetConfig& widget, const std::strin
         widget.guideStrokeWidth = ParseIntOrDefault(value, widget.guideStrokeWidth);
     } else if (key == "plot_stroke_width") {
         widget.plotStrokeWidth = ParseIntOrDefault(value, widget.plotStrokeWidth);
+    } else if (key == "leader_diameter") {
+        widget.leaderDiameter = ParseIntOrDefault(value, widget.leaderDiameter);
     }
 }
 

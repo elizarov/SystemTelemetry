@@ -263,6 +263,21 @@ void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
     graphics.FillPath(&brush, &path);
 }
 
+void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color, BYTE alpha) {
+    const int clampedDiameter = std::max(1, diameter);
+    const int radius = clampedDiameter / 2;
+
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    Gdiplus::SolidBrush brush(Gdiplus::Color(alpha, GetRValue(color), GetGValue(color), GetBValue(color)));
+    graphics.FillEllipse(&brush,
+        static_cast<INT>(centerX - radius),
+        static_cast<INT>(centerY - radius),
+        static_cast<INT>(clampedDiameter),
+        static_cast<INT>(clampedDiameter));
+}
+
 }  // namespace
 
 DashboardRenderer::DashboardRenderer() = default;
@@ -936,7 +951,9 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
         std::max(1, ScaleLogical(config_.layout.throughput.scaleLabelMinHeight)));
     const int graphTop = std::min(rect.bottom - 1, rect.top + labelBandHeight);
     const int graphLeft = rect.left + axisWidth;
-    const int width = std::max<int>(1, rect.right - graphLeft - 1);
+    const int leaderDiameter = std::max(0, ScaleLogical(config_.layout.throughput.leaderDiameter));
+    const int leaderRadius = leaderDiameter / 2;
+    const int width = std::max<int>(1, rect.right - graphLeft - 1 - leaderRadius);
     const int height = std::max<int>(1, rect.bottom - rect.top - 1);
     const int graphRight = graphLeft + width;
     const int graphBottom = rect.bottom - 1;
@@ -975,8 +992,21 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     RECT maxRect{rect.left, rect.top, rect.left + axisWidth, graphTop};
     DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 
-    HPEN pen = CreatePen(PS_SOLID, std::max(1, ScaleLogical(config_.layout.throughput.plotStrokeWidth)), AccentColor());
+    const COLORREF plotColor = AccentColor();
+    HPEN pen = CreatePen(PS_SOLID, std::max(1, ScaleLogical(config_.layout.throughput.plotStrokeWidth)), plotColor);
     HGDIOBJ oldPen = SelectObject(hdc, pen);
+    POINT lastPoint{graphLeft, graphBottom};
+    bool hasLastPoint = false;
+    if (!history.empty()) {
+        const size_t historyDenominator = std::max<size_t>(1, history.size() - 1);
+        for (size_t i = 0; i < history.size(); ++i) {
+            const double valueRatio = std::clamp(history[i] / maxValue, 0.0, 1.0);
+            const int x = graphLeft + static_cast<int>(i * width / historyDenominator);
+            const int y = rect.bottom - 1 - static_cast<int>(valueRatio * height);
+            lastPoint = POINT{x, y};
+            hasLastPoint = true;
+        }
+    }
     for (size_t i = 1; i < history.size(); ++i) {
         const double v1 = std::clamp(history[i - 1] / maxValue, 0.0, 1.0);
         const double v2 = std::clamp(history[i] / maxValue, 0.0, 1.0);
@@ -989,6 +1019,10 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     }
     SelectObject(hdc, oldPen);
     DeleteObject(pen);
+
+    if (hasLastPoint && leaderDiameter > 0) {
+        FillCircle(hdc, lastPoint.x, lastPoint.y, leaderDiameter, plotColor, 255);
+    }
 }
 
 void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const DashboardThroughputMetric& metric) {

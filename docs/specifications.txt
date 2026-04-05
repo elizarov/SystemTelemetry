@@ -270,6 +270,7 @@ Network plots should draw thin horizontal guide lines every 5 MB/s.
 Storage throughput plots should use the same averaged-history scaling, draw horizontal guide lines every 5 MB/s while the averaged max stays at or below 50 MB/s, and switch those guide lines to every 50 MB/s once the averaged max exceeds 50 MB/s.
 All throughput plots should also draw synchronized vertical time markers every 10 seconds, with marker placement driven from one shared snapshot-time phase so the markers line up and scroll in sync across network and storage.
 Throughput-plot horizontal and vertical markers should render with a dedicated darker config-driven marker color so they remain visually distinct from the throughput line itself.
+All throughput plots should render a small accent-colored leader circle centered on the right-most live point, with its diameter coming from the `[throughput]` widget config and the plotted line ending at that circle center so the live value reads clearly without labels on every point.
 Show adapter name and IP address together on the same final footer line when available.
 
 Storage Panel (Bottom Center)
