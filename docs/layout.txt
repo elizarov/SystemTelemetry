@@ -1,0 +1,259 @@
+System Telemetry layout language specification
+
+Overview
+========
+
+`config.ini` uses a compact INI-based layout language.
+
+The language is static:
+
+- layout is loaded from config
+- coordinates are computed once after config load or reload
+- rendering uses those precomputed coordinates until the next reload
+
+The language is centered around the dashboard's current shape:
+
+- rows contain cards
+- cards contain a small static composition of known widget kinds
+
+Compact rules
+=============
+
+- weights are written as `name*weight`
+- layout containers are written as `kind(...)`
+- size pairs are written as `x,y`
+- font specs are written as `face,size,weight`
+- widget parameters are written inline as `widget(key=value)`
+- omitted weights default to `1`
+- whitespace around commas is ignored
+
+Structure
+=========
+
+The language has two levels:
+
+1. Dashboard-level geometry, rows, palette, and fonts in `[layout]`
+2. Card-local title, icon, and content composition in `[card.<id>]`
+
+Dashboard section
+=================
+
+`[layout]` owns the shared geometry, row declaration, palette, and fonts.
+
+Supported geometry keys:
+
+- `window = width,height`
+- `outer_margin = pixels`
+- `row_gap = pixels`
+- `card_gap = pixels`
+- `card_padding = pixels`
+- `card_radius = pixels`
+- `card_border = pixels`
+- `header = height,icon_size,icon_gap`
+- `content_gap = pixels`
+- `column_gap = pixels`
+- `metric_row_height = pixels`
+- `metric_label_width = pixels`
+- `metric_value_gap = pixels`
+- `metric_bar_height = pixels`
+- `widget_line_gap = pixels`
+- `drive_row_height = pixels`
+- `drive_label_width = pixels`
+- `drive_percent_width = pixels`
+- `drive_free_width = pixels`
+- `drive_bar_gap = pixels`
+- `drive_value_gap = pixels`
+- `drive_bar_height = pixels`
+- `throughput_axis_width = pixels`
+- `throughput_header_gap = pixels`
+- `throughput_read_label_width = pixels`
+- `throughput_write_label_width = pixels`
+- `throughput_graph_height = pixels`
+- `gauge_preferred_size = pixels`
+
+Supported row key:
+
+- `rows = row*weight(card*weight,...)`
+
+Example:
+
+- `rows = top*3(cpu,gpu), bottom*2(network*4,storage*9,time*3)`
+
+Color keys stay in `[layout]` and use `#RRGGBB`:
+
+- `background_color`
+- `foreground_color`
+- `accent_color`
+- `panel_border_color`
+- `muted_text_color`
+- `track_color`
+- `panel_fill_color`
+- `graph_background_color`
+- `graph_grid_color`
+- `graph_axis_color`
+
+Font keys stay in `[layout]`:
+
+- `font.title = face,size,weight`
+- `font.big = face,size,weight`
+- `font.value = face,size,weight`
+- `font.label = face,size,weight`
+- `font.small = face,size,weight`
+
+Card sections
+=============
+
+Each card section uses:
+
+- `title = ...`
+- `icon = ...`
+- `layout = ...`
+
+Recommended section names:
+
+- `[card.cpu]`
+- `[card.gpu]`
+- `[card.network]`
+- `[card.storage]`
+- `[card.time]`
+
+Future cards follow the same pattern:
+
+- `[card.memory]`
+- `[card.board]`
+- `[card.weather]`
+
+Icon names
+==========
+
+`icon` values are resource names, not file paths.
+
+Supported icon names:
+
+- `cpu`
+- `gpu`
+- `network`
+- `storage`
+- `time`
+
+Layout expressions
+==================
+
+Supported layout kinds:
+
+- `columns(...)`
+- `stack(...)`
+- `stack_top(...)`
+- `center(...)`
+
+Meaning:
+
+- `columns(...)` splits content horizontally into weighted children
+- `stack(...)` splits content vertically into weighted children
+- `stack_top(...)` packs children from the top using their preferred heights and leaves any remaining space below
+
+`drive_usage_list(...)` rows use `drive_row_height` as their packed row height when placed inside a top-packed stack.
+- `center(...)` creates a centered vertical stack
+
+Nested layout expressions are allowed.
+
+Example:
+
+- `columns(stack(throughput_read*4,throughput_write*4)*5, drive_usage_list(drives=C,D,E)*7)`
+
+Widget names
+============
+
+Supported widget names:
+
+- `cpu_name`
+- `gpu_name`
+- `gauge_cpu_load`
+- `gauge_gpu_load`
+- `metric_list_cpu`
+- `metric_list_gpu`
+- `throughput_upload`
+- `throughput_download`
+- `throughput_read`
+- `throughput_write`
+- `network_footer`
+- `spacer`
+- `drive_usage_list`
+- `clock_time`
+- `clock_date`
+
+Widget parameters
+=================
+
+Widgets may bind data inline.
+
+Examples:
+
+- `metric_list_cpu(items=temp,clock,fan,ram)`
+- `metric_list_gpu(items=temp,clock,fan,vram)`
+- `drive_usage_list(drives=C,D,E)`
+
+`spacer` reserves layout space without drawing content.
+
+Drive and sensor selection
+==========================
+
+Rendering-oriented selection lives in the layout language when it changes what is drawn.
+
+Example:
+
+- `drive_usage_list(drives=C,D,E)`
+
+This defines a vertical list of drive-usage widgets and their order.
+
+Consistency rules
+=================
+
+Shared absolute geometry belongs only in `[layout]`, including:
+
+- margins
+- row and card gaps
+- border radius and border width
+- card padding
+- header metrics
+- shared content spacing
+- shared metric row height
+- widget-specific widths and bar thicknesses when a hard-coded widget shape needs to stay configurable
+
+Card sections define relative structure only:
+
+- card title
+- card icon
+- layout expression
+- widget parameters
+- relative child weights
+
+Static sizing rules
+===================
+
+Layout is resolved without using current telemetry values.
+
+Static sizing rules:
+
+- header height comes from config
+- metric rows share one configured height
+- metric bars, drive row columns, throughput plot chrome, and gauge preferred size come from config
+- throughput sections follow the configured vertical rhythm
+- centered time/date widgets use weighted slots from `center(...)`
+- repeated lists such as drives divide their assigned area using the item count from config
+
+Validation rules
+================
+
+- every row weight must be positive
+- every card weight must be positive
+- every card referenced from `rows` must have a matching `[card.<id>]` section
+- every icon name must resolve to a supported embedded resource
+- every widget name must resolve to a supported hard-coded widget kind
+
+Reference
+=========
+
+See [resources/config.ini](/D:/Projects/SystemTelemetry/resources/config.ini) for the maintained example of the
+language in use. That file is the single source of truth for the current checked-in layout shape and supported
+spelling of the shipped configuration.

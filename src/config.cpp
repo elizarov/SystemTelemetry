@@ -1,5 +1,8 @@
 #include "config.h"
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -11,6 +14,7 @@
 #include <cctype>
 #include <fstream>
 #include <iomanip>
+#include <set>
 #include <sstream>
 
 namespace {
@@ -41,7 +45,40 @@ std::vector<std::string> Split(const std::string& input, char delimiter) {
     std::stringstream stream(input);
     std::string item;
     while (std::getline(stream, item, delimiter)) {
-        parts.push_back(Trim(item));
+        const std::string trimmed = Trim(item);
+        if (!trimmed.empty()) {
+            parts.push_back(trimmed);
+        }
+    }
+    return parts;
+}
+
+std::vector<std::string> SplitTopLevel(const std::string& input, char delimiter) {
+    std::vector<std::string> parts;
+    int depth = 0;
+    std::string current;
+    for (char ch : input) {
+        if (ch == '(') {
+            ++depth;
+        } else if (ch == ')') {
+            depth = std::max(0, depth - 1);
+        }
+
+        if (ch == delimiter && depth == 0) {
+            const std::string trimmed = Trim(current);
+            if (!trimmed.empty()) {
+                parts.push_back(trimmed);
+            }
+            current.clear();
+            continue;
+        }
+
+        current.push_back(ch);
+    }
+
+    const std::string trimmed = Trim(current);
+    if (!trimmed.empty()) {
+        parts.push_back(trimmed);
     }
     return parts;
 }
@@ -90,6 +127,37 @@ void ApplyFontValue(UiFontConfig& font, const std::string& key, const std::strin
     } else if (key == "weight") {
         font.weight = ParseIntOrDefault(value, font.weight);
     }
+}
+
+bool ParseIntPair(const std::string& value, int& first, int& second) {
+    const std::vector<std::string> parts = Split(value, ',');
+    if (parts.size() != 2) {
+        return false;
+    }
+    first = ParseIntOrDefault(parts[0], first);
+    second = ParseIntOrDefault(parts[1], second);
+    return true;
+}
+
+bool ParseIntTriple(const std::string& value, int& first, int& second, int& third) {
+    const std::vector<std::string> parts = Split(value, ',');
+    if (parts.size() != 3) {
+        return false;
+    }
+    first = ParseIntOrDefault(parts[0], first);
+    second = ParseIntOrDefault(parts[1], second);
+    third = ParseIntOrDefault(parts[2], third);
+    return true;
+}
+
+void ParseFontSpec(UiFontConfig& font, const std::string& value) {
+    const std::vector<std::string> parts = Split(value, ',');
+    if (parts.size() != 3) {
+        return;
+    }
+    font.face = parts[0];
+    font.size = ParseIntOrDefault(parts[1], font.size);
+    font.weight = ParseIntOrDefault(parts[2], font.weight);
 }
 
 std::string ReadFileUtf8(const std::filesystem::path& path) {
@@ -156,6 +224,365 @@ std::string LoadUtf8Resource(WORD resourceId, const wchar_t* resourceType) {
     return text;
 }
 
+class LayoutExpressionParser {
+public:
+    explicit LayoutExpressionParser(const std::string& text) : text_(text) {}
+
+    bool ParseNode(LayoutNodeConfig& node) {
+        SkipWhitespace();
+        if (!ParseIdentifier(node.name)) {
+            return false;
+        }
+        SkipWhitespace();
+        if (Consume('(')) {
+            if (IsContainer(node.name)) {
+                if (!ParseChildren(node.children)) {
+                    return false;
+                }
+            } else {
+                if (!ParseParameters(node.parameters)) {
+                    return false;
+                }
+            }
+            SkipWhitespace();
+            if (!Consume(')')) {
+                return false;
+            }
+        }
+        SkipWhitespace();
+        if (Consume('*')) {
+            SkipWhitespace();
+            node.weight = ParseInteger(node.weight);
+        }
+        SkipWhitespace();
+        return !node.name.empty();
+    }
+
+    bool AtEnd() {
+        SkipWhitespace();
+        return index_ >= text_.size();
+    }
+
+private:
+    static bool IsContainer(const std::string& name) {
+        const std::string lowered = ToLower(name);
+        return lowered == "columns" || lowered == "stack" || lowered == "stack_top" || lowered == "center";
+    }
+
+    void SkipWhitespace() {
+        while (index_ < text_.size() && std::isspace(static_cast<unsigned char>(text_[index_])) != 0) {
+            ++index_;
+        }
+    }
+
+    bool Consume(char ch) {
+        if (index_ < text_.size() && text_[index_] == ch) {
+            ++index_;
+            return true;
+        }
+        return false;
+    }
+
+    bool ParseIdentifier(std::string& identifier) {
+        const size_t begin = index_;
+        while (index_ < text_.size()) {
+            const char ch = text_[index_];
+            if (std::isalnum(static_cast<unsigned char>(ch)) || ch == '_' || ch == '.' || ch == '-') {
+                ++index_;
+            } else {
+                break;
+            }
+        }
+        identifier = text_.substr(begin, index_ - begin);
+        return !identifier.empty();
+    }
+
+    int ParseInteger(int fallback) {
+        const size_t begin = index_;
+        while (index_ < text_.size() && std::isdigit(static_cast<unsigned char>(text_[index_])) != 0) {
+            ++index_;
+        }
+        if (begin == index_) {
+            return fallback;
+        }
+        return ParseIntOrDefault(text_.substr(begin, index_ - begin), fallback);
+    }
+
+    bool ParseChildren(std::vector<LayoutNodeConfig>& children);
+    bool ParseParameters(std::vector<std::pair<std::string, std::string>>& parameters);
+
+    std::string text_;
+    size_t index_ = 0;
+};
+
+bool LayoutExpressionParser::ParseChildren(std::vector<LayoutNodeConfig>& children) {
+    while (true) {
+        LayoutNodeConfig child;
+        if (!ParseNode(child)) {
+            return false;
+        }
+        children.push_back(std::move(child));
+        SkipWhitespace();
+        if (index_ >= text_.size() || text_[index_] == ')') {
+            return true;
+        }
+        if (!Consume(',')) {
+            return false;
+        }
+        SkipWhitespace();
+    }
+}
+
+bool LayoutExpressionParser::ParseParameters(std::vector<std::pair<std::string, std::string>>& parameters) {
+    SkipWhitespace();
+    if (index_ >= text_.size() || text_[index_] == ')') {
+        return true;
+    }
+
+    const size_t begin = index_;
+    int depth = 0;
+    while (index_ < text_.size()) {
+        const char ch = text_[index_];
+        if (ch == '(') {
+            ++depth;
+        } else if (ch == ')') {
+            if (depth == 0) {
+                break;
+            }
+            --depth;
+        }
+        ++index_;
+    }
+
+    const std::string body = Trim(text_.substr(begin, index_ - begin));
+    if (body.empty()) {
+        return true;
+    }
+
+    const size_t eq = body.find('=');
+    if (eq == std::string::npos) {
+        parameters.emplace_back("value", body);
+    } else {
+        parameters.emplace_back(ToLower(Trim(body.substr(0, eq))), Trim(body.substr(eq + 1)));
+    }
+    return true;
+}
+
+bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
+    LayoutExpressionParser parser(text);
+    if (!parser.ParseNode(node)) {
+        return false;
+    }
+    return parser.AtEnd();
+}
+
+bool ParseRowExpression(const std::string& text, std::vector<LayoutRowConfig>& rows) {
+    rows.clear();
+    for (const std::string& rowText : SplitTopLevel(text, ',')) {
+        const size_t open = rowText.find('(');
+        const size_t close = rowText.rfind(')');
+        if (open == std::string::npos || close == std::string::npos || close <= open) {
+            return false;
+        }
+
+        LayoutRowConfig row;
+        const std::string header = Trim(rowText.substr(0, open));
+        const size_t star = header.find('*');
+        if (star == std::string::npos) {
+            row.id = header;
+        } else {
+            row.id = Trim(header.substr(0, star));
+            row.weight = ParseIntOrDefault(Trim(header.substr(star + 1)), row.weight);
+        }
+        if (row.id.empty()) {
+            return false;
+        }
+
+        for (const std::string& cardText : SplitTopLevel(rowText.substr(open + 1, close - open - 1), ',')) {
+            LayoutRowCardConfig card;
+            const size_t cardStar = cardText.find('*');
+            if (cardStar == std::string::npos) {
+                card.cardId = Trim(cardText);
+            } else {
+                card.cardId = Trim(cardText.substr(0, cardStar));
+                card.weight = ParseIntOrDefault(Trim(cardText.substr(cardStar + 1)), card.weight);
+            }
+            if (!card.cardId.empty()) {
+                row.cards.push_back(std::move(card));
+            }
+        }
+        if (row.cards.empty()) {
+            return false;
+        }
+        rows.push_back(std::move(row));
+    }
+    return !rows.empty();
+}
+
+LayoutCardConfig* FindCardConfig(LayoutConfig& layout, const std::string& id) {
+    for (auto& card : layout.cards) {
+        if (ToLower(card.id) == ToLower(id)) {
+            return &card;
+        }
+    }
+    return nullptr;
+}
+
+LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) {
+    if (LayoutCardConfig* card = FindCardConfig(layout, id)) {
+        return *card;
+    }
+    layout.cards.push_back(LayoutCardConfig{id});
+    return layout.cards.back();
+}
+
+void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
+    if (key == "window") {
+        ParseIntPair(value, layout.windowWidth, layout.windowHeight);
+    } else if (key == "window_width") {
+        layout.windowWidth = ParseIntOrDefault(value, layout.windowWidth);
+    } else if (key == "window_height") {
+        layout.windowHeight = ParseIntOrDefault(value, layout.windowHeight);
+    } else if (key == "background_color") {
+        layout.backgroundColor = ParseHexColorOrDefault(value, layout.backgroundColor);
+    } else if (key == "foreground_color") {
+        layout.foregroundColor = ParseHexColorOrDefault(value, layout.foregroundColor);
+    } else if (key == "accent_color") {
+        layout.accentColor = ParseHexColorOrDefault(value, layout.accentColor);
+    } else if (key == "panel_border_color") {
+        layout.panelBorderColor = ParseHexColorOrDefault(value, layout.panelBorderColor);
+    } else if (key == "muted_text_color") {
+        layout.mutedTextColor = ParseHexColorOrDefault(value, layout.mutedTextColor);
+    } else if (key == "track_color") {
+        layout.trackColor = ParseHexColorOrDefault(value, layout.trackColor);
+    } else if (key == "panel_fill_color") {
+        layout.panelFillColor = ParseHexColorOrDefault(value, layout.panelFillColor);
+    } else if (key == "graph_background_color") {
+        layout.graphBackgroundColor = ParseHexColorOrDefault(value, layout.graphBackgroundColor);
+    } else if (key == "graph_grid_color") {
+        layout.graphGridColor = ParseHexColorOrDefault(value, layout.graphGridColor);
+    } else if (key == "graph_axis_color") {
+        layout.graphAxisColor = ParseHexColorOrDefault(value, layout.graphAxisColor);
+    } else if (key == "outer_margin") {
+        layout.outerMargin = ParseIntOrDefault(value, layout.outerMargin);
+    } else if (key == "row_gap") {
+        layout.rowGap = ParseIntOrDefault(value, layout.rowGap);
+    } else if (key == "card_gap") {
+        layout.cardGap = ParseIntOrDefault(value, layout.cardGap);
+    } else if (key == "card_padding") {
+        layout.cardPadding = ParseIntOrDefault(value, layout.cardPadding);
+    } else if (key == "card_radius") {
+        layout.cardRadius = ParseIntOrDefault(value, layout.cardRadius);
+    } else if (key == "card_border" || key == "card_border_width") {
+        layout.cardBorderWidth = ParseIntOrDefault(value, layout.cardBorderWidth);
+    } else if (key == "header") {
+        ParseIntTriple(value, layout.headerHeight, layout.headerIconSize, layout.headerGap);
+    } else if (key == "header_height") {
+        layout.headerHeight = ParseIntOrDefault(value, layout.headerHeight);
+    } else if (key == "header_icon_size") {
+        layout.headerIconSize = ParseIntOrDefault(value, layout.headerIconSize);
+    } else if (key == "header_gap") {
+        layout.headerGap = ParseIntOrDefault(value, layout.headerGap);
+    } else if (key == "content_gap") {
+        layout.contentGap = ParseIntOrDefault(value, layout.contentGap);
+    } else if (key == "column_gap") {
+        layout.columnGap = ParseIntOrDefault(value, layout.columnGap);
+    } else if (key == "metric_row_height") {
+        layout.metricRowHeight = ParseIntOrDefault(value, layout.metricRowHeight);
+    } else if (key == "metric_label_width") {
+        layout.metricLabelWidth = ParseIntOrDefault(value, layout.metricLabelWidth);
+    } else if (key == "metric_value_gap") {
+        layout.metricValueGap = ParseIntOrDefault(value, layout.metricValueGap);
+    } else if (key == "metric_bar_height") {
+        layout.metricBarHeight = ParseIntOrDefault(value, layout.metricBarHeight);
+    } else if (key == "widget_line_gap") {
+        layout.widgetLineGap = ParseIntOrDefault(value, layout.widgetLineGap);
+    } else if (key == "drive_row_height") {
+        layout.driveRowHeight = ParseIntOrDefault(value, layout.driveRowHeight);
+    } else if (key == "drive_label_width") {
+        layout.driveLabelWidth = ParseIntOrDefault(value, layout.driveLabelWidth);
+    } else if (key == "drive_percent_width") {
+        layout.drivePercentWidth = ParseIntOrDefault(value, layout.drivePercentWidth);
+    } else if (key == "drive_free_width") {
+        layout.driveFreeWidth = ParseIntOrDefault(value, layout.driveFreeWidth);
+    } else if (key == "drive_bar_gap") {
+        layout.driveBarGap = ParseIntOrDefault(value, layout.driveBarGap);
+    } else if (key == "drive_value_gap") {
+        layout.driveValueGap = ParseIntOrDefault(value, layout.driveValueGap);
+    } else if (key == "drive_bar_height") {
+        layout.driveBarHeight = ParseIntOrDefault(value, layout.driveBarHeight);
+    } else if (key == "throughput_axis_width") {
+        layout.throughputAxisWidth = ParseIntOrDefault(value, layout.throughputAxisWidth);
+    } else if (key == "throughput_header_gap") {
+        layout.throughputHeaderGap = ParseIntOrDefault(value, layout.throughputHeaderGap);
+    } else if (key == "throughput_read_label_width") {
+        layout.throughputReadLabelWidth = ParseIntOrDefault(value, layout.throughputReadLabelWidth);
+    } else if (key == "throughput_write_label_width") {
+        layout.throughputWriteLabelWidth = ParseIntOrDefault(value, layout.throughputWriteLabelWidth);
+    } else if (key == "throughput_graph_height") {
+        layout.throughputGraphHeight = ParseIntOrDefault(value, layout.throughputGraphHeight);
+    } else if (key == "gauge_preferred_size") {
+        layout.gaugePreferredSize = ParseIntOrDefault(value, layout.gaugePreferredSize);
+    } else if (key == "rows") {
+        ParseRowExpression(value, layout.rows);
+    } else if (key == "font.title") {
+        ParseFontSpec(layout.titleFont, value);
+    } else if (key == "font.big") {
+        ParseFontSpec(layout.bigFont, value);
+    } else if (key == "font.value") {
+        ParseFontSpec(layout.valueFont, value);
+    } else if (key == "font.label") {
+        ParseFontSpec(layout.labelFont, value);
+    } else if (key == "font.small") {
+        ParseFontSpec(layout.smallFont, value);
+    } else if (key == "title_font_face") {
+        ApplyFontValue(layout.titleFont, "face", value);
+    } else if (key == "title_font_size") {
+        ApplyFontValue(layout.titleFont, "size", value);
+    } else if (key == "title_font_weight") {
+        ApplyFontValue(layout.titleFont, "weight", value);
+    } else if (key == "big_font_face") {
+        ApplyFontValue(layout.bigFont, "face", value);
+    } else if (key == "big_font_size") {
+        ApplyFontValue(layout.bigFont, "size", value);
+    } else if (key == "big_font_weight") {
+        ApplyFontValue(layout.bigFont, "weight", value);
+    } else if (key == "value_font_face") {
+        ApplyFontValue(layout.valueFont, "face", value);
+    } else if (key == "value_font_size") {
+        ApplyFontValue(layout.valueFont, "size", value);
+    } else if (key == "value_font_weight") {
+        ApplyFontValue(layout.valueFont, "weight", value);
+    } else if (key == "label_font_face") {
+        ApplyFontValue(layout.labelFont, "face", value);
+    } else if (key == "label_font_size") {
+        ApplyFontValue(layout.labelFont, "size", value);
+    } else if (key == "label_font_weight") {
+        ApplyFontValue(layout.labelFont, "weight", value);
+    } else if (key == "small_font_face") {
+        ApplyFontValue(layout.smallFont, "face", value);
+    } else if (key == "small_font_size") {
+        ApplyFontValue(layout.smallFont, "size", value);
+    } else if (key == "small_font_weight") {
+        ApplyFontValue(layout.smallFont, "weight", value);
+    }
+}
+
+void ApplyCardValue(LayoutConfig& layout, const std::string& section, const std::string& key, const std::string& value) {
+    const std::string id = section.substr(std::string("card.").size());
+    LayoutCardConfig& card = EnsureCardConfig(layout, id);
+    if (key == "title") {
+        card.title = value;
+    } else if (key == "icon") {
+        card.icon = value;
+    } else if (key == "layout") {
+        LayoutNodeConfig parsed;
+        if (ParseLayoutExpression(value, parsed)) {
+            card.layout = std::move(parsed);
+        }
+    }
+}
+
 void ApplyConfigText(const std::string& text, AppConfig& config) {
     std::string section;
     std::stringstream stream(text);
@@ -193,56 +620,10 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             config.gigabyteFanChannelName = IsAutoChannelValue(value) ? std::string() : value;
         } else if (section == "vendor.gigabyte" && key == "temperature_channel") {
             config.gigabyteTemperatureChannelName = IsAutoChannelValue(value) ? std::string() : value;
-        } else if (section == "layout" && key == "background_color") {
-            config.layout.backgroundColor = ParseHexColorOrDefault(value, config.layout.backgroundColor);
-        } else if (section == "layout" && key == "foreground_color") {
-            config.layout.foregroundColor = ParseHexColorOrDefault(value, config.layout.foregroundColor);
-        } else if (section == "layout" && key == "accent_color") {
-            config.layout.accentColor = ParseHexColorOrDefault(value, config.layout.accentColor);
-        } else if (section == "layout" && key == "panel_border_color") {
-            config.layout.panelBorderColor = ParseHexColorOrDefault(value, config.layout.panelBorderColor);
-        } else if (section == "layout" && key == "muted_text_color") {
-            config.layout.mutedTextColor = ParseHexColorOrDefault(value, config.layout.mutedTextColor);
-        } else if (section == "layout" && key == "track_color") {
-            config.layout.trackColor = ParseHexColorOrDefault(value, config.layout.trackColor);
-        } else if (section == "layout" && key == "panel_fill_color") {
-            config.layout.panelFillColor = ParseHexColorOrDefault(value, config.layout.panelFillColor);
-        } else if (section == "layout" && key == "graph_background_color") {
-            config.layout.graphBackgroundColor = ParseHexColorOrDefault(value, config.layout.graphBackgroundColor);
-        } else if (section == "layout" && key == "graph_grid_color") {
-            config.layout.graphGridColor = ParseHexColorOrDefault(value, config.layout.graphGridColor);
-        } else if (section == "layout" && key == "graph_axis_color") {
-            config.layout.graphAxisColor = ParseHexColorOrDefault(value, config.layout.graphAxisColor);
-        } else if (section == "layout" && key == "title_font_face") {
-            ApplyFontValue(config.layout.titleFont, "face", value);
-        } else if (section == "layout" && key == "title_font_size") {
-            ApplyFontValue(config.layout.titleFont, "size", value);
-        } else if (section == "layout" && key == "title_font_weight") {
-            ApplyFontValue(config.layout.titleFont, "weight", value);
-        } else if (section == "layout" && key == "big_font_face") {
-            ApplyFontValue(config.layout.bigFont, "face", value);
-        } else if (section == "layout" && key == "big_font_size") {
-            ApplyFontValue(config.layout.bigFont, "size", value);
-        } else if (section == "layout" && key == "big_font_weight") {
-            ApplyFontValue(config.layout.bigFont, "weight", value);
-        } else if (section == "layout" && key == "value_font_face") {
-            ApplyFontValue(config.layout.valueFont, "face", value);
-        } else if (section == "layout" && key == "value_font_size") {
-            ApplyFontValue(config.layout.valueFont, "size", value);
-        } else if (section == "layout" && key == "value_font_weight") {
-            ApplyFontValue(config.layout.valueFont, "weight", value);
-        } else if (section == "layout" && key == "label_font_face") {
-            ApplyFontValue(config.layout.labelFont, "face", value);
-        } else if (section == "layout" && key == "label_font_size") {
-            ApplyFontValue(config.layout.labelFont, "size", value);
-        } else if (section == "layout" && key == "label_font_weight") {
-            ApplyFontValue(config.layout.labelFont, "weight", value);
-        } else if (section == "layout" && key == "small_font_face") {
-            ApplyFontValue(config.layout.smallFont, "face", value);
-        } else if (section == "layout" && key == "small_font_size") {
-            ApplyFontValue(config.layout.smallFont, "size", value);
-        } else if (section == "layout" && key == "small_font_weight") {
-            ApplyFontValue(config.layout.smallFont, "weight", value);
+        } else if (section == "layout") {
+            ApplyLayoutValue(config.layout, key, value);
+        } else if (section.rfind("card.", 0) == 0) {
+            ApplyCardValue(config.layout, section, key, value);
         }
     }
 }
@@ -268,17 +649,88 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, si
     lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
 }
 
+void CollectDriveLettersRecursive(const LayoutNodeConfig& node, std::vector<std::string>& drives) {
+    if (ToLower(node.name) == "drive_usage_list") {
+        for (const auto& parameter : node.parameters) {
+            if (parameter.first == "drives") {
+                for (const std::string& drive : Split(parameter.second, ',')) {
+                    const std::string normalized = ToLower(drive.substr(0, 1));
+                    if (std::find(drives.begin(), drives.end(), normalized) == drives.end()) {
+                        drives.push_back(normalized);
+                    }
+                }
+            }
+        }
+    }
+
+    for (const auto& child : node.children) {
+        CollectDriveLettersRecursive(child, drives);
+    }
+}
+
+void EnsureDefaultLayout(LayoutConfig& layout) {
+    if (layout.rows.empty()) {
+        ParseRowExpression("top*3(cpu,gpu), bottom*2(network*4,storage*9,time*3)", layout.rows);
+    }
+
+    const auto ensureCard = [&layout](const std::string& id, const std::string& title, const std::string& icon,
+                                  const std::string& expression) {
+        LayoutCardConfig& card = EnsureCardConfig(layout, id);
+        if (card.title.empty()) {
+            card.title = title;
+        }
+        if (card.icon.empty()) {
+            card.icon = icon;
+        }
+        if (card.layout.name.empty()) {
+            ParseLayoutExpression(expression, card.layout);
+        }
+    };
+
+    ensureCard("cpu", "CPU", "cpu",
+        "stack(cpu_name,columns(gauge_cpu_load*5,metric_list_cpu(items=temp,clock,fan,ram)*7)*7)");
+    ensureCard("gpu", "GPU", "gpu",
+        "stack(gpu_name,columns(gauge_gpu_load*5,metric_list_gpu(items=temp,clock,fan,vram)*7)*7)");
+    ensureCard("network", "Network", "network",
+        "stack(throughput_upload*4,throughput_download*4,network_footer)");
+    ensureCard("storage", "Storage", "storage",
+        "columns(stack(throughput_read*4,throughput_write*4,spacer)*5,stack_top(drive_usage_list(drives=C,D,E))*7)");
+    ensureCard("time", "Time", "time",
+        "center(clock_time*5,clock_date*2)");
+}
+
 }  // namespace
 
 std::string LoadEmbeddedConfigTemplate() {
     return LoadUtf8Resource(IDR_CONFIG_TEMPLATE, RT_RCDATA);
 }
 
+std::vector<std::string> CollectLayoutDriveLetters(const LayoutConfig& layout) {
+    std::vector<std::string> drives;
+    for (const auto& card : layout.cards) {
+        CollectDriveLettersRecursive(card.layout, drives);
+    }
+
+    std::vector<std::string> result;
+    result.reserve(drives.size());
+    for (const std::string& drive : drives) {
+        if (!drive.empty()) {
+            result.push_back(std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(drive[0])))));
+        }
+    }
+    return result;
+}
+
 AppConfig LoadConfig(const std::filesystem::path& path) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config);
     ApplyConfigText(ReadFileUtf8(path), config);
+    EnsureDefaultLayout(config.layout);
 
+    const std::vector<std::string> layoutDrives = CollectLayoutDriveLetters(config.layout);
+    if (!layoutDrives.empty()) {
+        config.driveLetters = layoutDrives;
+    }
     if (config.driveLetters.empty()) {
         config.driveLetters = {"C", "D", "E"};
     }
@@ -287,7 +739,7 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
 
 bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
     std::string text = ReadFileUtf8(path);
-    if (text.empty() && !std::filesystem::exists(path)) {
+    if (text.empty()) {
         text = LoadEmbeddedConfigTemplate();
     }
     std::vector<std::string> lines;
@@ -303,49 +755,14 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
     }
 
     if (lines.empty()) {
-        lines = {
-            "[display]",
-            "monitor_name = ",
-            "position_x = 0",
-            "position_y = 0",
-            "",
-            "[network]",
-            "adapter_name = ",
-            "",
-            "[storage]",
-            "drives = C,D,E",
-            "",
-            "[layout]",
-            "background_color = " + FormatHexColor(config.layout.backgroundColor),
-            "foreground_color = " + FormatHexColor(config.layout.foregroundColor),
-            "accent_color = " + FormatHexColor(config.layout.accentColor),
-            "panel_border_color = " + FormatHexColor(config.layout.panelBorderColor),
-            "muted_text_color = " + FormatHexColor(config.layout.mutedTextColor),
-            "track_color = " + FormatHexColor(config.layout.trackColor),
-            "panel_fill_color = " + FormatHexColor(config.layout.panelFillColor),
-            "graph_background_color = " + FormatHexColor(config.layout.graphBackgroundColor),
-            "graph_grid_color = " + FormatHexColor(config.layout.graphGridColor),
-            "graph_axis_color = " + FormatHexColor(config.layout.graphAxisColor),
-            "title_font_face = " + config.layout.titleFont.face,
-            "title_font_size = " + std::to_string(config.layout.titleFont.size),
-            "title_font_weight = " + std::to_string(config.layout.titleFont.weight),
-            "big_font_face = " + config.layout.bigFont.face,
-            "big_font_size = " + std::to_string(config.layout.bigFont.size),
-            "big_font_weight = " + std::to_string(config.layout.bigFont.weight),
-            "value_font_face = " + config.layout.valueFont.face,
-            "value_font_size = " + std::to_string(config.layout.valueFont.size),
-            "value_font_weight = " + std::to_string(config.layout.valueFont.weight),
-            "label_font_face = " + config.layout.labelFont.face,
-            "label_font_size = " + std::to_string(config.layout.labelFont.size),
-            "label_font_weight = " + std::to_string(config.layout.labelFont.weight),
-            "small_font_face = " + config.layout.smallFont.face,
-            "small_font_size = " + std::to_string(config.layout.smallFont.size),
-            "small_font_weight = " + std::to_string(config.layout.smallFont.weight),
-            "",
-            "[vendor.gigabyte]",
-            "fan_channel = ",
-            "temperature_channel = "
-        };
+        std::stringstream stream(LoadEmbeddedConfigTemplate());
+        std::string line;
+        while (std::getline(stream, line)) {
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+            lines.push_back(line);
+        }
     }
 
     const auto ensureSection = [&lines](const std::string& sectionName) -> size_t {
@@ -387,15 +804,6 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
     updateKey("[display]", "position_x", std::to_string(config.positionX));
     updateKey("[display]", "position_y", std::to_string(config.positionY));
     updateKey("[network]", "adapter_name", config.networkAdapter);
-
-    std::string drives;
-    for (size_t i = 0; i < config.driveLetters.size(); ++i) {
-        if (i > 0) {
-            drives += ",";
-        }
-        drives += config.driveLetters[i];
-    }
-    updateKey("[storage]", "drives", drives);
     updateKey("[vendor.gigabyte]", "fan_channel", config.gigabyteFanChannelName);
     updateKey("[vendor.gigabyte]", "temperature_channel", config.gigabyteTemperatureChannelName);
 

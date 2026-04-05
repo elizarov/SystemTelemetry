@@ -17,6 +17,7 @@
 #include <fstream>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -34,8 +35,6 @@
 
 namespace {
 
-constexpr int kWindowWidth = 800;
-constexpr int kWindowHeight = 480;
 constexpr UINT_PTR kRefreshTimerId = 1;
 constexpr UINT_PTR kMoveTimerId = 2;
 constexpr UINT kRefreshTimerMs = 250;
@@ -61,6 +60,16 @@ std::string ToLower(std::string value) {
         return static_cast<char>(std::tolower(ch));
     });
     return value;
+}
+
+std::string Trim(std::string value) {
+    const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
+    const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
+    if (first == value.end()) {
+        return {};
+    }
+    const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
+    return std::string(first, last);
 }
 
 bool ContainsInsensitive(const std::string& value, const std::string& needle) {
@@ -144,30 +153,126 @@ int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
     return -1;
 }
 
-enum class PanelIcon : size_t {
-    Cpu = 0,
-    Gpu,
-    Network,
-    Storage,
-    Time,
-};
-
-constexpr size_t kPanelIconCount = 5;
-
-UINT GetPanelIconResourceId(PanelIcon icon) {
-    switch (icon) {
-    case PanelIcon::Cpu:
+UINT GetPanelIconResourceId(const std::string& iconName) {
+    const std::string lowered = ToLower(iconName);
+    if (lowered == "cpu") {
         return IDR_PANEL_ICON_CPU;
-    case PanelIcon::Gpu:
+    }
+    if (lowered == "gpu") {
         return IDR_PANEL_ICON_GPU;
-    case PanelIcon::Network:
+    }
+    if (lowered == "network") {
         return IDR_PANEL_ICON_NETWORK;
-    case PanelIcon::Storage:
+    }
+    if (lowered == "storage") {
         return IDR_PANEL_ICON_STORAGE;
-    case PanelIcon::Time:
+    }
+    if (lowered == "time") {
         return IDR_PANEL_ICON_TIME;
     }
     return 0;
+}
+
+bool IsContainerNode(const LayoutNodeConfig& node) {
+    const std::string lowered = ToLower(node.name);
+    return lowered == "columns" || lowered == "stack" || lowered == "stack_top" || lowered == "center";
+}
+
+std::optional<std::string> GetNodeParameter(const LayoutNodeConfig& node, const std::string& key) {
+    for (const auto& parameter : node.parameters) {
+        if (ToLower(parameter.first) == ToLower(key)) {
+            return parameter.second;
+        }
+    }
+    return std::nullopt;
+}
+
+struct WidgetBinding {
+    std::vector<std::string> items;
+    std::vector<std::string> drives;
+};
+
+enum class WidgetKind {
+    CpuName,
+    GpuName,
+    GaugeCpuLoad,
+    GaugeGpuLoad,
+    MetricListCpu,
+    MetricListGpu,
+    ThroughputUpload,
+    ThroughputDownload,
+    ThroughputRead,
+    ThroughputWrite,
+    NetworkFooter,
+    Spacer,
+    DriveUsageList,
+    ClockTime,
+    ClockDate,
+    Unknown,
+};
+
+WidgetKind ParseWidgetKind(const std::string& name) {
+    const std::string lowered = ToLower(name);
+    if (lowered == "cpu_name") return WidgetKind::CpuName;
+    if (lowered == "gpu_name") return WidgetKind::GpuName;
+    if (lowered == "gauge_cpu_load") return WidgetKind::GaugeCpuLoad;
+    if (lowered == "gauge_gpu_load") return WidgetKind::GaugeGpuLoad;
+    if (lowered == "metric_list_cpu") return WidgetKind::MetricListCpu;
+    if (lowered == "metric_list_gpu") return WidgetKind::MetricListGpu;
+    if (lowered == "throughput_upload") return WidgetKind::ThroughputUpload;
+    if (lowered == "throughput_download") return WidgetKind::ThroughputDownload;
+    if (lowered == "throughput_read") return WidgetKind::ThroughputRead;
+    if (lowered == "throughput_write") return WidgetKind::ThroughputWrite;
+    if (lowered == "network_footer") return WidgetKind::NetworkFooter;
+    if (lowered == "spacer") return WidgetKind::Spacer;
+    if (lowered == "drive_usage_list") return WidgetKind::DriveUsageList;
+    if (lowered == "clock_time") return WidgetKind::ClockTime;
+    if (lowered == "clock_date") return WidgetKind::ClockDate;
+    return WidgetKind::Unknown;
+}
+
+struct ResolvedWidgetLayout {
+    WidgetKind kind = WidgetKind::Unknown;
+    RECT rect{};
+    WidgetBinding binding;
+};
+
+struct ResolvedCardLayout {
+    std::string id;
+    std::string title;
+    std::string iconName;
+    RECT rect{};
+    RECT titleRect{};
+    RECT iconRect{};
+    RECT contentRect{};
+    std::vector<ResolvedWidgetLayout> widgets;
+};
+
+struct ResolvedDashboardLayout {
+    int windowWidth = 800;
+    int windowHeight = 480;
+    std::vector<ResolvedCardLayout> cards;
+};
+
+struct FontHeights {
+    int title = 0;
+    int big = 0;
+    int value = 0;
+    int label = 0;
+    int smallText = 0;
+};
+
+std::vector<std::string> Split(const std::string& input, char delimiter) {
+    std::vector<std::string> parts;
+    std::stringstream stream(input);
+    std::string item;
+    while (std::getline(stream, item, delimiter)) {
+        const std::string trimmed = Trim(item);
+        if (!trimmed.empty()) {
+            parts.push_back(trimmed);
+        }
+    }
+    return parts;
 }
 
 std::unique_ptr<Gdiplus::Bitmap> LoadPngResourceBitmap(UINT resourceId) {
@@ -687,23 +792,31 @@ private:
     COLORREF GraphGridColor() const;
     COLORREF GraphAxisColor() const;
     COLORREF UsageFillColor() const;
+    int WindowWidth() const;
+    int WindowHeight() const;
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
         COLORREF color, UINT format);
-    void DrawPanel(HDC hdc, const RECT& rect, const std::string& title, PanelIcon icon);
-    void DrawPanelIcon(HDC hdc, PanelIcon icon, const RECT& iconRect);
+    void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
+    void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     POINT PolarPoint(int cx, int cy, int radius, double angleDegrees);
     void DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label);
     void DrawMetricRow(HDC hdc, const RECT& rect, const std::string& label, const std::string& value, double ratio);
-    void DrawProcessorPanel(HDC hdc, const RECT& rect, const ProcessorTelemetry& cpu);
-    void DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& gpu);
     void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue);
-    void DrawThroughputSection(HDC hdc, const RECT& valueRect, const RECT& graphRect, const char* label,
+    void DrawThroughputWidget(HDC hdc, const RECT& rect, const char* label,
         double valueMbps, const std::vector<double>& history, double maxGraph);
-    void DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTelemetry& network);
-    void DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTelemetry& storage, const std::vector<DriveInfo>& drives);
-    void DrawTimePanel(HDC hdc, const RECT& rect, const SYSTEMTIME& now);
+    void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const SystemSnapshot& snapshot);
+    void DrawMetricListWidget(HDC hdc, const RECT& rect, const std::vector<std::string>& items,
+        bool isGpu, const SystemSnapshot& snapshot);
+    void DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<std::string>& drives,
+        const std::vector<DriveInfo>& availableDrives);
     void DrawLayout(HDC hdc, const SystemSnapshot& snapshot);
+    bool ResolveLayout();
+    void ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets);
+    int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
+    int EffectiveHeaderHeight() const;
+    int EffectiveMetricRowHeight() const;
+    bool MeasureFonts();
 
     struct Fonts {
         HFONT title = nullptr;
@@ -721,7 +834,9 @@ private:
     NOTIFYICONDATAW trayIcon_{};
     MonitorPlacementInfo movePlacementInfo_{};
     ULONG_PTR gdiplusToken_ = 0;
-    std::array<std::unique_ptr<Gdiplus::Bitmap>, kPanelIconCount> panelIcons_{};
+    std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
+    FontHeights fontHeights_{};
+    ResolvedDashboardLayout resolvedLayout_{};
     HICON appIconLarge_ = nullptr;
     HICON appIconSmall_ = nullptr;
     DiagnosticsOptions diagnosticsOptions_;
@@ -733,6 +848,14 @@ DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagn
 
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
     config_ = config;
+}
+
+int DashboardApp::WindowWidth() const {
+    return std::max(1, config_.layout.windowWidth);
+}
+
+int DashboardApp::WindowHeight() const {
+    return std::max(1, config_.layout.windowHeight);
 }
 
 bool DashboardApp::Initialize(HINSTANCE instance) {
@@ -776,7 +899,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         return false;
     }
 
-    RECT placement{100, 100, 100 + kWindowWidth, 100 + kWindowHeight};
+    RECT placement{100, 100, 100 + WindowWidth(), 100 + WindowHeight()};
     if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
         placement.left = monitor->left + config_.positionX;
         placement.top = monitor->top + config_.positionY;
@@ -792,8 +915,8 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         WS_POPUP,
         placement.left,
         placement.top,
-        kWindowWidth,
-        kWindowHeight,
+        WindowWidth(),
+        WindowHeight(),
         nullptr,
         nullptr,
         instance,
@@ -808,7 +931,7 @@ void DashboardApp::ApplyConfigPlacement() {
         left = monitor->left + config_.positionX;
         top = monitor->top + config_.positionY;
     }
-    SetWindowPos(hwnd_, HWND_TOP, left, top, kWindowWidth, kWindowHeight, SWP_NOACTIVATE);
+    SetWindowPos(hwnd_, HWND_TOP, left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE);
 }
 
 bool DashboardApp::InitializeFonts() {
@@ -827,6 +950,10 @@ bool DashboardApp::InitializeFonts() {
     fonts_.smallFont = CreateUiFont(config_.layout.smallFont);
     if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr ||
         fonts_.label == nullptr || fonts_.smallFont == nullptr) {
+        ReleaseFonts();
+        return false;
+    }
+    if (!MeasureFonts() || !ResolveLayout()) {
         ReleaseFonts();
         return false;
     }
@@ -865,26 +992,36 @@ void DashboardApp::ShutdownGdiplus() {
 }
 
 bool DashboardApp::LoadPanelIcons() {
-    if (panelIcons_[0] != nullptr) {
+    if (!panelIcons_.empty()) {
         return true;
     }
 
-    for (size_t index = 0; index < kPanelIconCount; ++index) {
-        const auto icon = static_cast<PanelIcon>(index);
-        panelIcons_[index] = LoadPngResourceBitmap(GetPanelIconResourceId(icon));
-        if (panelIcons_[index] == nullptr) {
+    std::set<std::string> uniqueIcons;
+    for (const auto& card : config_.layout.cards) {
+        if (!card.icon.empty()) {
+            uniqueIcons.insert(ToLower(card.icon));
+        }
+    }
+
+    for (const auto& iconName : uniqueIcons) {
+        const UINT resourceId = GetPanelIconResourceId(iconName);
+        if (resourceId == 0) {
             ReleasePanelIcons();
             return false;
         }
+        auto bitmap = LoadPngResourceBitmap(resourceId);
+        if (bitmap == nullptr) {
+            ReleasePanelIcons();
+            return false;
+        }
+        panelIcons_.push_back({iconName, std::move(bitmap)});
     }
 
     return true;
 }
 
 void DashboardApp::ReleasePanelIcons() {
-    for (auto& icon : panelIcons_) {
-        icon.reset();
-    }
+    panelIcons_.clear();
 }
 
 COLORREF DashboardApp::BackgroundColor() const {
@@ -954,8 +1091,8 @@ bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const
 
     BITMAPINFO bitmapInfo{};
     bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
-    bitmapInfo.bmiHeader.biWidth = kWindowWidth;
-    bitmapInfo.bmiHeader.biHeight = -kWindowHeight;
+    bitmapInfo.bmiHeader.biWidth = WindowWidth();
+    bitmapInfo.bmiHeader.biHeight = -WindowHeight();
     bitmapInfo.bmiHeader.biPlanes = 1;
     bitmapInfo.bmiHeader.biBitCount = 32;
     bitmapInfo.bmiHeader.biCompression = BI_RGB;
@@ -969,7 +1106,7 @@ bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const
     }
 
     HGDIOBJ oldBitmap = SelectObject(memDc, bitmap);
-    RECT client{0, 0, kWindowWidth, kWindowHeight};
+    RECT client{0, 0, WindowWidth(), WindowHeight()};
     HBRUSH background = CreateSolidBrush(BackgroundColor());
     FillRect(memDc, &client, background);
     DeleteObject(background);
@@ -1178,7 +1315,7 @@ void DashboardApp::UpdateMoveTracking() {
         return;
     }
 
-    const int x = cursor.x - (kWindowWidth / 2);
+    const int x = cursor.x - (WindowWidth() / 2);
     const int y = cursor.y - 24;
     SetWindowPos(hwnd_, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
@@ -1413,44 +1550,295 @@ void DashboardApp::DrawTextBlock(HDC hdc, const RECT& rect, const std::string& t
     SelectObject(hdc, oldFont);
 }
 
-void DashboardApp::DrawPanelIcon(HDC hdc, PanelIcon icon, const RECT& iconRect) {
-    const auto& bitmap = panelIcons_[static_cast<size_t>(icon)];
-    if (bitmap == nullptr) {
+void DashboardApp::DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect) {
+    const auto it = std::find_if(panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) {
+        return ToLower(entry.first) == ToLower(iconName);
+    });
+    if (it == panelIcons_.end() || it->second == nullptr) {
         return;
     }
 
     Gdiplus::Graphics graphics(hdc);
     graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    graphics.DrawImage(bitmap.get(),
+    graphics.DrawImage(it->second.get(),
         static_cast<INT>(iconRect.left),
         static_cast<INT>(iconRect.top),
         static_cast<INT>(iconRect.right - iconRect.left),
         static_cast<INT>(iconRect.bottom - iconRect.top));
 }
 
-void DashboardApp::DrawPanel(HDC hdc, const RECT& rect, const std::string& title, PanelIcon icon) {
-    HPEN border = CreatePen(PS_SOLID, 1, PanelBorderColor());
+void DashboardApp::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
+    HPEN border = CreatePen(PS_SOLID, std::max(1, config_.layout.cardBorderWidth), PanelBorderColor());
     HBRUSH fill = CreateSolidBrush(PanelFillColor());
     HGDIOBJ oldPen = SelectObject(hdc, border);
     HGDIOBJ oldBrush = SelectObject(hdc, fill);
-    RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, 18, 18);
+    const int radius = std::max(1, config_.layout.cardRadius);
+    RoundRect(hdc, card.rect.left, card.rect.top, card.rect.right, card.rect.bottom, radius, radius);
     SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);
     DeleteObject(fill);
     DeleteObject(border);
+    DrawPanelIcon(hdc, card.iconName, card.iconRect);
+    DrawTextBlock(hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+}
 
-    RECT titleRect = rect;
-    titleRect.left += 40;
-    titleRect.top += 8;
-    titleRect.right -= 14;
-    titleRect.bottom = titleRect.top + 24;
+bool DashboardApp::MeasureFonts() {
+    HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
+    if (hdc == nullptr) {
+        return false;
+    }
 
-    const int titleCenterY = (titleRect.top + titleRect.bottom) / 2;
-    RECT iconRect{rect.left + 14, titleCenterY - 10, rect.left + 34, titleCenterY + 10};
-    DrawPanelIcon(hdc, icon, iconRect);
+    const auto measure = [&](HFONT font) {
+        TEXTMETRICW metrics{};
+        HGDIOBJ oldFont = SelectObject(hdc, font);
+        GetTextMetricsW(hdc, &metrics);
+        SelectObject(hdc, oldFont);
+        return static_cast<int>(metrics.tmHeight);
+    };
 
-    DrawTextBlock(hdc, titleRect, title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    fontHeights_.title = measure(fonts_.title);
+    fontHeights_.big = measure(fonts_.big);
+    fontHeights_.value = measure(fonts_.value);
+    fontHeights_.label = measure(fonts_.label);
+    fontHeights_.smallText = measure(fonts_.smallFont);
+    ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
+    return true;
+}
+
+int DashboardApp::EffectiveHeaderHeight() const {
+    const int titleHeight = std::max(fontHeights_.title, config_.layout.headerIconSize);
+    return std::max(config_.layout.headerHeight, titleHeight);
+}
+
+int DashboardApp::EffectiveMetricRowHeight() const {
+    return std::max(config_.layout.metricRowHeight,
+        std::max(fontHeights_.label, fontHeights_.value) + std::max(8, config_.layout.widgetLineGap));
+}
+
+int DashboardApp::PreferredNodeHeight(const LayoutNodeConfig& node, int width) const {
+    const std::string lowered = ToLower(node.name);
+    if (lowered == "stack_top") {
+        int total = 0;
+        for (size_t i = 0; i < node.children.size(); ++i) {
+            total += PreferredNodeHeight(node.children[i], width);
+            if (i + 1 < node.children.size()) {
+                total += config_.layout.widgetLineGap;
+            }
+        }
+        return total;
+    }
+    if (lowered == "cpu_name" || lowered == "gpu_name") {
+        return fontHeights_.label + 2;
+    }
+    if (lowered == "network_footer") {
+        return fontHeights_.smallText + 2;
+    }
+    if (lowered == "metric_list_cpu" || lowered == "metric_list_gpu") {
+        const int count = std::max<int>(1, static_cast<int>(GetNodeParameter(node, "items").has_value()
+            ? Split(*GetNodeParameter(node, "items"), ',').size()
+            : 4));
+        return count * EffectiveMetricRowHeight();
+    }
+    if (lowered == "drive_usage_list") {
+        const int count = std::max<int>(1, static_cast<int>(GetNodeParameter(node, "drives").has_value()
+            ? Split(*GetNodeParameter(node, "drives"), ',').size()
+            : 3));
+        return count * std::max(1, config_.layout.driveRowHeight);
+    }
+    if (lowered == "throughput_upload" || lowered == "throughput_download" ||
+        lowered == "throughput_read" || lowered == "throughput_write") {
+        return fontHeights_.smallText + config_.layout.throughputHeaderGap +
+            std::max(1, config_.layout.throughputGraphHeight);
+    }
+    if (lowered == "clock_time") {
+        return fontHeights_.big + 8;
+    }
+    if (lowered == "clock_date") {
+        return fontHeights_.value + 6;
+    }
+    if (lowered == "gauge_cpu_load" || lowered == "gauge_gpu_load") {
+        return std::max(1, config_.layout.gaugePreferredSize);
+    }
+    if (lowered == "spacer") {
+        return 0;
+    }
+    return 0;
+}
+
+void DashboardApp::ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
+    if (!IsContainerNode(node)) {
+        ResolvedWidgetLayout widget;
+        widget.kind = ParseWidgetKind(node.name);
+        widget.rect = rect;
+        if (const auto items = GetNodeParameter(node, "items"); items.has_value()) {
+            widget.binding.items = Split(*items, ',');
+        }
+        if (const auto drives = GetNodeParameter(node, "drives"); drives.has_value()) {
+            widget.binding.drives = Split(*drives, ',');
+        }
+        widgets.push_back(std::move(widget));
+        return;
+    }
+
+    const bool horizontal = ToLower(node.name) == "columns";
+    const bool topPacked = ToLower(node.name) == "stack_top";
+    const int gap = horizontal ? config_.layout.columnGap : config_.layout.widgetLineGap;
+    if (topPacked) {
+        int cursor = static_cast<int>(rect.top);
+        for (size_t i = 0; i < node.children.size(); ++i) {
+            const auto& child = node.children[i];
+            int preferred = PreferredNodeHeight(child, static_cast<int>(rect.right - rect.left));
+            if (preferred <= 0) {
+                preferred = std::max(0, (static_cast<int>(rect.bottom) - cursor) / static_cast<int>(node.children.size() - i));
+            }
+            if (cursor >= static_cast<int>(rect.bottom)) {
+                break;
+            }
+            RECT childRect{rect.left, cursor, rect.right, std::min(static_cast<int>(rect.bottom), cursor + preferred)};
+            ResolveNodeWidgets(child, childRect, widgets);
+            cursor = static_cast<int>(childRect.bottom) + gap;
+        }
+        return;
+    }
+
+    int totalWeight = 0;
+    for (const auto& child : node.children) {
+        totalWeight += std::max(1, child.weight);
+    }
+    if (totalWeight <= 0) {
+        return;
+    }
+
+    const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
+        gap * static_cast<int>(std::max<size_t>(0, node.children.size() - 1));
+    int remainingAvailable = totalAvailable;
+    int cursor = horizontal ? rect.left : rect.top;
+    for (size_t i = 0; i < node.children.size(); ++i) {
+        const auto& child = node.children[i];
+        const int childWeight = std::max(1, child.weight);
+        const int remainingWeight = std::max(1, totalWeight);
+        int size = (i + 1 == node.children.size())
+            ? ((horizontal ? rect.right : rect.bottom) - cursor)
+            : std::max(0, remainingAvailable * childWeight / remainingWeight);
+
+        RECT childRect = rect;
+        if (horizontal) {
+            childRect.left = cursor;
+            childRect.right = cursor + size;
+        } else {
+            childRect.top = cursor;
+            childRect.bottom = cursor + size;
+        }
+
+        ResolveNodeWidgets(child, childRect, widgets);
+        cursor += size + gap;
+        remainingAvailable -= size;
+        totalWeight -= childWeight;
+    }
+}
+
+bool DashboardApp::ResolveLayout() {
+    resolvedLayout_ = {};
+    resolvedLayout_.windowWidth = WindowWidth();
+    resolvedLayout_.windowHeight = WindowHeight();
+
+    const RECT dashboardRect{
+        config_.layout.outerMargin,
+        config_.layout.outerMargin,
+        WindowWidth() - config_.layout.outerMargin,
+        WindowHeight() - config_.layout.outerMargin
+    };
+
+    int totalRowWeight = 0;
+    for (const auto& row : config_.layout.rows) {
+        totalRowWeight += std::max(1, row.weight);
+    }
+    if (totalRowWeight <= 0) {
+        return false;
+    }
+
+    const int rowGap = config_.layout.rowGap;
+    const int totalHeight = (dashboardRect.bottom - dashboardRect.top) -
+        rowGap * static_cast<int>(std::max<size_t>(0, config_.layout.rows.size() - 1));
+    int remainingHeight = totalHeight;
+    int rowTop = dashboardRect.top;
+    int remainingRowWeight = totalRowWeight;
+
+    for (size_t rowIndex = 0; rowIndex < config_.layout.rows.size(); ++rowIndex) {
+        const auto& row = config_.layout.rows[rowIndex];
+        const int rowWeight = std::max(1, row.weight);
+        const int rowHeight = (rowIndex + 1 == config_.layout.rows.size())
+            ? (dashboardRect.bottom - rowTop)
+            : std::max(0, remainingHeight * rowWeight / remainingRowWeight);
+
+        int totalCardWeight = 0;
+        for (const auto& cardRef : row.cards) {
+            totalCardWeight += std::max(1, cardRef.weight);
+        }
+
+        const int cardGap = config_.layout.cardGap;
+        const int totalWidth = (dashboardRect.right - dashboardRect.left) -
+            cardGap * static_cast<int>(std::max<size_t>(0, row.cards.size() - 1));
+        int remainingWidth = totalWidth;
+        int cardLeft = dashboardRect.left;
+        int remainingCardWeight = std::max(1, totalCardWeight);
+
+        for (size_t cardIndex = 0; cardIndex < row.cards.size(); ++cardIndex) {
+            const auto& cardRef = row.cards[cardIndex];
+            const auto cardIt = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
+                return ToLower(card.id) == ToLower(cardRef.cardId);
+            });
+            if (cardIt == config_.layout.cards.end()) {
+                continue;
+            }
+
+            const int cardWeight = std::max(1, cardRef.weight);
+            const int cardWidth = (cardIndex + 1 == row.cards.size())
+                ? (dashboardRect.right - cardLeft)
+                : std::max(0, remainingWidth * cardWeight / remainingCardWeight);
+
+            ResolvedCardLayout card;
+            card.id = cardIt->id;
+            card.title = cardIt->title;
+            card.iconName = cardIt->icon;
+            card.rect = RECT{cardLeft, rowTop, cardLeft + cardWidth, rowTop + rowHeight};
+
+            const int padding = config_.layout.cardPadding;
+            const int headerHeight = EffectiveHeaderHeight();
+            card.iconRect = RECT{
+                card.rect.left + padding,
+                card.rect.top + padding + std::max(0, (headerHeight - config_.layout.headerIconSize) / 2),
+                card.rect.left + padding + config_.layout.headerIconSize,
+                card.rect.top + padding + std::max(0, (headerHeight - config_.layout.headerIconSize) / 2) + config_.layout.headerIconSize
+            };
+            card.titleRect = RECT{
+                card.iconRect.right + config_.layout.headerGap,
+                card.rect.top + padding,
+                card.rect.right - padding,
+                card.rect.top + padding + headerHeight
+            };
+            card.contentRect = RECT{
+                card.rect.left + padding,
+                card.rect.top + padding + headerHeight + config_.layout.contentGap,
+                card.rect.right - padding,
+                card.rect.bottom - padding
+            };
+
+            ResolveNodeWidgets(cardIt->layout, card.contentRect, card.widgets);
+            resolvedLayout_.cards.push_back(std::move(card));
+
+            cardLeft += cardWidth + cardGap;
+            remainingWidth -= cardWidth;
+            remainingCardWeight -= cardWeight;
+        }
+
+        rowTop += rowHeight + rowGap;
+        remainingHeight -= rowHeight;
+        remainingRowWeight -= rowWeight;
+    }
+
+    return !resolvedLayout_.cards.empty();
 }
 
 POINT DashboardApp::PolarPoint(int cx, int cy, int radius, double angleDegrees) {
@@ -1496,12 +1884,17 @@ void DashboardApp::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent
 
 void DashboardApp::DrawMetricRow(
     HDC hdc, const RECT& rect, const std::string& label, const std::string& value, double ratio) {
-    RECT labelRect{rect.left, rect.top, rect.left + 74, rect.bottom};
-    RECT valueRect{rect.left + 82, rect.top, rect.right, rect.bottom};
+    const int labelWidth = std::max(1, config_.layout.metricLabelWidth);
+    const int valueGap = std::max(0, config_.layout.metricValueGap);
+    RECT labelRect{rect.left, rect.top, std::min(rect.right, rect.left + labelWidth), rect.bottom};
+    RECT valueRect{std::min(rect.right, labelRect.right + valueGap), rect.top, rect.right, rect.bottom};
     DrawTextBlock(hdc, labelRect, label, fonts_.label, MutedTextColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     DrawTextBlock(hdc, valueRect, value, fonts_.value, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
-    RECT barRect{rect.left + 82, rect.bottom - 5, rect.right, rect.bottom - 1};
+    const int metricBarHeight = std::max(1, config_.layout.metricBarHeight);
+    const int barBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(rect.top) + EffectiveMetricRowHeight());
+    const int barTop = std::max(static_cast<int>(rect.top), barBottom - metricBarHeight);
+    RECT barRect{valueRect.left, barTop, rect.right, barBottom};
     HBRUSH track = CreateSolidBrush(TrackColor());
     FillRect(hdc, &barRect, track);
     DeleteObject(track);
@@ -1513,50 +1906,13 @@ void DashboardApp::DrawMetricRow(
     DeleteObject(accent);
 }
 
-void DashboardApp::DrawProcessorPanel(HDC hdc, const RECT& rect, const ProcessorTelemetry& cpu) {
-    DrawPanel(hdc, rect, "CPU", PanelIcon::Cpu);
-    RECT nameRect{rect.left + 16, rect.top + 34, rect.right - 16, rect.top + 58};
-    DrawTextBlock(hdc, nameRect, cpu.name, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, cpu.loadPercent, "Load");
-
-    int y = rect.top + 92;
-    const int rowHeight = 34;
-    RECT rows{rect.left + 164, y, rect.right - 18, y + rowHeight};
-    DrawMetricRow(hdc, rows, "Temp", FormatValue(cpu.temperature, 0), cpu.temperature.value.value_or(0.0) / 100.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, "Clock", FormatValue(cpu.clock, 2), cpu.clock.value.value_or(0.0) / 5.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, "Fan", FormatValue(cpu.fan, 0), cpu.fan.value.value_or(0.0) / 3000.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, "RAM", FormatMemory(cpu.memory.usedGb, cpu.memory.totalGb),
-        cpu.memory.totalGb > 0.0 ? cpu.memory.usedGb / cpu.memory.totalGb : 0.0);
-}
-
-void DashboardApp::DrawGpuPanel(HDC hdc, const RECT& rect, const GpuTelemetry& gpu) {
-    DrawPanel(hdc, rect, "GPU", PanelIcon::Gpu);
-    RECT nameRect{rect.left + 16, rect.top + 34, rect.right - 16, rect.top + 58};
-    DrawTextBlock(hdc, nameRect, gpu.name, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    DrawGauge(hdc, rect.left + 92, rect.top + 132, 52, gpu.loadPercent, "Load");
-
-    int y = rect.top + 92;
-    const int rowHeight = 34;
-    RECT rows{rect.left + 164, y, rect.right - 18, y + rowHeight};
-    DrawMetricRow(hdc, rows, "Temp", FormatValue(gpu.temperature, 0), gpu.temperature.value.value_or(0.0) / 100.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, "Clock", FormatValue(gpu.clock, 0), gpu.clock.value.value_or(0.0) / 2600.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, "Fan", FormatValue(gpu.fan, 0), gpu.fan.value.value_or(0.0) / 3000.0);
-    OffsetRect(&rows, 0, rowHeight);
-    DrawMetricRow(hdc, rows, "VRAM", FormatMemory(gpu.vram.usedGb, std::max(1.0, gpu.vram.totalGb)),
-        gpu.vram.totalGb > 0.0 ? gpu.vram.usedGb / gpu.vram.totalGb : 0.0);
-}
-
 void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue) {
     HBRUSH bg = CreateSolidBrush(GraphBackgroundColor());
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
 
-    const int graphLeft = rect.left + 18;
+    const int axisWidth = std::max(1, config_.layout.throughputAxisWidth);
+    const int graphLeft = rect.left + axisWidth;
     const int width = std::max<int>(1, rect.right - graphLeft - 1);
     const int height = std::max<int>(1, rect.bottom - rect.top - 1);
     const int graphRight = graphLeft + width;
@@ -1575,16 +1931,16 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
 
     HPEN axisPen = CreatePen(PS_SOLID, 1, GraphAxisColor());
     oldPen = SelectObject(hdc, axisPen);
-    MoveToEx(hdc, rect.left + 18, rect.top, nullptr);
-    LineTo(hdc, rect.left + 18, rect.bottom - 1);
-    MoveToEx(hdc, rect.left + 18, rect.bottom - 1, nullptr);
+    MoveToEx(hdc, rect.left + axisWidth, rect.top, nullptr);
+    LineTo(hdc, rect.left + axisWidth, rect.bottom - 1);
+    MoveToEx(hdc, rect.left + axisWidth, rect.bottom - 1, nullptr);
     LineTo(hdc, rect.right - 1, rect.bottom - 1);
     SelectObject(hdc, oldPen);
     DeleteObject(axisPen);
 
     char maxLabel[32];
     sprintf_s(maxLabel, "%.0f", maxValue);
-    RECT maxRect{rect.left, rect.top + 1, rect.left + 18, rect.top + 13};
+    RECT maxRect{rect.left, rect.top + 1, rect.left + axisWidth, rect.top + 13};
     DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_TOP);
 
     HPEN pen = CreatePen(PS_SOLID, 2, AccentColor());
@@ -1603,53 +1959,114 @@ void DashboardApp::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double
     DeleteObject(pen);
 }
 
-void DashboardApp::DrawThroughputSection(HDC hdc, const RECT& valueRect, const RECT& graphRect, const char* label,
+void DashboardApp::DrawThroughputWidget(HDC hdc, const RECT& rect, const char* label,
     double valueMbps, const std::vector<double>& history, double maxGraph) {
-    const int labelWidth = strcmp(label, "Write") == 0 ? 42 : 54;
-    RECT labelRect{valueRect.left, valueRect.top, valueRect.left + labelWidth, valueRect.bottom};
-    RECT numberRect{labelRect.right + 2, valueRect.top, valueRect.right, valueRect.bottom};
-    DrawTextBlock(hdc, labelRect, label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, numberRect, FormatSpeed(valueMbps), fonts_.label, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+    const int lineHeight = fontHeights_.smallText + 2;
+    RECT valueRect{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + lineHeight)};
+    RECT graphRect{rect.left, std::min(rect.bottom, valueRect.bottom + std::max(0, config_.layout.throughputHeaderGap)), rect.right, rect.bottom};
+    const int labelWidth = strcmp(label, "Write") == 0
+        ? std::max(1, config_.layout.throughputWriteLabelWidth)
+        : std::max(1, config_.layout.throughputReadLabelWidth);
+    RECT labelRect{valueRect.left, valueRect.top, std::min(valueRect.right, valueRect.left + labelWidth), valueRect.bottom};
+    RECT numberRect{std::min(valueRect.right, labelRect.right + std::max(0, config_.layout.throughputHeaderGap)), valueRect.top, valueRect.right, valueRect.bottom};
+    DrawTextBlock(hdc, labelRect, label, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, numberRect, FormatSpeed(valueMbps), fonts_.smallFont, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
     DrawGraph(hdc, graphRect, history, maxGraph);
 }
 
-void DashboardApp::DrawNetworkPanel(HDC hdc, const RECT& rect, const NetworkTelemetry& network) {
-    DrawPanel(hdc, rect, "Network", PanelIcon::Network);
-    const int chartRight = rect.right - 28;
-    RECT upRect{rect.left + 16, rect.top + 38, chartRight, rect.top + 54};
-    RECT uploadGraph{rect.left + 16, rect.top + 56, chartRight, rect.top + 97};
-    RECT downRect{rect.left + 16, rect.top + 102, chartRight, rect.top + 118};
-    RECT downloadGraph{rect.left + 16, rect.top + 120, chartRight, rect.bottom - 28};
-    RECT footerRect{rect.left + 16, rect.bottom - 22, rect.right - 16, rect.bottom - 6};
-    const double maxGraph = GetThroughputGraphMax(network.uploadHistory, network.downloadHistory);
-
-    DrawThroughputSection(hdc, upRect, uploadGraph, "Up", network.uploadMbps, network.uploadHistory, maxGraph);
-    DrawThroughputSection(hdc, downRect, downloadGraph, "Down", network.downloadMbps, network.downloadHistory, maxGraph);
-
-    const std::string footer = network.adapterName.empty()
-        ? network.ipAddress
-        : network.adapterName + " | " + network.ipAddress;
-    DrawTextBlock(hdc, footerRect, footer, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+void DashboardApp::DrawMetricListWidget(HDC hdc, const RECT& rect, const std::vector<std::string>& items,
+    bool isGpu, const SystemSnapshot& snapshot) {
+    const int rowHeight = EffectiveMetricRowHeight();
+    RECT row{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + rowHeight)};
+    for (const auto& item : items) {
+        const std::string lowered = ToLower(item);
+        std::string label;
+        std::string value;
+        double ratio = 0.0;
+        if (!isGpu && lowered == "temp") {
+            label = "Temp";
+            value = FormatValue(snapshot.cpu.temperature, 0);
+            ratio = snapshot.cpu.temperature.value.value_or(0.0) / 100.0;
+        } else if (!isGpu && lowered == "clock") {
+            label = "Clock";
+            value = FormatValue(snapshot.cpu.clock, 2);
+            ratio = snapshot.cpu.clock.value.value_or(0.0) / 5.0;
+        } else if (!isGpu && lowered == "fan") {
+            label = "Fan";
+            value = FormatValue(snapshot.cpu.fan, 0);
+            ratio = snapshot.cpu.fan.value.value_or(0.0) / 3000.0;
+        } else if (!isGpu && lowered == "ram") {
+            label = "RAM";
+            value = FormatMemory(snapshot.cpu.memory.usedGb, snapshot.cpu.memory.totalGb);
+            ratio = snapshot.cpu.memory.totalGb > 0.0 ? snapshot.cpu.memory.usedGb / snapshot.cpu.memory.totalGb : 0.0;
+        } else if (isGpu && lowered == "temp") {
+            label = "Temp";
+            value = FormatValue(snapshot.gpu.temperature, 0);
+            ratio = snapshot.gpu.temperature.value.value_or(0.0) / 100.0;
+        } else if (isGpu && lowered == "clock") {
+            label = "Clock";
+            value = FormatValue(snapshot.gpu.clock, 0);
+            ratio = snapshot.gpu.clock.value.value_or(0.0) / 2600.0;
+        } else if (isGpu && lowered == "fan") {
+            label = "Fan";
+            value = FormatValue(snapshot.gpu.fan, 0);
+            ratio = snapshot.gpu.fan.value.value_or(0.0) / 3000.0;
+        } else if (isGpu && lowered == "vram") {
+            label = "VRAM";
+            value = FormatMemory(snapshot.gpu.vram.usedGb, std::max(1.0, snapshot.gpu.vram.totalGb));
+            ratio = snapshot.gpu.vram.totalGb > 0.0 ? snapshot.gpu.vram.usedGb / snapshot.gpu.vram.totalGb : 0.0;
+        } else {
+            continue;
+        }
+        DrawMetricRow(hdc, row, label, value, ratio);
+        OffsetRect(&row, 0, rowHeight);
+        row.bottom = std::min(rect.bottom, row.top + rowHeight);
+        if (row.top >= rect.bottom) {
+            break;
+        }
+    }
 }
 
-void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTelemetry& storage, const std::vector<DriveInfo>& drives) {
-    DrawPanel(hdc, rect, "Storage", PanelIcon::Storage);
-    const int chartRight = rect.left + 176;
-    const RECT readValueRect{rect.left + 16, rect.top + 38, chartRight, rect.top + 54};
-    const RECT readGraphRect{rect.left + 16, rect.top + 56, chartRight, rect.top + 97};
-    const RECT writeValueRect{rect.left + 16, rect.top + 102, chartRight, rect.top + 118};
-    const RECT writeGraphRect{rect.left + 16, rect.top + 120, chartRight, rect.bottom - 28};
-    const double maxGraph = GetThroughputGraphMax(storage.readHistory, storage.writeHistory);
-    DrawThroughputSection(hdc, readValueRect, readGraphRect, "Read", storage.readMbps, storage.readHistory, maxGraph);
-    DrawThroughputSection(hdc, writeValueRect, writeGraphRect, "Write", storage.writeMbps, storage.writeHistory, maxGraph);
+void DashboardApp::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<std::string>& drives,
+    const std::vector<DriveInfo>& availableDrives) {
+    std::vector<DriveInfo> ordered;
+    for (const auto& driveName : drives) {
+        const auto it = std::find_if(availableDrives.begin(), availableDrives.end(), [&](const DriveInfo& drive) {
+            return ToLower(drive.label) == ToLower(driveName + ":") || ToLower(drive.label) == ToLower(driveName);
+        });
+        if (it != availableDrives.end()) {
+            ordered.push_back(*it);
+        }
+    }
+    if (ordered.empty()) {
+        ordered = availableDrives;
+    }
+    if (ordered.empty()) {
+        return;
+    }
 
-    const int usageLeft = rect.left + 192;
-    int y = rect.top + 42;
-    for (const auto& drive : drives) {
-        RECT labelRect{usageLeft, y, usageLeft + 26, y + 20};
-        RECT pctRect{rect.right - 140, y, rect.right - 94, y + 20};
-        RECT freeRect{rect.right - 92, y, rect.right - 16, y + 20};
-        RECT barRect{usageLeft + 32, y + 4, rect.right - 150, y + 16};
+    const int configuredDriveRowHeight = std::max(1, config_.layout.driveRowHeight);
+    const int rowHeight = configuredDriveRowHeight;
+    RECT row{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + rowHeight)};
+    for (const auto& drive : ordered) {
+        const int labelWidth = std::max(1, config_.layout.driveLabelWidth);
+        const int percentWidth = std::max(1, config_.layout.drivePercentWidth);
+        const int freeWidth = std::max(1, config_.layout.driveFreeWidth);
+        const int barGap = std::max(0, config_.layout.driveBarGap);
+        const int valueGap = std::max(0, config_.layout.driveValueGap);
+        RECT labelRect{row.left, row.top, std::min(row.right, row.left + labelWidth), row.bottom};
+        RECT pctRect{std::max(row.left, row.right - (percentWidth + freeWidth + valueGap)), row.top,
+            std::max(row.left, row.right - (freeWidth + valueGap)), row.bottom};
+        RECT freeRect{std::max(row.left, row.right - freeWidth), row.top, row.right, row.bottom};
+        const int driveBarHeight = std::max(2, config_.layout.driveBarHeight);
+        const int rowPixelHeight = static_cast<int>(row.bottom - row.top);
+        const int barTop = static_cast<int>(row.top) + std::max(0, (rowPixelHeight - driveBarHeight) / 2);
+        RECT barRect{
+            labelRect.right + barGap,
+            barTop,
+            std::max(static_cast<int>(labelRect.right) + barGap, static_cast<int>(pctRect.left) - valueGap),
+            std::min(static_cast<int>(row.bottom), barTop + driveBarHeight)
+        };
 
         DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         HBRUSH track = CreateSolidBrush(TrackColor());
@@ -1657,7 +2074,7 @@ void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTele
         DeleteObject(track);
 
         RECT fill = barRect;
-        fill.right = fill.left + static_cast<int>((fill.right - fill.left) * (drive.usedPercent / 100.0));
+        fill.right = fill.left + static_cast<int>((fill.right - fill.left) * std::clamp(drive.usedPercent / 100.0, 0.0, 1.0));
         HBRUSH accent = CreateSolidBrush(UsageFillColor());
         FillRect(hdc, &fill, accent);
         DeleteObject(accent);
@@ -1667,35 +2084,90 @@ void DashboardApp::DrawStoragePanel(HDC hdc, const RECT& rect, const StorageTele
         DrawTextBlock(hdc, pctRect, percent, fonts_.label, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
         DrawTextBlock(hdc, freeRect, FormatDriveFree(drive.freeGb), fonts_.smallFont, MutedTextColor(),
             DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-        y += 34;
+
+        OffsetRect(&row, 0, rowHeight);
+        row.bottom = std::min(rect.bottom, row.top + rowHeight);
+        if (row.top >= rect.bottom) {
+            break;
+        }
     }
 }
 
-void DashboardApp::DrawTimePanel(HDC hdc, const RECT& rect, const SYSTEMTIME& now) {
-    DrawPanel(hdc, rect, "Time", PanelIcon::Time);
-    char timeBuffer[32];
-    char dateBuffer[32];
-    sprintf_s(timeBuffer, "%02d:%02d", now.wHour, now.wMinute);
-    sprintf_s(dateBuffer, "%04d-%02d-%02d", now.wYear, now.wMonth, now.wDay);
-
-    RECT timeRect{rect.left + 16, rect.top + 46, rect.right - 16, rect.top + 116};
-    RECT dateRect{rect.left + 16, rect.top + 120, rect.right - 16, rect.top + 148};
-    DrawTextBlock(hdc, timeRect, timeBuffer, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, dateRect, dateBuffer, fonts_.value, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+void DashboardApp::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const SystemSnapshot& snapshot) {
+    switch (widget.kind) {
+    case WidgetKind::CpuName:
+        DrawTextBlock(hdc, widget.rect, snapshot.cpu.name, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        return;
+    case WidgetKind::GpuName:
+        DrawTextBlock(hdc, widget.rect, snapshot.gpu.name, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        return;
+    case WidgetKind::GaugeCpuLoad:
+    case WidgetKind::GaugeGpuLoad: {
+        const double percent = widget.kind == WidgetKind::GaugeCpuLoad ? snapshot.cpu.loadPercent : snapshot.gpu.loadPercent;
+        const int width = widget.rect.right - widget.rect.left;
+        const int height = widget.rect.bottom - widget.rect.top;
+        const int radius = std::max(20, std::min(width, height) / 3);
+        DrawGauge(hdc, widget.rect.left + width / 2, widget.rect.top + height / 2, radius, percent, "Load");
+        return;
+    }
+    case WidgetKind::MetricListCpu:
+        DrawMetricListWidget(hdc, widget.rect, widget.binding.items, false, snapshot);
+        return;
+    case WidgetKind::MetricListGpu:
+        DrawMetricListWidget(hdc, widget.rect, widget.binding.items, true, snapshot);
+        return;
+    case WidgetKind::ThroughputUpload:
+        DrawThroughputWidget(hdc, widget.rect, "Up", snapshot.network.uploadMbps, snapshot.network.uploadHistory,
+            GetThroughputGraphMax(snapshot.network.uploadHistory, snapshot.network.downloadHistory));
+        return;
+    case WidgetKind::ThroughputDownload:
+        DrawThroughputWidget(hdc, widget.rect, "Down", snapshot.network.downloadMbps, snapshot.network.downloadHistory,
+            GetThroughputGraphMax(snapshot.network.uploadHistory, snapshot.network.downloadHistory));
+        return;
+    case WidgetKind::ThroughputRead:
+        DrawThroughputWidget(hdc, widget.rect, "Read", snapshot.storage.readMbps, snapshot.storage.readHistory,
+            GetThroughputGraphMax(snapshot.storage.readHistory, snapshot.storage.writeHistory));
+        return;
+    case WidgetKind::ThroughputWrite:
+        DrawThroughputWidget(hdc, widget.rect, "Write", snapshot.storage.writeMbps, snapshot.storage.writeHistory,
+            GetThroughputGraphMax(snapshot.storage.readHistory, snapshot.storage.writeHistory));
+        return;
+    case WidgetKind::NetworkFooter: {
+        const std::string footer = snapshot.network.adapterName.empty()
+            ? snapshot.network.ipAddress
+            : snapshot.network.adapterName + " | " + snapshot.network.ipAddress;
+        DrawTextBlock(hdc, widget.rect, footer, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        return;
+    }
+    case WidgetKind::Spacer:
+        return;
+    case WidgetKind::DriveUsageList:
+        DrawDriveUsageWidget(hdc, widget.rect, widget.binding.drives, snapshot.drives);
+        return;
+    case WidgetKind::ClockTime: {
+        char timeBuffer[32];
+        sprintf_s(timeBuffer, "%02d:%02d", snapshot.now.wHour, snapshot.now.wMinute);
+        DrawTextBlock(hdc, widget.rect, timeBuffer, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        return;
+    }
+    case WidgetKind::ClockDate: {
+        char dateBuffer[32];
+        sprintf_s(dateBuffer, "%04d-%02d-%02d", snapshot.now.wYear, snapshot.now.wMonth, snapshot.now.wDay);
+        DrawTextBlock(hdc, widget.rect, dateBuffer, fonts_.value, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        return;
+    }
+    default:
+        return;
+    }
 }
 
 void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
-    const RECT cpuRect{10, 10, 395, 270};
-    const RECT gpuRect{405, 10, 790, 270};
-    const RECT networkRect{10, 280, 210, 470};
-    const RECT storageRect{220, 280, 654, 470};
-    const RECT timeRect{664, 280, 790, 470};
-
-    DrawProcessorPanel(hdc, cpuRect, snapshot.cpu);
-    DrawGpuPanel(hdc, gpuRect, snapshot.gpu);
-    DrawNetworkPanel(hdc, networkRect, snapshot.network);
-    DrawStoragePanel(hdc, storageRect, snapshot.storage, snapshot.drives);
-    DrawTimePanel(hdc, timeRect, snapshot.now);
+    for (const auto& card : resolvedLayout_.cards) {
+        DrawPanel(hdc, card);
+        for (const auto& widget : card.widgets) {
+            DrawResolvedWidget(hdc, widget, snapshot);
+        }
+    }
 }
 
 }  // namespace

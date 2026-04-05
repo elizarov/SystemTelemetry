@@ -2,6 +2,7 @@ Keep `docs/specifications.txt` in sync with behavior changes before finishing wo
 Keep `docs/diagnostics.txt` in sync with diagnostics-flow and trace/dump/screenshot behavior changes before finishing work.
 Keep `docs/architecture.txt` in sync with structural/code-organization changes before finishing work.
 Keep `docs/project.txt` in sync with project-environment, build/setup, and engineering-constraint changes before finishing work.
+Keep a single source of truth for every example, format description, and configuration-language reference; when one file is designated as the maintained source, update other docs to refer to it instead of duplicating the same example or format details.
 Document new requirements briefly in the same style as the existing spec.
 Always use `build.cmd` for builds.
 Keep all build artifacts and temporary compiler files in `build\` so the repository root stays clean.
