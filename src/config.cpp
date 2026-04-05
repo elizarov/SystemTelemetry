@@ -577,6 +577,8 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
 
         if (section == "display" && key == "monitor_name") {
             config.monitorName = value;
+        } else if (section == "display" && key == "position") {
+            ParseIntPair(value, config.positionX, config.positionY);
         } else if (section == "display" && key == "position_x") {
             config.positionX = ParseIntOrDefault(value, 0);
         } else if (section == "display" && key == "position_y") {
@@ -616,6 +618,28 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, si
     }
 
     lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
+}
+
+void RemoveKey(std::vector<std::string>& lines, size_t sectionStart, size_t sectionEnd, const std::string& key) {
+    const std::string normalizedKey = ToLower(key);
+    for (size_t i = sectionStart + 1; i < sectionEnd;) {
+        const std::string trimmed = Trim(lines[i]);
+        if (trimmed.empty() || trimmed[0] == ';' || trimmed[0] == '#') {
+            ++i;
+            continue;
+        }
+        const size_t eq = trimmed.find('=');
+        if (eq == std::string::npos) {
+            ++i;
+            continue;
+        }
+        if (ToLower(Trim(trimmed.substr(0, eq))) == normalizedKey) {
+            lines.erase(lines.begin() + static_cast<std::ptrdiff_t>(i));
+            --sectionEnd;
+            continue;
+        }
+        ++i;
+    }
 }
 
 void CollectDriveLettersRecursive(const LayoutNodeConfig& node, std::vector<std::string>& drives) {
@@ -769,9 +793,16 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
         ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value);
     };
 
+    auto removeKey = [&lines, &ensureSection, &findSectionEnd](const std::string& sectionName, const std::string& key) {
+        size_t sectionStart = ensureSection(sectionName);
+        const size_t sectionEnd = findSectionEnd(sectionStart);
+        RemoveKey(lines, sectionStart, sectionEnd, key);
+    };
+
     updateKey("[display]", "monitor_name", config.monitorName);
-    updateKey("[display]", "position_x", std::to_string(config.positionX));
-    updateKey("[display]", "position_y", std::to_string(config.positionY));
+    updateKey("[display]", "position", std::to_string(config.positionX) + "," + std::to_string(config.positionY));
+    removeKey("[display]", "position_x");
+    removeKey("[display]", "position_y");
     updateKey("[network]", "adapter_name", config.networkAdapter);
     updateKey("[vendor.gigabyte]", "fan_channel", config.gigabyteFanChannelName);
     updateKey("[vendor.gigabyte]", "temperature_channel", config.gigabyteTemperatureChannelName);

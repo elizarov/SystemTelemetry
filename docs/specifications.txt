@@ -50,6 +50,7 @@ Examples include:
 
 At runtime, the application must first load an embedded default `config.ini` resource, then read `config.ini` from the same directory as `SystemTelemetry.exe` when that file exists and overlay its values on top of the embedded defaults.
 The embedded `config.ini` resource must be the only self-documented source of truth for the config file format and supported entries; the rest of the repository does not need to duplicate per-entry config documentation.
+Display placement in `config.ini` must use the compact `position = x,y` form for consistency with the rest of the pair-based config syntax, while older `position_x` and `position_y` entries may still be read for backward compatibility.
 Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance instead of silently failing.
 The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
 The `[layout]` section in `config.ini` must control the dashboard window size, shared spacing metrics, the generic dashboard card-placement layout, color palette, and UI font faces, sizes, and weights.
