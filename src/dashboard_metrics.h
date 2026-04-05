@@ -28,6 +28,7 @@ struct DashboardThroughputMetric {
     double valueMbps = 0.0;
     std::vector<double> history;
     double maxGraph = 10.0;
+    double guideStepMbps = 5.0;
 };
 
 struct DashboardDriveRow {

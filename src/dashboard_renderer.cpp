@@ -782,7 +782,8 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const Dashboard
     DeleteObject(accent);
 }
 
-void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue) {
+void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
+    double guideStepMbps) {
     HBRUSH bg = CreateSolidBrush(ToColorRef(config_.layout.graphBackgroundColor));
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
@@ -796,7 +797,8 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
 
     HPEN gridPen = CreatePen(PS_SOLID, 1, ToColorRef(config_.layout.graphGridColor));
     HGDIOBJ oldPen = SelectObject(hdc, gridPen);
-    for (double tick = 5.0; tick < maxValue; tick += 5.0) {
+    const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
+    for (double tick = guideStep; tick < maxValue; tick += guideStep) {
         const double ratio = tick / maxValue;
         const int y = graphBottom - static_cast<int>(std::round(ratio * height));
         MoveToEx(hdc, graphLeft, y, nullptr);
@@ -852,7 +854,7 @@ void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const Da
     }
     DrawTextBlock(hdc, labelRect, metric.label, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     DrawTextBlock(hdc, numberRect, buffer, fonts_.smallFont, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-    DrawGraph(hdc, graphRect, metric.history, metric.maxGraph);
+    DrawGraph(hdc, graphRect, metric.history, metric.maxGraph, metric.guideStepMbps);
 }
 
 void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows) {

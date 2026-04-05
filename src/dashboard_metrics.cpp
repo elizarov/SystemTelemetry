@@ -40,6 +40,20 @@ std::string FormatDriveFree(double freeGb) {
     return buffer;
 }
 
+std::vector<double> SmoothThroughputHistory(const std::vector<double>& history) {
+    if (history.empty()) {
+        return {};
+    }
+
+    std::vector<double> smoothed;
+    smoothed.reserve(history.size());
+    smoothed.push_back(history.front());
+    for (size_t i = 1; i < history.size(); ++i) {
+        smoothed.push_back((history[i - 1] + history[i]) / 2.0);
+    }
+    return smoothed;
+}
+
 double GetThroughputGraphMax(const std::vector<double>& firstHistory, const std::vector<double>& secondHistory) {
     double rawMax = 10.0;
     for (double value : firstHistory) {
@@ -49,6 +63,10 @@ double GetThroughputGraphMax(const std::vector<double>& firstHistory, const std:
         rawMax = std::max(rawMax, value);
     }
     return std::max(10.0, std::ceil(rawMax / 5.0) * 5.0);
+}
+
+double GetStorageGuideStep(double maxGraph) {
+    return maxGraph > 50.0 ? 50.0 : 5.0;
 }
 
 std::string BuildBoardMetricLabel(const std::string& name, const char* suffix) {
@@ -156,21 +174,25 @@ std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const s
 
 DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::string& metricRef) const {
     const std::string lowered = ToLower(metricRef);
+    const auto networkUploadHistory = SmoothThroughputHistory(snapshot_.network.uploadHistory);
+    const auto networkDownloadHistory = SmoothThroughputHistory(snapshot_.network.downloadHistory);
+    const auto storageReadHistory = SmoothThroughputHistory(snapshot_.storage.readHistory);
+    const auto storageWriteHistory = SmoothThroughputHistory(snapshot_.storage.writeHistory);
+    const double networkMaxGraph = GetThroughputGraphMax(networkUploadHistory, networkDownloadHistory);
+    const double storageMaxGraph = GetThroughputGraphMax(storageReadHistory, storageWriteHistory);
     if (lowered == "network.upload") {
-        return DashboardThroughputMetric{"Up", snapshot_.network.uploadMbps, snapshot_.network.uploadHistory,
-            GetThroughputGraphMax(snapshot_.network.uploadHistory, snapshot_.network.downloadHistory)};
+        return DashboardThroughputMetric{"Up", snapshot_.network.uploadMbps, networkUploadHistory, networkMaxGraph, 5.0};
     }
     if (lowered == "network.download") {
-        return DashboardThroughputMetric{"Down", snapshot_.network.downloadMbps, snapshot_.network.downloadHistory,
-            GetThroughputGraphMax(snapshot_.network.uploadHistory, snapshot_.network.downloadHistory)};
+        return DashboardThroughputMetric{"Down", snapshot_.network.downloadMbps, networkDownloadHistory, networkMaxGraph, 5.0};
     }
     if (lowered == "storage.read") {
-        return DashboardThroughputMetric{"Read", snapshot_.storage.readMbps, snapshot_.storage.readHistory,
-            GetThroughputGraphMax(snapshot_.storage.readHistory, snapshot_.storage.writeHistory)};
+        return DashboardThroughputMetric{"Read", snapshot_.storage.readMbps, storageReadHistory,
+            storageMaxGraph, GetStorageGuideStep(storageMaxGraph)};
     }
     if (lowered == "storage.write") {
-        return DashboardThroughputMetric{"Write", snapshot_.storage.writeMbps, snapshot_.storage.writeHistory,
-            GetThroughputGraphMax(snapshot_.storage.readHistory, snapshot_.storage.writeHistory)};
+        return DashboardThroughputMetric{"Write", snapshot_.storage.writeMbps, storageWriteHistory,
+            storageMaxGraph, GetStorageGuideStep(storageMaxGraph)};
     }
     return DashboardThroughputMetric{};
 }

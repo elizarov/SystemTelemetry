@@ -108,7 +108,7 @@ private:
     void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
     void DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label);
     void DrawMetricRow(HDC hdc, const RECT& rect, const DashboardMetricRow& row);
-    void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue);
+    void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue, double guideStepMbps);
     void DrawThroughputWidget(HDC hdc, const RECT& rect, const DashboardThroughputMetric& metric);
     void DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
 
