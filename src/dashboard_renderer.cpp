@@ -24,13 +24,6 @@ COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
 }
 
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
-}
-
 std::string Trim(std::string value) {
     const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
     const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
@@ -100,23 +93,20 @@ std::vector<DashboardMetricListEntry> ParseMetricListEntries(const std::string& 
 }
 
 UINT GetPanelIconResourceId(const std::string& iconName) {
-    const std::string lowered = ToLower(iconName);
-    if (lowered == "cpu") return IDR_PANEL_ICON_CPU;
-    if (lowered == "gpu") return IDR_PANEL_ICON_GPU;
-    if (lowered == "network") return IDR_PANEL_ICON_NETWORK;
-    if (lowered == "storage") return IDR_PANEL_ICON_STORAGE;
-    if (lowered == "time") return IDR_PANEL_ICON_TIME;
+    if (iconName == "cpu") return IDR_PANEL_ICON_CPU;
+    if (iconName == "gpu") return IDR_PANEL_ICON_GPU;
+    if (iconName == "network") return IDR_PANEL_ICON_NETWORK;
+    if (iconName == "storage") return IDR_PANEL_ICON_STORAGE;
+    if (iconName == "time") return IDR_PANEL_ICON_TIME;
     return 0;
 }
 
 bool IsContainerNode(const LayoutNodeConfig& node) {
-    const std::string lowered = ToLower(node.name);
-    return lowered == "columns" || lowered == "stack" || lowered == "stack_top" || lowered == "center";
+    return node.name == "columns" || node.name == "stack" || node.name == "stack_top" || node.name == "center";
 }
 
 bool IsDashboardContainerNode(const LayoutNodeConfig& node) {
-    const std::string lowered = ToLower(node.name);
-    return lowered == "rows" || lowered == "columns";
+    return node.name == "rows" || node.name == "columns";
 }
 
 HFONT CreateUiFont(const UiFontConfig& font) {
@@ -458,7 +448,7 @@ bool DashboardRenderer::LoadPanelIcons() {
     std::set<std::string> uniqueIcons;
     for (const auto& card : config_.layout.cards) {
         if (!card.icon.empty()) {
-            uniqueIcons.insert(ToLower(card.icon));
+            uniqueIcons.insert(card.icon);
         }
     }
     for (const auto& iconName : uniqueIcons) {
@@ -567,8 +557,7 @@ int DashboardRenderer::EffectiveDriveRowHeight() const {
 }
 
 int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) const {
-    const std::string lowered = ToLower(node.name);
-    if (lowered == "stack_top") {
+    if (node.name == "stack_top") {
         int total = 0;
         for (size_t i = 0; i < node.children.size(); ++i) {
             total += PreferredNodeHeight(node.children[i], 0);
@@ -579,17 +568,17 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(total));
         return total;
     }
-    if (lowered == "text") {
+    if (node.name == "text") {
         const int height = fontHeights_.label + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "network_footer") {
+    if (node.name == "network_footer") {
         const int height = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "metric_list") {
+    if (node.name == "metric_list") {
         const std::string param = node.parameter;
         const int count = static_cast<int>(Split(param, ',').size());
         const int height = count * EffectiveMetricRowHeight();
@@ -597,7 +586,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
             " value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "drive_usage_list") {
+    if (node.name == "drive_usage_list") {
         const std::string param = node.parameter;
         const int count = static_cast<int>(Split(param, ',').size());
         const int height = count * EffectiveDriveRowHeight();
@@ -605,23 +594,23 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
             " value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "throughput") {
+    if (node.name == "throughput") {
         const int height = fontHeights_.smallText + ScaleLogical(config_.layout.throughput.headerGap) +
             std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "clock_time") {
+    if (node.name == "clock_time") {
         const int height = fontHeights_.big + std::max(0, ScaleLogical(config_.layout.clockTime.padding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "clock_date") {
+    if (node.name == "clock_date") {
         const int height = fontHeights_.value + std::max(0, ScaleLogical(config_.layout.clockDate.padding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
-    if (lowered == "gauge") {
+    if (node.name == "gauge") {
         const int height = std::max(1, ScaleLogical(config_.layout.gauge.preferredSize));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
@@ -635,29 +624,28 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
         " " + FormatRect(rect) + " children=" + std::to_string(node.children.size()));
     if (!IsContainerNode(node)) {
         ResolvedWidgetLayout widget;
-        const std::string lowered = ToLower(node.name);
-        if (lowered == "text") {
+        if (node.name == "text") {
             widget.kind = WidgetKind::Text;
             widget.binding.metric = node.parameter;
-        } else if (lowered == "gauge") {
+        } else if (node.name == "gauge") {
             widget.kind = WidgetKind::Gauge;
             widget.binding.metric = node.parameter;
-        } else if (lowered == "metric_list") {
+        } else if (node.name == "metric_list") {
             widget.kind = WidgetKind::MetricList;
             widget.binding.param = node.parameter;
-        } else if (lowered == "throughput") {
+        } else if (node.name == "throughput") {
             widget.kind = WidgetKind::Throughput;
             widget.binding.metric = node.parameter;
-        } else if (lowered == "network_footer") {
+        } else if (node.name == "network_footer") {
             widget.kind = WidgetKind::NetworkFooter;
-        } else if (lowered == "spacer") {
+        } else if (node.name == "spacer") {
             widget.kind = WidgetKind::Spacer;
-        } else if (lowered == "drive_usage_list") {
+        } else if (node.name == "drive_usage_list") {
             widget.kind = WidgetKind::DriveUsageList;
             widget.binding.param = node.parameter;
-        } else if (lowered == "clock_time") {
+        } else if (node.name == "clock_time") {
             widget.kind = WidgetKind::ClockTime;
-        } else if (lowered == "clock_date") {
+        } else if (node.name == "clock_date") {
             widget.kind = WidgetKind::ClockDate;
         }
         widget.rect = rect;
@@ -668,8 +656,8 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
         return;
     }
 
-    const bool horizontal = ToLower(node.name) == "columns";
-    const bool topPacked = ToLower(node.name) == "stack_top";
+    const bool horizontal = node.name == "columns";
+    const bool topPacked = node.name == "stack_top";
     const int gap = horizontal ? ScaleLogical(config_.layout.columnGap) : ScaleLogical(config_.layout.widgetLineGap);
     if (topPacked) {
         int cursor = static_cast<int>(rect.top);
@@ -756,7 +744,7 @@ bool DashboardRenderer::ResolveLayout() {
 
     const auto resolveCard = [&](const LayoutNodeConfig& node, const RECT& rect) {
         const auto cardIt = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
-            return ToLower(card.id) == ToLower(node.name);
+            return card.id == node.name;
         });
         if (cardIt == config_.layout.cards.end()) {
             return;
@@ -805,7 +793,7 @@ bool DashboardRenderer::ResolveLayout() {
                 return;
             }
 
-            const bool horizontal = ToLower(node.name) == "columns";
+            const bool horizontal = node.name == "columns";
             const int gap = horizontal ? ScaleLogical(config_.layout.cardGap) : ScaleLogical(config_.layout.rowGap);
             int totalWeight = 0;
             for (const auto& child : node.children) {
@@ -869,7 +857,7 @@ void DashboardRenderer::DrawTextBlock(HDC hdc, const RECT& rect, const std::stri
 
 void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect) {
     const auto it = std::find_if(panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) {
-        return ToLower(entry.first) == ToLower(iconName);
+        return entry.first == iconName;
     });
     if (it == panelIcons_.end() || it->second == nullptr) {
         return;

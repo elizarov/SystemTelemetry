@@ -64,6 +64,7 @@ Generic widget types such as `text(...)`, `gauge(...)`, `metric_list(...)`, and 
 Widgets that need multiple values, such as `metric_list(...)` and `drive_usage_list(...)`, must take a widget-specific plain comma-separated parameter body.
 `metric_list(...)` items may append `=Label` so the UI row caption can be customized without changing the underlying metric binding.
 The layout language must accept only the documented generic widget names and explicit metric bindings; aliases such as `cpu_name`, `gauge_cpu_load`, and `throughput_upload` are invalid.
+The config language must treat section names, key names, card ids, container names, widget names, icon names, and metric references as case-sensitive identifiers; differently cased names remain distinct and mixed-case aliases are invalid.
 The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
 The list of rendered cards must come from layout config.
 The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.

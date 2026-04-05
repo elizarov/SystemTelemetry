@@ -29,13 +29,6 @@ std::string Trim(const std::string& input) {
     return std::string(first, last);
 }
 
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
-}
-
 std::vector<std::string> Split(const std::string& input, char delimiter) {
     std::vector<std::string> parts;
     std::stringstream stream(input);
@@ -276,9 +269,8 @@ public:
 
 private:
     static bool IsContainer(const std::string& name) {
-        const std::string lowered = ToLower(name);
-        return lowered == "rows" || lowered == "columns" || lowered == "stack" ||
-            lowered == "stack_top" || lowered == "center";
+        return name == "rows" || name == "columns" || name == "stack" ||
+            name == "stack_top" || name == "center";
     }
 
     void SkipWhitespace() {
@@ -382,7 +374,7 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
 
 LayoutCardConfig* FindCardConfig(LayoutConfig& layout, const std::string& id) {
     for (auto& card : layout.cards) {
-        if (ToLower(card.id) == ToLower(id)) {
+        if (card.id == id) {
             return &card;
         }
     }
@@ -654,7 +646,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             continue;
         }
         if (line.front() == '[' && line.back() == ']') {
-            section = ToLower(Trim(line.substr(1, line.size() - 2)));
+            section = Trim(line.substr(1, line.size() - 2));
             continue;
         }
 
@@ -663,7 +655,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             continue;
         }
 
-        const std::string key = ToLower(Trim(line.substr(0, eq)));
+        const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
 
         if (section == "display" && key == "monitor_name") {
@@ -700,7 +692,6 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
 
 void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, size_t sectionEnd,
     const std::string& key, const std::string& value) {
-    const std::string normalizedKey = ToLower(key);
     for (size_t i = sectionStart + 1; i < sectionEnd; ++i) {
         const std::string trimmed = Trim(lines[i]);
         if (trimmed.empty() || trimmed[0] == ';' || trimmed[0] == '#') {
@@ -710,7 +701,7 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, si
         if (eq == std::string::npos) {
             continue;
         }
-        if (ToLower(Trim(trimmed.substr(0, eq))) == normalizedKey) {
+        if (Trim(trimmed.substr(0, eq)) == key) {
             lines[i] = key + " = " + value;
             return;
         }
@@ -724,9 +715,8 @@ void AddUniqueValue(std::vector<std::string>& values, const std::string& value) 
         return;
     }
 
-    const std::string lowered = ToLower(value);
     for (const auto& existing : values) {
-        if (ToLower(existing) == lowered) {
+        if (existing == value) {
             return;
         }
     }
@@ -740,19 +730,18 @@ std::string ExtractMetricReference(const std::string& token) {
 
 void CollectLayoutBindingsRecursive(const LayoutNodeConfig& node, std::vector<std::string>& drives,
     std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
-    if (ToLower(node.name) == "drive_usage_list") {
+    if (node.name == "drive_usage_list") {
         for (const std::string& drive : Split(node.parameter, ',')) {
-            const std::string normalized = ToLower(drive.substr(0, 1));
+            const std::string normalized = drive.substr(0, 1);
             AddUniqueValue(drives, normalized);
         }
     }
 
     for (const std::string& token : Split(node.parameter, ',')) {
         const std::string metricRef = ExtractMetricReference(token);
-        const std::string lowered = ToLower(metricRef);
-        if (lowered.rfind("board.temp.", 0) == 0) {
+        if (metricRef.rfind("board.temp.", 0) == 0) {
             AddUniqueValue(boardTemperatures, metricRef.substr(std::string("board.temp.").size()));
-        } else if (lowered.rfind("board.fan.", 0) == 0) {
+        } else if (metricRef.rfind("board.fan.", 0) == 0) {
             AddUniqueValue(boardFans, metricRef.substr(std::string("board.fan.").size()));
         }
     }

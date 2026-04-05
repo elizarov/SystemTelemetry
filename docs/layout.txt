@@ -75,6 +75,8 @@ Supported dashboard layout key:
 
 - `cards = rows(columns:weight(card:weight,...), ...)`
 
+Config sections, config keys, card ids, container names, widget names, icon names, and metric references are case-sensitive and must use their documented spelling exactly.
+
 Example:
 
 - `cards = rows(columns:3(cpu,gpu), columns:2(network:4,storage:9,time:3))`
@@ -137,6 +139,8 @@ Supported icon names:
 - `storage`
 - `time`
 
+Mixed-case icon spellings such as `CPU` or `Network` are invalid.
+
 Layout expressions
 ==================
 
@@ -182,6 +186,7 @@ Supported widget names:
 - `clock_date`
 
 Legacy widget aliases are not supported. Bind telemetry through the documented generic widget names and explicit parameters, for example `text(cpu.name)`, `gauge(cpu.load)`, or `throughput(network.upload)`.
+Mixed-case widget or container spellings such as `Throughput(...)` or `Columns(...)` are invalid.
 
 Widget parameters
 =================
