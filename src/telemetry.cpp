@@ -290,10 +290,6 @@ struct TelemetryCollector::Impl {
     uint64_t previousInOctets_ = 0;
     uint64_t previousOutOctets_ = 0;
     std::chrono::steady_clock::time_point previousNetworkTick_{};
-    std::chrono::steady_clock::time_point lastFast_{};
-    std::chrono::steady_clock::time_point lastDetails_{};
-    std::chrono::steady_clock::time_point lastNetwork_{};
-    std::chrono::steady_clock::time_point lastStorage_{};
 };
 
 TelemetryCollector::Impl::~Impl() {
@@ -475,25 +471,12 @@ AppConfig TelemetryCollector::EffectiveConfig() const {
 
 void TelemetryCollector::UpdateSnapshot() {
     impl_->trace_.Write("telemetry:update_snapshot_begin");
-    const auto now = std::chrono::steady_clock::now();
-    if (now - impl_->lastFast_ >= std::chrono::milliseconds(750)) {
-        impl_->UpdateCpu();
-        impl_->UpdateGpu();
-        impl_->lastFast_ = now;
-    }
-    if (now - impl_->lastNetwork_ >= std::chrono::milliseconds(500)) {
-        impl_->UpdateNetworkState(false);
-        impl_->UpdateStorageThroughput(false);
-        impl_->lastNetwork_ = now;
-    }
-    if (now - impl_->lastDetails_ >= std::chrono::seconds(1)) {
-        impl_->UpdateMemory();
-        impl_->lastDetails_ = now;
-    }
-    if (now - impl_->lastStorage_ >= std::chrono::seconds(8)) {
-        impl_->RefreshDriveUsage();
-        impl_->lastStorage_ = now;
-    }
+    impl_->UpdateCpu();
+    impl_->UpdateGpu();
+    impl_->UpdateNetworkState(false);
+    impl_->UpdateStorageThroughput(false);
+    impl_->UpdateMemory();
+    impl_->RefreshDriveUsage();
     GetLocalTime(&impl_->snapshot_.now);
     impl_->trace_.Write("telemetry:update_snapshot_done");
 }

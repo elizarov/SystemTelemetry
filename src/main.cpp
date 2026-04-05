@@ -31,7 +31,7 @@ namespace {
 
 constexpr UINT_PTR kRefreshTimerId = 1;
 constexpr UINT_PTR kMoveTimerId = 2;
-constexpr UINT kRefreshTimerMs = 250;
+constexpr UINT kRefreshTimerMs = 500;
 constexpr UINT kMoveTimerMs = 16;
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kCommandMove = 1001;

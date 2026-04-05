@@ -293,12 +293,13 @@ Behavior & Data Refresh
 =======================
 
 Refresh Rates
-CPU/GPU load: 0.5-1 sec
-GPU vendor metrics: about 1 sec
+Shared telemetry snapshot timer: 0.5 sec
+CPU/GPU load: 0.5 sec
+GPU vendor metrics: 0.5 sec
 Network: 0.5 sec
 Storage throughput: 0.5 sec
-Storage drive usage: 5-10 sec
-Clock: 1 sec
+Storage drive usage: 0.5 sec
+Clock: 0.5 sec
 
 Units
 CPU: GHz
