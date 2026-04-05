@@ -5,6 +5,7 @@ Keep `docs/project.txt` in sync with project-environment, build/setup, and engin
 Keep a single source of truth for every example, format description, and configuration-language reference; when one file is designated as the maintained source, update other docs to refer to it instead of duplicating the same example or format details.
 Document new requirements briefly in the same style as the existing spec.
 Always use `build.cmd` for builds.
+Run `build.cmd` outside the sandbox; CMake incremental generation/builds need file deletes, renames, and timestamp updates in `build\` that the sandbox denies with `Access is denied`.
 Keep all build artifacts and temporary compiler files in `build\` so the repository root stays clean.
 Ignore the stray `$null` file at the repository root when it appears; it is a Codex sandbox artifact, not a project file.
 This project has a single deployment target; do not preserve backwards compatibility for legacy configs unless the user explicitly asks for it.
@@ -12,6 +13,7 @@ Do not run build steps and validation runs in parallel; always finish the build 
 If you trip over a project-specific pitfall and then resolve it, add a short note here for future work so the mistake is less likely to repeat.
 Pitfall note: keep fake-runtime startup failures aligned with the diagnostics dialog policy; a direct modal dialog in `/fake /exit` can look like `/exit` is broken because the headless process waits behind it.
 Pitfall note: if rebuilt defaults seem unchanged, check the executable-side `config.ini` first; it overlays the embedded `resources/config.ini` template and `Save Config` preserves that live file.
+Pitfall note: if `build.cmd` fails in sandbox with CMake/MSBuild `Access is denied` errors on stamp, tmp, or tlog files, rerun it outside the sandbox; incremental CMake builds require mutable build-tree file operations that the sandbox blocks.
 
 After changing diagnostics behavior, update `docs/diagnostics.txt` instead of restating those rules here.
 
