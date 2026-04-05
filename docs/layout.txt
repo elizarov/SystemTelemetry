@@ -19,7 +19,7 @@ The language is centered around the dashboard's current shape:
 Compact rules
 =============
 
-- weights are written as `name*weight`
+- weights are written as `name:weight(...)` or `name:weight`
 - layout containers are written as `kind(...)`
 - size pairs are written as `x,y`
 - font specs are written as `face,size,weight`
@@ -73,11 +73,11 @@ Supported geometry keys:
 
 Supported dashboard layout key:
 
-- `cards = rows(columns(card*weight,...)*weight, ...)`
+- `cards = rows(columns:weight(card:weight,...), ...)`
 
 Example:
 
-- `cards = rows(columns(cpu,gpu)*3, columns(network*4,storage*9,time*3)*2)`
+- `cards = rows(columns:3(cpu,gpu), columns:2(network:4,storage:9,time:3))`
 
 Color keys stay in `[layout]` and use `#RRGGBB`:
 
@@ -149,9 +149,9 @@ Supported layout kinds:
 
 Meaning:
 
-- `rows(...)` splits dashboard cards vertically into weighted row groups
-- `columns(...)` splits content horizontally into weighted children
-- `stack(...)` splits content vertically into weighted children
+- `rows(...)` splits dashboard cards vertically into weighted row groups, with an optional row-group weight written as `rows:weight(...)`
+- `columns(...)` splits content horizontally into weighted children, with child weights written as `child:weight`
+- `stack(...)` splits content vertically into weighted children, with child weights written as `child:weight`
 - `stack_top(...)` packs children from the top using their preferred heights and leaves any remaining space below
 - `center(...)` creates a centered vertical stack
 
@@ -161,7 +161,7 @@ Nested layout expressions are allowed.
 
 Example:
 
-- `columns(stack(throughput(storage.read)*4,throughput(storage.write)*4)*5, drive_usage_list(drives=C,D,E)*7)`
+- `columns(stack:5(throughput:4(storage.read),throughput:4(storage.write)), drive_usage_list:7(drives=C,D,E))`
 
 Widget names
 ============
@@ -243,7 +243,7 @@ Card sections define relative structure only:
 - card icon
 - layout expression
 - widget parameters
-- relative child weights
+- relative child weights using the `name:weight(...)` form
 
 Static sizing rules
 ===================

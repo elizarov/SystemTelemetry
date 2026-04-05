@@ -234,6 +234,11 @@ public:
             return false;
         }
         SkipWhitespace();
+        if (Consume(':')) {
+            SkipWhitespace();
+            node.weight = ParseInteger(node.weight);
+            SkipWhitespace();
+        }
         if (Consume('(')) {
             if (IsContainer(node.name)) {
                 if (!ParseChildren(node.children)) {
@@ -634,7 +639,7 @@ void CollectDriveLettersRecursive(const LayoutNodeConfig& node, std::vector<std:
 
 void EnsureDefaultLayout(LayoutConfig& layout) {
     if (layout.cardsLayout.name.empty()) {
-        ParseLayoutExpression("rows(columns(cpu,gpu)*3,columns(network*4,storage*9,time*3)*2)", layout.cardsLayout);
+        ParseLayoutExpression("rows(columns:3(cpu,gpu),columns:2(network:4,storage:9,time:3))", layout.cardsLayout);
     }
 
     const auto ensureCard = [&layout](const std::string& id, const std::string& title, const std::string& icon,
@@ -652,15 +657,15 @@ void EnsureDefaultLayout(LayoutConfig& layout) {
     };
 
     ensureCard("cpu", "CPU", "cpu",
-        "stack(text(cpu.name),columns(gauge(cpu.load)*5,metric_list(items=cpu.temp,cpu.clock,cpu.fan,cpu.ram)*7)*7)");
+        "stack(text(cpu.name),columns:7(gauge:5(cpu.load),metric_list:7(items=cpu.temp,cpu.clock,cpu.fan,cpu.ram)))");
     ensureCard("gpu", "GPU", "gpu",
-        "stack(text(gpu.name),columns(gauge(gpu.load)*5,metric_list(items=gpu.temp,gpu.clock,gpu.fan,gpu.vram)*7)*7)");
+        "stack(text(gpu.name),columns:7(gauge:5(gpu.load),metric_list:7(items=gpu.temp,gpu.clock,gpu.fan,gpu.vram)))");
     ensureCard("network", "Network", "network",
-        "stack(throughput(network.upload)*4,throughput(network.download)*4,network_footer)");
+        "stack(throughput:4(network.upload),throughput:4(network.download),network_footer)");
     ensureCard("storage", "Storage", "storage",
-        "columns(stack(throughput(storage.read)*4,throughput(storage.write)*4,spacer)*5,stack_top(drive_usage_list(drives=C,D,E))*7)");
+        "columns(stack:5(throughput:4(storage.read),throughput:4(storage.write),spacer),stack_top:7(drive_usage_list(drives=C,D,E)))");
     ensureCard("time", "Time", "time",
-        "center(clock_time*5,clock_date*2)");
+        "center(clock_time:5,clock_date:2)");
 }
 
 }  // namespace

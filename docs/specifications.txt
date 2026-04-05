@@ -54,6 +54,7 @@ Before writing `config.ini` beside the executable, the application must verify t
 The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
 The `[layout]` section in `config.ini` must control the dashboard window size, shared spacing metrics, the generic dashboard card-placement layout, color palette, and UI font faces, sizes, and weights.
 Each dashboard card must have its own `[card.<id>]` section in `config.ini` that provides the card title, icon name, and widget layout expression.
+Layout-expression weights in `config.ini` must use the `name:weight(...)` form so the relative size is visually attached to the container or widget name it affects.
 Generic widget types such as `text(...)`, `gauge(...)`, `metric_list(...)`, and `throughput(...)` must bind to telemetry through explicit metric names in layout config instead of through card-specific hard-coded widget implementations.
 The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
 The list of rendered cards must come from layout config instead of from a hard-coded card list.
