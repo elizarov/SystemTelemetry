@@ -19,8 +19,10 @@ Post-build verification examples:
 - Dump content check: `build\\SystemTelemetry.exe /dump /exit`
 - Screenshot/exported rendering check: `build\\SystemTelemetry.exe /screenshot /exit`
 - Full diagnostics pass: `build\\SystemTelemetry.exe /trace /dump /screenshot /exit`
+- Repeatable UI snapshot check from fake data: `build\\SystemTelemetry.exe /fake /screenshot /exit`
+- Repeatable full fake-data pass: `build\\SystemTelemetry.exe /fake /trace /dump /screenshot /exit`
 
 What to inspect:
 - UI/rendering changes: confirm `telemetry_screenshot.png` matches the intended layout and no text is clipped.
 - Sensor/telemetry changes: confirm `telemetry_dump.txt` and `telemetry_trace.txt` show the expected values, provider diagnostics, and failure paths.
-- Diagnostics-flow changes: confirm the requested files are produced, overwritten/appended as expected for the chosen mode, and the `/exit` run terminates promptly.
+- Diagnostics-flow changes: confirm the requested files are produced, overwritten/appended as expected for the chosen mode, fake-data reloads come from `telemetry_fake.txt` when requested, and the `/exit` run terminates promptly.

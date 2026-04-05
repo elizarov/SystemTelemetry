@@ -5,22 +5,28 @@ Command-line diagnostics mode
 =============================
 
 Support independent `/trace`, `/dump`, `/screenshot`, and `/exit` command-line switches.
+Support a `/fake` command-line switch that replaces live telemetry collection with periodic reads from `telemetry_fake.txt` beside the executable.
 `/trace` must enable continuous trace logging to `telemetry_trace.txt` beside the executable, appending new trace lines in plain UTF-8 without a BOM.
 Trace lines must use the compact prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
-`/dump` must enable writing only the human-readable telemetry dump to `telemetry_dump.txt` beside the executable in plain UTF-8 without a BOM.
+`/dump` must enable writing a machine-parseable UTF-8 snapshot dump to `telemetry_dump.txt` beside the executable without a BOM.
+The dump format must be stable, text-based, and editable by hand so the same file contents can be copied directly into `telemetry_fake.txt`.
+The dump must include all telemetry fields needed by the dashboard plus provider diagnostics, history arrays, configured drive rows, and the full dumped local date/time including seconds and milliseconds.
 `/screenshot` must enable writing only the rendered dashboard screenshot to `telemetry_screenshot.png` beside the executable.
 When `/exit` is not present, the application must still start the normal dashboard UI and keep running normally while any requested diagnostics outputs are produced in parallel.
 Without `/exit`, trace logging must continue for the lifetime of the process, while dump and screenshot outputs must refresh once per second using the latest snapshot, with trace appending and dump/screenshot overwriting their existing files each refresh.
 When `/exit` is present, the application must initialize telemetry using the same runtime `config.ini`, perform the first data update, optionally write the requested dump and screenshot once, close outputs, and exit without starting the GUI or affecting any already-running dashboard instance.
+When `/fake` is present, the application must not initialize live telemetry providers and must instead load `telemetry_fake.txt` immediately and then reload it once per second while the process is running.
+`/fake` must work both with the normal UI path and with `/exit`, so exported screenshots can be reproduced from a fixed fake snapshot file.
 The diagnostics trace must cover all diagnostics collection paths, not only vendor GPU integration.
 Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
-The human-readable dump snapshot should include the board-vendor provider status plus Gigabyte debug details such as detected board identity, helper path, controller type, selected CPU temperature sensor, requested and selected fan channel, sampled diagnostics, and any raw chip-register details when that provider exposes them.
+The dumped board-provider block must include Gigabyte debug details such as detected board identity, helper path, controller type, selected CPU temperature sensor, requested and selected fan channel, sampled diagnostics, and any raw chip-register details when that provider exposes them.
 
 Single-instance interaction
 ===========================
 
 The `/exit` diagnostics mode is exempt from the normal single-instance behavior and should run as an independent one-shot command.
 Diagnostics switches without `/exit` must stay attached to the normal UI startup path and therefore still follow the usual single-instance replacement behavior.
+`/fake` by itself must stay on the normal UI startup path and therefore still follow the usual single-instance replacement behavior.
 
 Validation guide
 ================
@@ -29,5 +35,6 @@ Always rebuild through `build.cmd` before validating diagnostics changes.
 For UI-attached diagnostics, verify `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot` while the dashboard is running.
 For headless diagnostics, verify `/trace /dump /screenshot /exit` and confirm the process exits after the first update without entering the normal GUI path.
 For trace changes, inspect `telemetry_trace.txt` for timestamp format, append behavior, and expected provider/status details.
-For dump changes, inspect `telemetry_dump.txt` for overwrite behavior, current values, and provider diagnostics blocks.
+For dump changes, inspect `telemetry_dump.txt` for overwrite behavior, schema stability, current values, provider diagnostics blocks, and successful round-tripping into `telemetry_fake.txt`.
 For screenshot changes, inspect `telemetry_screenshot.png` and confirm it matches the live dashboard rendering for the same snapshot.
+For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, and confirm that editing `telemetry_fake.txt` changes the next one-second refresh without touching live providers.

@@ -7,7 +7,9 @@
 #include <vector>
 #include <windows.h>
 
+#include "board_vendor.h"
 #include "config.h"
+#include "gpu_vendor.h"
 
 struct ScalarMetric {
     std::optional<double> value;
@@ -68,6 +70,18 @@ struct SystemSnapshot {
     SYSTEMTIME now{};
 };
 
+struct GpuProviderTelemetryState {
+    std::string providerName = "None";
+    std::string diagnostics;
+    bool available = false;
+};
+
+struct TelemetryDump {
+    SystemSnapshot snapshot;
+    GpuProviderTelemetryState gpuProvider;
+    BoardVendorTelemetrySample boardProvider;
+};
+
 class TelemetryCollector {
 public:
     TelemetryCollector();
@@ -80,9 +94,10 @@ public:
 
     bool Initialize(const AppConfig& config, std::ostream* traceStream = nullptr);
     const SystemSnapshot& Snapshot() const;
+    TelemetryDump Dump() const;
     AppConfig EffectiveConfig() const;
     void UpdateSnapshot();
-    void DumpText(std::ostream& output) const;
+    void WriteDump(std::ostream& output) const;
 
 private:
     struct Impl;

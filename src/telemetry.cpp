@@ -23,6 +23,7 @@
 
 #include "board_vendor.h"
 #include "gpu_vendor.h"
+#include "snapshot_dump.h"
 #include "telemetry.h"
 #include "trace.h"
 #include "utf8.h"
@@ -42,39 +43,6 @@ std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
     }
     char buffer[64];
     sprintf_s(buffer, "%.*f %s", precision, *metric.value, metric.unit.c_str());
-    return buffer;
-}
-
-std::string FormatMemoryMetric(const MemoryMetric& metric) {
-    char buffer[64];
-    sprintf_s(buffer, "%.1f / %.1f GB", metric.usedGb, metric.totalGb);
-    return buffer;
-}
-
-std::string FormatOptionalHex16(const std::optional<uint16_t>& value) {
-    if (!value.has_value()) {
-        return "N/A";
-    }
-    char buffer[16];
-    sprintf_s(buffer, "0x%04X", static_cast<unsigned int>(*value));
-    return buffer;
-}
-
-std::string FormatOptionalHex32(const std::optional<uint32_t>& value) {
-    if (!value.has_value()) {
-        return "N/A";
-    }
-    char buffer[16];
-    sprintf_s(buffer, "0x%08X", static_cast<unsigned int>(*value));
-    return buffer;
-}
-
-std::string FormatOptionalHex8(const std::optional<uint8_t>& value) {
-    if (!value.has_value()) {
-        return "N/A";
-    }
-    char buffer[16];
-    sprintf_s(buffer, "0x%02X", static_cast<unsigned int>(*value));
     return buffer;
 }
 
@@ -280,7 +248,6 @@ struct TelemetryCollector::Impl {
     void UpdateStorageThroughput(bool initializeOnly);
     void RefreshDriveUsage();
     void UpdateNetworkState(bool initializeOnly);
-    void DumpText(std::ostream& output) const;
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
     static void PushHistory(std::vector<double>& history, double value);
     void Trace(const char* text) const;
@@ -474,6 +441,19 @@ const SystemSnapshot& TelemetryCollector::Snapshot() const {
     return impl_->snapshot_;
 }
 
+TelemetryDump TelemetryCollector::Dump() const {
+    TelemetryDump dump;
+    dump.snapshot = impl_->snapshot_;
+    dump.gpuProvider.providerName = impl_->gpuProviderName_;
+    dump.gpuProvider.diagnostics = impl_->gpuProviderDiagnostics_;
+    dump.gpuProvider.available = impl_->gpuProviderAvailable_;
+    dump.boardProvider = impl_->boardProviderSample_;
+    dump.boardProvider.providerName = impl_->boardProviderName_;
+    dump.boardProvider.diagnostics = impl_->boardProviderDiagnostics_;
+    dump.boardProvider.available = impl_->boardProviderAvailable_;
+    return dump;
+}
+
 AppConfig TelemetryCollector::EffectiveConfig() const {
     AppConfig config = impl_->config_;
     if (!impl_->snapshot_.network.adapterName.empty() && impl_->snapshot_.network.adapterName != "Auto") {
@@ -513,8 +493,8 @@ void TelemetryCollector::UpdateSnapshot() {
     impl_->trace_.Write("telemetry:update_snapshot_done");
 }
 
-void TelemetryCollector::DumpText(std::ostream& output) const {
-    impl_->DumpText(output);
+void TelemetryCollector::WriteDump(std::ostream& output) const {
+    WriteTelemetryDump(output, Dump());
 }
 
 void TelemetryCollector::Impl::UpdateCpu() {
@@ -716,104 +696,6 @@ void TelemetryCollector::Impl::UpdateMemory() {
     Trace(("telemetry:memory_status ok=" + tracing::Trace::BoolText(ok != FALSE) +
         " total_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.totalGb, 2) +
         " used_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.usedGb, 2)).c_str());
-}
-
-void TelemetryCollector::Impl::DumpText(std::ostream& output) const {
-    const auto now = snapshot_.now;
-    char dateTime[64];
-    sprintf_s(dateTime, "%04d-%02d-%02d %02d:%02d:%02d",
-        now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond);
-
-    output << "System Telemetry Dump\r\n";
-    output << "=====================\r\n";
-    output << "Timestamp: " << dateTime << "\r\n";
-    output << "\r\n";
-
-    output << "[CPU]\r\n";
-    output << "Name: " << snapshot_.cpu.name << "\r\n";
-    {
-        char buffer[64];
-        sprintf_s(buffer, "Load: %.2f%%", snapshot_.cpu.loadPercent);
-        output << buffer << "\r\n";
-    }
-    output << "Clock: " << FormatScalarMetric(snapshot_.cpu.clock, 2) << "\r\n";
-    output << "Temperature: " << FormatScalarMetric(snapshot_.cpu.temperature, 1) << "\r\n";
-    output << "Fan: " << FormatScalarMetric(snapshot_.cpu.fan, 0) << "\r\n";
-    output << "Memory: " << FormatMemoryMetric(snapshot_.cpu.memory) << "\r\n";
-    output << "\r\n";
-
-    output << "[GPU]\r\n";
-    output << "Name: " << snapshot_.gpu.name << "\r\n";
-    {
-        char buffer[64];
-        sprintf_s(buffer, "Load: %.2f%%", snapshot_.gpu.loadPercent);
-        output << buffer << "\r\n";
-    }
-    output << "Temperature: " << FormatScalarMetric(snapshot_.gpu.temperature, 1) << "\r\n";
-    output << "Clock: " << FormatScalarMetric(snapshot_.gpu.clock, 0) << "\r\n";
-    output << "Fan: " << FormatScalarMetric(snapshot_.gpu.fan, 0) << "\r\n";
-    output << "VRAM: " << FormatMemoryMetric(snapshot_.gpu.vram) << "\r\n";
-    output << "\r\n";
-
-    output << "[GPU Vendor Provider]\r\n";
-    output << "Name: " << gpuProviderName_ << "\r\n";
-    output << "Available: " << (gpuProviderAvailable_ ? "yes" : "no") << "\r\n";
-    output << "Diagnostics: " << gpuProviderDiagnostics_ << "\r\n";
-    output << "\r\n";
-
-    output << "[Board Vendor Provider]\r\n";
-    output << "Name: " << boardProviderName_ << "\r\n";
-    output << "Available: " << (boardProviderAvailable_ ? "yes" : "no") << "\r\n";
-    output << "Diagnostics: " << boardProviderDiagnostics_ << "\r\n";
-    output << "Board Manufacturer: " << (boardProviderSample_.boardManufacturer.empty() ? "N/A" : boardProviderSample_.boardManufacturer) << "\r\n";
-    output << "Board Product: " << (boardProviderSample_.boardProduct.empty() ? "N/A" : boardProviderSample_.boardProduct) << "\r\n";
-    output << "Chip: " << (boardProviderSample_.chipName.empty() ? "N/A" : boardProviderSample_.chipName) << "\r\n";
-    output << "Controller Type: " << (boardProviderSample_.controllerType.empty() ? "N/A" : boardProviderSample_.controllerType) << "\r\n";
-    output << "Driver/Helper: " << (boardProviderSample_.driverLibrary.empty() ? "N/A" : boardProviderSample_.driverLibrary) << "\r\n";
-    output << "Probe Port: " << FormatOptionalHex16(boardProviderSample_.probePort) << "\r\n";
-    output << "Chip ID: " << FormatOptionalHex16(boardProviderSample_.chipId) << "\r\n";
-    output << "Monitor Base: " << FormatOptionalHex32(boardProviderSample_.monitorBaseAddress) << "\r\n";
-    output << "EC MMIO Register: " << FormatOptionalHex8(boardProviderSample_.ecMmioRegisterValue) << "\r\n";
-    output << "CPU Temperature Sensor: " << (boardProviderSample_.selectedCpuTemperatureSensor.empty() ? "N/A" : boardProviderSample_.selectedCpuTemperatureSensor) << "\r\n";
-    output << "CPU Temperature: " << (boardProviderSample_.cpuTemperatureC.has_value() ? FormatScalarMetric(ScalarMetric{boardProviderSample_.cpuTemperatureC, "\xC2\xB0""C"}, 1) : "N/A") << "\r\n";
-    output << "Requested Fan Channel: " << (boardProviderSample_.requestedFanChannelName.empty() ? "Auto" : boardProviderSample_.requestedFanChannelName) << "\r\n";
-    output << "Selected Fan Channel: " << (boardProviderSample_.selectedFanChannelName.empty() ? "N/A" : boardProviderSample_.selectedFanChannelName) << "\r\n";
-    output << "Requested Temperature Channel: " << (boardProviderSample_.requestedTemperatureChannelName.empty() ? "Auto" : boardProviderSample_.requestedTemperatureChannelName) << "\r\n";
-    output << "Selected Temperature Channel: " << (boardProviderSample_.selectedTemperatureChannelName.empty() ? "N/A" : boardProviderSample_.selectedTemperatureChannelName) << "\r\n";
-    output << "Raw Fan Counter: " << FormatOptionalHex16(boardProviderSample_.rawFanCounter) << "\r\n";
-    output << "16-bit Fan Mode: " << (boardProviderSample_.fan16BitMode ? "yes" : "no") << "\r\n";
-    output << "\r\n";
-
-    output << "[Network]\r\n";
-    output << "Adapter: " << snapshot_.network.adapterName << "\r\n";
-    output << "IP: " << snapshot_.network.ipAddress << "\r\n";
-    {
-        char buffer[64];
-        sprintf_s(buffer, "Upload: %.3f MB/s", snapshot_.network.uploadMbps);
-        output << buffer << "\r\n";
-        sprintf_s(buffer, "Download: %.3f MB/s", snapshot_.network.downloadMbps);
-        output << buffer << "\r\n";
-    }
-    output << "\r\n";
-
-    output << "[Storage]\r\n";
-    {
-        char buffer[64];
-        sprintf_s(buffer, "Read: %.3f MB/s", snapshot_.storage.readMbps);
-        output << buffer << "\r\n";
-        sprintf_s(buffer, "Write: %.3f MB/s", snapshot_.storage.writeMbps);
-        output << buffer << "\r\n";
-    }
-    if (snapshot_.drives.empty()) {
-        output << "(none)\r\n";
-    } else {
-        for (const auto& drive : snapshot_.drives) {
-            char buffer[128];
-            sprintf_s(buffer, "%s used=%.1f%% free=%.1f GB", drive.label.c_str(), drive.usedPercent, drive.freeGb);
-            output << buffer << "\r\n";
-        }
-    }
-    output.flush();
 }
 
 void TelemetryCollector::Impl::EnumerateDrives() {
