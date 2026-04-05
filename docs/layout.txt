@@ -188,7 +188,7 @@ Examples:
 
 - `text(cpu.name)`
 - `gauge(gpu.load)`
-- `metric_list(board.temp.CPU=Temp,cpu.clock,board.fan.CPU=Fan,cpu.ram)`
+- `metric_list(cpu.ram,board.temp.CPU=Temp,cpu.clock,board.fan.CPU,board.fan.System 1=System Fan)`
 - `throughput(network.upload)`
 - `drive_usage_list(C,D,E)`
 
@@ -221,7 +221,7 @@ Rendering-oriented selection lives in the layout language when it changes what i
 Example:
 
 - `drive_usage_list(C,D,E)`
-- `metric_list(board.temp.CPU=Temp,board.temp.VRM=VRM,board.fan.CPU=Fan)`
+- `metric_list(cpu.ram=RAM,board.temp.CPU=Temp,board.fan.CPU=Fan,board.fan.System 1=System Fan)`
 
 This defines a vertical list of drive-usage widgets and their order, and it also makes the layout the source of
 truth for which named board temperature and fan sensors are requested from the board provider.

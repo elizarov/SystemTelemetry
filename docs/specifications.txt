@@ -11,11 +11,11 @@ The design emphasizes glanceable visuals with large load indicators, concise num
 │           CPU                │             GPU               │
 │  AMD Ryzen                   │  Radeon RX 6800               │
 │  ○  2%                       │  ○  0%                        │
-│  CPU Temp 67°C              │  Temp    45°C                 │
-│  Clock   3.70GHz             │  Clock   29MHz                │
-│  CPU Fan 2400RPM            │  Fan     0RPM                 │
 │  RAM     15.0 / 64 GB        │  VRAM    3.7 / 16 GB          │
-│                              │                               │
+│  Temp    67°C                │  Temp    45°C                 │
+│  Clock   3.70GHz             │  Clock   29MHz                │
+│  Fan     2400RPM             │  Fan     0RPM                 │
+│  System Fan 900RPM           │                               │
 ├───────────────┬──────────────────────────────────┬───────────┤
 │   Network     │             Storage              │   Time    │
 │  Up   0.3MB/s │  Read  0.8MB/s  C: ████░░░░ 32%  │   10:43   │
@@ -208,11 +208,12 @@ CPU Load (%)
 
 Metrics (display as thin bars)
 
-Clock (GHz)
-CPU Temp (°C)
-CPU Fan (RPM)
 RAM usage
 Format: used / total
+Temp (°C)
+Clock (GHz)
+Fan (RPM)
+System Fan (RPM)
 
 GPU Panel (Top Right)
 =====================
@@ -225,11 +226,11 @@ GPU Load (%)
 
 Metrics (display as thin bars)
 
+VRAM usage
+Example: 3.2 / 16 GB
 Temp (°C)
 Clock (MHz)
 Fan (RPM)
-VRAM usage
-Example: 3.2 / 16 GB
 
 Network Panel (Bottom Left)
 ===========================
