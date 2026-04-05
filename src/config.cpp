@@ -466,6 +466,48 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.throughputGraphHeight = ParseIntOrDefault(value, layout.throughputGraphHeight);
     } else if (key == "gauge_preferred_size") {
         layout.gaugePreferredSize = ParseIntOrDefault(value, layout.gaugePreferredSize);
+    } else if (key == "text_preferred_padding") {
+        layout.textPreferredPadding = ParseIntOrDefault(value, layout.textPreferredPadding);
+    } else if (key == "footer_preferred_padding") {
+        layout.footerPreferredPadding = ParseIntOrDefault(value, layout.footerPreferredPadding);
+    } else if (key == "clock_time_padding") {
+        layout.clockTimePadding = ParseIntOrDefault(value, layout.clockTimePadding);
+    } else if (key == "clock_date_padding") {
+        layout.clockDatePadding = ParseIntOrDefault(value, layout.clockDatePadding);
+    } else if (key == "throughput_value_padding") {
+        layout.throughputValuePadding = ParseIntOrDefault(value, layout.throughputValuePadding);
+    } else if (key == "throughput_label_padding") {
+        layout.throughputLabelPadding = ParseIntOrDefault(value, layout.throughputLabelPadding);
+    } else if (key == "throughput_axis_padding") {
+        layout.throughputAxisPadding = ParseIntOrDefault(value, layout.throughputAxisPadding);
+    } else if (key == "drive_label_padding") {
+        layout.driveLabelPadding = ParseIntOrDefault(value, layout.driveLabelPadding);
+    } else if (key == "drive_percent_padding") {
+        layout.drivePercentPadding = ParseIntOrDefault(value, layout.drivePercentPadding);
+    } else if (key == "graph_label_padding") {
+        layout.graphLabelPadding = ParseIntOrDefault(value, layout.graphLabelPadding);
+    } else if (key == "graph_label_min_height") {
+        layout.graphLabelMinHeight = ParseIntOrDefault(value, layout.graphLabelMinHeight);
+    } else if (key == "graph_stroke_width") {
+        layout.graphStrokeWidth = ParseIntOrDefault(value, layout.graphStrokeWidth);
+    } else if (key == "graph_plot_stroke_width") {
+        layout.graphPlotStrokeWidth = ParseIntOrDefault(value, layout.graphPlotStrokeWidth);
+    } else if (key == "gauge_outer_padding") {
+        layout.gaugeOuterPadding = ParseIntOrDefault(value, layout.gaugeOuterPadding);
+    } else if (key == "gauge_min_radius") {
+        layout.gaugeMinRadius = ParseIntOrDefault(value, layout.gaugeMinRadius);
+    } else if (key == "gauge_stroke_width") {
+        layout.gaugeStrokeWidth = ParseIntOrDefault(value, layout.gaugeStrokeWidth);
+    } else if (key == "gauge_text_half_width") {
+        layout.gaugeTextHalfWidth = ParseIntOrDefault(value, layout.gaugeTextHalfWidth);
+    } else if (key == "gauge_value_top") {
+        layout.gaugeValueTop = ParseIntOrDefault(value, layout.gaugeValueTop);
+    } else if (key == "gauge_value_bottom") {
+        layout.gaugeValueBottom = ParseIntOrDefault(value, layout.gaugeValueBottom);
+    } else if (key == "gauge_label_top") {
+        layout.gaugeLabelTop = ParseIntOrDefault(value, layout.gaugeLabelTop);
+    } else if (key == "gauge_label_bottom") {
+        layout.gaugeLabelBottom = ParseIntOrDefault(value, layout.gaugeLabelBottom);
     } else if (key == "cards") {
         ParseLayoutExpression(value, layout.cardsLayout);
     } else if (key == "rows") {

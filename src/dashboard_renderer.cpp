@@ -416,10 +416,13 @@ bool DashboardRenderer::MeasureFonts() {
     fontHeights_.smallText = measure(fonts_.smallFont);
     measuredWidths_.throughputLabel = std::max(
         MeasureTextSize(hdc, fonts_.smallFont, "Read").cx,
-        MeasureTextSize(hdc, fonts_.smallFont, "Write").cx) + ScaleLogical(4);
-    measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx + ScaleLogical(6);
-    measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx + ScaleLogical(4);
-    measuredWidths_.drivePercent = MeasureTextSize(hdc, fonts_.label, "100%").cx + ScaleLogical(4);
+        MeasureTextSize(hdc, fonts_.smallFont, "Write").cx) + std::max(0, ScaleLogical(config_.layout.throughputLabelPadding));
+    measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx +
+        std::max(0, ScaleLogical(config_.layout.throughputAxisPadding));
+    measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx +
+        std::max(0, ScaleLogical(config_.layout.driveLabelPadding));
+    measuredWidths_.drivePercent = MeasureTextSize(hdc, fonts_.label, "100%").cx +
+        std::max(0, ScaleLogical(config_.layout.drivePercentPadding));
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
     WriteTrace("renderer:font_metrics title=" + std::to_string(fontHeights_.title) +
         " big=" + std::to_string(fontHeights_.big) +
@@ -458,7 +461,7 @@ int DashboardRenderer::EffectiveMetricRowHeight() const {
 
 int DashboardRenderer::EffectiveDriveRowHeight() const {
     const int textHeight = std::max(fontHeights_.label, fontHeights_.smallText);
-    const int barHeight = std::max(2, ScaleLogical(config_.layout.driveBarHeight));
+    const int barHeight = std::max(1, ScaleLogical(config_.layout.driveBarHeight));
     const int verticalGap = std::max(0, ScaleLogical(config_.layout.driveVerticalGap));
     const int computed = std::max(textHeight, barHeight) + verticalGap;
     WriteTrace("renderer:layout_drive_row_height text=" + std::to_string(textHeight) +
@@ -482,18 +485,18 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return total;
     }
     if (lowered == "text") {
-        const int height = fontHeights_.label + ScaleLogical(2);
+        const int height = fontHeights_.label + std::max(0, ScaleLogical(config_.layout.textPreferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
     if (lowered == "network_footer") {
-        const int height = fontHeights_.smallText + ScaleLogical(2);
+        const int height = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.footerPreferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
     if (lowered == "metric_list") {
         const std::string param = node.parameter;
-        const int count = std::max<int>(1, static_cast<int>(param.empty() ? 4 : Split(param, ',').size()));
+        const int count = static_cast<int>(Split(param, ',').size());
         const int height = count * EffectiveMetricRowHeight();
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
             " value=" + std::to_string(height));
@@ -501,7 +504,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
     }
     if (lowered == "drive_usage_list") {
         const std::string param = node.parameter;
-        const int count = std::max<int>(1, static_cast<int>(param.empty() ? 3 : Split(param, ',').size()));
+        const int count = static_cast<int>(Split(param, ',').size());
         const int height = count * EffectiveDriveRowHeight();
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
             " value=" + std::to_string(height));
@@ -514,12 +517,12 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return height;
     }
     if (lowered == "clock_time") {
-        const int height = fontHeights_.big + ScaleLogical(8);
+        const int height = fontHeights_.big + std::max(0, ScaleLogical(config_.layout.clockTimePadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
     if (lowered == "clock_date") {
-        const int height = fontHeights_.value + ScaleLogical(6);
+        const int height = fontHeights_.value + std::max(0, ScaleLogical(config_.layout.clockDatePadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
@@ -803,7 +806,7 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
 }
 
 void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label) {
-    const int penWidth = std::max(1, ScaleLogical(10));
+    const int penWidth = std::max(1, ScaleLogical(config_.layout.gaugeStrokeWidth));
     HPEN trackPen = CreatePen(PS_SOLID, penWidth, ToColorRef(config_.layout.trackColor));
     HPEN usagePen = CreatePen(PS_SOLID, penWidth, ToColorRef(config_.layout.accentColor));
     HGDIOBJ oldPen = SelectObject(hdc, trackPen);
@@ -827,12 +830,18 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double pe
     DeleteObject(trackPen);
     DeleteObject(usagePen);
 
-    const int halfWidth = ScaleLogical(42);
-    RECT numberRect{cx - halfWidth, cy - ScaleLogical(28), cx + halfWidth, cy + ScaleLogical(18)};
+    const int halfWidth = std::max(1, ScaleLogical(config_.layout.gaugeTextHalfWidth));
+    RECT numberRect{cx - halfWidth,
+        cy - ScaleLogical(config_.layout.gaugeValueTop),
+        cx + halfWidth,
+        cy + ScaleLogical(config_.layout.gaugeValueBottom)};
     char number[16];
     sprintf_s(number, "%.0f%%", percent);
     DrawTextBlock(hdc, numberRect, number, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    RECT labelRect{cx - halfWidth, cy + ScaleLogical(18), cx + halfWidth, cy + ScaleLogical(42)};
+    RECT labelRect{cx - halfWidth,
+        cy + ScaleLogical(config_.layout.gaugeLabelTop),
+        cx + halfWidth,
+        cy + ScaleLogical(config_.layout.gaugeLabelBottom)};
     DrawTextBlock(hdc, labelRect, label, fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 }
 
@@ -867,7 +876,9 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     DeleteObject(bg);
 
     const int axisWidth = std::max(1, measuredWidths_.throughputAxis);
-    const int labelBandHeight = std::max(fontHeights_.smallText + ScaleLogical(4), ScaleLogical(14));
+    const int labelBandHeight = std::max(
+        fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.graphLabelPadding)),
+        std::max(1, ScaleLogical(config_.layout.graphLabelMinHeight)));
     const int graphTop = std::min(rect.bottom - 1, rect.top + labelBandHeight);
     const int graphLeft = rect.left + axisWidth;
     const int width = std::max<int>(1, rect.right - graphLeft - 1);
@@ -875,7 +886,7 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     const int graphRight = graphLeft + width;
     const int graphBottom = rect.bottom - 1;
 
-    const int strokeWidth = std::max(1, ScaleLogical(1));
+    const int strokeWidth = std::max(1, ScaleLogical(config_.layout.graphStrokeWidth));
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
     HBRUSH markerBrush = CreateSolidBrush(ToColorRef(config_.layout.graphMarkerColor));
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
@@ -909,7 +920,7 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     RECT maxRect{rect.left, rect.top, rect.left + axisWidth, graphTop};
     DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 
-    HPEN pen = CreatePen(PS_SOLID, std::max(1, ScaleLogical(2)), AccentColor());
+    HPEN pen = CreatePen(PS_SOLID, std::max(1, ScaleLogical(config_.layout.graphPlotStrokeWidth)), AccentColor());
     HGDIOBJ oldPen = SelectObject(hdc, pen);
     for (size_t i = 1; i < history.size(); ++i) {
         const double v1 = std::clamp(history[i - 1] / maxValue, 0.0, 1.0);
@@ -926,7 +937,7 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
 }
 
 void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const DashboardThroughputMetric& metric) {
-    const int lineHeight = fontHeights_.smallText + ScaleLogical(2);
+    const int lineHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughputValuePadding));
     RECT valueRect{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + lineHeight)};
     RECT graphRect{rect.left, std::min(rect.bottom, valueRect.bottom + std::max(0, ScaleLogical(config_.layout.throughputHeaderGap))),
         rect.right, rect.bottom};
@@ -959,7 +970,7 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
         RECT pctRect{std::max(row.left, row.right - (percentWidth + freeWidth + valueGap)), row.top,
             std::max(row.left, row.right - (freeWidth + valueGap)), row.bottom};
         RECT freeRect{std::max(row.left, row.right - freeWidth), row.top, row.right, row.bottom};
-        const int driveBarHeight = std::max(2, ScaleLogical(config_.layout.driveBarHeight));
+        const int driveBarHeight = std::max(1, ScaleLogical(config_.layout.driveBarHeight));
         const int rowPixelHeight = static_cast<int>(row.bottom - row.top);
         const int barTop = static_cast<int>(row.top) + std::max(0, (rowPixelHeight - driveBarHeight) / 2);
         RECT barRect{
@@ -1003,7 +1014,9 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         const double percent = metrics.ResolveGaugePercent(widget.binding.metric);
         const int width = widget.rect.right - widget.rect.left;
         const int height = widget.rect.bottom - widget.rect.top;
-        const int radius = std::max(ScaleLogical(20), std::min(width, height) / 3);
+        const int radius = std::max(
+            std::max(1, ScaleLogical(config_.layout.gaugeMinRadius)),
+            std::max(1, std::min(width, height) / 2 - std::max(0, ScaleLogical(config_.layout.gaugeOuterPadding))));
         DrawGauge(hdc, widget.rect.left + width / 2, widget.rect.top + height / 2, radius, percent, "Load");
         return;
     }

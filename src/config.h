@@ -64,6 +64,27 @@ struct LayoutConfig {
     int throughputHeaderGap = 0;
     int throughputGraphHeight = 0;
     int gaugePreferredSize = 0;
+    int textPreferredPadding = 0;
+    int footerPreferredPadding = 0;
+    int clockTimePadding = 0;
+    int clockDatePadding = 0;
+    int throughputValuePadding = 0;
+    int throughputLabelPadding = 0;
+    int throughputAxisPadding = 0;
+    int driveLabelPadding = 0;
+    int drivePercentPadding = 0;
+    int graphLabelPadding = 0;
+    int graphLabelMinHeight = 0;
+    int graphStrokeWidth = 0;
+    int graphPlotStrokeWidth = 0;
+    int gaugeOuterPadding = 0;
+    int gaugeMinRadius = 0;
+    int gaugeStrokeWidth = 0;
+    int gaugeTextHalfWidth = 0;
+    int gaugeValueTop = 0;
+    int gaugeValueBottom = 0;
+    int gaugeLabelTop = 0;
+    int gaugeLabelBottom = 0;
 
     UiFontConfig titleFont{};
     UiFontConfig bigFont{};

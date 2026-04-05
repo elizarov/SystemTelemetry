@@ -65,6 +65,27 @@ Supported geometry keys:
 - `throughput_header_gap = pixels`
 - `throughput_graph_height = pixels`
 - `gauge_preferred_size = pixels`
+- `text_preferred_padding = pixels`
+- `footer_preferred_padding = pixels`
+- `clock_time_padding = pixels`
+- `clock_date_padding = pixels`
+- `throughput_value_padding = pixels`
+- `throughput_label_padding = pixels`
+- `throughput_axis_padding = pixels`
+- `drive_label_padding = pixels`
+- `drive_percent_padding = pixels`
+- `graph_label_padding = pixels`
+- `graph_label_min_height = pixels`
+- `graph_stroke_width = pixels`
+- `graph_plot_stroke_width = pixels`
+- `gauge_outer_padding = pixels`
+- `gauge_min_radius = pixels`
+- `gauge_stroke_width = pixels`
+- `gauge_text_half_width = pixels`
+- `gauge_value_top = pixels`
+- `gauge_value_bottom = pixels`
+- `gauge_label_top = pixels`
+- `gauge_label_bottom = pixels`
 
 Supported dashboard layout key:
 
@@ -153,7 +174,7 @@ Meaning:
 
 `metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + metric_vertical_gap + metric_bar_height`.
 `drive_usage_list(...)` rows use a computed row height of `max(label_font_height,small_font_height,drive_bar_height) + drive_vertical_gap` when placed inside a top-packed stack.
-Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load instead of being configured as separate width keys.
+Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching `*_padding` layout keys instead of by buried renderer literals.
 
 Nested layout expressions are allowed.
 
@@ -257,7 +278,7 @@ Static sizing rules:
 
 - header height comes from config
 - metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
-- metric bars, the remaining drive-row spacing/free-space width, throughput plot chrome, and gauge preferred size come from config, while fixed text columns derive from measured text widths
+- metric bars, text/footer/clock preferred-height padding, throughput plot chrome, gauge geometry, and the remaining drive-row spacing/free-space width come from config, while fixed text columns derive from measured text widths plus their matching config padding
 - throughput sections follow the configured vertical rhythm
 - centered time/date widgets use weighted slots from `center(...)`
 - repeated lists such as drives divide their assigned area using the item count from config
