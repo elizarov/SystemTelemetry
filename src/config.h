@@ -68,7 +68,11 @@ struct GaugeWidgetConfig {
     int preferredSize = 0;
     int outerPadding = 0;
     int minRadius = 0;
-    int strokeWidth = 0;
+    int ringThickness = 0;
+    double startAngleDegrees = 0.0;
+    double sweepDegrees = 0.0;
+    int segmentCount = 0;
+    double segmentGapDegrees = 0.0;
     int textHalfWidth = 0;
     int valueTop = 0;
     int valueBottom = 0;

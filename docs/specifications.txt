@@ -194,11 +194,13 @@ Labels: small, minimal (Temp, Clock, RAM, etc.)
 Units: slightly dimmer than values
 
 Visual Elements
-Circular gauges for CPU/GPU load with the ring drawn in the track color and only the load-sized sliver overlaid in the shared usage color
+Circular gauges for CPU/GPU load with a segmented ring drawn in the track color and only the load-sized leading segments overlaid in the shared usage color
 Horizontal usage bars with rounded leading and trailing ends, with the straight middle section shrinking naturally to zero so empty values collapse to a circle the height of the bar
 Mini graphs for network and storage throughput activity
 Clean, minimal headers
 CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
+CPU and GPU load gauges must render as a segmented ring that follows the `[gauge]` config geometry, with the shipped default using a 262 degree clockwise sweep split into 42 slots with a bottom-centered opening and round-capped visible segment strokes separated by a small empty gap, filling clockwise from the lower-left toward the lower-right.
+Gauge fill must quantize to whole pills only; any usage above 0 percent lights the first pill, additional pills round up from the usage percentage, and partially filled pills must not be drawn.
 Each top-level panel header must show a small monochrome icon derived from the dashboard sketch for CPU, GPU, Network, Storage, and Time, with those icon assets stored under `resources\` and compiled into the executable.
 The application must define a custom app icon asset under `resources\`, embed it into the executable, and use that embedded icon for the executable and the tray icon instead of the default Windows icon.
 The CPU metrics stack must use the same vertical spacing and bar rhythm as the GPU metrics stack so both top cards read as a matched pair.

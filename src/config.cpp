@@ -564,8 +564,16 @@ void ApplyGaugeWidgetValue(GaugeWidgetConfig& widget, const std::string& key, co
         widget.outerPadding = ParseIntOrDefault(value, widget.outerPadding);
     } else if (key == "min_radius") {
         widget.minRadius = ParseIntOrDefault(value, widget.minRadius);
-    } else if (key == "stroke_width") {
-        widget.strokeWidth = ParseIntOrDefault(value, widget.strokeWidth);
+    } else if (key == "ring_thickness") {
+        widget.ringThickness = ParseIntOrDefault(value, widget.ringThickness);
+    } else if (key == "start_angle_degrees") {
+        widget.startAngleDegrees = ParseDoubleOrDefault(value, widget.startAngleDegrees);
+    } else if (key == "sweep_degrees") {
+        widget.sweepDegrees = ParseDoubleOrDefault(value, widget.sweepDegrees);
+    } else if (key == "segment_count") {
+        widget.segmentCount = ParseIntOrDefault(value, widget.segmentCount);
+    } else if (key == "segment_gap_degrees") {
+        widget.segmentGapDegrees = ParseDoubleOrDefault(value, widget.segmentGapDegrees);
     } else if (key == "text_half_width") {
         widget.textHalfWidth = ParseIntOrDefault(value, widget.textHalfWidth);
     } else if (key == "value_top") {

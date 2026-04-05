@@ -212,6 +212,51 @@ POINT PolarPoint(int cx, int cy, int radius, double angleDegrees) {
     };
 }
 
+Gdiplus::PointF GaugePoint(float cx, float cy, float radius, double angleDegrees) {
+    const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
+    return Gdiplus::PointF(
+        cx + static_cast<Gdiplus::REAL>(std::cos(radians) * radius),
+        cy + static_cast<Gdiplus::REAL>(std::sin(radians) * radius));
+}
+
+void AddCapsulePath(Gdiplus::GraphicsPath& path, const Gdiplus::RectF& rect) {
+    const float width = std::max(0.0f, rect.Width);
+    const float height = std::max(0.0f, rect.Height);
+    if (width <= 0.0f || height <= 0.0f) {
+        return;
+    }
+
+    const float diameter = std::max(1.0f, std::min(width, height));
+    const float centerWidth = std::max(0.0f, width - diameter);
+    const float rightArcLeft = rect.X + centerWidth;
+
+    path.StartFigure();
+    path.AddArc(rect.X, rect.Y, diameter, diameter, 180.0f, 90.0f);
+    path.AddArc(rightArcLeft, rect.Y, diameter, diameter, 270.0f, 90.0f);
+    path.AddArc(rightArcLeft, rect.Y + height - diameter, diameter, diameter, 0.0f, 90.0f);
+    path.AddArc(rect.X, rect.Y + height - diameter, diameter, diameter, 90.0f, 90.0f);
+    path.CloseFigure();
+}
+
+void FillGaugeSegment(Gdiplus::Graphics& graphics, float cx, float cy, float radius, float width, float height,
+    double angleDegrees, const Gdiplus::Color& color) {
+    if (width <= 0.0f || height <= 0.0f) {
+        return;
+    }
+
+    Gdiplus::GraphicsPath path;
+    AddCapsulePath(path, Gdiplus::RectF(-width / 2.0f, -height / 2.0f, width, height));
+
+    Gdiplus::Matrix transform;
+    transform.Rotate(static_cast<Gdiplus::REAL>(angleDegrees + 90.0));
+    const Gdiplus::PointF center = GaugePoint(cx, cy, radius, angleDegrees);
+    transform.Translate(center.X, center.Y, Gdiplus::MatrixOrderAppend);
+    path.Transform(&transform);
+
+    Gdiplus::SolidBrush brush(color);
+    graphics.FillPath(&brush, &path);
+}
+
 std::string FormatRect(const RECT& rect) {
     return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," +
         std::to_string(rect.right) + "," + std::to_string(rect.bottom) + ")";
@@ -856,29 +901,38 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
 }
 
 void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label) {
-    const int penWidth = std::max(1, ScaleLogical(config_.layout.gauge.strokeWidth));
-    HPEN trackPen = CreatePen(PS_SOLID, penWidth, ToColorRef(config_.layout.trackColor));
-    HPEN usagePen = CreatePen(PS_SOLID, penWidth, ToColorRef(config_.layout.accentColor));
-    HGDIOBJ oldPen = SelectObject(hdc, trackPen);
-    HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
-
-    const RECT bounds{cx - radius, cy - radius, cx + radius, cy + radius};
-    Ellipse(hdc, bounds.left, bounds.top, bounds.right, bounds.bottom);
-
+    const float segmentThickness = static_cast<float>(std::max(1, ScaleLogical(config_.layout.gauge.ringThickness)));
+    const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
+    const double totalSweep = std::max(0.0, config_.layout.gauge.sweepDegrees);
+    const double slotSweep = totalSweep / static_cast<double>(segmentCount);
+    const double segmentSweep = std::clamp(slotSweep - config_.layout.gauge.segmentGapDegrees, 0.0, slotSweep);
     const double clampedPercent = std::clamp(percent, 0.0, 100.0);
-    const double sweep = 360.0 * clampedPercent / 100.0;
-    if (sweep > 0.0) {
-        SelectObject(hdc, usagePen);
-        SetArcDirection(hdc, AD_CLOCKWISE);
-        const POINT startValue = PolarPoint(cx, cy, radius, 90.0);
-        MoveToEx(hdc, startValue.x, startValue.y, nullptr);
-        AngleArc(hdc, cx, cy, radius, 90.0f, static_cast<FLOAT>(-sweep));
-    }
+    const int filledSegments = clampedPercent <= 0.0 ? 0
+        : std::clamp(static_cast<int>(std::ceil(clampedPercent * static_cast<double>(segmentCount) / 100.0)),
+            1, segmentCount);
+    const double gaugeStart = config_.layout.gauge.startAngleDegrees;
+    const float segmentRadius = static_cast<float>(radius);
 
-    SelectObject(hdc, oldBrush);
-    SelectObject(hdc, oldPen);
-    DeleteObject(trackPen);
-    DeleteObject(usagePen);
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    const Gdiplus::Color trackColor(255, GetRValue(ToColorRef(config_.layout.trackColor)),
+        GetGValue(ToColorRef(config_.layout.trackColor)), GetBValue(ToColorRef(config_.layout.trackColor)));
+    const Gdiplus::Color usageColor(255, GetRValue(AccentColor()), GetGValue(AccentColor()), GetBValue(AccentColor()));
+
+    for (int i = 0; i < segmentCount; ++i) {
+        const double slotStart = gaugeStart + slotSweep * static_cast<double>(i);
+        const double segmentCenterAngle = slotStart + segmentSweep / 2.0;
+        const float trackLength = std::max(1.0f,
+            static_cast<float>(segmentRadius * (segmentSweep * 3.14159265358979323846 / 180.0)));
+        FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius, trackLength,
+            segmentThickness, segmentCenterAngle, trackColor);
+
+        if (i < filledSegments) {
+            FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius, trackLength,
+                segmentThickness, segmentCenterAngle, usageColor);
+        }
+    }
 
     const int halfWidth = std::max(1, ScaleLogical(config_.layout.gauge.textHalfWidth));
     RECT numberRect{cx - halfWidth,
