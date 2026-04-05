@@ -1,0 +1,36 @@
+System Telemetry project notes
+==============================
+
+Project environment
+===================
+
+The project runs on Windows 11 and is implemented in C++20 using Visual Studio 2022.
+Use `devenv.cmd` to activate the development environment when needed.
+Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.txt`.
+Keep all sources in `src`.
+Keep generated build outputs inside `build\` so the project root stays clean.
+When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
+Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
+Always build through `build.cmd`.
+Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies both `SystemTelemetry.exe` and the required `GigabyteSivProbe.exe` helper there, and registers `SystemTelemetry.exe` under `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` so the dashboard starts automatically for every user who signs into the machine.
+
+Development requirements
+========================
+
+- Visual Studio 2022 Build Tools
+
+Repository conventions
+======================
+
+`docs/specifications.txt` should keep only user-visible behavior requirements.
+`docs/project.txt` should capture project environment, build/setup expectations, and other engineering constraints that are not direct user-visible behavior.
+`docs/architecture.txt` should capture structural and code-organization details.
+
+Implementation constraints
+==========================
+
+The `src/config.ini` file in the source tree is only a checked-in example configuration template.
+When the runtime writer needs to create a new live `config.ini`, it should write only the active configuration sections and keys, without prepending the source-tree example header text.
+All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
+Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
+Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.

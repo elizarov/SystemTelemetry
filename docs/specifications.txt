@@ -1,4 +1,4 @@
-﻿System Telemetry
+System Telemetry
 ================
 
 This project is a compact, real-time system monitoring dashboard designed for a small 800x480 secondary display,
@@ -25,19 +25,6 @@ The design emphasizes glanceable visuals with large load indicators, concise num
 │  192.168.3.60 │                                  │           │
 └───────────────┴──────────────────────────────────┴───────────┘
 
-Project Environment and Setup
-=============================
-
-The project runs on Windows 11 and is implemented in C++20 using Visual Studio 2022.
-Use `devenv.cmd` to activate the development environment when needed.
-Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.txt`.
-Keep all sources in `src`.
-Keep generated build outputs inside `build\` so the project root stays clean.
-When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
-Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
-Always build through `build.cmd`.
-Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies both `SystemTelemetry.exe` and the required `GigabyteSivProbe.exe` helper there, and registers `SystemTelemetry.exe` under `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` so the dashboard starts automatically for every user who signs into the machine.
-
 Requirements
 ============
 
@@ -46,10 +33,6 @@ Runtime requirements:
 - Windows 11
 - AMD Software: Adrenalin Edition, including the ADLX runtime, for AMD GPU telemetry
 - Gigabyte SIV installed on supported Gigabyte motherboards when CPU temperature and fan telemetry are desired
-
-Development requirements:
-
-- Visual Studio 2022 Build Tools
 
 The application must not depend on LibreHardwareMonitor or OpenHardwareMonitor.
 
@@ -68,11 +51,6 @@ Examples include:
 At runtime, the application must read `config.ini` from the same directory as `SystemTelemetry.exe` and write updates back to that same file.
 Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Update Config` must prompt for elevation and complete the save through an elevated helper instance instead of silently failing.
 The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
-The `src/config.ini` file in the source tree is only a checked-in example configuration template.
-When the runtime writer needs to create a new live `config.ini`, it should write only the active configuration sections and keys, without prepending the source-tree example header text.
-All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
-Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
-Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.
 When `network.adapter_name` is left empty, auto-selection should prefer the active adapter that best represents the routed connection, favoring adapters with a usable default gateway and IPv4 address over host-only or otherwise unrouted virtual adapters.
 When `network.adapter_name` is set to a saved adapter name such as `Ethernet`, adapter selection should prefer an exact case-insensitive alias or description match and only fall back to substring matching when no exact match exists.
 When `vendor.gigabyte.fan_channel` is left empty, auto-selection should prefer a fan channel named `CPU` and only fall back to the first valid RPM source if no `CPU`-named channel is available.
@@ -83,39 +61,35 @@ The `Update Config` action must persist the current auto-selected network adapte
 Command-line dump mode
 ======================
 
-Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, open `telemetry_dump.txt` beside the executable through a standard C++ output stream, write plain UTF-8 text without a BOM, pass that stream into telemetry collection for trace logging, write the final telemetry snapshot directly into that same stream, render that same final snapshot through the dashboard UI into an offscreen buffer, save it beside the executable as `telemetry_screenshot.png`, close outputs, and exit without starting the GUI or affecting any already-running dashboard instance.
+Support a `/dump` command-line switch. When present, the application must initialize telemetry using the same runtime `config.ini`, open `telemetry_dump.txt` beside the executable, write plain UTF-8 text without a BOM, write the final telemetry snapshot into that same file, render that same final snapshot through the dashboard UI into an offscreen buffer, save it beside the executable as `telemetry_screenshot.png`, close outputs, and exit without starting the GUI or affecting any already-running dashboard instance.
 The `/dump` trace must cover all diagnostics collection paths, not only vendor GPU integration.
 Each trace line for telemetry or vendor API calls should include the relevant returned status/result codes and any key sampled values that help explain later failures or missing metrics.
-Trace output should go through one shared trace wrapper that safely handles a null output stream and centralizes common trace-formatting helpers.
 The human-readable dump snapshot should include the board-vendor provider status plus Gigabyte debug details such as detected board identity, helper path, controller type, selected CPU temperature sensor, requested and selected fan channel, sampled diagnostics, and any raw chip-register details when that provider exposes them.
 
 Telemetry sources
 =================
 
-CPU telemetry must rely only on Windows-accessible metrics that are available in a straightforward way:
+CPU telemetry must provide:
 
-- CPU model name from native CPU brand-string discovery, with a non-WMI Windows fallback when the direct brand string is unavailable
+- CPU model name
 - CPU load
 - CPU clock
 - RAM usage
 - Gigabyte motherboard CPU temperature and fan speed on the target Gigabyte X570 AORUS system through the installed Gigabyte SIV hardware-monitor stack, without LibreHardwareMonitor or OpenHardwareMonitor
 
-CPU package power is not required and should not rely on LibreHardwareMonitor or OpenHardwareMonitor.
+CPU package power is not required.
 
-GPU telemetry must use Windows counters for generic metrics and vendor APIs for vendor-specific metrics:
+GPU telemetry must provide:
 
-- GPU load from Windows/PDH
-- GPU dedicated VRAM usage from Windows/PDH
-- GPU total dedicated VRAM capacity from Windows adapter information, or from the vendor API when that is the more reliable source for the active GPU
+- GPU load
+- GPU dedicated VRAM usage
+- GPU total dedicated VRAM capacity
 - AMD GPU temperature, clock, and fan speed from AMD's ADLX API
 
 If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable instead of blocking startup.
-The application must not rely on WMI for telemetry, names, or dump diagnostics.
 Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
-
-Vendor telemetry integrations should live in separate source files so each vendor implementation remains isolated.
 Gigabyte motherboard fan telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the CPU fan metric unavailable instead of blocking startup.
-The Gigabyte motherboard telemetry path should identify Gigabyte boards through non-WMI Windows metadata, launch a local `GigabyteSivProbe.exe` helper beside the executable, have that helper discover the installed SIV location from the Windows registry, talk to the Gigabyte SIV hardware-monitor service over the `GigabyteEngine` IPC pipe, collect the available `HwRegister` fan RPM and temperature readings, and report provider diagnostics through `/dump`.
+The Gigabyte motherboard telemetry path should identify Gigabyte boards, launch a local `GigabyteSivProbe.exe` helper beside the executable, have that helper discover the installed SIV location from the Windows registry, talk to the Gigabyte SIV hardware-monitor service over the `GigabyteEngine` IPC pipe, collect the available `HwRegister` fan RPM and temperature readings, and report provider diagnostics through `/dump`.
 The Gigabyte helper must support a `/daemon` mode that keeps one SIV monitor session open and streams fresh fan and temperature snapshots continuously so the dashboard does not need to relaunch the helper process for each sample.
 
 Size and placement

@@ -1,5 +1,6 @@
-﻿System Telemetry architecture
+System Telemetry architecture
 
+- `docs/`: project documentation. `docs/specifications.txt` tracks user-visible behavior, `docs/project.txt` tracks project environment and engineering constraints, and `docs/architecture.txt` tracks structural and code-organization details.
 - `src/main.cpp`: Win32 app entry point, single-instance startup, `/dump` handling, monitor identification, tray/menu actions, timer-driven refresh loop, executable-relative `config.ini` path resolution, elevation-aware `Update Config` saves, and all GDI rendering/layout.
 - `src/config.h` + `src/config.cpp`: runtime config model plus load/save logic for executable-relative `config.ini`; saves display placement, network adapter name, and Gigabyte channel-name selections while preserving other settings.
 - `src/utf8.h` + `src/utf8.cpp`: shared UTF-8 and UTF-16 conversion helpers used only where the UTF-8-first runtime model crosses Win32 or vendor API boundaries.
