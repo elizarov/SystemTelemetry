@@ -119,7 +119,7 @@ private:
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio);
-    void DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label);
+    void DrawGauge(HDC hdc, int cx, int cy, int radius, const DashboardGaugeMetric& metric, const std::string& label);
     void DrawMetricRow(HDC hdc, const RECT& rect, const DashboardMetricRow& row);
     void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue, double guideStepMbps,
         double timeMarkerOffsetSamples, double timeMarkerIntervalSamples);

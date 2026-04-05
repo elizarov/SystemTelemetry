@@ -521,6 +521,7 @@ void TelemetryCollector::Impl::UpdateCpu() {
     }
     Trace(("telemetry:cpu_load " + tracing::Trace::FormatPdhStatus("status", loadStatus) + " " +
         tracing::Trace::FormatValueDouble("value", snapshot_.cpu.loadPercent, 2)).c_str());
+    PushMetricHistorySample("cpu.load", snapshot_.cpu.loadPercent / 100.0);
     PDH_STATUS clockStatus = PDH_INVALID_DATA;
     if (cpuFrequencyCounter_ != nullptr &&
         (clockStatus = PdhGetFormattedCounterValue(cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
@@ -677,6 +678,7 @@ void TelemetryCollector::Impl::UpdateGpu() {
             " loadAll=" + tracing::Trace::FormatValueDouble("value", loadAll, 2) +
             " selected=" + tracing::Trace::FormatValueDouble("value", snapshot_.gpu.loadPercent, 2)).c_str());
     }
+    PushMetricHistorySample("gpu.load", snapshot_.gpu.loadPercent / 100.0);
     if (gpuMemoryQuery_ != nullptr) {
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuMemoryQuery_);
         Trace(("telemetry:gpu_memory_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
@@ -807,8 +809,10 @@ void TelemetryCollector::Impl::PushHistory(std::vector<double>& history, double 
 
 void TelemetryCollector::Impl::InitializeMetricHistories() {
     snapshot_.metricHistories.clear();
+    snapshot_.metricHistories.push_back(CreateMetricHistorySeries("cpu.load"));
     snapshot_.metricHistories.push_back(CreateMetricHistorySeries("cpu.clock"));
     snapshot_.metricHistories.push_back(CreateMetricHistorySeries("cpu.memory"));
+    snapshot_.metricHistories.push_back(CreateMetricHistorySeries("gpu.load"));
     snapshot_.metricHistories.push_back(CreateMetricHistorySeries("gpu.temperature"));
     snapshot_.metricHistories.push_back(CreateMetricHistorySeries("gpu.clock"));
     snapshot_.metricHistories.push_back(CreateMetricHistorySeries("gpu.fan"));

@@ -24,6 +24,11 @@ struct DashboardMetricListEntry {
     std::string labelOverride;
 };
 
+struct DashboardGaugeMetric {
+    double percent = 0.0;
+    double peakRatio = 0.0;
+};
+
 struct DashboardThroughputMetric {
     std::string label;
     double valueMbps = 0.0;
@@ -45,7 +50,7 @@ public:
     DashboardMetricSource(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales);
 
     std::string ResolveText(const std::string& metricRef) const;
-    double ResolveGaugePercent(const std::string& metricRef) const;
+    DashboardGaugeMetric ResolveGauge(const std::string& metricRef) const;
     std::vector<DashboardMetricRow> ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const;
     DashboardThroughputMetric ResolveThroughput(const std::string& metricRef) const;
     std::string ResolveNetworkFooter() const;

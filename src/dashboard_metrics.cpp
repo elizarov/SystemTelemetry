@@ -198,15 +198,17 @@ std::string DashboardMetricSource::ResolveText(const std::string& metricRef) con
     return "N/A";
 }
 
-double DashboardMetricSource::ResolveGaugePercent(const std::string& metricRef) const {
+DashboardGaugeMetric DashboardMetricSource::ResolveGauge(const std::string& metricRef) const {
     const std::string lowered = ToLower(metricRef);
     if (lowered == "cpu.load" || lowered == "cpu.load_percent") {
-        return snapshot_.cpu.loadPercent;
+        const double percent = std::clamp(snapshot_.cpu.loadPercent, 0.0, 100.0);
+        return DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "cpu.load", percent / 100.0)};
     }
     if (lowered == "gpu.load" || lowered == "gpu.load_percent") {
-        return snapshot_.gpu.loadPercent;
+        const double percent = std::clamp(snapshot_.gpu.loadPercent, 0.0, 100.0);
+        return DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "gpu.load", percent / 100.0)};
     }
-    return 0.0;
+    return DashboardGaugeMetric{};
 }
 
 std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const {

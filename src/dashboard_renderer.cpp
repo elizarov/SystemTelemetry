@@ -900,16 +900,20 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
     DrawTextBlock(hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 }
 
-void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double percent, const std::string& label) {
+void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const DashboardGaugeMetric& metric, const std::string& label) {
     const float segmentThickness = static_cast<float>(std::max(1, ScaleLogical(config_.layout.gauge.ringThickness)));
     const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
     const double totalSweep = std::max(0.0, config_.layout.gauge.sweepDegrees);
     const double slotSweep = totalSweep / static_cast<double>(segmentCount);
     const double segmentSweep = std::clamp(slotSweep - config_.layout.gauge.segmentGapDegrees, 0.0, slotSweep);
-    const double clampedPercent = std::clamp(percent, 0.0, 100.0);
+    const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
     const int filledSegments = clampedPercent <= 0.0 ? 0
         : std::clamp(static_cast<int>(std::ceil(clampedPercent * static_cast<double>(segmentCount) / 100.0)),
             1, segmentCount);
+    const double clampedPeakRatio = std::clamp(metric.peakRatio, 0.0, 1.0);
+    const int peakSegment = clampedPeakRatio <= 0.0 ? -1
+        : std::clamp(static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(segmentCount))) - 1,
+            0, segmentCount - 1);
     const double gaugeStart = config_.layout.gauge.startAngleDegrees;
     const float segmentRadius = static_cast<float>(radius);
 
@@ -919,6 +923,7 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double pe
     const Gdiplus::Color trackColor(255, GetRValue(ToColorRef(config_.layout.trackColor)),
         GetGValue(ToColorRef(config_.layout.trackColor)), GetBValue(ToColorRef(config_.layout.trackColor)));
     const Gdiplus::Color usageColor(255, GetRValue(AccentColor()), GetGValue(AccentColor()), GetBValue(AccentColor()));
+    const Gdiplus::Color ghostColor(96, GetRValue(AccentColor()), GetGValue(AccentColor()), GetBValue(AccentColor()));
 
     for (int i = 0; i < segmentCount; ++i) {
         const double slotStart = gaugeStart + slotSweep * static_cast<double>(i);
@@ -932,6 +937,11 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double pe
             FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius, trackLength,
                 segmentThickness, segmentCenterAngle, usageColor);
         }
+
+        if (i == peakSegment) {
+            FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius, trackLength,
+                segmentThickness, segmentCenterAngle, ghostColor);
+        }
     }
 
     const int halfWidth = std::max(1, ScaleLogical(config_.layout.gauge.textHalfWidth));
@@ -940,7 +950,7 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double pe
         cx + halfWidth,
         cy + ScaleLogical(config_.layout.gauge.valueBottom)};
     char number[16];
-    sprintf_s(number, "%.0f%%", percent);
+    sprintf_s(number, "%.0f%%", metric.percent);
     DrawTextBlock(hdc, numberRect, number, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
     RECT labelRect{cx - halfWidth,
         cy + ScaleLogical(config_.layout.gauge.labelTop),
@@ -1146,13 +1156,13 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
             DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
         return;
     case WidgetKind::Gauge: {
-        const double percent = metrics.ResolveGaugePercent(widget.binding.metric);
+        const DashboardGaugeMetric gaugeMetric = metrics.ResolveGauge(widget.binding.metric);
         const int width = widget.rect.right - widget.rect.left;
         const int height = widget.rect.bottom - widget.rect.top;
         const int radius = std::max(
             std::max(1, ScaleLogical(config_.layout.gauge.minRadius)),
             std::max(1, std::min(width, height) / 2 - std::max(0, ScaleLogical(config_.layout.gauge.outerPadding))));
-        DrawGauge(hdc, widget.rect.left + width / 2, widget.rect.top + height / 2, radius, percent, "Load");
+        DrawGauge(hdc, widget.rect.left + width / 2, widget.rect.top + height / 2, radius, gaugeMetric, "Load");
         return;
     }
     case WidgetKind::MetricList: {
