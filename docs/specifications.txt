@@ -192,7 +192,7 @@ Units: slightly dimmer than values
 
 Visual Elements
 Circular gauges for CPU/GPU load with the ring drawn in the track color and only the load-sized sliver overlaid in the shared usage color
-Horizontal bars for usage
+Horizontal usage bars with rounded leading and trailing ends, with the straight middle section shrinking naturally to zero so empty values collapse to a circle the height of the bar
 Mini graphs for network and storage throughput activity
 Clean, minimal headers
 CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
@@ -224,6 +224,8 @@ Temp (°C)
 Clock (GHz)
 Fan (RPM)
 System Fan (RPM)
+Each CPU and GPU metric row bar must render with rounded leading and trailing ends, with the straight middle section proportional to the current value so the bar naturally collapses to a circle at zero, and overlay a small translucent vertical capsule marker at the highest bar ratio seen in the retained recent metric history.
+Metric-row peak ghosts must use the same shared 0.5 second update cadence and 60-sample retained history as the current network throughput history, for a 30 second recent-max window.
 
 GPU Panel (Top Right)
 =====================
@@ -290,7 +292,7 @@ C: 32% 2.5 TB free
 D: 44% 534 GB free
 E: 32% 5.0 TB free
 Visuals
-Thin horizontal bars
+Thin pill-shaped horizontal bars whose straight middle section shrinks naturally to zero for empty values
 Consistent alignment
 Compact rows
 

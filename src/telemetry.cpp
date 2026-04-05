@@ -30,6 +30,8 @@
 
 namespace {
 
+constexpr size_t kRecentHistorySamples = 60;
+
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -53,6 +55,13 @@ std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(const std::vector<std
         metrics.push_back(NamedScalarMetric{name, ScalarMetric{std::nullopt, unit}});
     }
     return metrics;
+}
+
+MetricHistorySeries CreateMetricHistorySeries(const std::string& metricRef) {
+    MetricHistorySeries history;
+    history.metricRef = ToLower(metricRef);
+    history.samples.assign(kRecentHistorySamples, 0.0);
+    return history;
 }
 
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
@@ -257,6 +266,9 @@ struct TelemetryCollector::Impl {
     void UpdateStorageThroughput(bool initializeOnly);
     void RefreshDriveUsage();
     void UpdateNetworkState(bool initializeOnly);
+    void InitializeMetricHistories();
+    void PushMetricHistorySample(const std::string& metricRef, double ratio);
+    void PushBoardMetricHistorySamples();
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
     static void PushHistory(std::vector<double>& history, double value);
     void Trace(const char* text) const;
@@ -321,10 +333,11 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     impl_->trace_.SetOutput(traceStream);
     impl_->snapshot_.boardTemperatures = CreateRequestedBoardMetrics(config.boardTemperatureNames, "\xC2\xB0""C");
     impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(config.boardFanNames, "RPM");
-    impl_->snapshot_.network.uploadHistory.assign(60, 0.0);
-    impl_->snapshot_.network.downloadHistory.assign(60, 0.0);
-    impl_->snapshot_.storage.readHistory.assign(60, 0.0);
-    impl_->snapshot_.storage.writeHistory.assign(60, 0.0);
+    impl_->InitializeMetricHistories();
+    impl_->snapshot_.network.uploadHistory.assign(kRecentHistorySamples, 0.0);
+    impl_->snapshot_.network.downloadHistory.assign(kRecentHistorySamples, 0.0);
+    impl_->snapshot_.storage.readHistory.assign(kRecentHistorySamples, 0.0);
+    impl_->snapshot_.storage.writeHistory.assign(kRecentHistorySamples, 0.0);
     if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {
         impl_->snapshot_.cpu.name = cpuName;
     }
@@ -515,6 +528,8 @@ void TelemetryCollector::Impl::UpdateCpu() {
             " available=" + tracing::Trace::BoolText(boardProviderAvailable_) +
             " diagnostics=\"" + boardProviderDiagnostics_ + "\"").c_str());
     }
+    PushMetricHistorySample("cpu.clock", snapshot_.cpu.clock.value.value_or(0.0) / 5.0);
+    PushBoardMetricHistorySamples();
 }
 
 void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
@@ -668,6 +683,11 @@ void TelemetryCollector::Impl::UpdateGpu() {
             " available=" + tracing::Trace::BoolText(gpuProviderAvailable_) +
             " diagnostics=\"" + gpuProviderDiagnostics_ + "\"").c_str());
     }
+    PushMetricHistorySample("gpu.temperature", snapshot_.gpu.temperature.value.value_or(0.0) / 100.0);
+    PushMetricHistorySample("gpu.clock", snapshot_.gpu.clock.value.value_or(0.0) / 2600.0);
+    PushMetricHistorySample("gpu.fan", snapshot_.gpu.fan.value.value_or(0.0) / 3000.0);
+    const double totalVram = snapshot_.gpu.vram.totalGb;
+    PushMetricHistorySample("gpu.vram", totalVram > 0.0 ? snapshot_.gpu.vram.usedGb / totalVram : 0.0);
 }
 
 void TelemetryCollector::Impl::UpdateMemory() {
@@ -682,6 +702,8 @@ void TelemetryCollector::Impl::UpdateMemory() {
     Trace(("telemetry:memory_status ok=" + tracing::Trace::BoolText(ok != FALSE) +
         " total_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.totalGb, 2) +
         " used_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.usedGb, 2)).c_str());
+    PushMetricHistorySample("cpu.memory",
+        snapshot_.cpu.memory.totalGb > 0.0 ? snapshot_.cpu.memory.usedGb / snapshot_.cpu.memory.totalGb : 0.0);
 }
 
 void TelemetryCollector::Impl::EnumerateDrives() {
@@ -770,6 +792,43 @@ void TelemetryCollector::Impl::PushHistory(std::vector<double>& history, double 
     }
     history.erase(history.begin());
     history.push_back(value);
+}
+
+void TelemetryCollector::Impl::InitializeMetricHistories() {
+    snapshot_.metricHistories.clear();
+    snapshot_.metricHistories.push_back(CreateMetricHistorySeries("cpu.clock"));
+    snapshot_.metricHistories.push_back(CreateMetricHistorySeries("cpu.memory"));
+    snapshot_.metricHistories.push_back(CreateMetricHistorySeries("gpu.temperature"));
+    snapshot_.metricHistories.push_back(CreateMetricHistorySeries("gpu.clock"));
+    snapshot_.metricHistories.push_back(CreateMetricHistorySeries("gpu.fan"));
+    snapshot_.metricHistories.push_back(CreateMetricHistorySeries("gpu.vram"));
+    for (const auto& name : config_.boardTemperatureNames) {
+        snapshot_.metricHistories.push_back(CreateMetricHistorySeries("board.temp." + name));
+    }
+    for (const auto& name : config_.boardFanNames) {
+        snapshot_.metricHistories.push_back(CreateMetricHistorySeries("board.fan." + name));
+    }
+}
+
+void TelemetryCollector::Impl::PushMetricHistorySample(const std::string& metricRef, double ratio) {
+    const std::string lowered = ToLower(metricRef);
+    const auto it = std::find_if(snapshot_.metricHistories.begin(), snapshot_.metricHistories.end(),
+        [&](const MetricHistorySeries& history) {
+            return history.metricRef == lowered;
+        });
+    if (it == snapshot_.metricHistories.end()) {
+        return;
+    }
+    PushHistory(it->samples, std::clamp(ratio, 0.0, 1.0));
+}
+
+void TelemetryCollector::Impl::PushBoardMetricHistorySamples() {
+    for (const auto& metric : snapshot_.boardTemperatures) {
+        PushMetricHistorySample("board.temp." + metric.name, metric.metric.value.value_or(0.0) / 100.0);
+    }
+    for (const auto& metric : snapshot_.boardFans) {
+        PushMetricHistorySample("board.fan." + metric.name, metric.metric.value.value_or(0.0) / 3000.0);
+    }
 }
 
 void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {

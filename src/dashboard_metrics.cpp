@@ -83,55 +83,87 @@ std::string BuildBoardMetricLabel(const std::string& name, const char* suffix) {
     return name + " " + suffix;
 }
 
+const std::vector<double>* FindMetricHistory(const SystemSnapshot& snapshot, const std::string& metricRef) {
+    const auto it = std::find_if(snapshot.metricHistories.begin(), snapshot.metricHistories.end(),
+        [&](const MetricHistorySeries& history) {
+            return history.metricRef == metricRef;
+        });
+    if (it == snapshot.metricHistories.end()) {
+        return nullptr;
+    }
+    return &it->samples;
+}
+
+double ResolvePeakRatio(const SystemSnapshot& snapshot, const std::string& metricRef, double fallbackRatio) {
+    const auto* history = FindMetricHistory(snapshot, metricRef);
+    if (history == nullptr || history->empty()) {
+        return std::clamp(fallbackRatio, 0.0, 1.0);
+    }
+    double peak = 0.0;
+    for (double value : *history) {
+        peak = std::max(peak, value);
+    }
+    return std::clamp(peak, 0.0, 1.0);
+}
+
 std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<NamedScalarMetric>& metrics,
-    const std::string& name, const char* suffix, double scale) {
+    const SystemSnapshot& snapshot, const std::string& metricHistoryRef, const std::string& name,
+    const char* suffix, double scale) {
     for (const auto& metric : metrics) {
         if (ToLower(metric.name) != ToLower(name)) {
             continue;
         }
+        const double ratio = metric.metric.value.value_or(0.0) / scale;
         return DashboardMetricRow{BuildBoardMetricLabel(metric.name, suffix), FormatScalarValue(metric.metric, 0),
-            metric.metric.value.value_or(0.0) / scale};
+            ratio, ResolvePeakRatio(snapshot, metricHistoryRef, ratio)};
     }
 
     ScalarMetric unavailable{std::nullopt, std::string(suffix) == "Temp" ? "\xC2\xB0""C" : "RPM"};
-    return DashboardMetricRow{BuildBoardMetricLabel(name, suffix), FormatScalarValue(unavailable, 0), 0.0};
+    return DashboardMetricRow{BuildBoardMetricLabel(name, suffix), FormatScalarValue(unavailable, 0), 0.0,
+        ResolvePeakRatio(snapshot, metricHistoryRef, 0.0)};
 }
 
 std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapshot, const std::string& metricRef) {
     const std::string lowered = ToLower(metricRef);
     if (lowered == "cpu.clock") {
+        const double ratio = snapshot.cpu.clock.value.value_or(0.0) / 5.0;
         return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.cpu.clock, 2),
-            snapshot.cpu.clock.value.value_or(0.0) / 5.0};
+            ratio, ResolvePeakRatio(snapshot, "cpu.clock", ratio)};
     }
     if (lowered == "cpu.ram" || lowered == "cpu.memory") {
         const double total = snapshot.cpu.memory.totalGb;
+        const double ratio = total > 0.0 ? snapshot.cpu.memory.usedGb / total : 0.0;
         return DashboardMetricRow{"RAM", FormatMemory(snapshot.cpu.memory.usedGb, total),
-            total > 0.0 ? snapshot.cpu.memory.usedGb / total : 0.0};
+            ratio, ResolvePeakRatio(snapshot, "cpu.memory", ratio)};
     }
     if (lowered == "gpu.temp" || lowered == "gpu.temperature") {
+        const double ratio = snapshot.gpu.temperature.value.value_or(0.0) / 100.0;
         return DashboardMetricRow{"Temp", FormatScalarValue(snapshot.gpu.temperature, 0),
-            snapshot.gpu.temperature.value.value_or(0.0) / 100.0};
+            ratio, ResolvePeakRatio(snapshot, "gpu.temperature", ratio)};
     }
     if (lowered == "gpu.clock") {
+        const double ratio = snapshot.gpu.clock.value.value_or(0.0) / 2600.0;
         return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.gpu.clock, 0),
-            snapshot.gpu.clock.value.value_or(0.0) / 2600.0};
+            ratio, ResolvePeakRatio(snapshot, "gpu.clock", ratio)};
     }
     if (lowered == "gpu.fan") {
+        const double ratio = snapshot.gpu.fan.value.value_or(0.0) / 3000.0;
         return DashboardMetricRow{"Fan", FormatScalarValue(snapshot.gpu.fan, 0),
-            snapshot.gpu.fan.value.value_or(0.0) / 3000.0};
+            ratio, ResolvePeakRatio(snapshot, "gpu.fan", ratio)};
     }
     if (lowered == "gpu.vram" || lowered == "gpu.memory") {
         const double total = std::max(1.0, snapshot.gpu.vram.totalGb);
+        const double ratio = snapshot.gpu.vram.totalGb > 0.0 ? snapshot.gpu.vram.usedGb / snapshot.gpu.vram.totalGb : 0.0;
         return DashboardMetricRow{"VRAM", FormatMemory(snapshot.gpu.vram.usedGb, total),
-            snapshot.gpu.vram.totalGb > 0.0 ? snapshot.gpu.vram.usedGb / snapshot.gpu.vram.totalGb : 0.0};
+            ratio, ResolvePeakRatio(snapshot, "gpu.vram", ratio)};
     }
     if (lowered.rfind("board.temp.", 0) == 0) {
-        return ResolveNamedBoardMetric(snapshot.boardTemperatures, metricRef.substr(std::string("board.temp.").size()),
-            "Temp", 100.0);
+        return ResolveNamedBoardMetric(snapshot.boardTemperatures, snapshot, lowered,
+            metricRef.substr(std::string("board.temp.").size()), "Temp", 100.0);
     }
     if (lowered.rfind("board.fan.", 0) == 0) {
-        return ResolveNamedBoardMetric(snapshot.boardFans, metricRef.substr(std::string("board.fan.").size()),
-            "Fan", 3000.0);
+        return ResolveNamedBoardMetric(snapshot.boardFans, snapshot, lowered,
+            metricRef.substr(std::string("board.fan.").size()), "Fan", 3000.0);
     }
     return std::nullopt;
 }

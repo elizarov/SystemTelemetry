@@ -160,6 +160,15 @@ void WriteNamedScalarMetrics(std::ostream& output, const std::string& prefix, co
     }
 }
 
+void WriteMetricHistories(std::ostream& output, const std::string& prefix, const std::vector<MetricHistorySeries>& histories) {
+    WriteInteger(output, prefix + ".count", histories.size());
+    for (size_t i = 0; i < histories.size(); ++i) {
+        const std::string historyPrefix = prefix + "." + std::to_string(i);
+        WriteString(output, historyPrefix + ".metric_ref", histories[i].metricRef);
+        WriteDoubleArray(output, historyPrefix + ".samples", histories[i].samples);
+    }
+}
+
 bool ParseStrictDouble(const std::string& text, double& value) {
     char* end = nullptr;
     errno = 0;
@@ -388,6 +397,27 @@ bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values, co
     return true;
 }
 
+bool LoadMetricHistories(const std::map<std::string, std::string>& values, const std::string& prefix,
+    std::vector<MetricHistorySeries>& field, std::string* error) {
+    size_t count = 0;
+    if (!LoadUnsigned(values, prefix + ".count", count, error)) {
+        return false;
+    }
+
+    field.clear();
+    field.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        MetricHistorySeries history;
+        const std::string historyPrefix = prefix + "." + std::to_string(i);
+        if (!LoadString(values, historyPrefix + ".metric_ref", history.metricRef, error) ||
+            !LoadDoubleArrayField(values, historyPrefix + ".samples", history.samples, error)) {
+            return false;
+        }
+        field.push_back(std::move(history));
+    }
+    return true;
+}
+
 }  // namespace
 
 bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
@@ -401,6 +431,7 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteDouble(output, "cpu.memory.total_gb", dump.snapshot.cpu.memory.totalGb, 6);
     WriteNamedScalarMetrics(output, "board.temperatures", dump.snapshot.boardTemperatures);
     WriteNamedScalarMetrics(output, "board.fans", dump.snapshot.boardFans);
+    WriteMetricHistories(output, "metric_histories", dump.snapshot.metricHistories);
 
     WriteString(output, "gpu.name", dump.snapshot.gpu.name);
     WriteDouble(output, "gpu.load_percent", dump.snapshot.gpu.loadPercent, 6);
@@ -502,6 +533,7 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadDouble(values, "cpu.memory.total_gb", parsed.snapshot.cpu.memory.totalGb, error) ||
         !LoadNamedScalarMetrics(values, "board.temperatures", parsed.snapshot.boardTemperatures, error) ||
         !LoadNamedScalarMetrics(values, "board.fans", parsed.snapshot.boardFans, error) ||
+        !LoadMetricHistories(values, "metric_histories", parsed.snapshot.metricHistories, error) ||
         !LoadString(values, "gpu.name", parsed.snapshot.gpu.name, error) ||
         !LoadDouble(values, "gpu.load_percent", parsed.snapshot.gpu.loadPercent, error) ||
         !LoadOptionalDouble(values, "gpu.temperature.value", parsed.snapshot.gpu.temperature.value, error) ||

@@ -23,6 +23,11 @@ struct DriveInfo {
     double freeGb = 0.0;
 };
 
+struct MetricHistorySeries {
+    std::string metricRef;
+    std::vector<double> samples;
+};
+
 struct ProcessorTelemetry {
     std::string name = "CPU";
     double loadPercent = 0.0;
@@ -60,6 +65,7 @@ struct SystemSnapshot {
     GpuTelemetry gpu;
     std::vector<NamedScalarMetric> boardTemperatures;
     std::vector<NamedScalarMetric> boardFans;
+    std::vector<MetricHistorySeries> metricHistories;
     NetworkTelemetry network;
     StorageTelemetry storage;
     std::vector<DriveInfo> drives;

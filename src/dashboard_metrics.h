@@ -16,6 +16,7 @@ struct DashboardMetricRow {
     std::string label;
     std::string valueText;
     double ratio = 0.0;
+    double peakRatio = 0.0;
 };
 
 struct DashboardMetricListEntry {

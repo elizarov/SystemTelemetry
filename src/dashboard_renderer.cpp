@@ -228,6 +228,41 @@ SIZE MeasureTextSize(HDC hdc, HFONT font, const std::string& text) {
     return size;
 }
 
+void AddCapsulePath(Gdiplus::GraphicsPath& path, const RECT& rect) {
+    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
+    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    const int diameter = std::max(1, std::min(width, height));
+    const int centerWidth = std::max(0, width - diameter);
+    const int rightArcLeft = rect.left + centerWidth;
+
+    path.StartFigure();
+    path.AddArc(rect.left, rect.top, diameter, diameter, 180.0f, 90.0f);
+    path.AddArc(rightArcLeft, rect.top, diameter, diameter, 270.0f, 90.0f);
+    path.AddArc(rightArcLeft, rect.bottom - diameter, diameter, diameter, 0.0f, 90.0f);
+    path.AddArc(rect.left, rect.bottom - diameter, diameter, diameter, 90.0f, 90.0f);
+    path.CloseFigure();
+}
+
+void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
+    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
+    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    Gdiplus::GraphicsPath path;
+    AddCapsulePath(path, rect);
+    Gdiplus::SolidBrush brush(Gdiplus::Color(alpha, GetRValue(color), GetGValue(color), GetBValue(color)));
+    graphics.FillPath(&brush, &path);
+}
+
 }  // namespace
 
 DashboardRenderer::DashboardRenderer() = default;
@@ -845,6 +880,34 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, double pe
     DrawTextBlock(hdc, labelRect, label, fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 }
 
+void DashboardRenderer::DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio) {
+    FillCapsule(hdc, rect, ToColorRef(config_.layout.trackColor), 255);
+
+    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
+    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    const double clampedRatio = std::clamp(ratio, 0.0, 1.0);
+    const int straightWidth = std::max(0, width - height);
+    const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
+    RECT fillRect = rect;
+    fillRect.right = fillRect.left + fillWidth;
+    FillCapsule(hdc, fillRect, AccentColor(), 255);
+
+    if (peakRatio.has_value()) {
+        const double peak = std::clamp(*peakRatio, 0.0, 1.0);
+        const int markerWidth = std::min(width, std::max(1, std::max(ScaleLogical(4), height)));
+        const int centerX = static_cast<int>(rect.left) + static_cast<int>(std::round(peak * width));
+        const int minLeft = static_cast<int>(rect.left);
+        const int maxLeft = static_cast<int>(rect.right) - markerWidth;
+        const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
+        RECT markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
+        FillCapsule(hdc, markerRect, AccentColor(), 96);
+    }
+}
+
 void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const DashboardMetricRow& row) {
     const int rowHeight = EffectiveMetricRowHeight();
     const int labelWidth = std::max(1, ScaleLogical(config_.layout.metricLabelWidth));
@@ -858,15 +921,7 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const Dashboard
     const int barBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(rect.top) + rowHeight);
     const int barTop = std::max(static_cast<int>(rect.top), barBottom - metricBarHeight);
     RECT barRect{valueRect.left, barTop, rect.right, barBottom};
-    HBRUSH track = CreateSolidBrush(ToColorRef(config_.layout.trackColor));
-    FillRect(hdc, &barRect, track);
-    DeleteObject(track);
-
-    RECT fill = barRect;
-    fill.right = fill.left + static_cast<int>((fill.right - fill.left) * std::clamp(row.ratio, 0.0, 1.0));
-    HBRUSH accent = CreateSolidBrush(ToColorRef(config_.layout.accentColor));
-    FillRect(hdc, &fill, accent);
-    DeleteObject(accent);
+    DrawPillBar(hdc, barRect, row.ratio, row.peakRatio);
 }
 
 void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
@@ -981,15 +1036,7 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
         };
 
         DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        HBRUSH track = CreateSolidBrush(ToColorRef(config_.layout.trackColor));
-        FillRect(hdc, &barRect, track);
-        DeleteObject(track);
-
-        RECT fill = barRect;
-        fill.right = fill.left + static_cast<int>((fill.right - fill.left) * std::clamp(drive.usedPercent / 100.0, 0.0, 1.0));
-        HBRUSH accent = CreateSolidBrush(ToColorRef(config_.layout.accentColor));
-        FillRect(hdc, &fill, accent);
-        DeleteObject(accent);
+        DrawPillBar(hdc, barRect, drive.usedPercent / 100.0, std::nullopt);
 
         char percent[16];
         sprintf_s(percent, "%.0f%%", drive.usedPercent);
