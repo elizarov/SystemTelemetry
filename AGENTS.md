@@ -23,4 +23,4 @@ Validation workflow:
 - Build first with `build.cmd`.
 - Prefer headless verification commands after the build so checks are repeatable and do not depend on manually closing the UI.
 - Use the smallest `/exit` combination that proves the change.
-- Use [docs/diagnostics.md](/D:/Projects/SystemTelemetry/docs/diagnostics.md) as the single maintained source of truth for post-build diagnostics command examples and what to inspect.
+- Use [docs/diagnostics.md](docs/diagnostics.md) as the single maintained source of truth for post-build diagnostics command examples and what to inspect.

@@ -21,7 +21,7 @@ build.cmd
 
 All build artifacts are kept under `build\`.
 
-Diagnostics validation commands and output expectations are documented in [docs/diagnostics.md](/D:/Projects/SystemTelemetry/docs/diagnostics.md).
+Diagnostics validation commands and output expectations are documented in [docs/diagnostics.md](diagnostics.md).
 
 ## Telemetry provider notes
 
