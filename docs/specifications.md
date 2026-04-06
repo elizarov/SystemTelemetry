@@ -267,7 +267,7 @@ While moving, show an overlay in the top-left corner with:
 - Use smaller text for the Up/Down speed readouts than the main metric text used elsewhere.
 - Each graph must include a vertical axis and a small label showing the current max value used to scale that plot.
 - Network and storage throughput plot scaling must be derived from the maximum value present in the retained history shown by that panel.
-- The throughput plots should render a simple moving average over the most recent two readings so the line reflects a 1-second smoothing window while the numeric throughput readout continues to show the latest sampled value.
+- The throughput plots should render a simple moving average over the most recent two readings so the line reflects a 1-second smoothing window, and the numeric throughput readout should show the same latest averaged point that the leader circle marks, yielding a per-last-second value that still refreshes every 0.5 seconds.
 - Throughput plot scaling must use a minimum max of 10 MB/s, round the averaged max up in 5 MB/s steps through 100 MB/s, and then round it up in 50 MB/s steps above 100 MB/s.
 - Throughput plots must reserve the configured `[throughput] plot_stroke_width` as top inset in the plotted area so a sample equal to the computed graph max still renders fully inside the chart bounds.
 - Network plots should draw thin horizontal guide lines every 5 MB/s.

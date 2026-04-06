@@ -14,7 +14,7 @@
 - `src/dashboard_metrics.h` + `src/dashboard_metrics.cpp`: dashboard metric-binding layer that adapts `SystemSnapshot` into widget-oriented data shapes.
   - Resolves text values, gauge data, metric-list rows, throughput series, network footer text, clock text, and storage drive rows by metric name.
   - Uses one shared snapshot-level retained-history-series collection for metric-list rows, load gauges, and throughput widgets so every recent-history consumer shares the same path.
-  - Applies retained normalized history ratios for peak ghosts, uses `AppConfig.metricScales` for every non-capacity metric-list normalization ceiling, smooths retained raw throughput history with a two-reading simple moving average before graph scaling and rendering, and attaches one snapshot-time phase so 10-second vertical markers line up across all throughput plots.
+  - Applies retained normalized history ratios for peak ghosts, uses `AppConfig.metricScales` for every non-capacity metric-list normalization ceiling, smooths retained raw throughput history with a two-reading simple moving average before graph scaling and rendering, uses that same latest averaged point for each throughput value readout, and attaches one snapshot-time phase so 10-second vertical markers line up across all throughput plots.
   - Uses 5 MB/s horizontal guide spacing through an averaged graph max of 50 MB/s and 50 MB/s above that range for storage plots.
 - `src/dashboard_renderer.h` + `src/dashboard_renderer.cpp`: dashboard layout and widget renderer module.
   - Owns panel icon loading, UI font creation, font measurement, static layout resolution, widget binding parsing, and GDI/GDI+ drawing for cards and supported widget kinds.
