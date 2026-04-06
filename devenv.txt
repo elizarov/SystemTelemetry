@@ -7,7 +7,8 @@ It is expected to prepare all command-line tools that `build.cmd` and CMake rely
 Requirements
 ============
 
-- `devenv.cmd` must call the Visual Studio 2022 developer environment script so that tools such as `cl`, `link`, `rc`, `cmake`, and `MSBuild` are available.
+- `devenv.cmd` must call the Visual Studio 2022 developer environment script with x64 host and target settings so that tools such as `cl`, `link`, `rc`, `cmake`, and `MSBuild` are available for the `x64` build.
+- The installed Visual Studio Build Tools workload must include the .NET Framework 4.8 SDK so `NETFXSDKDir` is exported and the mixed-mode Gigabyte provider link can resolve `mscoree.lib`.
 - `build.cmd` should remain a thin wrapper that calls `devenv.cmd`, configures `build\cmake\`, and then builds through `cmake --build`.
 
 Current expectation
@@ -20,6 +21,10 @@ After `devenv.cmd` completes successfully, these commands should be resolvable i
 - `rc`
 - `cmake`
 - `MSBuild`
+
+The environment should also export:
+
+- `NETFXSDKDir`
 
 Notes
 =====

@@ -27,6 +27,12 @@ set(CMAKE_PDB_OUTPUT_DIRECTORY "${output_root}")
 
 set(mscoree_search_paths)
 
+if(DEFINED ENV{NETFXSDKDir})
+    list(APPEND mscoree_search_paths
+        "$ENV{NETFXSDKDir}/Lib/um/x64"
+    )
+endif()
+
 if(DEFINED ENV{WindowsSdkDir} AND DEFINED ENV{WindowsSDKLibVersion})
     list(APPEND mscoree_search_paths
         "$ENV{WindowsSdkDir}/Lib/$ENV{WindowsSDKLibVersion}/um/x64"
@@ -39,17 +45,13 @@ if(DEFINED ENV{WindowsSdkDir})
     )
 endif()
 
-list(APPEND mscoree_search_paths
-    "C:/Program Files (x86)/Windows Kits/8.1/Lib/winv6.3/um/x64"
-)
-
 find_library(MSCOREE_LIB
     NAMES mscoree
     PATHS ${mscoree_search_paths}
 )
 
 if(NOT MSCOREE_LIB)
-    message(FATAL_ERROR "mscoree.lib was not found in the active Windows SDK. Run build.cmd from a configured developer prompt.")
+    message(FATAL_ERROR "mscoree.lib was not found. Install the .NET Framework SDK through Visual Studio Build Tools 2022 and run build.cmd from a configured developer prompt.")
 endif()
 add_executable(SystemTelemetry WIN32
     resources/SystemTelemetry.rc

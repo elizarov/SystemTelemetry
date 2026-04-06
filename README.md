@@ -3,7 +3,9 @@ System Telemetry is a compact Windows 11 dashboard for an 800x480 secondary disp
 ## Requirements
 
 - Windows 11
-- Visual Studio 2022 Build Tools
+- Visual Studio 2022 Build Tools with CMake support
+- Visual Studio 2022 C++/CLI support
+- .NET Framework 4.8 SDK
 - AMD Software: Adrenalin Edition with ADLX runtime available for AMD GPU telemetry
 - Gigabyte SIV installed on supported Gigabyte motherboards when board temperature and fan telemetry are desired
 

@@ -20,6 +20,8 @@ Development requirements
 ========================
 
 - Visual Studio 2022 Build Tools with CMake support
+- Visual Studio 2022 C++/CLI support for the mixed-mode Gigabyte board provider
+- .NET Framework 4.8 SDK so the developer environment exposes `NETFXSDKDir` and `mscoree.lib` for CLR-enabled linking
 
 Repository conventions
 ======================
