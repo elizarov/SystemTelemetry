@@ -6,16 +6,11 @@ if(NOT MSVC)
     message(FATAL_ERROR "SystemTelemetry currently supports MSVC builds only.")
 endif()
 
-if(NOT DEFINED ENV{CSC})
-    message(FATAL_ERROR "CSC is not set. Run build.cmd or configure CSC in devenv.cmd.")
-endif()
-
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(output_root "${CMAKE_SOURCE_DIR}/build")
-set(cmake_root "${output_root}/cmake")
 
 foreach(config_name IN ITEMS Debug Release RelWithDebInfo MinSizeRel)
     string(TOUPPER "${config_name}" config_upper)
@@ -30,6 +25,32 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${output_root}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${output_root}")
 set(CMAKE_PDB_OUTPUT_DIRECTORY "${output_root}")
 
+set(mscoree_search_paths)
+
+if(DEFINED ENV{WindowsSdkDir} AND DEFINED ENV{WindowsSDKLibVersion})
+    list(APPEND mscoree_search_paths
+        "$ENV{WindowsSdkDir}/Lib/$ENV{WindowsSDKLibVersion}/um/x64"
+    )
+endif()
+
+if(DEFINED ENV{WindowsSdkDir})
+    list(APPEND mscoree_search_paths
+        "$ENV{WindowsSdkDir}/Lib/winv6.3/um/x64"
+    )
+endif()
+
+list(APPEND mscoree_search_paths
+    "C:/Program Files (x86)/Windows Kits/8.1/Lib/winv6.3/um/x64"
+)
+
+find_library(MSCOREE_LIB
+    NAMES mscoree
+    PATHS ${mscoree_search_paths}
+)
+
+if(NOT MSCOREE_LIB)
+    message(FATAL_ERROR "mscoree.lib was not found in the active Windows SDK. Run build.cmd from a configured developer prompt.")
+endif()
 add_executable(SystemTelemetry WIN32
     resources/SystemTelemetry.rc
     src/main.cpp
@@ -41,13 +62,42 @@ add_executable(SystemTelemetry WIN32
     src/gpu_vendor.cpp
     src/gpu_amd_adl.cpp
     src/board_vendor.cpp
-    src/board_gigabyte_siv.cpp
     src/dashboard_metrics.cpp
     src/dashboard_renderer.cpp
     src/utf8.cpp
     src/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
+)
+
+add_library(SystemTelemetryGigabyte OBJECT
+    src/board_gigabyte_siv.cpp
+)
+
+set_target_properties(SystemTelemetryGigabyte PROPERTIES
+    COMMON_LANGUAGE_RUNTIME ""
+    VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.0"
+)
+
+target_include_directories(SystemTelemetryGigabyte PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+
+target_compile_definitions(SystemTelemetryGigabyte PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+)
+
+target_compile_options(SystemTelemetryGigabyte PRIVATE
+    /EHa
+    /W4
+    /permissive-
+    /Zi
+)
+
+target_sources(SystemTelemetry PRIVATE
+    $<TARGET_OBJECTS:SystemTelemetryGigabyte>
 )
 
 target_include_directories(SystemTelemetry PRIVATE
@@ -86,6 +136,7 @@ target_link_libraries(SystemTelemetry PRIVATE
     ole32
     oleaut32
     advapi32
+    ${MSCOREE_LIB}
 )
 
 set_target_properties(SystemTelemetry PROPERTIES
@@ -93,20 +144,3 @@ set_target_properties(SystemTelemetry PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
 
-set(probe_output "${output_root}/GigabyteSivProbe.exe")
-set(probe_stamp "${cmake_root}/GigabyteSivProbe.stamp")
-cmake_path(NATIVE_PATH probe_output probe_output_native)
-cmake_path(NATIVE_PATH CMAKE_SOURCE_DIR source_root_native)
-set(probe_source_native "${source_root_native}\\src\\GigabyteSivProbe.cs")
-
-add_custom_command(
-    OUTPUT "${probe_stamp}"
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_root}"
-    COMMAND "$ENV{CSC}" /nologo /target:exe /platform:x64 "/out:${probe_output_native}" "${probe_source_native}"
-    COMMAND "${CMAKE_COMMAND}" -E touch "${probe_stamp}"
-    DEPENDS "${CMAKE_SOURCE_DIR}/src/GigabyteSivProbe.cs"
-    COMMENT "Building GigabyteSivProbe.exe"
-    VERBATIM
-)
-
-add_custom_target(GigabyteSivProbe ALL DEPENDS "${probe_stamp}")

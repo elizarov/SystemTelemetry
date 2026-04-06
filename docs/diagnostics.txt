@@ -28,7 +28,7 @@ Diagnostics output failures such as trace/dump/screenshot file-open errors, dump
 When `/trace` is enabled, diagnostics failures must prefer trace logging over modal UI and should complete with a failure exit code.
 Required `/fake` load failures must follow that same rule, so `/fake /exit` returns promptly with trace output.
 When `/trace` is enabled and the renderer initializes, the trace must also include measured font heights plus computed layout heights and resolved widget/card rectangles to aid layout tuning.
-The dumped board-provider block must include Gigabyte debug details such as detected board identity, helper path, controller type, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, and sampled diagnostics.
+The dumped board-provider block must include Gigabyte debug details such as detected board identity, the loaded SIV assembly path, controller type, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, and sampled diagnostics.
 
 Single-instance interaction
 ===========================

@@ -3,28 +3,37 @@
 #include <winreg.h>
 
 #include <algorithm>
-#include <chrono>
-#include <cstdint>
-#include <cstdio>
-#include <deque>
+#include <cctype>
+#include <cwctype>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
+
+#include <vcclr.h>
+#include <msclr\marshal_cppstd.h>
+
+#using <mscorlib.dll>
+#using <System.dll>
 
 #include "board_vendor.h"
 #include "trace.h"
 #include "utf8.h"
 
+using namespace System;
+using namespace System::Collections;
+using namespace System::IO;
+using namespace System::Reflection;
+using namespace msclr::interop;
+
 namespace {
 
-struct ProbeResult {
-    bool success = false;
-    std::string diagnostics;
-    std::vector<std::pair<std::string, std::string>> fields;
-};
+constexpr wchar_t kEngineEnvironmentControlDll[] = L"Gigabyte.Engine.EnvironmentControl.dll";
+constexpr wchar_t kEnvironmentControlCommonDll[] = L"Gigabyte.EnvironmentControl.Common.dll";
+constexpr wchar_t kSivUninstallKey[] = L"SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+constexpr wchar_t kBiosKey[] = L"HARDWARE\\DESCRIPTION\\System\\BIOS";
 
 struct FanReading {
     std::string title;
@@ -36,7 +45,16 @@ struct TemperatureReading {
     std::optional<double> celsius;
 };
 
-std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
+struct GigabyteSnapshot {
+    bool success = false;
+    std::string diagnostics;
+    std::string controllerType;
+    std::string chipName;
+    std::vector<FanReading> fans;
+    std::vector<TemperatureReading> temperatures;
+};
+
+std::optional<std::wstring> ReadRegistryWideString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
     DWORD type = 0;
     DWORD bytes = 0;
     const LONG probe = RegGetValueW(root, subKey, valueName, RRF_RT_REG_SZ, &type, nullptr, &bytes);
@@ -53,7 +71,15 @@ std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, 
     while (!value.empty() && value.back() == L'\0') {
         value.pop_back();
     }
-    return Utf8FromWide(value);
+    return value;
+}
+
+std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
+    const auto value = ReadRegistryWideString(root, subKey, valueName);
+    if (!value.has_value()) {
+        return std::nullopt;
+    }
+    return Utf8FromWide(*value);
 }
 
 std::string ToLower(std::string value) {
@@ -74,6 +100,18 @@ bool EqualsInsensitive(const std::string& left, const std::string& right) {
     return ToLower(left) == ToLower(right);
 }
 
+bool EqualsInsensitive(const std::wstring& left, const std::wstring& right) {
+    if (left.size() != right.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < left.size(); ++i) {
+        if (::towlower(left[i]) != ::towlower(right[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 template <typename Reading>
 const Reading* FindReadingByName(const std::vector<Reading>& readings, const std::string& requestedName) {
     if (requestedName.empty()) {
@@ -88,57 +126,13 @@ const Reading* FindReadingByName(const std::vector<Reading>& readings, const std
     return nullptr;
 }
 
-std::wstring AbsolutePath(const std::wstring& relativePath) {
-    wchar_t modulePath[MAX_PATH];
-    GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
-    std::wstring path(modulePath);
-    const size_t slash = path.find_last_of(L"\\/");
-    if (slash != std::wstring::npos) {
-        path.resize(slash + 1);
+std::wstring CombinePath(const std::wstring& directory, const wchar_t* name) {
+    std::wstring path = directory;
+    if (!path.empty() && path.back() != L'\\' && path.back() != L'/') {
+        path += L'\\';
     }
-    path += relativePath;
-
-    wchar_t full[MAX_PATH];
-    const DWORD length = GetFullPathNameW(path.c_str(), ARRAYSIZE(full), full, nullptr);
-    if (length == 0 || length >= ARRAYSIZE(full)) {
-        return path;
-    }
-    return std::wstring(full, length);
-}
-
-std::string Trim(std::string value) {
-    while (!value.empty() && (value.back() == '\r' || value.back() == '\n' || value.back() == ' ' || value.back() == '\t')) {
-        value.pop_back();
-    }
-    size_t start = 0;
-    while (start < value.size() && (value[start] == ' ' || value[start] == '\t')) {
-        ++start;
-    }
-    return value.substr(start);
-}
-
-std::optional<uint32_t> ParseUnsigned(const std::string& text) {
-    if (text.empty()) {
-        return std::nullopt;
-    }
-    char* end = nullptr;
-    const unsigned long value = strtoul(text.c_str(), &end, 0);
-    if (end == text.c_str() || (end != nullptr && *end != '\0')) {
-        return std::nullopt;
-    }
-    return static_cast<uint32_t>(value);
-}
-
-std::optional<double> ParseDouble(const std::string& text) {
-    if (text.empty()) {
-        return std::nullopt;
-    }
-    char* end = nullptr;
-    const double value = strtod(text.c_str(), &end);
-    if (end == text.c_str() || (end != nullptr && *end != '\0')) {
-        return std::nullopt;
-    }
-    return value;
+    path += name;
+    return path;
 }
 
 std::string JoinNames(const std::vector<std::string>& names) {
@@ -152,167 +146,260 @@ std::string JoinNames(const std::vector<std::string>& names) {
     return joined;
 }
 
-struct DaemonProcess {
-    HANDLE readPipe = nullptr;
-    HANDLE process = nullptr;
-    HANDLE thread = nullptr;
+std::string Utf8FromManagedString(String^ value) {
+    return value == nullptr ? std::string() : marshal_as<std::string>(value);
+}
+
+String^ ManagedStringFromWide(const std::wstring& value) {
+    return gcnew String(value.c_str());
+}
+
+String^ ManagedStringFromUtf8(const std::string& value) {
+    return gcnew String(WideFromUtf8(value).c_str());
+}
+
+std::optional<std::wstring> FindInstalledSivDirectory() {
+    HKEY uninstallKey = nullptr;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, kSivUninstallKey, 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
+        return std::nullopt;
+    }
+
+    DWORD index = 0;
+    wchar_t childName[256];
+    DWORD childNameLength = ARRAYSIZE(childName);
+    while (RegEnumKeyExW(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+        HKEY childKey = nullptr;
+        if (RegOpenKeyExW(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
+            const auto displayName = ReadRegistryWideString(childKey, nullptr, L"DisplayName");
+            const bool isSiv = displayName.has_value() &&
+                (EqualsInsensitive(*displayName, L"SIV") || EqualsInsensitive(*displayName, L"System Information Viewer"));
+            if (isSiv) {
+                const auto installLocation = ReadRegistryWideString(childKey, nullptr, L"InstallLocation");
+                if (installLocation.has_value() && !installLocation->empty()) {
+                    const DWORD attributes = GetFileAttributesW(installLocation->c_str());
+                    if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+                        RegCloseKey(childKey);
+                        RegCloseKey(uninstallKey);
+                        return installLocation;
+                    }
+                }
+            }
+            RegCloseKey(childKey);
+        }
+        ++index;
+        childNameLength = ARRAYSIZE(childName);
+    }
+
+    RegCloseKey(uninstallKey);
+    return std::nullopt;
+}
+
+bool ManagedUnitEquals(String^ unit, String^ expected) {
+    return String::Equals(unit, expected, StringComparison::OrdinalIgnoreCase);
+}
+
+ref class GigabyteAssemblyResolver abstract sealed {
+public:
+    static void EnsureInstalled(String^ directory) {
+        toolDirectory_ = directory;
+        if (installed_) {
+            return;
+        }
+        AppDomain::CurrentDomain->AssemblyResolve += gcnew ResolveEventHandler(&GigabyteAssemblyResolver::ResolveAssembly);
+        installed_ = true;
+    }
+
+private:
+    static Assembly^ ResolveAssembly(Object^, ResolveEventArgs^ args) {
+        if (String::IsNullOrWhiteSpace(toolDirectory_)) {
+            return nullptr;
+        }
+
+        AssemblyName^ name = gcnew AssemblyName(args->Name);
+        String^ candidate = Path::Combine(toolDirectory_, name->Name + ".dll");
+        if (!File::Exists(candidate)) {
+            return nullptr;
+        }
+        return Assembly::LoadFrom(candidate);
+    }
+
+    static String^ toolDirectory_ = nullptr;
+    static bool installed_ = false;
 };
 
-void CloseDaemonProcess(DaemonProcess& daemon) {
-    if (daemon.readPipe != nullptr) {
-        CloseHandle(daemon.readPipe);
-        daemon.readPipe = nullptr;
-    }
-    if (daemon.thread != nullptr) {
-        CloseHandle(daemon.thread);
-        daemon.thread = nullptr;
-    }
-    if (daemon.process != nullptr) {
-        TerminateProcess(daemon.process, 0);
-        CloseHandle(daemon.process);
-        daemon.process = nullptr;
-    }
-}
+ref class GigabyteRuntimeContext sealed {
+public:
+    String^ sivDirectory = nullptr;
+    String^ engineAssemblyPath = nullptr;
+    String^ commonAssemblyPath = nullptr;
+    Assembly^ engineAssembly = nullptr;
+    Assembly^ commonAssembly = nullptr;
+    Type^ monitorType = nullptr;
+    Type^ sourceType = nullptr;
+    Type^ sensorType = nullptr;
+    Type^ sensorDataType = nullptr;
+    Type^ collectionType = nullptr;
+    MethodInfo^ initializeMethod = nullptr;
+    MethodInfo^ getCurrentMethod = nullptr;
+    PropertyInfo^ titleProperty = nullptr;
+    PropertyInfo^ valueProperty = nullptr;
+    PropertyInfo^ unitProperty = nullptr;
+    Object^ monitor = nullptr;
+    Object^ sourceHwRegister = nullptr;
+    Object^ sensorFan = nullptr;
+    Object^ sensorTemperature = nullptr;
+    bool loaded = false;
+};
 
-bool StartProbeDaemon(const std::wstring& helperPath, tracing::Trace& trace, DaemonProcess& daemon, std::string& diagnostics) {
-    SECURITY_ATTRIBUTES sa{};
-    sa.nLength = sizeof(sa);
-    sa.bInheritHandle = TRUE;
-
-    HANDLE readPipe = nullptr;
-    HANDLE writePipe = nullptr;
-    if (!CreatePipe(&readPipe, &writePipe, &sa, 0)) {
-        diagnostics = "Failed to create helper pipe.";
-        return false;
-    }
-    SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
-
-    std::wstring commandLine = L"\"" + helperPath + L"\" /daemon";
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    si.hStdOutput = writePipe;
-    si.hStdError = writePipe;
-
-    PROCESS_INFORMATION pi{};
-    std::vector<wchar_t> mutableCommand(commandLine.begin(), commandLine.end());
-    mutableCommand.push_back(L'\0');
-    const BOOL created = CreateProcessW(nullptr, mutableCommand.data(), nullptr, nullptr, TRUE,
-        CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
-
-    CloseHandle(writePipe);
-    if (!created) {
-        CloseHandle(readPipe);
-        diagnostics = "Failed to start GigabyteSivProbe daemon.";
-        return false;
-    }
-
-    daemon.readPipe = readPipe;
-    daemon.process = pi.hProcess;
-    daemon.thread = pi.hThread;
-    diagnostics = "GigabyteSivProbe daemon started.";
-    trace.Write("gigabyte_siv:daemon_started path=\"" + Utf8FromWide(helperPath) + "\"");
-    return true;
-}
-
-void ApplyResultField(ProbeResult& result, const std::string& line) {
-    if (line.empty()) {
-        return;
-    }
-    const size_t equals = line.find('=');
-    if (equals == std::string::npos) {
-        return;
-    }
-    const std::string key = line.substr(0, equals);
-    const std::string value = line.substr(equals + 1);
-    result.fields.emplace_back(key, value);
-    if (key == "success") {
-        result.success = value == "1" || value == "true" || value == "yes";
-    } else if (key == "diagnostics") {
-        result.diagnostics = value;
-    }
-}
-
-bool PumpProbeDaemon(DaemonProcess& daemon, tracing::Trace& trace, std::string& buffer,
-    ProbeResult& currentFrame, bool& frameOpen, std::deque<ProbeResult>& completedFrames, std::string& diagnostics) {
-    if (daemon.readPipe == nullptr || daemon.process == nullptr) {
-        diagnostics = "GigabyteSivProbe daemon is not running.";
-        return false;
-    }
-
-    DWORD exitCode = STILL_ACTIVE;
-    if (!GetExitCodeProcess(daemon.process, &exitCode) || exitCode != STILL_ACTIVE) {
-        diagnostics = "GigabyteSivProbe daemon exited.";
-        return false;
-    }
-
-    DWORD available = 0;
-    if (!PeekNamedPipe(daemon.readPipe, nullptr, 0, nullptr, &available, nullptr)) {
-        diagnostics = "Failed to poll GigabyteSivProbe daemon output.";
-        return false;
-    }
-    if (available == 0) {
+bool InitializeGigabyteRuntime(GigabyteRuntimeContext^ context, tracing::Trace& trace, std::string& diagnostics) {
+    if (context->loaded) {
         return true;
     }
 
-    std::string chunk;
-    chunk.resize(available);
-    DWORD read = 0;
-    if (!ReadFile(daemon.readPipe, chunk.data(), available, &read, nullptr) || read == 0) {
-        diagnostics = "Failed to read GigabyteSivProbe daemon output.";
+    const auto discoveredDirectory = FindInstalledSivDirectory();
+
+    if (!discoveredDirectory.has_value()) {
+        diagnostics = "Gigabyte SIV directory was not found in the registry.";
         return false;
     }
-    chunk.resize(read);
-    trace.Write("gigabyte_siv:daemon_chunk_begin");
-    trace.Write(chunk);
-    trace.Write("gigabyte_siv:daemon_chunk_end size=" + std::to_string(read));
-    buffer += chunk;
 
-    size_t position = 0;
-    while (position < buffer.size()) {
-        const size_t end = buffer.find('\n', position);
-        if (end == std::string::npos) {
-            break;
-        }
-        const std::string line = Trim(buffer.substr(position, end - position));
-        position = end + 1;
-        if (line == "frame_begin") {
-            currentFrame = ProbeResult{};
-            frameOpen = true;
-            continue;
-        }
-        if (line == "frame_end") {
-            if (frameOpen) {
-                completedFrames.push_back(currentFrame);
+    context->sivDirectory = ManagedStringFromWide(*discoveredDirectory);
+    context->engineAssemblyPath = ManagedStringFromWide(CombinePath(*discoveredDirectory, kEngineEnvironmentControlDll));
+    context->commonAssemblyPath = ManagedStringFromWide(CombinePath(*discoveredDirectory, kEnvironmentControlCommonDll));
+
+    if (!File::Exists(context->engineAssemblyPath)) {
+        diagnostics = "Gigabyte.Engine.EnvironmentControl.dll was not found.";
+        return false;
+    }
+    if (!File::Exists(context->commonAssemblyPath)) {
+        diagnostics = "Gigabyte.EnvironmentControl.Common.dll was not found.";
+        return false;
+    }
+
+    try {
+        Environment::CurrentDirectory = context->sivDirectory;
+        GigabyteAssemblyResolver::EnsureInstalled(context->sivDirectory);
+
+        array<String^>^ preloadFiles = Directory::GetFiles(context->sivDirectory, "Gigabyte*.dll");
+        for each (String ^ filePath in preloadFiles) {
+            try {
+                Assembly::LoadFrom(filePath);
+                trace.Write("gigabyte_siv:assembly_preload path=\"" + Utf8FromManagedString(filePath) + "\"");
+            } catch (Exception^) {
             }
-            currentFrame = ProbeResult{};
-            frameOpen = false;
-            continue;
         }
-        if (frameOpen) {
-            ApplyResultField(currentFrame, line);
+
+        context->engineAssembly = Assembly::LoadFrom(context->engineAssemblyPath);
+        context->commonAssembly = Assembly::LoadFrom(context->commonAssemblyPath);
+        context->monitorType = context->engineAssembly->GetType("Gigabyte.Engine.EnvironmentControl.HardwareMonitor.HardwareMonitorControlModule", true);
+        context->sourceType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitorSourceTypes", true);
+        context->sensorType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.SensorTypes", true);
+        context->sensorDataType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredData", true);
+        context->collectionType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredDataCollection", true);
+        context->initializeMethod = context->monitorType->GetMethod("Initialize", gcnew array<Type^>{ context->sourceType });
+        context->getCurrentMethod = context->monitorType->GetMethod("GetCurrentMonitoredData", gcnew array<Type^>{ context->sensorType, context->collectionType->MakeByRefType() });
+        context->titleProperty = context->sensorDataType->GetProperty("Title");
+        context->valueProperty = context->sensorDataType->GetProperty("Value");
+        context->unitProperty = context->sensorDataType->GetProperty("Unit");
+
+        if (context->initializeMethod == nullptr || context->getCurrentMethod == nullptr ||
+            context->titleProperty == nullptr || context->valueProperty == nullptr || context->unitProperty == nullptr) {
+            diagnostics = "Gigabyte hardware-monitor reflection members were not found.";
+            return false;
+        }
+
+        context->monitor = Activator::CreateInstance(context->monitorType);
+        context->sourceHwRegister = Enum::Parse(context->sourceType, "HwRegister", false);
+        context->sensorFan = Enum::Parse(context->sensorType, "Fan", false);
+        context->sensorTemperature = Enum::Parse(context->sensorType, "Temperature", false);
+
+        trace.Write("gigabyte_siv:monitor_created type=\"" + Utf8FromManagedString(context->monitor->GetType()->FullName) + "\"");
+        context->initializeMethod->Invoke(context->monitor, gcnew array<Object^>{ context->sourceHwRegister });
+        trace.Write("gigabyte_siv:initialize_success source=HwRegister");
+        context->loaded = true;
+        diagnostics = "Gigabyte SIV hardware-monitor runtime initialized.";
+        return true;
+    } catch (Exception^ ex) {
+        diagnostics = Utf8FromManagedString(ex->ToString());
+        trace.Write("gigabyte_siv:initialize_exception " + diagnostics);
+        return false;
+    }
+}
+
+
+void CollectManagedSensors(GigabyteRuntimeContext^ context, Object^ sensorKind,
+    std::vector<FanReading>* fans, std::vector<TemperatureReading>* temperatures) {
+    Object^ collection = Activator::CreateInstance(context->collectionType);
+    array<Object^>^ args = gcnew array<Object^>{ sensorKind, collection };
+    context->getCurrentMethod->Invoke(context->monitor, args);
+    IEnumerable^ enumerable = dynamic_cast<IEnumerable^>(args[1]);
+    if (enumerable == nullptr) {
+        throw gcnew InvalidOperationException("Gigabyte sensor collection did not implement IEnumerable.");
+    }
+
+    for each (Object ^ sensor in enumerable) {
+        String^ title = dynamic_cast<String^>(context->titleProperty->GetValue(sensor, nullptr));
+        Object^ valueObject = context->valueProperty->GetValue(sensor, nullptr);
+        String^ unit = dynamic_cast<String^>(context->unitProperty->GetValue(sensor, nullptr));
+        const std::string titleUtf8 = Utf8FromManagedString(title);
+        const double numericValue = Convert::ToDouble(valueObject, Globalization::CultureInfo::InvariantCulture);
+
+        if (fans != nullptr) {
+            if (!ManagedUnitEquals(unit, "RPM")) {
+                continue;
+            }
+            fans->push_back(FanReading{ titleUtf8, numericValue });
+        } else if (temperatures != nullptr) {
+            if (!ManagedUnitEquals(unit, gcnew String(L"\u2103")) && !ManagedUnitEquals(unit, gcnew String(L"\u00B0C"))) {
+                continue;
+            }
+            temperatures->push_back(TemperatureReading{ titleUtf8, numericValue });
         }
     }
-    buffer.erase(0, position);
-    return true;
+}
+
+bool CaptureGigabyteSnapshot(GigabyteRuntimeContext^ context, GigabyteSnapshot& snapshot,
+    tracing::Trace& trace, std::string& diagnostics) {
+    snapshot = GigabyteSnapshot{};
+    snapshot.controllerType = "Gigabyte Engine HardwareMonitorControlModule";
+    snapshot.chipName = "Gigabyte SIV HwRegister";
+
+    if (!InitializeGigabyteRuntime(context, trace, diagnostics)) {
+        snapshot.diagnostics = diagnostics;
+        return false;
+    }
+
+    try {
+        CollectManagedSensors(context, context->sensorFan, &snapshot.fans, nullptr);
+        CollectManagedSensors(context, context->sensorTemperature, nullptr, &snapshot.temperatures);
+        snapshot.success = true;
+
+        std::ostringstream details;
+        details << "Gigabyte SIV hardware-monitor query completed."
+                << " fan_count=" << snapshot.fans.size()
+                << " temp_count=" << snapshot.temperatures.size();
+        snapshot.diagnostics = details.str();
+        diagnostics = snapshot.diagnostics;
+        trace.Write("gigabyte_siv:snapshot_done fan_count=" + std::to_string(snapshot.fans.size()) + " temp_count=" + std::to_string(snapshot.temperatures.size()));
+        return true;
+    } catch (Exception^ ex) {
+        diagnostics = Utf8FromManagedString(ex->ToString());
+        snapshot.diagnostics = diagnostics;
+        trace.Write("gigabyte_siv:snapshot_exception " + diagnostics);
+        return false;
+    }
 }
 
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace) : trace_(trace) {}
-    ~GigabyteSivBoardTelemetryProvider() override {
-        CloseDaemonProcess(daemon_);
-    }
+    explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace) : trace_(trace), runtime_(gcnew GigabyteRuntimeContext()) {}
 
     bool Initialize(const AppConfig& config) override {
         config_ = config;
         trace().Write("gigabyte_siv:initialize_begin");
 
-        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, L"HARDWARE\\DESCRIPTION\\System\\BIOS",
-            L"BaseBoardManufacturer").value_or("");
-        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, L"HARDWARE\\DESCRIPTION\\System\\BIOS",
-            L"BaseBoardProduct").value_or("");
+        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
+        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardProduct").value_or("");
         trace().Write("gigabyte_siv:board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
 
         if (!ContainsInsensitive(boardManufacturer_, "gigabyte")) {
@@ -320,15 +407,15 @@ public:
             return false;
         }
 
-        helperPath_ = AbsolutePath(L"GigabyteSivProbe.exe");
-        if (GetFileAttributesW(helperPath_.c_str()) == INVALID_FILE_ATTRIBUTES) {
-            diagnostics_ = "GigabyteSivProbe helper was not built.";
-            trace().Write("gigabyte_siv:helper_missing path=\"" + Utf8FromWide(helperPath_) + "\"");
+        const auto sivDirectory = FindInstalledSivDirectory();
+
+        if (!sivDirectory.has_value()) {
+            diagnostics_ = "Gigabyte SIV directory was not found in the registry.";
             return false;
         }
 
-        loadedLibrary_ = Utf8FromWide(helperPath_);
-        diagnostics_ = "Gigabyte helper ready.";
+        loadedLibrary_ = Utf8FromWide(CombinePath(*sivDirectory, kEngineEnvironmentControlDll));
+        diagnostics_ = "Gigabyte SIV provider ready.";
         initialized_ = true;
         return true;
     }
@@ -352,26 +439,22 @@ public:
             return sample;
         }
 
-        if (!EnsureDaemonRunning()) {
+        GigabyteSnapshot snapshot;
+        std::string captureDiagnostics;
+        if (!CaptureGigabyteSnapshot(runtime_, snapshot, trace(), captureDiagnostics)) {
+            diagnostics_ = captureDiagnostics;
             sample.diagnostics = diagnostics_;
             return sample;
         }
 
-        PumpAndApplyLatestFrame();
-
-        if (cachedResult_.fields.empty()) {
-            sample.diagnostics = diagnostics_;
-            return sample;
-        }
+        controllerType_ = snapshot.controllerType;
+        chipName_ = snapshot.chipName;
+        diagnostics_ = snapshot.diagnostics;
+        fanReadings_ = std::move(snapshot.fans);
+        tempReadings_ = std::move(snapshot.temperatures);
 
         sample.chipName = chipName_;
         sample.controllerType = controllerType_;
-        sample.diagnostics = diagnostics_;
-
-        if (!cachedResult_.success) {
-            return sample;
-        }
-
         sample.temperatures = BuildRequestedTemperatures();
         sample.fans = BuildRequestedFans();
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
@@ -389,117 +472,6 @@ private:
     tracing::Trace& trace() {
         static tracing::Trace nullTrace;
         return trace_ != nullptr ? *trace_ : nullTrace;
-    }
-
-    bool EnsureDaemonRunning() {
-        DWORD exitCode = STILL_ACTIVE;
-        const bool running = daemon_.process != nullptr && GetExitCodeProcess(daemon_.process, &exitCode) && exitCode == STILL_ACTIVE;
-        if (running) {
-            return true;
-        }
-
-        CloseDaemonProcess(daemon_);
-        daemonBuffer_.clear();
-        daemonFrames_.clear();
-        daemonFrameOpen_ = false;
-        daemonCurrentFrame_ = ProbeResult{};
-
-        if (!StartProbeDaemon(helperPath_, trace(), daemon_, diagnostics_)) {
-            return false;
-        }
-
-        const ULONGLONG deadline = GetTickCount64() + 3000;
-        while (GetTickCount64() < deadline) {
-            if (!PumpProbeDaemon(daemon_, trace(), daemonBuffer_, daemonCurrentFrame_, daemonFrameOpen_, daemonFrames_, diagnostics_)) {
-                CloseDaemonProcess(daemon_);
-                return false;
-            }
-            if (!daemonFrames_.empty()) {
-                cachedResult_ = daemonFrames_.back();
-                daemonFrames_.clear();
-                ApplyProbeFields(cachedResult_);
-                lastProbeTick_ = GetTickCount64();
-                return true;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
-
-        diagnostics_ = "GigabyteSivProbe daemon did not emit an initial frame.";
-        CloseDaemonProcess(daemon_);
-        return false;
-    }
-
-    void PumpAndApplyLatestFrame() {
-        if (!PumpProbeDaemon(daemon_, trace(), daemonBuffer_, daemonCurrentFrame_, daemonFrameOpen_, daemonFrames_, diagnostics_)) {
-            CloseDaemonProcess(daemon_);
-            return;
-        }
-        if (daemonFrames_.empty()) {
-            return;
-        }
-
-        cachedResult_ = daemonFrames_.back();
-        daemonFrames_.clear();
-        ApplyProbeFields(cachedResult_);
-        lastProbeTick_ = GetTickCount64();
-    }
-
-    void ApplyProbeFields(const ProbeResult& result) {
-        diagnostics_ = result.diagnostics.empty() ? "GigabyteSivProbe completed." : result.diagnostics;
-        chipName_.clear();
-        controllerType_.clear();
-        fanReadings_.clear();
-        tempReadings_.clear();
-
-        for (const auto& [key, value] : result.fields) {
-            if (key == "controller_type") {
-                controllerType_ = value;
-            } else if (key == "chip_name") {
-                chipName_ = value;
-            } else if (key.rfind("fan_", 0) == 0) {
-                const size_t secondUnderscore = key.find('_', 4);
-                if (secondUnderscore == std::string::npos) {
-                    continue;
-                }
-                const auto parsedIndex = ParseUnsigned(key.substr(4, secondUnderscore - 4));
-                if (!parsedIndex.has_value()) {
-                    continue;
-                }
-                const int index = static_cast<int>(*parsedIndex);
-                if (index >= static_cast<int>(fanReadings_.size())) {
-                    fanReadings_.resize(index + 1);
-                }
-                const std::string suffix = key.substr(secondUnderscore + 1);
-                if (suffix == "title") {
-                    fanReadings_[index].title = value;
-                } else if (suffix == "rpm") {
-                    fanReadings_[index].rpm = ParseDouble(value);
-                }
-            } else if (key.rfind("temp_", 0) == 0) {
-                const size_t secondUnderscore = key.find('_', 5);
-                if (secondUnderscore == std::string::npos) {
-                    continue;
-                }
-                const auto parsedIndex = ParseUnsigned(key.substr(5, secondUnderscore - 5));
-                if (!parsedIndex.has_value()) {
-                    continue;
-                }
-                const int index = static_cast<int>(*parsedIndex);
-                if (index >= static_cast<int>(tempReadings_.size())) {
-                    tempReadings_.resize(index + 1);
-                }
-                const std::string suffix = key.substr(secondUnderscore + 1);
-                if (suffix == "title") {
-                    tempReadings_[index].title = value;
-                } else if (suffix == "c") {
-                    tempReadings_[index].celsius = ParseDouble(value);
-                }
-            }
-        }
-
-        if (chipName_.empty() && !controllerType_.empty()) {
-            chipName_ = controllerType_;
-        }
     }
 
     static bool HasAvailableMetricValue(const std::vector<NamedScalarMetric>& metrics) {
@@ -543,7 +515,7 @@ private:
 
     tracing::Trace* trace_ = nullptr;
     AppConfig config_{};
-    std::wstring helperPath_;
+    gcroot<GigabyteRuntimeContext^> runtime_;
     std::string boardManufacturer_;
     std::string boardProduct_;
     std::string chipName_;
@@ -552,13 +524,6 @@ private:
     std::string diagnostics_ = "Gigabyte provider not initialized.";
     std::vector<FanReading> fanReadings_;
     std::vector<TemperatureReading> tempReadings_;
-    ProbeResult cachedResult_{};
-    ProbeResult daemonCurrentFrame_{};
-    DaemonProcess daemon_{};
-    std::deque<ProbeResult> daemonFrames_{};
-    std::string daemonBuffer_;
-    bool daemonFrameOpen_ = false;
-    ULONGLONG lastProbeTick_ = 0;
     bool initialized_ = false;
 };
 
@@ -567,3 +532,7 @@ private:
 std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(tracing::Trace* trace) {
     return std::make_unique<GigabyteSivBoardTelemetryProvider>(trace);
 }
+
+
+
+

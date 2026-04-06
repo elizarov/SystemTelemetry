@@ -8,8 +8,6 @@ Requirements
 ============
 
 - `devenv.cmd` must call the Visual Studio 2022 developer environment script so that tools such as `cl`, `link`, `rc`, `cmake`, and `MSBuild` are available.
-- `devenv.cmd` must define the `CSC` environment variable to the .NET Framework C# compiler executable used to build `src\GigabyteSivProbe.cs`.
-- `devenv.cmd` should validate that `%CSC%` exists and fail with a clear error if it does not.
 - `build.cmd` should remain a thin wrapper that calls `devenv.cmd`, configures `build\cmake\`, and then builds through `cmake --build`.
 
 Current expectation
@@ -22,10 +20,9 @@ After `devenv.cmd` completes successfully, these commands should be resolvable i
 - `rc`
 - `cmake`
 - `MSBuild`
-- `%CSC%`
 
 Notes
 =====
 
 - Keep machine-specific paths in `devenv.cmd`, not in `CMakeLists.txt`.
-- If the .NET compiler path changes on a machine, update `devenv.cmd` rather than the build files.
+

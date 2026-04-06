@@ -11,9 +11,7 @@ set "INSTALL_ROOT=%ProgramW6432%"
 if not defined INSTALL_ROOT set "INSTALL_ROOT=%ProgramFiles%"
 set "INSTALL_DIR=%INSTALL_ROOT%\SystemTelemetry"
 set "SOURCE_EXE=%~dp0build\SystemTelemetry.exe"
-set "SOURCE_PROBE=%~dp0build\GigabyteSivProbe.exe"
 set "TARGET_EXE=%INSTALL_DIR%\SystemTelemetry.exe"
-set "TARGET_PROBE=%INSTALL_DIR%\GigabyteSivProbe.exe"
 set "RUN_KEY=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 set "RUN_VALUE=SystemTelemetry"
 
@@ -29,10 +27,6 @@ if not exist "%SOURCE_EXE%" (
     exit /b 1
 )
 
-if not exist "%SOURCE_PROBE%" (
-    echo Missing build output: "%SOURCE_PROBE%"
-    exit /b 1
-)
 
 echo Installing to "%INSTALL_DIR%"...
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
@@ -47,11 +41,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-copy /y "%SOURCE_PROBE%" "%TARGET_PROBE%" >nul
-if errorlevel 1 (
-    echo Failed to copy "%SOURCE_PROBE%" to "%TARGET_PROBE%".
-    exit /b 1
-)
 
 reg add "%RUN_KEY%" /v "%RUN_VALUE%" /t REG_SZ /d "\"%TARGET_EXE%\"" /f >nul
 if errorlevel 1 (
@@ -75,3 +64,5 @@ if errorlevel 1 (
     exit /b 1
 )
 exit /b 2
+
+
