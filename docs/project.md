@@ -2,35 +2,35 @@
 
 ## Project environment
 
-The project runs on Windows 11 and is implemented in C++20 using Visual Studio 2022.
-Use `devenv.cmd` to activate the development environment when needed.
-Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.txt`.
-Keep `docs/build.md` as the single maintained source of truth for build prerequisites, build invocation, and developer-facing setup notes; other docs should link to it instead of repeating that material.
-Keep all sources in `src`.
-Keep generated build outputs inside `build\` so the project root stays clean.
-Keep the CMake build tree under `build\cmake\` so generated project files, dependency state, and object directories stay inside `build\` as well.
-When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
-Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
-Always build through `build.cmd`.
-Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
-Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies `SystemTelemetry.exe` there, and registers `SystemTelemetry.exe` under `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` so the dashboard starts automatically for every user who signs into the machine.
+- The project runs on Windows 11 and is implemented in C++20 using Visual Studio 2022.
+- Use `devenv.cmd` to activate the development environment when needed.
+- Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.txt`.
+- Keep `docs/build.md` as the single maintained source of truth for build prerequisites, build invocation, and developer-facing setup notes; other docs should link to it instead of repeating that material.
+- Keep all sources in `src`.
+- Keep generated build outputs inside `build\` so the project root stays clean.
+- Keep the CMake build tree under `build\cmake\` so generated project files, dependency state, and object directories stay inside `build\` as well.
+- When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
+- Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
+- Always build through `build.cmd`.
+- Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
+- Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies `SystemTelemetry.exe` there, and registers `SystemTelemetry.exe` under `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` so the dashboard starts automatically for every user who signs into the machine.
 
 ## Repository conventions
 
-`docs/specifications.md` should keep only the core user-visible dashboard behavior requirements that are not diagnostics-specific.
-`docs/diagnostics.md` should capture command-line diagnostics behavior, trace/dump/screenshot output requirements, and diagnostics-specific verification expectations.
-`docs/layout.md` should capture the configuration language syntax, section ownership, and maintained inline language examples.
-`docs/project.md` should capture project environment, build/setup expectations, and other engineering constraints that are not direct user-visible behavior.
-`docs/architecture.md` should capture structural and code-organization details.
+- `docs/specifications.md` should keep only the core user-visible dashboard behavior requirements that are not diagnostics-specific.
+- `docs/diagnostics.md` should capture command-line diagnostics behavior, trace/dump/screenshot output requirements, and diagnostics-specific verification expectations.
+- `docs/layout.md` should capture the configuration language syntax, section ownership, and maintained inline language examples.
+- `docs/project.md` should capture project environment, build/setup expectations, and other engineering constraints that are not direct user-visible behavior.
+- `docs/architecture.md` should capture structural and code-organization details.
 
 ## Implementation constraints
 
-Keep the checked-in config template at `resources/config.ini` so it can be embedded into the executable as the default configuration resource.
-Treat `resources/config.ini` as the single maintained source of truth for config-file entry documentation instead of duplicating that format documentation elsewhere in the repo.
-Do not add C++-side synthesized fallback layout/card/widget defaults that duplicate the embedded config template; shipped defaults must come only from `resources/config.ini`.
-Do not keep code-side fallback fonts, colors, or layout-size defaults in the config structs; shipped UI styling defaults must come only from `resources/config.ini`.
-All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
-Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
-Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.
-Keep the embedded `resources/config.ini` template concise and mostly self-documenting; prefer short section-divider comments over long per-key comment blocks.
-Remember that an executable-side `config.ini` overrides the rebuilt embedded template on load and is preserved by `Save Config`; when a rebuilt default seems unchanged, inspect the live `config.ini` beside the executable first.
+- Keep the checked-in config template at `resources/config.ini` so it can be embedded into the executable as the default configuration resource.
+- Treat `resources/config.ini` as the single maintained source of truth for config-file entry documentation instead of duplicating that format documentation elsewhere in the repo.
+- Do not add C++-side synthesized fallback layout/card/widget defaults that duplicate the embedded config template; shipped defaults must come only from `resources/config.ini`.
+- Do not keep code-side fallback fonts, colors, or layout-size defaults in the config structs; shipped UI styling defaults must come only from `resources/config.ini`.
+- All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
+- Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
+- Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.
+- Keep the embedded `resources/config.ini` template concise and mostly self-documenting; prefer short section-divider comments over long per-key comment blocks.
+- Remember that an executable-side `config.ini` overrides the rebuilt embedded template on load and is preserved by `Save Config`; when a rebuilt default seems unchanged, inspect the live `config.ini` beside the executable first.

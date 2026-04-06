@@ -28,10 +28,12 @@ The design emphasizes glanceable visuals with large load indicators, concise num
 
 ## Requirements
 
-Runtime prerequisites and developer setup are documented in [docs/build.md](build.md).
-The application must not depend on LibreHardwareMonitor or OpenHardwareMonitor.
+- Runtime prerequisites and developer setup are documented in [docs/build.md](build.md).
+- The application must not depend on LibreHardwareMonitor or OpenHardwareMonitor.
 
 ## Configuration
+
+### Configurable choices
 
 Make the system configurable for display placement and the subset of data sources that require runtime choice.
 Examples include:
@@ -42,39 +44,49 @@ Examples include:
 - Which cards and widgets to show in each row
 - Which named board temperature and fan metrics to render through the layout bindings
 
-At runtime, the application must first load an embedded default `config.ini` resource, then read `config.ini` from the same directory as `SystemTelemetry.exe` when that file exists and overlay its values on top of the embedded defaults.
-The embedded `resources/config.ini` template must remain the single maintained source of truth for config-file entries, and [docs/layout.md](layout.md) must remain the single maintained source of truth for config-language syntax, section ownership, and examples.
-Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance.
-The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
-The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.
-The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using the current monitor DPI before rendering.
-When `display.monitor_name` targets a monitor that is not yet available during login startup, display-topology churn, or a temporary unplug, the UI must keep watching for that configured monitor instead of locking in a fallback monitor placement, and once the monitor is available it must apply the saved logical position there.
-The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
-The list of rendered cards must come from layout config.
-The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.
-The dedicated widget sections must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments preserve or intentionally retune the visual rhythm.
-The dedicated `drive_usage_list` section must provide a drive-usage bar thickness setting so storage usage bars can be tuned independently from row height and from the thinner CPU/GPU metric bars.
-The dedicated widget sections must own the widget-level geometry that affects visual rhythm, including metric bar thickness, throughput plot chrome sizes, gauge preferred size, and the fixed widths used by the storage drive row columns.
-The renderer must not rely on buried widget-spacing or widget-geometry pixel literals for text, footer, clock, gauge, or throughput sizing; those visual sizes must come from `config.ini` widget sections, with only non-visual safety clamps left in code.
-Widths that are fully determined by fixed renderer text such as throughput labels, throughput axis labels, drive-letter labels, and the `100%` drive percent column should be measured from the configured fonts at layout load and adjusted only by widget-section padding entries.
-The layout language must support a top-aligned stack mode that packs children at their preferred heights and leaves any remaining space below them, so lists such as drive usage rows do not have to stretch to fill the whole card column.
-The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
-The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
-The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
-When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
-When `network.adapter_name` is left empty, auto-selection should prefer the active adapter that best represents the routed connection, favoring adapters with a usable default gateway and IPv4 address over host-only or otherwise unrouted virtual adapters.
-When `network.adapter_name` is set to a saved adapter name such as `Ethernet`, adapter selection should prefer an exact case-insensitive alias or description match and only fall back to substring matching when no exact match exists.
-The layout bindings `board.temp.<name>` and `board.fan.<name>` must be the only source of truth for which named board sensors are requested at runtime.
-The board provider must receive the set of requested board temperature and fan names by scanning all layout metric references that begin with `board.temp.` or `board.fan.`.
-The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
-When `Save Config` creates `config.ini` beside the executable for the first time, it must begin from the embedded resource copy verbatim so the saved file keeps the same comments and documentation text before updating values in place.
-The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
-Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
+### Config sources and persistence
+
+- At runtime, the application must first load an embedded default `config.ini` resource, then read `config.ini` from the same directory as `SystemTelemetry.exe` when that file exists and overlay its values on top of the embedded defaults.
+- The embedded `resources/config.ini` template must remain the single maintained source of truth for config-file entries, and [docs/layout.md](layout.md) must remain the single maintained source of truth for config-language syntax, section ownership, and examples.
+- Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance.
+- The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
+- The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.
+- When `Save Config` creates `config.ini` beside the executable for the first time, it must begin from the embedded resource copy verbatim so the saved file keeps the same comments and documentation text before updating values in place.
+- The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
+- The config overlay path must replace parsed layout expressions during overlay, so `config.ini` safely overrides `[layout]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.
+
+### Layout and rendering behavior
+
+- The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using the current monitor DPI before rendering.
+- When `display.monitor_name` targets a monitor that is not yet available during login startup, display-topology churn, or a temporary unplug, the UI must keep watching for that configured monitor instead of locking in a fallback monitor placement, and once the monitor is available it must apply the saved logical position there.
+- The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
+- The list of rendered cards must come from layout config.
+- The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.
+- The dedicated widget sections must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments preserve or intentionally retune the visual rhythm.
+- The dedicated `drive_usage_list` section must provide a drive-usage bar thickness setting so storage usage bars can be tuned independently from row height and from the thinner CPU/GPU metric bars.
+- The dedicated widget sections must own the widget-level geometry that affects visual rhythm, including metric bar thickness, throughput plot chrome sizes, gauge preferred size, and the fixed widths used by the storage drive row columns.
+- The renderer must not rely on buried widget-spacing or widget-geometry pixel literals for text, footer, clock, gauge, or throughput sizing; those visual sizes must come from `config.ini` widget sections, with only non-visual safety clamps left in code.
+- Widths that are fully determined by fixed renderer text such as throughput labels, throughput axis labels, drive-letter labels, and the `100%` drive percent column should be measured from the configured fonts at layout load and adjusted only by widget-section padding entries.
+- The layout language must support a top-aligned stack mode that packs children at their preferred heights and leaves any remaining space below them, so lists such as drive usage rows do not have to stretch to fill the whole card column.
+- The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
+- Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
+
+### Runtime actions tied to config
+
+- The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
+- The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
+- When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
+- When `network.adapter_name` is left empty, auto-selection should prefer the active adapter that best represents the routed connection, favoring adapters with a usable default gateway and IPv4 address over host-only or otherwise unrouted virtual adapters.
+- When `network.adapter_name` is set to a saved adapter name such as `Ethernet`, adapter selection should prefer an exact case-insensitive alias or description match and only fall back to substring matching when no exact match exists.
+- The layout bindings `board.temp.<name>` and `board.fan.<name>` must be the only source of truth for which named board sensors are requested at runtime.
+- The board provider must receive the set of requested board temperature and fan names by scanning all layout metric references that begin with `board.temp.` or `board.fan.`.
+- The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
 
 Diagnostics requirements live in `docs/diagnostics.md`.
-The config overlay path must replace parsed layout expressions during overlay, so `config.ini` safely overrides `[layout]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.
 
 ## Telemetry sources
+
+### CPU telemetry
 
 CPU telemetry must provide:
 
@@ -84,7 +96,11 @@ CPU telemetry must provide:
 - RAM usage
 - Gigabyte motherboard named temperature and fan metrics on the target Gigabyte X570 AORUS system through the installed Gigabyte SIV hardware-monitor stack, without LibreHardwareMonitor or OpenHardwareMonitor
 
-CPU package power is not required.
+Additional rule:
+
+- CPU package power is not required.
+
+### GPU telemetry
 
 GPU telemetry must provide:
 
@@ -93,21 +109,21 @@ GPU telemetry must provide:
 - GPU total dedicated VRAM capacity
 - AMD GPU temperature, clock, and fan speed from AMD's ADLX API
 
-If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable.
-Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
-Gigabyte motherboard board-metric telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the requested `board.temp.*` and `board.fan.*` metrics unavailable.
-The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested `board.temp.*` and `board.fan.*` names directly by sensor title.
+### Provider behavior
+
+- If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable.
+- Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
+- Gigabyte motherboard board-metric telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the requested `board.temp.*` and `board.fan.*` metrics unavailable.
+- The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested `board.temp.*` and `board.fan.*` names directly by sensor title.
 
 ## Size and placement
 
-Panel size must come from the configured `layout.window` value.
-Place it as a top-level window at the monitor that is specified in configuration.
-Render the live dashboard at the native device-pixel size implied by the current monitor DPI.
-When the window moves onto a monitor with a different DPI, or when Windows reassigns it because monitors are connected or disconnected, the dashboard must recompute its device-pixel size and rerender at the new monitor scale automatically.
-Make sure the monitor to show the panel is selected by its name, not number,
-so it survives plugging/unplugging other monitors into the system.
-Support interactive repositioning so the user can discover and copy the monitor
-name plus the relative X/Y placement for configuration.
+- Panel size must come from the configured `layout.window` value.
+- Place it as a top-level window at the monitor that is specified in configuration.
+- Render the live dashboard at the native device-pixel size implied by the current monitor DPI.
+- When the window moves onto a monitor with a different DPI, or when Windows reassigns it because monitors are connected or disconnected, the dashboard must recompute its device-pixel size and rerender at the new monitor scale automatically.
+- Make sure the monitor to show the panel is selected by its name, not number, so it survives plugging and unplugging other monitors into the system.
+- Support interactive repositioning so the user can discover and copy the monitor name plus the relative X/Y placement for configuration.
 
 ## Window controls
 
@@ -118,40 +134,35 @@ Add a popup menu on right-click with these actions:
 - Save Config
 - Exit
 
-When Move is active, the dashboard window should follow the mouse cursor until
-the user places it. While moving, show an overlay in the top-left corner with:
+When Move is active, the dashboard window should follow the mouse cursor until the user places it.
+While moving, show an overlay in the top-left corner with:
 
 - Monitor friendly name
 - Current monitor scale
 - Relative X/Y position on that monitor
 
-The move overlay should size and space itself from the actual UI font metrics and monitor scale.
-The overlay content should be easy to copy into configuration.
-The application must also read the saved relative X/Y coordinates from
-configuration at startup and place the window accordingly.
-Add a `Save Config` action that writes the current display identifier and
-relative X/Y placement back to the config file while preserving all other
-settings.
+- The move overlay should size and space itself from the actual UI font metrics and monitor scale.
+- The overlay content should be easy to copy into configuration.
+- The application must also read the saved relative X/Y coordinates from configuration at startup and place the window accordingly.
+- Add a `Save Config` action that writes the current display identifier and relative X/Y placement back to the config file while preserving all other settings.
 
 ## Tray behavior
 
-Create a system tray icon with the same popup menu as the dashboard window.
-The tray menu must expose the same actions:
+- Create a system tray icon with the same popup menu as the dashboard window.
+- The tray menu must expose the same actions:
 
 - Move
 - Bring On Top
 - Save Config
 - Exit
 
-The dashboard should use normal window Z-order behavior so other windows may
-cover it. `Bring On Top` should raise the dashboard when it needs to be found.
-Double-clicking the tray icon should perform the same `Bring On Top` action.
+- The dashboard should use normal window Z-order behavior so other windows may cover it. `Bring On Top` should raise the dashboard when it needs to be found.
+- Double-clicking the tray icon should perform the same `Bring On Top` action.
 
 ## Single-instance behavior
 
-At most one dashboard instance may be running at a time.
-Starting a new copy must close the already running copy, then continue startup
-as the remaining instance.
+- At most one dashboard instance may be running at a time.
+- Starting a new copy must close the already running copy, then continue startup as the remaining instance.
 
 ## Style summary
 
@@ -198,7 +209,9 @@ as the remaining instance.
 ## CPU panel (top left)
 
 ### Header
+
 - CPU model name
+
 ### Main indicator
 - Large circular gauge
 - CPU load (`%`)
@@ -211,13 +224,17 @@ as the remaining instance.
 - Clock (`GHz`)
 - Fan (`RPM`)
 - System Fan (`RPM`)
-Each CPU and GPU metric row bar must render with rounded leading and trailing ends, with the straight middle section proportional to the current value so the bar naturally collapses to a circle at zero, and overlay a small translucent vertical capsule marker at the highest bar ratio seen in the retained recent metric history.
-Metric-row peak ghosts must use the same shared retained-history-series path, 0.5 second update cadence, and 60-sample depth as the network and storage throughput plots, for a 30 second recent-max window.
+### Metric-row rendering
+
+- Each CPU and GPU metric row bar must render with rounded leading and trailing ends, with the straight middle section proportional to the current value so the bar naturally collapses to a circle at zero, and overlay a small translucent vertical capsule marker at the highest bar ratio seen in the retained recent metric history.
+- Metric-row peak ghosts must use the same shared retained-history-series path, 0.5 second update cadence, and 60-sample depth as the network and storage throughput plots, for a 30 second recent-max window.
 
 ## GPU panel (top right)
 
 ### Header
+
 - GPU model name
+
 ### Main indicator
 - Large circular gauge
 - GPU load (`%`)
@@ -233,28 +250,32 @@ Metric-row peak ghosts must use the same shared retained-history-series path, 0.
 ## Network panel (bottom left)
 
 ### Header
+
 - Network
+
 ### Primary values
 - Upload speed shown as `Up 0.3 MB/s`
 - Download speed shown as `Down 24.1 MB/s`
+
 ### Graphs
 - Two small scrolling graphs
 - Upload history
 - Download history
+
 ### Footer and graph behavior
 - Show upload speed, then the upload graph directly below it, then download speed, then the download graph directly below it.
 - Use smaller text for the Up/Down speed readouts than the main metric text used elsewhere.
 - Each graph must include a vertical axis and a small label showing the current max value used to scale that plot.
-Network and storage throughput plot scaling must be derived from the maximum value present in the retained history shown by that panel.
-The throughput plots should render a simple moving average over the most recent two readings so the line reflects a 1-second smoothing window while the numeric throughput readout continues to show the latest sampled value.
-Throughput plot scaling must use a minimum max of 10 MB/s, round the averaged max up in 5 MB/s steps through 100 MB/s, and then round it up in 50 MB/s steps above 100 MB/s.
-Throughput plots must reserve the configured `[throughput] plot_stroke_width` as top inset in the plotted area so a sample equal to the computed graph max still renders fully inside the chart bounds.
-Network plots should draw thin horizontal guide lines every 5 MB/s.
-Storage throughput plots should use the same averaged-history scaling, draw horizontal guide lines every 5 MB/s while the averaged max stays at or below 50 MB/s, and switch those guide lines to every 50 MB/s once the averaged max exceeds 50 MB/s.
-All throughput plots should also draw synchronized vertical time markers every 10 seconds, with marker placement driven from one shared snapshot-time phase so the markers line up and scroll in sync across network and storage.
-Throughput-plot horizontal and vertical markers should render with a dedicated darker config-driven marker color so they remain visually distinct from the throughput line itself.
-All throughput plots should render a small accent-colored leader circle centered on the right-most live point, with its diameter coming from the `[throughput]` widget config and the plotted line ending at that circle center so the live value reads clearly without labels on every point.
-Show adapter name and IP address together on the same final footer line when available.
+- Network and storage throughput plot scaling must be derived from the maximum value present in the retained history shown by that panel.
+- The throughput plots should render a simple moving average over the most recent two readings so the line reflects a 1-second smoothing window while the numeric throughput readout continues to show the latest sampled value.
+- Throughput plot scaling must use a minimum max of 10 MB/s, round the averaged max up in 5 MB/s steps through 100 MB/s, and then round it up in 50 MB/s steps above 100 MB/s.
+- Throughput plots must reserve the configured `[throughput] plot_stroke_width` as top inset in the plotted area so a sample equal to the computed graph max still renders fully inside the chart bounds.
+- Network plots should draw thin horizontal guide lines every 5 MB/s.
+- Storage throughput plots should use the same averaged-history scaling, draw horizontal guide lines every 5 MB/s while the averaged max stays at or below 50 MB/s, and switch those guide lines to every 50 MB/s once the averaged max exceeds 50 MB/s.
+- All throughput plots should also draw synchronized vertical time markers every 10 seconds, with marker placement driven from one shared snapshot-time phase so the markers line up and scroll in sync across network and storage.
+- Throughput-plot horizontal and vertical markers should render with a dedicated darker config-driven marker color so they remain visually distinct from the throughput line itself.
+- All throughput plots should render a small accent-colored leader circle centered on the right-most live point, with its diameter coming from the `[throughput]` widget config and the plotted line ending at that circle center so the live value reads clearly without labels on every point.
+- Show adapter name and IP address together on the same final footer line when available.
 
 ## Storage panel (bottom center)
 
@@ -264,20 +285,26 @@ Show adapter name and IP address together on the same final footer line when ava
 - List the drives configured in the storage card's `drive_usage_list(...)` widget vertically on the right.
 
 ### Throughput
+
 - Read throughput
 - Write throughput
 - These throughput values should come from total system disk I/O counters.
 
 ### Per-drive row
+
 - Drive letter
 - Usage bar
 - Usage `%`
 - Free space
+
 ### Example format
+
 - `C: 32% 2.5 TB free`
 - `D: 44% 534 GB free`
 - `E: 32% 5.0 TB free`
+
 ### Visuals
+
 - Thin pill-shaped horizontal bars whose straight middle section shrinks naturally to zero for empty values
 - Consistent alignment
 - Compact rows
@@ -285,15 +312,19 @@ Show adapter name and IP address together on the same final footer line when ava
 ## Time and date (bottom right)
 
 ### Content
+
 - Time (large): `10:43`
 - Date (small): `2026-04-01`
+
 ### Layout
+
 - Centered horizontally
 - Time is the dominant visual element
 
 ## Behavior and data refresh
 
 ### Refresh rates
+
 - Shared telemetry snapshot timer: `0.5 sec`
 - CPU/GPU load: `0.5 sec`
 - GPU vendor metrics: `0.5 sec`
@@ -303,6 +334,7 @@ Show adapter name and IP address together on the same final footer line when ava
 - Clock: `0.5 sec`
 
 ### Units
+
 - CPU: `GHz`
 - Memory: `GB`
 - Network: `MB/s`

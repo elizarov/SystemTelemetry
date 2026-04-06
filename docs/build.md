@@ -25,7 +25,10 @@ Diagnostics validation commands and output expectations are documented in [docs/
 
 ## Telemetry provider notes
 
-AMD GPU metrics come from AMD's ADLX runtime instead of LibreHardwareMonitor or OpenHardwareMonitor. On supported Radeon systems, this is typically installed with current AMD graphics drivers and provides GPU temperature, clock, and fan speed directly from AMD's API.
+### AMD GPU metrics
+
+AMD GPU metrics come from AMD's ADLX runtime instead of LibreHardwareMonitor or OpenHardwareMonitor.
+On supported Radeon systems, this is typically installed with current AMD graphics drivers and provides GPU temperature, clock, and fan speed directly from AMD's API.
 
 If AMD GPU metrics are missing:
 
@@ -33,6 +36,8 @@ If AMD GPU metrics are missing:
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
 3. Run `build\SystemTelemetry.exe /dump`.
 4. Check `build\telemetry_dump.txt` for the final snapshot and `build\telemetry_trace.txt` for the step-by-step provider diagnostics.
+
+### Gigabyte board metrics
 
 On supported Gigabyte systems, named board temperature and fan telemetry come from the app's in-process Gigabyte SIV integration, which loads the installed SIV .NET assemblies directly from native C++ code.
 

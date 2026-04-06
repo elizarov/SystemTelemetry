@@ -5,11 +5,15 @@
 `config.ini` uses a compact INI-based layout language.
 This document is the single maintained source of truth for the language syntax, section ownership, and inline examples, while [resources/config.ini](../resources/config.ini) is the single maintained source of truth for the shipped configuration shape and entry spellings.
 
+### Static behavior
+
 The language is static:
 
 - layout is loaded from config
 - coordinates are computed once after config load or reload
 - rendering uses those precomputed coordinates until the next reload
+
+### Dashboard focus
 
 The language is centered around the dashboard shape:
 
@@ -145,7 +149,7 @@ Supported layout kinds:
 - `stack_top(...)`
 - `center(...)`
 
-Meaning:
+### Meaning
 
 - `rows(...)` splits dashboard cards vertically into weighted row groups, with an optional row-group weight written as `rows:weight(...)`
 - `columns(...)` splits content horizontally into weighted children, with child weights written as `child:weight`
@@ -182,8 +186,9 @@ Mixed-case widget or container spellings such as `Throughput(...)` or `Columns(.
 
 ## Widget parameters
 
-Widgets may bind data inline. For widgets that accept a list, the plain comma-separated body is passed through as that widget's parameter string.
-`metric_list(...)` items may append `=Label` to override the rendered row label for that metric.
+- Widgets may bind data inline.
+- For widgets that accept a list, the plain comma-separated body is passed through as that widget's parameter string.
+- `metric_list(...)` items may append `=Label` to override the rendered row label for that metric.
 
 Examples:
 
@@ -223,8 +228,8 @@ Example:
 - `drive_usage_list(C,D,E)`
 - `metric_list(cpu.ram=RAM,board.temp.CPU=Temp,board.fan.CPU=Fan,board.fan.System 1=System Fan)`
 
-This defines a vertical list of drive-usage widgets and their order, and it also makes the layout the source of
-truth for which named board temperature and fan sensors are requested from the board provider.
+- This defines a vertical list of drive-usage widgets and their order.
+- It also makes the layout the source of truth for which named board temperature and fan sensors are requested from the board provider.
 
 ## Consistency rules
 
