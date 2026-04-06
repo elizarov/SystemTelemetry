@@ -48,7 +48,7 @@ This document is the single maintained source of truth for diagnostics command b
 
 ### Dump diagnostics content
 
-- The dumped board-provider block must include Gigabyte debug details such as detected board identity, the loaded SIV assembly path, controller type, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, and sampled diagnostics.
+- The dumped board-provider block must include Gigabyte debug details such as detected board identity, the loaded SIV assembly path, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, and sampled diagnostics.
 
 ## Single-instance interaction
 

@@ -48,8 +48,6 @@ struct TemperatureReading {
 struct GigabyteSnapshot {
     bool success = false;
     std::string diagnostics;
-    std::string controllerType;
-    std::string chipName;
     std::vector<FanReading> fans;
     std::vector<TemperatureReading> temperatures;
 };
@@ -361,8 +359,6 @@ void CollectManagedSensors(GigabyteRuntimeContext^ context, Object^ sensorKind,
 bool CaptureGigabyteSnapshot(GigabyteRuntimeContext^ context, GigabyteSnapshot& snapshot,
     tracing::Trace& trace, std::string& diagnostics) {
     snapshot = GigabyteSnapshot{};
-    snapshot.controllerType = "Gigabyte Engine HardwareMonitorControlModule";
-    snapshot.chipName = "Gigabyte SIV HwRegister";
 
     if (!InitializeGigabyteRuntime(context, trace, diagnostics)) {
         snapshot.diagnostics = diagnostics;
@@ -427,8 +423,6 @@ public:
         sample.requestedTemperatureNames = config_.boardTemperatureNames;
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
-        sample.chipName = chipName_;
-        sample.controllerType = controllerType_;
         sample.driverLibrary = loadedLibrary_;
         sample.temperatures = BuildRequestedTemperatures();
         sample.fans = BuildRequestedFans();
@@ -447,14 +441,10 @@ public:
             return sample;
         }
 
-        controllerType_ = snapshot.controllerType;
-        chipName_ = snapshot.chipName;
         diagnostics_ = snapshot.diagnostics;
         fanReadings_ = std::move(snapshot.fans);
         tempReadings_ = std::move(snapshot.temperatures);
 
-        sample.chipName = chipName_;
-        sample.controllerType = controllerType_;
         sample.temperatures = BuildRequestedTemperatures();
         sample.fans = BuildRequestedFans();
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
@@ -518,8 +508,6 @@ private:
     gcroot<GigabyteRuntimeContext^> runtime_;
     std::string boardManufacturer_;
     std::string boardProduct_;
-    std::string chipName_;
-    std::string controllerType_;
     std::string loadedLibrary_;
     std::string diagnostics_ = "Gigabyte provider not initialized.";
     std::vector<FanReading> fanReadings_;

@@ -35,10 +35,10 @@
   - Stores CPU board temperatures and fans in the named `board.temperatures` and `board.fans` collections.
 - `src/telemetry_runtime.h` + `src/telemetry_runtime.cpp`: shared runtime abstraction plus the real telemetry runtime wrapper that adapts `TelemetryCollector` to the UI/diagnostics host flow. The same runtime layer also centralizes whether fake-runtime initialization failures are allowed to show modal dialogs so `/trace` diagnostics paths stay non-blocking.
 - `src/telemetry_runtime_fake.cpp`: fake telemetry runtime implementation that reloads `telemetry_fake.txt` through the dump parser once per second for repeatable UI testing.
-- `src/snapshot_dump.h` + `src/snapshot_dump.cpp`: versioned text dump serializer/parser for complete telemetry snapshots, including provider diagnostics, named board metrics, the shared retained-history-series collection for throughput and recent-peak widgets, drive rows, and full dumped local time; the same format powers both `/dump` exports and `/fake` imports.
+- `src/snapshot_dump.h` + `src/snapshot_dump.cpp`: versioned text dump serializer/parser for complete telemetry snapshots, including provider diagnostics, board-provider metadata, named board metrics, the shared retained-history-series collection for throughput and recent-peak widgets, drive rows, and full dumped local time; the same format powers both `/dump` exports and `/fake` imports.
 - `src/gpu_vendor.h` + `src/gpu_vendor.cpp`: vendor GPU provider abstraction plus factory selection.
 - `src/gpu_amd_adl.cpp`: AMD GPU provider implementation using AMD ADLX for GPU name, temperature, clock, and fan speed.
-- `src/board_vendor.h` + `src/board_vendor.cpp`: motherboard-vendor provider abstraction plus factory selection. The shared sample carries the board-provider metadata and named metrics that the dashboard and dump path use.
+- `src/board_vendor.h` + `src/board_vendor.cpp`: motherboard-vendor provider abstraction plus factory selection. The shared sample carries board identity, provider diagnostics, requested sensor names, and named metrics that the dashboard and dump path use.
 - `src/board_gigabyte_siv.cpp`: Gigabyte motherboard provider implementation.
   - Detects Gigabyte baseboards from registry-backed firmware metadata.
   - Discovers the installed SIV directory from the uninstall registry and resolves vendor assembly dependencies from that directory.

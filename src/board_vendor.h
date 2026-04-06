@@ -15,8 +15,6 @@ class Trace;
 struct BoardVendorTelemetrySample {
     std::string boardManufacturer;
     std::string boardProduct;
-    std::string chipName;
-    std::string controllerType;
     std::string driverLibrary;
     std::vector<std::string> requestedFanNames;
     std::vector<std::string> requestedTemperatureNames;

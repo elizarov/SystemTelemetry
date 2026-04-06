@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v4";
+constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v5";
 
 std::string TrimAsciiWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");
@@ -453,8 +453,6 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteBool(output, "board_provider.available", dump.boardProvider.available);
     WriteString(output, "board_provider.board_manufacturer", dump.boardProvider.boardManufacturer);
     WriteString(output, "board_provider.board_product", dump.boardProvider.boardProduct);
-    WriteString(output, "board_provider.chip_name", dump.boardProvider.chipName);
-    WriteString(output, "board_provider.controller_type", dump.boardProvider.controllerType);
     WriteString(output, "board_provider.driver_library", dump.boardProvider.driverLibrary);
     WriteStringList(output, "board_provider.requested_fans", dump.boardProvider.requestedFanNames);
     WriteStringList(output, "board_provider.requested_temperatures", dump.boardProvider.requestedTemperatureNames);
@@ -547,8 +545,6 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadBool(values, "board_provider.available", parsed.boardProvider.available, error) ||
         !LoadString(values, "board_provider.board_manufacturer", parsed.boardProvider.boardManufacturer, error) ||
         !LoadString(values, "board_provider.board_product", parsed.boardProvider.boardProduct, error) ||
-        !LoadString(values, "board_provider.chip_name", parsed.boardProvider.chipName, error) ||
-        !LoadString(values, "board_provider.controller_type", parsed.boardProvider.controllerType, error) ||
         !LoadString(values, "board_provider.driver_library", parsed.boardProvider.driverLibrary, error) ||
         !LoadStringList(values, "board_provider.requested_fans", parsed.boardProvider.requestedFanNames, error) ||
         !LoadStringList(values, "board_provider.requested_temperatures", parsed.boardProvider.requestedTemperatureNames, error) ||
