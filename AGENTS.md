@@ -1,7 +1,7 @@
-Keep `docs/specifications.txt` in sync with behavior changes before finishing work.
-Keep `docs/diagnostics.txt` in sync with diagnostics-flow and trace/dump/screenshot behavior changes before finishing work.
-Keep `docs/architecture.txt` in sync with structural/code-organization changes before finishing work.
-Keep `docs/project.txt` in sync with project-environment, build/setup, and engineering-constraint changes before finishing work.
+Keep `docs/specifications.md` in sync with behavior changes before finishing work.
+Keep `docs/diagnostics.md` in sync with diagnostics-flow and trace/dump/screenshot behavior changes before finishing work.
+Keep `docs/architecture.md` in sync with structural/code-organization changes before finishing work.
+Keep `docs/project.md` in sync with project-environment, build/setup, and engineering-constraint changes before finishing work.
 Keep a single source of truth for every example, format description, and configuration-language reference; when one file is designated as the maintained source, update other docs to refer to it instead of duplicating the same example or format details.
 Document new requirements briefly in the same style as the existing spec.
 Keep docs/specs in present-tense steady-state language; describe only the intended behavior and structure, not transitions, historical notes, removals, or migration context.
@@ -17,7 +17,7 @@ Pitfall note: if rebuilt defaults seem unchanged, check the executable-side `con
 Pitfall note: when restoring saved placement across monitors with different DPI scales, do not pre-scale the destination window size before the move; let `WM_DPICHANGED` apply the monitor transition first or the bounds can be double-scaled.
 Pitfall note: login startup and monitor hotplug can race ahead of monitor enumeration; when `display.monitor_name` is configured, keep a placement watch armed until the target display becomes enumerable instead of locking in a fallback monitor.
 
-After changing diagnostics behavior, update `docs/diagnostics.txt` instead of restating those rules here.
+After changing diagnostics behavior, update `docs/diagnostics.md` instead of restating those rules here.
 
 Validation workflow:
 - Build first with `build.cmd`.

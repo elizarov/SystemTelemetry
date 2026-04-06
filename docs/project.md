@@ -1,8 +1,6 @@
-System Telemetry project notes
-==============================
+# System Telemetry project notes
 
-Project environment
-===================
+## Project environment
 
 The project runs on Windows 11 and is implemented in C++20 using Visual Studio 2022.
 Use `devenv.cmd` to activate the development environment when needed.
@@ -16,23 +14,20 @@ Always build through `build.cmd`.
 Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
 Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies `SystemTelemetry.exe` there, and registers `SystemTelemetry.exe` under `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` so the dashboard starts automatically for every user who signs into the machine.
 
-Development requirements
-========================
+## Development requirements
 
 - Visual Studio 2022 Build Tools with CMake support
 - Visual Studio 2022 C++/CLI support for the mixed-mode Gigabyte board provider
 - .NET Framework 4.8 SDK so the developer environment exposes `NETFXSDKDir` and `mscoree.lib` for CLR-enabled linking
 
-Repository conventions
-======================
+## Repository conventions
 
-`docs/specifications.txt` should keep only the core user-visible dashboard behavior requirements that are not diagnostics-specific.
-`docs/diagnostics.txt` should capture command-line diagnostics behavior, trace/dump/screenshot output requirements, and diagnostics-specific verification expectations.
-`docs/project.txt` should capture project environment, build/setup expectations, and other engineering constraints that are not direct user-visible behavior.
-`docs/architecture.txt` should capture structural and code-organization details.
+`docs/specifications.md` should keep only the core user-visible dashboard behavior requirements that are not diagnostics-specific.
+`docs/diagnostics.md` should capture command-line diagnostics behavior, trace/dump/screenshot output requirements, and diagnostics-specific verification expectations.
+`docs/project.md` should capture project environment, build/setup expectations, and other engineering constraints that are not direct user-visible behavior.
+`docs/architecture.md` should capture structural and code-organization details.
 
-Implementation constraints
-==========================
+## Implementation constraints
 
 Keep the checked-in config template at `resources/config.ini` so it can be embedded into the executable as the default configuration resource.
 Treat `resources/config.ini` as the single maintained source of truth for config-file entry documentation instead of duplicating that format documentation elsewhere in the repo.

@@ -1,8 +1,6 @@
-System Telemetry diagnostics
-============================
+# System Telemetry diagnostics
 
-Command-line diagnostics mode
-=============================
+## Command-line diagnostics mode
 
 Support independent `/trace`, `/dump`, `/screenshot`, `/reload`, and `/exit` command-line switches.
 Support a `/fake` command-line switch that replaces live telemetry collection with periodic reads from `telemetry_fake.txt` beside the executable.
@@ -30,15 +28,13 @@ Required `/fake` load failures must follow that same rule, so `/fake /exit` retu
 When `/trace` is enabled and the renderer initializes, the trace must also include measured font heights plus computed layout heights and resolved widget/card rectangles to aid layout tuning.
 The dumped board-provider block must include Gigabyte debug details such as detected board identity, the loaded SIV assembly path, controller type, the requested board temperature and fan names derived from layout, the named temperature and fan metrics returned for those requests, and sampled diagnostics.
 
-Single-instance interaction
-===========================
+## Single-instance interaction
 
 The `/exit` diagnostics mode is exempt from the normal single-instance behavior and should run as an independent one-shot command.
 Diagnostics switches without `/exit` must stay attached to the normal UI startup path and follow the single-instance replacement behavior.
 `/fake` by itself must stay on the normal UI startup path and follow the single-instance replacement behavior.
 
-Validation guide
-================
+## Validation guide
 
 Always rebuild through `build.cmd` before validating diagnostics changes.
 For UI-attached diagnostics, verify `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot` while the dashboard is running.

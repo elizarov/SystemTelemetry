@@ -1,5 +1,4 @@
-System Telemetry
-================
+# System Telemetry
 
 This project is a compact, real-time system monitoring dashboard designed for a small 800x480 secondary display,
 presenting only the telemetry that can be collected cleanly through Windows APIs or vendor APIs.
@@ -7,6 +6,7 @@ It combines CPU load, temperature, clock, fan speed, and RAM usage with GPU load
 alongside network activity, system-wide storage throughput, multi-drive storage status, and a clock, all organized into a balanced panel layout.
 The design emphasizes glanceable visuals with large load indicators, concise numeric stats, and minimal clutter.
 
+```text
 ┌──────────────────────────────┬───────────────────────────────┐
 │           CPU                │             GPU               │
 │  AMD Ryzen                   │  Radeon RX 6800               │
@@ -24,9 +24,9 @@ The design emphasizes glanceable visuals with large load indicators, concise num
 │  ▒▒▒▒▒▒▒▒▒▒   │  ▒▒▒▒▒▒▒▒▒▒                      │           │
 │  192.168.3.60 │                                  │           │
 └───────────────┴──────────────────────────────────┴───────────┘
+```
 
-Requirements
-============
+## Requirements
 
 Runtime requirements:
 
@@ -36,8 +36,7 @@ Runtime requirements:
 
 The application must not depend on LibreHardwareMonitor or OpenHardwareMonitor.
 
-Configuration
-=============
+## Configuration
 
 Make the system configurable for display placement and the subset of data sources that require runtime choice.
 Examples include:
@@ -90,11 +89,10 @@ When `Save Config` creates `config.ini` beside the executable for the first time
 The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
 Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
 
-Diagnostics requirements live in `docs/diagnostics.txt`.
+Diagnostics requirements live in `docs/diagnostics.md`.
 The config overlay path must replace parsed layout expressions during overlay, so `config.ini` safely overrides `[layout]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.
 
-Telemetry sources
-=================
+## Telemetry sources
 
 CPU telemetry must provide:
 
@@ -118,8 +116,7 @@ Storage throughput should come from system-wide disk I/O counters, not only from
 Gigabyte motherboard board-metric telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the requested `board.temp.*` and `board.fan.*` metrics unavailable.
 The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, match requested `board.temp.*` and `board.fan.*` names directly by sensor title, and report provider diagnostics through `/dump`.
 
-Size and placement
-==================
+## Size and placement
 
 Panel size must come from the configured `layout.window` value.
 Place it as a top-level window at the monitor that is specified in configuration.
@@ -130,8 +127,7 @@ so it survives plugging/unplugging other monitors into the system.
 Support interactive repositioning so the user can discover and copy the monitor
 name plus the relative X/Y placement for configuration.
 
-Window controls
-===============
+## Window controls
 
 Add a popup menu on right-click with these actions:
 
@@ -155,8 +151,7 @@ Add a `Save Config` action that writes the current display identifier and
 relative X/Y placement back to the config file while preserving all other
 settings.
 
-Tray behavior
-=============
+## Tray behavior
 
 Create a system tray icon with the same popup menu as the dashboard window.
 The tray menu must expose the same actions:
@@ -170,15 +165,13 @@ The dashboard should use normal window Z-order behavior so other windows may
 cover it. `Bring On Top` should raise the dashboard when it needs to be found.
 Double-clicking the tray icon should perform the same `Bring On Top` action.
 
-Single-instance behavior
-========================
+## Single-instance behavior
 
 At most one dashboard instance may be running at a time.
 Starting a new copy must close the already running copy, then continue startup
 as the remaining instance.
 
-Style Summary
-=============
+## Style summary
 
 Visual Theme
 Background: pure black (#000000)
@@ -215,8 +208,7 @@ Prioritize large, glanceable values
 Avoid clutter
 Consistent alignment across panels
 
-CPU Panel (Top Left)
-====================
+## CPU panel (top left)
 
 Header
 CPU model name
@@ -235,8 +227,7 @@ System Fan (RPM)
 Each CPU and GPU metric row bar must render with rounded leading and trailing ends, with the straight middle section proportional to the current value so the bar naturally collapses to a circle at zero, and overlay a small translucent vertical capsule marker at the highest bar ratio seen in the retained recent metric history.
 Metric-row peak ghosts must use the same shared retained-history-series path, 0.5 second update cadence, and 60-sample depth as the network and storage throughput plots, for a 30 second recent-max window.
 
-GPU Panel (Top Right)
-=====================
+## GPU panel (top right)
 
 Header
 GPU model name
@@ -252,8 +243,7 @@ Temp (°C)
 Clock (MHz)
 Fan (RPM)
 
-Network Panel (Bottom Left)
-===========================
+## Network panel (bottom left)
 
 Header
 Network
@@ -279,8 +269,7 @@ Throughput-plot horizontal and vertical markers should render with a dedicated d
 All throughput plots should render a small accent-colored leader circle centered on the right-most live point, with its diameter coming from the `[throughput]` widget config and the plotted line ending at that circle center so the live value reads clearly without labels on every point.
 Show adapter name and IP address together on the same final footer line when available.
 
-Storage Panel (Bottom Center)
-=============================
+## Storage panel (bottom center)
 
 Structure
 
@@ -306,8 +295,7 @@ Thin pill-shaped horizontal bars whose straight middle section shrinks naturally
 Consistent alignment
 Compact rows
 
-Time & Date (Bottom Right)
-==========================
+## Time and date (bottom right)
 
 Content
 Time (large): 10:43
@@ -316,8 +304,7 @@ Layout
 Centered horizontally
 Time is the dominant visual element
 
-Behavior & Data Refresh
-=======================
+## Behavior and data refresh
 
 Refresh Rates
 Shared telemetry snapshot timer: 0.5 sec

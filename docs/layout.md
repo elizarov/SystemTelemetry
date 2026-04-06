@@ -1,7 +1,6 @@
-System Telemetry layout language specification
+# System Telemetry layout language specification
 
-Overview
-========
+## Overview
 
 `config.ini` uses a compact INI-based layout language.
 
@@ -16,8 +15,7 @@ The language is centered around the dashboard shape:
 - the dashboard-level `cards` layout places cards through generic containers
 - cards contain a small static composition of known widget kinds
 
-Compact rules
-=============
+## Compact rules
 
 - weights are written as `name:weight(...)` or `name:weight`
 - layout containers are written as `kind(...)`
@@ -27,8 +25,7 @@ Compact rules
 - omitted weights default to `1`
 - whitespace around commas is ignored
 
-Structure
-=========
+## Structure
 
 The language has three levels:
 
@@ -36,8 +33,7 @@ The language has three levels:
 2. Dashboard-level shared geometry, card-placement layout, palette, and fonts in `[layout]`
 3. Card-local title, icon, and content composition in `[card.<id>]`
 
-Widget sections
-===============
+## Widget sections
 
 Widget-specific sizing lives in dedicated sections named exactly after the widget.
 
@@ -52,8 +48,7 @@ Supported widget geometry keys:
 - `[clock_time]`: `padding`
 - `[clock_date]`: `padding`
 
-Dashboard section
-=================
+## Dashboard section
 
 `[layout]` owns the shared geometry, dashboard card-placement layout, palette, and fonts.
 
@@ -103,8 +98,7 @@ Font keys stay in `[layout]`:
 - `font.label = face,size,weight`
 - `font.small = face,size,weight`
 
-Card sections
-=============
+## Card sections
 
 Each card section uses:
 
@@ -126,8 +120,7 @@ Future cards follow the same pattern:
 - `[card.board]`
 - `[card.weather]`
 
-Icon names
-==========
+## Icon names
 
 `icon` values are resource names, not file paths.
 
@@ -141,8 +134,7 @@ Supported icon names:
 
 Mixed-case icon spellings such as `CPU` or `Network` are invalid.
 
-Layout expressions
-==================
+## Layout expressions
 
 Supported layout kinds:
 
@@ -170,8 +162,7 @@ Example:
 
 - `columns(stack:5(throughput:4(storage.read),throughput:4(storage.write)), drive_usage_list:7(C,D,E))`
 
-Widget names
-============
+## Widget names
 
 Supported widget names:
 
@@ -188,8 +179,7 @@ Supported widget names:
 Legacy widget aliases are not supported. Bind telemetry through the documented generic widget names and explicit parameters, for example `text(cpu.name)`, `gauge(cpu.load)`, or `throughput(network.upload)`.
 Mixed-case widget or container spellings such as `Throughput(...)` or `Columns(...)` are invalid.
 
-Widget parameters
-=================
+## Widget parameters
 
 Widgets may bind data inline. For widgets that accept a list, the plain comma-separated body is passed through as that widget's parameter string.
 `metric_list(...)` items may append `=Label` to override the rendered row label for that metric.
@@ -223,8 +213,7 @@ Supported metric references include:
 - `storage.read`
 - `storage.write`
 
-Drive and sensor selection
-==========================
+## Drive and sensor selection
 
 Rendering-oriented selection lives in the layout language when it changes what is drawn.
 
@@ -236,8 +225,7 @@ Example:
 This defines a vertical list of drive-usage widgets and their order, and it also makes the layout the source of
 truth for which named board temperature and fan sensors are requested from the board provider.
 
-Consistency rules
-=================
+## Consistency rules
 
 Shared absolute geometry belongs only in `[layout]`, including:
 
@@ -258,8 +246,7 @@ Card sections define relative structure only:
 - widget parameters
 - relative child weights using the `name:weight(...)` form
 
-Static sizing rules
-===================
+## Static sizing rules
 
 Layout is resolved without using live telemetry values.
 
@@ -272,16 +259,14 @@ Static sizing rules:
 - centered time/date widgets use weighted slots from `center(...)`
 - repeated lists such as drives divide their assigned area using the item count from config
 
-Validation rules
-================
+## Validation rules
 
 - every dashboard container weight must be positive
 - every card referenced from `cards` must have a matching `[card.<id>]` section
 - every icon name must resolve to a supported embedded resource
 - every widget name must resolve to a supported hard-coded widget kind
 
-Reference
-=========
+## Reference
 
 See [resources/config.ini](/D:/Projects/SystemTelemetry/resources/config.ini) for the maintained example of the
 language in use. That file is the single source of truth for the checked-in layout shape and supported
