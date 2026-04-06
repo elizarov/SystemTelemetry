@@ -43,12 +43,16 @@ struct MetricListWidgetConfig {
 
 struct DriveUsageListWidgetConfig {
     int freeWidth = 0;
+    int activityWidth = 0;
     int barGap = 0;
     int valueGap = 0;
+    int percentGap = 0;
     int barHeight = 0;
     int verticalGap = 0;
     int labelPadding = 0;
     int percentPadding = 0;
+    int activitySegments = 0;
+    int activitySegmentGap = 0;
 };
 
 struct ThroughputWidgetConfig {

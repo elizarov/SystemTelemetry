@@ -313,6 +313,45 @@ void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color,
         static_cast<INT>(clampedDiameter));
 }
 
+void DrawSegmentIndicator(HDC hdc, const RECT& rect, int segmentCount, int segmentGap, double ratio,
+    COLORREF trackColor, COLORREF accentColor) {
+    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
+    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    if (width <= 0 || height <= 0 || segmentCount <= 0) {
+        return;
+    }
+
+    const int totalGap = std::max(0, segmentGap) * std::max(0, segmentCount - 1);
+    const int availableHeight = std::max(segmentCount, height - totalGap);
+    const int baseSegmentHeight = std::max(1, availableHeight / segmentCount);
+    const int remainder = std::max(0, availableHeight - (baseSegmentHeight * segmentCount));
+    const double clampedRatio = std::clamp(ratio, 0.0, 1.0);
+    const int filledSegments = clampedRatio > 0.0
+        ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
+        : 0;
+    int top = rect.top;
+    for (int index = segmentCount - 1; index >= 0; --index) {
+        const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
+        const int segmentHeight = baseSegmentHeight + extra;
+        const int visualHeight = std::min(segmentHeight, std::max(2, width / 2));
+        const int segmentTop = top + std::max(0, (segmentHeight - visualHeight) / 2);
+        RECT segmentRect{rect.left, segmentTop, rect.right,
+            std::min(rect.bottom, static_cast<LONG>(segmentTop + visualHeight))};
+        HBRUSH trackBrush = CreateSolidBrush(trackColor);
+        FillRect(hdc, &segmentRect, trackBrush);
+        DeleteObject(trackBrush);
+
+        if (index < filledSegments) {
+            RECT fillRect = segmentRect;
+            HBRUSH fillBrush = CreateSolidBrush(accentColor);
+            FillRect(hdc, &fillRect, fillBrush);
+            DeleteObject(fillBrush);
+        }
+
+        top = segmentRect.bottom + std::max(0, segmentGap);
+    }
+}
+
 }  // namespace
 
 DashboardRenderer::DashboardRenderer() = default;
@@ -504,8 +543,7 @@ bool DashboardRenderer::MeasureFonts() {
         MeasureTextSize(hdc, fonts_.smallFont, "Write").cx) + std::max(0, ScaleLogical(config_.layout.throughput.labelPadding));
     measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx +
         std::max(0, ScaleLogical(config_.layout.throughput.axisPadding));
-    measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx +
-        std::max(0, ScaleLogical(config_.layout.driveUsageList.labelPadding));
+    measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx;
     measuredWidths_.drivePercent = MeasureTextSize(hdc, fonts_.label, "100%").cx +
         std::max(0, ScaleLogical(config_.layout.driveUsageList.percentPadding));
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
@@ -539,6 +577,15 @@ int DashboardRenderer::EffectiveMetricRowHeight() const {
     const int computed = textHeight + verticalGap + barHeight;
     WriteTrace("renderer:layout_metric_row_height text=" + std::to_string(textHeight) +
         " bar=" + std::to_string(barHeight) +
+        " gap=" + std::to_string(verticalGap) +
+        " effective=" + std::to_string(computed));
+    return computed;
+}
+
+int DashboardRenderer::EffectiveDriveHeaderHeight() const {
+    const int verticalGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.verticalGap));
+    const int computed = fontHeights_.smallText + verticalGap;
+    WriteTrace("renderer:layout_drive_header_height text=" + std::to_string(fontHeights_.smallText) +
         " gap=" + std::to_string(verticalGap) +
         " effective=" + std::to_string(computed));
     return computed;
@@ -589,7 +636,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
     if (node.name == "drive_usage_list") {
         const std::string param = node.parameter;
         const int count = static_cast<int>(Split(param, ',').size());
-        const int height = count * EffectiveDriveRowHeight();
+        const int height = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
             " value=" + std::to_string(height));
         return height;
@@ -1105,34 +1152,77 @@ void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const Da
 }
 
 void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows) {
+    const int headerHeight = EffectiveDriveHeaderHeight();
     const int rowHeight = EffectiveDriveRowHeight();
-    RECT row{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + rowHeight)};
+    const int labelWidth = std::max(1, measuredWidths_.driveLabel);
+    const int percentWidth = std::max(1, measuredWidths_.drivePercent);
+    const int freeWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.freeWidth));
+    const int activityWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.activityWidth));
+    const int barGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.barGap));
+    const int valueGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.valueGap));
+    const int percentGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.percentGap));
+    const int driveBarHeight = std::max(1, ScaleLogical(config_.layout.driveUsageList.barHeight));
+    const int activitySegments = std::max(1, config_.layout.driveUsageList.activitySegments);
+    const int activitySegmentGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.activitySegmentGap));
+    const int rowContentHeight = std::max(fontHeights_.label, std::max(fontHeights_.smallText, driveBarHeight));
+
+    RECT header{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + headerHeight)};
+    RECT row{rect.left, std::min(rect.bottom, header.bottom), rect.right,
+        std::min(rect.bottom, std::min(rect.bottom, header.bottom) + rowHeight)};
+
+    const auto resolveColumns = [&](const RECT& band, RECT& labelRect, RECT& readRect, RECT& writeRect,
+        RECT& barRect, RECT& pctRect, RECT& freeRect) {
+        labelRect = {band.left, band.top, std::min(band.right, static_cast<LONG>(band.left + labelWidth)), band.bottom};
+        readRect = {std::min(band.right, static_cast<LONG>(labelRect.right + barGap)), band.top,
+            std::min(band.right, static_cast<LONG>(labelRect.right + barGap + activityWidth)), band.bottom};
+        writeRect = {std::min(band.right, static_cast<LONG>(readRect.right + valueGap)), band.top,
+            std::min(band.right, static_cast<LONG>(readRect.right + valueGap + activityWidth)), band.bottom};
+        freeRect = {std::max(band.left, static_cast<LONG>(band.right - freeWidth)), band.top, band.right, band.bottom};
+        pctRect = {std::max(band.left, static_cast<LONG>(freeRect.left - valueGap - percentWidth)), band.top,
+            std::max(band.left, static_cast<LONG>(freeRect.left - valueGap)), band.bottom};
+        barRect = {std::min(band.right, static_cast<LONG>(writeRect.right + barGap)), band.top,
+            std::max(std::min(band.right, static_cast<LONG>(writeRect.right + barGap)),
+                static_cast<LONG>(pctRect.left - percentGap)), band.bottom};
+    };
+
+    RECT headerLabelRect{}, headerReadRect{}, headerWriteRect{}, headerBarRect{}, headerPctRect{}, headerFreeRect{};
+    resolveColumns(header, headerLabelRect, headerReadRect, headerWriteRect, headerBarRect, headerPctRect, headerFreeRect);
+    RECT usageHeaderRect{headerBarRect.left, header.top, headerPctRect.right, header.bottom};
+    RECT headerReadLabelRect{headerReadRect.left - valueGap, headerReadRect.top, headerReadRect.right + valueGap, headerReadRect.bottom};
+    RECT headerWriteLabelRect{headerWriteRect.left - valueGap, headerWriteRect.top, headerWriteRect.right + valueGap, headerWriteRect.bottom};
+    DrawTextBlock(hdc, headerReadLabelRect, "R", fonts_.smallFont, MutedTextColor(),
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+    DrawTextBlock(hdc, headerWriteLabelRect, "W", fonts_.smallFont, MutedTextColor(),
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+    DrawTextBlock(hdc, usageHeaderRect, "Usage", fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, headerFreeRect, "Free", fonts_.smallFont, MutedTextColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+
     for (const auto& drive : rows) {
-        const int labelWidth = std::max(1, measuredWidths_.driveLabel);
-        const int percentWidth = std::max(1, measuredWidths_.drivePercent);
-        const int freeWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.freeWidth));
-        const int barGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.barGap));
-        const int valueGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.valueGap));
-        RECT labelRect{row.left, row.top, std::min(row.right, row.left + labelWidth), row.bottom};
-        RECT pctRect{std::max(row.left, row.right - (percentWidth + freeWidth + valueGap)), row.top,
-            std::max(row.left, row.right - (freeWidth + valueGap)), row.bottom};
-        RECT freeRect{std::max(row.left, row.right - freeWidth), row.top, row.right, row.bottom};
-        const int driveBarHeight = std::max(1, ScaleLogical(config_.layout.driveUsageList.barHeight));
+        RECT labelRect{}, readRect{}, writeRect{}, pctRect{}, freeRect{}, barBandRect{};
+        resolveColumns(row, labelRect, readRect, writeRect, barBandRect, pctRect, freeRect);
         const int rowPixelHeight = static_cast<int>(row.bottom - row.top);
+        const int contentTop = static_cast<int>(row.top) + std::max(0, (rowPixelHeight - rowContentHeight) / 2);
+        RECT activityRect{0, contentTop, 0, std::min(static_cast<int>(row.bottom), contentTop + rowContentHeight)};
+        RECT readIndicatorRect{readRect.left, activityRect.top, readRect.right, activityRect.bottom};
+        RECT writeIndicatorRect{writeRect.left, activityRect.top, writeRect.right, activityRect.bottom};
         const int barTop = static_cast<int>(row.top) + std::max(0, (rowPixelHeight - driveBarHeight) / 2);
         RECT barRect{
-            labelRect.right + barGap,
+            barBandRect.left,
             barTop,
-            std::max(static_cast<int>(labelRect.right) + barGap, static_cast<int>(pctRect.left) - valueGap),
+            barBandRect.right,
             std::min(static_cast<int>(row.bottom), barTop + driveBarHeight)
         };
 
         DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        DrawSegmentIndicator(hdc, readIndicatorRect, activitySegments, activitySegmentGap, drive.readActivity,
+            ToColorRef(config_.layout.trackColor), AccentColor());
+        DrawSegmentIndicator(hdc, writeIndicatorRect, activitySegments, activitySegmentGap, drive.writeActivity,
+            ToColorRef(config_.layout.trackColor), AccentColor());
         DrawPillBar(hdc, barRect, drive.usedPercent / 100.0, std::nullopt);
 
         char percent[16];
         sprintf_s(percent, "%.0f%%", drive.usedPercent);
-        DrawTextBlock(hdc, pctRect, percent, fonts_.label, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(hdc, pctRect, percent, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         DrawTextBlock(hdc, freeRect, drive.freeText, fonts_.smallFont, MutedTextColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
 
         OffsetRect(&row, 0, rowHeight);

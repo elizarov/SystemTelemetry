@@ -136,6 +136,7 @@ private:
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
     int EffectiveHeaderHeight() const;
     int EffectiveMetricRowHeight() const;
+    int EffectiveDriveHeaderHeight() const;
     int EffectiveDriveRowHeight() const;
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;

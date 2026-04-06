@@ -17,7 +17,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Trace lines must use the compact prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
 - `/dump` must enable writing a machine-parseable UTF-8 snapshot dump to `telemetry_dump.txt` beside the executable without a BOM.
 - The dump format must be stable, text-based, and editable by hand so the same file contents can be copied directly into `telemetry_fake.txt`.
-- The dump must include all telemetry fields needed by the dashboard plus provider diagnostics, a single retained-history-series collection for throughput, metric rows, and load gauges, configured drive rows, and the full dumped local date/time including seconds and milliseconds.
+- The dump must include all telemetry fields needed by the dashboard plus provider diagnostics, a single retained-history-series collection for throughput, metric rows, and load gauges, configured drive rows including per-drive read/write MB/s, and the full dumped local date/time including seconds and milliseconds.
 - The dump schema must reflect the current runtime model directly; obsolete compatibility keys should be removed instead of being kept as null placeholders.
 - `/screenshot` must enable writing only the rendered dashboard screenshot to `telemetry_screenshot.png` beside the executable.
 

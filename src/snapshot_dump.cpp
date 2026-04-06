@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v5";
+constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v6";
 
 std::string TrimAsciiWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");
@@ -472,6 +472,8 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
         WriteString(output, prefix + ".label", dump.snapshot.drives[i].label);
         WriteDouble(output, prefix + ".used_percent", dump.snapshot.drives[i].usedPercent, 6);
         WriteDouble(output, prefix + ".free_gb", dump.snapshot.drives[i].freeGb, 6);
+        WriteDouble(output, prefix + ".read_mbps", dump.snapshot.drives[i].readMbps, 6);
+        WriteDouble(output, prefix + ".write_mbps", dump.snapshot.drives[i].writeMbps, 6);
     }
 
     WriteInteger(output, "time.year", dump.snapshot.now.wYear);
@@ -570,7 +572,9 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         const std::string prefix = "drives." + std::to_string(i);
         if (!LoadString(values, prefix + ".label", drive.label, error) ||
             !LoadDouble(values, prefix + ".used_percent", drive.usedPercent, error) ||
-            !LoadDouble(values, prefix + ".free_gb", drive.freeGb, error)) {
+            !LoadDouble(values, prefix + ".free_gb", drive.freeGb, error) ||
+            !LoadDouble(values, prefix + ".read_mbps", drive.readMbps, error) ||
+            !LoadDouble(values, prefix + ".write_mbps", drive.writeMbps, error)) {
             return false;
         }
         parsed.snapshot.drives.push_back(std::move(drive));

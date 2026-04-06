@@ -22,6 +22,8 @@ struct DriveInfo {
     std::string label;
     double usedPercent = 0.0;
     double freeGb = 0.0;
+    double readMbps = 0.0;
+    double writeMbps = 0.0;
 };
 
 struct RetainedHistorySeries {

@@ -510,10 +510,14 @@ void ApplyDriveUsageListWidgetValue(DriveUsageListWidgetConfig& widget, const st
     const std::string& value) {
     if (key == "free_width") {
         widget.freeWidth = ParseIntOrDefault(value, widget.freeWidth);
+    } else if (key == "activity_width") {
+        widget.activityWidth = ParseIntOrDefault(value, widget.activityWidth);
     } else if (key == "bar_gap") {
         widget.barGap = ParseIntOrDefault(value, widget.barGap);
     } else if (key == "value_gap") {
         widget.valueGap = ParseIntOrDefault(value, widget.valueGap);
+    } else if (key == "percent_gap") {
+        widget.percentGap = ParseIntOrDefault(value, widget.percentGap);
     } else if (key == "bar_height") {
         widget.barHeight = ParseIntOrDefault(value, widget.barHeight);
     } else if (key == "vertical_gap") {
@@ -522,6 +526,10 @@ void ApplyDriveUsageListWidgetValue(DriveUsageListWidgetConfig& widget, const st
         widget.labelPadding = ParseIntOrDefault(value, widget.labelPadding);
     } else if (key == "percent_padding") {
         widget.percentPadding = ParseIntOrDefault(value, widget.percentPadding);
+    } else if (key == "activity_segments") {
+        widget.activitySegments = ParseIntOrDefault(value, widget.activitySegments);
+    } else if (key == "activity_segment_gap") {
+        widget.activitySegmentGap = ParseIntOrDefault(value, widget.activitySegmentGap);
     }
 }
 

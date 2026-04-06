@@ -45,7 +45,7 @@ Widget-specific sizing lives in dedicated sections named exactly after the widge
 Supported widget geometry keys:
 
 - `[metric_list]`: `label_width`, `value_gap`, `bar_height`, `vertical_gap`
-- `[drive_usage_list]`: `free_width`, `bar_gap`, `value_gap`, `bar_height`, `vertical_gap`, `label_padding`, `percent_padding`
+- `[drive_usage_list]`: `free_width`, `activity_width`, `bar_gap`, `value_gap`, `percent_gap`, `bar_height`, `vertical_gap`, `label_padding`, `percent_padding`, `activity_segments`, `activity_segment_gap`
 - `[throughput]`: `header_gap`, `graph_height`, `value_padding`, `label_padding`, `axis_padding`, `scale_label_padding`, `scale_label_min_height`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
 - `[gauge]`: `preferred_size`, `outer_padding`, `min_radius`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`
 - `[text]`: `preferred_padding`
@@ -158,7 +158,7 @@ Supported layout kinds:
 - `center(...)` creates a centered vertical stack
 
 `metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + [metric_list].vertical_gap + [metric_list].bar_height`.
-`drive_usage_list(...)` rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].vertical_gap` when placed inside a top-packed stack.
+`drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].vertical_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].vertical_gap` when placed inside a top-packed stack.
 Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching widget-section `*_padding` keys.
 
 Nested layout expressions are allowed.
@@ -260,7 +260,8 @@ Static sizing rules:
 
 - header height comes from config
 - metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
-- widget-specific heights, paddings, widths, and gauge/throughput chrome come from their matching widget sections, while fixed text columns derive from measured text widths plus their matching widget-section padding
+- drive-usage widgets reserve a dedicated header row and use fixed-width read/write activity columns from `[drive_usage_list]`
+- widget-specific heights, paddings, widths, segment counts, and gauge/throughput chrome come from their matching widget sections, while fixed text columns derive from measured text widths plus their matching widget-section padding
 - throughput sections follow the configured vertical rhythm
 - centered time/date widgets use weighted slots from `center(...)`
 - repeated lists such as drives divide their assigned area using the item count from config

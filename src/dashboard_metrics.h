@@ -41,6 +41,8 @@ struct DashboardThroughputMetric {
 
 struct DashboardDriveRow {
     std::string label;
+    double readActivity = 0.0;
+    double writeActivity = 0.0;
     double usedPercent = 0.0;
     std::string freeText;
 };

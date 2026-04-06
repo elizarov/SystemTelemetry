@@ -64,6 +64,8 @@ Examples include:
 - The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.
 - The dedicated widget sections must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments preserve or intentionally retune the visual rhythm.
 - The dedicated `drive_usage_list` section must provide a drive-usage bar thickness setting so storage usage bars can be tuned independently from row height and from the thinner CPU/GPU metric bars.
+- The dedicated `drive_usage_list` section must also provide one shared read/write activity-column width, the number of stacked activity segments, and the gap between those segments.
+- The dedicated `drive_usage_list` section must provide separate gap controls for the activity-to-usage transition and the usage-bar-to-percent transition so the storage row alignment can be tuned without changing every column spacing together.
 - The dedicated widget sections must own the widget-level geometry that affects visual rhythm, including metric bar thickness, throughput plot chrome sizes, gauge preferred size, and the fixed widths used by the storage drive row columns.
 - The renderer must not rely on buried widget-spacing or widget-geometry pixel literals for text, footer, clock, gauge, or throughput sizing; those visual sizes must come from `config.ini` widget sections, with only non-visual safety clamps left in code.
 - Widths that are fully determined by fixed renderer text such as throughput labels, throughput axis labels, drive-letter labels, and the `100%` drive percent column should be measured from the configured fonts at layout load and adjusted only by widget-section padding entries.
@@ -113,6 +115,7 @@ GPU telemetry must provide:
 
 - If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable.
 - Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
+- Per-drive storage activity indicators should come from per-drive logical-disk I/O counters for the configured drive letters.
 - Gigabyte motherboard board-metric telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the requested `board.temp.*` and `board.fan.*` metrics unavailable.
 - The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested `board.temp.*` and `board.fan.*` names directly by sensor title.
 
@@ -293,18 +296,31 @@ While moving, show an overlay in the top-left corner with:
 ### Per-drive row
 
 - Drive letter
+- Read activity indicator
+- Write activity indicator
 - Usage bar
 - Usage `%`
 - Free space
 
+### Header row
+
+- No header over the drive-letter column
+- `R`
+- `W`
+- `Usage` spanning the usage-bar and usage-percent columns
+- `Free`
+
 ### Example format
 
-- `C: 32% 2.5 TB free`
-- `D: 44% 534 GB free`
-- `E: 32% 5.0 TB free`
+- `C: [R] [W] 32% 2.5 TB`
+- `D: [R] [W] 44% 534 GB`
+- `E: [R] [W] 32% 5.0 TB`
 
 ### Visuals
 
+- Two narrow vertical UV-style stacked-segment indicators per drive row, one for reads and one for writes
+- Each activity column should use the full current drive-row height and show the drive's relative share of visible read or write activity
+- Activity indicators should light whole segments only; any non-zero activity lights the first segment and higher activity rounds up to additional fully filled segments
 - Thin pill-shaped horizontal bars whose straight middle section shrinks naturally to zero for empty values
 - Consistent alignment
 - Compact rows

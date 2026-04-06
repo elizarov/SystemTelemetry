@@ -33,9 +33,9 @@ std::string FormatMemory(double usedGb, double totalGb) {
 std::string FormatDriveFree(double freeGb) {
     char buffer[64];
     if (freeGb >= 1024.0) {
-        sprintf_s(buffer, "%.1f TB free", freeGb / 1024.0);
+        sprintf_s(buffer, "%.1f TB", freeGb / 1024.0);
     } else {
-        sprintf_s(buffer, "%.0f GB free", freeGb);
+        sprintf_s(buffer, "%.0f GB", freeGb);
     }
     return buffer;
 }
@@ -279,8 +279,17 @@ std::vector<DashboardDriveRow> DashboardMetricSource::ResolveDriveRows(const std
     }
 
     std::vector<DashboardDriveRow> rows;
+    double totalReadMbps = 0.0;
+    double totalWriteMbps = 0.0;
     for (const auto& drive : ordered) {
-        rows.push_back(DashboardDriveRow{drive.label, drive.usedPercent, FormatDriveFree(drive.freeGb)});
+        totalReadMbps += std::max(0.0, drive.readMbps);
+        totalWriteMbps += std::max(0.0, drive.writeMbps);
+    }
+    for (const auto& drive : ordered) {
+        const double readActivity = totalReadMbps > 0.0 ? std::clamp(drive.readMbps / totalReadMbps, 0.0, 1.0) : 0.0;
+        const double writeActivity = totalWriteMbps > 0.0 ? std::clamp(drive.writeMbps / totalWriteMbps, 0.0, 1.0) : 0.0;
+        rows.push_back(DashboardDriveRow{drive.label, readActivity, writeActivity, drive.usedPercent,
+            FormatDriveFree(drive.freeGb)});
     }
     return rows;
 }
