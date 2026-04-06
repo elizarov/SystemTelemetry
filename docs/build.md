@@ -1,5 +1,7 @@
 # Build and development
 
+This document is the single maintained source of truth for build prerequisites, build invocation, and developer-facing setup notes.
+
 ## Requirements
 
 - Windows 11
@@ -18,6 +20,8 @@ build.cmd
 ```
 
 All build artifacts are kept under `build\`.
+
+Diagnostics validation commands and output expectations are documented in [docs/diagnostics.md](/D:/Projects/SystemTelemetry/docs/diagnostics.md).
 
 ## Telemetry provider notes
 

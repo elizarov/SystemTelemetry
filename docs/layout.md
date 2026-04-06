@@ -3,6 +3,7 @@
 ## Overview
 
 `config.ini` uses a compact INI-based layout language.
+This document is the single maintained source of truth for the language syntax, section ownership, and inline examples, while [resources/config.ini](/D:/Projects/SystemTelemetry/resources/config.ini) is the single maintained source of truth for the shipped configuration shape and entry spellings.
 
 The language is static:
 

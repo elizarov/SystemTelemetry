@@ -1,5 +1,7 @@
 # System Telemetry diagnostics
 
+This document is the single maintained source of truth for diagnostics command behavior, validation commands, and diagnostics-output inspection guidance.
+
 ## Command-line diagnostics mode
 
 Support independent `/trace`, `/dump`, `/screenshot`, `/reload`, and `/exit` command-line switches.

@@ -28,12 +28,7 @@ The design emphasizes glanceable visuals with large load indicators, concise num
 
 ## Requirements
 
-Runtime requirements:
-
-- Windows 11
-- AMD Software: Adrenalin Edition, including the ADLX runtime, for AMD GPU telemetry
-- Gigabyte SIV installed on supported Gigabyte motherboards when named board temperature and fan telemetry are desired
-
+Runtime prerequisites and developer setup are documented in [docs/build.md](/D:/Projects/SystemTelemetry/docs/build.md).
 The application must not depend on LibreHardwareMonitor or OpenHardwareMonitor.
 
 ## Configuration
@@ -48,34 +43,21 @@ Examples include:
 - Which named board temperature and fan metrics to render through the layout bindings
 
 At runtime, the application must first load an embedded default `config.ini` resource, then read `config.ini` from the same directory as `SystemTelemetry.exe` when that file exists and overlay its values on top of the embedded defaults.
-The embedded `config.ini` resource must be the only self-documented source of truth for the config file format and supported entries; the rest of the repository does not need to duplicate per-entry config documentation.
-Display placement in `config.ini` must use the compact `position = x,y` form for consistency with the rest of the pair-based config syntax.
+The embedded `resources/config.ini` template must remain the single maintained source of truth for config-file entries, and [docs/layout.md](/D:/Projects/SystemTelemetry/docs/layout.md) must remain the single maintained source of truth for config-language syntax, section ownership, and examples.
 Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance.
 The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
 The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.
-Metric-list normalization ceilings for non-capacity rows such as CPU clock, GPU temperature, GPU clock, GPU fan, and requested board temperatures and fans must come from a dedicated `[metric_scales]` section in `config.ini` that appears before `[layout]`, so those visual maxima can be tuned without code changes.
-Widget-specific sizing in `config.ini` must live in dedicated sections named exactly after the widget, with those sections appearing before `[layout]`.
-The `[layout]` section in `config.ini` must control only the dashboard window size, shared spacing metrics, the generic dashboard card-placement layout, color palette, and UI font faces, sizes, and weights.
 The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using the current monitor DPI before rendering.
 When `display.monitor_name` targets a monitor that is not yet available during login startup, display-topology churn, or a temporary unplug, the UI must keep watching for that configured monitor instead of locking in a fallback monitor placement, and once the monitor is available it must apply the saved logical position there.
-Each dashboard card must have its own `[card.<id>]` section in `config.ini` that provides the card title, icon name, and widget layout expression.
-Layout-expression weights in `config.ini` must use the `name:weight(...)` form so the relative size is visually attached to the container or widget name it affects.
-Generic widget types such as `text(...)`, `gauge(...)`, `metric_list(...)`, and `throughput(...)` must bind to telemetry through explicit metric names in layout config.
-Widgets that need multiple values, such as `metric_list(...)` and `drive_usage_list(...)`, must take a widget-specific plain comma-separated parameter body.
-`metric_list(...)` items may append `=Label` so the UI row caption can be customized without changing the underlying metric binding.
-The layout language must accept only the documented generic widget names and explicit metric bindings; aliases such as `cpu_name`, `gauge_cpu_load`, and `throughput_upload` are invalid.
-The config language must treat section names, key names, card ids, container names, widget names, icon names, and metric references as case-sensitive identifiers; differently cased names remain distinct and mixed-case aliases are invalid.
 The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
 The list of rendered cards must come from layout config.
 The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.
-The layout language must support a non-rendering spacer widget so cards may reserve matching vertical or horizontal space when neighboring cards need to keep plot or metric regions aligned.
 The dedicated widget sections must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments preserve or intentionally retune the visual rhythm.
 The dedicated `drive_usage_list` section must provide a drive-usage bar thickness setting so storage usage bars can be tuned independently from row height and from the thinner CPU/GPU metric bars.
 The dedicated widget sections must own the widget-level geometry that affects visual rhythm, including metric bar thickness, throughput plot chrome sizes, gauge preferred size, and the fixed widths used by the storage drive row columns.
 The renderer must not rely on buried widget-spacing or widget-geometry pixel literals for text, footer, clock, gauge, or throughput sizing; those visual sizes must come from `config.ini` widget sections, with only non-visual safety clamps left in code.
 Widths that are fully determined by fixed renderer text such as throughput labels, throughput axis labels, drive-letter labels, and the `100%` drive percent column should be measured from the configured fonts at layout load and adjusted only by widget-section padding entries.
 The layout language must support a top-aligned stack mode that packs children at their preferred heights and leaves any remaining space below them, so lists such as drive usage rows do not have to stretch to fill the whole card column.
-When diagnostics trace logging is enabled, renderer startup must trace the measured font heights plus the computed layout heights and resolved rectangles so layout tuning can be calibrated from exact numbers.
 The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
 The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
 The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
@@ -114,7 +96,7 @@ GPU telemetry must provide:
 If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable.
 Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
 Gigabyte motherboard board-metric telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the requested `board.temp.*` and `board.fan.*` metrics unavailable.
-The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, match requested `board.temp.*` and `board.fan.*` names directly by sensor title, and report provider diagnostics through `/dump`.
+The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested `board.temp.*` and `board.fan.*` names directly by sensor title.
 
 ## Size and placement
 
@@ -238,7 +220,7 @@ GPU Load (%)
 Metrics (display as thin bars)
 
 VRAM usage
-Example: 3.2 / 16 GB
+Format: used / total
 Temp (°C)
 Clock (MHz)
 Fan (RPM)
