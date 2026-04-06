@@ -58,6 +58,7 @@ Metric-list normalization ceilings for non-capacity rows such as CPU clock, GPU 
 Widget-specific sizing in `config.ini` must live in dedicated sections named exactly after the widget, with those sections appearing before `[layout]`.
 The `[layout]` section in `config.ini` must control only the dashboard window size, shared spacing metrics, the generic dashboard card-placement layout, color palette, and UI font faces, sizes, and weights.
 The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using the current monitor DPI before rendering.
+When `display.monitor_name` targets a monitor that is not yet available during login startup, display-topology churn, or a temporary unplug, the UI must keep watching for that configured monitor instead of locking in a fallback monitor placement, and once the monitor is available it must apply the saved logical position there.
 Each dashboard card must have its own `[card.<id>]` section in `config.ini` that provides the card title, icon name, and widget layout expression.
 Layout-expression weights in `config.ini` must use the `name:weight(...)` form so the relative size is visually attached to the container or widget name it affects.
 Generic widget types such as `text(...)`, `gauge(...)`, `metric_list(...)`, and `throughput(...)` must bind to telemetry through explicit metric names in layout config.

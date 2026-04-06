@@ -33,8 +33,10 @@ namespace {
 
 constexpr UINT_PTR kRefreshTimerId = 1;
 constexpr UINT_PTR kMoveTimerId = 2;
+constexpr UINT_PTR kPlacementTimerId = 3;
 constexpr UINT kRefreshTimerMs = 500;
 constexpr UINT kMoveTimerMs = 16;
+constexpr UINT kPlacementTimerMs = 2000;
 constexpr UINT kTrayMessage = WM_APP + 1;
 constexpr UINT kCommandMove = 1001;
 constexpr UINT kCommandBringOnTop = 1002;
@@ -739,6 +741,9 @@ private:
     COLORREF MutedTextColor() const;
     int WindowWidth() const;
     int WindowHeight() const;
+    void StartPlacementWatch();
+    void StopPlacementWatch();
+    void RetryConfigPlacementIfPending();
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
         COLORREF color, UINT format);
@@ -758,6 +763,7 @@ private:
     std::unique_ptr<DiagnosticsSession> diagnostics_;
     std::chrono::steady_clock::time_point lastDiagnosticsOutput_{};
     UINT currentDpi_ = kDefaultDpi;
+    bool placementWatchActive_ = false;
 };
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -865,27 +871,55 @@ void DashboardApp::ApplyConfigPlacement() {
     UINT targetDpi = hwnd_ != nullptr ? CurrentWindowDpi() : GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
     int left = 100 + ScaleLogicalToPhysical(config_.positionX, targetDpi);
     int top = 100 + ScaleLogicalToPhysical(config_.positionY, targetDpi);
+    bool monitorResolved = config_.monitorName.empty();
     if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
+        monitorResolved = true;
         targetDpi = monitor->dpi;
         left = monitor->rect.left + ScaleLogicalToPhysical(config_.positionX, targetDpi);
         top = monitor->rect.top + ScaleLogicalToPhysical(config_.positionY, targetDpi);
     }
 
-    const UINT currentDpi = CurrentWindowDpi();
-    if (targetDpi != currentDpi) {
-        RECT currentRect{};
-        if (GetWindowRect(hwnd_, &currentRect)) {
-            SetWindowPos(hwnd_, HWND_TOP, left, top,
-                currentRect.right - currentRect.left,
-                currentRect.bottom - currentRect.top,
-                SWP_NOACTIVATE);
-        }
+    if (!monitorResolved) {
+        return;
     }
 
-    if (CurrentWindowDpi() != targetDpi && !ApplyWindowDpi(targetDpi)) {
+    const UINT currentDpi = CurrentWindowDpi();
+    if (targetDpi != currentDpi) {
+        SetWindowPos(hwnd_, HWND_TOP, left, top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+
+    if ((CurrentWindowDpi() != targetDpi || currentDpi_ != targetDpi) && !ApplyWindowDpi(targetDpi)) {
         return;
     }
     SetWindowPos(hwnd_, HWND_TOP, left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE);
+}
+
+void DashboardApp::StartPlacementWatch() {
+    if (hwnd_ == nullptr || config_.monitorName.empty()) {
+        StopPlacementWatch();
+        return;
+    }
+    SetTimer(hwnd_, kPlacementTimerId, kPlacementTimerMs, nullptr);
+    placementWatchActive_ = true;
+}
+
+void DashboardApp::StopPlacementWatch() {
+    if (hwnd_ != nullptr) {
+        KillTimer(hwnd_, kPlacementTimerId);
+    }
+    placementWatchActive_ = false;
+}
+
+void DashboardApp::RetryConfigPlacementIfPending() {
+    if (!placementWatchActive_ || hwnd_ == nullptr || isMoving_) {
+        return;
+    }
+    if (config_.monitorName.empty() || FindTargetMonitor(config_.monitorName).has_value()) {
+        ApplyConfigPlacement();
+        movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+        InvalidateRect(hwnd_, nullptr, FALSE);
+        StopPlacementWatch();
+    }
 }
 
 bool DashboardApp::InitializeFonts() {
@@ -1000,6 +1034,7 @@ bool DashboardApp::ReloadConfigFromDisk() {
         }
         return false;
     }
+    StartPlacementWatch();
     ApplyConfigPlacement();
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
     InvalidateRect(hwnd_, nullptr, FALSE);
@@ -1274,6 +1309,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         if (!InitializeFonts()) {
             return -1;
         }
+        StartPlacementWatch();
         ApplyConfigPlacement();
         SetTimer(hwnd_, kRefreshTimerId, kRefreshTimerMs, nullptr);
         CreateTrayIcon();
@@ -1282,6 +1318,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         if (wParam == kMoveTimerId) {
             UpdateMoveTracking();
             InvalidateRect(hwnd_, nullptr, FALSE);
+            return 0;
+        }
+        if (wParam == kPlacementTimerId) {
+            RetryConfigPlacementIfPending();
             return 0;
         }
         telemetry_->UpdateSnapshot();
@@ -1344,9 +1384,18 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         InvalidateRect(hwnd_, nullptr, FALSE);
         return 0;
     case WM_DISPLAYCHANGE:
+        StartPlacementWatch();
+        RetryConfigPlacementIfPending();
         if (!ApplyWindowDpi(CurrentWindowDpi())) {
             return -1;
         }
+        movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+        InvalidateRect(hwnd_, nullptr, FALSE);
+        return 0;
+    case WM_DEVICECHANGE:
+    case WM_SETTINGCHANGE:
+        StartPlacementWatch();
+        RetryConfigPlacementIfPending();
         movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
         InvalidateRect(hwnd_, nullptr, FALSE);
         return 0;
@@ -1355,6 +1404,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_DESTROY:
         KillTimer(hwnd_, kRefreshTimerId);
         KillTimer(hwnd_, kMoveTimerId);
+        KillTimer(hwnd_, kPlacementTimerId);
         if (diagnostics_ != nullptr) {
             diagnostics_->WriteTraceMarker("diagnostics:ui_done");
         }
