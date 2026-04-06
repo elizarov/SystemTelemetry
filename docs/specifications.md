@@ -155,91 +155,96 @@ as the remaining instance.
 
 ## Style summary
 
-Visual Theme
-Background: pure black (#000000)
-Primary text: white (#FFFFFF)
-Accent color: cyan/blue (#00BFFF or similar)
+### Visual theme
 
-Panels
-Rounded rectangles with thin white borders
-Consistent padding inside all panels
-Subtle spacing between panels (8-12 px)
+- Background: pure black (`#000000`)
+- Primary text: white (`#FFFFFF`)
+- Accent color: cyan/blue (`#00BFFF` or similar)
 
-Typography
-Primary numbers (load, time): large, bold
-Labels: small, minimal (Temp, Clock, RAM, etc.)
-Units: slightly dimmer than values
+### Panels
 
-Visual Elements
-Circular gauges for CPU/GPU load with a segmented ring drawn in the track color and only the load-sized leading segments overlaid in the shared usage color
-Horizontal usage bars with rounded leading and trailing ends, with the straight middle section shrinking naturally to zero so empty values collapse to a circle the height of the bar
-Mini graphs for network and storage throughput activity
-Clean, minimal headers
-CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
-CPU and GPU load gauges must render as a segmented ring that follows the `[gauge]` config geometry, with the shipped default using a 262 degree clockwise sweep split into 42 slots with a bottom-centered opening and round-capped visible segment strokes separated by a small empty gap, filling clockwise from the lower-left toward the lower-right.
-Gauge fill must quantize to whole pills only; any usage above 0 percent lights the first pill, additional pills round up from the usage percentage, and partially filled pills must not be drawn.
-CPU and GPU load gauges must also overlay a small translucent max-ghost on the single segmented pill that corresponds to the highest retained load ratio seen in the shared recent 30 second history window.
-Each top-level panel header must show a small monochrome icon derived from the dashboard sketch for CPU, GPU, Network, Storage, and Time, with those icon assets stored under `resources\` and compiled into the executable.
-The application must define a custom app icon asset under `resources\`, embed it into the executable, and use that embedded icon for the executable and the tray icon.
-The CPU metrics stack must use the same vertical spacing and bar rhythm as the GPU metrics stack so both top cards read as a matched pair.
-The bottom row should keep enough width in the time card to avoid clipping the clock text, while giving most reclaimed horizontal space to the storage card and using slightly narrower network and storage throughput plot areas so the storage drive-usage section has more room.
+- Rounded rectangles with thin white borders
+- Consistent padding inside all panels
+- Subtle spacing between panels (`8-12 px`)
 
-Design Principles
-High contrast for readability on small screen
-Prioritize large, glanceable values
-Avoid clutter
-Consistent alignment across panels
+### Typography
+
+- Primary numbers (load, time): large, bold
+- Labels: small, minimal (`Temp`, `Clock`, `RAM`, and similar)
+- Units: slightly dimmer than values
+
+### Visual elements
+
+- Circular gauges for CPU/GPU load with a segmented ring drawn in the track color and only the load-sized leading segments overlaid in the shared usage color
+- Horizontal usage bars with rounded leading and trailing ends, with the straight middle section shrinking naturally to zero so empty values collapse to a circle the height of the bar
+- Mini graphs for network and storage throughput activity
+- Clean, minimal headers
+- CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
+- CPU and GPU load gauges must render as a segmented ring that follows the `[gauge]` config geometry, with the shipped default using a 262 degree clockwise sweep split into 42 slots with a bottom-centered opening and round-capped visible segment strokes separated by a small empty gap, filling clockwise from the lower-left toward the lower-right.
+- Gauge fill must quantize to whole pills only; any usage above 0 percent lights the first pill, additional pills round up from the usage percentage, and partially filled pills must not be drawn.
+- CPU and GPU load gauges must also overlay a small translucent max-ghost on the single segmented pill that corresponds to the highest retained load ratio seen in the shared recent 30 second history window.
+- Each top-level panel header must show a small monochrome icon derived from the dashboard sketch for CPU, GPU, Network, Storage, and Time, with those icon assets stored under `resources\` and compiled into the executable.
+- The application must define a custom app icon asset under `resources\`, embed it into the executable, and use that embedded icon for the executable and the tray icon.
+- The CPU metrics stack must use the same vertical spacing and bar rhythm as the GPU metrics stack so both top cards read as a matched pair.
+- The bottom row should keep enough width in the time card to avoid clipping the clock text, while giving most reclaimed horizontal space to the storage card and using slightly narrower network and storage throughput plot areas so the storage drive-usage section has more room.
+
+### Design principles
+
+- High contrast for readability on small screen
+- Prioritize large, glanceable values
+- Avoid clutter
+- Consistent alignment across panels
 
 ## CPU panel (top left)
 
-Header
-CPU model name
-Main Indicator
-Large circular gauge:
-CPU Load (%)
+### Header
+- CPU model name
+### Main indicator
+- Large circular gauge
+- CPU load (`%`)
 
-Metrics (display as thin bars)
+### Metrics
 
-RAM usage
-Format: used / total
-Temp (°C)
-Clock (GHz)
-Fan (RPM)
-System Fan (RPM)
+- RAM usage
+- Format: used / total
+- Temp (`°C`)
+- Clock (`GHz`)
+- Fan (`RPM`)
+- System Fan (`RPM`)
 Each CPU and GPU metric row bar must render with rounded leading and trailing ends, with the straight middle section proportional to the current value so the bar naturally collapses to a circle at zero, and overlay a small translucent vertical capsule marker at the highest bar ratio seen in the retained recent metric history.
 Metric-row peak ghosts must use the same shared retained-history-series path, 0.5 second update cadence, and 60-sample depth as the network and storage throughput plots, for a 30 second recent-max window.
 
 ## GPU panel (top right)
 
-Header
-GPU model name
-Main Indicator
-Large circular gauge:
-GPU Load (%)
+### Header
+- GPU model name
+### Main indicator
+- Large circular gauge
+- GPU load (`%`)
 
-Metrics (display as thin bars)
+### Metrics
 
-VRAM usage
-Format: used / total
-Temp (°C)
-Clock (MHz)
-Fan (RPM)
+- VRAM usage
+- Format: used / total
+- Temp (`°C`)
+- Clock (`MHz`)
+- Fan (`RPM`)
 
 ## Network panel (bottom left)
 
-Header
-Network
-Primary Values (prominent)
-Upload speed -> Up 0.3 MB/s
-Download speed -> Down 24.1 MB/s
-Graphs
-Two small scrolling graphs:
-Upload history
-Download history
-Footer
-Show upload speed, then the upload graph directly below it, then download speed, then the download graph directly below it.
-Use smaller text for the Up/Down speed readouts than the main metric text used elsewhere.
-Each graph must include a vertical axis and a small label showing the current max value used to scale that plot.
+### Header
+- Network
+### Primary values
+- Upload speed shown as `Up 0.3 MB/s`
+- Download speed shown as `Down 24.1 MB/s`
+### Graphs
+- Two small scrolling graphs
+- Upload history
+- Download history
+### Footer and graph behavior
+- Show upload speed, then the upload graph directly below it, then download speed, then the download graph directly below it.
+- Use smaller text for the Up/Down speed readouts than the main metric text used elsewhere.
+- Each graph must include a vertical axis and a small label showing the current max value used to scale that plot.
 Network and storage throughput plot scaling must be derived from the maximum value present in the retained history shown by that panel.
 The throughput plots should render a simple moving average over the most recent two readings so the line reflects a 1-second smoothing window while the numeric throughput readout continues to show the latest sampled value.
 Throughput plot scaling must use a minimum max of 10 MB/s, round the averaged max up in 5 MB/s steps through 100 MB/s, and then round it up in 50 MB/s steps above 100 MB/s.
@@ -253,52 +258,52 @@ Show adapter name and IP address together on the same final footer line when ava
 
 ## Storage panel (bottom center)
 
-Structure
+### Structure
 
-Stack read and write throughput sections on the left, with the same vertical rhythm and plot behavior used by the network panel, but at a slightly narrower width so the drive-usage list has more room.
-List the drives configured in the storage card's `drive_usage_list(...)` widget vertically on the right.
+- Stack read and write throughput sections on the left, with the same vertical rhythm and plot behavior used by the network panel, but at a slightly narrower width so the drive-usage list has more room.
+- List the drives configured in the storage card's `drive_usage_list(...)` widget vertically on the right.
 
-Throughput
-Read throughput
-Write throughput
-These throughput values should come from total system disk I/O counters.
+### Throughput
+- Read throughput
+- Write throughput
+- These throughput values should come from total system disk I/O counters.
 
-Per Drive Row
-Drive letter
-Usage bar
-Usage %
-Free space
-Example Format
-C: 32% 2.5 TB free
-D: 44% 534 GB free
-E: 32% 5.0 TB free
-Visuals
-Thin pill-shaped horizontal bars whose straight middle section shrinks naturally to zero for empty values
-Consistent alignment
-Compact rows
+### Per-drive row
+- Drive letter
+- Usage bar
+- Usage `%`
+- Free space
+### Example format
+- `C: 32% 2.5 TB free`
+- `D: 44% 534 GB free`
+- `E: 32% 5.0 TB free`
+### Visuals
+- Thin pill-shaped horizontal bars whose straight middle section shrinks naturally to zero for empty values
+- Consistent alignment
+- Compact rows
 
 ## Time and date (bottom right)
 
-Content
-Time (large): 10:43
-Date (small): 2026-04-01
-Layout
-Centered horizontally
-Time is the dominant visual element
+### Content
+- Time (large): `10:43`
+- Date (small): `2026-04-01`
+### Layout
+- Centered horizontally
+- Time is the dominant visual element
 
 ## Behavior and data refresh
 
-Refresh Rates
-Shared telemetry snapshot timer: 0.5 sec
-CPU/GPU load: 0.5 sec
-GPU vendor metrics: 0.5 sec
-Network: 0.5 sec
-Storage throughput: 0.5 sec
-Storage drive usage: 0.5 sec
-Clock: 0.5 sec
+### Refresh rates
+- Shared telemetry snapshot timer: `0.5 sec`
+- CPU/GPU load: `0.5 sec`
+- GPU vendor metrics: `0.5 sec`
+- Network: `0.5 sec`
+- Storage throughput: `0.5 sec`
+- Storage drive usage: `0.5 sec`
+- Clock: `0.5 sec`
 
-Units
-CPU: GHz
-Memory: GB
-Network: MB/s
-Storage: GB/TB
+### Units
+- CPU: `GHz`
+- Memory: `GB`
+- Network: `MB/s`
+- Storage: `GB/TB`
