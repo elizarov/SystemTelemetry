@@ -892,6 +892,7 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const Das
     const float segmentThickness = static_cast<float>(std::max(1, ScaleLogical(config_.layout.gauge.ringThickness)));
     const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
     const double totalSweep = std::max(0.0, config_.layout.gauge.sweepDegrees);
+    const double gapSweep = std::max(0.0, 360.0 - totalSweep);
     const double slotSweep = totalSweep / static_cast<double>(segmentCount);
     const double segmentSweep = std::clamp(slotSweep - config_.layout.gauge.segmentGapDegrees, 0.0, slotSweep);
     const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
@@ -902,7 +903,7 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const Das
     const int peakSegment = clampedPeakRatio <= 0.0 ? -1
         : std::clamp(static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(segmentCount))) - 1,
             0, segmentCount - 1);
-    const double gaugeStart = config_.layout.gauge.startAngleDegrees;
+    const double gaugeStart = 90.0 + gapSweep / 2.0;
     const float segmentRadius = static_cast<float>(radius);
 
     Gdiplus::Graphics graphics(hdc);
