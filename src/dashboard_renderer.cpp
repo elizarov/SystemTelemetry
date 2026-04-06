@@ -228,20 +228,39 @@ void AddCapsulePath(Gdiplus::GraphicsPath& path, const Gdiplus::RectF& rect) {
     path.CloseFigure();
 }
 
-void FillGaugeSegment(Gdiplus::Graphics& graphics, float cx, float cy, float radius, float width, float height,
-    double angleDegrees, const Gdiplus::Color& color) {
-    if (width <= 0.0f || height <= 0.0f) {
+void FillGaugeSegment(Gdiplus::Graphics& graphics, float cx, float cy, float radius, float thickness,
+    double startAngleDegrees, double sweepAngleDegrees, const Gdiplus::Color& color) {
+    if (radius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
         return;
     }
 
-    Gdiplus::GraphicsPath path;
-    AddCapsulePath(path, Gdiplus::RectF(-width / 2.0f, -height / 2.0f, width, height));
+    const float outerRadius = radius + (thickness / 2.0f);
+    const float innerRadius = std::max(0.0f, radius - (thickness / 2.0f));
+    if (outerRadius <= innerRadius) {
+        return;
+    }
 
-    Gdiplus::Matrix transform;
-    transform.Rotate(static_cast<Gdiplus::REAL>(angleDegrees + 90.0));
-    const Gdiplus::PointF center = GaugePoint(cx, cy, radius, angleDegrees);
-    transform.Translate(center.X, center.Y, Gdiplus::MatrixOrderAppend);
-    path.Transform(&transform);
+    const float outerDiameter = outerRadius * 2.0f;
+    const float innerDiameter = innerRadius * 2.0f;
+    const Gdiplus::RectF outerRect(cx - outerRadius, cy - outerRadius, outerDiameter, outerDiameter);
+    const Gdiplus::RectF innerRect(cx - innerRadius, cy - innerRadius, innerDiameter, innerDiameter);
+    const Gdiplus::PointF outerStart = GaugePoint(cx, cy, outerRadius, startAngleDegrees);
+    const Gdiplus::PointF outerEnd = GaugePoint(cx, cy, outerRadius, startAngleDegrees + sweepAngleDegrees);
+    const Gdiplus::PointF innerEnd = GaugePoint(cx, cy, innerRadius, startAngleDegrees + sweepAngleDegrees);
+    const Gdiplus::PointF innerStart = GaugePoint(cx, cy, innerRadius, startAngleDegrees);
+
+    Gdiplus::GraphicsPath path;
+    path.StartFigure();
+    path.AddArc(outerRect, static_cast<Gdiplus::REAL>(startAngleDegrees), static_cast<Gdiplus::REAL>(sweepAngleDegrees));
+    path.AddLine(outerEnd, innerEnd);
+    if (innerRadius > 0.0f) {
+        path.AddArc(innerRect, static_cast<Gdiplus::REAL>(startAngleDegrees + sweepAngleDegrees),
+            static_cast<Gdiplus::REAL>(-sweepAngleDegrees));
+    } else {
+        path.AddLine(innerEnd, Gdiplus::PointF(cx, cy));
+    }
+    path.AddLine(innerStart, outerStart);
+    path.CloseFigure();
 
     Gdiplus::SolidBrush brush(color);
     graphics.FillPath(&brush, &path);
@@ -963,20 +982,17 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const Das
 
     for (int i = 0; i < segmentCount; ++i) {
         const double slotStart = gaugeStart + slotSweep * static_cast<double>(i);
-        const double segmentCenterAngle = slotStart + segmentSweep / 2.0;
-        const float trackLength = std::max(1.0f,
-            static_cast<float>(segmentRadius * (segmentSweep * 3.14159265358979323846 / 180.0)));
-        FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius, trackLength,
-            segmentThickness, segmentCenterAngle, trackColor);
+        FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
+            segmentThickness, slotStart, segmentSweep, trackColor);
 
         if (i < filledSegments) {
-            FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius, trackLength,
-                segmentThickness, segmentCenterAngle, usageColor);
+            FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
+                segmentThickness, slotStart, segmentSweep, usageColor);
         }
 
         if (i == peakSegment) {
-            FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius, trackLength,
-                segmentThickness, segmentCenterAngle, ghostColor);
+            FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
+                segmentThickness, slotStart, segmentSweep, ghostColor);
         }
     }
 

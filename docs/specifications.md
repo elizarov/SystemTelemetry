@@ -194,7 +194,7 @@ While moving, show an overlay in the top-left corner with:
 - Mini graphs for network and storage throughput activity
 - Clean, minimal headers
 - CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
-- CPU and GPU load gauges must render as a segmented ring that follows the `[gauge]` config geometry, with the shipped default using a 262 degree clockwise sweep split into 33 slots with a bottom-centered opening derived from that sweep and round-capped visible segment strokes separated by a small empty gap, filling clockwise from the lower-left toward the lower-right.
+- CPU and GPU load gauges must render as a segmented ring that follows the `[gauge]` config geometry, with the shipped default using a 262 degree clockwise sweep split into 33 slots with a bottom-centered opening derived from that sweep and ring-slice segments separated by a small empty gap, filling clockwise from the lower-left toward the lower-right.
 - Gauge fill must quantize to whole pills only; any usage above 0 percent lights the first pill, additional pills round up from the usage percentage, and partially filled pills must not be drawn.
 - CPU and GPU load gauges must also overlay a small translucent max-ghost on the single segmented pill that corresponds to the highest retained load ratio seen in the shared recent 30 second history window.
 - Each top-level panel header must show a small monochrome icon derived from the dashboard sketch for CPU, GPU, Network, Storage, and Time, with those icon assets stored under `resources\` and compiled into the executable.
