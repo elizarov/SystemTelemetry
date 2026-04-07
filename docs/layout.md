@@ -32,12 +32,13 @@ The language is centered around the dashboard shape:
 
 ## Structure
 
-The language has three levels:
+The language has five levels:
 
 1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, `[clock_time]`, and `[clock_date]`
 2. Runtime selection sections such as `[display]` and `[network]`
-3. Dashboard-level shared geometry, card-placement layout, palette, and fonts in `[layout]`
-4. Card-local title, icon, and content composition in `[card.<id>]`
+3. Board sensor mapping in `[board]`
+4. Dashboard-level shared geometry, card-placement layout, palette, and fonts in `[layout]`
+5. Card-local title, icon, and content composition in `[card.<id>]`
 
 ## Runtime selection sections
 
@@ -50,6 +51,11 @@ The language has three levels:
 `[network]` owns runtime adapter selection:
 
 - `adapter_name = ...`
+
+`[board]` owns the mapping from logical layout metric names to board-specific sensor titles:
+
+- `board.temp.<name> = sensor title`
+- `board.fan.<name> = sensor title`
 
 ## Widget sections
 
@@ -207,7 +213,7 @@ Examples:
 
 - `text(cpu.name)`
 - `gauge(gpu.load)`
-- `metric_list(cpu.ram,board.temp.CPU=Temp,cpu.clock,board.fan.CPU,board.fan.System 1=System Fan)`
+- `metric_list(cpu.ram,board.temp.cpu=Temp,cpu.clock,board.fan.cpu,board.fan.system=System Fan)`
 - `throughput(network.upload)`
 - `drive_usage_list(C,D,E)`
 
@@ -219,8 +225,9 @@ Supported metric references include:
 - `cpu.load`
 - `cpu.clock`
 - `cpu.ram`
-- `board.temp.CPU`
-- `board.fan.CPU`
+- `board.temp.cpu`
+- `board.fan.cpu`
+- `board.fan.system`
 - `gpu.name`
 - `gpu.load`
 - `gpu.temp`
@@ -239,10 +246,11 @@ Rendering-oriented selection lives in the layout language when it changes what i
 Example:
 
 - `drive_usage_list(C,D,E)`
-- `metric_list(cpu.ram=RAM,board.temp.CPU=Temp,board.fan.CPU=Fan,board.fan.System 1=System Fan)`
+- `metric_list(cpu.ram=RAM,board.temp.cpu=Temp,board.fan.cpu=Fan,board.fan.system=System Fan)`
 
 - This defines a vertical list of drive-usage widgets and their order.
-- It also makes the layout the source of truth for which named board temperature and fan sensors are requested from the board provider.
+- It also makes the layout the source of truth for which logical board temperature and fan metrics are requested from the board provider.
+- The `[board]` section maps those logical metric names to the board-specific sensor titles that the provider looks up.
 
 ## Consistency rules
 

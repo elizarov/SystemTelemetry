@@ -46,7 +46,7 @@
   - Discovers the installed SIV directory from the uninstall registry and resolves vendor assembly dependencies from that directory.
   - Loads the required Gigabyte assemblies in-process through a mixed-mode C++/CLI bridge.
   - Initializes `Gigabyte.Engine.EnvironmentControl.HardwareMonitor.HardwareMonitorControlModule` against the `HwRegister` source through reflection.
-  - Maps layout-requested named board fan and temperature metrics directly to SIV sensor titles without any helper process or text-protocol layer.
+  - Maps layout-requested logical board fan and temperature metrics to SIV sensor titles through the parsed `[board]` config section without any helper process or text-protocol layer.
 - `resources/`: embedded UI assets, including the panel header icons extracted from the design sketch, the custom app icon, the self-documented embedded `config.ini` template, and the `.rc` plus resource-id definitions used to compile them into the executable.
 - `resources/SystemTelemetry.manifest`: embedded Win32 application manifest that keeps the app at `asInvoker`, disables legacy file virtualization so config I/O targets the real executable-side `config.ini`, and opts the process into per-monitor DPI-aware rendering.
 - `install.cmd`: elevated deployment script that builds via `build.cmd`, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and leaves automatic startup to the runtime popup-menu toggle.
@@ -80,14 +80,14 @@
 - Config I/O flow: `src/config.cpp` reads and writes UTF-8 `config.ini` text through standard `std::ifstream` and `std::ofstream` primitives.
   - Strips an existing UTF-8 BOM on load for compatibility.
   - Loads the embedded `resources/config.ini` blob through the Win32 resource API as the baseline config, then overlays executable-side values on top.
-  - Parses the `[display]` wallpaper setting, the `[metric_scales]` section, the dedicated per-widget sizing sections, the shared `[layout]` geometry/palette/font keys, and the `[card.*]` layout expressions and widget bindings.
+  - Parses the `[display]` wallpaper setting, the `[network]` adapter selection, the `[board]` logical-board-metric-to-sensor mapping section, the `[metric_scales]` section, the dedicated per-widget sizing sections, the shared `[layout]` geometry/palette/font keys, and the `[card.*]` layout expressions and widget bindings.
   - Replaces each parsed layout expression during overlay so executable-side config overrides embedded defaults without duplicating cards or widgets.
   - Keeps the embedded resource as the only shipped source of default layout, card, and widget definitions.
 - UI flow: `DashboardApp` owns the native window, tray icon, popup menu, move mode overlay, config reload/save actions, one-off diagnostics dump and screenshot Save-dialog actions, custom app-icon loading for the window and tray, tray double-click bring-to-front handling, and the active telemetry runtime.
   - Tracks the current monitor DPI, converts saved logical placement into physical pixels for window moves, seeds the first `CreateWindowExW` size and position from the configured monitor when available, listens for `WM_DPICHANGED`, `WM_DISPLAYCHANGE`, `WM_DEVICECHANGE`, and `WM_SETTINGCHANGE`, rebuilds renderer resources when the dashboard crosses onto a monitor with a different scale, applies the configured wallpaper through `IDesktopWallpaper`, and keeps a placement-watch timer armed while a configured monitor is missing.
   - Measures move-overlay fonts at paint time and lays the overlay out from scaled metrics while showing the current monitor scale, monitor name, and logical position.
   - Uses `DashboardRenderer` for panel-icon loading, UI font creation, static layout caching, and GDI/GDI+ drawing for cards and generic widget kinds such as text, gauge, metric-list, throughput, drive-usage, clock, footer, and spacer widgets.
-  - Uses `DashboardMetricSource` to resolve metric names like `board.temp.CPU`, `board.fan.System 1`, `gpu.load`, and `storage.read` into the data shape each widget needs.
+  - Uses `DashboardMetricSource` to resolve metric names like `board.temp.cpu`, `board.fan.system`, `gpu.load`, and `storage.read` into the data shape each widget needs.
   - Supports both stretch-to-fill vertical stacks and top-packed `stack_top(...)` containers, and sources widget geometry from the dedicated widget config sections.
   - Builds the `Config To Display` submenu from the currently enumerable monitors, shows each monitor as friendly name plus physical resolution, greys out monitors whose physical resolution does not match the dashboard's DPI-scaled window size, and when selected writes `telemetry_blank.png`, updates `config.ini`, and applies wallpaper in one local or elevated flow.
   - Tears down the current telemetry runtime before `Reload Config` creates a replacement, reapplies executable-side `config.ini`, reapplies any configured monitor wallpaper, recomputes static card and widget rectangles, and repaints immediately.

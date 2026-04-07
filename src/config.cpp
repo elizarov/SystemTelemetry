@@ -641,6 +641,14 @@ void ApplyCardValue(LayoutConfig& layout, const std::string& section, const std:
     }
 }
 
+void ApplyBoardValue(AppConfig& config, const std::string& key, const std::string& value) {
+    if (key.rfind("board.temp.", 0) == 0) {
+        config.boardTemperatureSensorNames[key.substr(std::string("board.temp.").size())] = value;
+    } else if (key.rfind("board.fan.", 0) == 0) {
+        config.boardFanSensorNames[key.substr(std::string("board.fan.").size())] = value;
+    }
+}
+
 void ApplyConfigText(const std::string& text, AppConfig& config) {
     std::string section;
     std::stringstream stream(text);
@@ -672,6 +680,8 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             ParseIntPair(value, config.positionX, config.positionY);
         } else if (section == "network" && key == "adapter_name") {
             config.networkAdapter = value;
+        } else if (section == "board") {
+            ApplyBoardValue(config, key, value);
         } else if (section == "metric_scales") {
             ApplyMetricScaleValue(config.metricScales, key, value);
         } else if (section == "metric_list") {
@@ -833,17 +843,64 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
         }
     }
 
-    const auto ensureSection = [&lines](const std::string& sectionName) -> size_t {
+    const auto findSectionIndex = [&lines](const std::string& sectionName) -> size_t {
         for (size_t i = 0; i < lines.size(); ++i) {
             if (Trim(lines[i]) == sectionName) {
                 return i;
             }
+        }
+        return lines.size();
+    };
+
+    const auto ensureSection = [&lines, &findSectionIndex](const std::string& sectionName) -> size_t {
+        const size_t existingIndex = findSectionIndex(sectionName);
+        if (existingIndex < lines.size()) {
+            return existingIndex;
         }
         if (!lines.empty() && !lines.back().empty()) {
             lines.push_back("");
         }
         lines.push_back(sectionName);
         return lines.size() - 1;
+    };
+
+    const auto ensureSectionAfter = [&lines, &findSectionIndex](const std::string& sectionName,
+                                    const std::string& afterSectionName) -> size_t {
+        const size_t existingIndex = findSectionIndex(sectionName);
+        if (existingIndex < lines.size()) {
+            return existingIndex;
+        }
+
+        const size_t afterIndex = findSectionIndex(afterSectionName);
+        if (afterIndex >= lines.size()) {
+            if (!lines.empty() && !lines.back().empty()) {
+                lines.push_back("");
+            }
+            lines.push_back(sectionName);
+            return lines.size() - 1;
+        }
+
+        size_t insertIndex = afterIndex + 1;
+        while (insertIndex < lines.size()) {
+            const std::string next = Trim(lines[insertIndex]);
+            if (!next.empty() && next.front() == '[' && next.back() == ']') {
+                break;
+            }
+            ++insertIndex;
+        }
+
+        std::vector<std::string> insertedLines;
+        if (insertIndex > 0 && !lines[insertIndex - 1].empty()) {
+            insertedLines.push_back("");
+        }
+        insertedLines.push_back(sectionName);
+        if (insertIndex < lines.size() && !lines[insertIndex].empty()) {
+            insertedLines.push_back("");
+        }
+
+        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(insertIndex),
+            insertedLines.begin(), insertedLines.end());
+        return insertIndex + (insertedLines.front().empty() ? 1 : 0);
     };
 
     const auto findSectionEnd = [&lines](size_t sectionStart) -> size_t {
@@ -872,6 +929,24 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
     updateKey("[display]", "wallpaper", config.wallpaper);
     updateKey("[display]", "position", std::to_string(config.positionX) + "," + std::to_string(config.positionY));
     updateKey("[network]", "adapter_name", config.networkAdapter);
+
+    const size_t boardSectionStart = ensureSectionAfter("[board]", "[network]");
+    for (const std::string& logicalName : config.boardTemperatureNames) {
+        const auto it = config.boardTemperatureSensorNames.find(logicalName);
+        const std::string sensorName = it != config.boardTemperatureSensorNames.end() && !it->second.empty()
+            ? it->second
+            : logicalName;
+        ReplaceOrAppendKey(lines, boardSectionStart, findSectionEnd(boardSectionStart),
+            "board.temp." + logicalName, sensorName);
+    }
+    for (const std::string& logicalName : config.boardFanNames) {
+        const auto it = config.boardFanSensorNames.find(logicalName);
+        const std::string sensorName = it != config.boardFanSensorNames.end() && !it->second.empty()
+            ? it->second
+            : logicalName;
+        ReplaceOrAppendKey(lines, boardSectionStart, findSectionEnd(boardSectionStart),
+            "board.fan." + logicalName, sensorName);
+    }
 
     std::string output;
     for (size_t i = 0; i < lines.size(); ++i) {

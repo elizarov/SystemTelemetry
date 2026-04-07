@@ -85,8 +85,9 @@ Examples include:
 - When the current process cannot update that machine-wide `Run` entry directly, the auto-start toggle must prompt for elevation and complete the change through an elevated helper instance of the same executable.
 - When `network.adapter_name` is left empty, auto-selection should prefer the active adapter that best represents the routed connection, favoring adapters with a usable default gateway and IPv4 address over host-only or otherwise unrouted virtual adapters.
 - When `network.adapter_name` is set to a saved adapter name such as `Ethernet`, adapter selection should prefer an exact case-insensitive alias or description match and only fall back to substring matching when no exact match exists.
-- The layout bindings `board.temp.<name>` and `board.fan.<name>` must be the only source of truth for which named board sensors are requested at runtime.
-- The board provider must receive the set of requested board temperature and fan names by scanning all layout metric references that begin with `board.temp.` or `board.fan.`.
+- The layout bindings `board.temp.<name>` and `board.fan.<name>` must be the only source of truth for which logical named board metrics are requested at runtime.
+- The board provider must receive the set of requested logical board temperature and fan names by scanning all layout metric references that begin with `board.temp.` or `board.fan.`.
+- The `[board]` section must map each requested logical `board.temp.*` or `board.fan.*` metric name to the board-specific sensor title that the active board provider uses for lookup.
 - The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
 
 Diagnostics requirements live in `docs/diagnostics.md`.
@@ -122,7 +123,7 @@ GPU telemetry must provide:
 - Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
 - Per-drive storage activity indicators should come from per-drive logical-disk I/O counters for the configured drive letters.
 - Gigabyte motherboard board-metric telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the requested `board.temp.*` and `board.fan.*` metrics unavailable.
-- The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested `board.temp.*` and `board.fan.*` names directly by sensor title.
+- The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested logical `board.temp.*` and `board.fan.*` names through the configured `[board]` sensor-title mapping.
 
 ## Size and placement
 

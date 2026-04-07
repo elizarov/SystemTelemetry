@@ -459,6 +459,22 @@ public:
     }
 
 private:
+    std::string ResolveTemperatureSensorName(const std::string& logicalName) const {
+        const auto it = config_.boardTemperatureSensorNames.find(logicalName);
+        if (it != config_.boardTemperatureSensorNames.end() && !it->second.empty()) {
+            return it->second;
+        }
+        return logicalName;
+    }
+
+    std::string ResolveFanSensorName(const std::string& logicalName) const {
+        const auto it = config_.boardFanSensorNames.find(logicalName);
+        if (it != config_.boardFanSensorNames.end() && !it->second.empty()) {
+            return it->second;
+        }
+        return logicalName;
+    }
+
     tracing::Trace& trace() {
         static tracing::Trace nullTrace;
         return trace_ != nullptr ? *trace_ : nullTrace;
@@ -480,7 +496,9 @@ private:
             NamedScalarMetric metric;
             metric.name = requestedName;
             metric.metric.unit = "\xC2\xB0""C";
-            if (const TemperatureReading* reading = FindReadingByName(tempReadings_, requestedName); reading != nullptr) {
+            if (const TemperatureReading* reading =
+                    FindReadingByName(tempReadings_, ResolveTemperatureSensorName(requestedName));
+                reading != nullptr) {
                 metric.metric.value = reading->celsius;
             }
             metrics.push_back(std::move(metric));
@@ -495,7 +513,8 @@ private:
             NamedScalarMetric metric;
             metric.name = requestedName;
             metric.metric.unit = "RPM";
-            if (const FanReading* reading = FindReadingByName(fanReadings_, requestedName); reading != nullptr) {
+            if (const FanReading* reading = FindReadingByName(fanReadings_, ResolveFanSensorName(requestedName));
+                reading != nullptr) {
                 metric.metric.value = reading->rpm;
             }
             metrics.push_back(std::move(metric));

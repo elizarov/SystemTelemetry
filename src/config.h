@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -155,6 +156,8 @@ struct AppConfig {
     std::vector<std::string> driveLetters;
     std::vector<std::string> boardTemperatureNames;
     std::vector<std::string> boardFanNames;
+    std::unordered_map<std::string, std::string> boardTemperatureSensorNames;
+    std::unordered_map<std::string, std::string> boardFanSensorNames;
     MetricScaleConfig metricScales;
     LayoutConfig layout;
 };
