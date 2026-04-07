@@ -136,6 +136,7 @@ std::string FormatHresult(HRESULT value) {
 }
 
 std::filesystem::path GetRuntimeConfigPath();
+AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options);
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
     double scale, DashboardRenderer::RenderMode renderMode, std::ostream* traceStream = nullptr,
@@ -498,6 +499,7 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.fake = HasSwitch("/fake");
     options.blank = HasSwitch("/blank");
     options.reload = HasSwitch("/reload");
+    options.defaultConfig = HasSwitch("/default-config");
     if (const auto layoutName = GetLayoutSwitchValue(); layoutName.has_value()) {
         options.layoutName = *layoutName;
     }
@@ -730,7 +732,7 @@ bool ReloadTelemetryRuntimeFromDisk(
     std::unique_ptr<TelemetryRuntime>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
     DiagnosticsSession* diagnostics) {
-    const AppConfig reloadedConfig = LoadConfig(configPath);
+    const AppConfig reloadedConfig = LoadConfig(configPath, !diagnosticsOptions.defaultConfig);
     AppConfig effectiveReloadedConfig = reloadedConfig;
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarker("diagnostics:reload_config_begin");
@@ -764,7 +766,7 @@ bool ReloadTelemetryRuntimeFromDisk(
 }
 
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
-    AppConfig config = LoadConfig(GetRuntimeConfigPath());
+    AppConfig config = LoadRuntimeConfig(diagnosticsOptions);
     DiagnosticsSession diagnostics(diagnosticsOptions);
     if (!diagnostics.Initialize()) {
         return 1;
@@ -1126,6 +1128,10 @@ std::filesystem::path GetRuntimeConfigPath() {
     return GetExecutableDirectory() / L"config.ini";
 }
 
+AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) {
+    return LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig);
+}
+
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) {
     if (config.display.wallpaper.empty()) {
         return true;
@@ -1355,7 +1361,7 @@ int DashboardApp::WindowHeight() const {
 
 bool DashboardApp::Initialize(HINSTANCE instance) {
     instance_ = instance;
-    config_ = LoadConfig(GetRuntimeConfigPath());
+    config_ = LoadRuntimeConfig(diagnosticsOptions_);
     if (!ApplyDiagnosticsLayoutOverride(config_, diagnosticsOptions_)) {
         return false;
     }

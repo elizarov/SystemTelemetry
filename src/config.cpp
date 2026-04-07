@@ -874,10 +874,12 @@ bool SelectResolvedLayout(AppConfig& config, const std::string& requestedName) {
     return true;
 }
 
-AppConfig LoadConfig(const std::filesystem::path& path) {
+AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config);
-    ApplyConfigText(ReadFileUtf8(path), config);
+    if (includeOverlay) {
+        ApplyConfigText(ReadFileUtf8(path), config);
+    }
     MarkCardLayoutReferences(config.layout);
     SelectResolvedLayout(config, config.display.layout);
 

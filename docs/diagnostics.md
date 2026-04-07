@@ -11,6 +11,7 @@ This document is the single maintained source of truth for diagnostics command b
 - `/exit` runs diagnostics as a one-shot headless export path instead of starting the dashboard UI.
 - `/fake[:path]` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` in the current working directory, or from the optional fake dump path.
 - `/layout:<name>` overrides `display.layout` for the current process so diagnostics can validate a named layout without editing `config.ini`.
+- `/default-config` suppresses loading the executable-side `config.ini` overlay and uses only the embedded `resources/config.ini` defaults for the current process.
 - `/blank` switches screenshot rendering into a blank background mode that keeps static dashboard chrome and static text such as CPU and GPU names while omitting dynamic metric text, time, date, plots, leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 - `/scale:<value>` multiplies headless `/screenshot /exit` render size, including all measured layout geometry, and accepts fractional values such as `1.5`.
 - `/blank` cannot be combined with `/fake`.
@@ -32,6 +33,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Without `/exit`, the application starts the normal dashboard UI and keeps producing any requested diagnostics outputs while it runs.
 - In UI-attached mode, trace logging continues for the process lifetime, while dump and screenshot outputs refresh once per second from the latest snapshot.
 - With `/exit`, the application initializes telemetry from the normal runtime `config.ini`, performs the first update, optionally writes the requested outputs once, and exits without starting the GUI.
+- With `/default-config`, the application skips the executable-side `config.ini` overlay and keeps only the embedded default config for startup and `/reload` diagnostics runs.
 - With `/layout:<name>`, the application applies that named layout after loading `config.ini` and keeps that override active for the rest of the process, including `/reload` diagnostics runs.
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
 - With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
@@ -62,13 +64,14 @@ This document is the single maintained source of truth for diagnostics command b
 
 - Always rebuild through `build.cmd` before validating diagnostics changes.
 - Always include `/trace` in diagnostics validation and inspect trace output, even when the primary change affects dump or screenshot behavior.
+- When headless validation is meant to exercise the built-in config, always add `/default-config` so executable-side `config.ini` does not mask the embedded defaults.
 - When validating default diagnostics paths, launch the executable from the intended working directory and confirm the default files land there.
 - When validation commands specify diagnostics paths explicitly, point them somewhere under `build\` so trace, dump, screenshot, and fake files do not pollute the repository root.
 - Verify UI-attached `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot`.
-- Verify headless `/trace /dump /screenshot /exit` and `/trace /reload /screenshot /exit`, and confirm the process exits after the requested export path.
+- Verify headless `/trace /default-config /dump /screenshot /exit` and `/trace /default-config /reload /screenshot /exit` when validating the built-in config, and confirm the process exits after the requested export path.
 - Verify headless `/trace /blank /screenshot /exit`, and confirm the saved PNG keeps the blank background composition without dynamic metric content.
 - Verify one headless run that supplies explicit output filenames such as `/trace:custom_trace.txt`, `/dump:custom_dump.txt`, and `/screenshot:custom_screenshot.png`, and confirm only the requested paths are updated.
-- Verify one headless `/trace /layout:<name> /screenshot /exit` run, and confirm the screenshot and trace use the requested named layout without editing `config.ini`.
+- Verify one headless `/trace /default-config /layout:<name> /screenshot /exit` run when validating the built-in config, and confirm the screenshot and trace use the requested named layout without editing `config.ini`.
 - When `/scale:<value>` is involved, confirm the screenshot uses the expected multiplied pixel dimensions while preserving the same logical composition.
 - For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm that editing the selected fake file changes the next one-second refresh without touching live providers, and verify one run with `/fake:custom_fake.txt`.
 - Verify `/blank /fake` fails before startup.

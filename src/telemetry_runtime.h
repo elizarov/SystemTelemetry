@@ -15,6 +15,7 @@ struct DiagnosticsOptions {
     bool fake = false;
     bool blank = false;
     bool reload = false;
+    bool defaultConfig = false;
     double scale = 1.0;
     std::string layoutName;
     std::filesystem::path tracePath;

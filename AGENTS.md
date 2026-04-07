@@ -21,6 +21,7 @@ Validation workflow:
 - Build first with `build.cmd`.
 - Prefer headless verification commands after the build so checks are repeatable and do not depend on manually closing the UI.
 - Use the smallest `/exit` combination that proves the change.
+- When headless validation is meant to exercise the built-in `resources/config.ini` behavior, always add `/default-config` so the executable-side `config.ini` overlay does not mask the embedded defaults.
 - When validation commands specify diagnostics paths explicitly, point them somewhere under `build\` so trace, dump, screenshot, and fake files do not pollute the repository root.
 - Use [docs/diagnostics.md](docs/diagnostics.md) as the single maintained source of truth for post-build diagnostics command examples and what to inspect.
 
