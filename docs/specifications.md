@@ -48,6 +48,7 @@ Examples include:
 
 - At runtime, the application must first load an embedded default `config.ini` resource, then read `config.ini` from the same directory as `SystemTelemetry.exe` when that file exists and overlay its values on top of the embedded defaults.
 - The embedded `resources/config.ini` template must remain the single maintained source of truth for config-file entries, and [docs/layout.md](layout.md) must remain the single maintained source of truth for config-language syntax, section ownership, and examples.
+- The config parser must accept only the documented current `resources/config.ini` key spellings and metric references; undocumented legacy aliases are not supported.
 - Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance.
 - The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
 - The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.

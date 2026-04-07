@@ -118,16 +118,6 @@ std::string FormatHexColor(unsigned int color) {
     return stream.str();
 }
 
-void ApplyFontValue(UiFontConfig& font, const std::string& key, const std::string& value) {
-    if (key == "face") {
-        font.face = value;
-    } else if (key == "size") {
-        font.size = ParseIntOrDefault(value, font.size);
-    } else if (key == "weight") {
-        font.weight = ParseIntOrDefault(value, font.weight);
-    }
-}
-
 bool ParseIntPair(const std::string& value, int& first, int& second) {
     const std::vector<std::string> parts = Split(value, ',');
     if (parts.size() != 2) {
@@ -392,10 +382,6 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
 void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
     if (key == "window") {
         ParseIntPair(value, layout.windowWidth, layout.windowHeight);
-    } else if (key == "window_width") {
-        layout.windowWidth = ParseIntOrDefault(value, layout.windowWidth);
-    } else if (key == "window_height") {
-        layout.windowHeight = ParseIntOrDefault(value, layout.windowHeight);
     } else if (key == "background_color") {
         layout.backgroundColor = ParseHexColorOrDefault(value, layout.backgroundColor);
     } else if (key == "foreground_color") {
@@ -428,16 +414,10 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.cardPadding = ParseIntOrDefault(value, layout.cardPadding);
     } else if (key == "card_radius") {
         layout.cardRadius = ParseIntOrDefault(value, layout.cardRadius);
-    } else if (key == "card_border" || key == "card_border_width") {
+    } else if (key == "card_border") {
         layout.cardBorderWidth = ParseIntOrDefault(value, layout.cardBorderWidth);
     } else if (key == "header") {
         ParseIntTriple(value, layout.headerHeight, layout.headerIconSize, layout.headerGap);
-    } else if (key == "header_height") {
-        layout.headerHeight = ParseIntOrDefault(value, layout.headerHeight);
-    } else if (key == "header_icon_size") {
-        layout.headerIconSize = ParseIntOrDefault(value, layout.headerIconSize);
-    } else if (key == "header_gap") {
-        layout.headerGap = ParseIntOrDefault(value, layout.headerGap);
     } else if (key == "content_gap") {
         layout.contentGap = ParseIntOrDefault(value, layout.contentGap);
     } else if (key == "column_gap") {
@@ -446,11 +426,6 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.widgetLineGap = ParseIntOrDefault(value, layout.widgetLineGap);
     } else if (key == "cards") {
         ParseLayoutExpression(value, layout.cardsLayout);
-    } else if (key == "rows") {
-        LayoutNodeConfig parsed;
-        if (ParseLayoutExpression("rows(" + value + ")", parsed)) {
-            layout.cardsLayout = std::move(parsed);
-        }
     } else if (key == "font.title") {
         ParseFontSpec(layout.titleFont, value);
     } else if (key == "font.big") {
@@ -461,36 +436,6 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         ParseFontSpec(layout.labelFont, value);
     } else if (key == "font.small") {
         ParseFontSpec(layout.smallFont, value);
-    } else if (key == "title_font_face") {
-        ApplyFontValue(layout.titleFont, "face", value);
-    } else if (key == "title_font_size") {
-        ApplyFontValue(layout.titleFont, "size", value);
-    } else if (key == "title_font_weight") {
-        ApplyFontValue(layout.titleFont, "weight", value);
-    } else if (key == "big_font_face") {
-        ApplyFontValue(layout.bigFont, "face", value);
-    } else if (key == "big_font_size") {
-        ApplyFontValue(layout.bigFont, "size", value);
-    } else if (key == "big_font_weight") {
-        ApplyFontValue(layout.bigFont, "weight", value);
-    } else if (key == "value_font_face") {
-        ApplyFontValue(layout.valueFont, "face", value);
-    } else if (key == "value_font_size") {
-        ApplyFontValue(layout.valueFont, "size", value);
-    } else if (key == "value_font_weight") {
-        ApplyFontValue(layout.valueFont, "weight", value);
-    } else if (key == "label_font_face") {
-        ApplyFontValue(layout.labelFont, "face", value);
-    } else if (key == "label_font_size") {
-        ApplyFontValue(layout.labelFont, "size", value);
-    } else if (key == "label_font_weight") {
-        ApplyFontValue(layout.labelFont, "weight", value);
-    } else if (key == "small_font_face") {
-        ApplyFontValue(layout.smallFont, "face", value);
-    } else if (key == "small_font_size") {
-        ApplyFontValue(layout.smallFont, "size", value);
-    } else if (key == "small_font_weight") {
-        ApplyFontValue(layout.smallFont, "weight", value);
     }
 }
 

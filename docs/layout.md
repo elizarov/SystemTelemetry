@@ -95,6 +95,7 @@ Supported dashboard layout key:
 - `cards = rows(columns:weight(card:weight,...), ...)`
 
 Config sections, config keys, card ids, container names, widget names, icon names, and metric references are case-sensitive and must use their documented spelling exactly.
+Undocumented legacy key spellings and metric aliases are not supported.
 
 Example:
 

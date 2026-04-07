@@ -206,11 +206,11 @@ std::string DashboardMetricSource::ResolveText(const std::string& metricRef) con
 }
 
 DashboardGaugeMetric DashboardMetricSource::ResolveGauge(const std::string& metricRef) const {
-    if (metricRef == "cpu.load" || metricRef == "cpu.load_percent") {
+    if (metricRef == "cpu.load") {
         const double percent = std::clamp(snapshot_.cpu.loadPercent, 0.0, 100.0);
         return DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "cpu.load", percent / 100.0)};
     }
-    if (metricRef == "gpu.load" || metricRef == "gpu.load_percent") {
+    if (metricRef == "gpu.load") {
         const double percent = std::clamp(snapshot_.gpu.loadPercent, 0.0, 100.0);
         return DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "gpu.load", percent / 100.0)};
     }
