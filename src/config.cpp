@@ -379,13 +379,23 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
 void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
     if (key == "window") {
         ParseLogicalSize(value, layout.window);
-    } else if (key == "outer_margin") {
+    } else if (key == "cards") {
+        ParseLayoutExpression(value, layout.cardsLayout);
+    }
+}
+
+void ApplyDashboardValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
+    if (key == "outer_margin") {
         layout.outerMargin = ParseIntOrDefault(value, layout.outerMargin);
     } else if (key == "row_gap") {
         layout.rowGap = ParseIntOrDefault(value, layout.rowGap);
     } else if (key == "card_gap") {
         layout.cardGap = ParseIntOrDefault(value, layout.cardGap);
-    } else if (key == "card_padding") {
+    }
+}
+
+void ApplyCardStyleValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
+    if (key == "card_padding") {
         layout.cardPadding = ParseIntOrDefault(value, layout.cardPadding);
     } else if (key == "card_radius") {
         layout.cardRadius = ParseIntOrDefault(value, layout.cardRadius);
@@ -403,8 +413,6 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.columnGap = ParseIntOrDefault(value, layout.columnGap);
     } else if (key == "widget_line_gap") {
         layout.widgetLineGap = ParseIntOrDefault(value, layout.widgetLineGap);
-    } else if (key == "cards") {
-        ParseLayoutExpression(value, layout.cardsLayout);
     }
 }
 
@@ -656,6 +664,10 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             ApplyClockDateWidgetValue(config.layout.clockDate, key, value);
         } else if (section == "layout") {
             ApplyLayoutValue(config.layout, key, value);
+        } else if (section == "dashboard") {
+            ApplyDashboardValue(config.layout, key, value);
+        } else if (section == "card_style") {
+            ApplyCardStyleValue(config.layout, key, value);
         } else if (section == "colors") {
             ApplyColorValue(config.layout, key, value);
         } else if (section == "fonts") {

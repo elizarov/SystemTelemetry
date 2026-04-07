@@ -32,15 +32,17 @@ The language is centered around the dashboard shape:
 
 ## Structure
 
-The language has seven levels:
+The language has nine levels:
 
 1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, `[clock_time]`, and `[clock_date]`
 2. Runtime selection sections such as `[display]` and `[network]`
 3. Board sensor mapping in `[board]`
-4. Dashboard-level shared geometry and card-placement layout in `[layout]`
-5. Shared dashboard palette in `[colors]`
-6. Shared dashboard fonts in `[fonts]`
-7. Card-local title, icon, and content composition in `[card.<id>]`
+4. Dashboard structure in `[layout]`
+5. Shared dashboard outer spacing in `[dashboard]`
+6. Shared card chrome and inner spacing in `[card_style]`
+7. Shared dashboard palette in `[colors]`
+8. Shared dashboard fonts in `[fonts]`
+9. Card-local title, icon, and content composition in `[card.<id>]`
 
 ## Runtime selection sections
 
@@ -74,16 +76,23 @@ Supported widget geometry keys:
 - `[clock_time]`: `padding`
 - `[clock_date]`: `padding`
 
-## Dashboard section
+## Dashboard sections
 
-`[layout]` owns the shared geometry and dashboard card-placement layout.
+`[layout]` owns only the dashboard size and card-placement layout.
 
-Supported geometry keys:
+Supported `[layout]` keys:
 
 - `window = width,height`
+- `cards = rows(columns:weight(card:weight,...), ...)`
+
+`[dashboard]` owns the outer dashboard spacing:
+
 - `outer_margin = pixels`
 - `row_gap = pixels`
 - `card_gap = pixels`
+
+`[card_style]` owns shared card chrome and internal spacing:
+
 - `card_padding = pixels`
 - `card_radius = pixels`
 - `card_border = pixels`
@@ -93,10 +102,6 @@ Supported geometry keys:
 - `content_gap = pixels`
 - `column_gap = pixels`
 - `widget_line_gap = pixels`
-
-Supported dashboard layout key:
-
-- `cards = rows(columns:weight(card:weight,...), ...)`
 
 Config sections, config keys, card ids, container names, widget names, icon names, and metric references are case-sensitive and must use their documented spelling exactly.
 Undocumented legacy key spellings and metric aliases are not supported.
@@ -261,14 +266,25 @@ Example:
 
 Shared absolute geometry belongs only in `[layout]`, including:
 
+- window size
+- cards layout tree
+
+Shared dashboard spacing belongs only in `[dashboard]`, including:
+
 - margins
 - row and card gaps
+
+Shared card chrome and inner spacing belong only in `[card_style]`, including:
+
 - border radius and border width
 - card padding
 - header height, icon size, and icon gap
 - shared content spacing
+- column gap
 - `widget_line_gap`
-- layout geometry
+
+Shared visual styling belongs only in:
+
 - colors in `[colors]`
 - fonts in `[fonts]`
 
