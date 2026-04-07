@@ -20,6 +20,7 @@ The language is centered around the dashboard shape:
 
 - the dashboard-level `cards` layout places cards through generic containers
 - cards contain a small static composition of known widget kinds
+- card layouts may also reference another card id as a reusable sub-layout node
 
 ## Compact rules
 
@@ -144,6 +145,10 @@ Each card section uses:
 - `icon = ...`
 - `layout = ...`
 
+Card layouts may reference another card id as a leaf layout node when they want to reuse that card's inner layout:
+
+- `layout = columns(storage_throughput:5, storage_usage:7)`
+
 Recommended section names:
 
 - `[card.cpu]`
@@ -195,10 +200,12 @@ Supported layout kinds:
 Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching widget-section `*_padding` keys.
 
 Nested layout expressions are allowed.
+Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is a card-layout reference and resolves to that referenced card's layout during layout resolution.
 
 Example:
 
 - `columns(stack:5(throughput:4(storage.read),throughput:4(storage.write)), drive_usage_list:7(C,D,E))`
+- `columns(storage_throughput:5, storage_usage:7)`
 
 ## Widget names
 

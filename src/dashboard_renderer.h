@@ -135,6 +135,9 @@ private:
     void DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
     ResolvedWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
     bool UsesFixedPreferredHeightInStack(const ResolvedWidgetLayout& widget) const;
+    const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
+    void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets,
+        std::vector<std::string>& cardReferenceStack);
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();

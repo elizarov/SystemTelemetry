@@ -603,6 +603,37 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
     return parser.AtEnd();
 }
 
+bool IsWidgetOrContainerNodeName(const std::string& name) {
+    return name == "rows" || name == "columns" || name == "stack" || name == "stack_top" || name == "center" ||
+        name == "text" || name == "gauge" || name == "metric_list" || name == "throughput" ||
+        name == "network_footer" || name == "spacer" || name == "drive_usage_list" ||
+        name == "clock_time" || name == "clock_date";
+}
+
+void MarkCardReferencesRecursive(LayoutNodeConfig& node, const std::set<std::string>& cardIds) {
+    node.cardReference = false;
+    if (node.children.empty() && node.parameter.empty() &&
+        !IsWidgetOrContainerNodeName(node.name) &&
+        cardIds.find(node.name) != cardIds.end()) {
+        node.cardReference = true;
+    }
+    for (auto& child : node.children) {
+        MarkCardReferencesRecursive(child, cardIds);
+    }
+}
+
+void MarkCardLayoutReferences(LayoutConfig& layout) {
+    std::set<std::string> cardIds;
+    for (const auto& card : layout.cards) {
+        if (!card.id.empty()) {
+            cardIds.insert(card.id);
+        }
+    }
+    for (auto& card : layout.cards) {
+        MarkCardReferencesRecursive(card.layout, cardIds);
+    }
+}
+
 std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
     std::string text = node.name;
     if (node.weight != 1) {
@@ -847,6 +878,7 @@ AppConfig LoadConfig(const std::filesystem::path& path) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config);
     ApplyConfigText(ReadFileUtf8(path), config);
+    MarkCardLayoutReferences(config.layout);
     SelectResolvedLayout(config, config.display.layout);
 
     const LayoutBindingSelection layoutBindings = CollectLayoutBindings(config.layout);

@@ -109,6 +109,10 @@ bool IsDashboardContainerNode(const LayoutNodeConfig& node) {
     return node.name == "rows" || node.name == "columns";
 }
 
+bool ContainsCardReference(const std::vector<std::string>& stack, const std::string& cardId) {
+    return std::find(stack.begin(), stack.end(), cardId) != stack.end();
+}
+
 HFONT CreateUiFont(const UiFontConfig& font) {
     const std::wstring face = WideFromUtf8(font.face);
     return CreateFontW(-font.size, 0, 0, 0, font.weight, FALSE, FALSE, FALSE,
@@ -741,9 +745,38 @@ bool DashboardRenderer::UsesFixedPreferredHeightInStack(const ResolvedWidgetLayo
     return widget.fixedPreferredHeightInStack;
 }
 
+const LayoutCardConfig* DashboardRenderer::FindCardConfigById(const std::string& id) const {
+    const auto it = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
+        return card.id == id;
+    });
+    return it != config_.layout.cards.end() ? &(*it) : nullptr;
+}
+
 void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
+    std::vector<std::string> cardReferenceStack;
+    ResolveNodeWidgetsInternal(node, rect, widgets, cardReferenceStack);
+}
+
+void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node, const RECT& rect,
+    std::vector<ResolvedWidgetLayout>& widgets, std::vector<std::string>& cardReferenceStack) {
     WriteTrace("renderer:layout_resolve_node name=\"" + node.name + "\" weight=" + std::to_string(node.weight) +
         " " + FormatRect(rect) + " children=" + std::to_string(node.children.size()));
+    if (node.cardReference) {
+        if (ContainsCardReference(cardReferenceStack, node.name)) {
+            WriteTrace("renderer:layout_card_ref_cycle id=\"" + node.name + "\"");
+            return;
+        }
+        const LayoutCardConfig* referencedCard = FindCardConfigById(node.name);
+        if (referencedCard == nullptr) {
+            WriteTrace("renderer:layout_card_ref_missing id=\"" + node.name + "\"");
+            return;
+        }
+        WriteTrace("renderer:layout_card_ref id=\"" + node.name + "\" " + FormatRect(rect));
+        cardReferenceStack.push_back(node.name);
+        ResolveNodeWidgetsInternal(referencedCard->layout, rect, widgets, cardReferenceStack);
+        cardReferenceStack.pop_back();
+        return;
+    }
     if (!IsContainerNode(node)) {
         ResolvedWidgetLayout widget = ResolveWidgetLayout(node, rect);
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
@@ -771,7 +804,7 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
             WriteTrace("renderer:layout_top_packed_child parent=\"" + node.name + "\" child=\"" + child.name +
                 "\" preferred=" + std::to_string(preferred) + " gap=" + std::to_string(gap) +
                 " " + FormatRect(childRect));
-            ResolveNodeWidgets(child, childRect, widgets);
+            ResolveNodeWidgetsInternal(child, childRect, widgets, cardReferenceStack);
             cursor = static_cast<int>(childRect.bottom) + gap;
         }
         return;
@@ -834,7 +867,7 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
             " gap=" + std::to_string(gap) +
             " size=" + std::to_string(size) +
             " " + FormatRect(childRect));
-        ResolveNodeWidgets(child, childRect, widgets);
+        ResolveNodeWidgetsInternal(child, childRect, widgets, cardReferenceStack);
         cursor += size + gap;
         remainingAvailable -= size;
         if (!fixedPreferred) {

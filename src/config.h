@@ -94,6 +94,7 @@ struct LayoutNodeConfig {
     std::string name;
     int weight = 1;
     std::string parameter;
+    bool cardReference = false;
     std::vector<LayoutNodeConfig> children;
 };
 CONFIG_CODEC(LayoutNodeConfig, configschema::LayoutExpressionCodec);
