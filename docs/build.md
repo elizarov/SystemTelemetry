@@ -35,7 +35,7 @@ If AMD GPU metrics are missing:
 1. Install or update AMD Software: Adrenalin Edition for your Radeon GPU.
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
 3. Run `build\SystemTelemetry.exe /dump`.
-4. Check `build\telemetry_dump.txt` for the final snapshot and `build\telemetry_trace.txt` for the step-by-step provider diagnostics.
+4. Check `telemetry_dump.txt` and `telemetry_trace.txt` in the command's working directory for the final snapshot and step-by-step provider diagnostics.
 
 ### Gigabyte board metrics
 
@@ -45,4 +45,4 @@ If those board metrics are missing:
 
 1. Install Gigabyte SIV so its assemblies are present and registered.
 2. Run `build\SystemTelemetry.exe /trace /dump /exit`.
-3. Check `build\telemetry_dump.txt` for the `board_provider.*` block and `build\telemetry_trace.txt` for the `gigabyte_siv:*` trace lines.
+3. Check `telemetry_dump.txt` and `telemetry_trace.txt` in the command's working directory for the `board_provider.*` block and the `gigabyte_siv:*` trace lines.

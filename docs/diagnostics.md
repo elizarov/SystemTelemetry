@@ -4,24 +4,24 @@ This document is the single maintained source of truth for diagnostics command b
 
 ## Command-line switches
 
-- `/trace[:path]` enables continuous trace logging to `telemetry_trace.txt` beside the executable, or to the optional target path.
-- `/dump[:path]` writes a machine-parseable snapshot dump to `telemetry_dump.txt` beside the executable, or to the optional target path.
-- `/screenshot[:path]` writes a rendered dashboard PNG to `telemetry_screenshot.png` beside the executable, or to the optional target path.
+- `/trace[:path]` enables continuous trace logging to `telemetry_trace.txt` in the current working directory, or to the optional target path.
+- `/dump[:path]` writes a machine-parseable snapshot dump to `telemetry_dump.txt` in the current working directory, or to the optional target path.
+- `/screenshot[:path]` writes a rendered dashboard PNG to `telemetry_screenshot.png` in the current working directory, or to the optional target path.
 - `/reload` forces a config reload through the normal live-dashboard reload path before headless diagnostics outputs are exported.
 - `/exit` runs diagnostics as a one-shot headless export path instead of starting the dashboard UI.
-- `/fake[:path]` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` beside the executable, or from the optional fake dump path.
+- `/fake[:path]` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` in the current working directory, or from the optional fake dump path.
 - `/blank` switches screenshot rendering into a blank background mode that keeps static dashboard chrome and static text such as CPU and GPU names while omitting dynamic metric text, time, date, plots, leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 - `/scale:<value>` multiplies headless `/screenshot /exit` render size, including all measured layout geometry, and accepts fractional values such as `1.5`.
 - `/blank` cannot be combined with `/fake`.
 
 ## Output files
 
-- Without an explicit path, `/trace`, `/dump`, and `/screenshot` write beside the executable using their default filenames.
+- Without an explicit path, `/trace`, `/dump`, and `/screenshot` write in the current working directory using their default filenames.
 - With an explicit path, each switch writes the same content format to that requested path instead of the default file.
-- Without an explicit path, `/fake` reads `telemetry_fake.txt` beside the executable.
+- Without an explicit path, `/fake` reads `telemetry_fake.txt` from the current working directory.
 - With an explicit path, `/fake` reads that requested dump file instead of the default fake file.
-- Relative diagnostics paths resolve beside the executable.
-- The UI `Diagnostics` submenu uses a standard Save dialog and defaults `Save dump to...` and `Save screenshot to...` to the same executable-relative default file names used by `/dump` and `/screenshot`.
+- Relative diagnostics paths resolve from the current working directory.
+- The UI `Diagnostics` submenu uses a standard Save dialog and defaults `Save dump to...` and `Save screenshot to...` to the current working directory with the same default file names used by `/dump` and `/screenshot`.
 - Trace output appends plain UTF-8 text without a BOM and uses the prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
 - Dump output overwrites with a stable text format that can be copied directly into the default fake file or a `/fake` target file.
 - Screenshot output overwrites with only the rendered dashboard PNG.
@@ -60,6 +60,8 @@ This document is the single maintained source of truth for diagnostics command b
 
 - Always rebuild through `build.cmd` before validating diagnostics changes.
 - Always include `/trace` in diagnostics validation and inspect trace output, even when the primary change affects dump or screenshot behavior.
+- When validating default diagnostics paths, launch the executable from the intended working directory and confirm the default files land there.
+- When validation commands specify diagnostics paths explicitly, point them somewhere under `build\` so trace, dump, screenshot, and fake files do not pollute the repository root.
 - Verify UI-attached `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot`.
 - Verify headless `/trace /dump /screenshot /exit` and `/trace /reload /screenshot /exit`, and confirm the process exits after the requested export path.
 - Verify headless `/trace /blank /screenshot /exit`, and confirm the saved PNG keeps the blank background composition without dynamic metric content.

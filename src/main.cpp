@@ -177,6 +177,10 @@ std::filesystem::path GetExecutableDirectory() {
     return std::filesystem::path(modulePath).parent_path();
 }
 
+std::filesystem::path GetWorkingDirectory() {
+    return std::filesystem::current_path();
+}
+
 std::filesystem::path ResolveExecutableRelativePath(const std::filesystem::path& configuredPath) {
     if (configuredPath.empty()) {
         return {};
@@ -362,16 +366,16 @@ bool UpdateAutoStartRegistration(bool enabled, HWND owner) {
 }
 
 std::filesystem::path ResolveDiagnosticsOutputPath(
-    const std::filesystem::path& executableDirectory,
+    const std::filesystem::path& workingDirectory,
     const std::filesystem::path& configuredPath,
     const wchar_t* defaultFileName) {
     if (configuredPath.empty()) {
-        return executableDirectory / defaultFileName;
+        return workingDirectory / defaultFileName;
     }
     if (configuredPath.is_absolute()) {
         return configuredPath;
     }
-    return executableDirectory / configuredPath;
+    return workingDirectory / configuredPath;
 }
 
 std::optional<std::filesystem::path> PromptSavePath(
@@ -517,9 +521,9 @@ bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
 DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options) : options_(options) {}
 
 bool DiagnosticsSession::Initialize() {
-    const std::filesystem::path executableDirectory = GetExecutableDirectory();
+    const std::filesystem::path workingDirectory = GetWorkingDirectory();
     if (options_.trace) {
-        tracePath_ = ResolveDiagnosticsOutputPath(executableDirectory, options_.tracePath, kDefaultTraceFileName);
+        tracePath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.tracePath, kDefaultTraceFileName);
         traceStream_.open(tracePath_, std::ios::binary | std::ios::app);
         if (!traceStream_.is_open()) {
             ShowFileOpenError("trace file", tracePath_);
@@ -527,11 +531,11 @@ bool DiagnosticsSession::Initialize() {
         }
     }
     if (options_.dump) {
-        dumpPath_ = ResolveDiagnosticsOutputPath(executableDirectory, options_.dumpPath, kDefaultDumpFileName);
+        dumpPath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.dumpPath, kDefaultDumpFileName);
     }
     if (options_.screenshot) {
         screenshotPath_ =
-            ResolveDiagnosticsOutputPath(executableDirectory, options_.screenshotPath, kDefaultScreenshotFileName);
+            ResolveDiagnosticsOutputPath(workingDirectory, options_.screenshotPath, kDefaultScreenshotFileName);
     }
     return true;
 }
@@ -673,7 +677,7 @@ std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
     const DiagnosticsOptions& diagnosticsOptions,
     std::ostream* traceStream) {
     std::unique_ptr<TelemetryRuntime> runtime =
-        CreateTelemetryRuntime(diagnosticsOptions, GetExecutableDirectory());
+        CreateTelemetryRuntime(diagnosticsOptions, GetWorkingDirectory());
     if (runtime == nullptr) {
         return nullptr;
     }
@@ -1292,7 +1296,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     config_ = LoadConfig(GetRuntimeConfigPath());
     renderer_.SetConfig(config_);
     renderer_.SetTraceOutput(nullptr);
-    telemetry_ = CreateTelemetryRuntime(diagnosticsOptions_, GetExecutableDirectory());
+    telemetry_ = CreateTelemetryRuntime(diagnosticsOptions_, GetWorkingDirectory());
     if (diagnosticsOptions_.HasAnyOutput()) {
         diagnostics_ = std::make_unique<DiagnosticsSession>(diagnosticsOptions_);
         if (!diagnostics_->Initialize()) {
@@ -1498,7 +1502,7 @@ std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
     const wchar_t* defaultFileName,
     const wchar_t* filter,
     const wchar_t* defaultExtension) const {
-    return PromptSavePath(hwnd_, GetExecutableDirectory(), defaultFileName, filter, defaultExtension);
+    return PromptSavePath(hwnd_, GetWorkingDirectory(), defaultFileName, filter, defaultExtension);
 }
 
 void DashboardApp::SaveDumpAs() {
