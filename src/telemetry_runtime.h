@@ -18,6 +18,7 @@ struct DiagnosticsOptions {
     std::filesystem::path tracePath;
     std::filesystem::path dumpPath;
     std::filesystem::path screenshotPath;
+    std::filesystem::path fakePath;
 
     bool HasAnyOutput() const {
         return trace || dump || screenshot;

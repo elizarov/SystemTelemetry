@@ -9,16 +9,18 @@ This document is the single maintained source of truth for diagnostics command b
 - `/screenshot[:path]` writes a rendered dashboard PNG to `telemetry_screenshot.png` beside the executable, or to the optional target path.
 - `/reload` forces a config reload through the normal live-dashboard reload path before headless diagnostics outputs are exported.
 - `/exit` runs diagnostics as a one-shot headless export path instead of starting the dashboard UI.
-- `/fake` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` beside the executable.
+- `/fake[:path]` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` beside the executable, or from the optional fake dump path.
 - `/scale:<value>` multiplies headless `/screenshot /exit` render size, including all measured layout geometry, and accepts fractional values such as `1.5`.
 
 ## Output files
 
 - Without an explicit path, `/trace`, `/dump`, and `/screenshot` write beside the executable using their default filenames.
 - With an explicit path, each switch writes the same content format to that requested path instead of the default file.
-- Relative output paths resolve beside the executable.
+- Without an explicit path, `/fake` reads `telemetry_fake.txt` beside the executable.
+- With an explicit path, `/fake` reads that requested dump file instead of the default fake file.
+- Relative diagnostics paths resolve beside the executable.
 - Trace output appends plain UTF-8 text without a BOM and uses the prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
-- Dump output overwrites with a stable text format that can be copied directly into `telemetry_fake.txt`.
+- Dump output overwrites with a stable text format that can be copied directly into the default fake file or a `/fake` target file.
 - Screenshot output overwrites with only the rendered dashboard PNG.
 
 ## Runtime behavior
@@ -27,7 +29,7 @@ This document is the single maintained source of truth for diagnostics command b
 - In UI-attached mode, trace logging continues for the process lifetime, while dump and screenshot outputs refresh once per second from the latest snapshot.
 - With `/exit`, the application initializes telemetry from the normal runtime `config.ini`, performs the first update, optionally writes the requested outputs once, and exits without starting the GUI.
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
-- With `/fake`, the application skips live telemetry providers, loads `telemetry_fake.txt` immediately, and reloads it once per second while the process runs.
+- With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
 
 ## Failures and trace coverage
 
@@ -58,4 +60,4 @@ This document is the single maintained source of truth for diagnostics command b
 - Verify headless `/trace /dump /screenshot /exit` and `/trace /reload /screenshot /exit`, and confirm the process exits after the requested export path.
 - Verify one headless run that supplies explicit output filenames such as `/trace:custom_trace.txt`, `/dump:custom_dump.txt`, and `/screenshot:custom_screenshot.png`, and confirm only the requested paths are updated.
 - When `/scale:<value>` is involved, confirm the screenshot uses the expected multiplied pixel dimensions while preserving the same logical composition.
-- For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, and confirm that editing `telemetry_fake.txt` changes the next one-second refresh without touching live providers.
+- For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm that editing the selected fake file changes the next one-second refresh without touching live providers, and verify one run with `/fake:custom_fake.txt`.

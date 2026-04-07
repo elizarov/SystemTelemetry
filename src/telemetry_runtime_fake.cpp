@@ -10,6 +10,18 @@
 
 namespace {
 
+std::filesystem::path ResolveFakePath(
+    const std::filesystem::path& executableDirectory,
+    const std::filesystem::path& configuredPath) {
+    if (configuredPath.empty()) {
+        return executableDirectory / L"telemetry_fake.txt";
+    }
+    if (configuredPath.is_absolute()) {
+        return configuredPath;
+    }
+    return executableDirectory / configuredPath;
+}
+
 class FakeTelemetryRuntime : public TelemetryRuntime {
 public:
     FakeTelemetryRuntime(std::filesystem::path fakePath, bool showDialogs)
@@ -94,7 +106,7 @@ std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(
     const std::filesystem::path& executableDirectory) {
     if (options.fake) {
         return std::make_unique<FakeTelemetryRuntime>(
-            executableDirectory / L"telemetry_fake.txt",
+            ResolveFakePath(executableDirectory, options.fakePath),
             ShouldShowRuntimeDialogs(options));
     }
     return CreateRealTelemetryRuntime();

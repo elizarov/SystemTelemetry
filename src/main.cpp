@@ -244,6 +244,10 @@ DiagnosticsOptions GetDiagnosticsOptions() {
         options.screenshot = true;
         options.screenshotPath = *screenshotPath;
     }
+    if (const auto fakePath = GetColonSwitchValue(L"/fake"); fakePath.has_value()) {
+        options.fake = true;
+        options.fakePath = *fakePath;
+    }
     return options;
 }
 
