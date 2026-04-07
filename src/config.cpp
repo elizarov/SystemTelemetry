@@ -523,64 +523,6 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
     return layout.cards.back();
 }
 
-void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<LayoutSectionConfig::Section>(layout.structure, key, value);
-}
-
-void ApplyDashboardValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<DashboardSectionConfig::Section>(layout.dashboard, key, value);
-}
-
-void ApplyCardStyleValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<CardStyleConfig::Section>(layout.cardStyle, key, value);
-}
-
-void ApplyColorValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<ColorConfig::Section>(layout.colors, key, value);
-}
-
-void ApplyFontValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<UiFontSetConfig::Section>(layout.fonts, key, value);
-}
-
-void ApplyMetricListWidgetValue(MetricListWidgetConfig& widget, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<MetricListWidgetConfig::Section>(widget, key, value);
-}
-
-void ApplyDriveUsageListWidgetValue(DriveUsageListWidgetConfig& widget, const std::string& key,
-    const std::string& value) {
-    ApplyStructuredSectionValue<DriveUsageListWidgetConfig::Section>(widget, key, value);
-}
-
-void ApplyThroughputWidgetValue(ThroughputWidgetConfig& widget, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<ThroughputWidgetConfig::Section>(widget, key, value);
-}
-
-void ApplyGaugeWidgetValue(GaugeWidgetConfig& widget, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<GaugeWidgetConfig::Section>(widget, key, value);
-}
-
-void ApplyTextWidgetValue(TextWidgetConfig& widget, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<TextWidgetConfig::Section>(widget, key, value);
-}
-
-void ApplyNetworkFooterWidgetValue(NetworkFooterWidgetConfig& widget, const std::string& key,
-    const std::string& value) {
-    ApplyStructuredSectionValue<NetworkFooterWidgetConfig::Section>(widget, key, value);
-}
-
-void ApplyClockTimeWidgetValue(ClockTimeWidgetConfig& widget, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<ClockTimeWidgetConfig::Section>(widget, key, value);
-}
-
-void ApplyClockDateWidgetValue(ClockDateWidgetConfig& widget, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<ClockDateWidgetConfig::Section>(widget, key, value);
-}
-
-void ApplyMetricScaleValue(MetricScaleConfig& metricScales, const std::string& key, const std::string& value) {
-    ApplyStructuredSectionValue<MetricScaleConfig::Section>(metricScales, key, value);
-}
-
 void ApplyCardValue(LayoutConfig& layout, const std::string& section, const std::string& key, const std::string& value) {
     const std::string id = section.substr(std::string("card.").size());
     LayoutCardConfig& card = EnsureCardConfig(layout, id);
@@ -634,33 +576,33 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
         } else if (section == "board") {
             ApplyBoardValue(config, key, value);
         } else if (section == "metric_scales") {
-            ApplyMetricScaleValue(config.metricScales, key, value);
+            ApplyStructuredSectionValue<MetricScaleConfig::Section>(config.metricScales, key, value);
         } else if (section == "metric_list") {
-            ApplyMetricListWidgetValue(config.layout.metricList, key, value);
+            ApplyStructuredSectionValue<MetricListWidgetConfig::Section>(config.layout.metricList, key, value);
         } else if (section == "drive_usage_list") {
-            ApplyDriveUsageListWidgetValue(config.layout.driveUsageList, key, value);
+            ApplyStructuredSectionValue<DriveUsageListWidgetConfig::Section>(config.layout.driveUsageList, key, value);
         } else if (section == "throughput") {
-            ApplyThroughputWidgetValue(config.layout.throughput, key, value);
+            ApplyStructuredSectionValue<ThroughputWidgetConfig::Section>(config.layout.throughput, key, value);
         } else if (section == "gauge") {
-            ApplyGaugeWidgetValue(config.layout.gauge, key, value);
+            ApplyStructuredSectionValue<GaugeWidgetConfig::Section>(config.layout.gauge, key, value);
         } else if (section == "text") {
-            ApplyTextWidgetValue(config.layout.text, key, value);
+            ApplyStructuredSectionValue<TextWidgetConfig::Section>(config.layout.text, key, value);
         } else if (section == "network_footer") {
-            ApplyNetworkFooterWidgetValue(config.layout.networkFooter, key, value);
+            ApplyStructuredSectionValue<NetworkFooterWidgetConfig::Section>(config.layout.networkFooter, key, value);
         } else if (section == "clock_time") {
-            ApplyClockTimeWidgetValue(config.layout.clockTime, key, value);
+            ApplyStructuredSectionValue<ClockTimeWidgetConfig::Section>(config.layout.clockTime, key, value);
         } else if (section == "clock_date") {
-            ApplyClockDateWidgetValue(config.layout.clockDate, key, value);
+            ApplyStructuredSectionValue<ClockDateWidgetConfig::Section>(config.layout.clockDate, key, value);
         } else if (section == "layout") {
-            ApplyLayoutValue(config.layout, key, value);
+            ApplyStructuredSectionValue<LayoutSectionConfig::Section>(config.layout.structure, key, value);
         } else if (section == "dashboard") {
-            ApplyDashboardValue(config.layout, key, value);
+            ApplyStructuredSectionValue<DashboardSectionConfig::Section>(config.layout.dashboard, key, value);
         } else if (section == "card_style") {
-            ApplyCardStyleValue(config.layout, key, value);
+            ApplyStructuredSectionValue<CardStyleConfig::Section>(config.layout.cardStyle, key, value);
         } else if (section == "colors") {
-            ApplyColorValue(config.layout, key, value);
+            ApplyStructuredSectionValue<ColorConfig::Section>(config.layout.colors, key, value);
         } else if (section == "fonts") {
-            ApplyFontValue(config.layout, key, value);
+            ApplyStructuredSectionValue<UiFontSetConfig::Section>(config.layout.fonts, key, value);
         } else if (section.rfind("card.", 0) == 0) {
             ApplyCardValue(config.layout, section, key, value);
         }
