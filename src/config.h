@@ -146,6 +146,12 @@ struct LayoutCardConfig {
     std::string title;
     std::string icon;
     LayoutNodeConfig layout;
+
+    using Section = configschema::DynamicSectionDescriptor<"card.", LayoutCardConfig,
+        configschema::FieldDescriptor<LayoutCardConfig, std::string, "title", &LayoutCardConfig::title, configschema::StringCodec>,
+        configschema::FieldDescriptor<LayoutCardConfig, std::string, "icon", &LayoutCardConfig::icon, configschema::StringCodec>,
+        configschema::FieldDescriptor<LayoutCardConfig, LayoutNodeConfig, "layout", &LayoutCardConfig::layout, configschema::LayoutExpressionCodec>
+    >;
 };
 
 struct MetricScaleConfig {

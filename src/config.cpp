@@ -260,6 +260,19 @@ void SaveStructuredSection(const typename Section::owner_type& owner, UpdateKeyF
     }, Section::fields);
 }
 
+template <typename Section, typename UpdateKeyFn>
+void SaveDynamicStructuredSection(const typename Section::owner_type& owner, std::string_view suffix, UpdateKeyFn&& updateKey) {
+    const std::string sectionName = Section::FormatName(suffix);
+    std::apply([&](auto... field) {
+        (updateKey(
+             sectionName,
+             std::string(std::remove_cvref_t<decltype(field)>::key.view()),
+             EncodeConfigValue<typename std::remove_cvref_t<decltype(field)>::codec_type>(
+                 owner.*(std::remove_cvref_t<decltype(field)>::member))),
+         ...);
+    }, Section::fields);
+}
+
 DisplayConfig& AccessDisplayConfig(AppConfig& config) {
     return config.display;
 }
@@ -347,6 +360,18 @@ bool DispatchStructuredSection(AppConfig& config, const std::string& section, co
         }());
     }, std::tuple<Bindings...>{});
     return handled;
+}
+
+template <typename Section, typename ResolveOwnerFn>
+bool DispatchDynamicStructuredSection(const std::string& section, const std::string& key, const std::string& value,
+    ResolveOwnerFn&& resolveOwner) {
+    if (!Section::Matches(section)) {
+        return false;
+    }
+
+    typename Section::owner_type& owner = resolveOwner(Section::Suffix(section));
+    ApplyStructuredSectionValue<Section>(owner, key, value);
+    return true;
 }
 
 bool DispatchKnownStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
@@ -633,19 +658,11 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
     return layout.cards.back();
 }
 
-void ApplyCardValue(LayoutConfig& layout, const std::string& section, const std::string& key, const std::string& value) {
-    const std::string id = section.substr(std::string("card.").size());
-    LayoutCardConfig& card = EnsureCardConfig(layout, id);
-    if (key == "title") {
-        card.title = value;
-    } else if (key == "icon") {
-        card.icon = value;
-    } else if (key == "layout") {
-        LayoutNodeConfig parsed;
-        if (ParseLayoutExpression(value, parsed)) {
-            card.layout = std::move(parsed);
-        }
-    }
+bool ApplyCardValue(LayoutConfig& layout, const std::string& section, const std::string& key, const std::string& value) {
+    return DispatchDynamicStructuredSection<LayoutCardConfig::Section>(section, key, value,
+        [&layout](std::string_view id) -> LayoutCardConfig& {
+            return EnsureCardConfig(layout, std::string(id));
+        });
 }
 
 void ApplyBoardValue(AppConfig& config, const std::string& key, const std::string& value) {
@@ -683,8 +700,8 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             continue;
         } else if (section == "board") {
             ApplyBoardValue(config, key, value);
-        } else if (section.rfind("card.", 0) == 0) {
-            ApplyCardValue(config.layout, section, key, value);
+        } else if (ApplyCardValue(config.layout, section, key, value)) {
+            continue;
         }
     }
 }

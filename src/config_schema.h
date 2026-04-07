@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <tuple>
 
@@ -46,6 +47,26 @@ struct SectionDescriptor {
 
     static constexpr auto name = Name;
     static constexpr auto fields = std::tuple<Fields...>{};
+};
+
+template <FixedString Prefix, typename Owner, typename... Fields>
+struct DynamicSectionDescriptor {
+    using owner_type = Owner;
+
+    static constexpr auto prefix = Prefix;
+    static constexpr auto fields = std::tuple<Fields...>{};
+
+    static constexpr bool Matches(std::string_view sectionName) {
+        return sectionName.rfind(prefix.view(), 0) == 0;
+    }
+
+    static constexpr std::string_view Suffix(std::string_view sectionName) {
+        return Matches(sectionName) ? sectionName.substr(prefix.view().size()) : std::string_view{};
+    }
+
+    static std::string FormatName(std::string_view suffix) {
+        return "[" + std::string(prefix.view()) + std::string(suffix) + "]";
+    }
 };
 
 }  // namespace configschema
