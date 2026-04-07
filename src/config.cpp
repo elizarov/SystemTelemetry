@@ -379,28 +379,6 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
 void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
     if (key == "window") {
         ParseLogicalSize(value, layout.window);
-    } else if (key == "background_color") {
-        layout.backgroundColor = ParseHexColorOrDefault(value, layout.backgroundColor);
-    } else if (key == "foreground_color") {
-        layout.foregroundColor = ParseHexColorOrDefault(value, layout.foregroundColor);
-    } else if (key == "accent_color") {
-        layout.accentColor = ParseHexColorOrDefault(value, layout.accentColor);
-    } else if (key == "panel_border_color") {
-        layout.panelBorderColor = ParseHexColorOrDefault(value, layout.panelBorderColor);
-    } else if (key == "muted_text_color") {
-        layout.mutedTextColor = ParseHexColorOrDefault(value, layout.mutedTextColor);
-    } else if (key == "track_color") {
-        layout.trackColor = ParseHexColorOrDefault(value, layout.trackColor);
-    } else if (key == "panel_fill_color") {
-        layout.panelFillColor = ParseHexColorOrDefault(value, layout.panelFillColor);
-    } else if (key == "graph_background_color") {
-        layout.graphBackgroundColor = ParseHexColorOrDefault(value, layout.graphBackgroundColor);
-    } else if (key == "graph_grid_color") {
-        layout.graphGridColor = ParseHexColorOrDefault(value, layout.graphGridColor);
-    } else if (key == "graph_axis_color") {
-        layout.graphAxisColor = ParseHexColorOrDefault(value, layout.graphAxisColor);
-    } else if (key == "graph_marker_color") {
-        layout.graphMarkerColor = ParseHexColorOrDefault(value, layout.graphMarkerColor);
     } else if (key == "outer_margin") {
         layout.outerMargin = ParseIntOrDefault(value, layout.outerMargin);
     } else if (key == "row_gap") {
@@ -427,15 +405,45 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.widgetLineGap = ParseIntOrDefault(value, layout.widgetLineGap);
     } else if (key == "cards") {
         ParseLayoutExpression(value, layout.cardsLayout);
-    } else if (key == "font.title") {
+    }
+}
+
+void ApplyColorValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
+    if (key == "background_color") {
+        layout.backgroundColor = ParseHexColorOrDefault(value, layout.backgroundColor);
+    } else if (key == "foreground_color") {
+        layout.foregroundColor = ParseHexColorOrDefault(value, layout.foregroundColor);
+    } else if (key == "accent_color") {
+        layout.accentColor = ParseHexColorOrDefault(value, layout.accentColor);
+    } else if (key == "panel_border_color") {
+        layout.panelBorderColor = ParseHexColorOrDefault(value, layout.panelBorderColor);
+    } else if (key == "muted_text_color") {
+        layout.mutedTextColor = ParseHexColorOrDefault(value, layout.mutedTextColor);
+    } else if (key == "track_color") {
+        layout.trackColor = ParseHexColorOrDefault(value, layout.trackColor);
+    } else if (key == "panel_fill_color") {
+        layout.panelFillColor = ParseHexColorOrDefault(value, layout.panelFillColor);
+    } else if (key == "graph_background_color") {
+        layout.graphBackgroundColor = ParseHexColorOrDefault(value, layout.graphBackgroundColor);
+    } else if (key == "graph_grid_color") {
+        layout.graphGridColor = ParseHexColorOrDefault(value, layout.graphGridColor);
+    } else if (key == "graph_axis_color") {
+        layout.graphAxisColor = ParseHexColorOrDefault(value, layout.graphAxisColor);
+    } else if (key == "graph_marker_color") {
+        layout.graphMarkerColor = ParseHexColorOrDefault(value, layout.graphMarkerColor);
+    }
+}
+
+void ApplyFontValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
+    if (key == "title") {
         ParseFontSpec(layout.fonts.title, value);
-    } else if (key == "font.big") {
+    } else if (key == "big") {
         ParseFontSpec(layout.fonts.big, value);
-    } else if (key == "font.value") {
+    } else if (key == "value") {
         ParseFontSpec(layout.fonts.value, value);
-    } else if (key == "font.label") {
+    } else if (key == "label") {
         ParseFontSpec(layout.fonts.label, value);
-    } else if (key == "font.small") {
+    } else if (key == "small") {
         ParseFontSpec(layout.fonts.smallText, value);
     }
 }
@@ -648,6 +656,10 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             ApplyClockDateWidgetValue(config.layout.clockDate, key, value);
         } else if (section == "layout") {
             ApplyLayoutValue(config.layout, key, value);
+        } else if (section == "colors") {
+            ApplyColorValue(config.layout, key, value);
+        } else if (section == "fonts") {
+            ApplyFontValue(config.layout, key, value);
         } else if (section.rfind("card.", 0) == 0) {
             ApplyCardValue(config.layout, section, key, value);
         }

@@ -32,13 +32,15 @@ The language is centered around the dashboard shape:
 
 ## Structure
 
-The language has five levels:
+The language has seven levels:
 
 1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, `[clock_time]`, and `[clock_date]`
 2. Runtime selection sections such as `[display]` and `[network]`
 3. Board sensor mapping in `[board]`
-4. Dashboard-level shared geometry, card-placement layout, palette, and fonts in `[layout]`
-5. Card-local title, icon, and content composition in `[card.<id>]`
+4. Dashboard-level shared geometry and card-placement layout in `[layout]`
+5. Shared dashboard palette in `[colors]`
+6. Shared dashboard fonts in `[fonts]`
+7. Card-local title, icon, and content composition in `[card.<id>]`
 
 ## Runtime selection sections
 
@@ -74,7 +76,7 @@ Supported widget geometry keys:
 
 ## Dashboard section
 
-`[layout]` owns the shared geometry, dashboard card-placement layout, palette, and fonts.
+`[layout]` owns the shared geometry and dashboard card-placement layout.
 
 Supported geometry keys:
 
@@ -103,7 +105,7 @@ Example:
 
 - `cards = rows(columns:3(cpu,gpu), columns:2(network:4,storage:9,time:3))`
 
-Color keys stay in `[layout]` and use `#RRGGBB`:
+`[colors]` owns the shared dashboard palette and uses `#RRGGBB`:
 
 - `background_color`
 - `foreground_color`
@@ -117,13 +119,13 @@ Color keys stay in `[layout]` and use `#RRGGBB`:
 - `graph_axis_color`
 - `graph_marker_color`
 
-Font keys stay in `[layout]`:
+`[fonts]` owns the shared dashboard fonts:
 
-- `font.title = face,size,weight`
-- `font.big = face,size,weight`
-- `font.value = face,size,weight`
-- `font.label = face,size,weight`
-- `font.small = face,size,weight`
+- `title = face,size,weight`
+- `big = face,size,weight`
+- `value = face,size,weight`
+- `label = face,size,weight`
+- `small = face,size,weight`
 
 ## Card sections
 
@@ -266,7 +268,9 @@ Shared absolute geometry belongs only in `[layout]`, including:
 - header height, icon size, and icon gap
 - shared content spacing
 - `widget_line_gap`
-- colors and fonts
+- layout geometry
+- colors in `[colors]`
+- fonts in `[fonts]`
 
 Card sections define relative structure only:
 
