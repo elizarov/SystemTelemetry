@@ -59,6 +59,7 @@ Examples include:
 
 - The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using the current monitor DPI before rendering.
 - When `display.monitor_name` targets a monitor that is not yet available during login startup, display-topology churn, or a temporary unplug, the UI must keep watching for that configured monitor instead of locking in a fallback monitor placement, and once the monitor is available it must apply the saved logical position there.
+- When `[display] wallpaper` is set to an image path, the runtime must resolve relative paths beside `SystemTelemetry.exe` and apply that image as the wallpaper for the configured display through Windows per-monitor wallpaper APIs during startup and config reload, retrying once the configured display becomes enumerable if startup monitor discovery races behind login or hotplug.
 - The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
 - The list of rendered cards must come from layout config.
 - The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.

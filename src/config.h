@@ -148,6 +148,7 @@ struct LayoutConfig {
 
 struct AppConfig {
     std::string monitorName;
+    std::string wallpaper;
     int positionX = 0;
     int positionY = 0;
     std::string networkAdapter;

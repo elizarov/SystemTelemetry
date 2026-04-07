@@ -35,8 +35,21 @@ The language is centered around the dashboard shape:
 The language has three levels:
 
 1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, `[clock_time]`, and `[clock_date]`
-2. Dashboard-level shared geometry, card-placement layout, palette, and fonts in `[layout]`
-3. Card-local title, icon, and content composition in `[card.<id>]`
+2. Runtime selection sections such as `[display]` and `[network]`
+3. Dashboard-level shared geometry, card-placement layout, palette, and fonts in `[layout]`
+4. Card-local title, icon, and content composition in `[card.<id>]`
+
+## Runtime selection sections
+
+`[display]` owns executable-relative display selection and placement settings:
+
+- `monitor_name = ...`
+- `wallpaper = ...`
+- `position = x,y`
+
+`[network]` owns runtime adapter selection:
+
+- `adapter_name = ...`
 
 ## Widget sections
 

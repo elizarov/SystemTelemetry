@@ -4,6 +4,7 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include <shellapi.h>
+#include <shobjidl.h>
 
 #include <algorithm>
 #include <cctype>
@@ -111,6 +112,24 @@ bool ContainsInsensitive(const std::string& value, const std::string& needle) {
     return ToLower(value).find(ToLower(needle)) != std::string::npos;
 }
 
+bool RectsEqual(const RECT& lhs, const RECT& rhs) {
+    return lhs.left == rhs.left && lhs.top == rhs.top && lhs.right == rhs.right && lhs.bottom == rhs.bottom;
+}
+
+void WriteOptionalTrace(std::ostream* traceStream, const std::string& text) {
+    if (traceStream == nullptr) {
+        return;
+    }
+    tracing::Trace trace(traceStream);
+    trace.Write(text);
+}
+
+std::string FormatHresult(HRESULT value) {
+    char buffer[32];
+    sprintf_s(buffer, "0x%08lX", static_cast<unsigned long>(value));
+    return buffer;
+}
+
 std::filesystem::path GetRuntimeConfigPath();
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
@@ -121,6 +140,7 @@ bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig
 DiagnosticsOptions GetDiagnosticsOptions();
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options);
+bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream);
 
 class DiagnosticsSession {
 public:
@@ -150,6 +170,16 @@ std::filesystem::path GetExecutableDirectory() {
         return std::filesystem::current_path();
     }
     return std::filesystem::path(modulePath).parent_path();
+}
+
+std::filesystem::path ResolveExecutableRelativePath(const std::filesystem::path& configuredPath) {
+    if (configuredPath.empty()) {
+        return {};
+    }
+    if (configuredPath.is_absolute()) {
+        return configuredPath;
+    }
+    return GetExecutableDirectory() / configuredPath;
 }
 
 std::optional<std::wstring> GetExecutablePath() {
@@ -969,6 +999,93 @@ std::filesystem::path GetRuntimeConfigPath() {
     return GetExecutableDirectory() / L"config.ini";
 }
 
+bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) {
+    if (config.wallpaper.empty()) {
+        return true;
+    }
+    if (config.monitorName.empty()) {
+        WriteOptionalTrace(traceStream, "wallpaper:skipped_missing_monitor wallpaper=\"" + config.wallpaper + "\"");
+        return false;
+    }
+
+    const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.monitorName);
+    if (!targetMonitor.has_value()) {
+        WriteOptionalTrace(traceStream, "wallpaper:monitor_unresolved monitor=\"" + config.monitorName +
+            "\" wallpaper=\"" + config.wallpaper + "\"");
+        return false;
+    }
+
+    const std::filesystem::path wallpaperPath = ResolveExecutableRelativePath(std::filesystem::path(WideFromUtf8(config.wallpaper)));
+    if (wallpaperPath.empty()) {
+        WriteOptionalTrace(traceStream, "wallpaper:path_empty monitor=\"" + config.monitorName + "\"");
+        return false;
+    }
+
+    const HRESULT initStatus = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    const bool shouldUninitialize = initStatus == S_OK || initStatus == S_FALSE;
+    if (FAILED(initStatus) && initStatus != RPC_E_CHANGED_MODE) {
+        WriteOptionalTrace(traceStream, "wallpaper:coinitialize_failed hr=" + FormatHresult(initStatus));
+        return false;
+    }
+
+    IDesktopWallpaper* desktopWallpaper = nullptr;
+    const HRESULT createStatus = CoCreateInstance(
+        CLSID_DesktopWallpaper,
+        nullptr,
+        CLSCTX_ALL,
+        IID_PPV_ARGS(&desktopWallpaper));
+    if (FAILED(createStatus) || desktopWallpaper == nullptr) {
+        WriteOptionalTrace(traceStream, "wallpaper:create_failed hr=" + FormatHresult(createStatus));
+        if (shouldUninitialize) {
+            CoUninitialize();
+        }
+        return false;
+    }
+
+    bool applied = false;
+    bool targetFound = false;
+    UINT monitorCount = 0;
+    const HRESULT countStatus = desktopWallpaper->GetMonitorDevicePathCount(&monitorCount);
+    if (FAILED(countStatus)) {
+        WriteOptionalTrace(traceStream, "wallpaper:monitor_count_failed hr=" + FormatHresult(countStatus));
+    } else {
+        for (UINT index = 0; index < monitorCount; ++index) {
+            LPWSTR monitorId = nullptr;
+            const HRESULT idStatus = desktopWallpaper->GetMonitorDevicePathAt(index, &monitorId);
+            if (FAILED(idStatus) || monitorId == nullptr) {
+                continue;
+            }
+
+            RECT monitorRect{};
+            const HRESULT rectStatus = desktopWallpaper->GetMonitorRECT(monitorId, &monitorRect);
+            if (SUCCEEDED(rectStatus) && RectsEqual(monitorRect, targetMonitor->rect)) {
+                targetFound = true;
+                const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wallpaperPath.c_str());
+                applied = SUCCEEDED(setStatus);
+                WriteOptionalTrace(traceStream,
+                    std::string("wallpaper:apply_") + (applied ? "done" : "failed") +
+                    " monitor=\"" + config.monitorName +
+                    "\" path=\"" + Utf8FromWide(wallpaperPath.wstring()) +
+                    "\" hr=" + FormatHresult(setStatus));
+                CoTaskMemFree(monitorId);
+                break;
+            }
+            CoTaskMemFree(monitorId);
+        }
+    }
+
+    if (!targetFound) {
+        WriteOptionalTrace(traceStream, "wallpaper:target_not_found monitor=\"" + config.monitorName +
+            "\" path=\"" + Utf8FromWide(wallpaperPath.wstring()) + "\"");
+    }
+
+    desktopWallpaper->Release();
+    if (shouldUninitialize) {
+        CoUninitialize();
+    }
+    return applied;
+}
+
 class DashboardApp {
 public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {});
@@ -994,6 +1111,7 @@ private:
     bool ReloadConfigFromDisk();
     void UpdateConfigFromCurrentPlacement();
     void ApplyConfigPlacement();
+    bool ApplyConfiguredWallpaper();
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     UINT CurrentWindowDpi() const;
@@ -1090,6 +1208,8 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         renderer_.SetTraceOutput(diagnostics_->TraceStream());
         lastDiagnosticsOutput_ = std::chrono::steady_clock::now();
     }
+
+    ApplyConfiguredWallpaper();
 
     INITCOMMONCONTROLSEX icc{sizeof(icc), ICC_STANDARD_CLASSES};
     InitCommonControlsEx(&icc);
@@ -1189,6 +1309,7 @@ void DashboardApp::RetryConfigPlacementIfPending() {
     }
     if (config_.monitorName.empty() || FindTargetMonitor(config_.monitorName).has_value()) {
         ApplyConfigPlacement();
+        ApplyConfiguredWallpaper();
         movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
         InvalidateRect(hwnd_, nullptr, FALSE);
         StopPlacementWatch();
@@ -1381,11 +1502,16 @@ bool DashboardApp::ReloadConfigFromDisk() {
         }
         return false;
     }
+    ApplyConfiguredWallpaper();
     StartPlacementWatch();
     ApplyConfigPlacement();
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
     InvalidateRect(hwnd_, nullptr, FALSE);
     return true;
+}
+
+bool DashboardApp::ApplyConfiguredWallpaper() {
+    return ::ApplyConfiguredWallpaper(config_, diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr);
 }
 
 void DashboardApp::UpdateConfigFromCurrentPlacement() {

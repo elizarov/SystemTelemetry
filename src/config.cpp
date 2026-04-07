@@ -666,6 +666,8 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
 
         if (section == "display" && key == "monitor_name") {
             config.monitorName = value;
+        } else if (section == "display" && key == "wallpaper") {
+            config.wallpaper = value;
         } else if (section == "display" && key == "position") {
             ParseIntPair(value, config.positionX, config.positionY);
         } else if (section == "network" && key == "adapter_name") {
@@ -867,6 +869,7 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
     };
 
     updateKey("[display]", "monitor_name", config.monitorName);
+    updateKey("[display]", "wallpaper", config.wallpaper);
     updateKey("[display]", "position", std::to_string(config.positionX) + "," + std::to_string(config.positionY));
     updateKey("[network]", "adapter_name", config.networkAdapter);
 
