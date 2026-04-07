@@ -400,11 +400,11 @@ const std::string& DashboardRenderer::LastError() const {
 }
 
 int DashboardRenderer::WindowWidth() const {
-    return std::max(1, ScaleLogical(config_.layout.windowWidth));
+    return std::max(1, ScaleLogical(config_.layout.window.width));
 }
 
 int DashboardRenderer::WindowHeight() const {
-    return std::max(1, ScaleLogical(config_.layout.windowHeight));
+    return std::max(1, ScaleLogical(config_.layout.window.height));
 }
 
 COLORREF DashboardRenderer::BackgroundColor() const {
@@ -442,11 +442,11 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
         return false;
     }
     if (fonts_.title == nullptr) {
-        UiFontConfig titleFont = config_.layout.titleFont;
-        UiFontConfig bigFont = config_.layout.bigFont;
-        UiFontConfig valueFont = config_.layout.valueFont;
-        UiFontConfig labelFont = config_.layout.labelFont;
-        UiFontConfig smallFont = config_.layout.smallFont;
+        UiFontConfig titleFont = config_.layout.fonts.title;
+        UiFontConfig bigFont = config_.layout.fonts.big;
+        UiFontConfig valueFont = config_.layout.fonts.value;
+        UiFontConfig labelFont = config_.layout.fonts.label;
+        UiFontConfig smallFont = config_.layout.fonts.smallText;
         titleFont.size = ScaleLogical(titleFont.size);
         bigFont.size = ScaleLogical(bigFont.size);
         valueFont.size = ScaleLogical(valueFont.size);

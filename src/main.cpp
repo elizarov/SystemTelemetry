@@ -827,8 +827,8 @@ int ScalePhysicalToLogical(int physicalValue, UINT dpi) {
 
 SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi) {
     return SIZE{
-        ScaleLogicalToPhysical(config.layout.windowWidth, dpi),
-        ScaleLogicalToPhysical(config.layout.windowHeight, dpi)
+        ScaleLogicalToPhysical(config.layout.window.width, dpi),
+        ScaleLogicalToPhysical(config.layout.window.height, dpi)
     };
 }
 
@@ -1342,12 +1342,12 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
         currentDpi_ = monitor->dpi;
         UpdateRendererScale(ScaleFromDpi(currentDpi_));
-        placement.left = monitor->rect.left + ScaleLogicalToPhysical(config_.positionX, currentDpi_);
-        placement.top = monitor->rect.top + ScaleLogicalToPhysical(config_.positionY, currentDpi_);
+        placement.left = monitor->rect.left + ScaleLogicalToPhysical(config_.position.x, currentDpi_);
+        placement.top = monitor->rect.top + ScaleLogicalToPhysical(config_.position.y, currentDpi_);
     } else {
         UpdateRendererScale(ScaleFromDpi(currentDpi_));
-        placement.left = 100 + ScaleLogicalToPhysical(config_.positionX, currentDpi_);
-        placement.top = 100 + ScaleLogicalToPhysical(config_.positionY, currentDpi_);
+        placement.left = 100 + ScaleLogicalToPhysical(config_.position.x, currentDpi_);
+        placement.top = 100 + ScaleLogicalToPhysical(config_.position.y, currentDpi_);
     }
     placement.right = placement.left + WindowWidth();
     placement.bottom = placement.top + WindowHeight();
@@ -1370,14 +1370,14 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 
 void DashboardApp::ApplyConfigPlacement() {
     UINT targetDpi = hwnd_ != nullptr ? CurrentWindowDpi() : GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
-    int left = 100 + ScaleLogicalToPhysical(config_.positionX, targetDpi);
-    int top = 100 + ScaleLogicalToPhysical(config_.positionY, targetDpi);
+    int left = 100 + ScaleLogicalToPhysical(config_.position.x, targetDpi);
+    int top = 100 + ScaleLogicalToPhysical(config_.position.y, targetDpi);
     bool monitorResolved = config_.monitorName.empty();
     if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
         monitorResolved = true;
         targetDpi = monitor->dpi;
-        left = monitor->rect.left + ScaleLogicalToPhysical(config_.positionX, targetDpi);
-        top = monitor->rect.top + ScaleLogicalToPhysical(config_.positionY, targetDpi);
+        left = monitor->rect.left + ScaleLogicalToPhysical(config_.position.x, targetDpi);
+        top = monitor->rect.top + ScaleLogicalToPhysical(config_.position.y, targetDpi);
     }
 
     if (!monitorResolved) {
@@ -1629,8 +1629,7 @@ bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
 
     AppConfig updatedConfig = telemetry_->EffectiveConfig();
     updatedConfig.monitorName = option.configMonitorName;
-    updatedConfig.positionX = 0;
-    updatedConfig.positionY = 0;
+    updatedConfig.position = {};
     updatedConfig.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
 
     const std::filesystem::path configPath = GetRuntimeConfigPath();
@@ -1729,8 +1728,8 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
         ? placement.configMonitorName
         : placement.deviceName;
     config.monitorName = monitorName;
-    config.positionX = placement.relativePosition.x;
-    config.positionY = placement.relativePosition.y;
+    config.position.x = placement.relativePosition.x;
+    config.position.y = placement.relativePosition.y;
     bool saved = false;
     if (CanWriteRuntimeConfig(configPath)) {
         saved = SaveConfig(configPath, config);
@@ -1745,8 +1744,8 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
     }
 
     config_.monitorName = monitorName;
-    config_.positionX = placement.relativePosition.x;
-    config_.positionY = placement.relativePosition.y;
+    config_.position.x = placement.relativePosition.x;
+    config_.position.y = placement.relativePosition.y;
 }
 
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {

@@ -12,6 +12,24 @@ struct UiFontConfig {
     int weight = 0;
 };
 
+struct UiFontSetConfig {
+    UiFontConfig title{};
+    UiFontConfig big{};
+    UiFontConfig value{};
+    UiFontConfig label{};
+    UiFontConfig smallText{};
+};
+
+struct LogicalPointConfig {
+    int x = 0;
+    int y = 0;
+};
+
+struct LogicalSizeConfig {
+    int width = 0;
+    int height = 0;
+};
+
 struct LayoutNodeConfig {
     std::string name;
     int weight = 1;
@@ -101,8 +119,7 @@ struct ClockDateWidgetConfig {
 };
 
 struct LayoutConfig {
-    int windowWidth = 0;
-    int windowHeight = 0;
+    LogicalSizeConfig window{};
     unsigned int backgroundColor = 0;
     unsigned int foregroundColor = 0;
     unsigned int accentColor = 0;
@@ -137,11 +154,7 @@ struct LayoutConfig {
     ClockTimeWidgetConfig clockTime{};
     ClockDateWidgetConfig clockDate{};
 
-    UiFontConfig titleFont{};
-    UiFontConfig bigFont{};
-    UiFontConfig valueFont{};
-    UiFontConfig labelFont{};
-    UiFontConfig smallFont{};
+    UiFontSetConfig fonts{};
 
     LayoutNodeConfig cardsLayout;
     std::vector<LayoutCardConfig> cards;
@@ -150,8 +163,7 @@ struct LayoutConfig {
 struct AppConfig {
     std::string monitorName;
     std::string wallpaper;
-    int positionX = 0;
-    int positionY = 0;
+    LogicalPointConfig position{};
     std::string networkAdapter;
     std::vector<std::string> driveLetters;
     std::vector<std::string> boardTemperatureNames;

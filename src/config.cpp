@@ -128,6 +128,14 @@ bool ParseIntPair(const std::string& value, int& first, int& second) {
     return true;
 }
 
+bool ParseLogicalPoint(const std::string& value, LogicalPointConfig& point) {
+    return ParseIntPair(value, point.x, point.y);
+}
+
+bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
+    return ParseIntPair(value, size.width, size.height);
+}
+
 void ParseFontSpec(UiFontConfig& font, const std::string& value) {
     const std::vector<std::string> parts = Split(value, ',');
     if (parts.size() != 3) {
@@ -370,7 +378,7 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
 
 void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
     if (key == "window") {
-        ParseIntPair(value, layout.windowWidth, layout.windowHeight);
+        ParseLogicalSize(value, layout.window);
     } else if (key == "background_color") {
         layout.backgroundColor = ParseHexColorOrDefault(value, layout.backgroundColor);
     } else if (key == "foreground_color") {
@@ -420,15 +428,15 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
     } else if (key == "cards") {
         ParseLayoutExpression(value, layout.cardsLayout);
     } else if (key == "font.title") {
-        ParseFontSpec(layout.titleFont, value);
+        ParseFontSpec(layout.fonts.title, value);
     } else if (key == "font.big") {
-        ParseFontSpec(layout.bigFont, value);
+        ParseFontSpec(layout.fonts.big, value);
     } else if (key == "font.value") {
-        ParseFontSpec(layout.valueFont, value);
+        ParseFontSpec(layout.fonts.value, value);
     } else if (key == "font.label") {
-        ParseFontSpec(layout.labelFont, value);
+        ParseFontSpec(layout.fonts.label, value);
     } else if (key == "font.small") {
-        ParseFontSpec(layout.smallFont, value);
+        ParseFontSpec(layout.fonts.smallText, value);
     }
 }
 
@@ -615,7 +623,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
         } else if (section == "display" && key == "wallpaper") {
             config.wallpaper = value;
         } else if (section == "display" && key == "position") {
-            ParseIntPair(value, config.positionX, config.positionY);
+            ParseLogicalPoint(value, config.position);
         } else if (section == "network" && key == "adapter_name") {
             config.networkAdapter = value;
         } else if (section == "board") {
@@ -865,7 +873,7 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
 
     updateKey("[display]", "monitor_name", config.monitorName);
     updateKey("[display]", "wallpaper", config.wallpaper);
-    updateKey("[display]", "position", std::to_string(config.positionX) + "," + std::to_string(config.positionY));
+    updateKey("[display]", "position", std::to_string(config.position.x) + "," + std::to_string(config.position.y));
     updateKey("[network]", "adapter_name", config.networkAdapter);
 
     const size_t boardSectionStart = ensureSectionAfter("[board]", "[network]");
