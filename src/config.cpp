@@ -136,6 +136,10 @@ bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
     return ParseIntPair(value, size.width, size.height);
 }
 
+std::string FormatLogicalSize(const LogicalSizeConfig& size) {
+    return std::to_string(size.width) + "," + std::to_string(size.height);
+}
+
 void ParseFontSpec(UiFontConfig& font, const std::string& value) {
     const std::vector<std::string> parts = Split(value, ',');
     if (parts.size() != 3) {
@@ -144,6 +148,116 @@ void ParseFontSpec(UiFontConfig& font, const std::string& value) {
     font.face = parts[0];
     font.size = ParseIntOrDefault(parts[1], font.size);
     font.weight = ParseIntOrDefault(parts[2], font.weight);
+}
+
+std::string FormatFontSpec(const UiFontConfig& font) {
+    return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
+}
+
+template <typename Codec, typename Value>
+void DecodeConfigValue(Value& target, const std::string& value);
+
+template <>
+void DecodeConfigValue<configschema::IntCodec, int>(int& target, const std::string& value) {
+    target = ParseIntOrDefault(value, target);
+}
+
+template <>
+void DecodeConfigValue<configschema::DoubleCodec, double>(double& target, const std::string& value) {
+    target = ParseDoubleOrDefault(value, target);
+}
+
+template <>
+void DecodeConfigValue<configschema::StringCodec, std::string>(std::string& target, const std::string& value) {
+    target = value;
+}
+
+template <>
+void DecodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(LogicalPointConfig& target, const std::string& value) {
+    ParseLogicalPoint(value, target);
+}
+
+template <>
+void DecodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(LogicalSizeConfig& target, const std::string& value) {
+    ParseLogicalSize(value, target);
+}
+
+template <>
+void DecodeConfigValue<configschema::HexColorCodec, unsigned int>(unsigned int& target, const std::string& value) {
+    target = ParseHexColorOrDefault(value, target);
+}
+
+template <>
+void DecodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(UiFontConfig& target, const std::string& value) {
+    ParseFontSpec(target, value);
+}
+
+template <typename Codec, typename Value>
+std::string EncodeConfigValue(const Value& value);
+
+template <>
+std::string EncodeConfigValue<configschema::IntCodec, int>(const int& value) {
+    return std::to_string(value);
+}
+
+template <>
+std::string EncodeConfigValue<configschema::DoubleCodec, double>(const double& value) {
+    std::ostringstream stream;
+    stream << value;
+    return stream.str();
+}
+
+template <>
+std::string EncodeConfigValue<configschema::StringCodec, std::string>(const std::string& value) {
+    return value;
+}
+
+template <>
+std::string EncodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(const LogicalPointConfig& value) {
+    return std::to_string(value.x) + "," + std::to_string(value.y);
+}
+
+template <>
+std::string EncodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(const LogicalSizeConfig& value) {
+    return FormatLogicalSize(value);
+}
+
+template <>
+std::string EncodeConfigValue<configschema::HexColorCodec, unsigned int>(const unsigned int& value) {
+    return FormatHexColor(value);
+}
+
+template <>
+std::string EncodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(const UiFontConfig& value) {
+    return FormatFontSpec(value);
+}
+
+template <typename Section>
+bool ApplyStructuredSectionValue(typename Section::owner_type& owner, const std::string& key, const std::string& value) {
+    bool handled = false;
+    std::apply([&](auto... field) {
+        (..., [&] {
+            using Field = std::remove_cvref_t<decltype(field)>;
+            if (!handled && key == Field::key.view()) {
+                DecodeConfigValue<typename Field::codec_type>(owner.*(Field::member), value);
+                handled = true;
+            }
+        }());
+    }, Section::fields);
+    return handled;
+}
+
+template <typename Section, typename UpdateKeyFn>
+void SaveStructuredSection(const typename Section::owner_type& owner, UpdateKeyFn&& updateKey) {
+    const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
+    std::apply([&](auto... field) {
+        (updateKey(
+             sectionName,
+             std::string(std::remove_cvref_t<decltype(field)>::key.view()),
+             EncodeConfigValue<typename std::remove_cvref_t<decltype(field)>::codec_type>(
+                 owner.*(std::remove_cvref_t<decltype(field)>::member))),
+         ...);
+    }, Section::fields);
 }
 
 std::string ReadFileUtf8(const std::filesystem::path& path) {
@@ -359,6 +473,39 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
     return parser.AtEnd();
 }
 
+std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
+    std::string text = node.name;
+    if (node.weight != 1) {
+        text += ":" + std::to_string(node.weight);
+    }
+    if (!node.children.empty()) {
+        text += "(";
+        for (size_t i = 0; i < node.children.size(); ++i) {
+            if (i > 0) {
+                text += ",";
+            }
+            text += FormatLayoutExpression(node.children[i]);
+        }
+        text += ")";
+    } else if (!node.parameter.empty()) {
+        text += "(" + node.parameter + ")";
+    }
+    return text;
+}
+
+template <>
+void DecodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(LayoutNodeConfig& target, const std::string& value) {
+    LayoutNodeConfig parsed;
+    if (ParseLayoutExpression(value, parsed)) {
+        target = std::move(parsed);
+    }
+}
+
+template <>
+std::string EncodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(const LayoutNodeConfig& value) {
+    return FormatLayoutExpression(value);
+}
+
 LayoutCardConfig* FindCardConfig(LayoutConfig& layout, const std::string& id) {
     for (auto& card : layout.cards) {
         if (card.id == id) {
@@ -377,215 +524,61 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
 }
 
 void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    if (key == "window") {
-        ParseLogicalSize(value, layout.window);
-    } else if (key == "cards") {
-        ParseLayoutExpression(value, layout.cardsLayout);
-    }
+    ApplyStructuredSectionValue<LayoutSectionConfig::Section>(layout.structure, key, value);
 }
 
 void ApplyDashboardValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    if (key == "outer_margin") {
-        layout.outerMargin = ParseIntOrDefault(value, layout.outerMargin);
-    } else if (key == "row_gap") {
-        layout.rowGap = ParseIntOrDefault(value, layout.rowGap);
-    } else if (key == "card_gap") {
-        layout.cardGap = ParseIntOrDefault(value, layout.cardGap);
-    }
+    ApplyStructuredSectionValue<DashboardSectionConfig::Section>(layout.dashboard, key, value);
 }
 
 void ApplyCardStyleValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    if (key == "card_padding") {
-        layout.cardPadding = ParseIntOrDefault(value, layout.cardPadding);
-    } else if (key == "card_radius") {
-        layout.cardRadius = ParseIntOrDefault(value, layout.cardRadius);
-    } else if (key == "card_border") {
-        layout.cardBorderWidth = ParseIntOrDefault(value, layout.cardBorderWidth);
-    } else if (key == "header_height") {
-        layout.headerHeight = ParseIntOrDefault(value, layout.headerHeight);
-    } else if (key == "header_icon_size") {
-        layout.headerIconSize = ParseIntOrDefault(value, layout.headerIconSize);
-    } else if (key == "header_gap") {
-        layout.headerGap = ParseIntOrDefault(value, layout.headerGap);
-    } else if (key == "content_gap") {
-        layout.contentGap = ParseIntOrDefault(value, layout.contentGap);
-    } else if (key == "column_gap") {
-        layout.columnGap = ParseIntOrDefault(value, layout.columnGap);
-    } else if (key == "widget_line_gap") {
-        layout.widgetLineGap = ParseIntOrDefault(value, layout.widgetLineGap);
-    }
+    ApplyStructuredSectionValue<CardStyleConfig::Section>(layout.cardStyle, key, value);
 }
 
 void ApplyColorValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    if (key == "background_color") {
-        layout.backgroundColor = ParseHexColorOrDefault(value, layout.backgroundColor);
-    } else if (key == "foreground_color") {
-        layout.foregroundColor = ParseHexColorOrDefault(value, layout.foregroundColor);
-    } else if (key == "accent_color") {
-        layout.accentColor = ParseHexColorOrDefault(value, layout.accentColor);
-    } else if (key == "panel_border_color") {
-        layout.panelBorderColor = ParseHexColorOrDefault(value, layout.panelBorderColor);
-    } else if (key == "muted_text_color") {
-        layout.mutedTextColor = ParseHexColorOrDefault(value, layout.mutedTextColor);
-    } else if (key == "track_color") {
-        layout.trackColor = ParseHexColorOrDefault(value, layout.trackColor);
-    } else if (key == "panel_fill_color") {
-        layout.panelFillColor = ParseHexColorOrDefault(value, layout.panelFillColor);
-    } else if (key == "graph_background_color") {
-        layout.graphBackgroundColor = ParseHexColorOrDefault(value, layout.graphBackgroundColor);
-    } else if (key == "graph_grid_color") {
-        layout.graphGridColor = ParseHexColorOrDefault(value, layout.graphGridColor);
-    } else if (key == "graph_axis_color") {
-        layout.graphAxisColor = ParseHexColorOrDefault(value, layout.graphAxisColor);
-    } else if (key == "graph_marker_color") {
-        layout.graphMarkerColor = ParseHexColorOrDefault(value, layout.graphMarkerColor);
-    }
+    ApplyStructuredSectionValue<ColorConfig::Section>(layout.colors, key, value);
 }
 
 void ApplyFontValue(LayoutConfig& layout, const std::string& key, const std::string& value) {
-    if (key == "title") {
-        ParseFontSpec(layout.fonts.title, value);
-    } else if (key == "big") {
-        ParseFontSpec(layout.fonts.big, value);
-    } else if (key == "value") {
-        ParseFontSpec(layout.fonts.value, value);
-    } else if (key == "label") {
-        ParseFontSpec(layout.fonts.label, value);
-    } else if (key == "small") {
-        ParseFontSpec(layout.fonts.smallText, value);
-    }
+    ApplyStructuredSectionValue<UiFontSetConfig::Section>(layout.fonts, key, value);
 }
 
 void ApplyMetricListWidgetValue(MetricListWidgetConfig& widget, const std::string& key, const std::string& value) {
-    if (key == "label_width") {
-        widget.labelWidth = ParseIntOrDefault(value, widget.labelWidth);
-    } else if (key == "value_gap") {
-        widget.valueGap = ParseIntOrDefault(value, widget.valueGap);
-    } else if (key == "bar_height") {
-        widget.barHeight = ParseIntOrDefault(value, widget.barHeight);
-    } else if (key == "vertical_gap") {
-        widget.verticalGap = ParseIntOrDefault(value, widget.verticalGap);
-    }
+    ApplyStructuredSectionValue<MetricListWidgetConfig::Section>(widget, key, value);
 }
 
 void ApplyDriveUsageListWidgetValue(DriveUsageListWidgetConfig& widget, const std::string& key,
     const std::string& value) {
-    if (key == "free_width") {
-        widget.freeWidth = ParseIntOrDefault(value, widget.freeWidth);
-    } else if (key == "activity_width") {
-        widget.activityWidth = ParseIntOrDefault(value, widget.activityWidth);
-    } else if (key == "bar_gap") {
-        widget.barGap = ParseIntOrDefault(value, widget.barGap);
-    } else if (key == "value_gap") {
-        widget.valueGap = ParseIntOrDefault(value, widget.valueGap);
-    } else if (key == "percent_gap") {
-        widget.percentGap = ParseIntOrDefault(value, widget.percentGap);
-    } else if (key == "bar_height") {
-        widget.barHeight = ParseIntOrDefault(value, widget.barHeight);
-    } else if (key == "vertical_gap") {
-        widget.verticalGap = ParseIntOrDefault(value, widget.verticalGap);
-    } else if (key == "label_padding") {
-        widget.labelPadding = ParseIntOrDefault(value, widget.labelPadding);
-    } else if (key == "percent_padding") {
-        widget.percentPadding = ParseIntOrDefault(value, widget.percentPadding);
-    } else if (key == "activity_segments") {
-        widget.activitySegments = ParseIntOrDefault(value, widget.activitySegments);
-    } else if (key == "activity_segment_gap") {
-        widget.activitySegmentGap = ParseIntOrDefault(value, widget.activitySegmentGap);
-    }
+    ApplyStructuredSectionValue<DriveUsageListWidgetConfig::Section>(widget, key, value);
 }
 
 void ApplyThroughputWidgetValue(ThroughputWidgetConfig& widget, const std::string& key, const std::string& value) {
-    if (key == "header_gap") {
-        widget.headerGap = ParseIntOrDefault(value, widget.headerGap);
-    } else if (key == "graph_height") {
-        widget.graphHeight = ParseIntOrDefault(value, widget.graphHeight);
-    } else if (key == "value_padding") {
-        widget.valuePadding = ParseIntOrDefault(value, widget.valuePadding);
-    } else if (key == "label_padding") {
-        widget.labelPadding = ParseIntOrDefault(value, widget.labelPadding);
-    } else if (key == "axis_padding") {
-        widget.axisPadding = ParseIntOrDefault(value, widget.axisPadding);
-    } else if (key == "scale_label_padding") {
-        widget.scaleLabelPadding = ParseIntOrDefault(value, widget.scaleLabelPadding);
-    } else if (key == "scale_label_min_height") {
-        widget.scaleLabelMinHeight = ParseIntOrDefault(value, widget.scaleLabelMinHeight);
-    } else if (key == "guide_stroke_width") {
-        widget.guideStrokeWidth = ParseIntOrDefault(value, widget.guideStrokeWidth);
-    } else if (key == "plot_stroke_width") {
-        widget.plotStrokeWidth = ParseIntOrDefault(value, widget.plotStrokeWidth);
-    } else if (key == "leader_diameter") {
-        widget.leaderDiameter = ParseIntOrDefault(value, widget.leaderDiameter);
-    }
+    ApplyStructuredSectionValue<ThroughputWidgetConfig::Section>(widget, key, value);
 }
 
 void ApplyGaugeWidgetValue(GaugeWidgetConfig& widget, const std::string& key, const std::string& value) {
-    if (key == "preferred_size") {
-        widget.preferredSize = ParseIntOrDefault(value, widget.preferredSize);
-    } else if (key == "outer_padding") {
-        widget.outerPadding = ParseIntOrDefault(value, widget.outerPadding);
-    } else if (key == "min_radius") {
-        widget.minRadius = ParseIntOrDefault(value, widget.minRadius);
-    } else if (key == "ring_thickness") {
-        widget.ringThickness = ParseIntOrDefault(value, widget.ringThickness);
-    } else if (key == "sweep_degrees") {
-        widget.sweepDegrees = ParseDoubleOrDefault(value, widget.sweepDegrees);
-    } else if (key == "segment_count") {
-        widget.segmentCount = ParseIntOrDefault(value, widget.segmentCount);
-    } else if (key == "segment_gap_degrees") {
-        widget.segmentGapDegrees = ParseDoubleOrDefault(value, widget.segmentGapDegrees);
-    } else if (key == "text_half_width") {
-        widget.textHalfWidth = ParseIntOrDefault(value, widget.textHalfWidth);
-    } else if (key == "value_top") {
-        widget.valueTop = ParseIntOrDefault(value, widget.valueTop);
-    } else if (key == "value_bottom") {
-        widget.valueBottom = ParseIntOrDefault(value, widget.valueBottom);
-    } else if (key == "label_top") {
-        widget.labelTop = ParseIntOrDefault(value, widget.labelTop);
-    } else if (key == "label_bottom") {
-        widget.labelBottom = ParseIntOrDefault(value, widget.labelBottom);
-    }
+    ApplyStructuredSectionValue<GaugeWidgetConfig::Section>(widget, key, value);
 }
 
 void ApplyTextWidgetValue(TextWidgetConfig& widget, const std::string& key, const std::string& value) {
-    if (key == "preferred_padding") {
-        widget.preferredPadding = ParseIntOrDefault(value, widget.preferredPadding);
-    }
+    ApplyStructuredSectionValue<TextWidgetConfig::Section>(widget, key, value);
 }
 
 void ApplyNetworkFooterWidgetValue(NetworkFooterWidgetConfig& widget, const std::string& key,
     const std::string& value) {
-    if (key == "preferred_padding") {
-        widget.preferredPadding = ParseIntOrDefault(value, widget.preferredPadding);
-    }
+    ApplyStructuredSectionValue<NetworkFooterWidgetConfig::Section>(widget, key, value);
 }
 
 void ApplyClockTimeWidgetValue(ClockTimeWidgetConfig& widget, const std::string& key, const std::string& value) {
-    if (key == "padding") {
-        widget.padding = ParseIntOrDefault(value, widget.padding);
-    }
+    ApplyStructuredSectionValue<ClockTimeWidgetConfig::Section>(widget, key, value);
 }
 
 void ApplyClockDateWidgetValue(ClockDateWidgetConfig& widget, const std::string& key, const std::string& value) {
-    if (key == "padding") {
-        widget.padding = ParseIntOrDefault(value, widget.padding);
-    }
+    ApplyStructuredSectionValue<ClockDateWidgetConfig::Section>(widget, key, value);
 }
 
 void ApplyMetricScaleValue(MetricScaleConfig& metricScales, const std::string& key, const std::string& value) {
-    if (key == "cpu_clock_ghz") {
-        metricScales.cpuClockGHz = ParseDoubleOrDefault(value, metricScales.cpuClockGHz);
-    } else if (key == "gpu_temperature_c") {
-        metricScales.gpuTemperatureC = ParseDoubleOrDefault(value, metricScales.gpuTemperatureC);
-    } else if (key == "gpu_clock_mhz") {
-        metricScales.gpuClockMHz = ParseDoubleOrDefault(value, metricScales.gpuClockMHz);
-    } else if (key == "gpu_fan_rpm") {
-        metricScales.gpuFanRpm = ParseDoubleOrDefault(value, metricScales.gpuFanRpm);
-    } else if (key == "board_temperature_c") {
-        metricScales.boardTemperatureC = ParseDoubleOrDefault(value, metricScales.boardTemperatureC);
-    } else if (key == "board_fan_rpm") {
-        metricScales.boardFanRpm = ParseDoubleOrDefault(value, metricScales.boardFanRpm);
-    }
+    ApplyStructuredSectionValue<MetricScaleConfig::Section>(metricScales, key, value);
 }
 
 void ApplyCardValue(LayoutConfig& layout, const std::string& section, const std::string& key, const std::string& value) {
@@ -634,14 +627,10 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
         const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
 
-        if (section == "display" && key == "monitor_name") {
-            config.monitorName = value;
-        } else if (section == "display" && key == "wallpaper") {
-            config.wallpaper = value;
-        } else if (section == "display" && key == "position") {
-            ParseLogicalPoint(value, config.position);
-        } else if (section == "network" && key == "adapter_name") {
-            config.networkAdapter = value;
+        if (section == "display") {
+            ApplyStructuredSectionValue<DisplayConfig::Section>(config.display, key, value);
+        } else if (section == "network") {
+            ApplyStructuredSectionValue<NetworkConfig::Section>(config.network, key, value);
         } else if (section == "board") {
             ApplyBoardValue(config, key, value);
         } else if (section == "metric_scales") {
@@ -895,10 +884,8 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
         ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value);
     };
 
-    updateKey("[display]", "monitor_name", config.monitorName);
-    updateKey("[display]", "wallpaper", config.wallpaper);
-    updateKey("[display]", "position", std::to_string(config.position.x) + "," + std::to_string(config.position.y));
-    updateKey("[network]", "adapter_name", config.networkAdapter);
+    SaveStructuredSection<DisplayConfig::Section>(config.display, updateKey);
+    SaveStructuredSection<NetworkConfig::Section>(config.network, updateKey);
 
     const size_t boardSectionStart = ensureSectionAfter("[board]", "[network]");
     for (const std::string& logicalName : config.boardTemperatureNames) {

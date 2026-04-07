@@ -487,7 +487,7 @@ TelemetryDump TelemetryCollector::Dump() const {
 AppConfig TelemetryCollector::EffectiveConfig() const {
     AppConfig config = impl_->config_;
     if (!impl_->snapshot_.network.adapterName.empty() && impl_->snapshot_.network.adapterName != "Auto") {
-        config.networkAdapter = impl_->snapshot_.network.adapterName;
+        config.network.adapterName = impl_->snapshot_.network.adapterName;
     }
     return config;
 }
@@ -918,15 +918,15 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         }
 
         const bool configuredExactMatch =
-            !config_.networkAdapter.empty() &&
-            (EqualsInsensitive(row.Alias, config_.networkAdapter) ||
-                EqualsInsensitive(row.Description, config_.networkAdapter));
+            !config_.network.adapterName.empty() &&
+            (EqualsInsensitive(row.Alias, config_.network.adapterName) ||
+                EqualsInsensitive(row.Description, config_.network.adapterName));
         const bool configuredPartialMatch =
-            !config_.networkAdapter.empty() &&
+            !config_.network.adapterName.empty() &&
             !configuredExactMatch &&
-            (ContainsInsensitive(row.Alias, config_.networkAdapter) ||
-                ContainsInsensitive(row.Description, config_.networkAdapter));
-        if (!config_.networkAdapter.empty() && !configuredExactMatch && !configuredPartialMatch) {
+            (ContainsInsensitive(row.Alias, config_.network.adapterName) ||
+                ContainsInsensitive(row.Description, config_.network.adapterName));
+        if (!config_.network.adapterName.empty() && !configuredExactMatch && !configuredPartialMatch) {
             continue;
         }
 
@@ -947,7 +947,7 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
             " traffic=" + std::to_string(traffic) +
             " ip=" + info.ipAddress).c_str());
 
-        if (config_.networkAdapter.empty()) {
+        if (config_.network.adapterName.empty()) {
             const bool candidatePreferred =
                 selected == nullptr ||
                 (info.hasGateway && !selectedInfo.hasGateway) ||
@@ -969,11 +969,11 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         } else if (
             selected == nullptr ||
             (configuredExactMatch && !(
-                EqualsInsensitive(selected->Alias, config_.networkAdapter) ||
-                EqualsInsensitive(selected->Description, config_.networkAdapter))) ||
+                EqualsInsensitive(selected->Alias, config_.network.adapterName) ||
+                EqualsInsensitive(selected->Description, config_.network.adapterName))) ||
             (configuredExactMatch ==
-                (EqualsInsensitive(selected->Alias, config_.networkAdapter) ||
-                    EqualsInsensitive(selected->Description, config_.networkAdapter)) &&
+                (EqualsInsensitive(selected->Alias, config_.network.adapterName) ||
+                    EqualsInsensitive(selected->Description, config_.network.adapterName)) &&
                 (info.hasGateway || info.hasIpv4))) {
             selected = &row;
             selectedTraffic = traffic;

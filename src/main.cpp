@@ -827,8 +827,8 @@ int ScalePhysicalToLogical(int physicalValue, UINT dpi) {
 
 SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi) {
     return SIZE{
-        ScaleLogicalToPhysical(config.layout.window.width, dpi),
-        ScaleLogicalToPhysical(config.layout.window.height, dpi)
+        ScaleLogicalToPhysical(config.layout.structure.window.width, dpi),
+        ScaleLogicalToPhysical(config.layout.structure.window.height, dpi)
     };
 }
 
@@ -1067,24 +1067,24 @@ std::filesystem::path GetRuntimeConfigPath() {
 }
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) {
-    if (config.wallpaper.empty()) {
+    if (config.display.wallpaper.empty()) {
         return true;
     }
-    if (config.monitorName.empty()) {
-        WriteOptionalTrace(traceStream, "wallpaper:skipped_missing_monitor wallpaper=\"" + config.wallpaper + "\"");
+    if (config.display.monitorName.empty()) {
+        WriteOptionalTrace(traceStream, "wallpaper:skipped_missing_monitor wallpaper=\"" + config.display.wallpaper + "\"");
         return false;
     }
 
-    const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.monitorName);
+    const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.display.monitorName);
     if (!targetMonitor.has_value()) {
-        WriteOptionalTrace(traceStream, "wallpaper:monitor_unresolved monitor=\"" + config.monitorName +
-            "\" wallpaper=\"" + config.wallpaper + "\"");
+        WriteOptionalTrace(traceStream, "wallpaper:monitor_unresolved monitor=\"" + config.display.monitorName +
+            "\" wallpaper=\"" + config.display.wallpaper + "\"");
         return false;
     }
 
-    const std::filesystem::path wallpaperPath = ResolveExecutableRelativePath(std::filesystem::path(WideFromUtf8(config.wallpaper)));
+    const std::filesystem::path wallpaperPath = ResolveExecutableRelativePath(std::filesystem::path(WideFromUtf8(config.display.wallpaper)));
     if (wallpaperPath.empty()) {
-        WriteOptionalTrace(traceStream, "wallpaper:path_empty monitor=\"" + config.monitorName + "\"");
+        WriteOptionalTrace(traceStream, "wallpaper:path_empty monitor=\"" + config.display.monitorName + "\"");
         return false;
     }
 
@@ -1131,7 +1131,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
                 applied = SUCCEEDED(setStatus);
                 WriteOptionalTrace(traceStream,
                     std::string("wallpaper:apply_") + (applied ? "done" : "failed") +
-                    " monitor=\"" + config.monitorName +
+                    " monitor=\"" + config.display.monitorName +
                     "\" path=\"" + Utf8FromWide(wallpaperPath.wstring()) +
                     "\" hr=" + FormatHresult(setStatus));
                 CoTaskMemFree(monitorId);
@@ -1142,7 +1142,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
     }
 
     if (!targetFound) {
-        WriteOptionalTrace(traceStream, "wallpaper:target_not_found monitor=\"" + config.monitorName +
+        WriteOptionalTrace(traceStream, "wallpaper:target_not_found monitor=\"" + config.display.monitorName +
             "\" path=\"" + Utf8FromWide(wallpaperPath.wstring()) + "\"");
     }
 
@@ -1169,7 +1169,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         }
     }
 
-    const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.monitorName);
+    const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.display.monitorName);
     if (!targetMonitor.has_value()) {
         return 1;
     }
@@ -1339,15 +1339,15 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 
     RECT placement{100, 100, 100 + WindowWidth(), 100 + WindowHeight()};
     currentDpi_ = GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
-    if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
+    if (const auto monitor = FindTargetMonitor(config_.display.monitorName); monitor.has_value()) {
         currentDpi_ = monitor->dpi;
         UpdateRendererScale(ScaleFromDpi(currentDpi_));
-        placement.left = monitor->rect.left + ScaleLogicalToPhysical(config_.position.x, currentDpi_);
-        placement.top = monitor->rect.top + ScaleLogicalToPhysical(config_.position.y, currentDpi_);
+        placement.left = monitor->rect.left + ScaleLogicalToPhysical(config_.display.position.x, currentDpi_);
+        placement.top = monitor->rect.top + ScaleLogicalToPhysical(config_.display.position.y, currentDpi_);
     } else {
         UpdateRendererScale(ScaleFromDpi(currentDpi_));
-        placement.left = 100 + ScaleLogicalToPhysical(config_.position.x, currentDpi_);
-        placement.top = 100 + ScaleLogicalToPhysical(config_.position.y, currentDpi_);
+        placement.left = 100 + ScaleLogicalToPhysical(config_.display.position.x, currentDpi_);
+        placement.top = 100 + ScaleLogicalToPhysical(config_.display.position.y, currentDpi_);
     }
     placement.right = placement.left + WindowWidth();
     placement.bottom = placement.top + WindowHeight();
@@ -1370,14 +1370,14 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 
 void DashboardApp::ApplyConfigPlacement() {
     UINT targetDpi = hwnd_ != nullptr ? CurrentWindowDpi() : GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
-    int left = 100 + ScaleLogicalToPhysical(config_.position.x, targetDpi);
-    int top = 100 + ScaleLogicalToPhysical(config_.position.y, targetDpi);
-    bool monitorResolved = config_.monitorName.empty();
-    if (const auto monitor = FindTargetMonitor(config_.monitorName); monitor.has_value()) {
+    int left = 100 + ScaleLogicalToPhysical(config_.display.position.x, targetDpi);
+    int top = 100 + ScaleLogicalToPhysical(config_.display.position.y, targetDpi);
+    bool monitorResolved = config_.display.monitorName.empty();
+    if (const auto monitor = FindTargetMonitor(config_.display.monitorName); monitor.has_value()) {
         monitorResolved = true;
         targetDpi = monitor->dpi;
-        left = monitor->rect.left + ScaleLogicalToPhysical(config_.position.x, targetDpi);
-        top = monitor->rect.top + ScaleLogicalToPhysical(config_.position.y, targetDpi);
+        left = monitor->rect.left + ScaleLogicalToPhysical(config_.display.position.x, targetDpi);
+        top = monitor->rect.top + ScaleLogicalToPhysical(config_.display.position.y, targetDpi);
     }
 
     if (!monitorResolved) {
@@ -1396,7 +1396,7 @@ void DashboardApp::ApplyConfigPlacement() {
 }
 
 void DashboardApp::StartPlacementWatch() {
-    if (hwnd_ == nullptr || config_.monitorName.empty()) {
+    if (hwnd_ == nullptr || config_.display.monitorName.empty()) {
         StopPlacementWatch();
         return;
     }
@@ -1415,7 +1415,7 @@ void DashboardApp::RetryConfigPlacementIfPending() {
     if (!placementWatchActive_ || hwnd_ == nullptr || isMoving_) {
         return;
     }
-    if (config_.monitorName.empty() || FindTargetMonitor(config_.monitorName).has_value()) {
+    if (config_.display.monitorName.empty() || FindTargetMonitor(config_.display.monitorName).has_value()) {
         ApplyConfigPlacement();
         ApplyConfiguredWallpaper();
         movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
@@ -1435,19 +1435,19 @@ void DashboardApp::ReleaseFonts() {
 }
 
 COLORREF DashboardApp::BackgroundColor() const {
-    return ToColorRef(config_.layout.backgroundColor);
+    return ToColorRef(config_.layout.colors.backgroundColor);
 }
 
 COLORREF DashboardApp::ForegroundColor() const {
-    return ToColorRef(config_.layout.foregroundColor);
+    return ToColorRef(config_.layout.colors.foregroundColor);
 }
 
 COLORREF DashboardApp::AccentColor() const {
-    return ToColorRef(config_.layout.accentColor);
+    return ToColorRef(config_.layout.colors.accentColor);
 }
 
 COLORREF DashboardApp::MutedTextColor() const {
-    return ToColorRef(config_.layout.mutedTextColor);
+    return ToColorRef(config_.layout.colors.mutedTextColor);
 }
 
 HICON DashboardApp::LoadAppIcon(int width, int height) {
@@ -1628,9 +1628,9 @@ bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
     }
 
     AppConfig updatedConfig = telemetry_->EffectiveConfig();
-    updatedConfig.monitorName = option.configMonitorName;
-    updatedConfig.position = {};
-    updatedConfig.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
+    updatedConfig.display.monitorName = option.configMonitorName;
+    updatedConfig.display.position = {};
+    updatedConfig.display.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
 
     const std::filesystem::path configPath = GetRuntimeConfigPath();
     const std::filesystem::path imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
@@ -1727,9 +1727,9 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
     const std::string monitorName = !placement.configMonitorName.empty()
         ? placement.configMonitorName
         : placement.deviceName;
-    config.monitorName = monitorName;
-    config.position.x = placement.relativePosition.x;
-    config.position.y = placement.relativePosition.y;
+    config.display.monitorName = monitorName;
+    config.display.position.x = placement.relativePosition.x;
+    config.display.position.y = placement.relativePosition.y;
     bool saved = false;
     if (CanWriteRuntimeConfig(configPath)) {
         saved = SaveConfig(configPath, config);
@@ -1743,9 +1743,9 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
         return;
     }
 
-    config_.monitorName = monitorName;
-    config_.position.x = placement.relativePosition.x;
-    config_.position.y = placement.relativePosition.y;
+    config_.display.monitorName = monitorName;
+    config_.display.position.x = placement.relativePosition.x;
+    config_.display.position.y = placement.relativePosition.y;
 }
 
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {

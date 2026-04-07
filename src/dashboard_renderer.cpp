@@ -400,27 +400,27 @@ const std::string& DashboardRenderer::LastError() const {
 }
 
 int DashboardRenderer::WindowWidth() const {
-    return std::max(1, ScaleLogical(config_.layout.window.width));
+    return std::max(1, ScaleLogical(config_.layout.structure.window.width));
 }
 
 int DashboardRenderer::WindowHeight() const {
-    return std::max(1, ScaleLogical(config_.layout.window.height));
+    return std::max(1, ScaleLogical(config_.layout.structure.window.height));
 }
 
 COLORREF DashboardRenderer::BackgroundColor() const {
-    return ToColorRef(config_.layout.backgroundColor);
+    return ToColorRef(config_.layout.colors.backgroundColor);
 }
 
 COLORREF DashboardRenderer::ForegroundColor() const {
-    return ToColorRef(config_.layout.foregroundColor);
+    return ToColorRef(config_.layout.colors.foregroundColor);
 }
 
 COLORREF DashboardRenderer::AccentColor() const {
-    return ToColorRef(config_.layout.accentColor);
+    return ToColorRef(config_.layout.colors.accentColor);
 }
 
 COLORREF DashboardRenderer::MutedTextColor() const {
-    return ToColorRef(config_.layout.mutedTextColor);
+    return ToColorRef(config_.layout.colors.mutedTextColor);
 }
 
 HFONT DashboardRenderer::LabelFont() const {
@@ -584,8 +584,8 @@ bool DashboardRenderer::MeasureFonts() {
 }
 
 int DashboardRenderer::EffectiveHeaderHeight() const {
-    const int titleHeight = std::max(fontHeights_.title, ScaleLogical(config_.layout.headerIconSize));
-    const int configured = ScaleLogical(config_.layout.headerHeight);
+    const int titleHeight = std::max(fontHeights_.title, ScaleLogical(config_.layout.cardStyle.headerIconSize));
+    const int configured = ScaleLogical(config_.layout.cardStyle.headerHeight);
     const int computed = std::max(configured, titleHeight);
     WriteTrace("renderer:layout_header_height configured=" + std::to_string(configured) +
         " title_or_icon=" + std::to_string(titleHeight) +
@@ -632,7 +632,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         for (size_t i = 0; i < node.children.size(); ++i) {
             total += PreferredNodeHeight(node.children[i], 0);
             if (i + 1 < node.children.size()) {
-                total += ScaleLogical(config_.layout.widgetLineGap);
+                total += ScaleLogical(config_.layout.cardStyle.widgetLineGap);
             }
         }
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(total));
@@ -728,7 +728,7 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
 
     const bool horizontal = node.name == "columns";
     const bool topPacked = node.name == "stack_top";
-    const int gap = horizontal ? ScaleLogical(config_.layout.columnGap) : ScaleLogical(config_.layout.widgetLineGap);
+    const int gap = horizontal ? ScaleLogical(config_.layout.cardStyle.columnGap) : ScaleLogical(config_.layout.cardStyle.widgetLineGap);
     if (topPacked) {
         int cursor = static_cast<int>(rect.top);
         for (size_t i = 0; i < node.children.size(); ++i) {
@@ -797,20 +797,20 @@ bool DashboardRenderer::ResolveLayout() {
     resolvedLayout_.windowHeight = WindowHeight();
 
     const RECT dashboardRect{
-        ScaleLogical(config_.layout.outerMargin),
-        ScaleLogical(config_.layout.outerMargin),
-        WindowWidth() - ScaleLogical(config_.layout.outerMargin),
-        WindowHeight() - ScaleLogical(config_.layout.outerMargin)
+        ScaleLogical(config_.layout.dashboard.outerMargin),
+        ScaleLogical(config_.layout.dashboard.outerMargin),
+        WindowWidth() - ScaleLogical(config_.layout.dashboard.outerMargin),
+        WindowHeight() - ScaleLogical(config_.layout.dashboard.outerMargin)
     };
 
-    if (config_.layout.cardsLayout.name.empty()) {
+    if (config_.layout.structure.cardsLayout.name.empty()) {
         lastError_ = "renderer:layout_missing_cards_root";
         return false;
     }
 
     WriteTrace("renderer:layout_begin window=" + std::to_string(resolvedLayout_.windowWidth) + "x" +
         std::to_string(resolvedLayout_.windowHeight) + " " + FormatRect(dashboardRect) +
-        " cards_root=\"" + config_.layout.cardsLayout.name + "\"");
+        " cards_root=\"" + config_.layout.structure.cardsLayout.name + "\"");
 
     const auto resolveCard = [&](const LayoutNodeConfig& node, const RECT& rect) {
         const auto cardIt = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
@@ -826,8 +826,8 @@ bool DashboardRenderer::ResolveLayout() {
         card.iconName = cardIt->icon;
         card.rect = rect;
 
-        const int padding = ScaleLogical(config_.layout.cardPadding);
-        const int iconSize = ScaleLogical(config_.layout.headerIconSize);
+        const int padding = ScaleLogical(config_.layout.cardStyle.cardPadding);
+        const int iconSize = ScaleLogical(config_.layout.cardStyle.headerIconSize);
         const int headerHeight = EffectiveHeaderHeight();
         card.iconRect = RECT{
             card.rect.left + padding,
@@ -836,14 +836,14 @@ bool DashboardRenderer::ResolveLayout() {
             card.rect.top + padding + std::max(0, (headerHeight - iconSize) / 2) + iconSize
         };
         card.titleRect = RECT{
-            card.iconRect.right + ScaleLogical(config_.layout.headerGap),
+            card.iconRect.right + ScaleLogical(config_.layout.cardStyle.headerGap),
             card.rect.top + padding,
             card.rect.right - padding,
             card.rect.top + padding + headerHeight
         };
         card.contentRect = RECT{
             card.rect.left + padding,
-            card.rect.top + padding + headerHeight + ScaleLogical(config_.layout.contentGap),
+            card.rect.top + padding + headerHeight + ScaleLogical(config_.layout.cardStyle.contentGap),
             card.rect.right - padding,
             card.rect.bottom - padding
         };
@@ -864,7 +864,7 @@ bool DashboardRenderer::ResolveLayout() {
             }
 
             const bool horizontal = node.name == "columns";
-            const int gap = horizontal ? ScaleLogical(config_.layout.cardGap) : ScaleLogical(config_.layout.rowGap);
+            const int gap = horizontal ? ScaleLogical(config_.layout.dashboard.cardGap) : ScaleLogical(config_.layout.dashboard.rowGap);
             int totalWeight = 0;
             for (const auto& child : node.children) {
                 totalWeight += std::max(1, child.weight);
@@ -906,10 +906,10 @@ bool DashboardRenderer::ResolveLayout() {
             }
         };
 
-    resolveDashboardNode(config_.layout.cardsLayout, dashboardRect);
+    resolveDashboardNode(config_.layout.structure.cardsLayout, dashboardRect);
 
     if (resolvedLayout_.cards.empty()) {
-        lastError_ = "renderer:layout_resolve_failed cards=0 root=\"" + config_.layout.cardsLayout.name + "\"";
+        lastError_ = "renderer:layout_resolve_failed cards=0 root=\"" + config_.layout.structure.cardsLayout.name + "\"";
         return false;
     }
     WriteTrace("renderer:layout_done cards=" + std::to_string(resolvedLayout_.cards.size()));
@@ -943,12 +943,12 @@ void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, cons
 }
 
 void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
-    HPEN border = CreatePen(PS_SOLID, std::max(1, ScaleLogical(config_.layout.cardBorderWidth)),
-        ToColorRef(config_.layout.panelBorderColor));
-    HBRUSH fill = CreateSolidBrush(ToColorRef(config_.layout.panelFillColor));
+    HPEN border = CreatePen(PS_SOLID, std::max(1, ScaleLogical(config_.layout.cardStyle.cardBorderWidth)),
+        ToColorRef(config_.layout.colors.panelBorderColor));
+    HBRUSH fill = CreateSolidBrush(ToColorRef(config_.layout.colors.panelFillColor));
     HGDIOBJ oldPen = SelectObject(hdc, border);
     HGDIOBJ oldBrush = SelectObject(hdc, fill);
-    const int radius = std::max(1, ScaleLogical(config_.layout.cardRadius));
+    const int radius = std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius));
     RoundRect(hdc, card.rect.left, card.rect.top, card.rect.right, card.rect.bottom, radius, radius);
     SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);
@@ -979,8 +979,8 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const Das
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    const Gdiplus::Color trackColor(255, GetRValue(ToColorRef(config_.layout.trackColor)),
-        GetGValue(ToColorRef(config_.layout.trackColor)), GetBValue(ToColorRef(config_.layout.trackColor)));
+    const Gdiplus::Color trackColor(255, GetRValue(ToColorRef(config_.layout.colors.trackColor)),
+        GetGValue(ToColorRef(config_.layout.colors.trackColor)), GetBValue(ToColorRef(config_.layout.colors.trackColor)));
     const Gdiplus::Color usageColor(255, GetRValue(AccentColor()), GetGValue(AccentColor()), GetBValue(AccentColor()));
     const Gdiplus::Color ghostColor(96, GetRValue(AccentColor()), GetGValue(AccentColor()), GetBValue(AccentColor()));
 
@@ -1018,7 +1018,7 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const Das
 }
 
 void DashboardRenderer::DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
-    FillCapsule(hdc, rect, ToColorRef(config_.layout.trackColor), 255);
+    FillCapsule(hdc, rect, ToColorRef(config_.layout.colors.trackColor), 255);
 
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
@@ -1069,7 +1069,7 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const Dashboard
 
 void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
     double guideStepMbps, double timeMarkerOffsetSamples, double timeMarkerIntervalSamples) {
-    HBRUSH bg = CreateSolidBrush(ToColorRef(config_.layout.graphBackgroundColor));
+    HBRUSH bg = CreateSolidBrush(ToColorRef(config_.layout.colors.graphBackgroundColor));
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
 
@@ -1090,7 +1090,7 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
 
     const int strokeWidth = std::max(1, ScaleLogical(config_.layout.throughput.guideStrokeWidth));
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
-    HBRUSH markerBrush = CreateSolidBrush(ToColorRef(config_.layout.graphMarkerColor));
+    HBRUSH markerBrush = CreateSolidBrush(ToColorRef(config_.layout.colors.graphMarkerColor));
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
         const double ratio = tick / maxValue;
         const int y = graphBottom - static_cast<int>(std::round(ratio * plotHeight));
@@ -1113,7 +1113,7 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
 
     DeleteObject(markerBrush);
 
-    HBRUSH axisBrush = CreateSolidBrush(ToColorRef(config_.layout.graphAxisColor));
+    HBRUSH axisBrush = CreateSolidBrush(ToColorRef(config_.layout.colors.graphAxisColor));
     RECT verticalAxisRect{rect.left + axisWidth, rect.top, rect.left + axisWidth + strokeWidth, rect.bottom};
     RECT horizontalAxisRect{rect.left + axisWidth, rect.bottom - strokeWidth, rect.right, rect.bottom};
     FillRect(hdc, &verticalAxisRect, axisBrush);
@@ -1252,10 +1252,10 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
         DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         DrawSegmentIndicator(hdc, readIndicatorRect, activitySegments, activitySegmentGap,
             renderMode_ == RenderMode::Blank ? 0.0 : drive.readActivity,
-            ToColorRef(config_.layout.trackColor), AccentColor());
+            ToColorRef(config_.layout.colors.trackColor), AccentColor());
         DrawSegmentIndicator(hdc, writeIndicatorRect, activitySegments, activitySegmentGap,
             renderMode_ == RenderMode::Blank ? 0.0 : drive.writeActivity,
-            ToColorRef(config_.layout.trackColor), AccentColor());
+            ToColorRef(config_.layout.colors.trackColor), AccentColor());
         DrawPillBar(hdc, barRect, drive.usedPercent / 100.0, std::nullopt, renderMode_ != RenderMode::Blank);
 
         if (renderMode_ != RenderMode::Blank) {
