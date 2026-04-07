@@ -2,4 +2,6 @@ System Telemetry is a compact Windows 11 dashboard for an 800x480 secondary disp
 
 The app reads telemetry from Windows and vendor runtimes where available, including AMD ADLX for Radeon GPU metrics and Gigabyte SIV integration for supported board sensors.
 
+For first-use setup, start the app, open the tray or window menu, use `Config To Display` to pick the target monitor, and then enable `Auto-start on user logon` if you want it to launch automatically after sign-in.
+
 Build and development setup instructions live in [docs/build.md](docs/build.md).
