@@ -49,10 +49,13 @@ constexpr UINT kCommandExit = 1005;
 constexpr UINT kCommandSaveDumpAs = 1006;
 constexpr UINT kCommandSaveScreenshotAs = 1007;
 constexpr UINT kCommandAutoStart = 1008;
+constexpr UINT kCommandConfigureDisplayBase = 2000;
+constexpr UINT kCommandConfigureDisplayMax = 2099;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
 constexpr wchar_t kDefaultTraceFileName[] = L"telemetry_trace.txt";
 constexpr wchar_t kDefaultDumpFileName[] = L"telemetry_dump.txt";
 constexpr wchar_t kDefaultScreenshotFileName[] = L"telemetry_screenshot.png";
+constexpr wchar_t kDefaultBlankWallpaperFileName[] = L"telemetry_blank.png";
 constexpr wchar_t kAutoStartRunSubKey[] = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 constexpr wchar_t kAutoStartValueName[] = L"SystemTelemetry";
 
@@ -141,6 +144,8 @@ DiagnosticsOptions GetDiagnosticsOptions();
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options);
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream);
+int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPath, const std::filesystem::path& sourceDumpPath,
+    const std::filesystem::path& targetConfigPath, const std::filesystem::path& targetImagePath);
 
 class DiagnosticsSession {
 public:
@@ -630,7 +635,7 @@ bool CanWriteRuntimeConfig(const std::filesystem::path& path) {
     return true;
 }
 
-std::filesystem::path CreateElevatedSaveConfigTempPath() {
+std::filesystem::path CreateTempFilePath(const wchar_t* prefix) {
     wchar_t tempPathBuffer[MAX_PATH];
     const DWORD length = GetTempPathW(ARRAYSIZE(tempPathBuffer), tempPathBuffer);
     if (length == 0 || length >= ARRAYSIZE(tempPathBuffer)) {
@@ -638,10 +643,14 @@ std::filesystem::path CreateElevatedSaveConfigTempPath() {
     }
 
     wchar_t tempFileBuffer[MAX_PATH];
-    if (GetTempFileNameW(tempPathBuffer, L"stc", 0, tempFileBuffer) == 0) {
+    if (GetTempFileNameW(tempPathBuffer, prefix, 0, tempFileBuffer) == 0) {
         return {};
     }
     return std::filesystem::path(tempFileBuffer);
+}
+
+std::filesystem::path CreateElevatedSaveConfigTempPath() {
+    return CreateTempFilePath(L"stc");
 }
 
 int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath) {
@@ -812,6 +821,13 @@ int ScalePhysicalToLogical(int physicalValue, UINT dpi) {
     return static_cast<int>(std::lround(static_cast<double>(physicalValue) / ScaleFromDpi(dpi)));
 }
 
+SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi) {
+    return SIZE{
+        ScaleLogicalToPhysical(config.layout.windowWidth, dpi),
+        ScaleLogicalToPhysical(config.layout.windowHeight, dpi)
+    };
+}
+
 struct MonitorPlacementInfo {
     std::string deviceName;
     std::string monitorName = "Unknown";
@@ -831,6 +847,15 @@ struct TargetMonitorInfo {
     UINT dpi = kDefaultDpi;
 };
 
+struct DisplayMenuOption {
+    UINT commandId = 0;
+    std::string displayName;
+    std::string configMonitorName;
+    RECT rect{};
+    UINT dpi = kDefaultDpi;
+    bool layoutFits = false;
+};
+
 std::string SimplifyDeviceName(const std::string& deviceName) {
     if (deviceName.rfind("\\\\.\\", 0) == 0) {
         return deviceName.substr(4);
@@ -846,6 +871,44 @@ bool IsUsefulFriendlyName(const std::string& name) {
 }
 
 MonitorIdentity GetMonitorIdentity(const std::string& deviceName);
+
+std::vector<DisplayMenuOption> EnumerateDisplayMenuOptions(const AppConfig& config) {
+    struct SearchContext {
+        const AppConfig* config = nullptr;
+        std::vector<DisplayMenuOption> results;
+    } context{&config, {}};
+
+    EnumDisplayMonitors(
+        nullptr, nullptr,
+        [](HMONITOR monitor, HDC, LPRECT, LPARAM data) -> BOOL {
+            auto* context = reinterpret_cast<SearchContext*>(data);
+            MONITORINFOEXW info{};
+            info.cbSize = sizeof(info);
+            if (!GetMonitorInfoW(monitor, &info)) {
+                return TRUE;
+            }
+
+            const std::string deviceName = Utf8FromWide(info.szDevice);
+            const MonitorIdentity identity = GetMonitorIdentity(deviceName);
+            const UINT dpi = GetMonitorDpi(monitor);
+            const SIZE scaledWindow = ComputeWindowSizeForDpi(*context->config, dpi);
+            const LONG monitorWidth = info.rcMonitor.right - info.rcMonitor.left;
+            const LONG monitorHeight = info.rcMonitor.bottom - info.rcMonitor.top;
+
+            DisplayMenuOption option;
+            option.commandId = kCommandConfigureDisplayBase + static_cast<UINT>(context->results.size());
+            option.displayName = identity.displayName + " (" + std::to_string(monitorWidth) + "x" + std::to_string(monitorHeight) + ")";
+            option.configMonitorName = !identity.configName.empty() ? identity.configName : deviceName;
+            option.rect = info.rcMonitor;
+            option.dpi = dpi;
+            option.layoutFits = scaledWindow.cx == monitorWidth && scaledWindow.cy == monitorHeight;
+            context->results.push_back(std::move(option));
+            return context->results.size() < (kCommandConfigureDisplayMax - kCommandConfigureDisplayBase + 1);
+        },
+        reinterpret_cast<LPARAM>(&context));
+
+    return context.results;
+}
 
 std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName) {
     if (requestedName.empty()) {
@@ -1086,6 +1149,45 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
     return applied;
 }
 
+int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPath, const std::filesystem::path& sourceDumpPath,
+    const std::filesystem::path& targetConfigPath, const std::filesystem::path& targetImagePath) {
+    if (sourceConfigPath.empty() || sourceDumpPath.empty() || targetConfigPath.empty() || targetImagePath.empty()) {
+        return 2;
+    }
+
+    const AppConfig config = LoadConfig(sourceConfigPath);
+    TelemetryDump dump;
+    {
+        std::ifstream input(sourceDumpPath, std::ios::binary);
+        std::string error;
+        if (!input.is_open() || !LoadTelemetryDump(input, dump, &error)) {
+            return 1;
+        }
+    }
+
+    const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.monitorName);
+    if (!targetMonitor.has_value()) {
+        return 1;
+    }
+
+    std::string screenshotError;
+    const bool imageSaved = SaveDumpScreenshot(
+        targetImagePath,
+        dump.snapshot,
+        config,
+        ScaleFromDpi(targetMonitor->dpi),
+        DashboardRenderer::RenderMode::Blank,
+        nullptr,
+        &screenshotError);
+    const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config);
+    const bool wallpaperApplied = configSaved && ApplyConfiguredWallpaper(config, nullptr);
+
+    std::error_code ignored;
+    std::filesystem::remove(sourceConfigPath, ignored);
+    std::filesystem::remove(sourceDumpPath, ignored);
+    return wallpaperApplied ? 0 : 1;
+}
+
 class DashboardApp {
 public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {});
@@ -1112,6 +1214,7 @@ private:
     void UpdateConfigFromCurrentPlacement();
     void ApplyConfigPlacement();
     bool ApplyConfiguredWallpaper();
+    bool ConfigureDisplay(const DisplayMenuOption& option);
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     UINT CurrentWindowDpi() const;
@@ -1155,6 +1258,7 @@ private:
     std::chrono::steady_clock::time_point lastDiagnosticsOutput_{};
     UINT currentDpi_ = kDefaultDpi;
     bool placementWatchActive_ = false;
+    std::vector<DisplayMenuOption> configDisplayOptions_;
 };
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -1514,6 +1618,105 @@ bool DashboardApp::ApplyConfiguredWallpaper() {
     return ::ApplyConfiguredWallpaper(config_, diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr);
 }
 
+bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
+    if (!option.layoutFits) {
+        return false;
+    }
+
+    AppConfig updatedConfig = telemetry_->EffectiveConfig();
+    updatedConfig.monitorName = option.configMonitorName;
+    updatedConfig.positionX = 0;
+    updatedConfig.positionY = 0;
+    updatedConfig.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
+
+    const std::filesystem::path configPath = GetRuntimeConfigPath();
+    const std::filesystem::path imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
+    const TelemetryDump dump = telemetry_->Dump();
+
+    bool saved = false;
+    if (CanWriteRuntimeConfig(configPath) && CanWriteRuntimeConfig(imagePath)) {
+        std::string screenshotError;
+        saved = SaveDumpScreenshot(
+            imagePath,
+            dump.snapshot,
+            updatedConfig,
+            ScaleFromDpi(option.dpi),
+            DashboardRenderer::RenderMode::Blank,
+            diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
+            &screenshotError);
+        if (saved) {
+            saved = SaveConfig(configPath, updatedConfig);
+        }
+        if (saved) {
+            saved = ::ApplyConfiguredWallpaper(updatedConfig, diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr);
+        }
+    } else {
+        const std::filesystem::path tempConfigPath = CreateTempFilePath(L"stc");
+        const std::filesystem::path tempDumpPath = CreateTempFilePath(L"std");
+        if (tempConfigPath.empty() || tempDumpPath.empty()) {
+            saved = false;
+        } else {
+            saved = SaveConfig(tempConfigPath, updatedConfig);
+            if (saved) {
+                std::ofstream dumpStream(tempDumpPath, std::ios::binary | std::ios::trunc);
+                saved = dumpStream.is_open() && WriteTelemetryDump(dumpStream, dump);
+            }
+            if (saved) {
+                std::wstring parameters = L"/configure-display \"";
+                parameters += tempConfigPath.wstring();
+                parameters += L"\" /configure-display-target \"";
+                parameters += configPath.wstring();
+                parameters += L"\" /configure-display-dump \"";
+                parameters += tempDumpPath.wstring();
+                parameters += L"\" /configure-display-image-target \"";
+                parameters += imagePath.wstring();
+                parameters += L"\"";
+
+                SHELLEXECUTEINFOW executeInfo{};
+                executeInfo.cbSize = sizeof(executeInfo);
+                executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+                executeInfo.hwnd = hwnd_;
+                executeInfo.lpVerb = L"runas";
+                wchar_t modulePath[MAX_PATH];
+                const DWORD length = GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
+                if (length != 0 && length < ARRAYSIZE(modulePath)) {
+                    executeInfo.lpFile = modulePath;
+                    executeInfo.lpParameters = parameters.c_str();
+                    executeInfo.nShow = SW_HIDE;
+                    saved = ShellExecuteExW(&executeInfo) == TRUE;
+                    if (saved) {
+                        WaitForSingleObject(executeInfo.hProcess, INFINITE);
+                        DWORD exitCode = 1;
+                        GetExitCodeProcess(executeInfo.hProcess, &exitCode);
+                        CloseHandle(executeInfo.hProcess);
+                        saved = exitCode == 0;
+                    }
+                } else {
+                    saved = false;
+                }
+            }
+
+            std::error_code ignored;
+            std::filesystem::remove(tempConfigPath, ignored);
+            std::filesystem::remove(tempDumpPath, ignored);
+        }
+    }
+
+    if (!saved) {
+        MessageBoxW(hwnd_, L"Failed to configure the selected display.", L"System Telemetry", MB_ICONERROR);
+        return false;
+    }
+
+    config_ = updatedConfig;
+    renderer_.SetConfig(config_);
+    ApplyConfiguredWallpaper();
+    StartPlacementWatch();
+    ApplyConfigPlacement();
+    movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+    InvalidateRect(hwnd_, nullptr, FALSE);
+    return true;
+}
+
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
     const MonitorPlacementInfo placement = GetMonitorPlacementForWindow(hwnd_);
     const std::filesystem::path configPath = GetRuntimeConfigPath();
@@ -1648,13 +1851,25 @@ void DashboardApp::UpdateMoveTracking() {
 void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU menu = CreatePopupMenu();
     HMENU diagnosticsMenu = CreatePopupMenu();
+    HMENU configureDisplayMenu = CreatePopupMenu();
     const UINT autoStartFlags = MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
+    configDisplayOptions_ = EnumerateDisplayMenuOptions(config_);
+    if (configDisplayOptions_.empty()) {
+        AppendMenuW(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, L"No displays found");
+    } else {
+        for (const auto& option : configDisplayOptions_) {
+            const std::wstring label = WideFromUtf8(option.displayName);
+            const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED);
+            AppendMenuW(configureDisplayMenu, flags, option.commandId, label.c_str());
+        }
+    }
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveDumpAs, L"Save Dump To...");
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), L"Config To Display");
     AppendMenuW(menu, autoStartFlags, kCommandAutoStart, L"Auto-start on user logon");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(diagnosticsMenu), L"Diagnostics");
     AppendMenuW(menu, MF_STRING, kCommandExit, L"Exit");
@@ -1692,6 +1907,13 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         DestroyWindow(hwnd_);
         break;
     default:
+        if (selected >= kCommandConfigureDisplayBase && selected <= kCommandConfigureDisplayMax) {
+            const auto it = std::find_if(configDisplayOptions_.begin(), configDisplayOptions_.end(),
+                [selected](const DisplayMenuOption& option) { return option.commandId == selected; });
+            if (it != configDisplayOptions_.end()) {
+                ConfigureDisplay(*it);
+            }
+        }
         break;
     }
 }
@@ -1970,6 +2192,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     if (const auto elevatedSaveSource = GetSwitchValue(L"/save-config"); elevatedSaveSource.has_value()) {
         const auto elevatedSaveTarget = GetSwitchValue(L"/save-config-target");
         return RunElevatedSaveConfigMode(*elevatedSaveSource, elevatedSaveTarget.value_or(std::filesystem::path{}));
+    }
+    if (const auto configureDisplaySource = GetSwitchValue(L"/configure-display"); configureDisplaySource.has_value()) {
+        const auto configureDisplayTarget = GetSwitchValue(L"/configure-display-target");
+        const auto configureDisplayDump = GetSwitchValue(L"/configure-display-dump");
+        const auto configureDisplayImageTarget = GetSwitchValue(L"/configure-display-image-target");
+        return RunElevatedConfigureDisplayMode(
+            *configureDisplaySource,
+            configureDisplayDump.value_or(std::filesystem::path{}),
+            configureDisplayTarget.value_or(std::filesystem::path{}),
+            configureDisplayImageTarget.value_or(std::filesystem::path{}));
     }
     if (const auto autoStartSetting = GetSwitchValue(L"/set-autostart"); autoStartSetting.has_value()) {
         if (_wcsicmp(autoStartSetting->c_str(), L"on") == 0) {

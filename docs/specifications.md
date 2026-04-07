@@ -78,6 +78,7 @@ Examples include:
 ### Runtime actions tied to config
 
 - The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
+- The popup menu must provide a `Config To Display` submenu that lists every currently enumerable display by friendly name plus physical resolution, enables only displays whose resolution matches the dashboard's DPI-scaled window size for that display, and on selection must set `display.monitor_name`, set `display.position` to `0,0`, render a blank dashboard image to `telemetry_blank.png` beside the executable, set `display.wallpaper` to `telemetry_blank.png`, save the updated `config.ini`, and immediately apply that wallpaper to the selected display.
 - The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
 - When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
 - The popup menu must expose an `Auto-start on user logon` toggle that shows a check mark only when the machine-wide `HKLM\Software\Microsoft\Windows\CurrentVersion\Run\SystemTelemetry` entry points to the running executable path, removes that entry when clicked while checked, and otherwise writes the running executable path there when clicked.
@@ -140,6 +141,7 @@ Add a popup menu on right-click with these actions:
 - Bring On Top
 - Reload Config
 - Save Config
+- Config To Display
 - Auto-start on user logon
 - Diagnostics
 - Exit
@@ -172,6 +174,7 @@ While moving, show an overlay in the top-left corner with:
 - Bring On Top
 - Reload Config
 - Save Config
+- Config To Display
 - Auto-start on user logon
 - Diagnostics
 - Exit
