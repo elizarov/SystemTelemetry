@@ -70,3 +70,12 @@ struct DynamicSectionDescriptor {
 };
 
 }  // namespace configschema
+
+#define CONFIG_FIELD(owner, member, key, codec) \
+    configschema::FieldDescriptor<owner, decltype(owner::member), key, &owner::member, codec>
+
+#define CONFIG_SECTION(owner, name, ...) \
+    using Section = configschema::SectionDescriptor<name, owner, __VA_ARGS__>
+
+#define CONFIG_DYNAMIC_SECTION(owner, prefix, ...) \
+    using Section = configschema::DynamicSectionDescriptor<prefix, owner, __VA_ARGS__>

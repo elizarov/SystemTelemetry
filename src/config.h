@@ -21,13 +21,13 @@ struct UiFontSetConfig {
     UiFontConfig label{};
     UiFontConfig smallText{};
 
-    using Section = configschema::SectionDescriptor<"fonts", UiFontSetConfig,
-        configschema::FieldDescriptor<UiFontSetConfig, UiFontConfig, "title", &UiFontSetConfig::title, configschema::FontSpecCodec>,
-        configschema::FieldDescriptor<UiFontSetConfig, UiFontConfig, "big", &UiFontSetConfig::big, configschema::FontSpecCodec>,
-        configschema::FieldDescriptor<UiFontSetConfig, UiFontConfig, "value", &UiFontSetConfig::value, configschema::FontSpecCodec>,
-        configschema::FieldDescriptor<UiFontSetConfig, UiFontConfig, "label", &UiFontSetConfig::label, configschema::FontSpecCodec>,
-        configschema::FieldDescriptor<UiFontSetConfig, UiFontConfig, "small", &UiFontSetConfig::smallText, configschema::FontSpecCodec>
-    >;
+    CONFIG_SECTION(UiFontSetConfig, "fonts",
+        CONFIG_FIELD(UiFontSetConfig, title, "title", configschema::FontSpecCodec),
+        CONFIG_FIELD(UiFontSetConfig, big, "big", configschema::FontSpecCodec),
+        CONFIG_FIELD(UiFontSetConfig, value, "value", configschema::FontSpecCodec),
+        CONFIG_FIELD(UiFontSetConfig, label, "label", configschema::FontSpecCodec),
+        CONFIG_FIELD(UiFontSetConfig, smallText, "small", configschema::FontSpecCodec)
+    );
 };
 
 struct LogicalPointConfig {
@@ -45,19 +45,19 @@ struct DisplayConfig {
     std::string wallpaper;
     LogicalPointConfig position{};
 
-    using Section = configschema::SectionDescriptor<"display", DisplayConfig,
-        configschema::FieldDescriptor<DisplayConfig, std::string, "monitor_name", &DisplayConfig::monitorName, configschema::StringCodec>,
-        configschema::FieldDescriptor<DisplayConfig, std::string, "wallpaper", &DisplayConfig::wallpaper, configschema::StringCodec>,
-        configschema::FieldDescriptor<DisplayConfig, LogicalPointConfig, "position", &DisplayConfig::position, configschema::LogicalPointCodec>
-    >;
+    CONFIG_SECTION(DisplayConfig, "display",
+        CONFIG_FIELD(DisplayConfig, monitorName, "monitor_name", configschema::StringCodec),
+        CONFIG_FIELD(DisplayConfig, wallpaper, "wallpaper", configschema::StringCodec),
+        CONFIG_FIELD(DisplayConfig, position, "position", configschema::LogicalPointCodec)
+    );
 };
 
 struct NetworkConfig {
     std::string adapterName;
 
-    using Section = configschema::SectionDescriptor<"network", NetworkConfig,
-        configschema::FieldDescriptor<NetworkConfig, std::string, "adapter_name", &NetworkConfig::adapterName, configschema::StringCodec>
-    >;
+    CONFIG_SECTION(NetworkConfig, "network",
+        CONFIG_FIELD(NetworkConfig, adapterName, "adapter_name", configschema::StringCodec)
+    );
 };
 
 struct DashboardSectionConfig {
@@ -65,11 +65,11 @@ struct DashboardSectionConfig {
     int rowGap = 0;
     int cardGap = 0;
 
-    using Section = configschema::SectionDescriptor<"dashboard", DashboardSectionConfig,
-        configschema::FieldDescriptor<DashboardSectionConfig, int, "outer_margin", &DashboardSectionConfig::outerMargin, configschema::IntCodec>,
-        configschema::FieldDescriptor<DashboardSectionConfig, int, "row_gap", &DashboardSectionConfig::rowGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<DashboardSectionConfig, int, "card_gap", &DashboardSectionConfig::cardGap, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(DashboardSectionConfig, "dashboard",
+        CONFIG_FIELD(DashboardSectionConfig, outerMargin, "outer_margin", configschema::IntCodec),
+        CONFIG_FIELD(DashboardSectionConfig, rowGap, "row_gap", configschema::IntCodec),
+        CONFIG_FIELD(DashboardSectionConfig, cardGap, "card_gap", configschema::IntCodec)
+    );
 };
 
 struct CardStyleConfig {
@@ -83,17 +83,17 @@ struct CardStyleConfig {
     int columnGap = 0;
     int widgetLineGap = 0;
 
-    using Section = configschema::SectionDescriptor<"card_style", CardStyleConfig,
-        configschema::FieldDescriptor<CardStyleConfig, int, "card_padding", &CardStyleConfig::cardPadding, configschema::IntCodec>,
-        configschema::FieldDescriptor<CardStyleConfig, int, "card_radius", &CardStyleConfig::cardRadius, configschema::IntCodec>,
-        configschema::FieldDescriptor<CardStyleConfig, int, "card_border", &CardStyleConfig::cardBorderWidth, configschema::IntCodec>,
-        configschema::FieldDescriptor<CardStyleConfig, int, "header_height", &CardStyleConfig::headerHeight, configschema::IntCodec>,
-        configschema::FieldDescriptor<CardStyleConfig, int, "header_icon_size", &CardStyleConfig::headerIconSize, configschema::IntCodec>,
-        configschema::FieldDescriptor<CardStyleConfig, int, "header_gap", &CardStyleConfig::headerGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<CardStyleConfig, int, "content_gap", &CardStyleConfig::contentGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<CardStyleConfig, int, "column_gap", &CardStyleConfig::columnGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<CardStyleConfig, int, "widget_line_gap", &CardStyleConfig::widgetLineGap, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(CardStyleConfig, "card_style",
+        CONFIG_FIELD(CardStyleConfig, cardPadding, "card_padding", configschema::IntCodec),
+        CONFIG_FIELD(CardStyleConfig, cardRadius, "card_radius", configschema::IntCodec),
+        CONFIG_FIELD(CardStyleConfig, cardBorderWidth, "card_border", configschema::IntCodec),
+        CONFIG_FIELD(CardStyleConfig, headerHeight, "header_height", configschema::IntCodec),
+        CONFIG_FIELD(CardStyleConfig, headerIconSize, "header_icon_size", configschema::IntCodec),
+        CONFIG_FIELD(CardStyleConfig, headerGap, "header_gap", configschema::IntCodec),
+        CONFIG_FIELD(CardStyleConfig, contentGap, "content_gap", configschema::IntCodec),
+        CONFIG_FIELD(CardStyleConfig, columnGap, "column_gap", configschema::IntCodec),
+        CONFIG_FIELD(CardStyleConfig, widgetLineGap, "widget_line_gap", configschema::IntCodec)
+    );
 };
 
 struct ColorConfig {
@@ -109,19 +109,19 @@ struct ColorConfig {
     unsigned int graphAxisColor = 0;
     unsigned int graphMarkerColor = 0;
 
-    using Section = configschema::SectionDescriptor<"colors", ColorConfig,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "background_color", &ColorConfig::backgroundColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "foreground_color", &ColorConfig::foregroundColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "accent_color", &ColorConfig::accentColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "panel_border_color", &ColorConfig::panelBorderColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "muted_text_color", &ColorConfig::mutedTextColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "track_color", &ColorConfig::trackColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "panel_fill_color", &ColorConfig::panelFillColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "graph_background_color", &ColorConfig::graphBackgroundColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "graph_grid_color", &ColorConfig::graphGridColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "graph_axis_color", &ColorConfig::graphAxisColor, configschema::HexColorCodec>,
-        configschema::FieldDescriptor<ColorConfig, unsigned int, "graph_marker_color", &ColorConfig::graphMarkerColor, configschema::HexColorCodec>
-    >;
+    CONFIG_SECTION(ColorConfig, "colors",
+        CONFIG_FIELD(ColorConfig, backgroundColor, "background_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, foregroundColor, "foreground_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, accentColor, "accent_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, panelBorderColor, "panel_border_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, mutedTextColor, "muted_text_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, trackColor, "track_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, panelFillColor, "panel_fill_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, graphBackgroundColor, "graph_background_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, graphGridColor, "graph_grid_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, graphAxisColor, "graph_axis_color", configschema::HexColorCodec),
+        CONFIG_FIELD(ColorConfig, graphMarkerColor, "graph_marker_color", configschema::HexColorCodec)
+    );
 };
 
 struct LayoutNodeConfig {
@@ -135,10 +135,10 @@ struct LayoutSectionConfig {
     LogicalSizeConfig window{};
     LayoutNodeConfig cardsLayout;
 
-    using Section = configschema::SectionDescriptor<"layout", LayoutSectionConfig,
-        configschema::FieldDescriptor<LayoutSectionConfig, LogicalSizeConfig, "window", &LayoutSectionConfig::window, configschema::LogicalSizeCodec>,
-        configschema::FieldDescriptor<LayoutSectionConfig, LayoutNodeConfig, "cards", &LayoutSectionConfig::cardsLayout, configschema::LayoutExpressionCodec>
-    >;
+    CONFIG_SECTION(LayoutSectionConfig, "layout",
+        CONFIG_FIELD(LayoutSectionConfig, window, "window", configschema::LogicalSizeCodec),
+        CONFIG_FIELD(LayoutSectionConfig, cardsLayout, "cards", configschema::LayoutExpressionCodec)
+    );
 };
 
 struct LayoutCardConfig {
@@ -147,11 +147,11 @@ struct LayoutCardConfig {
     std::string icon;
     LayoutNodeConfig layout;
 
-    using Section = configschema::DynamicSectionDescriptor<"card.", LayoutCardConfig,
-        configschema::FieldDescriptor<LayoutCardConfig, std::string, "title", &LayoutCardConfig::title, configschema::StringCodec>,
-        configschema::FieldDescriptor<LayoutCardConfig, std::string, "icon", &LayoutCardConfig::icon, configschema::StringCodec>,
-        configschema::FieldDescriptor<LayoutCardConfig, LayoutNodeConfig, "layout", &LayoutCardConfig::layout, configschema::LayoutExpressionCodec>
-    >;
+    CONFIG_DYNAMIC_SECTION(LayoutCardConfig, "card.",
+        CONFIG_FIELD(LayoutCardConfig, title, "title", configschema::StringCodec),
+        CONFIG_FIELD(LayoutCardConfig, icon, "icon", configschema::StringCodec),
+        CONFIG_FIELD(LayoutCardConfig, layout, "layout", configschema::LayoutExpressionCodec)
+    );
 };
 
 struct MetricScaleConfig {
@@ -162,14 +162,14 @@ struct MetricScaleConfig {
     double boardTemperatureC = 0.0;
     double boardFanRpm = 0.0;
 
-    using Section = configschema::SectionDescriptor<"metric_scales", MetricScaleConfig,
-        configschema::FieldDescriptor<MetricScaleConfig, double, "cpu_clock_ghz", &MetricScaleConfig::cpuClockGHz, configschema::DoubleCodec>,
-        configschema::FieldDescriptor<MetricScaleConfig, double, "gpu_temperature_c", &MetricScaleConfig::gpuTemperatureC, configschema::DoubleCodec>,
-        configschema::FieldDescriptor<MetricScaleConfig, double, "gpu_clock_mhz", &MetricScaleConfig::gpuClockMHz, configschema::DoubleCodec>,
-        configschema::FieldDescriptor<MetricScaleConfig, double, "gpu_fan_rpm", &MetricScaleConfig::gpuFanRpm, configschema::DoubleCodec>,
-        configschema::FieldDescriptor<MetricScaleConfig, double, "board_temperature_c", &MetricScaleConfig::boardTemperatureC, configschema::DoubleCodec>,
-        configschema::FieldDescriptor<MetricScaleConfig, double, "board_fan_rpm", &MetricScaleConfig::boardFanRpm, configschema::DoubleCodec>
-    >;
+    CONFIG_SECTION(MetricScaleConfig, "metric_scales",
+        CONFIG_FIELD(MetricScaleConfig, cpuClockGHz, "cpu_clock_ghz", configschema::DoubleCodec),
+        CONFIG_FIELD(MetricScaleConfig, gpuTemperatureC, "gpu_temperature_c", configschema::DoubleCodec),
+        CONFIG_FIELD(MetricScaleConfig, gpuClockMHz, "gpu_clock_mhz", configschema::DoubleCodec),
+        CONFIG_FIELD(MetricScaleConfig, gpuFanRpm, "gpu_fan_rpm", configschema::DoubleCodec),
+        CONFIG_FIELD(MetricScaleConfig, boardTemperatureC, "board_temperature_c", configschema::DoubleCodec),
+        CONFIG_FIELD(MetricScaleConfig, boardFanRpm, "board_fan_rpm", configschema::DoubleCodec)
+    );
 };
 
 struct MetricListWidgetConfig {
@@ -178,12 +178,12 @@ struct MetricListWidgetConfig {
     int barHeight = 0;
     int verticalGap = 0;
 
-    using Section = configschema::SectionDescriptor<"metric_list", MetricListWidgetConfig,
-        configschema::FieldDescriptor<MetricListWidgetConfig, int, "label_width", &MetricListWidgetConfig::labelWidth, configschema::IntCodec>,
-        configschema::FieldDescriptor<MetricListWidgetConfig, int, "value_gap", &MetricListWidgetConfig::valueGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<MetricListWidgetConfig, int, "bar_height", &MetricListWidgetConfig::barHeight, configschema::IntCodec>,
-        configschema::FieldDescriptor<MetricListWidgetConfig, int, "vertical_gap", &MetricListWidgetConfig::verticalGap, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(MetricListWidgetConfig, "metric_list",
+        CONFIG_FIELD(MetricListWidgetConfig, labelWidth, "label_width", configschema::IntCodec),
+        CONFIG_FIELD(MetricListWidgetConfig, valueGap, "value_gap", configschema::IntCodec),
+        CONFIG_FIELD(MetricListWidgetConfig, barHeight, "bar_height", configschema::IntCodec),
+        CONFIG_FIELD(MetricListWidgetConfig, verticalGap, "vertical_gap", configschema::IntCodec)
+    );
 };
 
 struct DriveUsageListWidgetConfig {
@@ -199,19 +199,19 @@ struct DriveUsageListWidgetConfig {
     int activitySegments = 0;
     int activitySegmentGap = 0;
 
-    using Section = configschema::SectionDescriptor<"drive_usage_list", DriveUsageListWidgetConfig,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "free_width", &DriveUsageListWidgetConfig::freeWidth, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "activity_width", &DriveUsageListWidgetConfig::activityWidth, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "bar_gap", &DriveUsageListWidgetConfig::barGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "value_gap", &DriveUsageListWidgetConfig::valueGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "percent_gap", &DriveUsageListWidgetConfig::percentGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "bar_height", &DriveUsageListWidgetConfig::barHeight, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "vertical_gap", &DriveUsageListWidgetConfig::verticalGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "label_padding", &DriveUsageListWidgetConfig::labelPadding, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "percent_padding", &DriveUsageListWidgetConfig::percentPadding, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "activity_segments", &DriveUsageListWidgetConfig::activitySegments, configschema::IntCodec>,
-        configschema::FieldDescriptor<DriveUsageListWidgetConfig, int, "activity_segment_gap", &DriveUsageListWidgetConfig::activitySegmentGap, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(DriveUsageListWidgetConfig, "drive_usage_list",
+        CONFIG_FIELD(DriveUsageListWidgetConfig, freeWidth, "free_width", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, activityWidth, "activity_width", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, barGap, "bar_gap", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, valueGap, "value_gap", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, percentGap, "percent_gap", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, barHeight, "bar_height", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, verticalGap, "vertical_gap", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, labelPadding, "label_padding", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, percentPadding, "percent_padding", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, activitySegments, "activity_segments", configschema::IntCodec),
+        CONFIG_FIELD(DriveUsageListWidgetConfig, activitySegmentGap, "activity_segment_gap", configschema::IntCodec)
+    );
 };
 
 struct ThroughputWidgetConfig {
@@ -226,18 +226,18 @@ struct ThroughputWidgetConfig {
     int plotStrokeWidth = 0;
     int leaderDiameter = 0;
 
-    using Section = configschema::SectionDescriptor<"throughput", ThroughputWidgetConfig,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "header_gap", &ThroughputWidgetConfig::headerGap, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "graph_height", &ThroughputWidgetConfig::graphHeight, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "value_padding", &ThroughputWidgetConfig::valuePadding, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "label_padding", &ThroughputWidgetConfig::labelPadding, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "axis_padding", &ThroughputWidgetConfig::axisPadding, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "scale_label_padding", &ThroughputWidgetConfig::scaleLabelPadding, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "scale_label_min_height", &ThroughputWidgetConfig::scaleLabelMinHeight, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "guide_stroke_width", &ThroughputWidgetConfig::guideStrokeWidth, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "plot_stroke_width", &ThroughputWidgetConfig::plotStrokeWidth, configschema::IntCodec>,
-        configschema::FieldDescriptor<ThroughputWidgetConfig, int, "leader_diameter", &ThroughputWidgetConfig::leaderDiameter, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(ThroughputWidgetConfig, "throughput",
+        CONFIG_FIELD(ThroughputWidgetConfig, headerGap, "header_gap", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, graphHeight, "graph_height", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, valuePadding, "value_padding", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, labelPadding, "label_padding", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, axisPadding, "axis_padding", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, scaleLabelPadding, "scale_label_padding", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, scaleLabelMinHeight, "scale_label_min_height", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, guideStrokeWidth, "guide_stroke_width", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, plotStrokeWidth, "plot_stroke_width", configschema::IntCodec),
+        CONFIG_FIELD(ThroughputWidgetConfig, leaderDiameter, "leader_diameter", configschema::IntCodec)
+    );
 };
 
 struct GaugeWidgetConfig {
@@ -254,52 +254,52 @@ struct GaugeWidgetConfig {
     int labelTop = 0;
     int labelBottom = 0;
 
-    using Section = configschema::SectionDescriptor<"gauge", GaugeWidgetConfig,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "preferred_size", &GaugeWidgetConfig::preferredSize, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "outer_padding", &GaugeWidgetConfig::outerPadding, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "min_radius", &GaugeWidgetConfig::minRadius, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "ring_thickness", &GaugeWidgetConfig::ringThickness, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, double, "sweep_degrees", &GaugeWidgetConfig::sweepDegrees, configschema::DoubleCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "segment_count", &GaugeWidgetConfig::segmentCount, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, double, "segment_gap_degrees", &GaugeWidgetConfig::segmentGapDegrees, configschema::DoubleCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "text_half_width", &GaugeWidgetConfig::textHalfWidth, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "value_top", &GaugeWidgetConfig::valueTop, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "value_bottom", &GaugeWidgetConfig::valueBottom, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "label_top", &GaugeWidgetConfig::labelTop, configschema::IntCodec>,
-        configschema::FieldDescriptor<GaugeWidgetConfig, int, "label_bottom", &GaugeWidgetConfig::labelBottom, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(GaugeWidgetConfig, "gauge",
+        CONFIG_FIELD(GaugeWidgetConfig, preferredSize, "preferred_size", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, outerPadding, "outer_padding", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, minRadius, "min_radius", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, ringThickness, "ring_thickness", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, sweepDegrees, "sweep_degrees", configschema::DoubleCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, segmentCount, "segment_count", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, segmentGapDegrees, "segment_gap_degrees", configschema::DoubleCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, textHalfWidth, "text_half_width", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, valueTop, "value_top", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, valueBottom, "value_bottom", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, labelTop, "label_top", configschema::IntCodec),
+        CONFIG_FIELD(GaugeWidgetConfig, labelBottom, "label_bottom", configschema::IntCodec)
+    );
 };
 
 struct TextWidgetConfig {
     int preferredPadding = 0;
 
-    using Section = configschema::SectionDescriptor<"text", TextWidgetConfig,
-        configschema::FieldDescriptor<TextWidgetConfig, int, "preferred_padding", &TextWidgetConfig::preferredPadding, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(TextWidgetConfig, "text",
+        CONFIG_FIELD(TextWidgetConfig, preferredPadding, "preferred_padding", configschema::IntCodec)
+    );
 };
 
 struct NetworkFooterWidgetConfig {
     int preferredPadding = 0;
 
-    using Section = configschema::SectionDescriptor<"network_footer", NetworkFooterWidgetConfig,
-        configschema::FieldDescriptor<NetworkFooterWidgetConfig, int, "preferred_padding", &NetworkFooterWidgetConfig::preferredPadding, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(NetworkFooterWidgetConfig, "network_footer",
+        CONFIG_FIELD(NetworkFooterWidgetConfig, preferredPadding, "preferred_padding", configschema::IntCodec)
+    );
 };
 
 struct ClockTimeWidgetConfig {
     int padding = 0;
 
-    using Section = configschema::SectionDescriptor<"clock_time", ClockTimeWidgetConfig,
-        configschema::FieldDescriptor<ClockTimeWidgetConfig, int, "padding", &ClockTimeWidgetConfig::padding, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(ClockTimeWidgetConfig, "clock_time",
+        CONFIG_FIELD(ClockTimeWidgetConfig, padding, "padding", configschema::IntCodec)
+    );
 };
 
 struct ClockDateWidgetConfig {
     int padding = 0;
 
-    using Section = configschema::SectionDescriptor<"clock_date", ClockDateWidgetConfig,
-        configschema::FieldDescriptor<ClockDateWidgetConfig, int, "padding", &ClockDateWidgetConfig::padding, configschema::IntCodec>
-    >;
+    CONFIG_SECTION(ClockDateWidgetConfig, "clock_date",
+        CONFIG_FIELD(ClockDateWidgetConfig, padding, "padding", configschema::IntCodec)
+    );
 };
 
 struct LayoutConfig {
