@@ -86,6 +86,7 @@ private:
         std::string id;
         std::string title;
         std::string iconName;
+        bool hasHeader = true;
         RECT rect{};
         RECT titleRect{};
         RECT iconRect{};

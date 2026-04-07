@@ -141,9 +141,11 @@ Example:
 
 Each card section uses:
 
-- `title = ...`
-- `icon = ...`
+- `title = ...` when the card shows a header title
+- `icon = ...` when the card shows a header icon
 - `layout = ...`
+
+When both `title` and `icon` are omitted, the card has no header and the card content starts immediately after the card padding.
 
 Card layouts may reference another card id as a leaf layout node when they want to reuse that card's inner layout:
 

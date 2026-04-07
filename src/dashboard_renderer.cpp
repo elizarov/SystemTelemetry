@@ -910,19 +910,27 @@ bool DashboardRenderer::ResolveLayout() {
         card.id = cardIt->id;
         card.title = cardIt->title;
         card.iconName = cardIt->icon;
+        card.hasHeader = !card.title.empty() || !card.iconName.empty();
         card.rect = rect;
 
         const int padding = ScaleLogical(config_.layout.cardStyle.cardPadding);
         const int iconSize = ScaleLogical(config_.layout.cardStyle.headerIconSize);
-        const int headerHeight = EffectiveHeaderHeight();
-        card.iconRect = RECT{
-            card.rect.left + padding,
-            card.rect.top + padding + std::max(0, (headerHeight - iconSize) / 2),
-            card.rect.left + padding + iconSize,
-            card.rect.top + padding + std::max(0, (headerHeight - iconSize) / 2) + iconSize
-        };
+        const int headerHeight = card.hasHeader ? EffectiveHeaderHeight() : 0;
+        if (!card.iconName.empty()) {
+            card.iconRect = RECT{
+                card.rect.left + padding,
+                card.rect.top + padding + std::max(0, (headerHeight - iconSize) / 2),
+                card.rect.left + padding + iconSize,
+                card.rect.top + padding + std::max(0, (headerHeight - iconSize) / 2) + iconSize
+            };
+        } else {
+            card.iconRect = RECT{card.rect.left + padding, card.rect.top + padding, card.rect.left + padding, card.rect.top + padding};
+        }
+        const int titleLeft = !card.iconName.empty()
+            ? card.iconRect.right + ScaleLogical(config_.layout.cardStyle.headerGap)
+            : card.rect.left + padding;
         card.titleRect = RECT{
-            card.iconRect.right + ScaleLogical(config_.layout.cardStyle.headerGap),
+            titleLeft,
             card.rect.top + padding,
             card.rect.right - padding,
             card.rect.top + padding + headerHeight
@@ -1040,8 +1048,12 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
     SelectObject(hdc, oldPen);
     DeleteObject(fill);
     DeleteObject(border);
-    DrawPanelIcon(hdc, card.iconName, card.iconRect);
-    DrawTextBlock(hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    if (!card.iconName.empty()) {
+        DrawPanelIcon(hdc, card.iconName, card.iconRect);
+    }
+    if (!card.title.empty()) {
+        DrawTextBlock(hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    }
 }
 
 void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const DashboardGaugeMetric& metric, const std::string& label) {
