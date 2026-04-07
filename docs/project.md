@@ -13,7 +13,7 @@
 - Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
 - Always build through `build.cmd`.
 - Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
-- Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies `SystemTelemetry.exe` there, and registers `SystemTelemetry.exe` under `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` so the dashboard starts automatically for every user who signs into the machine.
+- Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies `SystemTelemetry.exe` there, and leaves auto-start registration to the runtime popup-menu toggle.
 
 ## Repository conventions
 

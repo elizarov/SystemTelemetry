@@ -12,8 +12,6 @@ if not defined INSTALL_ROOT set "INSTALL_ROOT=%ProgramFiles%"
 set "INSTALL_DIR=%INSTALL_ROOT%\SystemTelemetry"
 set "SOURCE_EXE=%~dp0build\SystemTelemetry.exe"
 set "TARGET_EXE=%INSTALL_DIR%\SystemTelemetry.exe"
-set "RUN_KEY=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-set "RUN_VALUE=SystemTelemetry"
 
 echo Building SystemTelemetry...
 call "%~dp0build.cmd"
@@ -41,16 +39,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-
-reg add "%RUN_KEY%" /v "%RUN_VALUE%" /t REG_SZ /d "\"%TARGET_EXE%\"" /f >nul
-if errorlevel 1 (
-    echo Failed to register startup entry.
-    exit /b 1
-)
-
 echo Installation complete.
 echo Installed executable: "%TARGET_EXE%"
-echo Startup entry: "%RUN_KEY%\%RUN_VALUE%"
+echo Configure auto-start from the app popup menu if needed.
 exit /b 0
 
 :ensure_admin
@@ -60,7 +51,7 @@ if not errorlevel 1 exit /b 0
 echo Requesting administrator access...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -WorkingDirectory '%~dp0' -Verb RunAs"
 if errorlevel 1 (
-    echo Administrator approval is required to install into Program Files and register machine-wide startup.
+    echo Administrator approval is required to install into Program Files.
     exit /b 1
 )
 exit /b 2

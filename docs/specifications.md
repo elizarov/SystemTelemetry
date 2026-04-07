@@ -78,6 +78,8 @@ Examples include:
 - The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
 - The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
 - When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
+- The popup menu must expose an `Auto-start on user logon` toggle that shows a check mark only when the machine-wide `HKLM\Software\Microsoft\Windows\CurrentVersion\Run\SystemTelemetry` entry points to the running executable path, removes that entry when clicked while checked, and otherwise writes the running executable path there when clicked.
+- When the current process cannot update that machine-wide `Run` entry directly, the auto-start toggle must prompt for elevation and complete the change through an elevated helper instance of the same executable.
 - When `network.adapter_name` is left empty, auto-selection should prefer the active adapter that best represents the routed connection, favoring adapters with a usable default gateway and IPv4 address over host-only or otherwise unrouted virtual adapters.
 - When `network.adapter_name` is set to a saved adapter name such as `Ethernet`, adapter selection should prefer an exact case-insensitive alias or description match and only fall back to substring matching when no exact match exists.
 - The layout bindings `board.temp.<name>` and `board.fan.<name>` must be the only source of truth for which named board sensors are requested at runtime.
@@ -136,6 +138,7 @@ Add a popup menu on right-click with these actions:
 - Bring On Top
 - Reload Config
 - Save Config
+- Auto-start on user logon
 - Diagnostics
 - Exit
 
@@ -167,6 +170,7 @@ While moving, show an overlay in the top-left corner with:
 - Bring On Top
 - Reload Config
 - Save Config
+- Auto-start on user logon
 - Diagnostics
 - Exit
 

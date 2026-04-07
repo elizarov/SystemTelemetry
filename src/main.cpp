@@ -47,10 +47,13 @@ constexpr UINT kCommandSaveConfig = 1004;
 constexpr UINT kCommandExit = 1005;
 constexpr UINT kCommandSaveDumpAs = 1006;
 constexpr UINT kCommandSaveScreenshotAs = 1007;
+constexpr UINT kCommandAutoStart = 1008;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
 constexpr wchar_t kDefaultTraceFileName[] = L"telemetry_trace.txt";
 constexpr wchar_t kDefaultDumpFileName[] = L"telemetry_dump.txt";
 constexpr wchar_t kDefaultScreenshotFileName[] = L"telemetry_screenshot.png";
+constexpr wchar_t kAutoStartRunSubKey[] = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+constexpr wchar_t kAutoStartValueName[] = L"SystemTelemetry";
 
 COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
@@ -144,6 +147,180 @@ std::filesystem::path GetExecutableDirectory() {
         return std::filesystem::current_path();
     }
     return std::filesystem::path(modulePath).parent_path();
+}
+
+std::optional<std::wstring> GetExecutablePath() {
+    wchar_t modulePath[MAX_PATH];
+    const DWORD length = GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
+    if (length == 0 || length >= ARRAYSIZE(modulePath)) {
+        return std::nullopt;
+    }
+    return std::wstring(modulePath, length);
+}
+
+std::wstring TrimWhitespace(std::wstring value) {
+    const auto isSpace = [](wchar_t ch) { return iswspace(ch) != 0; };
+    const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
+    if (first == value.end()) {
+        return {};
+    }
+    const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
+    return std::wstring(first, last);
+}
+
+std::wstring StripOuterQuotes(std::wstring value) {
+    value = TrimWhitespace(std::move(value));
+    if (value.size() >= 2 && value.front() == L'"' && value.back() == L'"') {
+        value = value.substr(1, value.size() - 2);
+    }
+    return value;
+}
+
+std::wstring NormalizeWindowsPath(std::wstring value) {
+    value = StripOuterQuotes(std::move(value));
+    std::replace(value.begin(), value.end(), L'/', L'\\');
+    std::transform(value.begin(), value.end(), value.begin(), [](wchar_t ch) {
+        return static_cast<wchar_t>(towlower(ch));
+    });
+    return value;
+}
+
+std::wstring QuoteCommandLineArgument(const std::wstring& value) {
+    return L"\"" + value + L"\"";
+}
+
+std::optional<std::wstring> ReadAutoStartCommand() {
+    HKEY key = nullptr;
+    const LSTATUS openStatus = RegOpenKeyExW(
+        HKEY_LOCAL_MACHINE,
+        kAutoStartRunSubKey,
+        0,
+        KEY_QUERY_VALUE,
+        &key);
+    if (openStatus != ERROR_SUCCESS) {
+        return std::nullopt;
+    }
+
+    DWORD type = 0;
+    DWORD size = 0;
+    const LSTATUS queryStatus = RegQueryValueExW(key, kAutoStartValueName, nullptr, &type, nullptr, &size);
+    if (queryStatus != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ) || size < sizeof(wchar_t)) {
+        RegCloseKey(key);
+        return std::nullopt;
+    }
+
+    std::wstring value(size / sizeof(wchar_t), L'\0');
+    const LSTATUS readStatus = RegQueryValueExW(
+        key,
+        kAutoStartValueName,
+        nullptr,
+        &type,
+        reinterpret_cast<LPBYTE>(value.data()),
+        &size);
+    RegCloseKey(key);
+    if (readStatus != ERROR_SUCCESS || value.empty()) {
+        return std::nullopt;
+    }
+
+    const size_t terminator = value.find(L'\0');
+    if (terminator != std::wstring::npos) {
+        value.resize(terminator);
+    }
+    return value;
+}
+
+bool IsAutoStartEnabledForCurrentExecutable() {
+    const auto executablePath = GetExecutablePath();
+    const auto registeredCommand = ReadAutoStartCommand();
+    if (!executablePath.has_value() || !registeredCommand.has_value()) {
+        return false;
+    }
+    return NormalizeWindowsPath(*registeredCommand) == NormalizeWindowsPath(*executablePath);
+}
+
+LSTATUS WriteAutoStartRegistryValue(bool enabled) {
+    HKEY key = nullptr;
+    DWORD disposition = 0;
+    const LSTATUS createStatus = RegCreateKeyExW(
+        HKEY_LOCAL_MACHINE,
+        kAutoStartRunSubKey,
+        0,
+        nullptr,
+        REG_OPTION_NON_VOLATILE,
+        KEY_SET_VALUE,
+        nullptr,
+        &key,
+        &disposition);
+    if (createStatus != ERROR_SUCCESS) {
+        return createStatus;
+    }
+
+    LSTATUS result = ERROR_SUCCESS;
+    if (enabled) {
+        const auto executablePath = GetExecutablePath();
+        if (!executablePath.has_value()) {
+            RegCloseKey(key);
+            return ERROR_FILE_NOT_FOUND;
+        }
+        const std::wstring command = QuoteCommandLineArgument(*executablePath);
+        result = RegSetValueExW(
+            key,
+            kAutoStartValueName,
+            0,
+            REG_SZ,
+            reinterpret_cast<const BYTE*>(command.c_str()),
+            static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
+    } else {
+        result = RegDeleteValueW(key, kAutoStartValueName);
+        if (result == ERROR_FILE_NOT_FOUND) {
+            result = ERROR_SUCCESS;
+        }
+    }
+
+    RegCloseKey(key);
+    return result;
+}
+
+int RunElevatedAutoStartMode(bool enabled) {
+    const LSTATUS status = WriteAutoStartRegistryValue(enabled);
+    return status == ERROR_SUCCESS ? 0 : 1;
+}
+
+bool UpdateAutoStartElevated(bool enabled, HWND owner) {
+    const auto executablePath = GetExecutablePath();
+    if (!executablePath.has_value()) {
+        return false;
+    }
+
+    std::wstring parameters = enabled ? L"/set-autostart on" : L"/set-autostart off";
+    SHELLEXECUTEINFOW executeInfo{};
+    executeInfo.cbSize = sizeof(executeInfo);
+    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+    executeInfo.hwnd = owner;
+    executeInfo.lpVerb = L"runas";
+    executeInfo.lpFile = executablePath->c_str();
+    executeInfo.lpParameters = parameters.c_str();
+    executeInfo.nShow = SW_HIDE;
+    if (!ShellExecuteExW(&executeInfo)) {
+        return false;
+    }
+
+    WaitForSingleObject(executeInfo.hProcess, INFINITE);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(executeInfo.hProcess, &exitCode);
+    CloseHandle(executeInfo.hProcess);
+    return exitCode == 0;
+}
+
+bool UpdateAutoStartRegistration(bool enabled, HWND owner) {
+    const LSTATUS status = WriteAutoStartRegistryValue(enabled);
+    if (status == ERROR_SUCCESS) {
+        return true;
+    }
+    if (status == ERROR_ACCESS_DENIED) {
+        return UpdateAutoStartElevated(enabled, owner);
+    }
+    return false;
 }
 
 std::filesystem::path ResolveDiagnosticsOutputPath(
@@ -785,6 +962,8 @@ public:
     bool WriteDiagnosticsOutputs();
     void SaveDumpAs();
     void SaveScreenshotAs();
+    bool IsAutoStartEnabled() const;
+    void ToggleAutoStart();
 
 private:
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -1128,6 +1307,21 @@ void DashboardApp::SaveScreenshotAs() {
     }
 }
 
+bool DashboardApp::IsAutoStartEnabled() const {
+    return IsAutoStartEnabledForCurrentExecutable();
+}
+
+void DashboardApp::ToggleAutoStart() {
+    const bool enable = !IsAutoStartEnabled();
+    if (!UpdateAutoStartRegistration(enable, hwnd_)) {
+        const wchar_t* action = enable ? L"enable" : L"disable";
+        std::wstring message = L"Failed to ";
+        message += action;
+        message += L" auto-start on user logon.";
+        MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    }
+}
+
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
     double scale, std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
@@ -1307,12 +1501,14 @@ void DashboardApp::UpdateMoveTracking() {
 void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU menu = CreatePopupMenu();
     HMENU diagnosticsMenu = CreatePopupMenu();
+    const UINT autoStartFlags = MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveDumpAs, L"Save Dump To...");
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
+    AppendMenuW(menu, autoStartFlags, kCommandAutoStart, L"Auto-start on user logon");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(diagnosticsMenu), L"Diagnostics");
     AppendMenuW(menu, MF_STRING, kCommandExit, L"Exit");
     SetForegroundWindow(hwnd_);
@@ -1335,6 +1531,9 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         break;
     case kCommandSaveConfig:
         UpdateConfigFromCurrentPlacement();
+        break;
+    case kCommandAutoStart:
+        ToggleAutoStart();
         break;
     case kCommandSaveDumpAs:
         SaveDumpAs();
@@ -1624,6 +1823,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     if (const auto elevatedSaveSource = GetSwitchValue(L"/save-config"); elevatedSaveSource.has_value()) {
         const auto elevatedSaveTarget = GetSwitchValue(L"/save-config-target");
         return RunElevatedSaveConfigMode(*elevatedSaveSource, elevatedSaveTarget.value_or(std::filesystem::path{}));
+    }
+    if (const auto autoStartSetting = GetSwitchValue(L"/set-autostart"); autoStartSetting.has_value()) {
+        if (_wcsicmp(autoStartSetting->c_str(), L"on") == 0) {
+            return RunElevatedAutoStartMode(true);
+        }
+        if (_wcsicmp(autoStartSetting->c_str(), L"off") == 0) {
+            return RunElevatedAutoStartMode(false);
+        }
+        return 2;
     }
 
     if (diagnosticsOptions.exit) {
