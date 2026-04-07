@@ -70,6 +70,7 @@ Examples include:
 - The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.
 - The dedicated widget sections must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments preserve or intentionally retune the visual rhythm.
 - When a `metric_list` or `drive_usage_list` widget has less vertical space than its full configured content needs, the renderer must keep each header, row, bar, and configured gap at its full configured height and crop any overflow at the bottom instead of compressing the final visible lines.
+- In a regular vertical `stack(...)`, `text` must behave as a fixed-height widget at its preferred configured height, with the remaining vertical space going to flexible siblings.
 - The dedicated `drive_usage_list` section must provide a drive-usage bar thickness setting so storage usage bars can be tuned independently from row height and from the thinner CPU/GPU metric bars.
 - The dedicated `drive_usage_list` section must also provide one shared read/write activity-column width, the number of stacked activity segments, and the gap between those segments.
 - The dedicated `drive_usage_list` section must provide separate gap controls for the activity-to-usage transition and the usage-bar-to-percent transition so the storage row alignment can be tuned without changing every column spacing together.

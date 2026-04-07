@@ -203,6 +203,7 @@ Throughput label width, throughput axis width, drive label width, and drive perc
 
 Nested layout expressions are allowed.
 Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is a card-layout reference and resolves to that referenced card's layout during layout resolution.
+In a regular vertical `stack(...)`, fixed-height widgets such as `text`, `network_footer`, and `spacer` keep their preferred height and the remaining space goes to flexible siblings.
 
 Example:
 

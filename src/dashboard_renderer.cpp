@@ -705,6 +705,7 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
         widget.kind = WidgetKind::Text;
         widget.binding.metric = node.parameter;
         widget.preferredHeight = fontHeights_.label + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
+        widget.fixedPreferredHeightInStack = true;
     } else if (node.name == "gauge") {
         widget.kind = WidgetKind::Gauge;
         widget.binding.metric = node.parameter;
