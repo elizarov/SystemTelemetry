@@ -78,6 +78,8 @@ private:
         WidgetKind kind = WidgetKind::Unknown;
         RECT rect{};
         WidgetBinding binding;
+        int preferredHeight = 0;
+        bool fixedPreferredHeightInStack = false;
     };
 
     struct ResolvedCardLayout {
@@ -131,6 +133,8 @@ private:
         double timeMarkerOffsetSamples, double timeMarkerIntervalSamples);
     void DrawThroughputWidget(HDC hdc, const RECT& rect, const DashboardThroughputMetric& metric);
     void DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
+    ResolvedWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
+    bool UsesFixedPreferredHeightInStack(const ResolvedWidgetLayout& widget) const;
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();

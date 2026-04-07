@@ -67,6 +67,7 @@ Examples include:
 - The list of rendered cards must come from layout config.
 - The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.
 - The dedicated widget sections must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments preserve or intentionally retune the visual rhythm.
+- When a `metric_list` or `drive_usage_list` widget has less vertical space than its full configured content needs, the renderer must keep each header, row, bar, and configured gap at its full configured height and crop any overflow at the bottom instead of compressing the final visible lines.
 - The dedicated `drive_usage_list` section must provide a drive-usage bar thickness setting so storage usage bars can be tuned independently from row height and from the thinner CPU/GPU metric bars.
 - The dedicated `drive_usage_list` section must also provide one shared read/write activity-column width, the number of stacked activity segments, and the gap between those segments.
 - The dedicated `drive_usage_list` section must provide separate gap controls for the activity-to-usage transition and the usage-bar-to-percent transition so the storage row alignment can be tuned without changing every column spacing together.
@@ -74,6 +75,8 @@ Examples include:
 - The renderer must not rely on buried widget-spacing or widget-geometry pixel literals for text, footer, clock, gauge, or throughput sizing; those visual sizes must come from `config.ini` widget sections, with only non-visual safety clamps left in code.
 - Widths that are fully determined by fixed renderer text such as throughput labels, throughput axis labels, drive-letter labels, and the `100%` drive percent column should be measured from the configured fonts at layout load and adjusted only by widget-section padding entries.
 - The layout language must support a top-aligned stack mode that packs children at their preferred heights and leaves any remaining space below them, so lists such as drive usage rows do not have to stretch to fill the whole card column.
+- In a regular vertical `stack(...)`, any resolved fixed-height widget must keep its preferred configured height and any remaining height reduction must be absorbed by flexible siblings such as throughput plots.
+- The shipped `network_footer` and `spacer` widgets must use the same fixed preferred height.
 - The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
 - Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
 - The renderer must support a blank rendering mode that preserves panel chrome, card titles, card icons, CPU and GPU names, drive labels, and empty chart or bar tracks while omitting dynamic metric text, time, date, plot lines, chart leaders, peak ghosts, gauge fill, and drive activity or usage fill.

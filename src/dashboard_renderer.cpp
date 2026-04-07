@@ -648,6 +648,11 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
+    if (node.name == "spacer") {
+        const int height = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
+        return height;
+    }
     if (node.name == "metric_list") {
         const std::string param = node.parameter;
         const int count = static_cast<int>(Split(param, ',').size());
@@ -689,36 +694,58 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
     return 0;
 }
 
+DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const {
+    ResolvedWidgetLayout widget;
+    widget.rect = rect;
+    if (node.name == "text") {
+        widget.kind = WidgetKind::Text;
+        widget.binding.metric = node.parameter;
+        widget.preferredHeight = fontHeights_.label + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
+    } else if (node.name == "gauge") {
+        widget.kind = WidgetKind::Gauge;
+        widget.binding.metric = node.parameter;
+        widget.preferredHeight = std::max(1, ScaleLogical(config_.layout.gauge.preferredSize));
+    } else if (node.name == "metric_list") {
+        widget.kind = WidgetKind::MetricList;
+        widget.binding.param = node.parameter;
+        widget.preferredHeight = static_cast<int>(Split(node.parameter, ',').size()) * EffectiveMetricRowHeight();
+    } else if (node.name == "throughput") {
+        widget.kind = WidgetKind::Throughput;
+        widget.binding.metric = node.parameter;
+        widget.preferredHeight = fontHeights_.smallText + ScaleLogical(config_.layout.throughput.headerGap) +
+            std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
+    } else if (node.name == "network_footer") {
+        widget.kind = WidgetKind::NetworkFooter;
+        widget.preferredHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        widget.fixedPreferredHeightInStack = true;
+    } else if (node.name == "spacer") {
+        widget.kind = WidgetKind::Spacer;
+        widget.preferredHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        widget.fixedPreferredHeightInStack = true;
+    } else if (node.name == "drive_usage_list") {
+        widget.kind = WidgetKind::DriveUsageList;
+        widget.binding.param = node.parameter;
+        const int count = static_cast<int>(Split(node.parameter, ',').size());
+        widget.preferredHeight = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
+    } else if (node.name == "clock_time") {
+        widget.kind = WidgetKind::ClockTime;
+        widget.preferredHeight = fontHeights_.big + std::max(0, ScaleLogical(config_.layout.clockTime.padding));
+    } else if (node.name == "clock_date") {
+        widget.kind = WidgetKind::ClockDate;
+        widget.preferredHeight = fontHeights_.value + std::max(0, ScaleLogical(config_.layout.clockDate.padding));
+    }
+    return widget;
+}
+
+bool DashboardRenderer::UsesFixedPreferredHeightInStack(const ResolvedWidgetLayout& widget) const {
+    return widget.fixedPreferredHeightInStack;
+}
+
 void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
     WriteTrace("renderer:layout_resolve_node name=\"" + node.name + "\" weight=" + std::to_string(node.weight) +
         " " + FormatRect(rect) + " children=" + std::to_string(node.children.size()));
     if (!IsContainerNode(node)) {
-        ResolvedWidgetLayout widget;
-        if (node.name == "text") {
-            widget.kind = WidgetKind::Text;
-            widget.binding.metric = node.parameter;
-        } else if (node.name == "gauge") {
-            widget.kind = WidgetKind::Gauge;
-            widget.binding.metric = node.parameter;
-        } else if (node.name == "metric_list") {
-            widget.kind = WidgetKind::MetricList;
-            widget.binding.param = node.parameter;
-        } else if (node.name == "throughput") {
-            widget.kind = WidgetKind::Throughput;
-            widget.binding.metric = node.parameter;
-        } else if (node.name == "network_footer") {
-            widget.kind = WidgetKind::NetworkFooter;
-        } else if (node.name == "spacer") {
-            widget.kind = WidgetKind::Spacer;
-        } else if (node.name == "drive_usage_list") {
-            widget.kind = WidgetKind::DriveUsageList;
-            widget.binding.param = node.parameter;
-        } else if (node.name == "clock_time") {
-            widget.kind = WidgetKind::ClockTime;
-        } else if (node.name == "clock_date") {
-            widget.kind = WidgetKind::ClockDate;
-        }
-        widget.rect = rect;
+        ResolvedWidgetLayout widget = ResolveWidgetLayout(node, rect);
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
             (widget.binding.metric.empty() ? "" : " metric=\"" + widget.binding.metric + "\"") +
             (widget.binding.param.empty() ? "" : " param=\"" + widget.binding.param + "\""));
@@ -750,25 +777,48 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
         return;
     }
 
+    const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
+        gap * static_cast<int>(std::max<size_t>(0, node.children.size() - 1));
+    int reservedPreferred = 0;
     int totalWeight = 0;
-    for (const auto& child : node.children) {
-        totalWeight += std::max(1, child.weight);
+    if (!horizontal) {
+        for (const auto& child : node.children) {
+            const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
+            if (UsesFixedPreferredHeightInStack(resolvedChild)) {
+                reservedPreferred += std::max(0, resolvedChild.preferredHeight);
+            } else {
+                totalWeight += std::max(1, child.weight);
+            }
+        }
+    } else {
+        for (const auto& child : node.children) {
+            totalWeight += std::max(1, child.weight);
+        }
     }
-    if (totalWeight <= 0) {
+    const int distributableAvailable = horizontal ? totalAvailable : std::max(0, totalAvailable - reservedPreferred);
+    if (horizontal && totalWeight <= 0) {
         return;
     }
 
-    const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
-        gap * static_cast<int>(std::max<size_t>(0, node.children.size() - 1));
     int remainingAvailable = totalAvailable;
+    int remainingDistributable = distributableAvailable;
     int cursor = horizontal ? rect.left : rect.top;
     for (size_t i = 0; i < node.children.size(); ++i) {
         const auto& child = node.children[i];
-        const int childWeight = std::max(1, child.weight);
+        const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
+        const bool fixedPreferred = !horizontal && UsesFixedPreferredHeightInStack(resolvedChild);
+        const int childWeight = fixedPreferred ? 0 : std::max(1, child.weight);
         const int remainingWeight = std::max(1, totalWeight);
-        const int size = (i + 1 == node.children.size())
-            ? ((horizontal ? rect.right : rect.bottom) - cursor)
-            : std::max(0, remainingAvailable * childWeight / remainingWeight);
+        int size = 0;
+        if (fixedPreferred) {
+            size = std::max(0, resolvedChild.preferredHeight);
+        } else if (i + 1 == node.children.size()) {
+            size = (horizontal ? rect.right : rect.bottom) - cursor;
+        } else {
+            size = std::max(0, remainingDistributable * childWeight / remainingWeight);
+        }
+        const int remainingExtent = std::max(0, static_cast<int>((horizontal ? rect.right : rect.bottom) - cursor));
+        size = std::min(size, remainingExtent);
 
         RECT childRect = rect;
         if (horizontal) {
@@ -787,7 +837,10 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
         ResolveNodeWidgets(child, childRect, widgets);
         cursor += size + gap;
         remainingAvailable -= size;
-        totalWeight -= childWeight;
+        if (!fixedPreferred) {
+            remainingDistributable -= size;
+            totalWeight -= childWeight;
+        }
     }
 }
 
@@ -1202,9 +1255,11 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
     const int activitySegmentGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.activitySegmentGap));
     const int rowContentHeight = std::max(fontHeights_.label, std::max(fontHeights_.smallText, driveBarHeight));
 
-    RECT header{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + headerHeight)};
-    RECT row{rect.left, std::min(rect.bottom, header.bottom), rect.right,
-        std::min(rect.bottom, std::min(rect.bottom, header.bottom) + rowHeight)};
+    const int savedDc = SaveDC(hdc);
+    IntersectClipRect(hdc, rect.left, rect.top, rect.right, rect.bottom);
+
+    RECT header{rect.left, rect.top, rect.right, rect.top + headerHeight};
+    RECT row{rect.left, header.bottom, rect.right, header.bottom + rowHeight};
 
     const auto resolveColumns = [&](const RECT& band, RECT& labelRect, RECT& readRect, RECT& writeRect,
         RECT& barRect, RECT& pctRect, RECT& freeRect) {
@@ -1238,7 +1293,7 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
         resolveColumns(row, labelRect, readRect, writeRect, barBandRect, pctRect, freeRect);
         const int rowPixelHeight = static_cast<int>(row.bottom - row.top);
         const int contentTop = static_cast<int>(row.top) + std::max(0, (rowPixelHeight - rowContentHeight) / 2);
-        RECT activityRect{0, contentTop, 0, std::min(static_cast<int>(row.bottom), contentTop + rowContentHeight)};
+        RECT activityRect{0, contentTop, 0, contentTop + rowContentHeight};
         RECT readIndicatorRect{readRect.left, activityRect.top, readRect.right, activityRect.bottom};
         RECT writeIndicatorRect{writeRect.left, activityRect.top, writeRect.right, activityRect.bottom};
         const int barTop = static_cast<int>(row.top) + std::max(0, (rowPixelHeight - driveBarHeight) / 2);
@@ -1246,7 +1301,7 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
             barBandRect.left,
             barTop,
             barBandRect.right,
-            std::min(static_cast<int>(row.bottom), barTop + driveBarHeight)
+            barTop + driveBarHeight
         };
 
         DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
@@ -1266,11 +1321,12 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
         }
 
         OffsetRect(&row, 0, rowHeight);
-        row.bottom = std::min(rect.bottom, row.top + rowHeight);
         if (row.top >= rect.bottom) {
             break;
         }
     }
+
+    RestoreDC(hdc, savedDc);
 }
 
 void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics) {
@@ -1291,15 +1347,17 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
     }
     case WidgetKind::MetricList: {
         const int rowHeight = EffectiveMetricRowHeight();
-        RECT rowRect{widget.rect.left, widget.rect.top, widget.rect.right, std::min(widget.rect.bottom, widget.rect.top + rowHeight)};
+        const int savedDc = SaveDC(hdc);
+        IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
+        RECT rowRect{widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.top + rowHeight};
         for (const auto& row : metrics.ResolveMetricList(ParseMetricListEntries(widget.binding.param))) {
             DrawMetricRow(hdc, rowRect, row);
             OffsetRect(&rowRect, 0, rowHeight);
-            rowRect.bottom = std::min(widget.rect.bottom, rowRect.top + rowHeight);
             if (rowRect.top >= widget.rect.bottom) {
                 break;
             }
         }
+        RestoreDC(hdc, savedDc);
         return;
     }
     case WidgetKind::Throughput:
