@@ -45,4 +45,4 @@ If those board metrics are missing:
 
 1. Install Gigabyte SIV so its assemblies are present and registered.
 2. Run `build\SystemTelemetry.exe /trace /dump /exit`.
-3. Check `telemetry_dump.txt` and `telemetry_trace.txt` in the command's working directory for the `board_provider.*` block and the `gigabyte_siv:*` trace lines.
+3. Check `telemetry_dump.txt` for the rendered `board.*` metric values and `telemetry_trace.txt` for the `gigabyte_siv:*` trace lines and provider diagnostics.

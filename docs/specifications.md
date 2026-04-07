@@ -165,6 +165,7 @@ While moving, show an overlay in the top-left corner with:
 - The application must also read the saved relative X/Y coordinates from configuration at startup and place the window accordingly.
 - Add a `Save Config` action that writes the current display identifier and relative X/Y placement back to the config file while preserving all other settings.
 - The `Save dump to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_dump.txt`, and write the same text dump format used by diagnostics output.
+- The dump format contains only the snapshot fields that `/fake` loads and the dashboard renders; provider-debug details remain trace-only diagnostics data.
 - The `Save screenshot to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_screenshot.png`, and write the same PNG output format used by diagnostics output.
 
 ## Tray behavior

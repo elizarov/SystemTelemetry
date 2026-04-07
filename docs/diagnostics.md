@@ -46,9 +46,9 @@ This document is the single maintained source of truth for diagnostics command b
 
 ## Dump content
 
-- The dump includes the full current runtime snapshot model needed by the dashboard, including provider diagnostics, retained histories, configured drive rows with per-drive read and write MB/s, and the full local date and time down to milliseconds.
+- The dump includes only the current runtime snapshot model that `/fake` loads and the dashboard renders, including retained histories, configured drive rows with per-drive read and write MB/s, and the full local date and time down to milliseconds.
 - The dump schema reflects the current runtime model directly and removes obsolete compatibility keys instead of keeping null placeholders.
-- The dumped board-provider block includes Gigabyte debug details such as detected board identity, loaded SIV assembly path, requested board temperature and fan names, returned named metrics, and sampled diagnostics.
+- Provider diagnostics and provider-specific debug details stay in trace output instead of being duplicated into the dump schema.
 
 ## Single-instance behavior
 

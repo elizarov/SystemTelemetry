@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v6";
+constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v7";
 
 std::string TrimAsciiWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");
@@ -98,10 +98,6 @@ void WriteString(std::ostream& output, const std::string& key, const std::string
     WriteLine(output, key, '"' + EscapeString(value) + '"');
 }
 
-void WriteBool(std::ostream& output, const std::string& key, bool value) {
-    WriteLine(output, key, value ? "true" : "false");
-}
-
 void WriteDouble(std::ostream& output, const std::string& key, double value, int precision = 6) {
     char buffer[64];
     sprintf_s(buffer, "%.*f", precision, value);
@@ -143,13 +139,6 @@ void WriteDoubleArray(std::ostream& output, const std::string& key, const std::v
     output << "]\n";
 }
 
-void WriteStringList(std::ostream& output, const std::string& prefix, const std::vector<std::string>& values) {
-    WriteInteger(output, prefix + ".count", values.size());
-    for (size_t i = 0; i < values.size(); ++i) {
-        WriteString(output, prefix + "." + std::to_string(i) + ".name", values[i]);
-    }
-}
-
 void WriteNamedScalarMetrics(std::ostream& output, const std::string& prefix, const std::vector<NamedScalarMetric>& metrics) {
     WriteInteger(output, prefix + ".count", metrics.size());
     for (size_t i = 0; i < metrics.size(); ++i) {
@@ -189,18 +178,6 @@ bool ParseStrictUnsigned(const std::string& text, unsigned long long& value) {
     }
     value = parsed;
     return true;
-}
-
-bool ParseBool(const std::string& text, bool& value) {
-    if (text == "true") {
-        value = true;
-        return true;
-    }
-    if (text == "false") {
-        value = false;
-        return true;
-    }
-    return false;
 }
 
 bool ParseDoubleArray(const std::string& text, std::vector<double>& values) {
@@ -247,20 +224,6 @@ bool LoadString(const std::map<std::string, std::string>& values, const std::str
     if (!UnescapeQuotedString(text, field)) {
         if (error != nullptr) {
             *error = "Invalid quoted string for key: " + key;
-        }
-        return false;
-    }
-    return true;
-}
-
-bool LoadBool(const std::map<std::string, std::string>& values, const std::string& key, bool& field, std::string* error) {
-    std::string text;
-    if (!TryGetValue(values, key, text)) {
-        return true;
-    }
-    if (!ParseBool(text, field)) {
-        if (error != nullptr) {
-            *error = "Invalid boolean for key: " + key;
         }
         return false;
     }
@@ -356,25 +319,6 @@ bool LoadDoubleArrayField(const std::map<std::string, std::string>& values, cons
     return true;
 }
 
-bool LoadStringList(const std::map<std::string, std::string>& values, const std::string& prefix,
-    std::vector<std::string>& field, std::string* error) {
-    size_t count = 0;
-    if (!LoadUnsigned(values, prefix + ".count", count, error)) {
-        return false;
-    }
-
-    field.clear();
-    field.reserve(count);
-    for (size_t i = 0; i < count; ++i) {
-        std::string value;
-        if (!LoadString(values, prefix + "." + std::to_string(i) + ".name", value, error)) {
-            return false;
-        }
-        field.push_back(std::move(value));
-    }
-    return true;
-}
-
 bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values, const std::string& prefix,
     std::vector<NamedScalarMetric>& field, std::string* error) {
     size_t count = 0;
@@ -443,21 +387,6 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteString(output, "gpu.fan.unit", dump.snapshot.gpu.fan.unit);
     WriteDouble(output, "gpu.vram.used_gb", dump.snapshot.gpu.vram.usedGb, 6);
     WriteDouble(output, "gpu.vram.total_gb", dump.snapshot.gpu.vram.totalGb, 6);
-
-    WriteString(output, "gpu_provider.name", dump.gpuProvider.providerName);
-    WriteString(output, "gpu_provider.diagnostics", dump.gpuProvider.diagnostics);
-    WriteBool(output, "gpu_provider.available", dump.gpuProvider.available);
-
-    WriteString(output, "board_provider.name", dump.boardProvider.providerName);
-    WriteString(output, "board_provider.diagnostics", dump.boardProvider.diagnostics);
-    WriteBool(output, "board_provider.available", dump.boardProvider.available);
-    WriteString(output, "board_provider.board_manufacturer", dump.boardProvider.boardManufacturer);
-    WriteString(output, "board_provider.board_product", dump.boardProvider.boardProduct);
-    WriteString(output, "board_provider.driver_library", dump.boardProvider.driverLibrary);
-    WriteStringList(output, "board_provider.requested_fans", dump.boardProvider.requestedFanNames);
-    WriteStringList(output, "board_provider.requested_temperatures", dump.boardProvider.requestedTemperatureNames);
-    WriteNamedScalarMetrics(output, "board_provider.fans", dump.boardProvider.fans);
-    WriteNamedScalarMetrics(output, "board_provider.temperatures", dump.boardProvider.temperatures);
 
     WriteString(output, "network.adapter_name", dump.snapshot.network.adapterName);
     WriteDouble(output, "network.upload_mbps", dump.snapshot.network.uploadMbps, 6);
@@ -539,19 +468,6 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadString(values, "gpu.fan.unit", parsed.snapshot.gpu.fan.unit, error) ||
         !LoadDouble(values, "gpu.vram.used_gb", parsed.snapshot.gpu.vram.usedGb, error) ||
         !LoadDouble(values, "gpu.vram.total_gb", parsed.snapshot.gpu.vram.totalGb, error) ||
-        !LoadString(values, "gpu_provider.name", parsed.gpuProvider.providerName, error) ||
-        !LoadString(values, "gpu_provider.diagnostics", parsed.gpuProvider.diagnostics, error) ||
-        !LoadBool(values, "gpu_provider.available", parsed.gpuProvider.available, error) ||
-        !LoadString(values, "board_provider.name", parsed.boardProvider.providerName, error) ||
-        !LoadString(values, "board_provider.diagnostics", parsed.boardProvider.diagnostics, error) ||
-        !LoadBool(values, "board_provider.available", parsed.boardProvider.available, error) ||
-        !LoadString(values, "board_provider.board_manufacturer", parsed.boardProvider.boardManufacturer, error) ||
-        !LoadString(values, "board_provider.board_product", parsed.boardProvider.boardProduct, error) ||
-        !LoadString(values, "board_provider.driver_library", parsed.boardProvider.driverLibrary, error) ||
-        !LoadStringList(values, "board_provider.requested_fans", parsed.boardProvider.requestedFanNames, error) ||
-        !LoadStringList(values, "board_provider.requested_temperatures", parsed.boardProvider.requestedTemperatureNames, error) ||
-        !LoadNamedScalarMetrics(values, "board_provider.fans", parsed.boardProvider.fans, error) ||
-        !LoadNamedScalarMetrics(values, "board_provider.temperatures", parsed.boardProvider.temperatures, error) ||
         !LoadString(values, "network.adapter_name", parsed.snapshot.network.adapterName, error) ||
         !LoadDouble(values, "network.upload_mbps", parsed.snapshot.network.uploadMbps, error) ||
         !LoadDouble(values, "network.download_mbps", parsed.snapshot.network.downloadMbps, error) ||
