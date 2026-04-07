@@ -32,6 +32,29 @@ struct HexColorCodec {};
 struct FontSpecCodec {};
 struct LayoutExpressionCodec {};
 
+template <typename T>
+struct DefaultCodec;
+
+template <>
+struct DefaultCodec<int> {
+    using codec_type = IntCodec;
+};
+
+template <>
+struct DefaultCodec<double> {
+    using codec_type = DoubleCodec;
+};
+
+template <>
+struct DefaultCodec<std::string> {
+    using codec_type = StringCodec;
+};
+
+template <>
+struct DefaultCodec<unsigned int> {
+    using codec_type = HexColorCodec;
+};
+
 template <typename Owner, typename Field, FixedString Key, Field Owner::*Member, typename Codec>
 struct FieldDescriptor {
     using owner_type = Owner;
@@ -132,10 +155,16 @@ private: \
     using Self = owner; \
 public:
 
-#define CONFIG_VALUE(type, member, key, codec) \
-    type member{}; \
+#define CONFIG_CODEC(value_type, codec) \
+    template <> \
+    struct configschema::DefaultCodec<value_type> { \
+        using codec_type = codec; \
+    }
+
+#define CONFIG_VALUE(field_type, member, key) \
+    field_type member{}; \
     friend consteval auto reflect_field(configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) { \
-        return configschema::FieldDescriptor<Self, type, key, &Self::member, codec>{}; \
+        return configschema::FieldDescriptor<Self, field_type, key, &Self::member, typename configschema::DefaultCodec<field_type>::codec_type>{}; \
     }
 
 #define CONFIG_SECTION(name) \
