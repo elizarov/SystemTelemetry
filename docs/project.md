@@ -4,7 +4,7 @@
 
 - The project runs on Windows 11 and is implemented in C++20 using Visual Studio 2022.
 - Use `devenv.cmd` to activate the development environment when needed.
-- Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.txt`.
+- Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.md`.
 - Keep `docs/build.md` as the single maintained source of truth for build prerequisites, build invocation, and developer-facing setup notes; other docs should link to it instead of repeating that material.
 - Keep all sources in `src`.
 - Keep generated build outputs inside `build\` so the project root stays clean.

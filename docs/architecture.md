@@ -59,7 +59,7 @@
   - Compiles `src/board_gigabyte_siv.cpp` with Common Language Runtime support so it can call the vendor .NET assemblies in-process.
   - Links the required CLR host support library from the active Windows SDK.
 - `src/vendor/adlx/...`: vendored AMD ADLX headers/helper/runtime glue used by the AMD GPU provider.
-- `devenv.cmd` + `devenv.txt`: local build-environment bootstrap plus its machine-specific setup contract; `devenv.cmd` prepares the Visual Studio x64 toolchain that `build.cmd` and the mixed-mode Gigabyte board-provider build use, while `devenv.txt` documents that requirement for future machines.
+- `devenv.cmd` + `devenv.md`: local build-environment bootstrap plus its machine-specific setup contract; `devenv.cmd` prepares the Visual Studio x64 toolchain that `build.cmd` and the mixed-mode Gigabyte board-provider build use, while `devenv.md` documents that requirement for future machines.
 
 ## Runtime flows
 
