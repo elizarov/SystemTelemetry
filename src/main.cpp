@@ -188,19 +188,8 @@ std::optional<std::wstring> GetSwitchValue(const std::wstring& target) {
     return std::nullopt;
 }
 
-std::optional<std::wstring> GetOptionalSwitchValue(const std::wstring& target) {
-    const std::vector<std::wstring> arguments = GetCommandLineArguments();
-    for (size_t i = 0; i < arguments.size(); ++i) {
-        const std::wstring& argument = arguments[i];
-        if (_wcsicmp(argument.c_str(), target.c_str()) == 0) {
-            if (i + 1 < arguments.size()) {
-                const std::wstring& next = arguments[i + 1];
-                if (!next.empty() && next[0] != L'/') {
-                    return next;
-                }
-            }
-            return std::nullopt;
-        }
+std::optional<std::wstring> GetColonSwitchValue(const std::wstring& target) {
+    for (const std::wstring& argument : GetCommandLineArguments()) {
         if (argument.size() > target.size() &&
             _wcsnicmp(argument.c_str(), target.c_str(), target.size()) == 0 &&
             argument[target.size()] == L':') {
@@ -226,12 +215,7 @@ std::optional<double> TryParseScaleValue(const std::wstring& text) {
 }
 
 std::optional<double> GetScaleSwitchValue() {
-    for (const std::wstring& argument : GetCommandLineArguments()) {
-        if (argument.size() > 7 && _wcsnicmp(argument.c_str(), L"/scale:", 7) == 0) {
-            return TryParseScaleValue(argument.substr(7));
-        }
-    }
-    if (const auto value = GetSwitchValue(L"/scale"); value.has_value()) {
+    if (const auto value = GetColonSwitchValue(L"/scale"); value.has_value()) {
         return TryParseScaleValue(*value);
     }
     return std::nullopt;
@@ -248,15 +232,15 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     if (const auto scale = GetScaleSwitchValue(); scale.has_value()) {
         options.scale = *scale;
     }
-    if (const auto tracePath = GetOptionalSwitchValue(L"/trace"); tracePath.has_value()) {
+    if (const auto tracePath = GetColonSwitchValue(L"/trace"); tracePath.has_value()) {
         options.trace = true;
         options.tracePath = *tracePath;
     }
-    if (const auto dumpPath = GetOptionalSwitchValue(L"/dump"); dumpPath.has_value()) {
+    if (const auto dumpPath = GetColonSwitchValue(L"/dump"); dumpPath.has_value()) {
         options.dump = true;
         options.dumpPath = *dumpPath;
     }
-    if (const auto screenshotPath = GetOptionalSwitchValue(L"/screenshot"); screenshotPath.has_value()) {
+    if (const auto screenshotPath = GetColonSwitchValue(L"/screenshot"); screenshotPath.has_value()) {
         options.screenshot = true;
         options.screenshotPath = *screenshotPath;
     }
