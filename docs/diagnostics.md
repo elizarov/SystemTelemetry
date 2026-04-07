@@ -8,18 +8,22 @@ This document is the single maintained source of truth for diagnostics command b
 
 - Support independent `/trace`, `/dump`, `/screenshot`, `/reload`, and `/exit` command-line switches.
 - Support a `/fake` command-line switch that replaces live telemetry collection with periodic reads from `telemetry_fake.txt` beside the executable.
+- `/trace`, `/dump`, and `/screenshot` must each accept an optional output filename via both `/switch:<path>` and `/switch <path>`.
 - Support a `/scale:<value>` diagnostics switch, plus the equivalent `/scale <value>` form, that applies only to `/exit` rendering so headless screenshots can be exported at higher-than-runtime resolution from the same logical layout.
 - `/scale` must accept fractional values such as `1.5`, not only whole-number multipliers.
 
 ### Output files
 
 - `/trace` must enable continuous trace logging to `telemetry_trace.txt` beside the executable, appending new trace lines in plain UTF-8 without a BOM.
+- `/trace` with an explicit filename must append the same trace format to that requested path instead of the default file, and a relative filename must resolve beside the executable.
 - Trace lines must use the compact prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
 - `/dump` must enable writing a machine-parseable UTF-8 snapshot dump to `telemetry_dump.txt` beside the executable without a BOM.
+- `/dump` with an explicit filename must write the same dump format to that requested path instead of the default file, and a relative filename must resolve beside the executable.
 - The dump format must be stable, text-based, and editable by hand so the same file contents can be copied directly into `telemetry_fake.txt`.
 - The dump must include all telemetry fields needed by the dashboard plus provider diagnostics, a single retained-history-series collection for throughput, metric rows, and load gauges, configured drive rows including per-drive read/write MB/s, and the full dumped local date/time including seconds and milliseconds.
 - The dump schema must reflect the current runtime model directly; obsolete compatibility keys should be removed instead of being kept as null placeholders.
 - `/screenshot` must enable writing only the rendered dashboard screenshot to `telemetry_screenshot.png` beside the executable.
+- `/screenshot` with an explicit filename must write the same rendered PNG to that requested path instead of the default file, and a relative filename must resolve beside the executable.
 
 ### UI-attached mode
 
@@ -67,6 +71,7 @@ This document is the single maintained source of truth for diagnostics command b
 
 - For UI-attached diagnostics, verify `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot` while the dashboard is running.
 - For headless diagnostics, verify `/trace /dump /screenshot /exit` and `/trace /reload /screenshot /exit`, and confirm the process exits after the requested first-update or reload-export path.
+- Also verify one headless run that supplies explicit output filenames for `/trace`, `/dump`, and `/screenshot`, and confirm only the requested paths are updated.
 - When `/scale:<value>` is involved, also verify that `telemetry_screenshot.png` uses the expected multiplied pixel dimensions while preserving the same logical composition.
 - For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, and confirm that editing `telemetry_fake.txt` changes the next one-second refresh without touching live providers.
 

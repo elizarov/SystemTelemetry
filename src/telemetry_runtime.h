@@ -15,6 +15,9 @@ struct DiagnosticsOptions {
     bool fake = false;
     bool reload = false;
     double scale = 1.0;
+    std::filesystem::path tracePath;
+    std::filesystem::path dumpPath;
+    std::filesystem::path screenshotPath;
 
     bool HasAnyOutput() const {
         return trace || dump || screenshot;

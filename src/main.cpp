@@ -139,6 +139,19 @@ std::filesystem::path GetExecutableDirectory() {
     return std::filesystem::path(modulePath).parent_path();
 }
 
+std::filesystem::path ResolveDiagnosticsOutputPath(
+    const std::filesystem::path& executableDirectory,
+    const std::filesystem::path& configuredPath,
+    const wchar_t* defaultFileName) {
+    if (configuredPath.empty()) {
+        return executableDirectory / defaultFileName;
+    }
+    if (configuredPath.is_absolute()) {
+        return configuredPath;
+    }
+    return executableDirectory / configuredPath;
+}
+
 std::vector<std::wstring> GetCommandLineArguments() {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -170,6 +183,28 @@ std::optional<std::wstring> GetSwitchValue(const std::wstring& target) {
     for (size_t i = 0; i + 1 < arguments.size(); ++i) {
         if (_wcsicmp(arguments[i].c_str(), target.c_str()) == 0) {
             return arguments[i + 1];
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::wstring> GetOptionalSwitchValue(const std::wstring& target) {
+    const std::vector<std::wstring> arguments = GetCommandLineArguments();
+    for (size_t i = 0; i < arguments.size(); ++i) {
+        const std::wstring& argument = arguments[i];
+        if (_wcsicmp(argument.c_str(), target.c_str()) == 0) {
+            if (i + 1 < arguments.size()) {
+                const std::wstring& next = arguments[i + 1];
+                if (!next.empty() && next[0] != L'/') {
+                    return next;
+                }
+            }
+            return std::nullopt;
+        }
+        if (argument.size() > target.size() &&
+            _wcsnicmp(argument.c_str(), target.c_str(), target.size()) == 0 &&
+            argument[target.size()] == L':') {
+            return argument.substr(target.size() + 1);
         }
     }
     return std::nullopt;
@@ -213,6 +248,18 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     if (const auto scale = GetScaleSwitchValue(); scale.has_value()) {
         options.scale = *scale;
     }
+    if (const auto tracePath = GetOptionalSwitchValue(L"/trace"); tracePath.has_value()) {
+        options.trace = true;
+        options.tracePath = *tracePath;
+    }
+    if (const auto dumpPath = GetOptionalSwitchValue(L"/dump"); dumpPath.has_value()) {
+        options.dump = true;
+        options.dumpPath = *dumpPath;
+    }
+    if (const auto screenshotPath = GetOptionalSwitchValue(L"/screenshot"); screenshotPath.has_value()) {
+        options.screenshot = true;
+        options.screenshotPath = *screenshotPath;
+    }
     return options;
 }
 
@@ -221,7 +268,7 @@ DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options) : opti
 bool DiagnosticsSession::Initialize() {
     const std::filesystem::path executableDirectory = GetExecutableDirectory();
     if (options_.trace) {
-        tracePath_ = executableDirectory / L"telemetry_trace.txt";
+        tracePath_ = ResolveDiagnosticsOutputPath(executableDirectory, options_.tracePath, L"telemetry_trace.txt");
         traceStream_.open(tracePath_, std::ios::binary | std::ios::app);
         if (!traceStream_.is_open()) {
             ShowFileOpenError("trace file", tracePath_);
@@ -229,10 +276,11 @@ bool DiagnosticsSession::Initialize() {
         }
     }
     if (options_.dump) {
-        dumpPath_ = executableDirectory / L"telemetry_dump.txt";
+        dumpPath_ = ResolveDiagnosticsOutputPath(executableDirectory, options_.dumpPath, L"telemetry_dump.txt");
     }
     if (options_.screenshot) {
-        screenshotPath_ = executableDirectory / L"telemetry_screenshot.png";
+        screenshotPath_ =
+            ResolveDiagnosticsOutputPath(executableDirectory, options_.screenshotPath, L"telemetry_screenshot.png");
     }
     return true;
 }
