@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <commctrl.h>
+#include <commdlg.h>
 #include <shellapi.h>
 
 #include <algorithm>
@@ -27,6 +28,7 @@
 #include "utf8.h"
 
 #pragma comment(lib, "comctl32.lib")
+#pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "shell32.lib")
 
 namespace {
@@ -43,7 +45,12 @@ constexpr UINT kCommandBringOnTop = 1002;
 constexpr UINT kCommandReloadConfig = 1003;
 constexpr UINT kCommandSaveConfig = 1004;
 constexpr UINT kCommandExit = 1005;
+constexpr UINT kCommandSaveDumpAs = 1006;
+constexpr UINT kCommandSaveScreenshotAs = 1007;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
+constexpr wchar_t kDefaultTraceFileName[] = L"telemetry_trace.txt";
+constexpr wchar_t kDefaultDumpFileName[] = L"telemetry_dump.txt";
+constexpr wchar_t kDefaultScreenshotFileName[] = L"telemetry_screenshot.png";
 
 COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
@@ -152,6 +159,32 @@ std::filesystem::path ResolveDiagnosticsOutputPath(
     return executableDirectory / configuredPath;
 }
 
+std::optional<std::filesystem::path> PromptSavePath(
+    HWND owner,
+    const std::filesystem::path& initialDirectory,
+    const wchar_t* defaultFileName,
+    const wchar_t* filter,
+    const wchar_t* defaultExtension) {
+    wchar_t fileBuffer[MAX_PATH] = {};
+    wcsncpy_s(fileBuffer, defaultFileName != nullptr ? defaultFileName : L"", _TRUNCATE);
+
+    std::wstring initialDirectoryText = initialDirectory.wstring();
+    OPENFILENAMEW dialog{};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = owner;
+    dialog.lpstrFilter = filter;
+    dialog.lpstrFile = fileBuffer;
+    dialog.nMaxFile = ARRAYSIZE(fileBuffer);
+    dialog.lpstrInitialDir = initialDirectoryText.empty() ? nullptr : initialDirectoryText.c_str();
+    dialog.lpstrDefExt = defaultExtension;
+    dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (!GetSaveFileNameW(&dialog)) {
+        return std::nullopt;
+    }
+    return std::filesystem::path(dialog.lpstrFile);
+}
+
 std::vector<std::wstring> GetCommandLineArguments() {
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -256,7 +289,7 @@ DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options) : opti
 bool DiagnosticsSession::Initialize() {
     const std::filesystem::path executableDirectory = GetExecutableDirectory();
     if (options_.trace) {
-        tracePath_ = ResolveDiagnosticsOutputPath(executableDirectory, options_.tracePath, L"telemetry_trace.txt");
+        tracePath_ = ResolveDiagnosticsOutputPath(executableDirectory, options_.tracePath, kDefaultTraceFileName);
         traceStream_.open(tracePath_, std::ios::binary | std::ios::app);
         if (!traceStream_.is_open()) {
             ShowFileOpenError("trace file", tracePath_);
@@ -264,11 +297,11 @@ bool DiagnosticsSession::Initialize() {
         }
     }
     if (options_.dump) {
-        dumpPath_ = ResolveDiagnosticsOutputPath(executableDirectory, options_.dumpPath, L"telemetry_dump.txt");
+        dumpPath_ = ResolveDiagnosticsOutputPath(executableDirectory, options_.dumpPath, kDefaultDumpFileName);
     }
     if (options_.screenshot) {
         screenshotPath_ =
-            ResolveDiagnosticsOutputPath(executableDirectory, options_.screenshotPath, L"telemetry_screenshot.png");
+            ResolveDiagnosticsOutputPath(executableDirectory, options_.screenshotPath, kDefaultScreenshotFileName);
     }
     return true;
 }
@@ -750,6 +783,8 @@ public:
     void ReleaseFonts();
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
     bool WriteDiagnosticsOutputs();
+    void SaveDumpAs();
+    void SaveScreenshotAs();
 
 private:
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -780,6 +815,10 @@ private:
     void StartPlacementWatch();
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
+    std::optional<std::filesystem::path> PromptDiagnosticsSavePath(
+        const wchar_t* defaultFileName,
+        const wchar_t* filter,
+        const wchar_t* defaultExtension) const;
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
         COLORREF color, UINT format);
@@ -1032,6 +1071,63 @@ bool DashboardApp::WriteDiagnosticsOutputs() {
     return ok;
 }
 
+std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
+    const wchar_t* defaultFileName,
+    const wchar_t* filter,
+    const wchar_t* defaultExtension) const {
+    return PromptSavePath(hwnd_, GetExecutableDirectory(), defaultFileName, filter, defaultExtension);
+}
+
+void DashboardApp::SaveDumpAs() {
+    const auto path = PromptDiagnosticsSavePath(
+        kDefaultDumpFileName,
+        L"Telemetry dump (*.txt)\0*.txt\0All files (*.*)\0*.*\0",
+        L"txt");
+    if (!path.has_value()) {
+        return;
+    }
+
+    std::ofstream output(*path, std::ios::binary | std::ios::trunc);
+    if (!output.is_open()) {
+        const std::wstring message =
+            WideFromUtf8("Failed to open dump file:\n" + Utf8FromWide(path->wstring()));
+        MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
+        return;
+    }
+
+    if (!WriteTelemetryDump(output, telemetry_->Dump())) {
+        const std::wstring message =
+            WideFromUtf8("Failed to write dump file:\n" + Utf8FromWide(path->wstring()));
+        MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    }
+}
+
+void DashboardApp::SaveScreenshotAs() {
+    const auto path = PromptDiagnosticsSavePath(
+        kDefaultScreenshotFileName,
+        L"PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0",
+        L"png");
+    if (!path.has_value()) {
+        return;
+    }
+
+    std::string errorText;
+    if (!SaveDumpScreenshot(
+            *path,
+            telemetry_->Dump().snapshot,
+            telemetry_->EffectiveConfig(),
+            1.0,
+            diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
+            &errorText)) {
+        std::string message = "Failed to save screenshot:\n" + Utf8FromWide(path->wstring());
+        if (!errorText.empty()) {
+            message += "\n\n" + errorText;
+        }
+        const std::wstring wideMessage = WideFromUtf8(message);
+        MessageBoxW(hwnd_, wideMessage.c_str(), L"System Telemetry", MB_ICONERROR);
+    }
+}
+
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
     double scale, std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
@@ -1210,10 +1306,14 @@ void DashboardApp::UpdateMoveTracking() {
 
 void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU menu = CreatePopupMenu();
+    HMENU diagnosticsMenu = CreatePopupMenu();
+    AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveDumpAs, L"Save Dump To...");
+    AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(diagnosticsMenu), L"Diagnostics");
     AppendMenuW(menu, MF_STRING, kCommandExit, L"Exit");
     SetForegroundWindow(hwnd_);
     const UINT selected = TrackPopupMenu(
@@ -1235,6 +1335,12 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         break;
     case kCommandSaveConfig:
         UpdateConfigFromCurrentPlacement();
+        break;
+    case kCommandSaveDumpAs:
+        SaveDumpAs();
+        break;
+    case kCommandSaveScreenshotAs:
+        SaveScreenshotAs();
         break;
     case kCommandExit:
         DestroyWindow(hwnd_);

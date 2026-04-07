@@ -19,6 +19,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Without an explicit path, `/fake` reads `telemetry_fake.txt` beside the executable.
 - With an explicit path, `/fake` reads that requested dump file instead of the default fake file.
 - Relative diagnostics paths resolve beside the executable.
+- The UI `Diagnostics` submenu uses a standard Save dialog and defaults `Save dump to...` and `Save screenshot to...` to the same executable-relative default file names used by `/dump` and `/screenshot`.
 - Trace output appends plain UTF-8 text without a BOM and uses the prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
 - Dump output overwrites with a stable text format that can be copied directly into the default fake file or a `/fake` target file.
 - Screenshot output overwrites with only the rendered dashboard PNG.
