@@ -260,6 +260,116 @@ void SaveStructuredSection(const typename Section::owner_type& owner, UpdateKeyF
     }, Section::fields);
 }
 
+DisplayConfig& AccessDisplayConfig(AppConfig& config) {
+    return config.display;
+}
+
+NetworkConfig& AccessNetworkConfig(AppConfig& config) {
+    return config.network;
+}
+
+MetricScaleConfig& AccessMetricScalesConfig(AppConfig& config) {
+    return config.metricScales;
+}
+
+LayoutSectionConfig& AccessLayoutSectionConfig(AppConfig& config) {
+    return config.layout.structure;
+}
+
+DashboardSectionConfig& AccessDashboardSectionConfig(AppConfig& config) {
+    return config.layout.dashboard;
+}
+
+CardStyleConfig& AccessCardStyleConfig(AppConfig& config) {
+    return config.layout.cardStyle;
+}
+
+ColorConfig& AccessColorConfig(AppConfig& config) {
+    return config.layout.colors;
+}
+
+UiFontSetConfig& AccessFontConfig(AppConfig& config) {
+    return config.layout.fonts;
+}
+
+MetricListWidgetConfig& AccessMetricListWidgetConfig(AppConfig& config) {
+    return config.layout.metricList;
+}
+
+DriveUsageListWidgetConfig& AccessDriveUsageListWidgetConfig(AppConfig& config) {
+    return config.layout.driveUsageList;
+}
+
+ThroughputWidgetConfig& AccessThroughputWidgetConfig(AppConfig& config) {
+    return config.layout.throughput;
+}
+
+GaugeWidgetConfig& AccessGaugeWidgetConfig(AppConfig& config) {
+    return config.layout.gauge;
+}
+
+TextWidgetConfig& AccessTextWidgetConfig(AppConfig& config) {
+    return config.layout.text;
+}
+
+NetworkFooterWidgetConfig& AccessNetworkFooterWidgetConfig(AppConfig& config) {
+    return config.layout.networkFooter;
+}
+
+ClockTimeWidgetConfig& AccessClockTimeWidgetConfig(AppConfig& config) {
+    return config.layout.clockTime;
+}
+
+ClockDateWidgetConfig& AccessClockDateWidgetConfig(AppConfig& config) {
+    return config.layout.clockDate;
+}
+
+template <typename Section, auto Accessor>
+struct StructuredSectionBinding {
+    using section_type = Section;
+
+    static typename Section::owner_type& Get(AppConfig& config) {
+        return Accessor(config);
+    }
+};
+
+template <typename... Bindings>
+bool DispatchStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
+    bool handled = false;
+    std::apply([&](auto... binding) {
+        (..., [&] {
+            using Binding = std::remove_cvref_t<decltype(binding)>;
+            using Section = typename Binding::section_type;
+            if (!handled && section == Section::name.view()) {
+                ApplyStructuredSectionValue<Section>(Binding::Get(config), key, value);
+                handled = true;
+            }
+        }());
+    }, std::tuple<Bindings...>{});
+    return handled;
+}
+
+bool DispatchKnownStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
+    return DispatchStructuredSection<
+        StructuredSectionBinding<DisplayConfig::Section, AccessDisplayConfig>,
+        StructuredSectionBinding<NetworkConfig::Section, AccessNetworkConfig>,
+        StructuredSectionBinding<MetricScaleConfig::Section, AccessMetricScalesConfig>,
+        StructuredSectionBinding<LayoutSectionConfig::Section, AccessLayoutSectionConfig>,
+        StructuredSectionBinding<DashboardSectionConfig::Section, AccessDashboardSectionConfig>,
+        StructuredSectionBinding<CardStyleConfig::Section, AccessCardStyleConfig>,
+        StructuredSectionBinding<ColorConfig::Section, AccessColorConfig>,
+        StructuredSectionBinding<UiFontSetConfig::Section, AccessFontConfig>,
+        StructuredSectionBinding<MetricListWidgetConfig::Section, AccessMetricListWidgetConfig>,
+        StructuredSectionBinding<DriveUsageListWidgetConfig::Section, AccessDriveUsageListWidgetConfig>,
+        StructuredSectionBinding<ThroughputWidgetConfig::Section, AccessThroughputWidgetConfig>,
+        StructuredSectionBinding<GaugeWidgetConfig::Section, AccessGaugeWidgetConfig>,
+        StructuredSectionBinding<TextWidgetConfig::Section, AccessTextWidgetConfig>,
+        StructuredSectionBinding<NetworkFooterWidgetConfig::Section, AccessNetworkFooterWidgetConfig>,
+        StructuredSectionBinding<ClockTimeWidgetConfig::Section, AccessClockTimeWidgetConfig>,
+        StructuredSectionBinding<ClockDateWidgetConfig::Section, AccessClockDateWidgetConfig>
+    >(config, section, key, value);
+}
+
 std::string ReadFileUtf8(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
     if (!input.is_open()) {
@@ -569,40 +679,10 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
         const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
 
-        if (section == "display") {
-            ApplyStructuredSectionValue<DisplayConfig::Section>(config.display, key, value);
-        } else if (section == "network") {
-            ApplyStructuredSectionValue<NetworkConfig::Section>(config.network, key, value);
+        if (DispatchKnownStructuredSection(config, section, key, value)) {
+            continue;
         } else if (section == "board") {
             ApplyBoardValue(config, key, value);
-        } else if (section == "metric_scales") {
-            ApplyStructuredSectionValue<MetricScaleConfig::Section>(config.metricScales, key, value);
-        } else if (section == "metric_list") {
-            ApplyStructuredSectionValue<MetricListWidgetConfig::Section>(config.layout.metricList, key, value);
-        } else if (section == "drive_usage_list") {
-            ApplyStructuredSectionValue<DriveUsageListWidgetConfig::Section>(config.layout.driveUsageList, key, value);
-        } else if (section == "throughput") {
-            ApplyStructuredSectionValue<ThroughputWidgetConfig::Section>(config.layout.throughput, key, value);
-        } else if (section == "gauge") {
-            ApplyStructuredSectionValue<GaugeWidgetConfig::Section>(config.layout.gauge, key, value);
-        } else if (section == "text") {
-            ApplyStructuredSectionValue<TextWidgetConfig::Section>(config.layout.text, key, value);
-        } else if (section == "network_footer") {
-            ApplyStructuredSectionValue<NetworkFooterWidgetConfig::Section>(config.layout.networkFooter, key, value);
-        } else if (section == "clock_time") {
-            ApplyStructuredSectionValue<ClockTimeWidgetConfig::Section>(config.layout.clockTime, key, value);
-        } else if (section == "clock_date") {
-            ApplyStructuredSectionValue<ClockDateWidgetConfig::Section>(config.layout.clockDate, key, value);
-        } else if (section == "layout") {
-            ApplyStructuredSectionValue<LayoutSectionConfig::Section>(config.layout.structure, key, value);
-        } else if (section == "dashboard") {
-            ApplyStructuredSectionValue<DashboardSectionConfig::Section>(config.layout.dashboard, key, value);
-        } else if (section == "card_style") {
-            ApplyStructuredSectionValue<CardStyleConfig::Section>(config.layout.cardStyle, key, value);
-        } else if (section == "colors") {
-            ApplyStructuredSectionValue<ColorConfig::Section>(config.layout.colors, key, value);
-        } else if (section == "fonts") {
-            ApplyStructuredSectionValue<UiFontSetConfig::Section>(config.layout.fonts, key, value);
         } else if (section.rfind("card.", 0) == 0) {
             ApplyCardValue(config.layout, section, key, value);
         }
