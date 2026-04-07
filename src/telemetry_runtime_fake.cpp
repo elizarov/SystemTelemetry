@@ -51,6 +51,10 @@ public:
         return config_;
     }
 
+    void SetEffectiveConfig(const AppConfig& config) override {
+        config_ = config;
+    }
+
     void UpdateSnapshot() override {
         const auto now = std::chrono::steady_clock::now();
         if (lastReload_.time_since_epoch().count() == 0 || now - lastReload_ >= std::chrono::seconds(1)) {

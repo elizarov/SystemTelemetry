@@ -10,6 +10,7 @@ This document is the single maintained source of truth for diagnostics command b
 - `/reload` forces a config reload through the normal live-dashboard reload path before headless diagnostics outputs are exported.
 - `/exit` runs diagnostics as a one-shot headless export path instead of starting the dashboard UI.
 - `/fake[:path]` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` in the current working directory, or from the optional fake dump path.
+- `/layout:<name>` overrides `display.layout` for the current process so diagnostics can validate a named layout without editing `config.ini`.
 - `/blank` switches screenshot rendering into a blank background mode that keeps static dashboard chrome and static text such as CPU and GPU names while omitting dynamic metric text, time, date, plots, leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 - `/scale:<value>` multiplies headless `/screenshot /exit` render size, including all measured layout geometry, and accepts fractional values such as `1.5`.
 - `/blank` cannot be combined with `/fake`.
@@ -31,6 +32,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Without `/exit`, the application starts the normal dashboard UI and keeps producing any requested diagnostics outputs while it runs.
 - In UI-attached mode, trace logging continues for the process lifetime, while dump and screenshot outputs refresh once per second from the latest snapshot.
 - With `/exit`, the application initializes telemetry from the normal runtime `config.ini`, performs the first update, optionally writes the requested outputs once, and exits without starting the GUI.
+- With `/layout:<name>`, the application applies that named layout after loading `config.ini` and keeps that override active for the rest of the process, including `/reload` diagnostics runs.
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
 - With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
 - With `/blank`, the application keeps the normal layout, panel chrome, card headers, CPU and GPU names, drive labels, and empty chart or bar tracks while suppressing dynamic metric rendering.
@@ -66,6 +68,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Verify headless `/trace /dump /screenshot /exit` and `/trace /reload /screenshot /exit`, and confirm the process exits after the requested export path.
 - Verify headless `/trace /blank /screenshot /exit`, and confirm the saved PNG keeps the blank background composition without dynamic metric content.
 - Verify one headless run that supplies explicit output filenames such as `/trace:custom_trace.txt`, `/dump:custom_dump.txt`, and `/screenshot:custom_screenshot.png`, and confirm only the requested paths are updated.
+- Verify one headless `/trace /layout:<name> /screenshot /exit` run, and confirm the screenshot and trace use the requested named layout without editing `config.ini`.
 - When `/scale:<value>` is involved, confirm the screenshot uses the expected multiplied pixel dimensions while preserving the same logical composition.
 - For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm that editing the selected fake file changes the next one-second refresh without touching live providers, and verify one run with `/fake:custom_fake.txt`.
 - Verify `/blank /fake` fails before startup.

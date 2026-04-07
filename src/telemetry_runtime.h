@@ -16,6 +16,7 @@ struct DiagnosticsOptions {
     bool blank = false;
     bool reload = false;
     double scale = 1.0;
+    std::string layoutName;
     std::filesystem::path tracePath;
     std::filesystem::path dumpPath;
     std::filesystem::path screenshotPath;
@@ -33,6 +34,7 @@ public:
     virtual const SystemSnapshot& Snapshot() const = 0;
     virtual TelemetryDump Dump() const = 0;
     virtual AppConfig EffectiveConfig() const = 0;
+    virtual void SetEffectiveConfig(const AppConfig& config) = 0;
     virtual void UpdateSnapshot() = 0;
 };
 

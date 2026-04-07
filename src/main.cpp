@@ -49,6 +49,8 @@ constexpr UINT kCommandExit = 1005;
 constexpr UINT kCommandSaveDumpAs = 1006;
 constexpr UINT kCommandSaveScreenshotAs = 1007;
 constexpr UINT kCommandAutoStart = 1008;
+constexpr UINT kCommandLayoutBase = 1100;
+constexpr UINT kCommandLayoutMax = 1199;
 constexpr UINT kCommandConfigureDisplayBase = 2000;
 constexpr UINT kCommandConfigureDisplayMax = 2099;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
@@ -473,6 +475,16 @@ std::optional<double> GetScaleSwitchValue() {
     return std::nullopt;
 }
 
+std::optional<std::string> GetLayoutSwitchValue() {
+    if (const auto value = GetColonSwitchValue(L"/layout"); value.has_value()) {
+        const std::string layoutName = Trim(Utf8FromWide(*value));
+        if (!layoutName.empty()) {
+            return layoutName;
+        }
+    }
+    return std::nullopt;
+}
+
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options) {
     return options.blank ? DashboardRenderer::RenderMode::Blank : DashboardRenderer::RenderMode::Normal;
 }
@@ -486,6 +498,9 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.fake = HasSwitch("/fake");
     options.blank = HasSwitch("/blank");
     options.reload = HasSwitch("/reload");
+    if (const auto layoutName = GetLayoutSwitchValue(); layoutName.has_value()) {
+        options.layoutName = *layoutName;
+    }
     if (const auto scale = GetScaleSwitchValue(); scale.has_value()) {
         options.scale = *scale;
     }
@@ -516,6 +531,28 @@ bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
         return false;
     }
     return true;
+}
+
+bool ApplyDiagnosticsLayoutOverride(AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr) {
+    if (options.layoutName.empty()) {
+        return true;
+    }
+    if (SelectLayout(config, options.layoutName)) {
+        if (diagnostics != nullptr) {
+            diagnostics->WriteTraceMarker("diagnostics:layout_override name=\"" + options.layoutName + "\"");
+        }
+        return true;
+    }
+
+    if (diagnostics != nullptr) {
+        diagnostics->WriteTraceMarker("diagnostics:layout_override_failed name=\"" + options.layoutName + "\"");
+        return false;
+    }
+
+    const std::wstring message =
+        WideFromUtf8("Unknown layout name:\n" + options.layoutName);
+    MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    return false;
 }
 
 DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options) : options_(options) {}
@@ -694,13 +731,20 @@ bool ReloadTelemetryRuntimeFromDisk(
     const DiagnosticsOptions& diagnosticsOptions,
     DiagnosticsSession* diagnostics) {
     const AppConfig reloadedConfig = LoadConfig(configPath);
+    AppConfig effectiveReloadedConfig = reloadedConfig;
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarker("diagnostics:reload_config_begin");
+    }
+    if (!ApplyDiagnosticsLayoutOverride(effectiveReloadedConfig, diagnosticsOptions, diagnostics)) {
+        if (diagnostics != nullptr) {
+            diagnostics->WriteTraceMarker("diagnostics:reload_config_failed");
+        }
+        return false;
     }
 
     telemetry.reset();
     std::unique_ptr<TelemetryRuntime> reloadedTelemetry = InitializeTelemetryRuntimeInstance(
-        reloadedConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
+        effectiveReloadedConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
     if (reloadedTelemetry == nullptr) {
         telemetry = InitializeTelemetryRuntimeInstance(
             activeConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
@@ -710,7 +754,7 @@ bool ReloadTelemetryRuntimeFromDisk(
         return false;
     }
 
-    activeConfig = reloadedConfig;
+    activeConfig = effectiveReloadedConfig;
     telemetry = std::move(reloadedTelemetry);
     telemetry->UpdateSnapshot();
     if (diagnostics != nullptr) {
@@ -723,6 +767,9 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     AppConfig config = LoadConfig(GetRuntimeConfigPath());
     DiagnosticsSession diagnostics(diagnosticsOptions);
     if (!diagnostics.Initialize()) {
+        return 1;
+    }
+    if (!ApplyDiagnosticsLayoutOverride(config, diagnosticsOptions, &diagnostics)) {
         return 1;
     }
 
@@ -859,6 +906,19 @@ struct DisplayMenuOption {
     UINT dpi = kDefaultDpi;
     bool layoutFits = false;
 };
+
+struct LayoutMenuOption {
+    UINT commandId = 0;
+    std::string name;
+};
+
+void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
+    MENUITEMINFOW info{};
+    info.cbSize = sizeof(info);
+    info.fMask = MIIM_FTYPE;
+    info.fType = MFT_RADIOCHECK;
+    SetMenuItemInfoW(menu, commandId, FALSE, &info);
+}
 
 std::string SimplifyDeviceName(const std::string& deviceName) {
     if (deviceName.rfind("\\\\.\\", 0) == 0) {
@@ -1219,6 +1279,7 @@ private:
     void ApplyConfigPlacement();
     bool ApplyConfiguredWallpaper();
     bool ConfigureDisplay(const DisplayMenuOption& option);
+    bool SwitchLayout(const std::string& layoutName);
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     UINT CurrentWindowDpi() const;
@@ -1263,6 +1324,7 @@ private:
     UINT currentDpi_ = kDefaultDpi;
     bool placementWatchActive_ = false;
     std::vector<DisplayMenuOption> configDisplayOptions_;
+    std::vector<LayoutMenuOption> layoutMenuOptions_;
 };
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -1294,6 +1356,9 @@ int DashboardApp::WindowHeight() const {
 bool DashboardApp::Initialize(HINSTANCE instance) {
     instance_ = instance;
     config_ = LoadConfig(GetRuntimeConfigPath());
+    if (!ApplyDiagnosticsLayoutOverride(config_, diagnosticsOptions_)) {
+        return false;
+    }
     renderer_.SetConfig(config_);
     renderer_.SetTraceOutput(nullptr);
     telemetry_ = CreateTelemetryRuntime(diagnosticsOptions_, GetWorkingDirectory());
@@ -1711,8 +1776,33 @@ bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
     }
 
     config_ = updatedConfig;
+    telemetry_->SetEffectiveConfig(config_);
     renderer_.SetConfig(config_);
     ApplyConfiguredWallpaper();
+    StartPlacementWatch();
+    ApplyConfigPlacement();
+    movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+    InvalidateRect(hwnd_, nullptr, FALSE);
+    return true;
+}
+
+bool DashboardApp::SwitchLayout(const std::string& layoutName) {
+    AppConfig updatedConfig = config_;
+    if (!SelectLayout(updatedConfig, layoutName)) {
+        return false;
+    }
+
+    const AppConfig previousConfig = config_;
+    ReleaseFonts();
+    config_ = updatedConfig;
+    telemetry_->SetEffectiveConfig(config_);
+    if (!InitializeFonts()) {
+        config_ = previousConfig;
+        telemetry_->SetEffectiveConfig(config_);
+        InitializeFonts();
+        return false;
+    }
+
     StartPlacementWatch();
     ApplyConfigPlacement();
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
@@ -1746,6 +1836,7 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
     config_.display.monitorName = monitorName;
     config_.display.position.x = placement.relativePosition.x;
     config_.display.position.y = placement.relativePosition.y;
+    telemetry_->SetEffectiveConfig(config_);
 }
 
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {
@@ -1854,8 +1945,26 @@ void DashboardApp::UpdateMoveTracking() {
 void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU menu = CreatePopupMenu();
     HMENU diagnosticsMenu = CreatePopupMenu();
+    HMENU layoutMenu = CreatePopupMenu();
     HMENU configureDisplayMenu = CreatePopupMenu();
     const UINT autoStartFlags = MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
+    layoutMenuOptions_.clear();
+    for (size_t i = 0; i < config_.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax; ++i) {
+        LayoutMenuOption option;
+        option.commandId = kCommandLayoutBase + static_cast<UINT>(i);
+        option.name = config_.layouts[i].name;
+        layoutMenuOptions_.push_back(option);
+    }
+    if (layoutMenuOptions_.empty()) {
+        AppendMenuW(layoutMenu, MF_STRING | MF_GRAYED, kCommandLayoutBase, L"No layouts found");
+    } else {
+        for (const auto& option : layoutMenuOptions_) {
+            const std::wstring label = WideFromUtf8(option.name);
+            const UINT flags = MF_STRING | (config_.display.layout == option.name ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuW(layoutMenu, flags, option.commandId, label.c_str());
+            SetMenuItemRadioStyle(layoutMenu, option.commandId);
+        }
+    }
     configDisplayOptions_ = EnumerateDisplayMenuOptions(config_);
     if (configDisplayOptions_.empty()) {
         AppendMenuW(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, L"No displays found");
@@ -1872,6 +1981,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), L"Layout");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), L"Config To Display");
     AppendMenuW(menu, autoStartFlags, kCommandAutoStart, L"Auto-start on user logon");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(diagnosticsMenu), L"Diagnostics");
@@ -1910,6 +2020,14 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         DestroyWindow(hwnd_);
         break;
     default:
+        if (selected >= kCommandLayoutBase && selected <= kCommandLayoutMax) {
+            const auto it = std::find_if(layoutMenuOptions_.begin(), layoutMenuOptions_.end(),
+                [selected](const LayoutMenuOption& option) { return option.commandId == selected; });
+            if (it != layoutMenuOptions_.end() && !SwitchLayout(it->name)) {
+                MessageBoxW(hwnd_, L"Failed to switch layout.", L"System Telemetry", MB_ICONERROR);
+            }
+            break;
+        }
         if (selected >= kCommandConfigureDisplayBase && selected <= kCommandConfigureDisplayMax) {
             const auto it = std::find_if(configDisplayOptions_.begin(), configDisplayOptions_.end(),
                 [selected](const DisplayMenuOption& option) { return option.commandId == selected; });

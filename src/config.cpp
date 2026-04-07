@@ -285,10 +285,6 @@ MetricScaleConfig& AccessMetricScalesConfig(AppConfig& config) {
     return config.metricScales;
 }
 
-LayoutSectionConfig& AccessLayoutSectionConfig(AppConfig& config) {
-    return config.layout.structure;
-}
-
 DashboardSectionConfig& AccessDashboardSectionConfig(AppConfig& config) {
     return config.layout.dashboard;
 }
@@ -379,7 +375,6 @@ bool DispatchKnownStructuredSection(AppConfig& config, const std::string& sectio
         StructuredSectionBinding<DisplayConfig::Section, AccessDisplayConfig>,
         StructuredSectionBinding<NetworkConfig::Section, AccessNetworkConfig>,
         StructuredSectionBinding<MetricScaleConfig::Section, AccessMetricScalesConfig>,
-        StructuredSectionBinding<LayoutSectionConfig::Section, AccessLayoutSectionConfig>,
         StructuredSectionBinding<DashboardSectionConfig::Section, AccessDashboardSectionConfig>,
         StructuredSectionBinding<CardStyleConfig::Section, AccessCardStyleConfig>,
         StructuredSectionBinding<ColorConfig::Section, AccessColorConfig>,
@@ -658,10 +653,34 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
     return layout.cards.back();
 }
 
+NamedLayoutSectionConfig* FindNamedLayoutSection(AppConfig& config, const std::string& name) {
+    for (auto& layout : config.layouts) {
+        if (layout.name == name) {
+            return &layout;
+        }
+    }
+    return nullptr;
+}
+
+NamedLayoutSectionConfig& EnsureNamedLayoutSection(AppConfig& config, const std::string& name) {
+    if (NamedLayoutSectionConfig* layout = FindNamedLayoutSection(config, name)) {
+        return *layout;
+    }
+    config.layouts.push_back(NamedLayoutSectionConfig{name});
+    return config.layouts.back();
+}
+
 bool ApplyCardValue(LayoutConfig& layout, const std::string& section, const std::string& key, const std::string& value) {
     return DispatchDynamicStructuredSection<LayoutCardConfig::Section>(section, key, value,
         [&layout](std::string_view id) -> LayoutCardConfig& {
             return EnsureCardConfig(layout, std::string(id));
+        });
+}
+
+bool ApplyNamedLayoutValue(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
+    return DispatchDynamicStructuredSection<NamedLayoutSectionConfig::Section>(section, key, value,
+        [&config](std::string_view name) -> NamedLayoutSectionConfig& {
+            return EnsureNamedLayoutSection(config, std::string(name));
         });
 }
 
@@ -700,6 +719,8 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
             continue;
         } else if (section == "board") {
             ApplyBoardValue(config, key, value);
+        } else if (ApplyNamedLayoutValue(config, section, key, value)) {
+            continue;
         } else if (ApplyCardValue(config.layout, section, key, value)) {
             continue;
         }
@@ -799,10 +820,34 @@ static LayoutBindingSelection CollectLayoutBindings(const LayoutConfig& layout) 
     return result;
 }
 
+bool SelectResolvedLayout(AppConfig& config, const std::string& requestedName) {
+    const NamedLayoutSectionConfig* selected = nullptr;
+    if (!requestedName.empty()) {
+        for (const auto& layout : config.layouts) {
+            if (layout.name == requestedName) {
+                selected = &layout;
+                break;
+            }
+        }
+    }
+    if (selected == nullptr && !config.layouts.empty()) {
+        selected = &config.layouts.front();
+    }
+    if (selected == nullptr) {
+        return false;
+    }
+
+    config.display.layout = selected->name;
+    config.layout.structure.window = selected->window;
+    config.layout.structure.cardsLayout = selected->cardsLayout;
+    return true;
+}
+
 AppConfig LoadConfig(const std::filesystem::path& path) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config);
     ApplyConfigText(ReadFileUtf8(path), config);
+    SelectResolvedLayout(config, config.display.layout);
 
     const LayoutBindingSelection layoutBindings = CollectLayoutBindings(config.layout);
     if (!layoutBindings.driveLetters.empty()) {
@@ -925,6 +970,9 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
 
     SaveStructuredSection<DisplayConfig::Section>(config.display, updateKey);
     SaveStructuredSection<NetworkConfig::Section>(config.network, updateKey);
+    for (const auto& layout : config.layouts) {
+        SaveDynamicStructuredSection<NamedLayoutSectionConfig::Section>(layout, layout.name, updateKey);
+    }
 
     const size_t boardSectionStart = ensureSectionAfter("[board]", "[network]");
     for (const std::string& logicalName : config.boardTemperatureNames) {
@@ -950,4 +998,19 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
         output += "\r\n";
     }
     return WriteFileUtf8(path, output);
+}
+
+bool SelectLayout(AppConfig& config, const std::string& name) {
+    if (name.empty()) {
+        return false;
+    }
+    for (const auto& layout : config.layouts) {
+        if (layout.name == name) {
+            config.display.layout = layout.name;
+            config.layout.structure.window = layout.window;
+            config.layout.structure.cardsLayout = layout.cardsLayout;
+            return true;
+        }
+    }
+    return false;
 }

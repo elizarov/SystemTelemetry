@@ -54,7 +54,9 @@ Examples include:
 - The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.
 - When `Save Config` creates `config.ini` beside the executable for the first time, it must begin from the embedded resource copy verbatim so the saved file keeps the same comments and documentation text before updating values in place.
 - The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
-- The config overlay path must replace parsed layout expressions during overlay, so `config.ini` safely overrides `[layout]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.
+- The `[display]` section must select the active dashboard layout by name through `display.layout`, and named dashboard size-and-card-placement definitions must live in `[layout.<name>]` sections.
+- The shipped config template must define `800x480` as the default active layout and also include an experimental `480x800` portrait layout for the same panel resolution.
+- The config overlay path must replace parsed layout expressions during overlay, so `config.ini` safely overrides `[layout.<name>]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.
 
 ### Layout and rendering behavior
 
@@ -79,6 +81,7 @@ Examples include:
 ### Runtime actions tied to config
 
 - The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
+- The popup menu must provide a `Layout` submenu that lists every configured layout name, shows the active layout with a radio check, and on selection switches `display.layout`, reapplies the active named layout, and resizes the window immediately.
 - The popup menu must provide a `Config To Display` submenu that lists every currently enumerable display by friendly name plus physical resolution, enables only displays whose resolution matches the dashboard's DPI-scaled window size for that display, and on selection must set `display.monitor_name`, set `display.position` to `0,0`, render a blank dashboard image to `telemetry_blank.png` beside the executable, set `display.wallpaper` to `telemetry_blank.png`, save the updated `config.ini`, and immediately apply that wallpaper to the selected display.
 - The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
 - When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
@@ -143,6 +146,7 @@ Add a popup menu on right-click with these actions:
 - Bring On Top
 - Reload Config
 - Save Config
+- Layout
 - Config To Display
 - Auto-start on user logon
 - Diagnostics
@@ -177,6 +181,7 @@ While moving, show an overlay in the top-left corner with:
 - Bring On Top
 - Reload Config
 - Save Config
+- Layout
 - Config To Display
 - Auto-start on user logon
 - Diagnostics

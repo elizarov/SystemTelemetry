@@ -10,6 +10,7 @@ This document is the single maintained source of truth for the language syntax, 
 The language is static:
 
 - layout is loaded from config
+- the active named layout is selected by `display.layout`
 - coordinates are computed once after config load or reload
 - rendering uses those precomputed coordinates until the next reload
 
@@ -37,7 +38,7 @@ The language has nine levels:
 1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, `[clock_time]`, and `[clock_date]`
 2. Runtime selection sections such as `[display]` and `[network]`
 3. Board sensor mapping in `[board]`
-4. Dashboard structure in `[layout]`
+4. Named dashboard structure sections in `[layout.<name>]`
 5. Shared dashboard outer spacing in `[dashboard]`
 6. Shared card chrome and inner spacing in `[card_style]`
 7. Shared dashboard palette in `[colors]`
@@ -49,6 +50,7 @@ The language has nine levels:
 `[display]` owns executable-relative display selection and placement settings:
 
 - `monitor_name = ...`
+- `layout = ...`
 - `wallpaper = ...`
 - `position = x,y`
 
@@ -78,9 +80,9 @@ Supported widget geometry keys:
 
 ## Dashboard sections
 
-`[layout]` owns only the dashboard size and card-placement layout.
+Each `[layout.<name>]` section owns only one named dashboard size and card-placement layout.
 
-Supported `[layout]` keys:
+Supported `[layout.<name>]` keys:
 
 - `window = width,height`
 - `cards = rows(columns:weight(card:weight,...), ...)`
@@ -108,6 +110,8 @@ Undocumented legacy key spellings and metric aliases are not supported.
 
 Example:
 
+- `[layout.800x480]`
+- `[layout.480x800]`
 - `cards = rows(columns:3(cpu,gpu), columns:2(network:4,storage:9,time:3))`
 
 `[colors]` owns the shared dashboard palette and uses `#RRGGBB`:

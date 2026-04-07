@@ -9,6 +9,7 @@ bool ShouldShowRuntimeDialogs(const DiagnosticsOptions& options) {
 class RealTelemetryRuntime : public TelemetryRuntime {
 public:
     bool Initialize(const AppConfig& config, std::ostream* traceStream) override {
+        effectiveConfig_ = config;
         return telemetry_.Initialize(config, traceStream);
     }
 
@@ -21,7 +22,15 @@ public:
     }
 
     AppConfig EffectiveConfig() const override {
-        return telemetry_.EffectiveConfig();
+        AppConfig config = telemetry_.EffectiveConfig();
+        config.display = effectiveConfig_.display;
+        config.layouts = effectiveConfig_.layouts;
+        config.layout = effectiveConfig_.layout;
+        return config;
+    }
+
+    void SetEffectiveConfig(const AppConfig& config) override {
+        effectiveConfig_ = config;
     }
 
     void UpdateSnapshot() override {
@@ -30,6 +39,7 @@ public:
 
 private:
     TelemetryCollector telemetry_;
+    AppConfig effectiveConfig_{};
 };
 
 std::unique_ptr<TelemetryRuntime> CreateRealTelemetryRuntime() {

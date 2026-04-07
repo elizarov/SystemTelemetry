@@ -40,6 +40,7 @@ CONFIG_CODEC(LogicalSizeConfig, configschema::LogicalSizeCodec);
 struct DisplayConfig {
     CONFIG_REFLECTED_STRUCT(DisplayConfig)
     CONFIG_VALUE(std::string, monitorName, "monitor_name");
+    CONFIG_VALUE(std::string, layout, "layout");
     CONFIG_VALUE(std::string, wallpaper, "wallpaper");
     CONFIG_VALUE(LogicalPointConfig, position, "position");
     CONFIG_SECTION("display");
@@ -101,7 +102,16 @@ struct LayoutSectionConfig {
     CONFIG_REFLECTED_STRUCT(LayoutSectionConfig)
     CONFIG_VALUE(LogicalSizeConfig, window, "window");
     CONFIG_VALUE(LayoutNodeConfig, cardsLayout, "cards");
-    CONFIG_SECTION("layout");
+    CONFIG_DYNAMIC_SECTION("layout.");
+};
+
+struct NamedLayoutSectionConfig {
+    std::string name;
+
+    CONFIG_REFLECTED_STRUCT(NamedLayoutSectionConfig)
+    CONFIG_VALUE(LogicalSizeConfig, window, "window");
+    CONFIG_VALUE(LayoutNodeConfig, cardsLayout, "cards");
+    CONFIG_DYNAMIC_SECTION("layout.");
 };
 
 struct LayoutCardConfig {
@@ -235,9 +245,11 @@ struct AppConfig {
     std::unordered_map<std::string, std::string> boardTemperatureSensorNames;
     std::unordered_map<std::string, std::string> boardFanSensorNames;
     MetricScaleConfig metricScales;
+    std::vector<NamedLayoutSectionConfig> layouts;
     LayoutConfig layout;
 };
 
 std::string LoadEmbeddedConfigTemplate();
 AppConfig LoadConfig(const std::filesystem::path& path);
 bool SaveConfig(const std::filesystem::path& path, const AppConfig& config);
+bool SelectLayout(AppConfig& config, const std::string& name);
