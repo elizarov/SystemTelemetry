@@ -76,6 +76,7 @@ Examples include:
 - The dedicated `drive_usage_list` section must provide separate gap controls for the activity-to-usage transition and the usage-bar-to-percent transition so the storage row alignment can be tuned without changing every column spacing together.
 - The dedicated widget sections must own the widget-level geometry that affects visual rhythm, including metric bar thickness, throughput plot chrome sizes, gauge preferred size, and the fixed widths used by the storage drive row columns.
 - The renderer must not rely on buried widget-spacing or widget-geometry pixel literals for text, footer, clock, gauge, or throughput sizing; those visual sizes must come from `config.ini` widget sections, with only non-visual safety clamps left in code.
+- After the first layout pass resolves every gauge slot, the renderer must derive one shared fitted gauge radius from the most constrained resolved gauge bounds and use that same gauge size for every gauge render in the active layout.
 - Widths that are fully determined by fixed renderer text such as throughput labels, throughput axis labels, drive-letter labels, and the `100%` drive percent column should be measured from the configured fonts at layout load and adjusted only by widget-section padding entries.
 - The layout language must support a top-aligned stack mode that packs children at their preferred heights and leaves any remaining space below them, so lists such as drive usage rows do not have to stretch to fill the whole card column.
 - In a regular vertical `stack(...)`, any resolved fixed-height widget must keep its preferred configured height and any remaining height reduction must be absorbed by flexible siblings such as throughput plots.
@@ -224,6 +225,7 @@ While moving, show an overlay in the top-left corner with:
 ### Visual elements
 
 - Circular gauges for CPU/GPU load with a segmented ring drawn in the track color and only the load-sized leading segments overlaid in the shared usage color
+- CPU and GPU gauges within one resolved layout must render at the same fitted size, even when their surrounding cards have different available heights.
 - Horizontal usage bars with rounded leading and trailing ends, with the straight middle section shrinking naturally to zero so empty values collapse to a circle the height of the bar
 - Mini graphs for network and storage throughput activity
 - Clean, minimal headers

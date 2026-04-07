@@ -97,6 +97,7 @@ private:
     struct ResolvedDashboardLayout {
         int windowWidth = 800;
         int windowHeight = 480;
+        int globalGaugeRadius = 0;
         std::vector<ResolvedCardLayout> cards;
     };
 
@@ -148,6 +149,7 @@ private:
     bool ResolveLayout();
     void ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets);
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
+    int GaugeRadiusForRect(const RECT& rect) const;
     int EffectiveHeaderHeight() const;
     int EffectiveMetricRowHeight() const;
     int EffectiveDriveHeaderHeight() const;

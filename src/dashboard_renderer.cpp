@@ -698,6 +698,14 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
     return 0;
 }
 
+int DashboardRenderer::GaugeRadiusForRect(const RECT& rect) const {
+    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
+    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    const int outerPadding = std::max(0, ScaleLogical(config_.layout.gauge.outerPadding));
+    const int fittedRadius = std::max(1, std::min(width, height) / 2 - outerPadding);
+    return fittedRadius;
+}
+
 DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const {
     ResolvedWidgetLayout widget;
     widget.rect = rect;
@@ -1007,6 +1015,29 @@ bool DashboardRenderer::ResolveLayout() {
         lastError_ = "renderer:layout_resolve_failed cards=0 root=\"" + config_.layout.structure.cardsLayout.name + "\"";
         return false;
     }
+
+    int gaugeCount = 0;
+    int globalGaugeRadius = 0;
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            if (widget.kind != WidgetKind::Gauge) {
+                continue;
+            }
+
+            const int gaugeRadius = GaugeRadiusForRect(widget.rect);
+            if (gaugeCount == 0) {
+                globalGaugeRadius = gaugeRadius;
+            } else {
+                globalGaugeRadius = std::min(globalGaugeRadius, gaugeRadius);
+            }
+            ++gaugeCount;
+        }
+    }
+    resolvedLayout_.globalGaugeRadius = gaugeCount > 0 ? globalGaugeRadius :
+        std::max(1, ScaleLogical(config_.layout.gauge.minRadius));
+    WriteTrace("renderer:layout_global_gauge_radius count=" + std::to_string(gaugeCount) +
+        " value=" + std::to_string(resolvedLayout_.globalGaugeRadius));
+
     WriteTrace("renderer:layout_done cards=" + std::to_string(resolvedLayout_.cards.size()));
     return true;
 }
@@ -1385,9 +1416,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         const DashboardGaugeMetric gaugeMetric = metrics.ResolveGauge(widget.binding.metric);
         const int width = widget.rect.right - widget.rect.left;
         const int height = widget.rect.bottom - widget.rect.top;
-        const int radius = std::max(
-            std::max(1, ScaleLogical(config_.layout.gauge.minRadius)),
-            std::max(1, std::min(width, height) / 2 - std::max(0, ScaleLogical(config_.layout.gauge.outerPadding))));
+        const int radius = std::min(std::max(1, resolvedLayout_.globalGaugeRadius), GaugeRadiusForRect(widget.rect));
         DrawGauge(hdc, widget.rect.left + width / 2, widget.rect.top + height / 2, radius, gaugeMetric, "Load");
         return;
     }
