@@ -85,7 +85,9 @@ Supported geometry keys:
 - `card_padding = pixels`
 - `card_radius = pixels`
 - `card_border = pixels`
-- `header = height,icon_size,icon_gap`
+- `header_height = pixels`
+- `header_icon_size = pixels`
+- `header_gap = pixels`
 - `content_gap = pixels`
 - `column_gap = pixels`
 - `widget_line_gap = pixels`
@@ -261,7 +263,7 @@ Shared absolute geometry belongs only in `[layout]`, including:
 - row and card gaps
 - border radius and border width
 - card padding
-- header metrics
+- header height, icon size, and icon gap
 - shared content spacing
 - `widget_line_gap`
 - colors and fonts

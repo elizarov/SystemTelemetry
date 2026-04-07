@@ -128,17 +128,6 @@ bool ParseIntPair(const std::string& value, int& first, int& second) {
     return true;
 }
 
-bool ParseIntTriple(const std::string& value, int& first, int& second, int& third) {
-    const std::vector<std::string> parts = Split(value, ',');
-    if (parts.size() != 3) {
-        return false;
-    }
-    first = ParseIntOrDefault(parts[0], first);
-    second = ParseIntOrDefault(parts[1], second);
-    third = ParseIntOrDefault(parts[2], third);
-    return true;
-}
-
 void ParseFontSpec(UiFontConfig& font, const std::string& value) {
     const std::vector<std::string> parts = Split(value, ',');
     if (parts.size() != 3) {
@@ -416,8 +405,12 @@ void ApplyLayoutValue(LayoutConfig& layout, const std::string& key, const std::s
         layout.cardRadius = ParseIntOrDefault(value, layout.cardRadius);
     } else if (key == "card_border") {
         layout.cardBorderWidth = ParseIntOrDefault(value, layout.cardBorderWidth);
-    } else if (key == "header") {
-        ParseIntTriple(value, layout.headerHeight, layout.headerIconSize, layout.headerGap);
+    } else if (key == "header_height") {
+        layout.headerHeight = ParseIntOrDefault(value, layout.headerHeight);
+    } else if (key == "header_icon_size") {
+        layout.headerIconSize = ParseIntOrDefault(value, layout.headerIconSize);
+    } else if (key == "header_gap") {
+        layout.headerGap = ParseIntOrDefault(value, layout.headerGap);
     } else if (key == "content_gap") {
         layout.contentGap = ParseIntOrDefault(value, layout.contentGap);
     } else if (key == "column_gap") {
