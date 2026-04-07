@@ -114,10 +114,13 @@ bool ContainsInsensitive(const std::string& value, const std::string& needle) {
 std::filesystem::path GetRuntimeConfigPath();
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    double scale, std::ostream* traceStream = nullptr, std::string* errorText = nullptr);
+    double scale, DashboardRenderer::RenderMode renderMode, std::ostream* traceStream = nullptr,
+    std::string* errorText = nullptr);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
 
 DiagnosticsOptions GetDiagnosticsOptions();
+bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
+DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options);
 
 class DiagnosticsSession {
 public:
@@ -431,6 +434,10 @@ std::optional<double> GetScaleSwitchValue() {
     return std::nullopt;
 }
 
+DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options) {
+    return options.blank ? DashboardRenderer::RenderMode::Blank : DashboardRenderer::RenderMode::Normal;
+}
+
 DiagnosticsOptions GetDiagnosticsOptions() {
     DiagnosticsOptions options;
     options.trace = HasSwitch("/trace");
@@ -438,6 +445,7 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.screenshot = HasSwitch("/screenshot");
     options.exit = HasSwitch("/exit");
     options.fake = HasSwitch("/fake");
+    options.blank = HasSwitch("/blank");
     options.reload = HasSwitch("/reload");
     if (const auto scale = GetScaleSwitchValue(); scale.has_value()) {
         options.scale = *scale;
@@ -459,6 +467,16 @@ DiagnosticsOptions GetDiagnosticsOptions() {
         options.fakePath = *fakePath;
     }
     return options;
+}
+
+bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
+    if (options.blank && options.fake) {
+        if (!options.trace) {
+            MessageBoxW(nullptr, L"/blank cannot be used together with /fake.", L"System Telemetry", MB_ICONERROR);
+        }
+        return false;
+    }
+    return true;
 }
 
 DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options) : options_(options) {}
@@ -523,7 +541,8 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
 
     std::string screenshotError;
     if (options_.screenshot && !SaveDumpScreenshot(
-            screenshotPath_, dump.snapshot, config, options_.exit ? options_.scale : 1.0, TraceStream(), &screenshotError)) {
+            screenshotPath_, dump.snapshot, config, options_.exit ? options_.scale : 1.0,
+            GetDiagnosticsRenderMode(options_), TraceStream(), &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
         std::string traceText = "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
@@ -1296,6 +1315,7 @@ void DashboardApp::SaveScreenshotAs() {
             telemetry_->Dump().snapshot,
             telemetry_->EffectiveConfig(),
             1.0,
+            GetDiagnosticsRenderMode(diagnosticsOptions_),
             diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
             &errorText)) {
         std::string message = "Failed to save screenshot:\n" + Utf8FromWide(path->wstring());
@@ -1323,10 +1343,11 @@ void DashboardApp::ToggleAutoStart() {
 }
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    double scale, std::ostream* traceStream, std::string* errorText) {
+    double scale, DashboardRenderer::RenderMode renderMode, std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
     renderer.SetConfig(config);
     renderer.SetRenderScale(scale);
+    renderer.SetRenderMode(renderMode);
     renderer.SetTraceOutput(traceStream);
     if (!renderer.Initialize()) {
         if (errorText != nullptr) {
@@ -1831,6 +1852,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         if (_wcsicmp(autoStartSetting->c_str(), L"off") == 0) {
             return RunElevatedAutoStartMode(false);
         }
+        return 2;
+    }
+
+    if (!ValidateDiagnosticsOptions(diagnosticsOptions)) {
         return 2;
     }
 

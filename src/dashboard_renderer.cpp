@@ -387,6 +387,10 @@ void DashboardRenderer::SetRenderScale(double scale) {
     renderScale_ = std::clamp(scale, 0.1, 16.0);
 }
 
+void DashboardRenderer::SetRenderMode(RenderMode mode) {
+    renderMode_ = mode;
+}
+
 double DashboardRenderer::RenderScale() const {
     return renderScale_;
 }
@@ -985,25 +989,27 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const Das
         FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
             segmentThickness, slotStart, segmentSweep, trackColor);
 
-        if (i < filledSegments) {
+        if (renderMode_ != RenderMode::Blank && i < filledSegments) {
             FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
                 segmentThickness, slotStart, segmentSweep, usageColor);
         }
 
-        if (i == peakSegment) {
+        if (renderMode_ != RenderMode::Blank && i == peakSegment) {
             FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
                 segmentThickness, slotStart, segmentSweep, ghostColor);
         }
     }
 
     const int halfWidth = std::max(1, ScaleLogical(config_.layout.gauge.textHalfWidth));
-    RECT numberRect{cx - halfWidth,
-        cy - ScaleLogical(config_.layout.gauge.valueTop),
-        cx + halfWidth,
-        cy + ScaleLogical(config_.layout.gauge.valueBottom)};
-    char number[16];
-    sprintf_s(number, "%.0f%%", metric.percent);
-    DrawTextBlock(hdc, numberRect, number, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    if (renderMode_ != RenderMode::Blank) {
+        RECT numberRect{cx - halfWidth,
+            cy - ScaleLogical(config_.layout.gauge.valueTop),
+            cx + halfWidth,
+            cy + ScaleLogical(config_.layout.gauge.valueBottom)};
+        char number[16];
+        sprintf_s(number, "%.0f%%", metric.percent);
+        DrawTextBlock(hdc, numberRect, number, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    }
     RECT labelRect{cx - halfWidth,
         cy + ScaleLogical(config_.layout.gauge.labelTop),
         cx + halfWidth,
@@ -1011,12 +1017,16 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const Das
     DrawTextBlock(hdc, labelRect, label, fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 }
 
-void DashboardRenderer::DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio) {
+void DashboardRenderer::DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
     FillCapsule(hdc, rect, ToColorRef(config_.layout.trackColor), 255);
 
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
     if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    if (!drawFill) {
         return;
     }
 
@@ -1046,13 +1056,15 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const Dashboard
     RECT labelRect{rect.left, rect.top, std::min(rect.right, rect.left + labelWidth), rect.bottom};
     RECT valueRect{std::min(rect.right, labelRect.right + valueGap), rect.top, rect.right, rect.bottom};
     DrawTextBlock(hdc, labelRect, row.label, fonts_.label, MutedTextColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, valueRect, row.valueText, fonts_.value, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    if (renderMode_ != RenderMode::Blank) {
+        DrawTextBlock(hdc, valueRect, row.valueText, fonts_.value, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    }
 
     const int metricBarHeight = std::max(1, ScaleLogical(config_.layout.metricList.barHeight));
     const int barBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(rect.top) + rowHeight);
     const int barTop = std::max(static_cast<int>(rect.top), barBottom - metricBarHeight);
     RECT barRect{valueRect.left, barTop, rect.right, barBottom};
-    DrawPillBar(hdc, barRect, row.ratio, row.peakRatio);
+    DrawPillBar(hdc, barRect, row.ratio, row.peakRatio, renderMode_ != RenderMode::Blank);
 }
 
 void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
@@ -1111,7 +1123,13 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     char maxLabel[32];
     sprintf_s(maxLabel, "%.0f", maxValue);
     RECT maxRect{rect.left, rect.top, rect.left + axisWidth, graphTop};
-    DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    if (renderMode_ != RenderMode::Blank) {
+        DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    }
+
+    if (renderMode_ == RenderMode::Blank) {
+        return;
+    }
 
     const COLORREF plotColor = AccentColor();
     HPEN pen = CreatePen(PS_SOLID, plotStrokeWidth, plotColor);
@@ -1162,7 +1180,9 @@ void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const Da
         sprintf_s(buffer, "%.1f MB/s", metric.valueMbps);
     }
     DrawTextBlock(hdc, labelRect, metric.label, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, numberRect, buffer, fonts_.smallFont, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+    if (renderMode_ != RenderMode::Blank) {
+        DrawTextBlock(hdc, numberRect, buffer, fonts_.smallFont, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+    }
     DrawGraph(hdc, graphRect, metric.history, metric.maxGraph, metric.guideStepMbps,
         metric.timeMarkerOffsetSamples, metric.timeMarkerIntervalSamples);
 }
@@ -1230,16 +1250,20 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
         };
 
         DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        DrawSegmentIndicator(hdc, readIndicatorRect, activitySegments, activitySegmentGap, drive.readActivity,
+        DrawSegmentIndicator(hdc, readIndicatorRect, activitySegments, activitySegmentGap,
+            renderMode_ == RenderMode::Blank ? 0.0 : drive.readActivity,
             ToColorRef(config_.layout.trackColor), AccentColor());
-        DrawSegmentIndicator(hdc, writeIndicatorRect, activitySegments, activitySegmentGap, drive.writeActivity,
+        DrawSegmentIndicator(hdc, writeIndicatorRect, activitySegments, activitySegmentGap,
+            renderMode_ == RenderMode::Blank ? 0.0 : drive.writeActivity,
             ToColorRef(config_.layout.trackColor), AccentColor());
-        DrawPillBar(hdc, barRect, drive.usedPercent / 100.0, std::nullopt);
+        DrawPillBar(hdc, barRect, drive.usedPercent / 100.0, std::nullopt, renderMode_ != RenderMode::Blank);
 
-        char percent[16];
-        sprintf_s(percent, "%.0f%%", drive.usedPercent);
-        DrawTextBlock(hdc, pctRect, percent, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        DrawTextBlock(hdc, freeRect, drive.freeText, fonts_.smallFont, MutedTextColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+        if (renderMode_ != RenderMode::Blank) {
+            char percent[16];
+            sprintf_s(percent, "%.0f%%", drive.usedPercent);
+            DrawTextBlock(hdc, pctRect, percent, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+            DrawTextBlock(hdc, freeRect, drive.freeText, fonts_.smallFont, MutedTextColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+        }
 
         OffsetRect(&row, 0, rowHeight);
         row.bottom = std::min(rect.bottom, row.top + rowHeight);
@@ -1282,8 +1306,10 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         DrawThroughputWidget(hdc, widget.rect, metrics.ResolveThroughput(widget.binding.metric));
         return;
     case WidgetKind::NetworkFooter:
-        DrawTextBlock(hdc, widget.rect, metrics.ResolveNetworkFooter(), fonts_.smallFont, ForegroundColor(),
-            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        if (renderMode_ != RenderMode::Blank) {
+            DrawTextBlock(hdc, widget.rect, metrics.ResolveNetworkFooter(), fonts_.smallFont, ForegroundColor(),
+                DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        }
         return;
     case WidgetKind::Spacer:
         return;
@@ -1291,12 +1317,16 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         DrawDriveUsageWidget(hdc, widget.rect, metrics.ResolveDriveRows(Split(widget.binding.param, ',')));
         return;
     case WidgetKind::ClockTime:
-        DrawTextBlock(hdc, widget.rect, metrics.ResolveClockTime(), fonts_.big, ForegroundColor(),
-            DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        if (renderMode_ != RenderMode::Blank) {
+            DrawTextBlock(hdc, widget.rect, metrics.ResolveClockTime(), fonts_.big, ForegroundColor(),
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        }
         return;
     case WidgetKind::ClockDate:
-        DrawTextBlock(hdc, widget.rect, metrics.ResolveClockDate(), fonts_.value, MutedTextColor(),
-            DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        if (renderMode_ != RenderMode::Blank) {
+            DrawTextBlock(hdc, widget.rect, metrics.ResolveClockDate(), fonts_.value, MutedTextColor(),
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        }
         return;
     default:
         return;

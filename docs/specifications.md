@@ -72,6 +72,7 @@ Examples include:
 - The layout language must support a top-aligned stack mode that packs children at their preferred heights and leaves any remaining space below them, so lists such as drive usage rows do not have to stretch to fill the whole card column.
 - The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
 - Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
+- The renderer must support a blank rendering mode that preserves panel chrome, card titles, card icons, CPU and GPU names, drive labels, and empty chart or bar tracks while omitting dynamic metric text, time, date, plot lines, chart leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 
 ### Runtime actions tied to config
 

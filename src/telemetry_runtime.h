@@ -13,6 +13,7 @@ struct DiagnosticsOptions {
     bool screenshot = false;
     bool exit = false;
     bool fake = false;
+    bool blank = false;
     bool reload = false;
     double scale = 1.0;
     std::filesystem::path tracePath;

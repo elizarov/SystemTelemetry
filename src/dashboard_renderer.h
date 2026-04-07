@@ -25,11 +25,17 @@ class Bitmap;
 
 class DashboardRenderer {
 public:
+    enum class RenderMode {
+        Normal,
+        Blank,
+    };
+
     DashboardRenderer();
     ~DashboardRenderer();
 
     void SetConfig(const AppConfig& config);
     void SetRenderScale(double scale);
+    void SetRenderMode(RenderMode mode);
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
@@ -118,7 +124,7 @@ private:
     void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
-    void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio);
+    void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
     void DrawGauge(HDC hdc, int cx, int cy, int radius, const DashboardGaugeMetric& metric, const std::string& label);
     void DrawMetricRow(HDC hdc, const RECT& rect, const DashboardMetricRow& row);
     void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue, double guideStepMbps,
@@ -152,4 +158,5 @@ private:
     ResolvedDashboardLayout resolvedLayout_{};
     std::string lastError_;
     double renderScale_ = 1.0;
+    RenderMode renderMode_ = RenderMode::Normal;
 };
