@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <utility>
 
 namespace configschema {
 
@@ -71,11 +72,73 @@ struct DynamicSectionDescriptor {
 
 }  // namespace configschema
 
-#define CONFIG_FIELD(owner, member, key, codec) \
-    configschema::FieldDescriptor<owner, decltype(owner::member), key, &owner::member, codec>
+namespace configschema {
 
-#define CONFIG_SECTION(owner, name, ...) \
-    using Section = configschema::SectionDescriptor<name, owner, __VA_ARGS__>
+template <typename Owner, size_t Index>
+struct FieldTag {};
 
-#define CONFIG_DYNAMIC_SECTION(owner, prefix, ...) \
-    using Section = configschema::DynamicSectionDescriptor<prefix, owner, __VA_ARGS__>
+template <typename Owner, size_t Index>
+concept HasReflectedField = requires {
+    reflect_field(FieldTag<Owner, Index>{});
+};
+
+template <typename Owner, size_t Index = 0>
+consteval size_t CountReflectedFields() {
+    if constexpr (HasReflectedField<Owner, Index>) {
+        return CountReflectedFields<Owner, Index + 1>();
+    } else {
+        return Index;
+    }
+}
+
+template <typename Owner, size_t... Index>
+consteval auto MakeReflectedFieldTuple(std::index_sequence<Index...>) {
+    return std::tuple{reflect_field(FieldTag<Owner, Index>{})...};
+}
+
+template <FixedString Name, typename Owner>
+struct AutoSectionDescriptor {
+    using owner_type = Owner;
+
+    static constexpr auto name = Name;
+    static constexpr auto fields = MakeReflectedFieldTuple<Owner>(std::make_index_sequence<CountReflectedFields<Owner>()>{});
+};
+
+template <FixedString Prefix, typename Owner>
+struct AutoDynamicSectionDescriptor {
+    using owner_type = Owner;
+
+    static constexpr auto prefix = Prefix;
+    static constexpr auto fields = MakeReflectedFieldTuple<Owner>(std::make_index_sequence<CountReflectedFields<Owner>()>{});
+
+    static constexpr bool Matches(std::string_view sectionName) {
+        return sectionName.rfind(prefix.view(), 0) == 0;
+    }
+
+    static constexpr std::string_view Suffix(std::string_view sectionName) {
+        return Matches(sectionName) ? sectionName.substr(prefix.view().size()) : std::string_view{};
+    }
+
+    static std::string FormatName(std::string_view suffix) {
+        return "[" + std::string(prefix.view()) + std::string(suffix) + "]";
+    }
+};
+
+}  // namespace configschema
+
+#define CONFIG_REFLECTED_STRUCT(owner) \
+private: \
+    static constexpr std::size_t _configschema_field_base = __COUNTER__; \
+public:
+
+#define CONFIG_VALUE(owner, type, member, key, codec) \
+    type member{}; \
+    friend consteval auto reflect_field(configschema::FieldTag<owner, __COUNTER__ - owner::_configschema_field_base - 1>) { \
+        return configschema::FieldDescriptor<owner, type, key, &owner::member, codec>{}; \
+    }
+
+#define CONFIG_AUTO_SECTION(owner, name) \
+    using Section = configschema::AutoSectionDescriptor<name, owner>
+
+#define CONFIG_AUTO_DYNAMIC_SECTION(owner, prefix) \
+    using Section = configschema::AutoDynamicSectionDescriptor<prefix, owner>
