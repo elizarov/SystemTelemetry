@@ -129,16 +129,17 @@ struct AutoDynamicSectionDescriptor {
 #define CONFIG_REFLECTED_STRUCT(owner) \
 private: \
     static constexpr std::size_t _configschema_field_base = __COUNTER__; \
+    using Self = owner; \
 public:
 
-#define CONFIG_VALUE(owner, type, member, key, codec) \
+#define CONFIG_VALUE(type, member, key, codec) \
     type member{}; \
-    friend consteval auto reflect_field(configschema::FieldTag<owner, __COUNTER__ - owner::_configschema_field_base - 1>) { \
-        return configschema::FieldDescriptor<owner, type, key, &owner::member, codec>{}; \
+    friend consteval auto reflect_field(configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) { \
+        return configschema::FieldDescriptor<Self, type, key, &Self::member, codec>{}; \
     }
 
-#define CONFIG_AUTO_SECTION(owner, name) \
-    using Section = configschema::AutoSectionDescriptor<name, owner>
+#define CONFIG_SECTION(name) \
+    using Section = configschema::AutoSectionDescriptor<name, Self>
 
-#define CONFIG_AUTO_DYNAMIC_SECTION(owner, prefix) \
-    using Section = configschema::AutoDynamicSectionDescriptor<prefix, owner>
+#define CONFIG_DYNAMIC_SECTION(prefix) \
+    using Section = configschema::AutoDynamicSectionDescriptor<prefix, Self>
