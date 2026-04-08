@@ -52,6 +52,17 @@ struct NetworkConfig {
     CONFIG_SECTION("network");
 };
 
+struct BoardConfig {
+    CONFIG_REFLECTED_STRUCT(BoardConfig)
+    CONFIG_SECTION("board");
+
+    std::vector<std::string> requestedTemperatureNames;
+    std::vector<std::string> requestedFanNames;
+    std::unordered_map<std::string, std::string> temperatureSensorNames;
+    std::unordered_map<std::string, std::string> fanSensorNames;
+};
+CONFIG_SECTION_CODEC(BoardConfig, configschema::BoardSectionCodec);
+
 struct DashboardSectionConfig {
     CONFIG_REFLECTED_STRUCT(DashboardSectionConfig)
     CONFIG_VALUE(int, outerMargin, "outer_margin");
@@ -242,14 +253,11 @@ struct AppConfig {
     CONFIG_REFLECTED_BINDINGS(AppConfig)
     CONFIG_SECTION_VALUE(DisplayConfig, display);
     CONFIG_SECTION_VALUE(NetworkConfig, network);
+    CONFIG_SECTION_VALUE(BoardConfig, board);
     CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
     CONFIG_BINDING_LIST();
 
     std::vector<std::string> driveLetters;
-    std::vector<std::string> boardTemperatureNames;
-    std::vector<std::string> boardFanNames;
-    std::unordered_map<std::string, std::string> boardTemperatureSensorNames;
-    std::unordered_map<std::string, std::string> boardFanSensorNames;
     std::vector<NamedLayoutSectionConfig> layouts;
     LayoutConfig layout;
 };

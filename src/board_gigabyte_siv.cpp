@@ -419,8 +419,8 @@ public:
     BoardVendorTelemetrySample Sample() override {
         BoardVendorTelemetrySample sample;
         sample.providerName = "Gigabyte";
-        sample.requestedFanNames = config_.boardFanNames;
-        sample.requestedTemperatureNames = config_.boardTemperatureNames;
+        sample.requestedFanNames = config_.board.requestedFanNames;
+        sample.requestedTemperatureNames = config_.board.requestedTemperatureNames;
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
         sample.driverLibrary = loadedLibrary_;
@@ -460,16 +460,16 @@ public:
 
 private:
     std::string ResolveTemperatureSensorName(const std::string& logicalName) const {
-        const auto it = config_.boardTemperatureSensorNames.find(logicalName);
-        if (it != config_.boardTemperatureSensorNames.end() && !it->second.empty()) {
+        const auto it = config_.board.temperatureSensorNames.find(logicalName);
+        if (it != config_.board.temperatureSensorNames.end() && !it->second.empty()) {
             return it->second;
         }
         return logicalName;
     }
 
     std::string ResolveFanSensorName(const std::string& logicalName) const {
-        const auto it = config_.boardFanSensorNames.find(logicalName);
-        if (it != config_.boardFanSensorNames.end() && !it->second.empty()) {
+        const auto it = config_.board.fanSensorNames.find(logicalName);
+        if (it != config_.board.fanSensorNames.end() && !it->second.empty()) {
             return it->second;
         }
         return logicalName;
@@ -491,8 +491,8 @@ private:
 
     std::vector<NamedScalarMetric> BuildRequestedTemperatures() const {
         std::vector<NamedScalarMetric> metrics;
-        metrics.reserve(config_.boardTemperatureNames.size());
-        for (const auto& requestedName : config_.boardTemperatureNames) {
+        metrics.reserve(config_.board.requestedTemperatureNames.size());
+        for (const auto& requestedName : config_.board.requestedTemperatureNames) {
             NamedScalarMetric metric;
             metric.name = requestedName;
             metric.metric.unit = "\xC2\xB0""C";
@@ -508,8 +508,8 @@ private:
 
     std::vector<NamedScalarMetric> BuildRequestedFans() const {
         std::vector<NamedScalarMetric> metrics;
-        metrics.reserve(config_.boardFanNames.size());
-        for (const auto& requestedName : config_.boardFanNames) {
+        metrics.reserve(config_.board.requestedFanNames.size());
+        for (const auto& requestedName : config_.board.requestedFanNames) {
             NamedScalarMetric metric;
             metric.name = requestedName;
             metric.metric.unit = "RPM";

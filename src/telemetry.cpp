@@ -344,8 +344,8 @@ TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept
 bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* traceStream) {
     impl_->config_ = config;
     impl_->trace_.SetOutput(traceStream);
-    impl_->snapshot_.boardTemperatures = CreateRequestedBoardMetrics(config.boardTemperatureNames, "\xC2\xB0""C");
-    impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(config.boardFanNames, "RPM");
+    impl_->snapshot_.boardTemperatures = CreateRequestedBoardMetrics(config.board.requestedTemperatureNames, "\xC2\xB0""C");
+    impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(config.board.requestedFanNames, "RPM");
     impl_->snapshot_.retainedHistories.clear();
     impl_->snapshot_.retainedHistoryIndexByRef.clear();
     if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {

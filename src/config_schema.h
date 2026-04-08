@@ -31,9 +31,16 @@ struct LogicalSizeCodec {};
 struct HexColorCodec {};
 struct FontSpecCodec {};
 struct LayoutExpressionCodec {};
+struct StructuredSectionCodec {};
+struct BoardSectionCodec {};
 
 template <typename T>
 struct DefaultCodec;
+
+template <typename T>
+struct DefaultSectionCodec {
+    using codec_type = StructuredSectionCodec;
+};
 
 template <>
 struct DefaultCodec<int> {
@@ -160,6 +167,7 @@ consteval auto MakeReflectedBindingTuple(std::index_sequence<Index...>) {
 template <FixedString Name, typename Owner>
 struct AutoSectionDescriptor {
     using owner_type = Owner;
+    using codec_type = typename DefaultSectionCodec<Owner>::codec_type;
 
     static constexpr auto name = Name;
     static constexpr auto fields = MakeReflectedFieldTuple<Owner>(std::make_index_sequence<CountReflectedFields<Owner>()>{});
@@ -168,6 +176,7 @@ struct AutoSectionDescriptor {
 template <FixedString Prefix, typename Owner>
 struct AutoDynamicSectionDescriptor {
     using owner_type = Owner;
+    using codec_type = typename DefaultSectionCodec<Owner>::codec_type;
 
     static constexpr auto prefix = Prefix;
     static constexpr auto fields = MakeReflectedFieldTuple<Owner>(std::make_index_sequence<CountReflectedFields<Owner>()>{});
@@ -204,6 +213,12 @@ public:
 #define CONFIG_CODEC(value_type, codec) \
     template <> \
     struct configschema::DefaultCodec<value_type> { \
+        using codec_type = codec; \
+    }
+
+#define CONFIG_SECTION_CODEC(value_type, codec) \
+    template <> \
+    struct configschema::DefaultSectionCodec<value_type> { \
         using codec_type = codec; \
     }
 
