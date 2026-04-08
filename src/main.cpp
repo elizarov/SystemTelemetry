@@ -52,6 +52,8 @@ constexpr UINT kCommandAutoStart = 1008;
 constexpr UINT kCommandSaveFullConfigAs = 1009;
 constexpr UINT kCommandLayoutBase = 1100;
 constexpr UINT kCommandLayoutMax = 1199;
+constexpr UINT kCommandNetworkAdapterBase = 1200;
+constexpr UINT kCommandNetworkAdapterMax = 1299;
 constexpr UINT kCommandConfigureDisplayBase = 2000;
 constexpr UINT kCommandConfigureDisplayMax = 2099;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
@@ -953,12 +955,29 @@ struct LayoutMenuOption {
     std::string name;
 };
 
+struct NetworkMenuOption {
+    UINT commandId = 0;
+    std::string adapterName;
+    std::string ipAddress;
+    bool selected = false;
+};
+
 void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
     MENUITEMINFOW info{};
     info.cbSize = sizeof(info);
     info.fMask = MIIM_FTYPE;
     info.fType = MFT_RADIOCHECK;
     SetMenuItemInfoW(menu, commandId, FALSE, &info);
+}
+
+std::string FormatNetworkFooterText(const std::string& adapterName, const std::string& ipAddress) {
+    if (adapterName.empty()) {
+        return ipAddress;
+    }
+    if (ipAddress.empty()) {
+        return adapterName;
+    }
+    return adapterName + " | " + ipAddress;
 }
 
 std::string SimplifyDeviceName(const std::string& deviceName) {
@@ -1327,6 +1346,7 @@ private:
     bool ApplyConfiguredWallpaper();
     bool ConfigureDisplay(const DisplayMenuOption& option);
     bool SwitchLayout(const std::string& layoutName);
+    void SelectNetworkAdapter(const NetworkMenuOption& option);
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     UINT CurrentWindowDpi() const;
@@ -1372,6 +1392,7 @@ private:
     bool placementWatchActive_ = false;
     std::vector<DisplayMenuOption> configDisplayOptions_;
     std::vector<LayoutMenuOption> layoutMenuOptions_;
+    std::vector<NetworkMenuOption> networkMenuOptions_;
 };
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -1885,6 +1906,13 @@ bool DashboardApp::SwitchLayout(const std::string& layoutName) {
     return true;
 }
 
+void DashboardApp::SelectNetworkAdapter(const NetworkMenuOption& option) {
+    config_.network.adapterName = option.adapterName;
+    telemetry_->SetPreferredNetworkAdapterName(option.adapterName);
+    telemetry_->UpdateSnapshot();
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
     const std::filesystem::path configPath = GetRuntimeConfigPath();
     AppConfig config = BuildCurrentConfigForSaving();
@@ -2013,6 +2041,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU menu = CreatePopupMenu();
     HMENU diagnosticsMenu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
+    HMENU networkMenu = CreatePopupMenu();
     HMENU configureDisplayMenu = CreatePopupMenu();
     const UINT autoStartFlags = MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     layoutMenuOptions_.clear();
@@ -2030,6 +2059,26 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
             const UINT flags = MF_STRING | (config_.display.layout == option.name ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(layoutMenu, flags, option.commandId, label.c_str());
             SetMenuItemRadioStyle(layoutMenu, option.commandId);
+        }
+    }
+    networkMenuOptions_.clear();
+    const auto& networkCandidates = telemetry_->NetworkAdapterCandidates();
+    for (size_t i = 0; i < networkCandidates.size() && (kCommandNetworkAdapterBase + i) <= kCommandNetworkAdapterMax; ++i) {
+        NetworkMenuOption option;
+        option.commandId = kCommandNetworkAdapterBase + static_cast<UINT>(i);
+        option.adapterName = networkCandidates[i].adapterName;
+        option.ipAddress = networkCandidates[i].ipAddress;
+        option.selected = networkCandidates[i].selected;
+        networkMenuOptions_.push_back(std::move(option));
+    }
+    if (networkMenuOptions_.empty()) {
+        AppendMenuW(networkMenu, MF_STRING | MF_GRAYED, kCommandNetworkAdapterBase, L"No adapters found");
+    } else {
+        for (const auto& option : networkMenuOptions_) {
+            const std::wstring label = WideFromUtf8(FormatNetworkFooterText(option.adapterName, option.ipAddress));
+            const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuW(networkMenu, flags, option.commandId, label.c_str());
+            SetMenuItemRadioStyle(networkMenu, option.commandId);
         }
     }
     configDisplayOptions_ = EnumerateDisplayMenuOptions(config_);
@@ -2051,6 +2100,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), L"Layout");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), L"Network");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), L"Config To Display");
     AppendMenuW(menu, autoStartFlags, kCommandAutoStart, L"Auto-start on user logon");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(diagnosticsMenu), L"Diagnostics");
@@ -2097,6 +2147,14 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
                 [selected](const LayoutMenuOption& option) { return option.commandId == selected; });
             if (it != layoutMenuOptions_.end() && !SwitchLayout(it->name)) {
                 MessageBoxW(hwnd_, L"Failed to switch layout.", L"System Telemetry", MB_ICONERROR);
+            }
+            break;
+        }
+        if (selected >= kCommandNetworkAdapterBase && selected <= kCommandNetworkAdapterMax) {
+            const auto it = std::find_if(networkMenuOptions_.begin(), networkMenuOptions_.end(),
+                [selected](const NetworkMenuOption& option) { return option.commandId == selected; });
+            if (it != networkMenuOptions_.end()) {
+                SelectNetworkAdapter(*it);
             }
             break;
         }

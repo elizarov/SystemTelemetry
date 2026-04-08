@@ -51,8 +51,16 @@ public:
         return config_;
     }
 
+    const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
+        return networkAdapterCandidates_;
+    }
+
     void SetEffectiveConfig(const AppConfig& config) override {
         config_ = config;
+    }
+
+    void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
+        config_.network.adapterName = adapterName;
     }
 
     void UpdateSnapshot() override {
@@ -97,6 +105,7 @@ private:
     bool showDialogs_ = true;
     AppConfig config_;
     TelemetryDump dump_{};
+    std::vector<NetworkAdapterCandidate> networkAdapterCandidates_;
     tracing::Trace trace_;
     std::chrono::steady_clock::time_point lastReload_{};
 };

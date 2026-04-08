@@ -54,6 +54,12 @@ struct NetworkTelemetry {
     std::string ipAddress = "N/A";
 };
 
+struct NetworkAdapterCandidate {
+    std::string adapterName;
+    std::string ipAddress = "N/A";
+    bool selected = false;
+};
+
 struct StorageTelemetry {
     double readMbps = 0.0;
     double writeMbps = 0.0;
@@ -106,6 +112,8 @@ public:
     const SystemSnapshot& Snapshot() const;
     TelemetryDump Dump() const;
     AppConfig EffectiveConfig() const;
+    const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const;
+    void SetPreferredNetworkAdapterName(std::string adapterName);
     void UpdateSnapshot();
     void WriteDump(std::ostream& output) const;
 

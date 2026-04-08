@@ -29,8 +29,17 @@ public:
         return config;
     }
 
+    const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
+        return telemetry_.NetworkAdapterCandidates();
+    }
+
     void SetEffectiveConfig(const AppConfig& config) override {
         effectiveConfig_ = config;
+    }
+
+    void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
+        effectiveConfig_.network.adapterName = adapterName;
+        telemetry_.SetPreferredNetworkAdapterName(adapterName);
     }
 
     void UpdateSnapshot() override {

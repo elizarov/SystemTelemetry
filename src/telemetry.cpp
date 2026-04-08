@@ -202,6 +202,11 @@ struct AdapterSelectionInfo {
     std::string ipAddress = "N/A";
 };
 
+struct NetworkCandidateState {
+    NetworkAdapterCandidate candidate;
+    ULONG interfaceIndex = 0;
+};
+
 bool AdapterMatchesRow(const IP_ADAPTER_ADDRESSES& adapter, const MIB_IF_ROW2& row) {
     return adapter.Luid.Value == row.InterfaceLuid.Value ||
         adapter.IfIndex == row.InterfaceIndex ||
@@ -288,6 +293,7 @@ struct TelemetryCollector::Impl {
 
     AppConfig config_;
     SystemSnapshot snapshot_;
+    std::vector<NetworkAdapterCandidate> networkAdapterCandidates_;
     tracing::Trace trace_;
     std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
     std::unique_ptr<BoardVendorTelemetryProvider> boardProvider_;
@@ -490,6 +496,14 @@ AppConfig TelemetryCollector::EffectiveConfig() const {
         config.network.adapterName = impl_->snapshot_.network.adapterName;
     }
     return config;
+}
+
+const std::vector<NetworkAdapterCandidate>& TelemetryCollector::NetworkAdapterCandidates() const {
+    return impl_->networkAdapterCandidates_;
+}
+
+void TelemetryCollector::SetPreferredNetworkAdapterName(std::string adapterName) {
+    impl_->config_.network.adapterName = std::move(adapterName);
 }
 
 void TelemetryCollector::UpdateSnapshot() {
@@ -911,6 +925,27 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
     MIB_IF_ROW2* selected = nullptr;
     uint64_t selectedTraffic = 0;
     AdapterSelectionInfo selectedInfo;
+    std::vector<NetworkCandidateState> candidates;
+    bool configuredCandidateAvailable = false;
+    if (!config_.network.adapterName.empty()) {
+        for (ULONG i = 0; i < table->NumEntries; ++i) {
+            const auto& row = table->Table[i];
+            if (row.Type == IF_TYPE_SOFTWARE_LOOPBACK || row.OperStatus != IfOperStatusUp) {
+                continue;
+            }
+            const AdapterSelectionInfo info = BuildAdapterSelectionInfo(row, addresses);
+            if (!info.hasIpv4) {
+                continue;
+            }
+            if (EqualsInsensitive(row.Alias, config_.network.adapterName) ||
+                EqualsInsensitive(row.Description, config_.network.adapterName) ||
+                ContainsInsensitive(row.Alias, config_.network.adapterName) ||
+                ContainsInsensitive(row.Description, config_.network.adapterName)) {
+                configuredCandidateAvailable = true;
+                break;
+            }
+        }
+    }
     for (ULONG i = 0; i < table->NumEntries; ++i) {
         auto& row = table->Table[i];
         if (row.Type == IF_TYPE_SOFTWARE_LOOPBACK || row.OperStatus != IfOperStatusUp) {
@@ -918,19 +953,22 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         }
 
         const bool configuredExactMatch =
-            !config_.network.adapterName.empty() &&
+            configuredCandidateAvailable &&
             (EqualsInsensitive(row.Alias, config_.network.adapterName) ||
                 EqualsInsensitive(row.Description, config_.network.adapterName));
         const bool configuredPartialMatch =
-            !config_.network.adapterName.empty() &&
+            configuredCandidateAvailable &&
             !configuredExactMatch &&
             (ContainsInsensitive(row.Alias, config_.network.adapterName) ||
                 ContainsInsensitive(row.Description, config_.network.adapterName));
-        if (!config_.network.adapterName.empty() && !configuredExactMatch && !configuredPartialMatch) {
+        if (configuredCandidateAvailable && !configuredExactMatch && !configuredPartialMatch) {
             continue;
         }
 
         const AdapterSelectionInfo info = BuildAdapterSelectionInfo(row, addresses);
+        if (!info.hasIpv4) {
+            continue;
+        }
         const uint64_t traffic = row.InOctets + row.OutOctets;
         const bool hardwareInterface = row.InterfaceAndOperStatusFlags.HardwareInterface != FALSE;
         const bool connectorPresent = row.InterfaceAndOperStatusFlags.ConnectorPresent != FALSE;
@@ -947,7 +985,14 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
             " traffic=" + std::to_string(traffic) +
             " ip=" + info.ipAddress).c_str());
 
-        if (config_.network.adapterName.empty()) {
+        NetworkCandidateState candidateState;
+        candidateState.interfaceIndex = row.InterfaceIndex;
+        candidateState.candidate.adapterName = Utf8FromWide(
+            row.Alias[0] != L'\0' ? std::wstring_view(row.Alias) : std::wstring_view(row.Description));
+        candidateState.candidate.ipAddress = info.ipAddress;
+        candidates.push_back(std::move(candidateState));
+
+        if (!configuredCandidateAvailable) {
             const bool candidatePreferred =
                 selected == nullptr ||
                 (info.hasGateway && !selectedInfo.hasGateway) ||
@@ -982,6 +1027,15 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
                 break;
             }
         }
+    }
+
+    networkAdapterCandidates_.clear();
+    networkAdapterCandidates_.reserve(candidates.size());
+    for (auto& candidate : candidates) {
+        if (selected != nullptr && candidate.interfaceIndex == selected->InterfaceIndex) {
+            candidate.candidate.selected = true;
+        }
+        networkAdapterCandidates_.push_back(std::move(candidate.candidate));
     }
 
     if (selected != nullptr) {

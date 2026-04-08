@@ -91,6 +91,9 @@ Examples include:
 
 - The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
 - The popup menu must provide a `Layout` submenu that lists every configured layout name, shows the active layout with a radio check, and on selection switches `display.layout`, reapplies the active named layout, and resizes the window immediately.
+- The popup menu must provide a `Network` submenu that lists every runtime network candidate with an IPv4 address, using the same `adapter name | IP address` footer text shown by the network footer widget.
+- The `Network` submenu must show a radio check on the adapter currently selected by the runtime selection flow, even when `network.adapter_name` is empty or no longer matches any current adapter.
+- Selecting a `Network` submenu item must set `network.adapter_name` to that adapter name and apply the selection immediately without restarting the app.
 - The popup menu must provide a `Config To Display` submenu that lists every currently enumerable display by friendly name plus physical resolution, enables only displays whose resolution matches the dashboard's DPI-scaled window size for that display, and on selection must set `display.monitor_name`, set `display.position` to `0,0`, render a blank dashboard image to `telemetry_blank.png` beside the executable, set `display.wallpaper` to `telemetry_blank.png`, save the updated `config.ini`, and immediately apply that wallpaper to the selected display.
 - The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
 - When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
@@ -98,6 +101,7 @@ Examples include:
 - When the current process cannot update that machine-wide `Run` entry directly, the auto-start toggle must prompt for elevation and complete the change through an elevated helper instance of the same executable.
 - When `network.adapter_name` is left empty, auto-selection should prefer the active adapter that best represents the routed connection, favoring adapters with a usable default gateway and IPv4 address over host-only or otherwise unrouted virtual adapters.
 - When `network.adapter_name` is set to a saved adapter name such as `Ethernet`, adapter selection should prefer an exact case-insensitive alias or description match and only fall back to substring matching when no exact match exists.
+- When `network.adapter_name` is set but does not match any current non-loopback, up adapter with an IPv4 address, runtime selection must fall back to the same auto-selection logic used when the setting is empty.
 - The layout bindings `board.temp.<name>` and `board.fan.<name>` must be the only source of truth for which logical named board metrics are requested at runtime.
 - The board provider must receive the set of requested logical board temperature and fan names by scanning all layout metric references that begin with `board.temp.` or `board.fan.`.
 - The `[board]` section must map each requested logical `board.temp.*` or `board.fan.*` metric name to the board-specific sensor title that the active board provider uses for lookup.
@@ -156,6 +160,7 @@ Add a popup menu on right-click with these actions:
 - Reload Config
 - Save Config
 - Layout
+- Network
 - Config To Display
 - Auto-start on user logon
 - Diagnostics
@@ -193,6 +198,7 @@ While moving, show an overlay in the top-left corner with:
 - Reload Config
 - Save Config
 - Layout
+- Network
 - Config To Display
 - Auto-start on user logon
 - Diagnostics
