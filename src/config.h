@@ -219,7 +219,6 @@ struct ClockDateWidgetConfig {
 
 struct LayoutConfig {
     CONFIG_REFLECTED_BINDINGS(LayoutConfig)
-    LayoutSectionConfig structure{};
     CONFIG_SECTION_VALUE(ColorConfig, colors);
     CONFIG_SECTION_VALUE(DashboardSectionConfig, dashboard);
     CONFIG_SECTION_VALUE(CardStyleConfig, cardStyle);
@@ -234,6 +233,7 @@ struct LayoutConfig {
     CONFIG_SECTION_VALUE(UiFontSetConfig, fonts);
     CONFIG_BINDING_LIST();
 
+    LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
     std::vector<LayoutCardConfig> cards;
 };
@@ -242,15 +242,16 @@ struct AppConfig {
     CONFIG_REFLECTED_BINDINGS(AppConfig)
     CONFIG_SECTION_VALUE(DisplayConfig, display);
     CONFIG_SECTION_VALUE(NetworkConfig, network);
+    CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
+    CONFIG_BINDING_LIST();
+
     std::vector<std::string> driveLetters;
     std::vector<std::string> boardTemperatureNames;
     std::vector<std::string> boardFanNames;
     std::unordered_map<std::string, std::string> boardTemperatureSensorNames;
     std::unordered_map<std::string, std::string> boardFanSensorNames;
-    CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
     std::vector<NamedLayoutSectionConfig> layouts;
     LayoutConfig layout;
-    CONFIG_BINDING_LIST();
 };
 
 std::string LoadEmbeddedConfigTemplate();
