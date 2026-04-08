@@ -7,6 +7,8 @@ This document is the single maintained source of truth for diagnostics command b
 - `/trace[:path]` enables continuous trace logging to `telemetry_trace.txt` in the current working directory, or to the optional target path.
 - `/dump[:path]` writes a machine-parseable snapshot dump to `telemetry_dump.txt` in the current working directory, or to the optional target path.
 - `/screenshot[:path]` writes a rendered dashboard PNG to `telemetry_screenshot.png` in the current working directory, or to the optional target path.
+- `/save-config[:path]` writes a minimal INI overlay to `telemetry_config.ini` in the current working directory, or to the optional target path.
+- `/save-full-config[:path]` writes a full embedded-template-shaped INI export to `telemetry_full_config.ini` in the current working directory, or to the optional target path.
 - `/reload` forces a config reload through the normal live-dashboard reload path before headless diagnostics outputs are exported.
 - `/exit` runs diagnostics as a one-shot headless export path instead of starting the dashboard UI.
 - `/fake[:path]` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` in the current working directory, or from the optional fake dump path.
@@ -18,15 +20,17 @@ This document is the single maintained source of truth for diagnostics command b
 
 ## Output files
 
-- Without an explicit path, `/trace`, `/dump`, and `/screenshot` write in the current working directory using their default filenames.
+- Without an explicit path, `/trace`, `/dump`, `/screenshot`, `/save-config`, and `/save-full-config` write in the current working directory using their default filenames.
 - With an explicit path, each switch writes the same content format to that requested path instead of the default file.
 - Without an explicit path, `/fake` reads `telemetry_fake.txt` from the current working directory.
 - With an explicit path, `/fake` reads that requested dump file instead of the default fake file.
 - Relative diagnostics paths resolve from the current working directory.
-- The UI `Diagnostics` submenu uses a standard Save dialog and defaults `Save dump to...` and `Save screenshot to...` to the current working directory with the same default file names used by `/dump` and `/screenshot`.
+- The UI `Diagnostics` submenu uses a standard Save dialog and defaults `Save full config to...`, `Save dump to...`, and `Save screenshot to...` to the current working directory with the same default file names used by `/save-full-config`, `/dump`, and `/screenshot`.
 - Trace output appends plain UTF-8 text without a BOM and uses the prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
 - Dump output overwrites with a stable text format that can be copied directly into the default fake file or a `/fake` target file.
 - Screenshot output overwrites with only the rendered dashboard PNG.
+- `/save-config` overwrites with only the changed live values relative to the target file's current loaded config state.
+- `/save-full-config` overwrites with the full embedded-template line structure updated to the live config values.
 
 ## Runtime behavior
 
@@ -43,7 +47,7 @@ This document is the single maintained source of truth for diagnostics command b
 
 - The diagnostics trace covers all diagnostics collection paths, not only vendor GPU integration.
 - Trace lines for telemetry or vendor API calls should include returned status or result codes plus key sampled values that help explain missing metrics or failures.
-- Diagnostics output failures such as trace, dump, or screenshot file-open or write failures must be written to the trace before any error dialog is shown.
+- Diagnostics output failures such as trace, dump, screenshot, or config-export file-open or write failures must be written to the trace before any error dialog is shown.
 - When `/trace` is enabled, diagnostics failures prefer trace logging over modal UI and complete with a failure exit code.
 - Required `/fake` load failures follow that same rule so `/fake /exit` returns promptly with trace output.
 - When the renderer initializes under `/trace`, the trace also includes measured font heights, computed layout heights, and resolved widget and card rectangles.
@@ -69,6 +73,7 @@ This document is the single maintained source of truth for diagnostics command b
 - When validation commands specify diagnostics paths explicitly, point them somewhere under `build\` so trace, dump, screenshot, and fake files do not pollute the repository root.
 - Verify UI-attached `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot`.
 - Verify headless `/trace /default-config /dump /screenshot /exit` and `/trace /default-config /reload /screenshot /exit` when validating the built-in config, and confirm the process exits after the requested export path.
+- Verify headless `/trace /default-config /layout:<name> /save-config /save-full-config /exit`, confirm the minimal config contains only the changed live overrides, and confirm the full config keeps the embedded template structure with updated live values.
 - Verify headless `/trace /blank /screenshot /exit`, and confirm the saved PNG keeps the blank background composition without dynamic metric content.
 - Verify one headless run that supplies explicit output filenames such as `/trace:custom_trace.txt`, `/dump:custom_dump.txt`, and `/screenshot:custom_screenshot.png`, and confirm only the requested paths are updated.
 - Verify one headless `/trace /default-config /layout:<name> /screenshot /exit` run when validating the built-in config, and confirm the screenshot and trace use the requested named layout without editing `config.ini`.

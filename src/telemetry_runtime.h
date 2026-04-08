@@ -16,15 +16,19 @@ struct DiagnosticsOptions {
     bool blank = false;
     bool reload = false;
     bool defaultConfig = false;
+    bool saveConfig = false;
+    bool saveFullConfig = false;
     double scale = 1.0;
     std::string layoutName;
     std::filesystem::path tracePath;
     std::filesystem::path dumpPath;
     std::filesystem::path screenshotPath;
+    std::filesystem::path saveConfigPath;
+    std::filesystem::path saveFullConfigPath;
     std::filesystem::path fakePath;
 
     bool HasAnyOutput() const {
-        return trace || dump || screenshot;
+        return trace || dump || screenshot || saveConfig || saveFullConfig;
     }
 };
 

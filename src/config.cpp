@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <set>
 #include <sstream>
@@ -273,6 +274,49 @@ void SaveDynamicStructuredSection(const typename Section::owner_type& owner, std
     }, Section::fields);
 }
 
+template <typename Section, typename CompareOwner, typename UpdateKeyFn>
+void SaveStructuredSectionDifferences(
+    const typename Section::owner_type& owner,
+    const CompareOwner* compareOwner,
+    UpdateKeyFn&& updateKey) {
+    const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
+    std::apply([&](auto... field) {
+        (..., [&] {
+            using Field = std::remove_cvref_t<decltype(field)>;
+            const std::string currentValue =
+                EncodeConfigValue<typename Field::codec_type>(owner.*(Field::member));
+            const std::string compareValue = compareOwner != nullptr
+                ? EncodeConfigValue<typename Field::codec_type>((*compareOwner).*(Field::member))
+                : std::string{};
+            if (compareOwner == nullptr || currentValue != compareValue) {
+                updateKey(sectionName, std::string(Field::key.view()), currentValue);
+            }
+        }());
+    }, Section::fields);
+}
+
+template <typename Section, typename CompareOwner, typename UpdateKeyFn>
+void SaveDynamicStructuredSectionDifferences(
+    const typename Section::owner_type& owner,
+    std::string_view suffix,
+    const CompareOwner* compareOwner,
+    UpdateKeyFn&& updateKey) {
+    const std::string sectionName = Section::FormatName(suffix);
+    std::apply([&](auto... field) {
+        (..., [&] {
+            using Field = std::remove_cvref_t<decltype(field)>;
+            const std::string currentValue =
+                EncodeConfigValue<typename Field::codec_type>(owner.*(Field::member));
+            const std::string compareValue = compareOwner != nullptr
+                ? EncodeConfigValue<typename Field::codec_type>((*compareOwner).*(Field::member))
+                : std::string{};
+            if (compareOwner == nullptr || currentValue != compareValue) {
+                updateKey(sectionName, std::string(Field::key.view()), currentValue);
+            }
+        }());
+    }, Section::fields);
+}
+
 DisplayConfig& AccessDisplayConfig(AppConfig& config) {
     return config.display;
 }
@@ -340,7 +384,46 @@ struct StructuredSectionBinding {
     static typename Section::owner_type& Get(AppConfig& config) {
         return Accessor(config);
     }
+
+    static const typename Section::owner_type& Get(const AppConfig& config) {
+        return Accessor(const_cast<AppConfig&>(config));
+    }
 };
+
+using DisplaySectionBinding = StructuredSectionBinding<DisplayConfig::Section, AccessDisplayConfig>;
+using NetworkSectionBinding = StructuredSectionBinding<NetworkConfig::Section, AccessNetworkConfig>;
+using MetricScalesSectionBinding = StructuredSectionBinding<MetricScaleConfig::Section, AccessMetricScalesConfig>;
+using DashboardSectionBinding = StructuredSectionBinding<DashboardSectionConfig::Section, AccessDashboardSectionConfig>;
+using CardStyleSectionBinding = StructuredSectionBinding<CardStyleConfig::Section, AccessCardStyleConfig>;
+using ColorSectionBinding = StructuredSectionBinding<ColorConfig::Section, AccessColorConfig>;
+using FontSectionBinding = StructuredSectionBinding<UiFontSetConfig::Section, AccessFontConfig>;
+using MetricListSectionBinding = StructuredSectionBinding<MetricListWidgetConfig::Section, AccessMetricListWidgetConfig>;
+using DriveUsageListSectionBinding =
+    StructuredSectionBinding<DriveUsageListWidgetConfig::Section, AccessDriveUsageListWidgetConfig>;
+using ThroughputSectionBinding = StructuredSectionBinding<ThroughputWidgetConfig::Section, AccessThroughputWidgetConfig>;
+using GaugeSectionBinding = StructuredSectionBinding<GaugeWidgetConfig::Section, AccessGaugeWidgetConfig>;
+using TextSectionBinding = StructuredSectionBinding<TextWidgetConfig::Section, AccessTextWidgetConfig>;
+using NetworkFooterSectionBinding =
+    StructuredSectionBinding<NetworkFooterWidgetConfig::Section, AccessNetworkFooterWidgetConfig>;
+using ClockTimeSectionBinding = StructuredSectionBinding<ClockTimeWidgetConfig::Section, AccessClockTimeWidgetConfig>;
+using ClockDateSectionBinding = StructuredSectionBinding<ClockDateWidgetConfig::Section, AccessClockDateWidgetConfig>;
+
+using KnownStructuredBindings = std::tuple<
+    DisplaySectionBinding,
+    NetworkSectionBinding,
+    MetricScalesSectionBinding,
+    DashboardSectionBinding,
+    CardStyleSectionBinding,
+    ColorSectionBinding,
+    FontSectionBinding,
+    MetricListSectionBinding,
+    DriveUsageListSectionBinding,
+    ThroughputSectionBinding,
+    GaugeSectionBinding,
+    TextSectionBinding,
+    NetworkFooterSectionBinding,
+    ClockTimeSectionBinding,
+    ClockDateSectionBinding>;
 
 template <typename... Bindings>
 bool DispatchStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
@@ -372,21 +455,21 @@ bool DispatchDynamicStructuredSection(const std::string& section, const std::str
 
 bool DispatchKnownStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
     return DispatchStructuredSection<
-        StructuredSectionBinding<DisplayConfig::Section, AccessDisplayConfig>,
-        StructuredSectionBinding<NetworkConfig::Section, AccessNetworkConfig>,
-        StructuredSectionBinding<MetricScaleConfig::Section, AccessMetricScalesConfig>,
-        StructuredSectionBinding<DashboardSectionConfig::Section, AccessDashboardSectionConfig>,
-        StructuredSectionBinding<CardStyleConfig::Section, AccessCardStyleConfig>,
-        StructuredSectionBinding<ColorConfig::Section, AccessColorConfig>,
-        StructuredSectionBinding<UiFontSetConfig::Section, AccessFontConfig>,
-        StructuredSectionBinding<MetricListWidgetConfig::Section, AccessMetricListWidgetConfig>,
-        StructuredSectionBinding<DriveUsageListWidgetConfig::Section, AccessDriveUsageListWidgetConfig>,
-        StructuredSectionBinding<ThroughputWidgetConfig::Section, AccessThroughputWidgetConfig>,
-        StructuredSectionBinding<GaugeWidgetConfig::Section, AccessGaugeWidgetConfig>,
-        StructuredSectionBinding<TextWidgetConfig::Section, AccessTextWidgetConfig>,
-        StructuredSectionBinding<NetworkFooterWidgetConfig::Section, AccessNetworkFooterWidgetConfig>,
-        StructuredSectionBinding<ClockTimeWidgetConfig::Section, AccessClockTimeWidgetConfig>,
-        StructuredSectionBinding<ClockDateWidgetConfig::Section, AccessClockDateWidgetConfig>
+        DisplaySectionBinding,
+        NetworkSectionBinding,
+        MetricScalesSectionBinding,
+        DashboardSectionBinding,
+        CardStyleSectionBinding,
+        ColorSectionBinding,
+        FontSectionBinding,
+        MetricListSectionBinding,
+        DriveUsageListSectionBinding,
+        ThroughputSectionBinding,
+        GaugeSectionBinding,
+        TextSectionBinding,
+        NetworkFooterSectionBinding,
+        ClockTimeSectionBinding,
+        ClockDateSectionBinding
     >(config, section, key, value);
 }
 
@@ -676,6 +759,15 @@ LayoutCardConfig* FindCardConfig(LayoutConfig& layout, const std::string& id) {
     return nullptr;
 }
 
+const LayoutCardConfig* FindCardConfig(const LayoutConfig& layout, const std::string& id) {
+    for (const auto& card : layout.cards) {
+        if (card.id == id) {
+            return &card;
+        }
+    }
+    return nullptr;
+}
+
 LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) {
     if (LayoutCardConfig* card = FindCardConfig(layout, id)) {
         return *card;
@@ -686,6 +778,15 @@ LayoutCardConfig& EnsureCardConfig(LayoutConfig& layout, const std::string& id) 
 
 NamedLayoutSectionConfig* FindNamedLayoutSection(AppConfig& config, const std::string& name) {
     for (auto& layout : config.layouts) {
+        if (layout.name == name) {
+            return &layout;
+        }
+    }
+    return nullptr;
+}
+
+const NamedLayoutSectionConfig* FindNamedLayoutSection(const AppConfig& config, const std::string& name) {
+    for (const auto& layout : config.layouts) {
         if (layout.name == name) {
             return &layout;
         }
@@ -776,6 +877,211 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, si
     }
 
     lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
+}
+
+std::vector<std::string> SplitConfigLines(const std::string& text) {
+    std::vector<std::string> lines;
+    std::stringstream stream(text);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        lines.push_back(line);
+    }
+    return lines;
+}
+
+std::string JoinConfigLines(const std::vector<std::string>& lines) {
+    std::string output;
+    for (const std::string& line : lines) {
+        output += line;
+        output += "\r\n";
+    }
+    return output;
+}
+
+template <typename UpdateKeyFn>
+void SaveKnownStructuredSections(const AppConfig& config, UpdateKeyFn&& updateKey) {
+    std::apply([&](auto... binding) {
+        (..., SaveStructuredSection<typename std::remove_cvref_t<decltype(binding)>::section_type>(
+            std::remove_cvref_t<decltype(binding)>::Get(config),
+            updateKey));
+    }, KnownStructuredBindings{});
+}
+
+template <typename UpdateKeyFn>
+void SaveKnownStructuredSectionDifferences(const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn&& updateKey) {
+    std::apply([&](auto... binding) {
+        (..., SaveStructuredSectionDifferences<typename std::remove_cvref_t<decltype(binding)>::section_type>(
+            std::remove_cvref_t<decltype(binding)>::Get(config),
+            compareConfig != nullptr ? &std::remove_cvref_t<decltype(binding)>::Get(*compareConfig) : nullptr,
+            updateKey));
+    }, KnownStructuredBindings{});
+}
+
+void SaveBoardValues(const AppConfig& config, const AppConfig* compareConfig,
+    const std::function<void(const std::string&, const std::string&, const std::string&)>& updateKey) {
+    const auto saveBoardKey = [&](const std::string& key, const std::string& currentValue, const std::string& compareValue) {
+        if (compareConfig == nullptr || currentValue != compareValue) {
+            updateKey("[board]", key, currentValue);
+        }
+    };
+
+    for (const std::string& logicalName : config.boardTemperatureNames) {
+        const auto currentIt = config.boardTemperatureSensorNames.find(logicalName);
+        const std::string currentValue = currentIt != config.boardTemperatureSensorNames.end() && !currentIt->second.empty()
+            ? currentIt->second
+            : logicalName;
+
+        std::string compareValue = logicalName;
+        if (compareConfig != nullptr) {
+            const auto compareIt = compareConfig->boardTemperatureSensorNames.find(logicalName);
+            if (compareIt != compareConfig->boardTemperatureSensorNames.end() && !compareIt->second.empty()) {
+                compareValue = compareIt->second;
+            }
+        }
+
+        saveBoardKey("board.temp." + logicalName, currentValue, compareValue);
+    }
+
+    for (const std::string& logicalName : config.boardFanNames) {
+        const auto currentIt = config.boardFanSensorNames.find(logicalName);
+        const std::string currentValue = currentIt != config.boardFanSensorNames.end() && !currentIt->second.empty()
+            ? currentIt->second
+            : logicalName;
+
+        std::string compareValue = logicalName;
+        if (compareConfig != nullptr) {
+            const auto compareIt = compareConfig->boardFanSensorNames.find(logicalName);
+            if (compareIt != compareConfig->boardFanSensorNames.end() && !compareIt->second.empty()) {
+                compareValue = compareIt->second;
+            }
+        }
+
+        saveBoardKey("board.fan." + logicalName, currentValue, compareValue);
+    }
+}
+
+std::string BuildSavedConfigText(const std::string& initialText, const AppConfig& config, const AppConfig* compareConfig) {
+    std::vector<std::string> lines = SplitConfigLines(initialText);
+
+    const auto findSectionIndex = [&lines](const std::string& sectionName) -> size_t {
+        for (size_t i = 0; i < lines.size(); ++i) {
+            if (Trim(lines[i]) == sectionName) {
+                return i;
+            }
+        }
+        return lines.size();
+    };
+
+    const auto ensureSection = [&lines, &findSectionIndex](const std::string& sectionName) -> size_t {
+        const size_t existingIndex = findSectionIndex(sectionName);
+        if (existingIndex < lines.size()) {
+            return existingIndex;
+        }
+        if (!lines.empty() && !lines.back().empty()) {
+            lines.push_back("");
+        }
+        lines.push_back(sectionName);
+        return lines.size() - 1;
+    };
+
+    const auto ensureSectionAfter = [&lines, &findSectionIndex](const std::string& sectionName,
+                                    const std::string& afterSectionName) -> size_t {
+        const size_t existingIndex = findSectionIndex(sectionName);
+        if (existingIndex < lines.size()) {
+            return existingIndex;
+        }
+
+        const size_t afterIndex = findSectionIndex(afterSectionName);
+        if (afterIndex >= lines.size()) {
+            if (!lines.empty() && !lines.back().empty()) {
+                lines.push_back("");
+            }
+            lines.push_back(sectionName);
+            return lines.size() - 1;
+        }
+
+        size_t insertIndex = afterIndex + 1;
+        while (insertIndex < lines.size()) {
+            const std::string next = Trim(lines[insertIndex]);
+            if (!next.empty() && next.front() == '[' && next.back() == ']') {
+                break;
+            }
+            ++insertIndex;
+        }
+
+        std::vector<std::string> insertedLines;
+        if (insertIndex > 0 && !lines[insertIndex - 1].empty()) {
+            insertedLines.push_back("");
+        }
+        insertedLines.push_back(sectionName);
+        if (insertIndex < lines.size() && !lines[insertIndex].empty()) {
+            insertedLines.push_back("");
+        }
+
+        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(insertIndex),
+            insertedLines.begin(), insertedLines.end());
+        return insertIndex + (insertedLines.front().empty() ? 1 : 0);
+    };
+
+    const auto findSectionEnd = [&lines](size_t sectionStart) -> size_t {
+        size_t sectionEnd = lines.size();
+        for (size_t j = sectionStart + 1; j < lines.size(); ++j) {
+            const std::string next = Trim(lines[j]);
+            if (!next.empty() && next.front() == '[' && next.back() == ']') {
+                sectionEnd = j;
+                break;
+            }
+        }
+        return sectionEnd;
+    };
+
+    const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd](
+        const std::string& sectionName,
+        const std::string& key,
+        const std::string& value) {
+        size_t sectionStart = sectionName == "[board]"
+            ? ensureSectionAfter(sectionName, "[network]")
+            : ensureSection(sectionName);
+        if (Trim(lines[sectionStart]) != sectionName) {
+            lines[sectionStart] = sectionName;
+        }
+        const size_t sectionEnd = findSectionEnd(sectionStart);
+        ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value);
+    };
+
+    if (compareConfig == nullptr) {
+        SaveKnownStructuredSections(config, updateKey);
+    } else {
+        SaveKnownStructuredSectionDifferences(config, compareConfig, updateKey);
+    }
+
+    for (const auto& layout : config.layouts) {
+        const NamedLayoutSectionConfig* compareLayout =
+            compareConfig != nullptr ? FindNamedLayoutSection(*compareConfig, layout.name) : nullptr;
+        if (compareConfig == nullptr) {
+            SaveDynamicStructuredSection<NamedLayoutSectionConfig::Section>(layout, layout.name, updateKey);
+        } else {
+            SaveDynamicStructuredSectionDifferences<NamedLayoutSectionConfig::Section>(
+                layout, layout.name, compareLayout, updateKey);
+        }
+    }
+
+    for (const auto& card : config.layout.cards) {
+        const LayoutCardConfig* compareCard =
+            compareConfig != nullptr ? FindCardConfig(compareConfig->layout, card.id) : nullptr;
+        if (compareConfig == nullptr) {
+            SaveDynamicStructuredSection<LayoutCardConfig::Section>(card, card.id, updateKey);
+        } else {
+            SaveDynamicStructuredSectionDifferences<LayoutCardConfig::Section>(
+                card, card.id, compareCard, updateKey);
+        }
+    }
+
+    SaveBoardValues(config, compareConfig, updateKey);
+    return JoinConfigLines(lines);
 }
 
 void AddUniqueValue(std::vector<std::string>& values, const std::string& value) {
@@ -893,144 +1199,13 @@ AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay) {
 }
 
 bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
-    std::string text = ReadFileUtf8(path);
-    if (text.empty()) {
-        text = LoadEmbeddedConfigTemplate();
-    }
-    std::vector<std::string> lines;
-    {
-        std::stringstream stream(text);
-        std::string line;
-        while (std::getline(stream, line)) {
-            if (!line.empty() && line.back() == '\r') {
-                line.pop_back();
-            }
-            lines.push_back(line);
-        }
-    }
+    const AppConfig compareConfig = LoadConfig(path);
+    const std::string output = BuildSavedConfigText(ReadFileUtf8(path), config, &compareConfig);
+    return WriteFileUtf8(path, output);
+}
 
-    if (lines.empty()) {
-        std::stringstream stream(LoadEmbeddedConfigTemplate());
-        std::string line;
-        while (std::getline(stream, line)) {
-            if (!line.empty() && line.back() == '\r') {
-                line.pop_back();
-            }
-            lines.push_back(line);
-        }
-    }
-
-    const auto findSectionIndex = [&lines](const std::string& sectionName) -> size_t {
-        for (size_t i = 0; i < lines.size(); ++i) {
-            if (Trim(lines[i]) == sectionName) {
-                return i;
-            }
-        }
-        return lines.size();
-    };
-
-    const auto ensureSection = [&lines, &findSectionIndex](const std::string& sectionName) -> size_t {
-        const size_t existingIndex = findSectionIndex(sectionName);
-        if (existingIndex < lines.size()) {
-            return existingIndex;
-        }
-        if (!lines.empty() && !lines.back().empty()) {
-            lines.push_back("");
-        }
-        lines.push_back(sectionName);
-        return lines.size() - 1;
-    };
-
-    const auto ensureSectionAfter = [&lines, &findSectionIndex](const std::string& sectionName,
-                                    const std::string& afterSectionName) -> size_t {
-        const size_t existingIndex = findSectionIndex(sectionName);
-        if (existingIndex < lines.size()) {
-            return existingIndex;
-        }
-
-        const size_t afterIndex = findSectionIndex(afterSectionName);
-        if (afterIndex >= lines.size()) {
-            if (!lines.empty() && !lines.back().empty()) {
-                lines.push_back("");
-            }
-            lines.push_back(sectionName);
-            return lines.size() - 1;
-        }
-
-        size_t insertIndex = afterIndex + 1;
-        while (insertIndex < lines.size()) {
-            const std::string next = Trim(lines[insertIndex]);
-            if (!next.empty() && next.front() == '[' && next.back() == ']') {
-                break;
-            }
-            ++insertIndex;
-        }
-
-        std::vector<std::string> insertedLines;
-        if (insertIndex > 0 && !lines[insertIndex - 1].empty()) {
-            insertedLines.push_back("");
-        }
-        insertedLines.push_back(sectionName);
-        if (insertIndex < lines.size() && !lines[insertIndex].empty()) {
-            insertedLines.push_back("");
-        }
-
-        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(insertIndex),
-            insertedLines.begin(), insertedLines.end());
-        return insertIndex + (insertedLines.front().empty() ? 1 : 0);
-    };
-
-    const auto findSectionEnd = [&lines](size_t sectionStart) -> size_t {
-        size_t sectionEnd = lines.size();
-        for (size_t j = sectionStart + 1; j < lines.size(); ++j) {
-            const std::string next = Trim(lines[j]);
-            if (!next.empty() && next.front() == '[' && next.back() == ']') {
-                sectionEnd = j;
-                break;
-            }
-        }
-        return sectionEnd;
-    };
-
-    auto updateKey = [&lines, &ensureSection, &findSectionEnd](const std::string& sectionName,
-        const std::string& key, const std::string& value) {
-        size_t sectionStart = ensureSection(sectionName);
-        if (Trim(lines[sectionStart]) != sectionName) {
-            lines[sectionStart] = sectionName;
-        }
-        const size_t sectionEnd = findSectionEnd(sectionStart);
-        ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value);
-    };
-
-    SaveStructuredSection<DisplayConfig::Section>(config.display, updateKey);
-    SaveStructuredSection<NetworkConfig::Section>(config.network, updateKey);
-    for (const auto& layout : config.layouts) {
-        SaveDynamicStructuredSection<NamedLayoutSectionConfig::Section>(layout, layout.name, updateKey);
-    }
-
-    const size_t boardSectionStart = ensureSectionAfter("[board]", "[network]");
-    for (const std::string& logicalName : config.boardTemperatureNames) {
-        const auto it = config.boardTemperatureSensorNames.find(logicalName);
-        const std::string sensorName = it != config.boardTemperatureSensorNames.end() && !it->second.empty()
-            ? it->second
-            : logicalName;
-        ReplaceOrAppendKey(lines, boardSectionStart, findSectionEnd(boardSectionStart),
-            "board.temp." + logicalName, sensorName);
-    }
-    for (const std::string& logicalName : config.boardFanNames) {
-        const auto it = config.boardFanSensorNames.find(logicalName);
-        const std::string sensorName = it != config.boardFanSensorNames.end() && !it->second.empty()
-            ? it->second
-            : logicalName;
-        ReplaceOrAppendKey(lines, boardSectionStart, findSectionEnd(boardSectionStart),
-            "board.fan." + logicalName, sensorName);
-    }
-
-    std::string output;
-    for (size_t i = 0; i < lines.size(); ++i) {
-        output += lines[i];
-        output += "\r\n";
-    }
+bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) {
+    const std::string output = BuildSavedConfigText(LoadEmbeddedConfigTemplate(), config, nullptr);
     return WriteFileUtf8(path, output);
 }
 

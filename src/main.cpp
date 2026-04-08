@@ -49,6 +49,7 @@ constexpr UINT kCommandExit = 1005;
 constexpr UINT kCommandSaveDumpAs = 1006;
 constexpr UINT kCommandSaveScreenshotAs = 1007;
 constexpr UINT kCommandAutoStart = 1008;
+constexpr UINT kCommandSaveFullConfigAs = 1009;
 constexpr UINT kCommandLayoutBase = 1100;
 constexpr UINT kCommandLayoutMax = 1199;
 constexpr UINT kCommandConfigureDisplayBase = 2000;
@@ -57,6 +58,8 @@ constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
 constexpr wchar_t kDefaultTraceFileName[] = L"telemetry_trace.txt";
 constexpr wchar_t kDefaultDumpFileName[] = L"telemetry_dump.txt";
 constexpr wchar_t kDefaultScreenshotFileName[] = L"telemetry_screenshot.png";
+constexpr wchar_t kDefaultSavedConfigFileName[] = L"telemetry_config.ini";
+constexpr wchar_t kDefaultSavedFullConfigFileName[] = L"telemetry_full_config.ini";
 constexpr wchar_t kDefaultBlankWallpaperFileName[] = L"telemetry_blank.png";
 constexpr wchar_t kAutoStartRunSubKey[] = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 constexpr wchar_t kAutoStartValueName[] = L"SystemTelemetry";
@@ -168,6 +171,8 @@ private:
     std::filesystem::path tracePath_;
     std::filesystem::path dumpPath_;
     std::filesystem::path screenshotPath_;
+    std::filesystem::path saveConfigPath_;
+    std::filesystem::path saveFullConfigPath_;
     std::ofstream traceStream_;
 };
 
@@ -518,6 +523,18 @@ DiagnosticsOptions GetDiagnosticsOptions() {
         options.screenshot = true;
         options.screenshotPath = *screenshotPath;
     }
+    if (const auto saveConfigPath = GetColonSwitchValue(L"/save-config"); saveConfigPath.has_value()) {
+        options.saveConfig = true;
+        options.saveConfigPath = *saveConfigPath;
+    } else if (HasSwitch("/save-config")) {
+        options.saveConfig = true;
+    }
+    if (const auto saveFullConfigPath = GetColonSwitchValue(L"/save-full-config"); saveFullConfigPath.has_value()) {
+        options.saveFullConfig = true;
+        options.saveFullConfigPath = *saveFullConfigPath;
+    } else if (HasSwitch("/save-full-config")) {
+        options.saveFullConfig = true;
+    }
     if (const auto fakePath = GetColonSwitchValue(L"/fake"); fakePath.has_value()) {
         options.fake = true;
         options.fakePath = *fakePath;
@@ -576,6 +593,14 @@ bool DiagnosticsSession::Initialize() {
         screenshotPath_ =
             ResolveDiagnosticsOutputPath(workingDirectory, options_.screenshotPath, kDefaultScreenshotFileName);
     }
+    if (options_.saveConfig) {
+        saveConfigPath_ =
+            ResolveDiagnosticsOutputPath(workingDirectory, options_.saveConfigPath, kDefaultSavedConfigFileName);
+    }
+    if (options_.saveFullConfig) {
+        saveFullConfigPath_ =
+            ResolveDiagnosticsOutputPath(workingDirectory, options_.saveFullConfigPath, kDefaultSavedFullConfigFileName);
+    }
     return true;
 }
 
@@ -628,6 +653,20 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
             traceText += " detail=\"" + screenshotError + "\"";
         }
         ReportError(traceText, message);
+        return false;
+    }
+
+    if (options_.saveConfig && !SaveConfig(saveConfigPath_, config)) {
+        const std::wstring message =
+            WideFromUtf8("Failed to save config file:\n" + Utf8FromWide(saveConfigPath_.wstring()));
+        ReportError("diagnostics:config_save_failed path=\"" + Utf8FromWide(saveConfigPath_.wstring()) + "\"", message);
+        return false;
+    }
+
+    if (options_.saveFullConfig && !SaveFullConfig(saveFullConfigPath_, config)) {
+        const std::wstring message =
+            WideFromUtf8("Failed to save full config file:\n" + Utf8FromWide(saveFullConfigPath_.wstring()));
+        ReportError("diagnostics:full_config_save_failed path=\"" + Utf8FromWide(saveFullConfigPath_.wstring()) + "\"", message);
         return false;
     }
 
@@ -1270,6 +1309,7 @@ public:
     bool WriteDiagnosticsOutputs();
     void SaveDumpAs();
     void SaveScreenshotAs();
+    void SaveFullConfigAs();
     bool IsAutoStartEnabled() const;
     void ToggleAutoStart();
 
@@ -1281,6 +1321,7 @@ private:
     void ShowContextMenu(POINT screenPoint);
     void BringOnTop();
     bool ReloadConfigFromDisk();
+    AppConfig BuildCurrentConfigForSaving() const;
     void UpdateConfigFromCurrentPlacement();
     void ApplyConfigPlacement();
     bool ApplyConfiguredWallpaper();
@@ -1576,6 +1617,18 @@ std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
     return PromptSavePath(hwnd_, GetWorkingDirectory(), defaultFileName, filter, defaultExtension);
 }
 
+AppConfig DashboardApp::BuildCurrentConfigForSaving() const {
+    AppConfig config = telemetry_->EffectiveConfig();
+    const MonitorPlacementInfo placement = GetMonitorPlacementForWindow(hwnd_);
+    const std::string monitorName = !placement.configMonitorName.empty()
+        ? placement.configMonitorName
+        : placement.deviceName;
+    config.display.monitorName = monitorName;
+    config.display.position.x = placement.relativePosition.x;
+    config.display.position.y = placement.relativePosition.y;
+    return config;
+}
+
 void DashboardApp::SaveDumpAs() {
     const auto path = PromptDiagnosticsSavePath(
         kDefaultDumpFileName,
@@ -1624,6 +1677,22 @@ void DashboardApp::SaveScreenshotAs() {
         }
         const std::wstring wideMessage = WideFromUtf8(message);
         MessageBoxW(hwnd_, wideMessage.c_str(), L"System Telemetry", MB_ICONERROR);
+    }
+}
+
+void DashboardApp::SaveFullConfigAs() {
+    const auto path = PromptDiagnosticsSavePath(
+        kDefaultSavedFullConfigFileName,
+        L"INI config (*.ini)\0*.ini\0All files (*.*)\0*.*\0",
+        L"ini");
+    if (!path.has_value()) {
+        return;
+    }
+
+    if (!SaveFullConfig(*path, BuildCurrentConfigForSaving())) {
+        const std::wstring message =
+            WideFromUtf8("Failed to save full config file:\n" + Utf8FromWide(path->wstring()));
+        MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
     }
 }
 
@@ -1817,15 +1886,8 @@ bool DashboardApp::SwitchLayout(const std::string& layoutName) {
 }
 
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
-    const MonitorPlacementInfo placement = GetMonitorPlacementForWindow(hwnd_);
     const std::filesystem::path configPath = GetRuntimeConfigPath();
-    AppConfig config = telemetry_->EffectiveConfig();
-    const std::string monitorName = !placement.configMonitorName.empty()
-        ? placement.configMonitorName
-        : placement.deviceName;
-    config.display.monitorName = monitorName;
-    config.display.position.x = placement.relativePosition.x;
-    config.display.position.y = placement.relativePosition.y;
+    AppConfig config = BuildCurrentConfigForSaving();
     bool saved = false;
     if (CanWriteRuntimeConfig(configPath)) {
         saved = SaveConfig(configPath, config);
@@ -1839,9 +1901,8 @@ void DashboardApp::UpdateConfigFromCurrentPlacement() {
         return;
     }
 
-    config_.display.monitorName = monitorName;
-    config_.display.position.x = placement.relativePosition.x;
-    config_.display.position.y = placement.relativePosition.y;
+    config_ = config;
+    renderer_.SetConfig(config_);
     telemetry_->SetEffectiveConfig(config_);
 }
 
@@ -1981,6 +2042,8 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
             AppendMenuW(configureDisplayMenu, flags, option.commandId, label.c_str());
         }
     }
+    AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveFullConfigAs, L"Save Full Config To...");
+    AppendMenuW(diagnosticsMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveDumpAs, L"Save Dump To...");
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
@@ -2021,6 +2084,9 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         break;
     case kCommandSaveScreenshotAs:
         SaveScreenshotAs();
+        break;
+    case kCommandSaveFullConfigAs:
+        SaveFullConfigAs();
         break;
     case kCommandExit:
         DestroyWindow(hwnd_);

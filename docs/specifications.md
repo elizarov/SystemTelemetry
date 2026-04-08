@@ -52,7 +52,9 @@ Examples include:
 - Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance.
 - The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
 - The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.
-- When `Save Config` creates `config.ini` beside the executable for the first time, it must begin from the embedded resource copy verbatim so the saved file keeps the same comments and documentation text before updating values in place.
+- `Save Config` must load the current executable-side `config.ini` through the normal startup overlay path into a comparison copy, update only the keys whose live in-memory values differ, and write those updates back into the existing INI text so unchanged explicit overrides and unknown lines remain intact.
+- When `Save Config` creates `config.ini` beside the executable for the first time, it must write only the keys whose live in-memory values differ from the embedded defaults.
+- `Save Full Config To...` must export a complete config file by starting from the embedded `resources/config.ini` template text and updating every maintained config key with the live in-memory values so the exported file keeps the shipped line structure and comments.
 - The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
 - The `[display]` section must select the active dashboard layout by name through `display.layout`, and named dashboard size-and-card-placement definitions must live in `[layout.<name>]` sections.
 - The shipped config template must define `800x480` as the default active layout and also include an experimental `480x800` portrait layout for the same panel resolution.
@@ -161,6 +163,7 @@ Add a popup menu on right-click with these actions:
 
 The `Diagnostics` submenu must provide:
 
+- Save full config to...
 - Save dump to...
 - Save screenshot to...
 
@@ -174,7 +177,8 @@ While moving, show an overlay in the top-left corner with:
 - The move overlay should size and space itself from the actual UI font metrics and monitor scale.
 - The overlay content should be easy to copy into configuration.
 - The application must also read the saved relative X/Y coordinates from configuration at startup and place the window accordingly.
-- Add a `Save Config` action that writes the current display identifier and relative X/Y placement back to the config file while preserving all other settings.
+- Add a `Save Config` action that writes the current display identifier and relative X/Y placement back to the config file while preserving all other settings and unchanged explicit overrides.
+- The `Save full config to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_full_config.ini`, and export the full embedded-template-shaped config with current live values.
 - The `Save dump to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_dump.txt`, and write the same text dump format used by diagnostics output.
 - The dump format contains only the snapshot fields that `/fake` loads and the dashboard renders; provider-debug details remain trace-only diagnostics data.
 - The `Save screenshot to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_screenshot.png`, and write the same PNG output format used by diagnostics output.
