@@ -407,6 +407,10 @@ void DashboardRenderer::SetShowLayoutEditGuides(bool show) {
     showLayoutEditGuides_ = show;
 }
 
+void DashboardRenderer::SetActiveLayoutEditGuide(const std::optional<LayoutEditGuide>& guide) {
+    activeLayoutEditGuide_ = guide;
+}
+
 double DashboardRenderer::RenderScale() const {
     return renderScale_;
 }
@@ -801,6 +805,7 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const R
         guide.containerRect = rect;
         guide.gap = gap;
         guide.childExtents.reserve(childRects.size());
+        guide.childRects = childRects;
         for (const RECT& childRect : childRects) {
             guide.childExtents.push_back(horizontal ? (childRect.right - childRect.left) : (childRect.bottom - childRect.top));
         }
@@ -835,12 +840,13 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         }
         WriteTrace("renderer:layout_card_ref id=\"" + node.name + "\" " + FormatRect(rect));
         cardReferenceStack.push_back(node.name);
-        ResolveNodeWidgetsInternal(referencedCard->layout, rect, widgets, cardReferenceStack, node.name, {});
+        ResolveNodeWidgetsInternal(referencedCard->layout, rect, widgets, cardReferenceStack, cardId, nodePath);
         cardReferenceStack.pop_back();
         return;
     }
     if (!IsCardContainerNode(node)) {
         ResolvedWidgetLayout widget = ResolveWidgetLayout(node, rect);
+        widget.cardId = cardId;
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
             (widget.binding.metric.empty() ? "" : " metric=\"" + widget.binding.metric + "\"") +
             (widget.binding.param.empty() ? "" : " param=\"" + widget.binding.param + "\""));
@@ -1137,6 +1143,121 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
         }
     }
     SelectObject(hdc, oldPen);
+    DeleteObject(pen);
+}
+
+int DashboardRenderer::WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const {
+    return axis == LayoutGuideAxis::Vertical
+        ? std::max(0, static_cast<int>(widget.rect.right - widget.rect.left))
+        : std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
+}
+
+bool DashboardRenderer::IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const {
+    if (!guide.cardId.empty() && widget.cardId != guide.cardId) {
+        return false;
+    }
+    return widget.rect.left >= guide.containerRect.left &&
+        widget.rect.top >= guide.containerRect.top &&
+        widget.rect.right <= guide.containerRect.right &&
+        widget.rect.bottom <= guide.containerRect.bottom;
+}
+
+void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
+    if (!activeLayoutEditGuide_.has_value()) {
+        return;
+    }
+
+    const LayoutEditGuide& guide = *activeLayoutEditGuide_;
+    const int threshold = std::max(0, ScaleLogical(config_.layout.layoutEditor.sizeSimilarityThreshold));
+    if (threshold <= 0) {
+        return;
+    }
+
+    struct WidgetRef {
+        const ResolvedWidgetLayout* widget = nullptr;
+    };
+
+    std::vector<WidgetRef> allWidgets;
+    std::vector<WidgetRef> affectedWidgets;
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            allWidgets.push_back(WidgetRef{&widget});
+            if (IsWidgetAffectedByGuide(widget, guide)) {
+                affectedWidgets.push_back(WidgetRef{&widget});
+            }
+        }
+    }
+    if (affectedWidgets.empty()) {
+        return;
+    }
+
+    std::vector<SimilarityIndicator> indicators;
+    for (const WidgetRef affected : affectedWidgets) {
+        const int affectedExtent = WidgetExtentForAxis(*affected.widget, guide.axis);
+        if (affectedExtent <= 0) {
+            continue;
+        }
+        for (const WidgetRef candidate : allWidgets) {
+            if (candidate.widget == affected.widget || candidate.widget->kind != affected.widget->kind) {
+                continue;
+            }
+            const int candidateExtent = WidgetExtentForAxis(*candidate.widget, guide.axis);
+            if (candidateExtent <= 0 || std::abs(candidateExtent - affectedExtent) > threshold) {
+                continue;
+            }
+            indicators.push_back(SimilarityIndicator{guide.axis, affected.widget->rect, candidateExtent == affectedExtent});
+            indicators.push_back(SimilarityIndicator{guide.axis, candidate.widget->rect, candidateExtent == affectedExtent});
+        }
+    }
+    if (indicators.empty()) {
+        return;
+    }
+
+    const COLORREF color = LayoutGuideColor();
+    const int inset = std::max(2, ScaleLogical(4));
+    const int cap = std::max(3, ScaleLogical(4));
+    const int offset = std::max(4, ScaleLogical(6));
+    const int exactRadius = std::max(2, ScaleLogical(2));
+
+    HPEN pen = CreatePen(PS_SOLID, 1, color);
+    HBRUSH brush = CreateSolidBrush(color);
+    HGDIOBJ oldPen = SelectObject(hdc, pen);
+    HGDIOBJ oldBrush = SelectObject(hdc, brush);
+    for (const SimilarityIndicator& indicator : indicators) {
+        const RECT& rect = indicator.rect;
+        if (indicator.axis == LayoutGuideAxis::Vertical) {
+            const int y = rect.top + offset;
+            const int left = rect.left + inset;
+            const int right = rect.right - inset;
+            MoveToEx(hdc, left, y, nullptr);
+            LineTo(hdc, right, y);
+            MoveToEx(hdc, left, y - cap, nullptr);
+            LineTo(hdc, left, y + cap + 1);
+            MoveToEx(hdc, right, y - cap, nullptr);
+            LineTo(hdc, right, y + cap + 1);
+            if (indicator.exact) {
+                const int cx = left + std::max(0, (right - left) / 2);
+                Rectangle(hdc, cx - exactRadius, y - exactRadius, cx + exactRadius + 1, y + exactRadius + 1);
+            }
+        } else {
+            const int x = rect.left + offset;
+            const int top = rect.top + inset;
+            const int bottom = rect.bottom - inset;
+            MoveToEx(hdc, x, top, nullptr);
+            LineTo(hdc, x, bottom);
+            MoveToEx(hdc, x - cap, top, nullptr);
+            LineTo(hdc, x + cap + 1, top);
+            MoveToEx(hdc, x - cap, bottom, nullptr);
+            LineTo(hdc, x + cap + 1, bottom);
+            if (indicator.exact) {
+                const int cy = top + std::max(0, (bottom - top) / 2);
+                Rectangle(hdc, x - exactRadius, cy - exactRadius, x + exactRadius + 1, cy + exactRadius + 1);
+            }
+        }
+    }
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(brush);
     DeleteObject(pen);
 }
 
@@ -1564,6 +1685,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
         }
     }
     DrawLayoutEditGuides(hdc);
+    DrawLayoutSimilarityIndicators(hdc);
 }
 
 bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {

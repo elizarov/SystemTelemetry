@@ -40,6 +40,7 @@ public:
         RECT hitRect{};
         int gap = 0;
         std::vector<int> childExtents;
+        std::vector<RECT> childRects;
     };
 
     enum class RenderMode {
@@ -54,6 +55,7 @@ public:
     void SetRenderScale(double scale);
     void SetRenderMode(RenderMode mode);
     void SetShowLayoutEditGuides(bool show);
+    void SetActiveLayoutEditGuide(const std::optional<LayoutEditGuide>& guide);
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
@@ -97,9 +99,16 @@ private:
     struct ResolvedWidgetLayout {
         WidgetKind kind = WidgetKind::Unknown;
         RECT rect{};
+        std::string cardId;
         WidgetBinding binding;
         int preferredHeight = 0;
         bool fixedPreferredHeightInStack = false;
+    };
+
+    struct SimilarityIndicator {
+        LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
+        RECT rect{};
+        bool exact = false;
     };
 
     struct ResolvedCardLayout {
@@ -146,6 +155,7 @@ private:
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawLayoutEditGuides(HDC hdc) const;
+    void DrawLayoutSimilarityIndicators(HDC hdc) const;
     void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
@@ -177,6 +187,8 @@ private:
     int EffectiveMetricRowHeight() const;
     int EffectiveDriveHeaderHeight() const;
     int EffectiveDriveRowHeight() const;
+    int WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
+    bool IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const;
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
 
@@ -190,6 +202,7 @@ private:
     MeasuredWidths measuredWidths_{}; 
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
+    std::optional<LayoutEditGuide> activeLayoutEditGuide_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

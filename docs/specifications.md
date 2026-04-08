@@ -116,6 +116,8 @@ Examples include:
 - The `Save Config` action must also persist any in-memory layout weight edits made through interactive layout editing.
 - While layout-edit mode is active, the renderer must draw thin config-colored separator guides over every resolved `rows(...)` and `columns(...)` split and update the cursor to the matching horizontal or vertical resize shape when the pointer hovers a draggable guide.
 - Dragging a layout-edit guide must adjust the two adjacent child weights live, immediately relayout and repaint the dashboard, and reseed the dragged container's editable integer weights from the current resolved child extents when the drag begins.
+- While a layout-edit guide drag is active, the renderer must compare each affected descendant widget against every other widget of the same type in the active layout and draw paired measurement rulers on widgets whose dragged-axis size differs by no more than the configured threshold.
+- When two same-type widgets match exactly on the dragged axis, the measurement ruler on each widget must show a special center marker that pinpoints the exact equal-size moment.
 - Pressing `Esc` must exit either move mode or layout-edit mode.
 
 Diagnostics requirements live in `docs/diagnostics.md`.

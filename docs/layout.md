@@ -83,6 +83,10 @@ Supported widget geometry keys:
 - `[clock_time]`: `padding`
 - `[clock_date]`: `padding`
 
+`[layout_editor]` owns interactive layout-edit affordance tuning:
+
+- `size_similarity_threshold`
+
 ## Dashboard sections
 
 Each `[layout.<name>]` section owns only one named dashboard size and card-placement layout.

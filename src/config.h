@@ -236,6 +236,12 @@ struct ClockDateWidgetConfig {
     CONFIG_SECTION("clock_date");
 };
 
+struct LayoutEditorConfig {
+    CONFIG_REFLECTED_STRUCT(LayoutEditorConfig)
+    CONFIG_VALUE(int, sizeSimilarityThreshold, "size_similarity_threshold");
+    CONFIG_SECTION("layout_editor");
+};
+
 struct LayoutConfig {
     CONFIG_REFLECTED_BINDINGS(LayoutConfig)
     CONFIG_SECTION_VALUE(ColorConfig, colors);
@@ -249,6 +255,7 @@ struct LayoutConfig {
     CONFIG_SECTION_VALUE(NetworkFooterWidgetConfig, networkFooter);
     CONFIG_SECTION_VALUE(ClockTimeWidgetConfig, clockTime);
     CONFIG_SECTION_VALUE(ClockDateWidgetConfig, clockDate);
+    CONFIG_SECTION_VALUE(LayoutEditorConfig, layoutEditor);
     CONFIG_SECTION_VALUE(UiFontSetConfig, fonts);
     CONFIG_DYNAMIC_SECTION_VALUE(LayoutCardConfig, cards, id);
     CONFIG_BINDING_LIST();
