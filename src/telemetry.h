@@ -20,10 +20,21 @@ struct MemoryMetric {
 
 struct DriveInfo {
     std::string label;
+    std::string volumeLabel;
+    double totalGb = 0.0;
     double usedPercent = 0.0;
     double freeGb = 0.0;
     double readMbps = 0.0;
     double writeMbps = 0.0;
+    UINT driveType = DRIVE_UNKNOWN;
+};
+
+struct StorageDriveCandidate {
+    std::string letter;
+    std::string volumeLabel;
+    double totalGb = 0.0;
+    UINT driveType = DRIVE_UNKNOWN;
+    bool selected = false;
 };
 
 struct RetainedHistorySeries {
@@ -113,7 +124,9 @@ public:
     TelemetryDump Dump() const;
     AppConfig EffectiveConfig() const;
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const;
+    const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const;
     void SetPreferredNetworkAdapterName(std::string adapterName);
+    void SetSelectedStorageDrives(std::vector<std::string> driveLetters);
     void UpdateSnapshot();
     void WriteDump(std::ostream& output) const;
 

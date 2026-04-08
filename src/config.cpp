@@ -194,6 +194,11 @@ void DecodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(UiFontConfig& 
     ParseFontSpec(target, value);
 }
 
+template <>
+void DecodeConfigValue<configschema::StringCodec, std::vector<std::string>>(std::vector<std::string>& target, const std::string& value) {
+    target = Split(value, ',');
+}
+
 template <typename Codec, typename Value>
 std::string EncodeConfigValue(const Value& value);
 
@@ -232,6 +237,18 @@ std::string EncodeConfigValue<configschema::HexColorCodec, unsigned int>(const u
 template <>
 std::string EncodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(const UiFontConfig& value) {
     return FormatFontSpec(value);
+}
+
+template <>
+std::string EncodeConfigValue<configschema::StringCodec, std::vector<std::string>>(const std::vector<std::string>& value) {
+    std::string encoded;
+    for (size_t i = 0; i < value.size(); ++i) {
+        if (i > 0) {
+            encoded += ",";
+        }
+        encoded += value[i];
+    }
+    return encoded;
 }
 
 template <typename Section>
@@ -939,9 +956,11 @@ std::string BuildSavedConfigText(const std::string& initialText, const AppConfig
         const std::string& sectionName,
         const std::string& key,
         const std::string& value) {
-        size_t sectionStart = sectionName == "[board]"
+        size_t sectionStart = sectionName == "[storage]"
             ? ensureSectionAfter(sectionName, "[network]")
-            : ensureSection(sectionName);
+            : sectionName == "[board]"
+                ? ensureSectionAfter(sectionName, "[storage]")
+                : ensureSection(sectionName);
         if (Trim(lines[sectionStart]) != sectionName) {
             lines[sectionStart] = sectionName;
         }
@@ -970,20 +989,26 @@ void AddUniqueValue(std::vector<std::string>& values, const std::string& value) 
     values.push_back(value);
 }
 
+std::string NormalizeDriveLetter(const std::string& drive) {
+    const std::string trimmed = Trim(drive);
+    if (trimmed.empty()) {
+        return {};
+    }
+
+    const unsigned char ch = static_cast<unsigned char>(trimmed.front());
+    if (!std::isalpha(ch)) {
+        return {};
+    }
+    return std::string(1, static_cast<char>(std::toupper(ch)));
+}
+
 std::string ExtractMetricReference(const std::string& token) {
     const size_t equals = token.find('=');
     return Trim(token.substr(0, equals));
 }
 
-void CollectLayoutBindingsRecursive(const LayoutNodeConfig& node, std::vector<std::string>& drives,
+void CollectLayoutBindingsRecursive(const LayoutNodeConfig& node,
     std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
-    if (node.name == "drive_usage_list") {
-        for (const std::string& drive : Split(node.parameter, ',')) {
-            const std::string normalized = drive.substr(0, 1);
-            AddUniqueValue(drives, normalized);
-        }
-    }
-
     for (const std::string& token : Split(node.parameter, ',')) {
         const std::string metricRef = ExtractMetricReference(token);
         if (metricRef.rfind("board.temp.", 0) == 0) {
@@ -994,7 +1019,7 @@ void CollectLayoutBindingsRecursive(const LayoutNodeConfig& node, std::vector<st
     }
 
     for (const auto& child : node.children) {
-        CollectLayoutBindingsRecursive(child, drives, boardTemperatures, boardFans);
+        CollectLayoutBindingsRecursive(child, boardTemperatures, boardFans);
     }
 }
 
@@ -1005,26 +1030,18 @@ std::string LoadEmbeddedConfigTemplate() {
 }
 
 struct LayoutBindingSelection {
-    std::vector<std::string> driveLetters;
     std::vector<std::string> boardTemperatureNames;
     std::vector<std::string> boardFanNames;
 };
 
 static LayoutBindingSelection CollectLayoutBindings(const LayoutConfig& layout) {
-    std::vector<std::string> drives;
     std::vector<std::string> boardTemperatures;
     std::vector<std::string> boardFans;
     for (const auto& card : layout.cards) {
-        CollectLayoutBindingsRecursive(card.layout, drives, boardTemperatures, boardFans);
+        CollectLayoutBindingsRecursive(card.layout, boardTemperatures, boardFans);
     }
 
     LayoutBindingSelection result;
-    result.driveLetters.reserve(drives.size());
-    for (const std::string& drive : drives) {
-        if (!drive.empty()) {
-            result.driveLetters.push_back(std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(drive[0])))));
-        }
-    }
     result.boardTemperatureNames = std::move(boardTemperatures);
     result.boardFanNames = std::move(boardFans);
     return result;
@@ -1063,9 +1080,11 @@ AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay) {
     SelectResolvedLayout(config, config.display.layout);
 
     const LayoutBindingSelection layoutBindings = CollectLayoutBindings(config.layout);
-    if (!layoutBindings.driveLetters.empty()) {
-        config.driveLetters = layoutBindings.driveLetters;
+    std::vector<std::string> normalizedDrives;
+    for (const auto& drive : config.storage.drives) {
+        AddUniqueValue(normalizedDrives, NormalizeDriveLetter(drive));
     }
+    config.storage.drives = std::move(normalizedDrives);
     config.board.requestedTemperatureNames = layoutBindings.boardTemperatureNames;
     config.board.requestedFanNames = layoutBindings.boardFanNames;
     return config;

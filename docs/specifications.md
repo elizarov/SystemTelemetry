@@ -41,6 +41,7 @@ Examples include:
 - Display on which to show the system
 - Relative position on the selected display
 - Which network adapter to prefer
+- Which storage drives to show in the storage usage list
 - Which cards and widgets to show in each row
 - Which named board temperature and fan metrics to render through the layout bindings
 
@@ -69,7 +70,7 @@ Examples include:
 - Card-local layout expressions may reference another card id as a reusable sub-layout, and the renderer must substitute that referenced card's layout during layout resolution instead of flattening it during config parse.
 - The list of rendered cards must come from layout config.
 - Card titles and icons must be optional, and when a card specifies neither one the renderer must not reserve any card-header height for that card.
-- The storage drive list must come from the storage card's `drive_usage_list(...)` widget binding.
+- The storage drive list must come from `[storage] drives`.
 - The dedicated widget sections must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments preserve or intentionally retune the visual rhythm.
 - When a `metric_list` or `drive_usage_list` widget has less vertical space than its full configured content needs, the renderer must keep each header, row, bar, and configured gap at its full configured height and crop any overflow at the bottom instead of compressing the final visible lines.
 - In a regular vertical `stack(...)`, `text` must behave as a fixed-height widget at its preferred configured height, with the remaining vertical space going to flexible siblings.
@@ -94,6 +95,9 @@ Examples include:
 - The popup menu must provide a `Network` submenu that lists every runtime network candidate with an IPv4 address, using the same `adapter name | IP address` footer text shown by the network footer widget.
 - The `Network` submenu must show a radio check on the adapter currently selected by the runtime selection flow, even when `network.adapter_name` is empty or no longer matches any current adapter.
 - Selecting a `Network` submenu item must set `network.adapter_name` to that adapter name and apply the selection immediately without restarting the app.
+- The popup menu must provide a `Storage drives` submenu that lists every active non-network fixed or removable drive with a checkbox per drive.
+- Each `Storage drives` submenu item must show `drive letter | volume label | size`, omitting only the label text when the volume has no label.
+- Clicking a `Storage drives` submenu item must add or remove that drive letter in `[storage] drives`, keep the saved drive list sorted by drive letter, and refresh the storage usage list immediately without restarting the app.
 - The popup menu must provide a `Config To Display` submenu that lists every currently enumerable display by friendly name plus physical resolution, enables only displays whose resolution matches the dashboard's DPI-scaled window size for that display, and on selection must set `display.monitor_name`, set `display.position` to `0,0`, render a blank dashboard image to `telemetry_blank.png` beside the executable, set `display.wallpaper` to `telemetry_blank.png`, save the updated `config.ini`, and immediately apply that wallpaper to the selected display.
 - The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
 - When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
@@ -106,6 +110,7 @@ Examples include:
 - The board provider must receive the set of requested logical board temperature and fan names by scanning all layout metric references that begin with `board.temp.` or `board.fan.`.
 - The `[board]` section must map each requested logical `board.temp.*` or `board.fan.*` metric name to the board-specific sensor title that the active board provider uses for lookup.
 - The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
+- The `Save Config` action must also persist the current `[storage] drives` selection.
 
 Diagnostics requirements live in `docs/diagnostics.md`.
 
@@ -138,7 +143,7 @@ GPU telemetry must provide:
 
 - If AMD ADLX is unavailable or unsupported, the dashboard should continue running and leave AMD vendor metrics unavailable.
 - Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
-- Per-drive storage activity indicators should come from per-drive logical-disk I/O counters for the configured drive letters.
+- Per-drive storage activity indicators should come from per-drive logical-disk I/O counters for the configured `[storage] drives` letters.
 - Gigabyte motherboard board-metric telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the requested `board.temp.*` and `board.fan.*` metrics unavailable.
 - The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested logical `board.temp.*` and `board.fan.*` names through the configured `[board]` sensor-title mapping.
 
@@ -161,6 +166,7 @@ Add a popup menu on right-click with these actions:
 - Save Config
 - Layout
 - Network
+- Storage drives
 - Config To Display
 - Auto-start on user logon
 - Diagnostics
@@ -199,6 +205,7 @@ While moving, show an overlay in the top-left corner with:
 - Save Config
 - Layout
 - Network
+- Storage drives
 - Config To Display
 - Auto-start on user logon
 - Diagnostics
@@ -331,7 +338,7 @@ While moving, show an overlay in the top-left corner with:
 ### Structure
 
 - Stack read and write throughput sections on the left, with the same vertical rhythm and plot behavior used by the network panel, but at a slightly narrower width so the drive-usage list has more room.
-- List the drives configured in the storage card's `drive_usage_list(...)` widget vertically on the right.
+- List the drives configured in `[storage] drives` vertically on the right.
 
 ### Throughput
 

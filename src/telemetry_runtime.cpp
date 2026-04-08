@@ -33,6 +33,10 @@ public:
         return telemetry_.NetworkAdapterCandidates();
     }
 
+    const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const override {
+        return telemetry_.StorageDriveCandidates();
+    }
+
     void SetEffectiveConfig(const AppConfig& config) override {
         effectiveConfig_ = config;
     }
@@ -40,6 +44,11 @@ public:
     void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
         effectiveConfig_.network.adapterName = adapterName;
         telemetry_.SetPreferredNetworkAdapterName(adapterName);
+    }
+
+    void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) override {
+        effectiveConfig_.storage.drives = driveLetters;
+        telemetry_.SetSelectedStorageDrives(driveLetters);
     }
 
     void UpdateSnapshot() override {

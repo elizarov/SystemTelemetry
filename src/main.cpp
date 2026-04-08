@@ -54,6 +54,8 @@ constexpr UINT kCommandLayoutBase = 1100;
 constexpr UINT kCommandLayoutMax = 1199;
 constexpr UINT kCommandNetworkAdapterBase = 1200;
 constexpr UINT kCommandNetworkAdapterMax = 1299;
+constexpr UINT kCommandStorageDriveBase = 1300;
+constexpr UINT kCommandStorageDriveMax = 1399;
 constexpr UINT kCommandConfigureDisplayBase = 2000;
 constexpr UINT kCommandConfigureDisplayMax = 2099;
 constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";
@@ -962,6 +964,14 @@ struct NetworkMenuOption {
     bool selected = false;
 };
 
+struct StorageDriveMenuOption {
+    UINT commandId = 0;
+    std::string driveLetter;
+    std::string volumeLabel;
+    double totalGb = 0.0;
+    bool selected = false;
+};
+
 void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
     MENUITEMINFOW info{};
     info.cbSize = sizeof(info);
@@ -978,6 +988,25 @@ std::string FormatNetworkFooterText(const std::string& adapterName, const std::s
         return adapterName;
     }
     return adapterName + " | " + ipAddress;
+}
+
+std::string FormatStorageDriveSize(double totalGb) {
+    char buffer[64];
+    if (totalGb >= 1024.0) {
+        sprintf_s(buffer, "%.1f TB", totalGb / 1024.0);
+    } else {
+        sprintf_s(buffer, "%.0f GB", totalGb);
+    }
+    return buffer;
+}
+
+std::string FormatStorageDriveMenuText(const StorageDriveMenuOption& option) {
+    std::string text = option.driveLetter + ":";
+    if (!option.volumeLabel.empty()) {
+        text += " | " + option.volumeLabel;
+    }
+    text += " | " + FormatStorageDriveSize(option.totalGb);
+    return text;
 }
 
 std::string SimplifyDeviceName(const std::string& deviceName) {
@@ -1347,6 +1376,7 @@ private:
     bool ConfigureDisplay(const DisplayMenuOption& option);
     bool SwitchLayout(const std::string& layoutName);
     void SelectNetworkAdapter(const NetworkMenuOption& option);
+    void ToggleStorageDrive(const StorageDriveMenuOption& option);
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     UINT CurrentWindowDpi() const;
@@ -1393,6 +1423,7 @@ private:
     std::vector<DisplayMenuOption> configDisplayOptions_;
     std::vector<LayoutMenuOption> layoutMenuOptions_;
     std::vector<NetworkMenuOption> networkMenuOptions_;
+    std::vector<StorageDriveMenuOption> storageDriveMenuOptions_;
 };
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -1913,6 +1944,22 @@ void DashboardApp::SelectNetworkAdapter(const NetworkMenuOption& option) {
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
+void DashboardApp::ToggleStorageDrive(const StorageDriveMenuOption& option) {
+    std::vector<std::string> driveLetters = config_.storage.drives;
+    const auto it = std::find(driveLetters.begin(), driveLetters.end(), option.driveLetter);
+    if (it == driveLetters.end()) {
+        driveLetters.push_back(option.driveLetter);
+    } else {
+        driveLetters.erase(it);
+    }
+    std::sort(driveLetters.begin(), driveLetters.end());
+    config_.storage.drives = driveLetters;
+    renderer_.SetConfig(config_);
+    telemetry_->SetSelectedStorageDrives(driveLetters);
+    telemetry_->UpdateSnapshot();
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
     const std::filesystem::path configPath = GetRuntimeConfigPath();
     AppConfig config = BuildCurrentConfigForSaving();
@@ -2042,6 +2089,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU diagnosticsMenu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
     HMENU networkMenu = CreatePopupMenu();
+    HMENU storageDrivesMenu = CreatePopupMenu();
     HMENU configureDisplayMenu = CreatePopupMenu();
     const UINT autoStartFlags = MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     layoutMenuOptions_.clear();
@@ -2081,6 +2129,26 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
             SetMenuItemRadioStyle(networkMenu, option.commandId);
         }
     }
+    storageDriveMenuOptions_.clear();
+    const auto& storageDriveCandidates = telemetry_->StorageDriveCandidates();
+    for (size_t i = 0; i < storageDriveCandidates.size() && (kCommandStorageDriveBase + i) <= kCommandStorageDriveMax; ++i) {
+        StorageDriveMenuOption option;
+        option.commandId = kCommandStorageDriveBase + static_cast<UINT>(i);
+        option.driveLetter = storageDriveCandidates[i].letter;
+        option.volumeLabel = storageDriveCandidates[i].volumeLabel;
+        option.totalGb = storageDriveCandidates[i].totalGb;
+        option.selected = storageDriveCandidates[i].selected;
+        storageDriveMenuOptions_.push_back(std::move(option));
+    }
+    if (storageDriveMenuOptions_.empty()) {
+        AppendMenuW(storageDrivesMenu, MF_STRING | MF_GRAYED, kCommandStorageDriveBase, L"No drives found");
+    } else {
+        for (const auto& option : storageDriveMenuOptions_) {
+            const std::wstring label = WideFromUtf8(FormatStorageDriveMenuText(option));
+            const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuW(storageDrivesMenu, flags, option.commandId, label.c_str());
+        }
+    }
     configDisplayOptions_ = EnumerateDisplayMenuOptions(config_);
     if (configDisplayOptions_.empty()) {
         AppendMenuW(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, L"No displays found");
@@ -2101,6 +2169,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), L"Layout");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), L"Network");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), L"Storage drives");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), L"Config To Display");
     AppendMenuW(menu, autoStartFlags, kCommandAutoStart, L"Auto-start on user logon");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(diagnosticsMenu), L"Diagnostics");
@@ -2155,6 +2224,14 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
                 [selected](const NetworkMenuOption& option) { return option.commandId == selected; });
             if (it != networkMenuOptions_.end()) {
                 SelectNetworkAdapter(*it);
+            }
+            break;
+        }
+        if (selected >= kCommandStorageDriveBase && selected <= kCommandStorageDriveMax) {
+            const auto it = std::find_if(storageDriveMenuOptions_.begin(), storageDriveMenuOptions_.end(),
+                [selected](const StorageDriveMenuOption& option) { return option.commandId == selected; });
+            if (it != storageDriveMenuOptions_.end()) {
+                ToggleStorageDrive(*it);
             }
             break;
         }

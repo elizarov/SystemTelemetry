@@ -55,12 +55,20 @@ public:
         return networkAdapterCandidates_;
     }
 
+    const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const override {
+        return storageDriveCandidates_;
+    }
+
     void SetEffectiveConfig(const AppConfig& config) override {
         config_ = config;
     }
 
     void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
         config_.network.adapterName = adapterName;
+    }
+
+    void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) override {
+        config_.storage.drives = driveLetters;
     }
 
     void UpdateSnapshot() override {
@@ -106,6 +114,7 @@ private:
     AppConfig config_;
     TelemetryDump dump_{};
     std::vector<NetworkAdapterCandidate> networkAdapterCandidates_;
+    std::vector<StorageDriveCandidate> storageDriveCandidates_;
     tracing::Trace trace_;
     std::chrono::steady_clock::time_point lastReload_{};
 };

@@ -37,7 +37,7 @@ The language is centered around the dashboard shape:
 The language has nine levels:
 
 1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, `[clock_time]`, and `[clock_date]`
-2. Runtime selection sections such as `[display]` and `[network]`
+2. Runtime selection sections such as `[display]`, `[network]`, and `[storage]`
 3. Board sensor mapping in `[board]`
 4. Named dashboard structure sections in `[layout.<name>]`
 5. Shared dashboard outer spacing in `[dashboard]`
@@ -58,6 +58,10 @@ The language has nine levels:
 `[network]` owns runtime adapter selection:
 
 - `adapter_name = ...`
+
+`[storage]` owns runtime storage-drive selection:
+
+- `drives = C,D,E`
 
 `[board]` owns the mapping from logical layout metric names to board-specific sensor titles:
 
@@ -207,7 +211,7 @@ In a regular vertical `stack(...)`, fixed-height widgets such as `text`, `networ
 
 Example:
 
-- `columns(stack:5(throughput:4(storage.read),throughput:4(storage.write)), drive_usage_list:7(C,D,E))`
+- `columns(stack:5(throughput:4(storage.read),throughput:4(storage.write)), drive_usage_list:7)`
 - `columns(storage_throughput:5, storage_usage:7)`
 
 ## Widget names
@@ -239,7 +243,7 @@ Examples:
 - `gauge(gpu.load)`
 - `metric_list(cpu.ram,board.temp.cpu=Temp,cpu.clock,board.fan.cpu,board.fan.system=System Fan)`
 - `throughput(network.upload)`
-- `drive_usage_list(C,D,E)`
+- `drive_usage_list`
 
 `spacer` reserves layout space without drawing content.
 
@@ -265,15 +269,16 @@ Supported metric references include:
 
 ## Drive and sensor selection
 
-Rendering-oriented selection lives in the layout language when it changes what is drawn.
+Runtime storage-drive selection lives in `[storage]`, while board-sensor selection still comes from layout metric references.
 
 Example:
 
-- `drive_usage_list(C,D,E)`
+- `[storage]`
+- `drives = C,D,E`
 - `metric_list(cpu.ram=RAM,board.temp.cpu=Temp,board.fan.cpu=Fan,board.fan.system=System Fan)`
 
-- This defines a vertical list of drive-usage widgets and their order.
-- It also makes the layout the source of truth for which logical board temperature and fan metrics are requested from the board provider.
+- `[storage] drives` defines the vertical drive-usage list contents and order.
+- Layout metric references still define which logical board temperature and fan metrics are requested from the board provider.
 - The `[board]` section maps those logical metric names to the board-specific sensor titles that the provider looks up.
 
 ## Consistency rules

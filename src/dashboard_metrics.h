@@ -56,7 +56,7 @@ public:
     std::vector<DashboardMetricRow> ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const;
     DashboardThroughputMetric ResolveThroughput(const std::string& metricRef) const;
     std::string ResolveNetworkFooter() const;
-    std::vector<DashboardDriveRow> ResolveDriveRows(const std::vector<std::string>& drives) const;
+    std::vector<DashboardDriveRow> ResolveDriveRows() const;
     std::string ResolveClockTime() const;
     std::string ResolveClockDate() const;
 

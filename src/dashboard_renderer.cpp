@@ -385,6 +385,10 @@ DashboardRenderer::~DashboardRenderer() {
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
     config_ = config;
+    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
+        fonts_.label != nullptr && fonts_.smallFont != nullptr) {
+        ResolveLayout();
+    }
 }
 
 void DashboardRenderer::SetRenderScale(double scale) {
@@ -666,8 +670,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return height;
     }
     if (node.name == "drive_usage_list") {
-        const std::string param = node.parameter;
-        const int count = static_cast<int>(Split(param, ',').size());
+        const int count = static_cast<int>(config_.storage.drives.size());
         const int height = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
             " value=" + std::to_string(height));
@@ -737,8 +740,7 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
         widget.fixedPreferredHeightInStack = true;
     } else if (node.name == "drive_usage_list") {
         widget.kind = WidgetKind::DriveUsageList;
-        widget.binding.param = node.parameter;
-        const int count = static_cast<int>(Split(node.parameter, ',').size());
+        const int count = static_cast<int>(config_.storage.drives.size());
         widget.preferredHeight = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
     } else if (node.name == "clock_time") {
         widget.kind = WidgetKind::ClockTime;
@@ -1447,7 +1449,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
     case WidgetKind::Spacer:
         return;
     case WidgetKind::DriveUsageList:
-        DrawDriveUsageWidget(hdc, widget.rect, metrics.ResolveDriveRows(Split(widget.binding.param, ',')));
+        DrawDriveUsageWidget(hdc, widget.rect, metrics.ResolveDriveRows());
         return;
     case WidgetKind::ClockTime:
         if (renderMode_ != RenderMode::Blank) {

@@ -38,6 +38,29 @@ struct DriveCounterState {
     PDH_HCOUNTER writeCounter = nullptr;
 };
 
+std::string NormalizeDriveLetter(const std::string& drive) {
+    if (drive.empty()) {
+        return {};
+    }
+    const unsigned char ch = static_cast<unsigned char>(drive.front());
+    if (!std::isalpha(ch)) {
+        return {};
+    }
+    return std::string(1, static_cast<char>(std::toupper(ch)));
+}
+
+bool IsSelectableStorageDriveType(UINT driveType) {
+    return driveType == DRIVE_FIXED || driveType == DRIVE_REMOVABLE;
+}
+
+std::string ReadVolumeLabel(const std::wstring& root) {
+    wchar_t volumeName[MAX_PATH] = {};
+    if (!GetVolumeInformationW(root.c_str(), volumeName, ARRAYSIZE(volumeName), nullptr, nullptr, nullptr, nullptr, 0)) {
+        return {};
+    }
+    return Utf8FromWide(volumeName);
+}
+
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -282,6 +305,7 @@ struct TelemetryCollector::Impl {
     void ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample);
     void EnumerateDrives();
     void UpdateStorageThroughput(bool initializeOnly);
+    void RefreshStorageDriveCandidates();
     void RefreshDriveUsage();
     void UpdateNetworkState(bool initializeOnly);
     void PushRetainedHistorySample(const std::string& seriesRef, double value);
@@ -294,6 +318,7 @@ struct TelemetryCollector::Impl {
     AppConfig config_;
     SystemSnapshot snapshot_;
     std::vector<NetworkAdapterCandidate> networkAdapterCandidates_;
+    std::vector<StorageDriveCandidate> storageDriveCandidates_;
     tracing::Trace trace_;
     std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
     std::unique_ptr<BoardVendorTelemetryProvider> boardProvider_;
@@ -453,6 +478,7 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     const PDH_STATUS storageCollectStatus = PdhCollectQueryData(impl_->storageQuery_);
     impl_->trace_.Write(("telemetry:pdh_collect storage_query " + tracing::Trace::FormatPdhStatus("status", storageCollectStatus)).c_str());
 
+    impl_->RefreshStorageDriveCandidates();
     impl_->EnumerateDrives();
     impl_->InitializeGpuAdapterInfo();
     impl_->UpdateNetworkState(true);
@@ -502,8 +528,30 @@ const std::vector<NetworkAdapterCandidate>& TelemetryCollector::NetworkAdapterCa
     return impl_->networkAdapterCandidates_;
 }
 
+const std::vector<StorageDriveCandidate>& TelemetryCollector::StorageDriveCandidates() const {
+    return impl_->storageDriveCandidates_;
+}
+
 void TelemetryCollector::SetPreferredNetworkAdapterName(std::string adapterName) {
     impl_->config_.network.adapterName = std::move(adapterName);
+}
+
+void TelemetryCollector::SetSelectedStorageDrives(std::vector<std::string> driveLetters) {
+    std::vector<std::string> normalized;
+    normalized.reserve(driveLetters.size());
+    for (const auto& drive : driveLetters) {
+        const std::string letter = NormalizeDriveLetter(drive);
+        if (letter.empty()) {
+            continue;
+        }
+        if (std::find(normalized.begin(), normalized.end(), letter) == normalized.end()) {
+            normalized.push_back(letter);
+        }
+    }
+    std::sort(normalized.begin(), normalized.end());
+    impl_->config_.storage.drives = std::move(normalized);
+    impl_->RefreshStorageDriveCandidates();
+    impl_->EnumerateDrives();
 }
 
 void TelemetryCollector::UpdateSnapshot() {
@@ -512,6 +560,7 @@ void TelemetryCollector::UpdateSnapshot() {
     impl_->UpdateGpu();
     impl_->UpdateNetworkState(false);
     impl_->UpdateStorageThroughput(false);
+    impl_->RefreshStorageDriveCandidates();
     impl_->UpdateMemory();
     impl_->RefreshDriveUsage();
     GetLocalTime(&impl_->snapshot_.now);
@@ -739,30 +788,85 @@ void TelemetryCollector::Impl::UpdateMemory() {
 void TelemetryCollector::Impl::EnumerateDrives() {
     snapshot_.drives.clear();
     driveCounters_.clear();
-    for (const auto& drive : config_.driveLetters) {
-        if (!drive.empty()) {
-            const std::string label = drive.substr(0, 1) + ":";
-            snapshot_.drives.push_back(DriveInfo{label});
-            Trace(("telemetry:drive_config label=" + label).c_str());
+    for (const auto& drive : config_.storage.drives) {
+        const std::string letter = NormalizeDriveLetter(drive);
+        if (letter.empty()) {
+            continue;
+        }
 
-            if (storageQuery_ != nullptr) {
-                const std::wstring logicalDisk = WideFromUtf8(label);
-                DriveCounterState counters;
-                counters.label = label;
-                const std::wstring readPath = L"\\LogicalDisk(" + logicalDisk + L")\\Disk Read Bytes/sec";
-                const std::wstring writePath = L"\\LogicalDisk(" + logicalDisk + L")\\Disk Write Bytes/sec";
-                const PDH_STATUS readStatus = AddCounterCompat(storageQuery_, readPath.c_str(), &counters.readCounter);
-                const PDH_STATUS writeStatus = AddCounterCompat(storageQuery_, writePath.c_str(), &counters.writeCounter);
-                Trace(("telemetry:pdh_add drive_read label=" + label + " path=\"" + Utf8FromWide(readPath) + "\" " +
-                    tracing::Trace::FormatPdhStatus("status", readStatus)).c_str());
-                Trace(("telemetry:pdh_add drive_write label=" + label + " path=\"" + Utf8FromWide(writePath) + "\" " +
-                    tracing::Trace::FormatPdhStatus("status", writeStatus)).c_str());
-                driveCounters_.push_back(std::move(counters));
-            }
+        const std::string label = letter + ":";
+        DriveInfo info;
+        info.label = label;
+        snapshot_.drives.push_back(std::move(info));
+        Trace(("telemetry:drive_config label=" + label).c_str());
+
+        if (storageQuery_ != nullptr) {
+            const std::wstring logicalDisk = WideFromUtf8(label);
+            DriveCounterState counters;
+            counters.label = label;
+            const std::wstring readPath = L"\\LogicalDisk(" + logicalDisk + L")\\Disk Read Bytes/sec";
+            const std::wstring writePath = L"\\LogicalDisk(" + logicalDisk + L")\\Disk Write Bytes/sec";
+            const PDH_STATUS readStatus = AddCounterCompat(storageQuery_, readPath.c_str(), &counters.readCounter);
+            const PDH_STATUS writeStatus = AddCounterCompat(storageQuery_, writePath.c_str(), &counters.writeCounter);
+            Trace(("telemetry:pdh_add drive_read label=" + label + " path=\"" + Utf8FromWide(readPath) + "\" " +
+                tracing::Trace::FormatPdhStatus("status", readStatus)).c_str());
+            Trace(("telemetry:pdh_add drive_write label=" + label + " path=\"" + Utf8FromWide(writePath) + "\" " +
+                tracing::Trace::FormatPdhStatus("status", writeStatus)).c_str());
+            driveCounters_.push_back(std::move(counters));
         }
     }
     Trace(("telemetry:drive_enumerate count=" + std::to_string(snapshot_.drives.size())).c_str());
     RefreshDriveUsage();
+}
+
+void TelemetryCollector::Impl::RefreshStorageDriveCandidates() {
+    storageDriveCandidates_.clear();
+
+    const DWORD bufferLength = GetLogicalDriveStringsW(0, nullptr);
+    if (bufferLength == 0) {
+        Trace("telemetry:storage_candidates skipped=no_drives");
+        return;
+    }
+
+    std::vector<wchar_t> buffer(bufferLength + 1, L'\0');
+    const DWORD copied = GetLogicalDriveStringsW(static_cast<DWORD>(buffer.size()), buffer.data());
+    if (copied == 0 || copied >= buffer.size()) {
+        Trace("telemetry:storage_candidates skipped=query_failed");
+        return;
+    }
+
+    for (const wchar_t* current = buffer.data(); *current != L'\0'; current += wcslen(current) + 1) {
+        const std::wstring root(current);
+        if (root.size() < 2 || !iswalpha(root[0])) {
+            continue;
+        }
+
+        const UINT driveType = GetDriveTypeW(root.c_str());
+        if (!IsSelectableStorageDriveType(driveType)) {
+            Trace(("telemetry:storage_candidate_skip root=\"" + Utf8FromWide(root) + "\" type=" + std::to_string(driveType)).c_str());
+            continue;
+        }
+
+        ULARGE_INTEGER totalBytes{};
+        if (!GetDiskFreeSpaceExW(root.c_str(), nullptr, &totalBytes, nullptr) || totalBytes.QuadPart == 0) {
+            Trace(("telemetry:storage_candidate_skip root=\"" + Utf8FromWide(root) + "\" type=" + std::to_string(driveType) +
+                " total_bytes=" + std::to_string(totalBytes.QuadPart)).c_str());
+            continue;
+        }
+
+        StorageDriveCandidate candidate;
+        candidate.letter = std::string(1, static_cast<char>(towupper(root[0])));
+        candidate.volumeLabel = ReadVolumeLabel(root);
+        candidate.totalGb = totalBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
+        candidate.driveType = driveType;
+        candidate.selected = std::find(config_.storage.drives.begin(), config_.storage.drives.end(), candidate.letter) != config_.storage.drives.end();
+        storageDriveCandidates_.push_back(std::move(candidate));
+    }
+
+    std::sort(storageDriveCandidates_.begin(), storageDriveCandidates_.end(), [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) {
+        return lhs.letter < rhs.letter;
+    });
+    Trace(("telemetry:storage_candidates count=" + std::to_string(storageDriveCandidates_.size())).c_str());
 }
 
 void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
@@ -808,7 +912,8 @@ void TelemetryCollector::Impl::RefreshDriveUsage() {
     for (auto& drive : snapshot_.drives) {
         const std::wstring root = WideFromUtf8(drive.label + "\\");
         const UINT driveType = GetDriveTypeW(root.c_str());
-        if (driveType != DRIVE_FIXED) {
+        drive.driveType = driveType;
+        if (!IsSelectableStorageDriveType(driveType)) {
             Trace(("telemetry:drive_skip label=" + drive.label + " type=" + std::to_string(driveType)).c_str());
             continue;
         }
@@ -824,7 +929,9 @@ void TelemetryCollector::Impl::RefreshDriveUsage() {
 
         const double totalGb = totalBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
         const double freeGb = freeBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
+        drive.totalGb = totalGb;
         drive.freeGb = freeGb;
+        drive.volumeLabel = ReadVolumeLabel(root);
         drive.usedPercent = std::clamp((1.0 - (freeGb / totalGb)) * 100.0, 0.0, 100.0);
         drive.readMbps = 0.0;
         drive.writeMbps = 0.0;

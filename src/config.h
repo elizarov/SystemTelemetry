@@ -14,6 +14,7 @@ struct UiFontConfig {
     int weight = 0;
 };
 CONFIG_CODEC(UiFontConfig, configschema::FontSpecCodec);
+CONFIG_CODEC(std::vector<std::string>, configschema::StringCodec);
 
 struct UiFontSetConfig {
     CONFIG_REFLECTED_STRUCT(UiFontSetConfig)
@@ -50,6 +51,12 @@ struct NetworkConfig {
     CONFIG_REFLECTED_STRUCT(NetworkConfig)
     CONFIG_VALUE(std::string, adapterName, "adapter_name");
     CONFIG_SECTION("network");
+};
+
+struct StorageConfig {
+    CONFIG_REFLECTED_STRUCT(StorageConfig)
+    CONFIG_VALUE(std::vector<std::string>, drives, "drives");
+    CONFIG_SECTION("storage");
 };
 
 struct BoardConfig {
@@ -253,13 +260,12 @@ struct AppConfig {
     CONFIG_REFLECTED_BINDINGS(AppConfig)
     CONFIG_SECTION_VALUE(DisplayConfig, display);
     CONFIG_SECTION_VALUE(NetworkConfig, network);
+    CONFIG_SECTION_VALUE(StorageConfig, storage);
     CONFIG_SECTION_VALUE(BoardConfig, board);
     CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
     CONFIG_DYNAMIC_SECTION_VALUE(NamedLayoutSectionConfig, layouts, name);
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
-
-    std::vector<std::string> driveLetters;
 };
 
 std::string LoadEmbeddedConfigTemplate();

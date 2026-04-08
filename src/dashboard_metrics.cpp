@@ -8,13 +8,6 @@
 
 namespace {
 
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
-}
-
 std::string FormatScalarValue(const ScalarMetric& metric, int precision) {
     if (!metric.value.has_value()) {
         return "N/A";
@@ -264,28 +257,15 @@ std::string DashboardMetricSource::ResolveNetworkFooter() const {
     return snapshot_.network.adapterName + " | " + snapshot_.network.ipAddress;
 }
 
-std::vector<DashboardDriveRow> DashboardMetricSource::ResolveDriveRows(const std::vector<std::string>& drives) const {
-    std::vector<DriveInfo> ordered;
-    for (const auto& driveName : drives) {
-        const auto it = std::find_if(snapshot_.drives.begin(), snapshot_.drives.end(), [&](const DriveInfo& drive) {
-            return ToLower(drive.label) == ToLower(driveName + ":") || ToLower(drive.label) == ToLower(driveName);
-        });
-        if (it != snapshot_.drives.end()) {
-            ordered.push_back(*it);
-        }
-    }
-    if (ordered.empty()) {
-        ordered = snapshot_.drives;
-    }
-
+std::vector<DashboardDriveRow> DashboardMetricSource::ResolveDriveRows() const {
     std::vector<DashboardDriveRow> rows;
     double totalReadMbps = 0.0;
     double totalWriteMbps = 0.0;
-    for (const auto& drive : ordered) {
+    for (const auto& drive : snapshot_.drives) {
         totalReadMbps += std::max(0.0, drive.readMbps);
         totalWriteMbps += std::max(0.0, drive.writeMbps);
     }
-    for (const auto& drive : ordered) {
+    for (const auto& drive : snapshot_.drives) {
         const double readActivity = totalReadMbps > 0.0 ? std::clamp(drive.readMbps / totalReadMbps, 0.0, 1.0) : 0.0;
         const double writeActivity = totalWriteMbps > 0.0 ? std::clamp(drive.writeMbps / totalWriteMbps, 0.0, 1.0) : 0.0;
         rows.push_back(DashboardDriveRow{drive.label, readActivity, writeActivity, drive.usedPercent,
