@@ -362,41 +362,42 @@ bool DispatchKnownBindingSection(Owner& owner, const std::string& section, const
     bool handled = false;
     ForEachKnownBinding<BindingList>(owner, [&](auto binding, auto& currentOwner) {
         using Binding = decltype(binding);
-        using Section = typename Binding::section_type;
         if (!handled) {
-            if constexpr (Binding::is_dynamic) {
+            if constexpr (Binding::is_recursive) {
+                handled = DispatchKnownBindingSection<typename Binding::nested_owner_type::BindingList>(
+                    Binding::Get(currentOwner), section, key, value);
+            } else if constexpr (Binding::is_dynamic) {
+                using Section = typename Binding::section_type;
                 if (Section::Matches(section)) {
                     typename Section::owner_type& item = Binding::Ensure(currentOwner, Section::Suffix(section));
                     ApplySectionValue<Section>(item, key, value);
                     handled = true;
                 }
-            } else if (section == Section::name.view()) {
+            } else {
+                using Section = typename Binding::section_type;
+                if (section == Section::name.view()) {
                 ApplySectionValue<Section>(Binding::Get(currentOwner), key, value);
                 handled = true;
+                }
             }
         }
     });
     return handled;
 }
 
-bool DispatchKnownStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
-    if (DispatchKnownBindingSection<AppConfig::BindingList>(config, section, key, value)) {
-        return true;
-    }
-
-    return DispatchKnownBindingSection<LayoutConfig::BindingList>(config.layout, section, key, value);
-}
-
 template <typename BindingList, typename Owner, typename UpdateKeyFn>
 void SaveKnownSections(const Owner& owner, UpdateKeyFn&& updateKey) {
     ForEachKnownBinding<BindingList>(owner, [&](auto binding, const auto& currentOwner) {
         using Binding = decltype(binding);
-        using Section = typename Binding::section_type;
-        if constexpr (Binding::is_dynamic) {
+        if constexpr (Binding::is_recursive) {
+            SaveKnownSections<typename Binding::nested_owner_type::BindingList>(Binding::Get(currentOwner), updateKey);
+        } else if constexpr (Binding::is_dynamic) {
+            using Section = typename Binding::section_type;
             for (const auto& item : Binding::Get(currentOwner)) {
                 SaveDynamicStructuredSection<Section>(item, Binding::Key(item), updateKey);
             }
         } else {
+            using Section = typename Binding::section_type;
             SaveStructuredSection<Section>(Binding::Get(currentOwner), updateKey);
         }
     });
@@ -406,14 +407,20 @@ template <typename BindingList, typename Owner, typename CompareOwner, typename 
 void SaveKnownSectionDifferences(const Owner& owner, const CompareOwner* compareOwner, UpdateKeyFn&& updateKey) {
     ForEachKnownBinding<BindingList>(owner, [&](auto binding, const auto& currentOwner) {
         using Binding = decltype(binding);
-        using Section = typename Binding::section_type;
-        if constexpr (Binding::is_dynamic) {
+        if constexpr (Binding::is_recursive) {
+            const typename Binding::nested_owner_type* compareNestedOwner =
+                compareOwner != nullptr ? &Binding::Get(*compareOwner) : nullptr;
+            SaveKnownSectionDifferences<typename Binding::nested_owner_type::BindingList>(
+                Binding::Get(currentOwner), compareNestedOwner, updateKey);
+        } else if constexpr (Binding::is_dynamic) {
+            using Section = typename Binding::section_type;
             for (const auto& item : Binding::Get(currentOwner)) {
                 const typename Binding::item_type* compareItem =
                     compareOwner != nullptr ? Binding::Find(*compareOwner, Binding::Key(item)) : nullptr;
                 SaveDynamicStructuredSectionDifferences<Section>(item, Binding::Key(item), compareItem, updateKey);
             }
         } else {
+            using Section = typename Binding::section_type;
             using SectionOwner = typename Section::owner_type;
             const SectionOwner* compareSectionOwner = compareOwner != nullptr ? &Binding::Get(*compareOwner) : nullptr;
             SaveStructuredSectionDifferences<Section>(Binding::Get(currentOwner), compareSectionOwner, updateKey);
@@ -795,7 +802,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
         const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
 
-        if (DispatchKnownStructuredSection(config, section, key, value)) {
+        if (DispatchKnownBindingSection<AppConfig::BindingList>(config, section, key, value)) {
             continue;
         }
     }
@@ -846,13 +853,11 @@ std::string JoinConfigLines(const std::vector<std::string>& lines) {
 template <typename UpdateKeyFn>
 void SaveKnownStructuredSections(const AppConfig& config, UpdateKeyFn&& updateKey) {
     SaveKnownSections<AppConfig::BindingList>(config, updateKey);
-    SaveKnownSections<LayoutConfig::BindingList>(config.layout, updateKey);
 }
 
 template <typename UpdateKeyFn>
 void SaveKnownStructuredSectionDifferences(const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn&& updateKey) {
     SaveKnownSectionDifferences<AppConfig::BindingList>(config, compareConfig, updateKey);
-    SaveKnownSectionDifferences<LayoutConfig::BindingList>(config.layout, compareConfig != nullptr ? &compareConfig->layout : nullptr, updateKey);
 }
 
 std::string BuildSavedConfigText(const std::string& initialText, const AppConfig& config, const AppConfig* compareConfig) {

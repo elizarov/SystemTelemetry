@@ -78,6 +78,7 @@ struct StructuredBindingDescriptor {
     using owner_type = Owner;
     using section_type = Section;
     static constexpr bool is_dynamic = false;
+    static constexpr bool is_recursive = false;
 
     static constexpr auto member = Member;
 
@@ -96,6 +97,7 @@ struct DynamicStructuredBindingDescriptor {
     using item_type = Item;
     using section_type = typename Item::Section;
     static constexpr bool is_dynamic = true;
+    static constexpr bool is_recursive = false;
 
     static constexpr auto member = Member;
     static constexpr auto key_member = KeyMember;
@@ -138,6 +140,24 @@ struct DynamicStructuredBindingDescriptor {
 
     static std::string_view Key(const Item& item) {
         return item.*key_member;
+    }
+};
+
+template <typename Owner, typename NestedOwner, NestedOwner Owner::*Member>
+struct RecursiveStructuredBindingDescriptor {
+    using owner_type = Owner;
+    using nested_owner_type = NestedOwner;
+    static constexpr bool is_dynamic = false;
+    static constexpr bool is_recursive = true;
+
+    static constexpr auto member = Member;
+
+    static NestedOwner& Get(Owner& owner) {
+        return owner.*member;
+    }
+
+    static const NestedOwner& Get(const Owner& owner) {
+        return owner.*member;
     }
 };
 
@@ -306,4 +326,10 @@ public:
     std::vector<item_type> member{}; \
     friend consteval auto reflect_binding(configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) { \
         return configschema::DynamicStructuredBindingDescriptor<Self, item_type, &Self::member, &item_type::key_member>{}; \
+    }
+
+#define CONFIG_RECURSIVE_BINDING_VALUE(field_type, member) \
+    field_type member{}; \
+    friend consteval auto reflect_binding(configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) { \
+        return configschema::RecursiveStructuredBindingDescriptor<Self, field_type, &Self::member>{}; \
     }

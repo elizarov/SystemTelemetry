@@ -256,10 +256,10 @@ struct AppConfig {
     CONFIG_SECTION_VALUE(BoardConfig, board);
     CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
     CONFIG_DYNAMIC_SECTION_VALUE(NamedLayoutSectionConfig, layouts, name);
+    CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
 
     std::vector<std::string> driveLetters;
-    LayoutConfig layout;
 };
 
 std::string LoadEmbeddedConfigTemplate();
