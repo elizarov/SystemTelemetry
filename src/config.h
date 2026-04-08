@@ -218,20 +218,21 @@ struct ClockDateWidgetConfig {
 };
 
 struct LayoutConfig {
+    CONFIG_REFLECTED_BINDINGS(LayoutConfig)
     LayoutSectionConfig structure{};
-    ColorConfig colors{};
-    DashboardSectionConfig dashboard{};
-    CardStyleConfig cardStyle{};
-    MetricListWidgetConfig metricList{};
-    DriveUsageListWidgetConfig driveUsageList{};
-    ThroughputWidgetConfig throughput{};
-    GaugeWidgetConfig gauge{};
-    TextWidgetConfig text{};
-    NetworkFooterWidgetConfig networkFooter{};
-    ClockTimeWidgetConfig clockTime{};
-    ClockDateWidgetConfig clockDate{};
-
-    UiFontSetConfig fonts{};
+    CONFIG_SECTION_VALUE(ColorConfig, colors);
+    CONFIG_SECTION_VALUE(DashboardSectionConfig, dashboard);
+    CONFIG_SECTION_VALUE(CardStyleConfig, cardStyle);
+    CONFIG_SECTION_VALUE(MetricListWidgetConfig, metricList);
+    CONFIG_SECTION_VALUE(DriveUsageListWidgetConfig, driveUsageList);
+    CONFIG_SECTION_VALUE(ThroughputWidgetConfig, throughput);
+    CONFIG_SECTION_VALUE(GaugeWidgetConfig, gauge);
+    CONFIG_SECTION_VALUE(TextWidgetConfig, text);
+    CONFIG_SECTION_VALUE(NetworkFooterWidgetConfig, networkFooter);
+    CONFIG_SECTION_VALUE(ClockTimeWidgetConfig, clockTime);
+    CONFIG_SECTION_VALUE(ClockDateWidgetConfig, clockDate);
+    CONFIG_SECTION_VALUE(UiFontSetConfig, fonts);
+    CONFIG_BINDING_LIST();
 
     LayoutNodeConfig cardsLayout;
     std::vector<LayoutCardConfig> cards;

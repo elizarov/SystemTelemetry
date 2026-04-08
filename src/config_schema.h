@@ -65,6 +65,22 @@ struct FieldDescriptor {
     static constexpr auto member = Member;
 };
 
+template <typename Owner, typename Section, typename Section::owner_type Owner::*Member>
+struct StructuredBindingDescriptor {
+    using owner_type = Owner;
+    using section_type = Section;
+
+    static constexpr auto member = Member;
+
+    static typename Section::owner_type& Get(Owner& owner) {
+        return owner.*member;
+    }
+
+    static const typename Section::owner_type& Get(const Owner& owner) {
+        return owner.*member;
+    }
+};
+
 template <FixedString Name, typename Owner, typename... Fields>
 struct SectionDescriptor {
     using owner_type = Owner;
@@ -101,8 +117,16 @@ template <typename Owner, size_t Index>
 struct FieldTag {};
 
 template <typename Owner, size_t Index>
+struct BindingTag {};
+
+template <typename Owner, size_t Index>
 concept HasReflectedField = requires {
     reflect_field(FieldTag<Owner, Index>{});
+};
+
+template <typename Owner, size_t Index>
+concept HasReflectedBinding = requires {
+    reflect_binding(BindingTag<Owner, Index>{});
 };
 
 template <typename Owner, size_t Index = 0>
@@ -114,9 +138,23 @@ consteval size_t CountReflectedFields() {
     }
 }
 
+template <typename Owner, size_t Index = 0>
+consteval size_t CountReflectedBindings() {
+    if constexpr (HasReflectedBinding<Owner, Index>) {
+        return CountReflectedBindings<Owner, Index + 1>();
+    } else {
+        return Index;
+    }
+}
+
 template <typename Owner, size_t... Index>
 consteval auto MakeReflectedFieldTuple(std::index_sequence<Index...>) {
     return std::tuple{reflect_field(FieldTag<Owner, Index>{})...};
+}
+
+template <typename Owner, size_t... Index>
+consteval auto MakeReflectedBindingTuple(std::index_sequence<Index...>) {
+    return std::tuple{reflect_binding(BindingTag<Owner, Index>{})...};
 }
 
 template <FixedString Name, typename Owner>
@@ -147,6 +185,14 @@ struct AutoDynamicSectionDescriptor {
     }
 };
 
+template <typename Owner>
+struct AutoStructuredBindingListDescriptor {
+    using owner_type = Owner;
+
+    static constexpr auto bindings =
+        MakeReflectedBindingTuple<Owner>(std::make_index_sequence<CountReflectedBindings<Owner>()>{});
+};
+
 }  // namespace configschema
 
 #define CONFIG_REFLECTED_STRUCT(owner) \
@@ -172,3 +218,18 @@ public:
 
 #define CONFIG_DYNAMIC_SECTION(prefix) \
     using Section = configschema::AutoDynamicSectionDescriptor<prefix, Self>
+
+#define CONFIG_REFLECTED_BINDINGS(owner) \
+private: \
+    static constexpr std::size_t _configschema_binding_base = __COUNTER__; \
+    using Self = owner; \
+public:
+
+#define CONFIG_SECTION_VALUE(field_type, member) \
+    field_type member{}; \
+    friend consteval auto reflect_binding(configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) { \
+        return configschema::StructuredBindingDescriptor<Self, typename field_type::Section, &Self::member>{}; \
+    }
+
+#define CONFIG_BINDING_LIST() \
+    using BindingList = configschema::AutoStructuredBindingListDescriptor<Self>

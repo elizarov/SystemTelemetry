@@ -329,54 +329,6 @@ MetricScaleConfig& AccessMetricScalesConfig(AppConfig& config) {
     return config.metricScales;
 }
 
-DashboardSectionConfig& AccessDashboardSectionConfig(AppConfig& config) {
-    return config.layout.dashboard;
-}
-
-CardStyleConfig& AccessCardStyleConfig(AppConfig& config) {
-    return config.layout.cardStyle;
-}
-
-ColorConfig& AccessColorConfig(AppConfig& config) {
-    return config.layout.colors;
-}
-
-UiFontSetConfig& AccessFontConfig(AppConfig& config) {
-    return config.layout.fonts;
-}
-
-MetricListWidgetConfig& AccessMetricListWidgetConfig(AppConfig& config) {
-    return config.layout.metricList;
-}
-
-DriveUsageListWidgetConfig& AccessDriveUsageListWidgetConfig(AppConfig& config) {
-    return config.layout.driveUsageList;
-}
-
-ThroughputWidgetConfig& AccessThroughputWidgetConfig(AppConfig& config) {
-    return config.layout.throughput;
-}
-
-GaugeWidgetConfig& AccessGaugeWidgetConfig(AppConfig& config) {
-    return config.layout.gauge;
-}
-
-TextWidgetConfig& AccessTextWidgetConfig(AppConfig& config) {
-    return config.layout.text;
-}
-
-NetworkFooterWidgetConfig& AccessNetworkFooterWidgetConfig(AppConfig& config) {
-    return config.layout.networkFooter;
-}
-
-ClockTimeWidgetConfig& AccessClockTimeWidgetConfig(AppConfig& config) {
-    return config.layout.clockTime;
-}
-
-ClockDateWidgetConfig& AccessClockDateWidgetConfig(AppConfig& config) {
-    return config.layout.clockDate;
-}
-
 template <typename Section, auto Accessor>
 struct StructuredSectionBinding {
     using section_type = Section;
@@ -393,37 +345,18 @@ struct StructuredSectionBinding {
 using DisplaySectionBinding = StructuredSectionBinding<DisplayConfig::Section, AccessDisplayConfig>;
 using NetworkSectionBinding = StructuredSectionBinding<NetworkConfig::Section, AccessNetworkConfig>;
 using MetricScalesSectionBinding = StructuredSectionBinding<MetricScaleConfig::Section, AccessMetricScalesConfig>;
-using DashboardSectionBinding = StructuredSectionBinding<DashboardSectionConfig::Section, AccessDashboardSectionConfig>;
-using CardStyleSectionBinding = StructuredSectionBinding<CardStyleConfig::Section, AccessCardStyleConfig>;
-using ColorSectionBinding = StructuredSectionBinding<ColorConfig::Section, AccessColorConfig>;
-using FontSectionBinding = StructuredSectionBinding<UiFontSetConfig::Section, AccessFontConfig>;
-using MetricListSectionBinding = StructuredSectionBinding<MetricListWidgetConfig::Section, AccessMetricListWidgetConfig>;
-using DriveUsageListSectionBinding =
-    StructuredSectionBinding<DriveUsageListWidgetConfig::Section, AccessDriveUsageListWidgetConfig>;
-using ThroughputSectionBinding = StructuredSectionBinding<ThroughputWidgetConfig::Section, AccessThroughputWidgetConfig>;
-using GaugeSectionBinding = StructuredSectionBinding<GaugeWidgetConfig::Section, AccessGaugeWidgetConfig>;
-using TextSectionBinding = StructuredSectionBinding<TextWidgetConfig::Section, AccessTextWidgetConfig>;
-using NetworkFooterSectionBinding =
-    StructuredSectionBinding<NetworkFooterWidgetConfig::Section, AccessNetworkFooterWidgetConfig>;
-using ClockTimeSectionBinding = StructuredSectionBinding<ClockTimeWidgetConfig::Section, AccessClockTimeWidgetConfig>;
-using ClockDateSectionBinding = StructuredSectionBinding<ClockDateWidgetConfig::Section, AccessClockDateWidgetConfig>;
 
-using KnownStructuredBindings = std::tuple<
+using TopLevelStructuredBindings = std::tuple<
     DisplaySectionBinding,
     NetworkSectionBinding,
-    MetricScalesSectionBinding,
-    DashboardSectionBinding,
-    CardStyleSectionBinding,
-    ColorSectionBinding,
-    FontSectionBinding,
-    MetricListSectionBinding,
-    DriveUsageListSectionBinding,
-    ThroughputSectionBinding,
-    GaugeSectionBinding,
-    TextSectionBinding,
-    NetworkFooterSectionBinding,
-    ClockTimeSectionBinding,
-    ClockDateSectionBinding>;
+    MetricScalesSectionBinding>;
+
+template <typename BindingList, typename Owner, typename Fn>
+void ForEachStructuredBinding(Owner&& owner, Fn&& fn) {
+    std::apply([&](auto... binding) {
+        (..., fn(std::remove_cvref_t<decltype(binding)>{}, owner));
+    }, BindingList::bindings);
+}
 
 template <typename... Bindings>
 bool DispatchStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
@@ -454,23 +387,24 @@ bool DispatchDynamicStructuredSection(const std::string& section, const std::str
 }
 
 bool DispatchKnownStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
-    return DispatchStructuredSection<
+    if (DispatchStructuredSection<
         DisplaySectionBinding,
         NetworkSectionBinding,
-        MetricScalesSectionBinding,
-        DashboardSectionBinding,
-        CardStyleSectionBinding,
-        ColorSectionBinding,
-        FontSectionBinding,
-        MetricListSectionBinding,
-        DriveUsageListSectionBinding,
-        ThroughputSectionBinding,
-        GaugeSectionBinding,
-        TextSectionBinding,
-        NetworkFooterSectionBinding,
-        ClockTimeSectionBinding,
-        ClockDateSectionBinding
-    >(config, section, key, value);
+        MetricScalesSectionBinding
+    >(config, section, key, value)) {
+        return true;
+    }
+
+    bool handled = false;
+    ForEachStructuredBinding<LayoutConfig::BindingList>(config.layout, [&](auto binding, auto& owner) {
+        using Binding = decltype(binding);
+        using Section = typename Binding::section_type;
+        if (!handled && section == Section::name.view()) {
+            ApplyStructuredSectionValue<Section>(Binding::Get(owner), key, value);
+            handled = true;
+        }
+    });
+    return handled;
 }
 
 std::string ReadFileUtf8(const std::filesystem::path& path) {
@@ -907,7 +841,13 @@ void SaveKnownStructuredSections(const AppConfig& config, UpdateKeyFn&& updateKe
         (..., SaveStructuredSection<typename std::remove_cvref_t<decltype(binding)>::section_type>(
             std::remove_cvref_t<decltype(binding)>::Get(config),
             updateKey));
-    }, KnownStructuredBindings{});
+    }, TopLevelStructuredBindings{});
+
+    ForEachStructuredBinding<LayoutConfig::BindingList>(config.layout, [&](auto binding, const auto& owner) {
+        using Binding = decltype(binding);
+        using Section = typename Binding::section_type;
+        SaveStructuredSection<Section>(Binding::Get(owner), updateKey);
+    });
 }
 
 template <typename UpdateKeyFn>
@@ -917,7 +857,15 @@ void SaveKnownStructuredSectionDifferences(const AppConfig& config, const AppCon
             std::remove_cvref_t<decltype(binding)>::Get(config),
             compareConfig != nullptr ? &std::remove_cvref_t<decltype(binding)>::Get(*compareConfig) : nullptr,
             updateKey));
-    }, KnownStructuredBindings{});
+    }, TopLevelStructuredBindings{});
+
+    ForEachStructuredBinding<LayoutConfig::BindingList>(config.layout, [&](auto binding, const auto& owner) {
+        using Binding = decltype(binding);
+        using Section = typename Binding::section_type;
+        using SectionOwner = typename Section::owner_type;
+        const SectionOwner* compareOwner = compareConfig != nullptr ? &Binding::Get(compareConfig->layout) : nullptr;
+        SaveStructuredSectionDifferences<Section>(Binding::Get(owner), compareOwner, updateKey);
+    });
 }
 
 void SaveBoardValues(const AppConfig& config, const AppConfig* compareConfig,
