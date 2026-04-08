@@ -242,11 +242,11 @@ struct LayoutConfig {
     CONFIG_SECTION_VALUE(ClockTimeWidgetConfig, clockTime);
     CONFIG_SECTION_VALUE(ClockDateWidgetConfig, clockDate);
     CONFIG_SECTION_VALUE(UiFontSetConfig, fonts);
+    CONFIG_DYNAMIC_SECTION_VALUE(LayoutCardConfig, cards, id);
     CONFIG_BINDING_LIST();
 
     LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
-    std::vector<LayoutCardConfig> cards;
 };
 
 struct AppConfig {
@@ -255,10 +255,10 @@ struct AppConfig {
     CONFIG_SECTION_VALUE(NetworkConfig, network);
     CONFIG_SECTION_VALUE(BoardConfig, board);
     CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
+    CONFIG_DYNAMIC_SECTION_VALUE(NamedLayoutSectionConfig, layouts, name);
     CONFIG_BINDING_LIST();
 
     std::vector<std::string> driveLetters;
-    std::vector<NamedLayoutSectionConfig> layouts;
     LayoutConfig layout;
 };
 

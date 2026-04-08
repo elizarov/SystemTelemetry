@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <vector>
 #include <utility>
 
 namespace configschema {
@@ -76,6 +77,7 @@ template <typename Owner, typename Section, typename Section::owner_type Owner::
 struct StructuredBindingDescriptor {
     using owner_type = Owner;
     using section_type = Section;
+    static constexpr bool is_dynamic = false;
 
     static constexpr auto member = Member;
 
@@ -85,6 +87,57 @@ struct StructuredBindingDescriptor {
 
     static const typename Section::owner_type& Get(const Owner& owner) {
         return owner.*member;
+    }
+};
+
+template <typename Owner, typename Item, std::vector<Item> Owner::*Member, std::string Item::*KeyMember>
+struct DynamicStructuredBindingDescriptor {
+    using owner_type = Owner;
+    using item_type = Item;
+    using section_type = typename Item::Section;
+    static constexpr bool is_dynamic = true;
+
+    static constexpr auto member = Member;
+    static constexpr auto key_member = KeyMember;
+
+    static std::vector<Item>& Get(Owner& owner) {
+        return owner.*member;
+    }
+
+    static const std::vector<Item>& Get(const Owner& owner) {
+        return owner.*member;
+    }
+
+    static Item* Find(Owner& owner, std::string_view key) {
+        for (auto& item : Get(owner)) {
+            if (item.*key_member == key) {
+                return &item;
+            }
+        }
+        return nullptr;
+    }
+
+    static const Item* Find(const Owner& owner, std::string_view key) {
+        for (const auto& item : Get(owner)) {
+            if (item.*key_member == key) {
+                return &item;
+            }
+        }
+        return nullptr;
+    }
+
+    static Item& Ensure(Owner& owner, std::string_view key) {
+        if (Item* existing = Find(owner, key)) {
+            return *existing;
+        }
+        Get(owner).push_back(Item{});
+        Item& item = Get(owner).back();
+        item.*key_member = std::string(key);
+        return item;
+    }
+
+    static std::string_view Key(const Item& item) {
+        return item.*key_member;
     }
 };
 
@@ -248,3 +301,9 @@ public:
 
 #define CONFIG_BINDING_LIST() \
     using BindingList = configschema::AutoStructuredBindingListDescriptor<Self>
+
+#define CONFIG_DYNAMIC_SECTION_VALUE(item_type, member, key_member) \
+    std::vector<item_type> member{}; \
+    friend consteval auto reflect_binding(configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) { \
+        return configschema::DynamicStructuredBindingDescriptor<Self, item_type, &Self::member, &item_type::key_member>{}; \
+    }
