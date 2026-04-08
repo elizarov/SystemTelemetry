@@ -91,6 +91,8 @@ Examples include:
 ### Runtime actions tied to config
 
 - The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
+- The popup menu must provide an `Edit layout` toggle that switches the dashboard into interactive layout-edit mode, shows that item checked while the mode is active, and lets the same menu item turn the mode back off.
+- The command line must accept `/edit-layout` to start the dashboard with layout-edit guides already enabled, and that same switch must make diagnostics screenshots render the guides.
 - The popup menu must provide a `Layout` submenu that lists every configured layout name, shows the active layout with a radio check, and on selection switches `display.layout`, reapplies the active named layout, and resizes the window immediately.
 - The popup menu must provide a `Network` submenu that lists every runtime network candidate with an IPv4 address, using the same `adapter name | IP address` footer text shown by the network footer widget.
 - The `Network` submenu must show a radio check on the adapter currently selected by the runtime selection flow, even when `network.adapter_name` is empty or no longer matches any current adapter.
@@ -111,6 +113,10 @@ Examples include:
 - The `[board]` section must map each requested logical `board.temp.*` or `board.fan.*` metric name to the board-specific sensor title that the active board provider uses for lookup.
 - The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
 - The `Save Config` action must also persist the current `[storage] drives` selection.
+- The `Save Config` action must also persist any in-memory layout weight edits made through interactive layout editing.
+- While layout-edit mode is active, the renderer must draw thin config-colored separator guides over every resolved `rows(...)` and `columns(...)` split and update the cursor to the matching horizontal or vertical resize shape when the pointer hovers a draggable guide.
+- Dragging a layout-edit guide must adjust the two adjacent child weights live, immediately relayout and repaint the dashboard, and reseed the dragged container's editable integer weights from the current resolved child extents when the drag begins.
+- Pressing `Esc` must exit either move mode or layout-edit mode.
 
 Diagnostics requirements live in `docs/diagnostics.md`.
 

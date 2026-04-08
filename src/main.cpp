@@ -50,6 +50,7 @@ constexpr UINT kCommandSaveDumpAs = 1006;
 constexpr UINT kCommandSaveScreenshotAs = 1007;
 constexpr UINT kCommandAutoStart = 1008;
 constexpr UINT kCommandSaveFullConfigAs = 1009;
+constexpr UINT kCommandEditLayout = 1010;
 constexpr UINT kCommandLayoutBase = 1100;
 constexpr UINT kCommandLayoutMax = 1199;
 constexpr UINT kCommandNetworkAdapterBase = 1200;
@@ -146,7 +147,8 @@ std::filesystem::path GetRuntimeConfigPath();
 AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options);
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    double scale, DashboardRenderer::RenderMode renderMode, std::ostream* traceStream = nullptr,
+    double scale, DashboardRenderer::RenderMode renderMode, bool showLayoutEditGuides,
+    std::ostream* traceStream = nullptr,
     std::string* errorText = nullptr);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
 
@@ -507,6 +509,7 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.exit = HasSwitch("/exit");
     options.fake = HasSwitch("/fake");
     options.blank = HasSwitch("/blank");
+    options.editLayout = HasSwitch("/edit-layout");
     options.reload = HasSwitch("/reload");
     options.defaultConfig = HasSwitch("/default-config");
     if (const auto layoutName = GetLayoutSwitchValue(); layoutName.has_value()) {
@@ -649,7 +652,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     std::string screenshotError;
     if (options_.screenshot && !SaveDumpScreenshot(
             screenshotPath_, dump.snapshot, config, options_.exit ? options_.scale : 1.0,
-            GetDiagnosticsRenderMode(options_), TraceStream(), &screenshotError)) {
+            GetDiagnosticsRenderMode(options_), options_.editLayout, TraceStream(), &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
         std::string traceText = "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
@@ -971,6 +974,37 @@ struct StorageDriveMenuOption {
     double totalGb = 0.0;
     bool selected = false;
 };
+
+struct LayoutDragState {
+    DashboardRenderer::LayoutEditGuide guide;
+    std::vector<int> initialWeights;
+    int dragStartCoordinate = 0;
+};
+
+LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector<size_t>& path) {
+    LayoutNodeConfig* node = &root;
+    for (size_t index : path) {
+        if (index >= node->children.size()) {
+            return nullptr;
+        }
+        node = &node->children[index];
+    }
+    return node;
+}
+
+LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
+    const auto it = std::find_if(layout.cards.begin(), layout.cards.end(), [&](LayoutCardConfig& card) {
+        return card.id == cardId;
+    });
+    return it != layout.cards.end() ? &(*it) : nullptr;
+}
+
+NamedLayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name) {
+    const auto it = std::find_if(config.layouts.begin(), config.layouts.end(), [&](NamedLayoutSectionConfig& layout) {
+        return layout.name == name;
+    });
+    return it != config.layouts.end() ? &(*it) : nullptr;
+}
 
 void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
     MENUITEMINFOW info{};
@@ -1334,6 +1368,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         config,
         ScaleFromDpi(targetMonitor->dpi),
         DashboardRenderer::RenderMode::Blank,
+        false,
         nullptr,
         &screenshotError);
     const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config);
@@ -1380,6 +1415,13 @@ private:
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     UINT CurrentWindowDpi() const;
+    bool IsLayoutEditMode() const;
+    void StartLayoutEditMode();
+    void StopLayoutEditMode();
+    void RefreshLayoutEditHover(POINT clientPoint);
+    const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
+    bool ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights);
+    bool UpdateLayoutDrag(POINT clientPoint);
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -1411,6 +1453,7 @@ private:
     DashboardRenderer renderer_;
     std::unique_ptr<TelemetryRuntime> telemetry_;
     bool isMoving_ = false;
+    bool isEditingLayout_ = false;
     NOTIFYICONDATAW trayIcon_{};
     MonitorPlacementInfo movePlacementInfo_{};
     HICON appIconLarge_ = nullptr;
@@ -1424,6 +1467,8 @@ private:
     std::vector<LayoutMenuOption> layoutMenuOptions_;
     std::vector<NetworkMenuOption> networkMenuOptions_;
     std::vector<StorageDriveMenuOption> storageDriveMenuOptions_;
+    std::optional<size_t> hoveredLayoutGuideIndex_;
+    std::optional<LayoutDragState> activeLayoutDrag_;
 };
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -1431,6 +1476,7 @@ DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagn
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
     config_ = config;
     renderer_.SetConfig(config);
+    renderer_.SetShowLayoutEditGuides(isEditingLayout_ || diagnosticsOptions_.editLayout);
 }
 
 void DashboardApp::UpdateRendererScale(double scale) {
@@ -1442,6 +1488,10 @@ UINT DashboardApp::CurrentWindowDpi() const {
         return GetDpiForWindow(hwnd_);
     }
     return currentDpi_;
+}
+
+bool DashboardApp::IsLayoutEditMode() const {
+    return isEditingLayout_;
 }
 
 int DashboardApp::WindowWidth() const {
@@ -1459,6 +1509,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         return false;
     }
     renderer_.SetConfig(config_);
+    renderer_.SetShowLayoutEditGuides(diagnosticsOptions_.editLayout);
     renderer_.SetTraceOutput(nullptr);
     telemetry_ = CreateTelemetryRuntime(diagnosticsOptions_, GetWorkingDirectory());
     if (diagnosticsOptions_.HasAnyOutput()) {
@@ -1479,6 +1530,10 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         diagnostics_->WriteTraceMarker("diagnostics:telemetry_initialized");
         renderer_.SetTraceOutput(diagnostics_->TraceStream());
         lastDiagnosticsOutput_ = std::chrono::steady_clock::now();
+    }
+    if (diagnosticsOptions_.editLayout) {
+        isEditingLayout_ = true;
+        renderer_.SetShowLayoutEditGuides(true);
     }
 
     ApplyConfiguredWallpaper();
@@ -1621,6 +1676,7 @@ HICON DashboardApp::LoadAppIcon(int width, int height) {
 
 bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
     renderer_.SetConfig(config_);
+    renderer_.SetShowLayoutEditGuides(isEditingLayout_ || diagnosticsOptions_.editLayout);
     renderer_.SetTraceOutput(diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr);
     if (!renderer_.Initialize(hwnd_)) {
         return false;
@@ -1721,6 +1777,7 @@ void DashboardApp::SaveScreenshotAs() {
             telemetry_->EffectiveConfig(),
             1.0,
             GetDiagnosticsRenderMode(diagnosticsOptions_),
+            isEditingLayout_ || diagnosticsOptions_.editLayout,
             diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
             &errorText)) {
         std::string message = "Failed to save screenshot:\n" + Utf8FromWide(path->wstring());
@@ -1764,11 +1821,13 @@ void DashboardApp::ToggleAutoStart() {
 }
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    double scale, DashboardRenderer::RenderMode renderMode, std::ostream* traceStream, std::string* errorText) {
+    double scale, DashboardRenderer::RenderMode renderMode, bool showLayoutEditGuides,
+    std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
     renderer.SetConfig(config);
     renderer.SetRenderScale(scale);
     renderer.SetRenderMode(renderMode);
+    renderer.SetShowLayoutEditGuides(showLayoutEditGuides);
     renderer.SetTraceOutput(traceStream);
     if (!renderer.Initialize()) {
         if (errorText != nullptr) {
@@ -1790,6 +1849,7 @@ void DashboardApp::BringOnTop() {
 }
 
 bool DashboardApp::ReloadConfigFromDisk() {
+    StopLayoutEditMode();
     if (!ReloadTelemetryRuntimeFromDisk(GetRuntimeConfigPath(), config_, telemetry_, diagnosticsOptions_, diagnostics_.get())) {
         ReleaseFonts();
         InitializeFonts();
@@ -1815,6 +1875,7 @@ bool DashboardApp::ApplyConfiguredWallpaper() {
 }
 
 bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
+    StopLayoutEditMode();
     if (!option.layoutFits) {
         return false;
     }
@@ -1837,6 +1898,7 @@ bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
             updatedConfig,
             ScaleFromDpi(option.dpi),
             DashboardRenderer::RenderMode::Blank,
+            false,
             diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
             &screenshotError);
         if (saved) {
@@ -1914,6 +1976,7 @@ bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
 }
 
 bool DashboardApp::SwitchLayout(const std::string& layoutName) {
+    StopLayoutEditMode();
     AppConfig updatedConfig = config_;
     if (!SelectLayout(updatedConfig, layoutName)) {
         return false;
@@ -1958,6 +2021,134 @@ void DashboardApp::ToggleStorageDrive(const StorageDriveMenuOption& option) {
     telemetry_->SetSelectedStorageDrives(driveLetters);
     telemetry_->UpdateSnapshot();
     InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void DashboardApp::StartLayoutEditMode() {
+    if (isEditingLayout_) {
+        return;
+    }
+    if (isMoving_) {
+        StopMoveMode();
+    }
+    isEditingLayout_ = true;
+    renderer_.SetShowLayoutEditGuides(true);
+    hoveredLayoutGuideIndex_.reset();
+    activeLayoutDrag_.reset();
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void DashboardApp::StopLayoutEditMode() {
+    if (!isEditingLayout_) {
+        return;
+    }
+    isEditingLayout_ = false;
+    renderer_.SetShowLayoutEditGuides(diagnosticsOptions_.editLayout);
+    hoveredLayoutGuideIndex_.reset();
+    activeLayoutDrag_.reset();
+    ReleaseCapture();
+    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+const DashboardRenderer::LayoutEditGuide* DashboardApp::HitTestLayoutGuide(POINT clientPoint, size_t* index) const {
+    const auto& guides = renderer_.LayoutEditGuides();
+    for (size_t i = 0; i < guides.size(); ++i) {
+        if (PtInRect(&guides[i].hitRect, clientPoint)) {
+            if (index != nullptr) {
+                *index = i;
+            }
+            return &guides[i];
+        }
+    }
+    return nullptr;
+}
+
+void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
+    if (!isEditingLayout_ || activeLayoutDrag_.has_value()) {
+        return;
+    }
+    size_t guideIndex = 0;
+    const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
+    const std::optional<size_t> nextIndex = guide != nullptr ? std::optional<size_t>(guideIndex) : std::nullopt;
+    if (hoveredLayoutGuideIndex_ != nextIndex) {
+        hoveredLayoutGuideIndex_ = nextIndex;
+        InvalidateRect(hwnd_, nullptr, FALSE);
+    }
+    if (guide != nullptr) {
+        SetCursor(LoadCursorW(nullptr,
+            guide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+    } else {
+        SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    }
+}
+
+bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights) {
+    if (weights.size() < 2) {
+        return false;
+    }
+
+    const auto applyWeights = [&](LayoutNodeConfig* node) -> bool {
+        if (node == nullptr || node->children.size() != weights.size()) {
+            return false;
+        }
+        for (size_t i = 0; i < weights.size(); ++i) {
+            node->children[i].weight = std::max(1, weights[i]);
+        }
+        return true;
+    };
+
+    bool updated = false;
+    if (guide.cardId.empty()) {
+        updated = applyWeights(FindLayoutNodeByPath(config_.layout.structure.cardsLayout, guide.nodePath));
+        if (!updated) {
+            return false;
+        }
+        if (NamedLayoutSectionConfig* namedLayout = FindNamedLayoutByName(config_, config_.display.layout)) {
+            applyWeights(FindLayoutNodeByPath(namedLayout->cardsLayout, guide.nodePath));
+        }
+    } else {
+        if (LayoutCardConfig* card = FindCardLayoutById(config_.layout, guide.cardId)) {
+            updated = applyWeights(FindLayoutNodeByPath(card->layout, guide.nodePath));
+        }
+    }
+
+    if (!updated) {
+        return false;
+    }
+
+    renderer_.SetConfig(config_);
+    telemetry_->SetEffectiveConfig(config_);
+    InvalidateRect(hwnd_, nullptr, FALSE);
+    return true;
+}
+
+bool DashboardApp::UpdateLayoutDrag(POINT clientPoint) {
+    if (!activeLayoutDrag_.has_value()) {
+        return false;
+    }
+
+    LayoutDragState& drag = *activeLayoutDrag_;
+    const int currentCoordinate = drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
+    const int delta = currentCoordinate - drag.dragStartCoordinate;
+    const size_t index = drag.guide.separatorIndex;
+    if (index + 1 >= drag.initialWeights.size()) {
+        return false;
+    }
+
+    const int combined = drag.initialWeights[index] + drag.initialWeights[index + 1];
+    if (combined <= 1) {
+        return false;
+    }
+
+    std::vector<int> weights = drag.initialWeights;
+    weights[index] = std::clamp(drag.initialWeights[index] + delta, 1, combined - 1);
+    weights[index + 1] = combined - weights[index];
+    if (!ApplyLayoutGuideWeights(drag.guide, weights)) {
+        return false;
+    }
+
+    RefreshLayoutEditHover(clientPoint);
+    return true;
 }
 
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
@@ -2050,6 +2241,9 @@ void DashboardApp::RemoveTrayIcon() {
 }
 
 void DashboardApp::StartMoveMode() {
+    if (isEditingLayout_) {
+        StopLayoutEditMode();
+    }
     isMoving_ = true;
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
     UpdateMoveTracking();
@@ -2164,6 +2358,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveDumpAs, L"Save Dump To...");
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
+    AppendMenuW(menu, MF_STRING | (isEditingLayout_ ? MF_CHECKED : MF_UNCHECKED), kCommandEditLayout, L"Edit layout");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
@@ -2183,6 +2378,13 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     switch (selected) {
     case kCommandMove:
         StartMoveMode();
+        break;
+    case kCommandEditLayout:
+        if (isEditingLayout_) {
+            StopLayoutEditMode();
+        } else {
+            StartLayoutEditMode();
+        }
         break;
     case kCommandBringOnTop:
         BringOnTop();
@@ -2387,16 +2589,78 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         ShowContextMenu(point);
         return 0;
     }
+    case WM_LBUTTONDOWN:
+        if (isEditingLayout_) {
+            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            size_t guideIndex = 0;
+            const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
+            if (guide != nullptr) {
+                activeLayoutDrag_ = LayoutDragState{
+                    *guide,
+                    guide->childExtents,
+                    guide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y};
+                hoveredLayoutGuideIndex_ = guideIndex;
+                SetCapture(hwnd_);
+                return 0;
+            }
+        }
+        break;
+    case WM_MOUSEMOVE:
+        if (isEditingLayout_) {
+            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            if (activeLayoutDrag_.has_value()) {
+                UpdateLayoutDrag(clientPoint);
+            } else {
+                RefreshLayoutEditHover(clientPoint);
+            }
+            return 0;
+        }
+        break;
     case WM_LBUTTONUP:
+        if (activeLayoutDrag_.has_value()) {
+            activeLayoutDrag_.reset();
+            ReleaseCapture();
+            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            RefreshLayoutEditHover(clientPoint);
+            return 0;
+        }
         if (isMoving_) {
             StopMoveMode();
             return 0;
         }
         break;
     case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE && isMoving_) {
-            StopMoveMode();
+        if (wParam == VK_ESCAPE) {
+            if (isEditingLayout_) {
+                StopLayoutEditMode();
+                return 0;
+            }
+            if (isMoving_) {
+                StopMoveMode();
+                return 0;
+            }
+        }
+        break;
+    case WM_CAPTURECHANGED:
+        if (activeLayoutDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
+            activeLayoutDrag_.reset();
+            InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
+        }
+        break;
+    case WM_SETCURSOR:
+        if (LOWORD(lParam) == HTCLIENT && isEditingLayout_) {
+            if (activeLayoutDrag_.has_value()) {
+                const auto& guide = activeLayoutDrag_->guide;
+                SetCursor(LoadCursorW(nullptr,
+                    guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+            } else {
+                POINT cursor{};
+                GetCursorPos(&cursor);
+                ScreenToClient(hwnd_, &cursor);
+                RefreshLayoutEditHover(cursor);
+            }
+            return TRUE;
         }
         break;
     case kTrayMessage:

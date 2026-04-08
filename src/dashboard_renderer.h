@@ -25,6 +25,23 @@ class Bitmap;
 
 class DashboardRenderer {
 public:
+    enum class LayoutGuideAxis {
+        Horizontal,
+        Vertical,
+    };
+
+    struct LayoutEditGuide {
+        LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
+        std::string cardId;
+        std::vector<size_t> nodePath;
+        size_t separatorIndex = 0;
+        RECT containerRect{};
+        RECT lineRect{};
+        RECT hitRect{};
+        int gap = 0;
+        std::vector<int> childExtents;
+    };
+
     enum class RenderMode {
         Normal,
         Blank,
@@ -36,6 +53,7 @@ public:
     void SetConfig(const AppConfig& config);
     void SetRenderScale(double scale);
     void SetRenderMode(RenderMode mode);
+    void SetShowLayoutEditGuides(bool show);
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
@@ -43,10 +61,12 @@ public:
     COLORREF BackgroundColor() const;
     COLORREF ForegroundColor() const;
     COLORREF AccentColor() const;
+    COLORREF LayoutGuideColor() const;
     COLORREF MutedTextColor() const;
     HFONT LabelFont() const;
     HFONT SmallFont() const;
     void SetTraceOutput(std::ostream* traceOutput);
+    const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -125,6 +145,7 @@ private:
     };
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
+    void DrawLayoutEditGuides(HDC hdc) const;
     void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
@@ -138,8 +159,10 @@ private:
     ResolvedWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
     bool UsesFixedPreferredHeightInStack(const ResolvedWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
+    void AddLayoutEditGuide(const LayoutNodeConfig& node, const RECT& rect, const std::vector<RECT>& childRects,
+        int gap, const std::string& cardId, const std::vector<size_t>& nodePath);
     void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets,
-        std::vector<std::string>& cardReferenceStack);
+        std::vector<std::string>& cardReferenceStack, const std::string& cardId, const std::vector<size_t>& nodePath);
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();
@@ -166,7 +189,9 @@ private:
     FontHeights fontHeights_{};
     MeasuredWidths measuredWidths_{}; 
     ResolvedDashboardLayout resolvedLayout_{};
+    std::vector<LayoutEditGuide> layoutEditGuides_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;
+    bool showLayoutEditGuides_ = false;
 };

@@ -14,6 +14,7 @@ struct DiagnosticsOptions {
     bool exit = false;
     bool fake = false;
     bool blank = false;
+    bool editLayout = false;
     bool reload = false;
     bool defaultConfig = false;
     bool saveConfig = false;

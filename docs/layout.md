@@ -124,6 +124,7 @@ Example:
 - `background_color`
 - `foreground_color`
 - `accent_color`
+- `layout_guide_color`
 - `panel_border_color`
 - `muted_text_color`
 - `track_color`
@@ -208,6 +209,7 @@ Throughput label width, throughput axis width, drive label width, and drive perc
 Nested layout expressions are allowed.
 Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is a card-layout reference and resolves to that referenced card's layout during layout resolution.
 In a regular vertical `stack(...)`, fixed-height widgets such as `text`, `network_footer`, and `spacer` keep their preferred height and the remaining space goes to flexible siblings.
+Interactive layout editing applies only to `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
 
 Example:
 
