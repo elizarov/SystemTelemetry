@@ -239,16 +239,18 @@ struct LayoutConfig {
 };
 
 struct AppConfig {
-    DisplayConfig display{};
-    NetworkConfig network{};
+    CONFIG_REFLECTED_BINDINGS(AppConfig)
+    CONFIG_SECTION_VALUE(DisplayConfig, display);
+    CONFIG_SECTION_VALUE(NetworkConfig, network);
     std::vector<std::string> driveLetters;
     std::vector<std::string> boardTemperatureNames;
     std::vector<std::string> boardFanNames;
     std::unordered_map<std::string, std::string> boardTemperatureSensorNames;
     std::unordered_map<std::string, std::string> boardFanSensorNames;
-    MetricScaleConfig metricScales;
+    CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
     std::vector<NamedLayoutSectionConfig> layouts;
     LayoutConfig layout;
+    CONFIG_BINDING_LIST();
 };
 
 std::string LoadEmbeddedConfigTemplate();

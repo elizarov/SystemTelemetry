@@ -317,40 +317,6 @@ void SaveDynamicStructuredSectionDifferences(
     }, Section::fields);
 }
 
-DisplayConfig& AccessDisplayConfig(AppConfig& config) {
-    return config.display;
-}
-
-NetworkConfig& AccessNetworkConfig(AppConfig& config) {
-    return config.network;
-}
-
-MetricScaleConfig& AccessMetricScalesConfig(AppConfig& config) {
-    return config.metricScales;
-}
-
-template <typename Section, auto Accessor>
-struct StructuredSectionBinding {
-    using section_type = Section;
-
-    static typename Section::owner_type& Get(AppConfig& config) {
-        return Accessor(config);
-    }
-
-    static const typename Section::owner_type& Get(const AppConfig& config) {
-        return Accessor(const_cast<AppConfig&>(config));
-    }
-};
-
-using DisplaySectionBinding = StructuredSectionBinding<DisplayConfig::Section, AccessDisplayConfig>;
-using NetworkSectionBinding = StructuredSectionBinding<NetworkConfig::Section, AccessNetworkConfig>;
-using MetricScalesSectionBinding = StructuredSectionBinding<MetricScaleConfig::Section, AccessMetricScalesConfig>;
-
-using TopLevelStructuredBindings = std::tuple<
-    DisplaySectionBinding,
-    NetworkSectionBinding,
-    MetricScalesSectionBinding>;
-
 template <typename BindingList, typename Owner, typename Fn>
 void ForEachStructuredBinding(Owner&& owner, Fn&& fn) {
     std::apply([&](auto... binding) {
@@ -358,19 +324,17 @@ void ForEachStructuredBinding(Owner&& owner, Fn&& fn) {
     }, BindingList::bindings);
 }
 
-template <typename... Bindings>
-bool DispatchStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
+template <typename BindingList, typename Owner>
+bool DispatchStructuredSection(Owner& owner, const std::string& section, const std::string& key, const std::string& value) {
     bool handled = false;
-    std::apply([&](auto... binding) {
-        (..., [&] {
-            using Binding = std::remove_cvref_t<decltype(binding)>;
-            using Section = typename Binding::section_type;
-            if (!handled && section == Section::name.view()) {
-                ApplyStructuredSectionValue<Section>(Binding::Get(config), key, value);
-                handled = true;
-            }
-        }());
-    }, std::tuple<Bindings...>{});
+    ForEachStructuredBinding<BindingList>(owner, [&](auto binding, auto& currentOwner) {
+        using Binding = decltype(binding);
+        using Section = typename Binding::section_type;
+        if (!handled && section == Section::name.view()) {
+            ApplyStructuredSectionValue<Section>(Binding::Get(currentOwner), key, value);
+            handled = true;
+        }
+    });
     return handled;
 }
 
@@ -387,24 +351,11 @@ bool DispatchDynamicStructuredSection(const std::string& section, const std::str
 }
 
 bool DispatchKnownStructuredSection(AppConfig& config, const std::string& section, const std::string& key, const std::string& value) {
-    if (DispatchStructuredSection<
-        DisplaySectionBinding,
-        NetworkSectionBinding,
-        MetricScalesSectionBinding
-    >(config, section, key, value)) {
+    if (DispatchStructuredSection<AppConfig::BindingList>(config, section, key, value)) {
         return true;
     }
 
-    bool handled = false;
-    ForEachStructuredBinding<LayoutConfig::BindingList>(config.layout, [&](auto binding, auto& owner) {
-        using Binding = decltype(binding);
-        using Section = typename Binding::section_type;
-        if (!handled && section == Section::name.view()) {
-            ApplyStructuredSectionValue<Section>(Binding::Get(owner), key, value);
-            handled = true;
-        }
-    });
-    return handled;
+    return DispatchStructuredSection<LayoutConfig::BindingList>(config.layout, section, key, value);
 }
 
 std::string ReadFileUtf8(const std::filesystem::path& path) {
@@ -837,11 +788,11 @@ std::string JoinConfigLines(const std::vector<std::string>& lines) {
 
 template <typename UpdateKeyFn>
 void SaveKnownStructuredSections(const AppConfig& config, UpdateKeyFn&& updateKey) {
-    std::apply([&](auto... binding) {
-        (..., SaveStructuredSection<typename std::remove_cvref_t<decltype(binding)>::section_type>(
-            std::remove_cvref_t<decltype(binding)>::Get(config),
-            updateKey));
-    }, TopLevelStructuredBindings{});
+    ForEachStructuredBinding<AppConfig::BindingList>(config, [&](auto binding, const auto& owner) {
+        using Binding = decltype(binding);
+        using Section = typename Binding::section_type;
+        SaveStructuredSection<Section>(Binding::Get(owner), updateKey);
+    });
 
     ForEachStructuredBinding<LayoutConfig::BindingList>(config.layout, [&](auto binding, const auto& owner) {
         using Binding = decltype(binding);
@@ -852,12 +803,13 @@ void SaveKnownStructuredSections(const AppConfig& config, UpdateKeyFn&& updateKe
 
 template <typename UpdateKeyFn>
 void SaveKnownStructuredSectionDifferences(const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn&& updateKey) {
-    std::apply([&](auto... binding) {
-        (..., SaveStructuredSectionDifferences<typename std::remove_cvref_t<decltype(binding)>::section_type>(
-            std::remove_cvref_t<decltype(binding)>::Get(config),
-            compareConfig != nullptr ? &std::remove_cvref_t<decltype(binding)>::Get(*compareConfig) : nullptr,
-            updateKey));
-    }, TopLevelStructuredBindings{});
+    ForEachStructuredBinding<AppConfig::BindingList>(config, [&](auto binding, const auto& owner) {
+        using Binding = decltype(binding);
+        using Section = typename Binding::section_type;
+        using SectionOwner = typename Section::owner_type;
+        const SectionOwner* compareOwner = compareConfig != nullptr ? &Binding::Get(*compareConfig) : nullptr;
+        SaveStructuredSectionDifferences<Section>(Binding::Get(owner), compareOwner, updateKey);
+    });
 
     ForEachStructuredBinding<LayoutConfig::BindingList>(config.layout, [&](auto binding, const auto& owner) {
         using Binding = decltype(binding);
