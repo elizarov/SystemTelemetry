@@ -25,21 +25,44 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
 
 void DashboardRenderer::AddMetricListWidgetEditGuides(const ResolvedWidgetLayout& widget) {
     const int labelWidth = std::max(1, ScaleLogical(config_.layout.metricList.labelWidth));
+    const int rowHeight = EffectiveMetricRowHeight();
     const int hitInset = std::max(3, ScaleLogical(4));
     const int x = std::clamp(static_cast<int>(widget.rect.left) + labelWidth,
         static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
+    const int totalRows = widget.binding.param.empty()
+        ? 0
+        : 1 + static_cast<int>(std::count(widget.binding.param.begin(), widget.binding.param.end(), ','));
+    const int visibleRows = rowHeight > 0
+        ? std::clamp((std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top)) + rowHeight - 1) / rowHeight, 0, totalRows)
+        : 0;
 
-    WidgetEditGuide guide;
-    guide.axis = LayoutGuideAxis::Vertical;
-    guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = WidgetEditParameter::MetricListLabelWidth;
-    guide.guideId = 0;
-    guide.widgetRect = widget.rect;
-    guide.lineRect = RECT{x, widget.rect.top, x + 1, widget.rect.bottom};
-    guide.hitRect = RECT{x - hitInset, widget.rect.top, x + hitInset + 1, widget.rect.bottom};
-    guide.value = config_.layout.metricList.labelWidth;
-    guide.dragDirection = 1;
-    widgetEditGuides_.push_back(std::move(guide));
+    const auto addGuide = [&](LayoutGuideAxis axis, int guideId, WidgetEditParameter parameter,
+        const RECT& lineRect, const RECT& hitRect, int value, int dragDirection) {
+        WidgetEditGuide guide;
+        guide.axis = axis;
+        guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        guide.parameter = parameter;
+        guide.guideId = guideId;
+        guide.widgetRect = widget.rect;
+        guide.lineRect = lineRect;
+        guide.hitRect = hitRect;
+        guide.value = value;
+        guide.dragDirection = dragDirection;
+        widgetEditGuides_.push_back(std::move(guide));
+    };
+
+    addGuide(LayoutGuideAxis::Vertical, 0, WidgetEditParameter::MetricListLabelWidth,
+        RECT{x, widget.rect.top, x + 1, widget.rect.bottom},
+        RECT{x - hitInset, widget.rect.top, x + hitInset + 1, widget.rect.bottom},
+        config_.layout.metricList.labelWidth, 1);
+
+    for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {
+        const int y = widget.rect.top + ((rowIndex + 1) * rowHeight);
+        addGuide(LayoutGuideAxis::Horizontal, 1 + rowIndex, WidgetEditParameter::MetricListVerticalGap,
+            RECT{widget.rect.left, y, widget.rect.right, y + 1},
+            RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1},
+            config_.layout.metricList.verticalGap, 1);
+    }
 }
 
 void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget) {
@@ -52,6 +75,11 @@ void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout
     const int barGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.barGap));
     const int valueGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.valueGap));
     const int hitInset = std::max(3, ScaleLogical(4));
+    const int totalRows = static_cast<int>(config_.storage.drives.size());
+    const int availableRowPixels = std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top) - headerHeight);
+    const int visibleRows = rowHeight > 0
+        ? std::clamp((availableRowPixels + rowHeight - 1) / rowHeight, 0, totalRows)
+        : 0;
 
     RECT labelRect{
         widget.rect.left,
@@ -119,11 +147,8 @@ void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout
         config_.layout.driveUsageList.freeWidth, -1);
     addHorizontalGuide(3, widget.rect.top + headerHeight, WidgetEditParameter::DriveUsageHeaderGap,
         config_.layout.driveUsageList.headerGap, 1);
-    for (int rowIndex = 0;; ++rowIndex) {
+    for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {
         const int y = widget.rect.top + headerHeight + ((rowIndex + 1) * rowHeight);
-        if (y >= widget.rect.bottom) {
-            break;
-        }
         addHorizontalGuide(4 + rowIndex, y, WidgetEditParameter::DriveUsageRowGap,
             config_.layout.driveUsageList.rowGap, 1);
     }

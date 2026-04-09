@@ -691,6 +691,9 @@ bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide
     case DashboardRenderer::WidgetEditParameter::MetricListLabelWidth:
         config_.layout.metricList.labelWidth = clampedValue;
         break;
+    case DashboardRenderer::WidgetEditParameter::MetricListVerticalGap:
+        config_.layout.metricList.verticalGap = clampedValue;
+        break;
     case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
         config_.layout.driveUsageList.activityWidth = clampedValue;
         break;

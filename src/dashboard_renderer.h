@@ -53,6 +53,7 @@ public:
 
     enum class WidgetEditParameter {
         MetricListLabelWidth,
+        MetricListVerticalGap,
         DriveUsageActivityWidth,
         DriveUsageFreeWidth,
         DriveUsageHeaderGap,
