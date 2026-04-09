@@ -102,18 +102,6 @@ UINT GetPanelIconResourceId(const std::string& iconName) {
     return 0;
 }
 
-bool IsCardContainerNode(const LayoutNodeConfig& node) {
-    return node.name == "columns" || node.name == "rows";
-}
-
-bool IsDashboardContainerNode(const LayoutNodeConfig& node) {
-    return node.name == "rows" || node.name == "columns";
-}
-
-bool IsEditableContainerNode(const LayoutNodeConfig& node) {
-    return node.name == "rows" || node.name == "columns";
-}
-
 bool ContainsCardReference(const std::vector<std::string>& stack, const std::string& cardId) {
     return std::find(stack.begin(), stack.end(), cardId) != stack.end();
 }
@@ -863,6 +851,10 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
     }
     WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=0");
     return 0;
+}
+
+bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
+    return node.name == "rows" || node.name == "columns";
 }
 
 int DashboardRenderer::GaugeRadiusForRect(const RECT& rect) const {

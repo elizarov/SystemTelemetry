@@ -223,6 +223,7 @@ private:
     int WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const;
     bool MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
+    static bool IsContainerNode(const LayoutNodeConfig& node);
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
 

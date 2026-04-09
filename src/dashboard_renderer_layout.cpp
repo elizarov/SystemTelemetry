@@ -7,18 +7,6 @@
 
 namespace {
 
-bool IsCardContainerNode(const LayoutNodeConfig& node) {
-    return node.name == "columns" || node.name == "rows";
-}
-
-bool IsDashboardContainerNode(const LayoutNodeConfig& node) {
-    return node.name == "rows" || node.name == "columns";
-}
-
-bool IsEditableContainerNode(const LayoutNodeConfig& node) {
-    return node.name == "rows" || node.name == "columns";
-}
-
 bool ContainsCardReference(const std::vector<std::string>& stack, const std::string& cardId) {
     return std::find(stack.begin(), stack.end(), cardId) != stack.end();
 }
@@ -37,7 +25,7 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
 
 void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const RECT& rect, const std::vector<RECT>& childRects,
     int gap, const std::string& renderCardId, const std::string& editCardId, const std::vector<size_t>& nodePath) {
-    if (!IsEditableContainerNode(node) || childRects.size() < 2) {
+    if (!IsContainerNode(node) || childRects.size() < 2) {
         return;
     }
 
@@ -103,7 +91,7 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         cardReferenceStack.pop_back();
         return;
     }
-    if (!IsCardContainerNode(node)) {
+    if (!IsContainerNode(node)) {
         ResolvedWidgetLayout widget = ResolveWidgetLayout(node, rect);
         widget.cardId = renderCardId;
         widget.editCardId = editCardId;
@@ -291,7 +279,7 @@ bool DashboardRenderer::ResolveLayout() {
 
     std::function<void(const LayoutNodeConfig&, const RECT&, const std::vector<size_t>&)> resolveDashboardNode =
         [&](const LayoutNodeConfig& node, const RECT& rect, const std::vector<size_t>& nodePath) {
-            if (!IsDashboardContainerNode(node)) {
+            if (!IsContainerNode(node)) {
                 resolveCard(node, rect);
                 return;
             }
