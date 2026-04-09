@@ -7,6 +7,15 @@
 #include "app_strings.h"
 #include "utf8.h"
 
+namespace {
+
+struct MonitorIdentity {
+    std::string displayName;
+    std::string configName;
+};
+
+}  // namespace
+
 bool RectsEqual(const RECT& lhs, const RECT& rhs) {
     return lhs.left == rhs.left && lhs.top == rhs.top && lhs.right == rhs.right && lhs.bottom == rhs.bottom;
 }

@@ -8,6 +8,7 @@
 #include "app_diagnostics.h"
 #include "app_display_config.h"
 #include "app_monitor.h"
+#include "dashboard_menu_types.h"
 #include "layout_edit_controller.h"
 
 struct DashboardSessionState {
