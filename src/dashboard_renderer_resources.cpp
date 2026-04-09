@@ -461,6 +461,14 @@ void DashboardRenderer::SetActiveEditableText(const std::optional<EditableTextKe
     activeEditableText_ = key;
 }
 
+void DashboardRenderer::SetHoveredEditableBar(const std::optional<EditableBarKey>& key) {
+    hoveredEditableBar_ = key;
+}
+
+void DashboardRenderer::SetActiveEditableBar(const std::optional<EditableBarKey>& key) {
+    activeEditableBar_ = key;
+}
+
 void DashboardRenderer::SetSimilarityIndicatorMode(SimilarityIndicatorMode mode) {
     similarityIndicatorMode_ = mode;
 }
@@ -630,6 +638,33 @@ std::optional<DashboardRenderer::EditableTextRegion> DashboardRenderer::FindEdit
     const auto it = std::find_if(editableTextRegions_.begin(), editableTextRegions_.end(),
         [&](const EditableTextRegion& region) { return MatchesEditableTextKey(region.key, key); });
     if (it == editableTextRegions_.end()) {
+        return std::nullopt;
+    }
+    return *it;
+}
+
+std::optional<DashboardRenderer::EditableBarKey> DashboardRenderer::HitTestEditableBar(POINT clientPoint) const {
+    for (auto it = editableBarRegions_.rbegin(); it != editableBarRegions_.rend(); ++it) {
+        if (PtInRect(&it->barRect, clientPoint)) {
+            return it->key;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<DashboardRenderer::EditableBarKey> DashboardRenderer::HitTestEditableBarAnchor(POINT clientPoint) const {
+    for (auto it = editableBarRegions_.rbegin(); it != editableBarRegions_.rend(); ++it) {
+        if (PtInRect(&it->anchorHitRect, clientPoint)) {
+            return it->key;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<DashboardRenderer::EditableBarRegion> DashboardRenderer::FindEditableBarRegion(const EditableBarKey& key) const {
+    const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
+        [&](const EditableBarRegion& region) { return MatchesEditableBarKey(region.key, key); });
+    if (it == editableBarRegions_.end()) {
         return std::nullopt;
     }
     return *it;

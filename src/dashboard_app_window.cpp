@@ -317,6 +317,22 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_LBUTTONDOWN:
         if (isEditingLayout_) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            if (hoveredEditableBarAnchor_.has_value()) {
+                const auto region = renderer_.FindEditableBarRegion(*hoveredEditableBarAnchor_);
+                if (region.has_value()) {
+                    activeBarEditDrag_ = BarEditDragState{
+                        region->key,
+                        region->value,
+                        clientPoint.y};
+                    hoveredEditableBar_ = region->key;
+                    hoveredEditableWidget_ = region->key.widget;
+                    renderer_.SetHoveredEditableBar(hoveredEditableBar_);
+                    renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
+                    renderer_.SetActiveEditableBar(region->key);
+                    SetCapture(hwnd_);
+                    return 0;
+                }
+            }
             if (hoveredEditableTextAnchor_.has_value()) {
                 const auto region = renderer_.FindEditableTextRegion(*hoveredEditableTextAnchor_);
                 if (region.has_value()) {
@@ -369,6 +385,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             if (activeLayoutDrag_.has_value()) {
                 UpdateLayoutDrag(clientPoint);
+            } else if (activeBarEditDrag_.has_value()) {
+                UpdateBarEditDrag(clientPoint);
             } else if (activeTextEditDrag_.has_value()) {
                 UpdateTextEditDrag(clientPoint);
             } else if (activeWidgetEditDrag_.has_value()) {
@@ -380,6 +398,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         }
         break;
     case WM_LBUTTONUP:
+        if (activeBarEditDrag_.has_value()) {
+            activeBarEditDrag_.reset();
+            renderer_.SetActiveEditableBar(std::nullopt);
+            ReleaseCapture();
+            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            RefreshLayoutEditHover(clientPoint);
+            return 0;
+        }
         if (activeTextEditDrag_.has_value()) {
             activeTextEditDrag_.reset();
             renderer_.SetActiveEditableText(std::nullopt);
@@ -422,6 +448,12 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         }
         break;
     case WM_CAPTURECHANGED:
+        if (activeBarEditDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
+            activeBarEditDrag_.reset();
+            renderer_.SetActiveEditableBar(std::nullopt);
+            InvalidateRect(hwnd_, nullptr, FALSE);
+            return 0;
+        }
         if (activeTextEditDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
             activeTextEditDrag_.reset();
             renderer_.SetActiveEditableText(std::nullopt);
@@ -443,7 +475,9 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         break;
     case WM_SETCURSOR:
         if (LOWORD(lParam) == HTCLIENT && isEditingLayout_) {
-            if (activeTextEditDrag_.has_value()) {
+            if (activeBarEditDrag_.has_value()) {
+                SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
+            } else if (activeTextEditDrag_.has_value()) {
                 SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
             } else if (activeWidgetEditDrag_.has_value()) {
                 const auto& guide = activeWidgetEditDrag_->guide;

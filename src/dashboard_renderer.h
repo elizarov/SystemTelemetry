@@ -73,6 +73,25 @@ public:
         int fontSize = 0;
     };
 
+    enum class BarEditParameter {
+        MetricListBarHeight,
+        DriveUsageBarHeight,
+    };
+
+    struct EditableBarKey {
+        LayoutWidgetIdentity widget;
+        BarEditParameter parameter = BarEditParameter::MetricListBarHeight;
+        int barId = 0;
+    };
+
+    struct EditableBarRegion {
+        EditableBarKey key;
+        RECT barRect{};
+        RECT anchorRect{};
+        RECT anchorHitRect{};
+        int value = 0;
+    };
+
     enum class WidgetEditParameter {
         MetricListLabelWidth,
         MetricListVerticalGap,
@@ -127,6 +146,8 @@ public:
     void SetActiveWidgetEditGuide(const std::optional<WidgetEditGuide>& guide);
     void SetHoveredEditableText(const std::optional<EditableTextKey>& key);
     void SetActiveEditableText(const std::optional<EditableTextKey>& key);
+    void SetHoveredEditableBar(const std::optional<EditableBarKey>& key);
+    void SetActiveEditableBar(const std::optional<EditableBarKey>& key);
     void SetSimilarityIndicatorMode(SimilarityIndicatorMode mode);
     double RenderScale() const;
     int WindowWidth() const;
@@ -149,6 +170,9 @@ public:
     std::optional<EditableTextKey> HitTestEditableText(POINT clientPoint) const;
     std::optional<EditableTextKey> HitTestEditableTextAnchor(POINT clientPoint) const;
     std::optional<EditableTextRegion> FindEditableTextRegion(const EditableTextKey& key) const;
+    std::optional<EditableBarKey> HitTestEditableBar(POINT clientPoint) const;
+    std::optional<EditableBarKey> HitTestEditableBarAnchor(POINT clientPoint) const;
+    std::optional<EditableBarRegion> FindEditableBarRegion(const EditableBarKey& key) const;
     std::optional<LayoutWidgetIdentity> FindFirstEditableWidgetByTypeName(const std::string& widgetTypeName) const;
 
     bool Initialize(HWND hwnd = nullptr);
@@ -251,6 +275,7 @@ private:
         UINT format, const std::optional<EditableTextBinding>& editable = std::nullopt);
     void DrawHoveredWidgetHighlight(HDC hdc) const;
     void DrawHoveredEditableTextHighlight(HDC hdc) const;
+    void DrawHoveredEditableBarHighlight(HDC hdc) const;
     void DrawLayoutEditGuides(HDC hdc) const;
     void DrawWidgetEditGuides(HDC hdc) const;
     void DrawLayoutSimilarityIndicators(HDC hdc) const;
@@ -301,8 +326,10 @@ private:
     bool IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const;
     bool MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
     bool MatchesEditableTextKey(const EditableTextKey& left, const EditableTextKey& right) const;
+    bool MatchesEditableBarKey(const EditableBarKey& left, const EditableBarKey& right) const;
     EditableTextBinding MakeEditableTextBinding(const ResolvedWidgetLayout& widget, FontRole fontRole, int textId,
         int fontSize) const;
+    void RegisterEditableBarRegion(const EditableBarKey& key, const RECT& barRect, int value);
     static bool IsContainerNode(const LayoutNodeConfig& node);
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
@@ -320,10 +347,13 @@ private:
     std::optional<LayoutEditGuide> activeLayoutEditGuide_;
     std::vector<WidgetEditGuide> widgetEditGuides_;
     std::vector<EditableTextRegion> editableTextRegions_;
+    std::vector<EditableBarRegion> editableBarRegions_;
     std::optional<LayoutWidgetIdentity> hoveredEditableWidget_;
     std::optional<WidgetEditGuide> activeWidgetEditGuide_;
     std::optional<EditableTextKey> hoveredEditableText_;
     std::optional<EditableTextKey> activeEditableText_;
+    std::optional<EditableBarKey> hoveredEditableBar_;
+    std::optional<EditableBarKey> activeEditableBar_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

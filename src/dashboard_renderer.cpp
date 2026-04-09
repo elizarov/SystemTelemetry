@@ -417,6 +417,53 @@ void DashboardRenderer::DrawHoveredEditableTextHighlight(HDC hdc) const {
         static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
 }
 
+void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc) const {
+    if (!showLayoutEditGuides_) {
+        return;
+    }
+
+    const EditableBarRegion* highlighted = nullptr;
+    if (activeEditableBar_.has_value()) {
+        const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
+            [&](const EditableBarRegion& region) { return MatchesEditableBarKey(region.key, *activeEditableBar_); });
+        if (it != editableBarRegions_.end()) {
+            highlighted = &(*it);
+        }
+    }
+    if (highlighted == nullptr && hoveredEditableBar_.has_value()) {
+        const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
+            [&](const EditableBarRegion& region) { return MatchesEditableBarKey(region.key, *hoveredEditableBar_); });
+        if (it != editableBarRegions_.end()) {
+            highlighted = &(*it);
+        }
+    }
+    if (highlighted == nullptr) {
+        return;
+    }
+
+    const COLORREF outlineColor = BlendColor(LayoutGuideColor(), RGB(255, 255, 255), 0.55);
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    Gdiplus::Pen pen(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
+        static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
+    pen.SetDashStyle(Gdiplus::DashStyleDot);
+    const RECT& barRect = highlighted->barRect;
+    graphics.DrawRectangle(&pen,
+        static_cast<Gdiplus::REAL>(barRect.left),
+        static_cast<Gdiplus::REAL>(barRect.top),
+        static_cast<Gdiplus::REAL>(std::max<LONG>(1, barRect.right - barRect.left)),
+        static_cast<Gdiplus::REAL>(std::max<LONG>(1, barRect.bottom - barRect.top)));
+
+    const RECT& anchorRect = highlighted->anchorRect;
+    Gdiplus::SolidBrush fill(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)));
+    graphics.FillEllipse(&fill,
+        static_cast<Gdiplus::REAL>(anchorRect.left),
+        static_cast<Gdiplus::REAL>(anchorRect.top),
+        static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
+        static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
+}
+
 void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
     if (!showLayoutEditGuides_ || layoutEditGuides_.empty()) {
         return;
@@ -512,6 +559,14 @@ bool DashboardRenderer::MatchesEditableTextKey(const EditableTextKey& left, cons
         left.widget.nodePath == right.widget.nodePath;
 }
 
+bool DashboardRenderer::MatchesEditableBarKey(const EditableBarKey& left, const EditableBarKey& right) const {
+    return left.parameter == right.parameter &&
+        left.barId == right.barId &&
+        left.widget.renderCardId == right.widget.renderCardId &&
+        left.widget.editCardId == right.widget.editCardId &&
+        left.widget.nodePath == right.widget.nodePath;
+}
+
 DashboardRenderer::EditableTextBinding DashboardRenderer::MakeEditableTextBinding(
     const ResolvedWidgetLayout& widget, FontRole fontRole, int textId, int fontSize) const {
     return EditableTextBinding{
@@ -522,6 +577,34 @@ DashboardRenderer::EditableTextBinding DashboardRenderer::MakeEditableTextBindin
         },
         fontSize,
     };
+}
+
+void DashboardRenderer::RegisterEditableBarRegion(const EditableBarKey& key, const RECT& barRect, int value) {
+    if (barRect.right <= barRect.left || barRect.bottom <= barRect.top) {
+        return;
+    }
+    const int anchorSize = std::max(4, ScaleLogical(6));
+    const int anchorHalf = anchorSize / 2;
+    const int anchorCenterX = static_cast<int>(barRect.left) + std::max(0, static_cast<int>(barRect.right - barRect.left) / 2);
+    const int anchorCenterY = static_cast<int>(barRect.bottom);
+    EditableBarRegion region;
+    region.key = key;
+    region.barRect = barRect;
+    region.anchorRect = RECT{
+        anchorCenterX - anchorHalf,
+        anchorCenterY - anchorHalf,
+        anchorCenterX - anchorHalf + anchorSize,
+        anchorCenterY - anchorHalf + anchorSize
+    };
+    const int anchorHitInset = std::max(3, ScaleLogical(4));
+    region.anchorHitRect = RECT{
+        region.anchorRect.left - anchorHitInset,
+        region.anchorRect.top - anchorHitInset,
+        region.anchorRect.right + anchorHitInset,
+        region.anchorRect.bottom + anchorHitInset
+    };
+    region.value = value;
+    editableBarRegions_.push_back(std::move(region));
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
@@ -866,6 +949,11 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const ResolvedWidgetLayout& widge
     const int barTop = std::max(static_cast<int>(rect.top), barBottom - metricBarHeight);
     RECT barRect{valueRect.left, barTop, rect.right, barBottom};
     DrawPillBar(hdc, barRect, row.ratio, row.peakRatio, renderMode_ != RenderMode::Blank);
+    RegisterEditableBarRegion(EditableBarKey{
+        LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        BarEditParameter::MetricListBarHeight,
+        rowIndex,
+    }, barRect, config_.layout.metricList.barHeight);
 }
 
 void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
@@ -1074,6 +1162,11 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
             renderMode_ == RenderMode::Blank ? 0.0 : drive.writeActivity,
             ToColorRef(config_.layout.colors.trackColor), AccentColor());
         DrawPillBar(hdc, barRect, drive.usedPercent / 100.0, std::nullopt, renderMode_ != RenderMode::Blank);
+        RegisterEditableBarRegion(EditableBarKey{
+            LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            BarEditParameter::DriveUsageBarHeight,
+            static_cast<int>(rowIndex),
+        }, barRect, config_.layout.driveUsageList.barHeight);
 
         if (renderMode_ != RenderMode::Blank) {
             char percent[16];
@@ -1161,6 +1254,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
     editableTextRegions_.clear();
+    editableBarRegions_.clear();
     DashboardMetricSource metrics(snapshot, config_.metricScales);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
@@ -1170,6 +1264,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
     }
     DrawHoveredWidgetHighlight(hdc);
     DrawHoveredEditableTextHighlight(hdc);
+    DrawHoveredEditableBarHighlight(hdc);
     DrawLayoutEditGuides(hdc);
     DrawWidgetEditGuides(hdc);
     DrawLayoutSimilarityIndicators(hdc);
