@@ -74,6 +74,7 @@ add_executable(SystemTelemetry WIN32
     src/telemetry_storage_source.cpp
     src/telemetry_network_source.cpp
     src/telemetry_runtime.cpp
+    src/telemetry_runtime_state.cpp
     src/telemetry_runtime_fake.cpp
     src/snapshot_dump.cpp
     src/gpu_vendor.cpp
