@@ -78,6 +78,7 @@ add_executable(SystemTelemetry WIN32
     src/board_vendor.cpp
     src/dashboard_metrics.cpp
     src/dashboard_renderer_resources.cpp
+    src/dashboard_renderer_layout_engine.cpp
     src/dashboard_renderer_layout.cpp
     src/dashboard_renderer.cpp
     src/utf8.cpp

@@ -219,6 +219,8 @@ public:
     const std::string& LastError() const;
 
 private:
+    friend struct DashboardRendererLayoutEngine;
+
     struct WidgetBinding {
         std::string metric;
         std::string param;
@@ -345,10 +347,6 @@ private:
         std::vector<std::string>& cardReferenceStack, const std::string& renderCardId, const std::string& editCardId,
         const std::vector<size_t>& nodePath);
     void BuildWidgetEditGuides();
-    void AddMetricListWidgetEditGuides(const ResolvedWidgetLayout& widget);
-    void AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget);
-    void AddThroughputWidgetEditGuide(const ResolvedWidgetLayout& widget);
-    void AddGaugeWidgetEditGuide(const ResolvedWidgetLayout& widget);
     void ClearLayoutEditInteractionState();
     std::optional<LayoutWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
 
