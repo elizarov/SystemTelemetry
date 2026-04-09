@@ -50,6 +50,40 @@ std::optional<double> ComputeGaugeSweepDegrees(POINT origin, POINT clientPoint) 
     return std::clamp(360.0 - (gapHalf * 2.0), 0.0, 360.0);
 }
 
+std::optional<double> ComputeGaugePointerAngle(POINT origin, POINT clientPoint) {
+    const double dx = static_cast<double>(clientPoint.x - origin.x);
+    const double dy = static_cast<double>(clientPoint.y - origin.y);
+    if (std::abs(dx) < 0.001 && std::abs(dy) < 0.001) {
+        return std::nullopt;
+    }
+    return NormalizeDegrees(std::atan2(dy, dx) * 180.0 / 3.14159265358979323846);
+}
+
+double ClampAngleToRange(double angleDegrees, double angularMin, double angularMax) {
+    double best = std::clamp(angleDegrees, angularMin, angularMax);
+    double bestDistance = std::abs(best - angleDegrees);
+    for (double candidate : {angleDegrees - 360.0, angleDegrees + 360.0}) {
+        const double clamped = std::clamp(candidate, angularMin, angularMax);
+        const double distance = std::abs(clamped - candidate);
+        if (distance < bestDistance) {
+            best = clamped;
+            bestDistance = distance;
+        }
+    }
+    return best;
+}
+
+std::optional<double> ComputeGaugeSegmentGapDegrees(const DashboardRenderer::WidgetEditGuide& guide, POINT clientPoint) {
+    const auto pointerAngle = ComputeGaugePointerAngle(guide.dragOrigin, clientPoint);
+    if (!pointerAngle.has_value()) {
+        return std::nullopt;
+    }
+    const double clampedAngle = ClampAngleToRange(*pointerAngle, guide.angularMin, guide.angularMax);
+    const double slotSweep = std::max(0.0, guide.angularMax - guide.angularMin);
+    const double segmentSweep = std::clamp(clampedAngle - guide.angularMin, 0.0, slotSweep);
+    return std::clamp(slotSweep - segmentSweep, 0.0, slotSweep);
+}
+
 }
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -834,6 +868,13 @@ bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide
     case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees:
         config_.layout.gauge.sweepDegrees = std::clamp(value, 0.0, 360.0);
         break;
+    case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees: {
+        const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
+        const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
+        const double slotSweep = totalSweep / static_cast<double>(segmentCount);
+        config_.layout.gauge.segmentGapDegrees = std::clamp(value, 0.0, slotSweep);
+        break;
+    }
     default:
         return false;
     }
@@ -1001,11 +1042,26 @@ bool DashboardApp::UpdateWidgetEditDrag(POINT clientPoint) {
     WidgetEditDragState& drag = *activeWidgetEditDrag_;
     double nextValue = drag.initialValue;
     if (drag.guide.angularDrag) {
-        const auto sweepDegrees = ComputeGaugeSweepDegrees(drag.guide.dragOrigin, clientPoint);
-        if (!sweepDegrees.has_value()) {
-            return true;
+        switch (drag.guide.parameter) {
+        case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees: {
+            const auto sweepDegrees = ComputeGaugeSweepDegrees(drag.guide.dragOrigin, clientPoint);
+            if (!sweepDegrees.has_value()) {
+                return true;
+            }
+            nextValue = *sweepDegrees;
+            break;
         }
-        nextValue = *sweepDegrees;
+        case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees: {
+            const auto segmentGapDegrees = ComputeGaugeSegmentGapDegrees(drag.guide, clientPoint);
+            if (!segmentGapDegrees.has_value()) {
+                return true;
+            }
+            nextValue = *segmentGapDegrees;
+            break;
+        }
+        default:
+            return false;
+        }
     } else {
         const int currentCoordinate = drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
         const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;

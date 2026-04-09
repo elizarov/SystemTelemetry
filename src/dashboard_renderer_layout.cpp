@@ -226,28 +226,43 @@ void DashboardRenderer::AddGaugeWidgetEditGuide(const ResolvedWidgetLayout& widg
     const int cy = widget.rect.top + std::max(0L, widget.rect.bottom - widget.rect.top) / 2;
     const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
     const double gapSweep = std::max(0.0, 360.0 - totalSweep);
+    const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
+    const double slotSweep = totalSweep / static_cast<double>(segmentCount);
+    const double segmentGap = std::clamp(config_.layout.gauge.segmentGapDegrees, 0.0, slotSweep);
+    const double segmentSweep = std::clamp(slotSweep - segmentGap, 0.0, slotSweep);
+    const double gaugeStart = 90.0 + gapSweep / 2.0;
     const double endAngle = 90.0 + gapSweep / 2.0 + totalSweep;
     const POINT center{cx, cy};
     const int ringThickness = std::max(1, ScaleLogical(config_.layout.gauge.ringThickness));
-    const int guideInset = std::max(2, ringThickness / 2);
-    const int guideOverhang = std::max(3, ScaleLogical(6));
-    const POINT guideStart = PolarPoint(cx, cy, std::max(1, radius - guideInset), endAngle);
-    const POINT guideEnd = PolarPoint(cx, cy, radius + guideOverhang, endAngle);
+    const int guideHalfExtension = std::max(1, ringThickness / 2);
     const int hitInset = std::max(4, ScaleLogical(5));
 
-    WidgetEditGuide guide;
-    guide.axis = LayoutGuideAxis::Vertical;
-    guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = WidgetEditParameter::GaugeSweepDegrees;
-    guide.guideId = 0;
-    guide.widgetRect = widget.rect;
-    guide.drawStart = guideStart;
-    guide.drawEnd = guideEnd;
-    guide.hitRect = ExpandSegmentBounds(guideStart, guideEnd, hitInset);
-    guide.dragOrigin = center;
-    guide.value = totalSweep;
-    guide.angularDrag = true;
-    widgetEditGuides_.push_back(std::move(guide));
+    const auto addRadialGuide = [&](WidgetEditParameter parameter, int guideId, double angleDegrees,
+        double value, double angularMin, double angularMax) {
+        const int innerGuideRadius = std::max(1, radius - (ringThickness / 2) - guideHalfExtension);
+        const int outerGuideRadius = radius + (ringThickness / 2) + guideHalfExtension;
+        const POINT guideStart = PolarPoint(cx, cy, innerGuideRadius, angleDegrees);
+        const POINT guideEnd = PolarPoint(cx, cy, outerGuideRadius, angleDegrees);
+        WidgetEditGuide guide;
+        guide.axis = LayoutGuideAxis::Vertical;
+        guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        guide.parameter = parameter;
+        guide.guideId = guideId;
+        guide.widgetRect = widget.rect;
+        guide.drawStart = guideStart;
+        guide.drawEnd = guideEnd;
+        guide.hitRect = ExpandSegmentBounds(guideStart, guideEnd, hitInset);
+        guide.dragOrigin = center;
+        guide.value = value;
+        guide.angularDrag = true;
+        guide.angularMin = angularMin;
+        guide.angularMax = angularMax;
+        widgetEditGuides_.push_back(std::move(guide));
+    };
+
+    addRadialGuide(WidgetEditParameter::GaugeSweepDegrees, 0, endAngle, totalSweep, 0.0, 360.0);
+    addRadialGuide(WidgetEditParameter::GaugeSegmentGapDegrees, 1, gaugeStart + segmentSweep,
+        segmentGap, gaugeStart, gaugeStart + slotSweep);
 }
 
 void DashboardRenderer::BuildWidgetEditGuides() {

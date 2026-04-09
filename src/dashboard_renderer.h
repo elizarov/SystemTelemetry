@@ -106,6 +106,7 @@ public:
         ThroughputAxisPadding,
         ThroughputHeaderGap,
         GaugeSweepDegrees,
+        GaugeSegmentGapDegrees,
     };
 
     struct WidgetEditGuide {
@@ -120,6 +121,8 @@ public:
         POINT dragOrigin{};
         double value = 0.0;
         bool angularDrag = false;
+        double angularMin = 0.0;
+        double angularMax = 0.0;
         int dragDirection = 1;
     };
 
