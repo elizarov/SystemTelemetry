@@ -1,7 +1,6 @@
 #include "telemetry_runtime.h"
 
 #include "telemetry_runtime_state.h"
-#include "trace.h"
 
 bool ShouldShowRuntimeDialogs(const DiagnosticsOptions& options) {
     return !options.trace;

@@ -1,6 +1,5 @@
 #include "app_shared.h"
 
-#include <cmath>
 #include <cstdio>
 
 void DashboardApp::ShowContextMenu(POINT screenPoint) {

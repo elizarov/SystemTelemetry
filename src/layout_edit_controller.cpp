@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include "app_shared.h"
 #include "layout_edit_service.h"
 #include "layout_snap_solver.h"
 

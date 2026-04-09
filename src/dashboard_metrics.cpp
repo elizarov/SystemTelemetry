@@ -1,10 +1,8 @@
 #include "dashboard_metrics.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdio>
-#include <optional>
 
 namespace {
 

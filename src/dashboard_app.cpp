@@ -1,7 +1,4 @@
 #include "app_shared.h"
-#include "config_writer.h"
-
-#include <cstdio>
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
     : diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this) {}

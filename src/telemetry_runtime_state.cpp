@@ -1,7 +1,5 @@
 #include "telemetry_runtime_state.h"
 
-#include <algorithm>
-
 #include "telemetry_support.h"
 
 AppConfig RuntimeConfigView::ComposeEffectiveConfig(const AppConfig& telemetryConfig) const {

@@ -2,9 +2,6 @@
 
 #include "layout_snap_solver.h"
 
-#include <optional>
-#include <vector>
-
 namespace {
 
 int SplitWeightedFirstChild(int totalExtent, int gap, int firstWeight, int secondWeight) {

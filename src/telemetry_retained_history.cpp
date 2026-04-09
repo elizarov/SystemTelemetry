@@ -1,7 +1,5 @@
 #include "telemetry_retained_history.h"
 
-#include <vector>
-
 namespace {
 
 constexpr size_t kRecentHistorySamples = 60;

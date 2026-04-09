@@ -1,8 +1,6 @@
 #include "telemetry_runtime.h"
 
-#include <chrono>
 #include <fstream>
-#include <utility>
 
 #include "snapshot_dump.h"
 #include "telemetry_runtime_state.h"
