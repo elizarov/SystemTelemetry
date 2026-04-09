@@ -18,8 +18,8 @@
 #using <mscorlib.dll>
 #using <System.dll>
 
+#include "app_strings.h"
 #include "board_vendor.h"
-#include "app_shared.h"
 #include "telemetry_support.h"
 #include "trace.h"
 #include "utf8.h"
