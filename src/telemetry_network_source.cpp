@@ -1,4 +1,5 @@
 #include "telemetry_internal.h"
+#include "telemetry_support.h"
 
 #include <algorithm>
 #include <vector>
@@ -6,6 +7,13 @@
 #include "utf8.h"
 
 namespace {
+
+struct AdapterSelectionInfo {
+    bool matched = false;
+    bool hasIpv4 = false;
+    bool hasGateway = false;
+    std::string ipAddress = "N/A";
+};
 
 struct NetworkCandidateState {
     NetworkAdapterCandidate candidate;

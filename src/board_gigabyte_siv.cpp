@@ -20,7 +20,7 @@
 
 #include "board_vendor.h"
 #include "app_shared.h"
-#include "telemetry_internal.h"
+#include "telemetry_support.h"
 #include "trace.h"
 #include "utf8.h"
 

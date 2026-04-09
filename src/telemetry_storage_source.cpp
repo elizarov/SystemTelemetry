@@ -1,4 +1,5 @@
 #include "telemetry_internal.h"
+#include "telemetry_support.h"
 
 #include <algorithm>
 #include <vector>

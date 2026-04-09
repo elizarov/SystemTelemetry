@@ -69,6 +69,7 @@ add_executable(SystemTelemetry WIN32
     src/config_resolution.cpp
     src/layout_snap_solver.cpp
     src/telemetry.cpp
+    src/telemetry_support.cpp
     src/telemetry_retained_history.cpp
     src/telemetry_storage_source.cpp
     src/telemetry_network_source.cpp
