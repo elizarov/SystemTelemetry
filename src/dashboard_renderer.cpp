@@ -1078,7 +1078,7 @@ void DashboardRenderer::DrawThroughputWidget(HDC hdc, const ResolvedWidgetLayout
     } else {
         sprintf_s(buffer, "%.1f MB/s", metric.valueMbps);
     }
-    DrawTextBlock(hdc, labelRect, metric.label, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+    DrawTextBlock(hdc, labelRect, metric.label, fonts_.smallFont, MutedTextColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
         MakeEditableTextBinding(widget, FontRole::Small, 0, config_.layout.fonts.smallText.size));
     if (renderMode_ != RenderMode::Blank) {
         DrawTextBlock(hdc, numberRect, buffer, fonts_.smallFont, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
@@ -1229,7 +1229,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         return;
     case WidgetKind::NetworkFooter:
         if (renderMode_ != RenderMode::Blank) {
-            DrawTextBlock(hdc, widget.rect, metrics.ResolveNetworkFooter(), fonts_.footer, ForegroundColor(),
+            DrawTextBlock(hdc, widget.rect, metrics.ResolveNetworkFooter(), fonts_.footer, MutedTextColor(),
                 DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
                 MakeEditableTextBinding(widget, FontRole::Footer, 0, config_.layout.fonts.footer.size));
         }
