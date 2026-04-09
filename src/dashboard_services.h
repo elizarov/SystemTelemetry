@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "app_diagnostics.h"
 #include "app_platform.h"
 #include "layout_edit_service.h"
 

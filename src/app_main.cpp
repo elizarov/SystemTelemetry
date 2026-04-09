@@ -1,3 +1,4 @@
+#include "app_diagnostics.h"
 #include "app_shared.h"
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {

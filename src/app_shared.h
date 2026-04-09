@@ -19,6 +19,7 @@
 
 #include "../resources/resource.h"
 #include "app_constants.h"
+#include "app_diagnostics.h"
 #include "app_platform.h"
 #include "dashboard_controller.h"
 #include "layout_edit_controller.h"

@@ -1,4 +1,5 @@
-#include "app_shared.h"
+#include "app_diagnostics.h"
+#include "app_platform.h"
 
 #include <cmath>
 #include <cstdio>
