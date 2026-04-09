@@ -62,6 +62,20 @@ std::string FormatWin32Error(DWORD error) {
     return message;
 }
 
+bool FontConfigEquals(const UiFontConfig& left, const UiFontConfig& right) {
+    return left.face == right.face &&
+        left.size == right.size &&
+        left.weight == right.weight;
+}
+
+bool FontSetConfigEquals(const UiFontSetConfig& left, const UiFontSetConfig& right) {
+    return FontConfigEquals(left.title, right.title) &&
+        FontConfigEquals(left.big, right.big) &&
+        FontConfigEquals(left.value, right.value) &&
+        FontConfigEquals(left.label, right.label) &&
+        FontConfigEquals(left.smallText, right.smallText);
+}
+
 std::vector<std::string> Split(const std::string& input, char delimiter) {
     std::vector<std::string> parts;
     std::stringstream stream(input);
@@ -383,16 +397,40 @@ DashboardRenderer::~DashboardRenderer() {
 }
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
+    const bool fontsChanged = !FontSetConfigEquals(config_.layout.fonts, config.layout.fonts);
     config_ = config;
+    if (fontsChanged) {
+        DestroyFonts();
+        if (!CreateFonts()) {
+            lastError_ = "renderer:font_create_failed";
+            return;
+        }
+    }
     if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
         fonts_.label != nullptr && fonts_.smallFont != nullptr) {
-        MeasureFonts();
-        ResolveLayout();
+        if (!MeasureFonts() || !ResolveLayout()) {
+            lastError_ = lastError_.empty() ? "renderer:reconfigure_failed" : lastError_;
+        }
     }
 }
 
 void DashboardRenderer::SetRenderScale(double scale) {
-    renderScale_ = std::clamp(scale, 0.1, 16.0);
+    const double nextScale = std::clamp(scale, 0.1, 16.0);
+    if (std::abs(renderScale_ - nextScale) < 0.0001) {
+        return;
+    }
+    renderScale_ = nextScale;
+    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
+        fonts_.label != nullptr && fonts_.smallFont != nullptr) {
+        DestroyFonts();
+        if (!CreateFonts()) {
+            lastError_ = "renderer:font_create_failed";
+            return;
+        }
+        if (!MeasureFonts() || !ResolveLayout()) {
+            lastError_ = lastError_.empty() ? "renderer:rescale_failed" : lastError_;
+        }
+    }
 }
 
 void DashboardRenderer::SetRenderMode(RenderMode mode) {
@@ -413,6 +451,14 @@ void DashboardRenderer::SetHoveredEditableWidget(const std::optional<LayoutWidge
 
 void DashboardRenderer::SetActiveWidgetEditGuide(const std::optional<WidgetEditGuide>& guide) {
     activeWidgetEditGuide_ = guide;
+}
+
+void DashboardRenderer::SetHoveredEditableText(const std::optional<EditableTextKey>& key) {
+    hoveredEditableText_ = key;
+}
+
+void DashboardRenderer::SetActiveEditableText(const std::optional<EditableTextKey>& key) {
+    activeEditableText_ = key;
 }
 
 void DashboardRenderer::SetSimilarityIndicatorMode(SimilarityIndicatorMode mode) {
@@ -562,6 +608,33 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     return std::nullopt;
 }
 
+std::optional<DashboardRenderer::EditableTextKey> DashboardRenderer::HitTestEditableText(POINT clientPoint) const {
+    for (auto it = editableTextRegions_.rbegin(); it != editableTextRegions_.rend(); ++it) {
+        if (PtInRect(&it->textRect, clientPoint)) {
+            return it->key;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<DashboardRenderer::EditableTextKey> DashboardRenderer::HitTestEditableTextAnchor(POINT clientPoint) const {
+    for (auto it = editableTextRegions_.rbegin(); it != editableTextRegions_.rend(); ++it) {
+        if (PtInRect(&it->anchorHitRect, clientPoint)) {
+            return it->key;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<DashboardRenderer::EditableTextRegion> DashboardRenderer::FindEditableTextRegion(const EditableTextKey& key) const {
+    const auto it = std::find_if(editableTextRegions_.begin(), editableTextRegions_.end(),
+        [&](const EditableTextRegion& region) { return MatchesEditableTextKey(region.key, key); });
+    if (it == editableTextRegions_.end()) {
+        return std::nullopt;
+    }
+    return *it;
+}
+
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstEditableWidgetByTypeName(
     const std::string& widgetTypeName) const {
     const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
@@ -608,22 +681,10 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
     if (!InitializeGdiplus() || !LoadPanelIcons()) {
         return false;
     }
-    if (fonts_.title == nullptr) {
-        UiFontConfig titleFont = config_.layout.fonts.title;
-        UiFontConfig bigFont = config_.layout.fonts.big;
-        UiFontConfig valueFont = config_.layout.fonts.value;
-        UiFontConfig labelFont = config_.layout.fonts.label;
-        UiFontConfig smallFont = config_.layout.fonts.smallText;
-        titleFont.size = ScaleLogical(titleFont.size);
-        bigFont.size = ScaleLogical(bigFont.size);
-        valueFont.size = ScaleLogical(valueFont.size);
-        labelFont.size = ScaleLogical(labelFont.size);
-        smallFont.size = ScaleLogical(smallFont.size);
-        fonts_.title = CreateUiFont(titleFont);
-        fonts_.big = CreateUiFont(bigFont);
-        fonts_.value = CreateUiFont(valueFont);
-        fonts_.label = CreateUiFont(labelFont);
-        fonts_.smallFont = CreateUiFont(smallFont);
+    if (!CreateFonts()) {
+        lastError_ = "renderer:font_create_failed";
+        Shutdown();
+        return false;
     }
     if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr ||
         fonts_.label == nullptr || fonts_.smallFont == nullptr) {
@@ -639,15 +700,11 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
 }
 
 void DashboardRenderer::Shutdown() {
-    DeleteObject(fonts_.title);
-    DeleteObject(fonts_.big);
-    DeleteObject(fonts_.value);
-    DeleteObject(fonts_.label);
-    DeleteObject(fonts_.smallFont);
-    fonts_ = {};
+    DestroyFonts();
     fontHeights_ = {};
     measuredWidths_ = {};
     resolvedLayout_ = {};
+    editableTextRegions_.clear();
     ReleasePanelIcons();
     ShutdownGdiplus();
 }
@@ -670,6 +727,41 @@ void DashboardRenderer::ShutdownGdiplus() {
         Gdiplus::GdiplusShutdown(gdiplusToken_);
         gdiplusToken_ = 0;
     }
+}
+
+bool DashboardRenderer::CreateFonts() {
+    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
+        fonts_.label != nullptr && fonts_.smallFont != nullptr) {
+        return true;
+    }
+
+    DestroyFonts();
+    UiFontConfig titleFont = config_.layout.fonts.title;
+    UiFontConfig bigFont = config_.layout.fonts.big;
+    UiFontConfig valueFont = config_.layout.fonts.value;
+    UiFontConfig labelFont = config_.layout.fonts.label;
+    UiFontConfig smallFont = config_.layout.fonts.smallText;
+    titleFont.size = ScaleLogical(titleFont.size);
+    bigFont.size = ScaleLogical(bigFont.size);
+    valueFont.size = ScaleLogical(valueFont.size);
+    labelFont.size = ScaleLogical(labelFont.size);
+    smallFont.size = ScaleLogical(smallFont.size);
+    fonts_.title = CreateUiFont(titleFont);
+    fonts_.big = CreateUiFont(bigFont);
+    fonts_.value = CreateUiFont(valueFont);
+    fonts_.label = CreateUiFont(labelFont);
+    fonts_.smallFont = CreateUiFont(smallFont);
+    return fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
+        fonts_.label != nullptr && fonts_.smallFont != nullptr;
+}
+
+void DashboardRenderer::DestroyFonts() {
+    DeleteObject(fonts_.title);
+    DeleteObject(fonts_.big);
+    DeleteObject(fonts_.value);
+    DeleteObject(fonts_.label);
+    DeleteObject(fonts_.smallFont);
+    fonts_ = {};
 }
 
 bool DashboardRenderer::LoadPanelIcons() {

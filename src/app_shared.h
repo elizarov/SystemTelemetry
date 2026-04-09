@@ -239,6 +239,12 @@ struct WidgetEditDragState {
     int dragStartCoordinate = 0;
 };
 
+struct TextEditDragState {
+    DashboardRenderer::EditableTextKey key;
+    int initialValue = 0;
+    int dragStartCoordinate = 0;
+};
+
 NamedLayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name);
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId);
 LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector<size_t>& path);
@@ -301,6 +307,8 @@ private:
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
     const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(POINT clientPoint, size_t* index = nullptr) const;
     std::optional<DashboardRenderer::LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
+    std::optional<DashboardRenderer::EditableTextKey> HitTestEditableText(POINT clientPoint) const;
+    std::optional<DashboardRenderer::EditableTextKey> HitTestEditableTextAnchor(POINT clientPoint) const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
         const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
     std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag, const std::vector<int>& freeWeights);
@@ -308,6 +316,8 @@ private:
     bool UpdateLayoutDrag(POINT clientPoint);
     bool ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, int value);
     bool UpdateWidgetEditDrag(POINT clientPoint);
+    bool ApplyTextEditValue(const DashboardRenderer::EditableTextKey& key, int value);
+    bool UpdateTextEditDrag(POINT clientPoint);
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -356,6 +366,9 @@ private:
     std::optional<size_t> hoveredLayoutGuideIndex_;
     std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget_;
     std::optional<size_t> hoveredWidgetEditGuideIndex_;
+    std::optional<DashboardRenderer::EditableTextKey> hoveredEditableText_;
+    std::optional<DashboardRenderer::EditableTextKey> hoveredEditableTextAnchor_;
     std::optional<LayoutDragState> activeLayoutDrag_;
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
+    std::optional<TextEditDragState> activeTextEditDrag_;
 };

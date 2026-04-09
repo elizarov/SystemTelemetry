@@ -427,8 +427,8 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnap
     DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode, const std::string& editLayoutWidgetName,
     std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
-    renderer.SetConfig(config);
     renderer.SetRenderScale(scale);
+    renderer.SetConfig(config);
     renderer.SetRenderMode(renderMode);
     renderer.SetShowLayoutEditGuides(showLayoutEditGuides);
     renderer.SetSimilarityIndicatorMode(similarityIndicatorMode);

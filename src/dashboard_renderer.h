@@ -51,6 +51,28 @@ public:
         std::vector<size_t> nodePath;
     };
 
+    enum class FontRole {
+        Title,
+        Big,
+        Value,
+        Label,
+        Small,
+    };
+
+    struct EditableTextKey {
+        LayoutWidgetIdentity widget;
+        FontRole fontRole = FontRole::Label;
+        int textId = 0;
+    };
+
+    struct EditableTextRegion {
+        EditableTextKey key;
+        RECT textRect{};
+        RECT anchorRect{};
+        RECT anchorHitRect{};
+        int fontSize = 0;
+    };
+
     enum class WidgetEditParameter {
         MetricListLabelWidth,
         MetricListVerticalGap,
@@ -103,6 +125,8 @@ public:
     void SetActiveLayoutEditGuide(const std::optional<LayoutEditGuide>& guide);
     void SetHoveredEditableWidget(const std::optional<LayoutWidgetIdentity>& widget);
     void SetActiveWidgetEditGuide(const std::optional<WidgetEditGuide>& guide);
+    void SetHoveredEditableText(const std::optional<EditableTextKey>& key);
+    void SetActiveEditableText(const std::optional<EditableTextKey>& key);
     void SetSimilarityIndicatorMode(SimilarityIndicatorMode mode);
     double RenderScale() const;
     int WindowWidth() const;
@@ -122,6 +146,9 @@ public:
     std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
     std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
     std::optional<LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
+    std::optional<EditableTextKey> HitTestEditableText(POINT clientPoint) const;
+    std::optional<EditableTextKey> HitTestEditableTextAnchor(POINT clientPoint) const;
+    std::optional<EditableTextRegion> FindEditableTextRegion(const EditableTextKey& key) const;
     std::optional<LayoutWidgetIdentity> FindFirstEditableWidgetByTypeName(const std::string& widgetTypeName) const;
 
     bool Initialize(HWND hwnd = nullptr);
@@ -210,8 +237,20 @@ private:
         HFONT smallFont = nullptr;
     };
 
-    void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
+    struct EditableTextBinding {
+        EditableTextKey key;
+        int fontSize = 0;
+    };
+
+    struct TextLayoutResult {
+        RECT textRect{};
+    };
+
+    TextLayoutResult MeasureTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
+    TextLayoutResult DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color,
+        UINT format, const std::optional<EditableTextBinding>& editable = std::nullopt);
     void DrawHoveredWidgetHighlight(HDC hdc) const;
+    void DrawHoveredEditableTextHighlight(HDC hdc) const;
     void DrawLayoutEditGuides(HDC hdc) const;
     void DrawWidgetEditGuides(HDC hdc) const;
     void DrawLayoutSimilarityIndicators(HDC hdc) const;
@@ -219,12 +258,14 @@ private:
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
-    void DrawGauge(HDC hdc, int cx, int cy, int radius, const DashboardGaugeMetric& metric, const std::string& label);
-    void DrawMetricRow(HDC hdc, const RECT& rect, const DashboardMetricRow& row);
+    void DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, int cx, int cy, int radius,
+        const DashboardGaugeMetric& metric, const std::string& label);
+    void DrawMetricRow(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardMetricRow& row, int rowIndex);
     void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue, double guideStepMbps,
-        double timeMarkerOffsetSamples, double timeMarkerIntervalSamples);
-    void DrawThroughputWidget(HDC hdc, const RECT& rect, const DashboardThroughputMetric& metric);
-    void DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
+        double timeMarkerOffsetSamples, double timeMarkerIntervalSamples,
+        const std::optional<EditableTextBinding>& maxLabelEditable = std::nullopt);
+    void DrawThroughputWidget(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardThroughputMetric& metric);
+    void DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
     ResolvedWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
     bool UsesFixedPreferredHeightInRows(const ResolvedWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
@@ -240,6 +281,8 @@ private:
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();
+    bool CreateFonts();
+    void DestroyFonts();
     bool LoadPanelIcons();
     void ReleasePanelIcons();
     bool MeasureFonts();
@@ -257,6 +300,9 @@ private:
     int WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const;
     bool MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
+    bool MatchesEditableTextKey(const EditableTextKey& left, const EditableTextKey& right) const;
+    EditableTextBinding MakeEditableTextBinding(const ResolvedWidgetLayout& widget, FontRole fontRole, int textId,
+        int fontSize) const;
     static bool IsContainerNode(const LayoutNodeConfig& node);
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
@@ -273,8 +319,11 @@ private:
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::optional<LayoutEditGuide> activeLayoutEditGuide_;
     std::vector<WidgetEditGuide> widgetEditGuides_;
+    std::vector<EditableTextRegion> editableTextRegions_;
     std::optional<LayoutWidgetIdentity> hoveredEditableWidget_;
     std::optional<WidgetEditGuide> activeWidgetEditGuide_;
+    std::optional<EditableTextKey> hoveredEditableText_;
+    std::optional<EditableTextKey> activeEditableText_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

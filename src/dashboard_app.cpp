@@ -12,6 +12,13 @@ bool WidgetIdentityEquals(const DashboardRenderer::LayoutWidgetIdentity& left,
         left.nodePath == right.nodePath;
 }
 
+bool EditableTextKeyEquals(const DashboardRenderer::EditableTextKey& left,
+    const DashboardRenderer::EditableTextKey& right) {
+    return WidgetIdentityEquals(left.widget, right.widget) &&
+        left.fontRole == right.fontRole &&
+        left.textId == right.textId;
+}
+
 }
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -562,11 +569,16 @@ void DashboardApp::StartLayoutEditMode() {
     renderer_.SetActiveLayoutEditGuide(std::nullopt);
     renderer_.SetHoveredEditableWidget(std::nullopt);
     renderer_.SetActiveWidgetEditGuide(std::nullopt);
+    renderer_.SetHoveredEditableText(std::nullopt);
+    renderer_.SetActiveEditableText(std::nullopt);
     hoveredLayoutGuideIndex_.reset();
     hoveredEditableWidget_.reset();
     hoveredWidgetEditGuideIndex_.reset();
+    hoveredEditableText_.reset();
+    hoveredEditableTextAnchor_.reset();
     activeLayoutDrag_.reset();
     activeWidgetEditDrag_.reset();
+    activeTextEditDrag_.reset();
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -579,11 +591,16 @@ void DashboardApp::StopLayoutEditMode() {
     renderer_.SetActiveLayoutEditGuide(std::nullopt);
     renderer_.SetHoveredEditableWidget(std::nullopt);
     renderer_.SetActiveWidgetEditGuide(std::nullopt);
+    renderer_.SetHoveredEditableText(std::nullopt);
+    renderer_.SetActiveEditableText(std::nullopt);
     hoveredLayoutGuideIndex_.reset();
     hoveredEditableWidget_.reset();
     hoveredWidgetEditGuideIndex_.reset();
+    hoveredEditableText_.reset();
+    hoveredEditableTextAnchor_.reset();
     activeLayoutDrag_.reset();
     activeWidgetEditDrag_.reset();
+    activeTextEditDrag_.reset();
     ReleaseCapture();
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
     InvalidateRect(hwnd_, nullptr, FALSE);
@@ -619,11 +636,26 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardApp::HitTestEdit
     return renderer_.HitTestEditableWidget(clientPoint);
 }
 
+std::optional<DashboardRenderer::EditableTextKey> DashboardApp::HitTestEditableText(POINT clientPoint) const {
+    return renderer_.HitTestEditableText(clientPoint);
+}
+
+std::optional<DashboardRenderer::EditableTextKey> DashboardApp::HitTestEditableTextAnchor(POINT clientPoint) const {
+    return renderer_.HitTestEditableTextAnchor(clientPoint);
+}
+
 void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
-    if (!isEditingLayout_ || activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value()) {
+    if (!isEditingLayout_ || activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeTextEditDrag_.has_value()) {
         return;
     }
-    const std::optional<DashboardRenderer::LayoutWidgetIdentity> nextHoveredWidget = HitTestEditableWidget(clientPoint);
+    const std::optional<DashboardRenderer::EditableTextKey> nextHoveredTextAnchor = HitTestEditableTextAnchor(clientPoint);
+    std::optional<DashboardRenderer::EditableTextKey> nextHoveredText = nextHoveredTextAnchor;
+    if (!nextHoveredText.has_value()) {
+        nextHoveredText = HitTestEditableText(clientPoint);
+    }
+    const std::optional<DashboardRenderer::LayoutWidgetIdentity> nextHoveredWidget = nextHoveredText.has_value()
+        ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredText->widget)
+        : HitTestEditableWidget(clientPoint);
     bool hoverChanged = (hoveredEditableWidget_.has_value() != nextHoveredWidget.has_value());
     if (!hoverChanged && hoveredEditableWidget_.has_value() && nextHoveredWidget.has_value()) {
         hoverChanged = !WidgetIdentityEquals(*hoveredEditableWidget_, *nextHoveredWidget);
@@ -631,6 +663,19 @@ void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
     if (hoverChanged) {
         hoveredEditableWidget_ = nextHoveredWidget;
         renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
+    }
+    if (hoveredEditableText_.has_value() != nextHoveredText.has_value() ||
+        (hoveredEditableText_.has_value() && nextHoveredText.has_value() &&
+            !EditableTextKeyEquals(*hoveredEditableText_, *nextHoveredText))) {
+        hoveredEditableText_ = nextHoveredText;
+        renderer_.SetHoveredEditableText(hoveredEditableText_);
+        hoverChanged = true;
+    }
+    if (hoveredEditableTextAnchor_.has_value() != nextHoveredTextAnchor.has_value() ||
+        (hoveredEditableTextAnchor_.has_value() && nextHoveredTextAnchor.has_value() &&
+            !EditableTextKeyEquals(*hoveredEditableTextAnchor_, *nextHoveredTextAnchor))) {
+        hoveredEditableTextAnchor_ = nextHoveredTextAnchor;
+        hoverChanged = true;
     }
 
     size_t widgetGuideIndex = 0;
@@ -663,7 +708,9 @@ void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
         InvalidateRect(hwnd_, nullptr, FALSE);
     }
 
-    if (widgetGuide != nullptr) {
+    if (hoveredEditableTextAnchor_.has_value()) {
+        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+    } else if (widgetGuide != nullptr) {
         SetCursor(LoadCursorW(nullptr,
             widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
     } else if (layoutGuide != nullptr) {
@@ -720,6 +767,43 @@ bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide
     telemetry_->SetEffectiveConfig(config_);
     if (hoveredEditableWidget_.has_value()) {
         renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
+    }
+    InvalidateRect(hwnd_, nullptr, FALSE);
+    return true;
+}
+
+bool DashboardApp::ApplyTextEditValue(const DashboardRenderer::EditableTextKey& key, int value) {
+    const int clampedValue = std::max(1, value);
+    switch (key.fontRole) {
+    case DashboardRenderer::FontRole::Title:
+        config_.layout.fonts.title.size = clampedValue;
+        break;
+    case DashboardRenderer::FontRole::Big:
+        config_.layout.fonts.big.size = clampedValue;
+        break;
+    case DashboardRenderer::FontRole::Value:
+        config_.layout.fonts.value.size = clampedValue;
+        break;
+    case DashboardRenderer::FontRole::Label:
+        config_.layout.fonts.label.size = clampedValue;
+        break;
+    case DashboardRenderer::FontRole::Small:
+        config_.layout.fonts.smallText.size = clampedValue;
+        break;
+    default:
+        return false;
+    }
+
+    renderer_.SetConfig(config_);
+    telemetry_->SetEffectiveConfig(config_);
+    if (hoveredEditableWidget_.has_value()) {
+        renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
+    }
+    if (hoveredEditableText_.has_value()) {
+        renderer_.SetHoveredEditableText(hoveredEditableText_);
+    }
+    if (activeTextEditDrag_.has_value()) {
+        renderer_.SetActiveEditableText(activeTextEditDrag_->key);
     }
     InvalidateRect(hwnd_, nullptr, FALSE);
     return true;
@@ -851,6 +935,19 @@ bool DashboardApp::UpdateWidgetEditDrag(POINT clientPoint) {
     }
 
     return true;
+}
+
+bool DashboardApp::UpdateTextEditDrag(POINT clientPoint) {
+    if (!activeTextEditDrag_.has_value()) {
+        return false;
+    }
+
+    TextEditDragState& drag = *activeTextEditDrag_;
+    const int pixelDelta = clientPoint.x - drag.dragStartCoordinate;
+    const int logicalDelta = static_cast<int>(std::lround(
+        static_cast<double>(pixelDelta) / std::max(0.1, renderer_.RenderScale())));
+    const int nextValue = std::max(1, drag.initialValue + logicalDelta);
+    return ApplyTextEditValue(drag.key, nextValue);
 }
 
 void DashboardApp::UpdateConfigFromCurrentPlacement() {

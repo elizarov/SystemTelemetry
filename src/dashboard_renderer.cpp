@@ -66,6 +66,15 @@ std::vector<std::string> Split(const std::string& input, char delimiter) {
     return parts;
 }
 
+COLORREF BlendColor(COLORREF first, COLORREF second, double secondWeight) {
+    const double clampedWeight = std::clamp(secondWeight, 0.0, 1.0);
+    const double firstWeight = 1.0 - clampedWeight;
+    return RGB(
+        static_cast<int>(std::lround(GetRValue(first) * firstWeight + GetRValue(second) * clampedWeight)),
+        static_cast<int>(std::lround(GetGValue(first) * firstWeight + GetGValue(second) * clampedWeight)),
+        static_cast<int>(std::lround(GetBValue(first) * firstWeight + GetBValue(second) * clampedWeight)));
+}
+
 DashboardMetricListEntry ParseMetricListEntry(std::string item) {
     DashboardMetricListEntry entry;
     const size_t equals = item.find('=');
@@ -246,13 +255,89 @@ int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
 }
 
 }  // namespace
-void DashboardRenderer::DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
+DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(HDC hdc, const RECT& rect,
+    const std::string& text, HFONT font, UINT format) const {
+    TextLayoutResult result{rect};
+    const std::wstring wideText = WideFromUtf8(text);
+    if (wideText.empty()) {
+        return result;
+    }
+
+    HGDIOBJ oldFont = SelectObject(hdc, font);
+    RECT measureRect{0, 0, std::max<LONG>(0, rect.right - rect.left), std::max<LONG>(0, rect.bottom - rect.top)};
+    UINT measureFormat = format | DT_CALCRECT;
+    measureFormat &= ~DT_VCENTER;
+    measureFormat &= ~DT_BOTTOM;
+    measureFormat &= ~DT_NOCLIP;
+    DrawTextW(hdc, wideText.c_str(), -1, &measureRect, measureFormat);
+
+    const int measuredWidth = std::max(0, static_cast<int>(measureRect.right - measureRect.left));
+    const int measuredHeight = std::max(0, static_cast<int>(measureRect.bottom - measureRect.top));
+    const int availableWidth = std::max(0, static_cast<int>(rect.right - rect.left));
+    const int availableHeight = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    const int textWidth = std::min(availableWidth, measuredWidth);
+    const int textHeight = std::min(availableHeight, measuredHeight);
+
+    int left = rect.left;
+    if ((format & DT_CENTER) != 0) {
+        left = rect.left + std::max(0, (availableWidth - textWidth) / 2);
+    } else if ((format & DT_RIGHT) != 0) {
+        left = rect.right - textWidth;
+    }
+
+    int top = rect.top;
+    if ((format & DT_VCENTER) != 0) {
+        top = rect.top + std::max(0, (availableHeight - textHeight) / 2);
+    } else if ((format & DT_BOTTOM) != 0) {
+        top = rect.bottom - textHeight;
+    }
+
+    result.textRect = RECT{
+        left,
+        top,
+        std::min(rect.right, static_cast<LONG>(left + textWidth)),
+        std::min(rect.bottom, static_cast<LONG>(top + textHeight))
+    };
+    SelectObject(hdc, oldFont);
+    return result;
+}
+
+DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text,
+    HFONT font, COLORREF color, UINT format, const std::optional<EditableTextBinding>& editable) {
+    TextLayoutResult result{rect};
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
     RECT copy = rect;
     const std::wstring wideText = WideFromUtf8(text);
     DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
     SelectObject(hdc, oldFont);
+    if (editable.has_value() && !wideText.empty()) {
+        result = MeasureTextBlock(hdc, rect, text, font, format);
+
+        const int anchorSize = std::max(4, ScaleLogical(6));
+        const int anchorHalf = anchorSize / 2;
+        const int anchorCenterX = result.textRect.right;
+        const int anchorCenterY = result.textRect.top;
+        EditableTextRegion region;
+        region.key = editable->key;
+        region.textRect = result.textRect;
+        region.anchorRect = RECT{
+            anchorCenterX - anchorHalf,
+            anchorCenterY - anchorHalf,
+            anchorCenterX - anchorHalf + anchorSize,
+            anchorCenterY - anchorHalf + anchorSize
+        };
+        const int anchorHitInset = std::max(3, ScaleLogical(4));
+        region.anchorHitRect = RECT{
+            region.anchorRect.left - anchorHitInset,
+            region.anchorRect.top - anchorHitInset,
+            region.anchorRect.right + anchorHitInset,
+            region.anchorRect.bottom + anchorHitInset
+        };
+        region.fontSize = editable->fontSize;
+        editableTextRegions_.push_back(std::move(region));
+    }
+    return result;
 }
 
 void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc) const {
@@ -283,6 +368,53 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc) const {
     SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);
     DeleteObject(pen);
+}
+
+void DashboardRenderer::DrawHoveredEditableTextHighlight(HDC hdc) const {
+    if (!showLayoutEditGuides_) {
+        return;
+    }
+
+    const EditableTextRegion* highlighted = nullptr;
+    if (activeEditableText_.has_value()) {
+        const auto it = std::find_if(editableTextRegions_.begin(), editableTextRegions_.end(),
+            [&](const EditableTextRegion& region) { return MatchesEditableTextKey(region.key, *activeEditableText_); });
+        if (it != editableTextRegions_.end()) {
+            highlighted = &(*it);
+        }
+    }
+    if (highlighted == nullptr && hoveredEditableText_.has_value()) {
+        const auto it = std::find_if(editableTextRegions_.begin(), editableTextRegions_.end(),
+            [&](const EditableTextRegion& region) { return MatchesEditableTextKey(region.key, *hoveredEditableText_); });
+        if (it != editableTextRegions_.end()) {
+            highlighted = &(*it);
+        }
+    }
+    if (highlighted == nullptr) {
+        return;
+    }
+
+    const COLORREF outlineColor = BlendColor(LayoutGuideColor(), RGB(255, 255, 255), 0.55);
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    Gdiplus::Pen pen(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
+        static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
+    pen.SetDashStyle(Gdiplus::DashStyleDot);
+    const RECT& textRect = highlighted->textRect;
+    graphics.DrawRectangle(&pen,
+        static_cast<Gdiplus::REAL>(textRect.left),
+        static_cast<Gdiplus::REAL>(textRect.top),
+        static_cast<Gdiplus::REAL>(std::max<LONG>(1, textRect.right - textRect.left)),
+        static_cast<Gdiplus::REAL>(std::max<LONG>(1, textRect.bottom - textRect.top)));
+
+    const RECT& anchorRect = highlighted->anchorRect;
+    Gdiplus::SolidBrush fill(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)));
+    graphics.FillEllipse(&fill,
+        static_cast<Gdiplus::REAL>(anchorRect.left),
+        static_cast<Gdiplus::REAL>(anchorRect.top),
+        static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
+        static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
 }
 
 void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
@@ -370,6 +502,26 @@ bool DashboardRenderer::MatchesWidgetIdentity(const ResolvedWidgetLayout& widget
     return widget.cardId == identity.renderCardId &&
         widget.editCardId == identity.editCardId &&
         widget.nodePath == identity.nodePath;
+}
+
+bool DashboardRenderer::MatchesEditableTextKey(const EditableTextKey& left, const EditableTextKey& right) const {
+    return left.fontRole == right.fontRole &&
+        left.textId == right.textId &&
+        left.widget.renderCardId == right.widget.renderCardId &&
+        left.widget.editCardId == right.widget.editCardId &&
+        left.widget.nodePath == right.widget.nodePath;
+}
+
+DashboardRenderer::EditableTextBinding DashboardRenderer::MakeEditableTextBinding(
+    const ResolvedWidgetLayout& widget, FontRole fontRole, int textId, int fontSize) const {
+    return EditableTextBinding{
+        EditableTextKey{
+            LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            fontRole,
+            textId,
+        },
+        fontSize,
+    };
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
@@ -593,7 +745,8 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
     }
 }
 
-void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const DashboardGaugeMetric& metric, const std::string& label) {
+void DashboardRenderer::DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, int cx, int cy, int radius,
+    const DashboardGaugeMetric& metric, const std::string& label) {
     const float segmentThickness = static_cast<float>(std::max(1, ScaleLogical(config_.layout.gauge.ringThickness)));
     const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
     const double totalSweep = std::max(0.0, config_.layout.gauge.sweepDegrees);
@@ -643,13 +796,15 @@ void DashboardRenderer::DrawGauge(HDC hdc, int cx, int cy, int radius, const Das
             cy + ScaleLogical(config_.layout.gauge.valueBottom)};
         char number[16];
         sprintf_s(number, "%.0f%%", metric.percent);
-        DrawTextBlock(hdc, numberRect, number, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(hdc, numberRect, number, fonts_.big, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+            MakeEditableTextBinding(widget, FontRole::Big, 0, config_.layout.fonts.big.size));
     }
     RECT labelRect{cx - halfWidth,
         cy + ScaleLogical(config_.layout.gauge.labelTop),
         cx + halfWidth,
         cy + ScaleLogical(config_.layout.gauge.labelBottom)};
-    DrawTextBlock(hdc, labelRect, label, fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, labelRect, label, fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+        MakeEditableTextBinding(widget, FontRole::Small, 1, config_.layout.fonts.smallText.size));
 }
 
 void DashboardRenderer::DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
@@ -684,15 +839,18 @@ void DashboardRenderer::DrawPillBar(HDC hdc, const RECT& rect, double ratio, std
     }
 }
 
-void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const DashboardMetricRow& row) {
+void DashboardRenderer::DrawMetricRow(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect,
+    const DashboardMetricRow& row, int rowIndex) {
     const int rowHeight = EffectiveMetricRowHeight();
     const int labelWidth = std::max(1, ScaleLogical(config_.layout.metricList.labelWidth));
     const int valueGap = std::max(0, ScaleLogical(config_.layout.metricList.valueGap));
     RECT labelRect{rect.left, rect.top, std::min(rect.right, rect.left + labelWidth), rect.bottom};
     RECT valueRect{std::min(rect.right, labelRect.right + valueGap), rect.top, rect.right, rect.bottom};
-    DrawTextBlock(hdc, labelRect, row.label, fonts_.label, MutedTextColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, labelRect, row.label, fonts_.label, MutedTextColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        MakeEditableTextBinding(widget, FontRole::Label, rowIndex * 2, config_.layout.fonts.label.size));
     if (renderMode_ != RenderMode::Blank) {
-        DrawTextBlock(hdc, valueRect, row.valueText, fonts_.value, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(hdc, valueRect, row.valueText, fonts_.value, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+            MakeEditableTextBinding(widget, FontRole::Value, rowIndex * 2 + 1, config_.layout.fonts.value.size));
     }
 
     const int metricBarHeight = std::max(1, ScaleLogical(config_.layout.metricList.barHeight));
@@ -703,7 +861,8 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const RECT& rect, const Dashboard
 }
 
 void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
-    double guideStepMbps, double timeMarkerOffsetSamples, double timeMarkerIntervalSamples) {
+    double guideStepMbps, double timeMarkerOffsetSamples, double timeMarkerIntervalSamples,
+    const std::optional<EditableTextBinding>& maxLabelEditable) {
     HBRUSH bg = CreateSolidBrush(ToColorRef(config_.layout.colors.graphBackgroundColor));
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
@@ -759,7 +918,8 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     sprintf_s(maxLabel, "%.0f", maxValue);
     RECT maxRect{rect.left, rect.top, rect.left + axisWidth, graphTop};
     if (renderMode_ != RenderMode::Blank) {
-        DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(hdc, maxRect, maxLabel, fonts_.smallFont, ForegroundColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+            maxLabelEditable);
     }
 
     if (renderMode_ == RenderMode::Blank) {
@@ -799,7 +959,8 @@ void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<d
     }
 }
 
-void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const DashboardThroughputMetric& metric) {
+void DashboardRenderer::DrawThroughputWidget(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect,
+    const DashboardThroughputMetric& metric) {
     const int lineHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.valuePadding));
     RECT valueRect{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + lineHeight)};
     RECT graphRect{rect.left, std::min(rect.bottom, valueRect.bottom + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
@@ -814,15 +975,19 @@ void DashboardRenderer::DrawThroughputWidget(HDC hdc, const RECT& rect, const Da
     } else {
         sprintf_s(buffer, "%.1f MB/s", metric.valueMbps);
     }
-    DrawTextBlock(hdc, labelRect, metric.label, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, labelRect, metric.label, fonts_.smallFont, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+        MakeEditableTextBinding(widget, FontRole::Small, 0, config_.layout.fonts.smallText.size));
     if (renderMode_ != RenderMode::Blank) {
-        DrawTextBlock(hdc, numberRect, buffer, fonts_.smallFont, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(hdc, numberRect, buffer, fonts_.smallFont, ForegroundColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
+            MakeEditableTextBinding(widget, FontRole::Small, 1, config_.layout.fonts.smallText.size));
     }
     DrawGraph(hdc, graphRect, metric.history, metric.maxGraph, metric.guideStepMbps,
-        metric.timeMarkerOffsetSamples, metric.timeMarkerIntervalSamples);
+        metric.timeMarkerOffsetSamples, metric.timeMarkerIntervalSamples,
+        MakeEditableTextBinding(widget, FontRole::Small, 2, config_.layout.fonts.smallText.size));
 }
 
-void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows) {
+void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect,
+    const std::vector<DashboardDriveRow>& rows) {
     const int headerHeight = EffectiveDriveHeaderHeight();
     const int rowHeight = EffectiveDriveRowHeight();
     const int labelWidth = std::max(1, measuredWidths_.driveLabel);
@@ -864,13 +1029,19 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
     RECT headerReadLabelRect{headerReadRect.left - valueGap, headerReadRect.top, headerReadRect.right + valueGap, headerReadRect.bottom};
     RECT headerWriteLabelRect{headerWriteRect.left - valueGap, headerWriteRect.top, headerWriteRect.right + valueGap, headerWriteRect.bottom};
     DrawTextBlock(hdc, headerReadLabelRect, "R", fonts_.smallFont, MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
+        MakeEditableTextBinding(widget, FontRole::Small, 0, config_.layout.fonts.smallText.size));
     DrawTextBlock(hdc, headerWriteLabelRect, "W", fonts_.smallFont, MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
-    DrawTextBlock(hdc, usageHeaderRect, "Usage", fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc, headerFreeRect, "Free", fonts_.smallFont, MutedTextColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
+        MakeEditableTextBinding(widget, FontRole::Small, 1, config_.layout.fonts.smallText.size));
+    DrawTextBlock(hdc, usageHeaderRect, "Usage", fonts_.smallFont, MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+        MakeEditableTextBinding(widget, FontRole::Small, 2, config_.layout.fonts.smallText.size));
+    DrawTextBlock(hdc, headerFreeRect, "Free", fonts_.smallFont, MutedTextColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
+        MakeEditableTextBinding(widget, FontRole::Small, 3, config_.layout.fonts.smallText.size));
 
-    for (const auto& drive : rows) {
+    for (size_t rowIndex = 0; rowIndex < rows.size(); ++rowIndex) {
+        const auto& drive = rows[rowIndex];
+        const int textBaseId = 100 + static_cast<int>(rowIndex) * 3;
         RECT labelRect{}, readRect{}, writeRect{}, pctRect{}, freeRect{}, barBandRect{};
         resolveColumns(row, labelRect, readRect, writeRect, barBandRect, pctRect, freeRect);
         const int rowPixelHeight = static_cast<int>(row.bottom - row.top);
@@ -886,7 +1057,8 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
             barTop + driveBarHeight
         };
 
-        DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(hdc, labelRect, drive.label, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+            MakeEditableTextBinding(widget, FontRole::Label, textBaseId, config_.layout.fonts.label.size));
         DrawSegmentIndicator(hdc, readIndicatorRect, activitySegments, activitySegmentGap,
             renderMode_ == RenderMode::Blank ? 0.0 : drive.readActivity,
             ToColorRef(config_.layout.colors.trackColor), AccentColor());
@@ -898,8 +1070,10 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const RECT& rect, const st
         if (renderMode_ != RenderMode::Blank) {
             char percent[16];
             sprintf_s(percent, "%.0f%%", drive.usedPercent);
-            DrawTextBlock(hdc, pctRect, percent, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-            DrawTextBlock(hdc, freeRect, drive.freeText, fonts_.smallFont, MutedTextColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+            DrawTextBlock(hdc, pctRect, percent, fonts_.label, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+                MakeEditableTextBinding(widget, FontRole::Label, textBaseId + 1, config_.layout.fonts.label.size));
+            DrawTextBlock(hdc, freeRect, drive.freeText, fonts_.smallFont, MutedTextColor(), DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
+                MakeEditableTextBinding(widget, FontRole::Small, textBaseId + 2, config_.layout.fonts.smallText.size));
         }
 
         OffsetRect(&row, 0, rowHeight);
@@ -915,14 +1089,15 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
     switch (widget.kind) {
     case WidgetKind::Text:
         DrawTextBlock(hdc, widget.rect, metrics.ResolveText(widget.binding.metric), fonts_.label, ForegroundColor(),
-            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
+            MakeEditableTextBinding(widget, FontRole::Label, 0, config_.layout.fonts.label.size));
         return;
     case WidgetKind::Gauge: {
         const DashboardGaugeMetric gaugeMetric = metrics.ResolveGauge(widget.binding.metric);
         const int width = widget.rect.right - widget.rect.left;
         const int height = widget.rect.bottom - widget.rect.top;
         const int radius = std::min(std::max(1, resolvedLayout_.globalGaugeRadius), GaugeRadiusForRect(widget.rect));
-        DrawGauge(hdc, widget.rect.left + width / 2, widget.rect.top + height / 2, radius, gaugeMetric, "Load");
+        DrawGauge(hdc, widget, widget.rect.left + width / 2, widget.rect.top + height / 2, radius, gaugeMetric, "Load");
         return;
     }
     case WidgetKind::MetricList: {
@@ -930,8 +1105,9 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         const int savedDc = SaveDC(hdc);
         IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
         RECT rowRect{widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.top + rowHeight};
+        int rowIndex = 0;
         for (const auto& row : metrics.ResolveMetricList(ParseMetricListEntries(widget.binding.param))) {
-            DrawMetricRow(hdc, rowRect, row);
+            DrawMetricRow(hdc, widget, rowRect, row, rowIndex++);
             OffsetRect(&rowRect, 0, rowHeight);
             if (rowRect.top >= widget.rect.bottom) {
                 break;
@@ -941,30 +1117,33 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         return;
     }
     case WidgetKind::Throughput:
-        DrawThroughputWidget(hdc, widget.rect, metrics.ResolveThroughput(widget.binding.metric));
+        DrawThroughputWidget(hdc, widget, widget.rect, metrics.ResolveThroughput(widget.binding.metric));
         return;
     case WidgetKind::NetworkFooter:
         if (renderMode_ != RenderMode::Blank) {
             DrawTextBlock(hdc, widget.rect, metrics.ResolveNetworkFooter(), fonts_.smallFont, ForegroundColor(),
-                DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+                DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
+                MakeEditableTextBinding(widget, FontRole::Small, 0, config_.layout.fonts.smallText.size));
         }
         return;
     case WidgetKind::Spacer:
     case WidgetKind::VerticalSpring:
         return;
     case WidgetKind::DriveUsageList:
-        DrawDriveUsageWidget(hdc, widget.rect, metrics.ResolveDriveRows());
+        DrawDriveUsageWidget(hdc, widget, widget.rect, metrics.ResolveDriveRows());
         return;
     case WidgetKind::ClockTime:
         if (renderMode_ != RenderMode::Blank) {
             DrawTextBlock(hdc, widget.rect, metrics.ResolveClockTime(), fonts_.big, ForegroundColor(),
-                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+                MakeEditableTextBinding(widget, FontRole::Big, 0, config_.layout.fonts.big.size));
         }
         return;
     case WidgetKind::ClockDate:
         if (renderMode_ != RenderMode::Blank) {
             DrawTextBlock(hdc, widget.rect, metrics.ResolveClockDate(), fonts_.value, MutedTextColor(),
-                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+                MakeEditableTextBinding(widget, FontRole::Value, 0, config_.layout.fonts.value.size));
         }
         return;
     default:
@@ -973,6 +1152,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
 }
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
+    editableTextRegions_.clear();
     DashboardMetricSource metrics(snapshot, config_.metricScales);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
@@ -981,6 +1161,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
         }
     }
     DrawHoveredWidgetHighlight(hdc);
+    DrawHoveredEditableTextHighlight(hdc);
     DrawLayoutEditGuides(hdc);
     DrawWidgetEditGuides(hdc);
     DrawLayoutSimilarityIndicators(hdc);
