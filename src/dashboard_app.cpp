@@ -835,8 +835,20 @@ bool DashboardApp::ApplyTextEditValue(const DashboardRenderer::EditableTextKey& 
     case DashboardRenderer::FontRole::Label:
         config_.layout.fonts.label.size = clampedValue;
         break;
+    case DashboardRenderer::FontRole::Text:
+        config_.layout.fonts.text.size = clampedValue;
+        break;
     case DashboardRenderer::FontRole::Small:
         config_.layout.fonts.smallText.size = clampedValue;
+        break;
+    case DashboardRenderer::FontRole::Footer:
+        config_.layout.fonts.footer.size = clampedValue;
+        break;
+    case DashboardRenderer::FontRole::ClockTime:
+        config_.layout.fonts.clockTime.size = clampedValue;
+        break;
+    case DashboardRenderer::FontRole::ClockDate:
+        config_.layout.fonts.clockDate.size = clampedValue;
         break;
     default:
         return false;

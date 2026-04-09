@@ -22,7 +22,11 @@ struct UiFontSetConfig {
     CONFIG_VALUE(UiFontConfig, big, "big");
     CONFIG_VALUE(UiFontConfig, value, "value");
     CONFIG_VALUE(UiFontConfig, label, "label");
+    CONFIG_VALUE(UiFontConfig, text, "text");
     CONFIG_VALUE(UiFontConfig, smallText, "small");
+    CONFIG_VALUE(UiFontConfig, footer, "footer");
+    CONFIG_VALUE(UiFontConfig, clockTime, "clock_time");
+    CONFIG_VALUE(UiFontConfig, clockDate, "clock_date");
     CONFIG_SECTION("fonts");
 };
 

@@ -73,7 +73,11 @@ bool FontSetConfigEquals(const UiFontSetConfig& left, const UiFontSetConfig& rig
         FontConfigEquals(left.big, right.big) &&
         FontConfigEquals(left.value, right.value) &&
         FontConfigEquals(left.label, right.label) &&
-        FontConfigEquals(left.smallText, right.smallText);
+        FontConfigEquals(left.text, right.text) &&
+        FontConfigEquals(left.smallText, right.smallText) &&
+        FontConfigEquals(left.footer, right.footer) &&
+        FontConfigEquals(left.clockTime, right.clockTime) &&
+        FontConfigEquals(left.clockDate, right.clockDate);
 }
 
 std::vector<std::string> Split(const std::string& input, char delimiter) {
@@ -407,7 +411,8 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
         }
     }
     if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-        fonts_.label != nullptr && fonts_.smallFont != nullptr) {
+        fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
+        fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
         if (!MeasureFonts() || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:reconfigure_failed" : lastError_;
         }
@@ -421,7 +426,8 @@ void DashboardRenderer::SetRenderScale(double scale) {
     }
     renderScale_ = nextScale;
     if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-        fonts_.label != nullptr && fonts_.smallFont != nullptr) {
+        fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
+        fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
         DestroyFonts();
         if (!CreateFonts()) {
             lastError_ = "renderer:font_create_failed";
@@ -722,7 +728,8 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
         return false;
     }
     if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr ||
-        fonts_.label == nullptr || fonts_.smallFont == nullptr) {
+        fonts_.label == nullptr || fonts_.text == nullptr || fonts_.smallFont == nullptr ||
+        fonts_.footer == nullptr || fonts_.clockTime == nullptr || fonts_.clockDate == nullptr) {
         lastError_ = "renderer:font_create_failed";
         Shutdown();
         return false;
@@ -766,7 +773,8 @@ void DashboardRenderer::ShutdownGdiplus() {
 
 bool DashboardRenderer::CreateFonts() {
     if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-        fonts_.label != nullptr && fonts_.smallFont != nullptr) {
+        fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
+        fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
         return true;
     }
 
@@ -775,19 +783,32 @@ bool DashboardRenderer::CreateFonts() {
     UiFontConfig bigFont = config_.layout.fonts.big;
     UiFontConfig valueFont = config_.layout.fonts.value;
     UiFontConfig labelFont = config_.layout.fonts.label;
+    UiFontConfig textFont = config_.layout.fonts.text;
     UiFontConfig smallFont = config_.layout.fonts.smallText;
+    UiFontConfig footerFont = config_.layout.fonts.footer;
+    UiFontConfig clockTimeFont = config_.layout.fonts.clockTime;
+    UiFontConfig clockDateFont = config_.layout.fonts.clockDate;
     titleFont.size = ScaleLogical(titleFont.size);
     bigFont.size = ScaleLogical(bigFont.size);
     valueFont.size = ScaleLogical(valueFont.size);
     labelFont.size = ScaleLogical(labelFont.size);
+    textFont.size = ScaleLogical(textFont.size);
     smallFont.size = ScaleLogical(smallFont.size);
+    footerFont.size = ScaleLogical(footerFont.size);
+    clockTimeFont.size = ScaleLogical(clockTimeFont.size);
+    clockDateFont.size = ScaleLogical(clockDateFont.size);
     fonts_.title = CreateUiFont(titleFont);
     fonts_.big = CreateUiFont(bigFont);
     fonts_.value = CreateUiFont(valueFont);
     fonts_.label = CreateUiFont(labelFont);
+    fonts_.text = CreateUiFont(textFont);
     fonts_.smallFont = CreateUiFont(smallFont);
+    fonts_.footer = CreateUiFont(footerFont);
+    fonts_.clockTime = CreateUiFont(clockTimeFont);
+    fonts_.clockDate = CreateUiFont(clockDateFont);
     return fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-        fonts_.label != nullptr && fonts_.smallFont != nullptr;
+        fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
+        fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr;
 }
 
 void DashboardRenderer::DestroyFonts() {
@@ -795,7 +816,11 @@ void DashboardRenderer::DestroyFonts() {
     DeleteObject(fonts_.big);
     DeleteObject(fonts_.value);
     DeleteObject(fonts_.label);
+    DeleteObject(fonts_.text);
     DeleteObject(fonts_.smallFont);
+    DeleteObject(fonts_.footer);
+    DeleteObject(fonts_.clockTime);
+    DeleteObject(fonts_.clockDate);
     fonts_ = {};
 }
 
@@ -854,7 +879,11 @@ bool DashboardRenderer::MeasureFonts() {
     fontHeights_.big = measure(fonts_.big);
     fontHeights_.value = measure(fonts_.value);
     fontHeights_.label = measure(fonts_.label);
+    fontHeights_.text = measure(fonts_.text);
     fontHeights_.smallText = measure(fonts_.smallFont);
+    fontHeights_.footer = measure(fonts_.footer);
+    fontHeights_.clockTime = measure(fonts_.clockTime);
+    fontHeights_.clockDate = measure(fonts_.clockDate);
     measuredWidths_.throughputLabel = std::max(
         MeasureTextSize(hdc, fonts_.smallFont, "Read").cx,
         MeasureTextSize(hdc, fonts_.smallFont, "Write").cx) + std::max(0, ScaleLogical(config_.layout.throughput.labelPadding));
@@ -868,7 +897,11 @@ bool DashboardRenderer::MeasureFonts() {
         " big=" + std::to_string(fontHeights_.big) +
         " value=" + std::to_string(fontHeights_.value) +
         " label=" + std::to_string(fontHeights_.label) +
+        " text=" + std::to_string(fontHeights_.text) +
         " small=" + std::to_string(fontHeights_.smallText) +
+        " footer=" + std::to_string(fontHeights_.footer) +
+        " clock_time=" + std::to_string(fontHeights_.clockTime) +
+        " clock_date=" + std::to_string(fontHeights_.clockDate) +
         " render_scale=" + std::to_string(renderScale_) +
         " throughput_label_width=" + std::to_string(measuredWidths_.throughputLabel) +
         " throughput_axis_width=" + std::to_string(measuredWidths_.throughputAxis) +
@@ -996,17 +1029,17 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return tallest;
     }
     if (node.name == "text") {
-        const int height = fontHeights_.label + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
+        const int height = fontHeights_.text + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
     if (node.name == "network_footer") {
-        const int height = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        const int height = fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
     if (node.name == "spacer") {
-        const int height = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        const int height = fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
@@ -1036,12 +1069,12 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return height;
     }
     if (node.name == "clock_time") {
-        const int height = fontHeights_.big;
+        const int height = fontHeights_.clockTime;
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
     if (node.name == "clock_date") {
-        const int height = fontHeights_.value;
+        const int height = fontHeights_.clockDate;
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
@@ -1072,7 +1105,7 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
     if (node.name == "text") {
         widget.kind = WidgetKind::Text;
         widget.binding.metric = node.parameter;
-        widget.preferredHeight = fontHeights_.label + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
+        widget.preferredHeight = fontHeights_.text + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
         widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "gauge") {
         widget.kind = WidgetKind::Gauge;
@@ -1089,11 +1122,11 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
             std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
     } else if (node.name == "network_footer") {
         widget.kind = WidgetKind::NetworkFooter;
-        widget.preferredHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        widget.preferredHeight = fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "spacer") {
         widget.kind = WidgetKind::Spacer;
-        widget.preferredHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        widget.preferredHeight = fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "vertical_spring") {
         widget.kind = WidgetKind::VerticalSpring;
@@ -1103,11 +1136,11 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
         widget.preferredHeight = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
     } else if (node.name == "clock_time") {
         widget.kind = WidgetKind::ClockTime;
-        widget.preferredHeight = fontHeights_.big;
+        widget.preferredHeight = fontHeights_.clockTime;
         widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "clock_date") {
         widget.kind = WidgetKind::ClockDate;
-        widget.preferredHeight = fontHeights_.value;
+        widget.preferredHeight = fontHeights_.clockDate;
         widget.fixedPreferredHeightInRows = true;
     }
     return widget;

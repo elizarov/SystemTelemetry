@@ -56,7 +56,11 @@ public:
         Big,
         Value,
         Label,
+        Text,
         Small,
+        Footer,
+        ClockTime,
+        ClockDate,
     };
 
     struct EditableTextKey {
@@ -243,7 +247,11 @@ private:
         int big = 0;
         int value = 0;
         int label = 0;
+        int text = 0;
         int smallText = 0;
+        int footer = 0;
+        int clockTime = 0;
+        int clockDate = 0;
     };
 
     struct MeasuredWidths {
@@ -258,7 +266,11 @@ private:
         HFONT big = nullptr;
         HFONT value = nullptr;
         HFONT label = nullptr;
+        HFONT text = nullptr;
         HFONT smallFont = nullptr;
+        HFONT footer = nullptr;
+        HFONT clockTime = nullptr;
+        HFONT clockDate = nullptr;
     };
 
     struct EditableTextBinding {

@@ -1189,9 +1189,9 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
 void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics) {
     switch (widget.kind) {
     case WidgetKind::Text:
-        DrawTextBlock(hdc, widget.rect, metrics.ResolveText(widget.binding.metric), fonts_.label, ForegroundColor(),
+        DrawTextBlock(hdc, widget.rect, metrics.ResolveText(widget.binding.metric), fonts_.text, ForegroundColor(),
             DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
-            MakeEditableTextBinding(widget, FontRole::Label, 0, config_.layout.fonts.label.size));
+            MakeEditableTextBinding(widget, FontRole::Text, 0, config_.layout.fonts.text.size));
         return;
     case WidgetKind::Gauge: {
         const DashboardGaugeMetric gaugeMetric = metrics.ResolveGauge(widget.binding.metric);
@@ -1222,9 +1222,9 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         return;
     case WidgetKind::NetworkFooter:
         if (renderMode_ != RenderMode::Blank) {
-            DrawTextBlock(hdc, widget.rect, metrics.ResolveNetworkFooter(), fonts_.smallFont, ForegroundColor(),
+            DrawTextBlock(hdc, widget.rect, metrics.ResolveNetworkFooter(), fonts_.footer, ForegroundColor(),
                 DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
-                MakeEditableTextBinding(widget, FontRole::Small, 0, config_.layout.fonts.smallText.size));
+                MakeEditableTextBinding(widget, FontRole::Footer, 0, config_.layout.fonts.footer.size));
         }
         return;
     case WidgetKind::Spacer:
@@ -1235,16 +1235,16 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         return;
     case WidgetKind::ClockTime:
         if (renderMode_ != RenderMode::Blank) {
-            DrawTextBlock(hdc, widget.rect, metrics.ResolveClockTime(), fonts_.big, ForegroundColor(),
+            DrawTextBlock(hdc, widget.rect, metrics.ResolveClockTime(), fonts_.clockTime, ForegroundColor(),
                 DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-                MakeEditableTextBinding(widget, FontRole::Big, 0, config_.layout.fonts.big.size));
+                MakeEditableTextBinding(widget, FontRole::ClockTime, 0, config_.layout.fonts.clockTime.size));
         }
         return;
     case WidgetKind::ClockDate:
         if (renderMode_ != RenderMode::Blank) {
-            DrawTextBlock(hdc, widget.rect, metrics.ResolveClockDate(), fonts_.value, MutedTextColor(),
+            DrawTextBlock(hdc, widget.rect, metrics.ResolveClockDate(), fonts_.clockDate, MutedTextColor(),
                 DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-                MakeEditableTextBinding(widget, FontRole::Value, 0, config_.layout.fonts.value.size));
+                MakeEditableTextBinding(widget, FontRole::ClockDate, 0, config_.layout.fonts.clockDate.size));
         }
         return;
     default:

@@ -141,7 +141,11 @@ Example:
 - `big = face,size,weight`
 - `value = face,size,weight`
 - `label = face,size,weight`
+- `text = face,size,weight`
 - `small = face,size,weight`
+- `footer = face,size,weight`
+- `clock_time = face,size,weight`
+- `clock_date = face,size,weight`
 
 ## Card sections
 
@@ -199,6 +203,10 @@ Supported layout kinds:
 
 `metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + [metric_list].vertical_gap + [metric_list].bar_height`.
 `drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].header_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].row_gap`.
+`text(...)` uses a preferred height of `text_font_height + [text].preferred_padding`.
+`network_footer` and `spacer` use a preferred height of `footer_font_height + [network_footer].preferred_padding`.
+`clock_time` uses a preferred height of `clock_time_font_height`.
+`clock_date` uses a preferred height of `clock_date_font_height`.
 Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching widget-section `*_padding` keys.
 
 Nested layout expressions are allowed.
@@ -330,7 +338,7 @@ Static sizing rules:
 - header height comes from config
 - metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
 - drive-usage widgets reserve a dedicated header row and use fixed-width read/write activity columns from `[drive_usage_list]`
-- widget-specific heights, paddings, widths, segment counts, and gauge/throughput chrome come from their matching widget sections, while fixed text columns and clock preferred heights derive directly from measured font metrics plus their matching documented padding where applicable
+- widget-specific heights, paddings, widths, segment counts, and gauge/throughput chrome come from their matching widget sections, while fixed text columns, text-widget preferred heights, footer or spacer preferred heights, and clock preferred heights derive directly from their documented measured font metrics plus their matching documented padding where applicable
 - throughput sections follow the configured vertical rhythm
 - centered time/date layouts use `rows(vertical_spring, ..., vertical_spring)` so springs balance the surrounding free space
 - repeated lists such as drives divide their assigned area using the item count from config
