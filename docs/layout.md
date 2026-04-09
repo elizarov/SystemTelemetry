@@ -127,6 +127,7 @@ Example:
 - `foreground_color`
 - `accent_color`
 - `layout_guide_color`
+- `active_edit_color`
 - `panel_border_color`
 - `muted_text_color`
 - `track_color`

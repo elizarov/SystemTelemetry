@@ -511,6 +511,10 @@ COLORREF DashboardRenderer::LayoutGuideColor() const {
     return ToColorRef(config_.layout.colors.layoutGuideColor);
 }
 
+COLORREF DashboardRenderer::ActiveEditColor() const {
+    return ToColorRef(config_.layout.colors.activeEditColor);
+}
+
 COLORREF DashboardRenderer::MutedTextColor() const {
     return ToColorRef(config_.layout.colors.mutedTextColor);
 }

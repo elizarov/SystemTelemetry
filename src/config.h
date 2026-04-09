@@ -102,6 +102,7 @@ struct ColorConfig {
     CONFIG_VALUE(unsigned int, foregroundColor, "foreground_color");
     CONFIG_VALUE(unsigned int, accentColor, "accent_color");
     CONFIG_VALUE(unsigned int, layoutGuideColor, "layout_guide_color");
+    CONFIG_VALUE(unsigned int, activeEditColor, "active_edit_color");
     CONFIG_VALUE(unsigned int, panelBorderColor, "panel_border_color");
     CONFIG_VALUE(unsigned int, mutedTextColor, "muted_text_color");
     CONFIG_VALUE(unsigned int, trackColor, "track_color");

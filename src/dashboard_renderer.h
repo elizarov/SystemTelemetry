@@ -161,6 +161,7 @@ public:
     COLORREF ForegroundColor() const;
     COLORREF AccentColor() const;
     COLORREF LayoutGuideColor() const;
+    COLORREF ActiveEditColor() const;
     COLORREF MutedTextColor() const;
     HFONT LabelFont() const;
     HFONT SmallFont() const;
@@ -339,6 +340,8 @@ private:
     bool MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
     bool MatchesEditableTextKey(const EditableTextKey& left, const EditableTextKey& right) const;
     bool MatchesEditableBarKey(const EditableBarKey& left, const EditableBarKey& right) const;
+    bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const;
+    bool MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const;
     EditableTextBinding MakeEditableTextBinding(const ResolvedWidgetLayout& widget, FontRole fontRole, int textId,
         int fontSize) const;
     void RegisterEditableBarRegion(const EditableBarKey& key, const RECT& barRect, int value);

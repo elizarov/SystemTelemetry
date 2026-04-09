@@ -66,15 +66,6 @@ std::vector<std::string> Split(const std::string& input, char delimiter) {
     return parts;
 }
 
-COLORREF BlendColor(COLORREF first, COLORREF second, double secondWeight) {
-    const double clampedWeight = std::clamp(secondWeight, 0.0, 1.0);
-    const double firstWeight = 1.0 - clampedWeight;
-    return RGB(
-        static_cast<int>(std::lround(GetRValue(first) * firstWeight + GetRValue(second) * clampedWeight)),
-        static_cast<int>(std::lround(GetGValue(first) * firstWeight + GetGValue(second) * clampedWeight)),
-        static_cast<int>(std::lround(GetBValue(first) * firstWeight + GetBValue(second) * clampedWeight)));
-}
-
 DashboardMetricListEntry ParseMetricListEntry(std::string item) {
     DashboardMetricListEntry entry;
     const size_t equals = item.find('=');
@@ -376,11 +367,13 @@ void DashboardRenderer::DrawHoveredEditableTextHighlight(HDC hdc) const {
     }
 
     const EditableTextRegion* highlighted = nullptr;
+    bool active = false;
     if (activeEditableText_.has_value()) {
         const auto it = std::find_if(editableTextRegions_.begin(), editableTextRegions_.end(),
             [&](const EditableTextRegion& region) { return MatchesEditableTextKey(region.key, *activeEditableText_); });
         if (it != editableTextRegions_.end()) {
             highlighted = &(*it);
+            active = true;
         }
     }
     if (highlighted == nullptr && hoveredEditableText_.has_value()) {
@@ -394,7 +387,7 @@ void DashboardRenderer::DrawHoveredEditableTextHighlight(HDC hdc) const {
         return;
     }
 
-    const COLORREF outlineColor = BlendColor(LayoutGuideColor(), RGB(255, 255, 255), 0.55);
+    const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
@@ -423,11 +416,13 @@ void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc) const {
     }
 
     const EditableBarRegion* highlighted = nullptr;
+    bool active = false;
     if (activeEditableBar_.has_value()) {
         const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
             [&](const EditableBarRegion& region) { return MatchesEditableBarKey(region.key, *activeEditableBar_); });
         if (it != editableBarRegions_.end()) {
             highlighted = &(*it);
+            active = true;
         }
     }
     if (highlighted == nullptr && hoveredEditableBar_.has_value()) {
@@ -441,7 +436,7 @@ void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc) const {
         return;
     }
 
-    const COLORREF outlineColor = BlendColor(LayoutGuideColor(), RGB(255, 255, 255), 0.55);
+    const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
@@ -470,8 +465,11 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
     }
 
     HPEN pen = CreatePen(PS_SOLID, 1, LayoutGuideColor());
+    HPEN activePen = CreatePen(PS_SOLID, 1, ActiveEditColor());
     HGDIOBJ oldPen = SelectObject(hdc, pen);
     for (const auto& guide : layoutEditGuides_) {
+        const bool active = activeLayoutEditGuide_.has_value() && MatchesLayoutEditGuide(guide, *activeLayoutEditGuide_);
+        SelectObject(hdc, active ? activePen : pen);
         if (guide.axis == LayoutGuideAxis::Vertical) {
             MoveToEx(hdc, guide.lineRect.left, guide.lineRect.top, nullptr);
             LineTo(hdc, guide.lineRect.left, guide.lineRect.bottom);
@@ -481,6 +479,7 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
         }
     }
     SelectObject(hdc, oldPen);
+    DeleteObject(activePen);
     DeleteObject(pen);
 }
 
@@ -504,18 +503,13 @@ void DashboardRenderer::DrawWidgetEditGuides(HDC hdc) const {
     };
 
     HPEN pen = CreatePen(PS_SOLID, 1, LayoutGuideColor());
-    HPEN activePen = CreatePen(PS_SOLID, std::max(1, ScaleLogical(2)), LayoutGuideColor());
+    HPEN activePen = CreatePen(PS_SOLID, 1, ActiveEditColor());
     HGDIOBJ oldPen = SelectObject(hdc, pen);
     for (const auto& guide : widgetEditGuides_) {
         if (!shouldDraw(guide)) {
             continue;
         }
-        const bool active = activeWidgetEditGuide_.has_value() &&
-            guide.parameter == activeWidgetEditGuide_->parameter &&
-            guide.guideId == activeWidgetEditGuide_->guideId &&
-            guide.widget.renderCardId == activeWidgetEditGuide_->widget.renderCardId &&
-            guide.widget.editCardId == activeWidgetEditGuide_->widget.editCardId &&
-            guide.widget.nodePath == activeWidgetEditGuide_->widget.nodePath;
+        const bool active = activeWidgetEditGuide_.has_value() && MatchesWidgetEditGuide(guide, *activeWidgetEditGuide_);
         SelectObject(hdc, active ? activePen : pen);
         MoveToEx(hdc, guide.lineRect.left, guide.lineRect.top, nullptr);
         if (guide.axis == LayoutGuideAxis::Vertical) {
@@ -559,9 +553,26 @@ bool DashboardRenderer::MatchesEditableTextKey(const EditableTextKey& left, cons
         left.widget.nodePath == right.widget.nodePath;
 }
 
+bool DashboardRenderer::MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const {
+    return left.axis == right.axis &&
+        left.renderCardId == right.renderCardId &&
+        left.editCardId == right.editCardId &&
+        left.nodePath == right.nodePath &&
+        left.separatorIndex == right.separatorIndex;
+}
+
 bool DashboardRenderer::MatchesEditableBarKey(const EditableBarKey& left, const EditableBarKey& right) const {
     return left.parameter == right.parameter &&
         left.barId == right.barId &&
+        left.widget.renderCardId == right.widget.renderCardId &&
+        left.widget.editCardId == right.widget.editCardId &&
+        left.widget.nodePath == right.widget.nodePath;
+}
+
+bool DashboardRenderer::MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const {
+    return left.axis == right.axis &&
+        left.parameter == right.parameter &&
+        left.guideId == right.guideId &&
         left.widget.renderCardId == right.widget.renderCardId &&
         left.widget.editCardId == right.widget.editCardId &&
         left.widget.nodePath == right.widget.nodePath;
