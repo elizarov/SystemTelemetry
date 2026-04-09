@@ -3,6 +3,17 @@
 #include <cmath>
 #include <cstdio>
 
+namespace {
+
+bool WidgetIdentityEquals(const DashboardRenderer::LayoutWidgetIdentity& left,
+    const DashboardRenderer::LayoutWidgetIdentity& right) {
+    return left.renderCardId == right.renderCardId &&
+        left.editCardId == right.editCardId &&
+        left.nodePath == right.nodePath;
+}
+
+}
+
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
 
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
@@ -547,8 +558,13 @@ void DashboardApp::StartLayoutEditMode() {
     isEditingLayout_ = true;
     renderer_.SetShowLayoutEditGuides(true);
     renderer_.SetActiveLayoutEditGuide(std::nullopt);
+    renderer_.SetHoveredEditableWidget(std::nullopt);
+    renderer_.SetActiveWidgetEditGuide(std::nullopt);
     hoveredLayoutGuideIndex_.reset();
+    hoveredEditableWidget_.reset();
+    hoveredWidgetEditGuideIndex_.reset();
     activeLayoutDrag_.reset();
+    activeWidgetEditDrag_.reset();
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -559,8 +575,13 @@ void DashboardApp::StopLayoutEditMode() {
     isEditingLayout_ = false;
     renderer_.SetShowLayoutEditGuides(diagnosticsOptions_.editLayout);
     renderer_.SetActiveLayoutEditGuide(std::nullopt);
+    renderer_.SetHoveredEditableWidget(std::nullopt);
+    renderer_.SetActiveWidgetEditGuide(std::nullopt);
     hoveredLayoutGuideIndex_.reset();
+    hoveredEditableWidget_.reset();
+    hoveredWidgetEditGuideIndex_.reset();
     activeLayoutDrag_.reset();
+    activeWidgetEditDrag_.reset();
     ReleaseCapture();
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
     InvalidateRect(hwnd_, nullptr, FALSE);
@@ -579,20 +600,72 @@ const DashboardRenderer::LayoutEditGuide* DashboardApp::HitTestLayoutGuide(POINT
     return nullptr;
 }
 
+const DashboardRenderer::WidgetEditGuide* DashboardApp::HitTestWidgetEditGuide(POINT clientPoint, size_t* index) const {
+    const auto& guides = renderer_.WidgetEditGuides();
+    for (size_t i = 0; i < guides.size(); ++i) {
+        if (PtInRect(&guides[i].hitRect, clientPoint)) {
+            if (index != nullptr) {
+                *index = i;
+            }
+            return &guides[i];
+        }
+    }
+    return nullptr;
+}
+
+std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardApp::HitTestEditableWidget(POINT clientPoint) const {
+    return renderer_.HitTestEditableWidget(clientPoint);
+}
+
 void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
-    if (!isEditingLayout_ || activeLayoutDrag_.has_value()) {
+    if (!isEditingLayout_ || activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value()) {
         return;
     }
-    size_t guideIndex = 0;
-    const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
-    const std::optional<size_t> nextIndex = guide != nullptr ? std::optional<size_t>(guideIndex) : std::nullopt;
-    if (hoveredLayoutGuideIndex_ != nextIndex) {
-        hoveredLayoutGuideIndex_ = nextIndex;
+    const std::optional<DashboardRenderer::LayoutWidgetIdentity> nextHoveredWidget = HitTestEditableWidget(clientPoint);
+    bool hoverChanged = (hoveredEditableWidget_.has_value() != nextHoveredWidget.has_value());
+    if (!hoverChanged && hoveredEditableWidget_.has_value() && nextHoveredWidget.has_value()) {
+        hoverChanged = !WidgetIdentityEquals(*hoveredEditableWidget_, *nextHoveredWidget);
+    }
+    if (hoverChanged) {
+        hoveredEditableWidget_ = nextHoveredWidget;
+        renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
+    }
+
+    size_t widgetGuideIndex = 0;
+    const DashboardRenderer::WidgetEditGuide* widgetGuide = nullptr;
+    if (hoveredEditableWidget_.has_value()) {
+        widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
+        if (widgetGuide != nullptr && !WidgetIdentityEquals(widgetGuide->widget, *hoveredEditableWidget_)) {
+            widgetGuide = nullptr;
+        }
+    }
+    const std::optional<size_t> nextWidgetGuideIndex = widgetGuide != nullptr
+        ? std::optional<size_t>(widgetGuideIndex)
+        : std::nullopt;
+    if (hoveredWidgetEditGuideIndex_ != nextWidgetGuideIndex) {
+        hoveredWidgetEditGuideIndex_ = nextWidgetGuideIndex;
+        hoverChanged = true;
+    }
+
+    size_t layoutGuideIndex = 0;
+    const DashboardRenderer::LayoutEditGuide* layoutGuide = HitTestLayoutGuide(clientPoint, &layoutGuideIndex);
+    const std::optional<size_t> nextLayoutGuideIndex = layoutGuide != nullptr
+        ? std::optional<size_t>(layoutGuideIndex)
+        : std::nullopt;
+    if (hoveredLayoutGuideIndex_ != nextLayoutGuideIndex) {
+        hoveredLayoutGuideIndex_ = nextLayoutGuideIndex;
+        hoverChanged = true;
+    }
+
+    if (hoverChanged) {
         InvalidateRect(hwnd_, nullptr, FALSE);
     }
-    if (guide != nullptr) {
+
+    if (widgetGuide != nullptr) {
+        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+    } else if (layoutGuide != nullptr) {
         SetCursor(LoadCursorW(nullptr,
-            guide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+            layoutGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
     } else {
         SetCursor(LoadCursorW(nullptr, IDC_ARROW));
     }
@@ -605,6 +678,28 @@ bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGu
 
     renderer_.SetConfig(config_);
     telemetry_->SetEffectiveConfig(config_);
+    InvalidateRect(hwnd_, nullptr, FALSE);
+    return true;
+}
+
+bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, int value) {
+    const int clampedValue = std::max(1, value);
+    switch (guide.parameter) {
+    case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
+        config_.layout.driveUsageList.activityWidth = clampedValue;
+        break;
+    case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
+        config_.layout.driveUsageList.freeWidth = clampedValue;
+        break;
+    default:
+        return false;
+    }
+
+    renderer_.SetConfig(config_);
+    telemetry_->SetEffectiveConfig(config_);
+    if (hoveredEditableWidget_.has_value()) {
+        renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
+    }
     InvalidateRect(hwnd_, nullptr, FALSE);
     return true;
 }
@@ -703,6 +798,37 @@ bool DashboardApp::UpdateLayoutDrag(POINT clientPoint) {
     }
 
     RefreshLayoutEditHover(clientPoint);
+    return true;
+}
+
+bool DashboardApp::UpdateWidgetEditDrag(POINT clientPoint) {
+    if (!activeWidgetEditDrag_.has_value()) {
+        return false;
+    }
+
+    WidgetEditDragState& drag = *activeWidgetEditDrag_;
+    const int currentCoordinate = drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
+    const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;
+    const int logicalDelta = static_cast<int>(std::lround(
+        static_cast<double>(pixelDelta * drag.guide.dragDirection) / std::max(0.1, renderer_.RenderScale())));
+    const int nextValue = std::max(1, drag.initialValue + logicalDelta);
+    if (!ApplyWidgetEditValue(drag.guide, nextValue)) {
+        return false;
+    }
+
+    const auto& guides = renderer_.WidgetEditGuides();
+    const auto guideIt = std::find_if(guides.begin(), guides.end(), [&](const DashboardRenderer::WidgetEditGuide& candidate) {
+        return candidate.parameter == drag.guide.parameter &&
+            candidate.guideId == drag.guide.guideId &&
+            candidate.widget.renderCardId == drag.guide.widget.renderCardId &&
+            candidate.widget.editCardId == drag.guide.widget.editCardId &&
+            candidate.widget.nodePath == drag.guide.widget.nodePath;
+    });
+    if (guideIt != guides.end()) {
+        drag.guide = *guideIt;
+        renderer_.SetActiveWidgetEditGuide(drag.guide);
+    }
+
     return true;
 }
 

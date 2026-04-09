@@ -51,6 +51,23 @@ public:
         std::vector<size_t> nodePath;
     };
 
+    enum class WidgetEditParameter {
+        DriveUsageActivityWidth,
+        DriveUsageFreeWidth,
+    };
+
+    struct WidgetEditGuide {
+        LayoutGuideAxis axis = LayoutGuideAxis::Vertical;
+        LayoutWidgetIdentity widget;
+        WidgetEditParameter parameter = WidgetEditParameter::DriveUsageActivityWidth;
+        int guideId = 0;
+        RECT widgetRect{};
+        RECT lineRect{};
+        RECT hitRect{};
+        int value = 0;
+        int dragDirection = 1;
+    };
+
     struct LayoutGuideSnapCandidate {
         LayoutWidgetIdentity widget;
         int targetExtent = 0;
@@ -78,6 +95,8 @@ public:
     void SetRenderMode(RenderMode mode);
     void SetShowLayoutEditGuides(bool show);
     void SetActiveLayoutEditGuide(const std::optional<LayoutEditGuide>& guide);
+    void SetHoveredEditableWidget(const std::optional<LayoutWidgetIdentity>& widget);
+    void SetActiveWidgetEditGuide(const std::optional<WidgetEditGuide>& guide);
     void SetSimilarityIndicatorMode(SimilarityIndicatorMode mode);
     double RenderScale() const;
     int WindowWidth() const;
@@ -92,9 +111,11 @@ public:
     HFONT SmallFont() const;
     void SetTraceOutput(std::ostream* traceOutput);
     const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
+    const std::vector<WidgetEditGuide>& WidgetEditGuides() const;
     int LayoutSimilarityThreshold() const;
     std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
     std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
+    std::optional<LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -183,7 +204,9 @@ private:
     };
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
+    void DrawHoveredWidgetHighlight(HDC hdc) const;
     void DrawLayoutEditGuides(HDC hdc) const;
+    void DrawWidgetEditGuides(HDC hdc) const;
     void DrawLayoutSimilarityIndicators(HDC hdc) const;
     void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
@@ -203,6 +226,8 @@ private:
     void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets,
         std::vector<std::string>& cardReferenceStack, const std::string& renderCardId, const std::string& editCardId,
         const std::vector<size_t>& nodePath);
+    void BuildWidgetEditGuides();
+    void AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget);
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();
@@ -238,6 +263,9 @@ private:
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::optional<LayoutEditGuide> activeLayoutEditGuide_;
+    std::vector<WidgetEditGuide> widgetEditGuides_;
+    std::optional<LayoutWidgetIdentity> hoveredEditableWidget_;
+    std::optional<WidgetEditGuide> activeWidgetEditGuide_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

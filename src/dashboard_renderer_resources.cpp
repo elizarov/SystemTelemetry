@@ -400,6 +400,14 @@ void DashboardRenderer::SetActiveLayoutEditGuide(const std::optional<LayoutEditG
     activeLayoutEditGuide_ = guide;
 }
 
+void DashboardRenderer::SetHoveredEditableWidget(const std::optional<LayoutWidgetIdentity>& widget) {
+    hoveredEditableWidget_ = widget;
+}
+
+void DashboardRenderer::SetActiveWidgetEditGuide(const std::optional<WidgetEditGuide>& guide) {
+    activeWidgetEditGuide_ = guide;
+}
+
 void DashboardRenderer::SetSimilarityIndicatorMode(SimilarityIndicatorMode mode) {
     similarityIndicatorMode_ = mode;
 }
@@ -454,6 +462,10 @@ void DashboardRenderer::SetTraceOutput(std::ostream* traceOutput) {
 
 const std::vector<DashboardRenderer::LayoutEditGuide>& DashboardRenderer::LayoutEditGuides() const {
     return layoutEditGuides_;
+}
+
+const std::vector<DashboardRenderer::WidgetEditGuide>& DashboardRenderer::WidgetEditGuides() const {
+    return widgetEditGuides_;
 }
 
 int DashboardRenderer::LayoutSimilarityThreshold() const {
@@ -523,6 +535,21 @@ std::optional<int> DashboardRenderer::FindLayoutWidgetExtent(const LayoutWidgetI
             if (MatchesWidgetIdentity(widget, identity)) {
                 return WidgetExtentForAxis(widget, axis);
             }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableWidget(POINT clientPoint) const {
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            const bool hoverableWidget = widget.kind != WidgetKind::Spacer &&
+                widget.kind != WidgetKind::VerticalSpring &&
+                widget.kind != WidgetKind::Unknown;
+            if (!hoverableWidget || !PtInRect(&widget.rect, clientPoint)) {
+                continue;
+            }
+            return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
         }
     }
     return std::nullopt;

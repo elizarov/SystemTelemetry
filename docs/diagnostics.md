@@ -44,6 +44,7 @@ This document is the single maintained source of truth for diagnostics command b
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
 - With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
 - With `/blank`, the application keeps the normal layout, panel chrome, card headers, CPU and GPU names, drive labels, and empty chart or bar tracks while suppressing dynamic metric rendering.
+- `/edit-layout` diagnostics outputs always include the resolved container guides, while widget-local guides appear only when the live UI is hovering a supported widget.
 
 ## Failures and trace coverage
 
@@ -80,6 +81,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Verify one headless run that supplies explicit output filenames such as `/trace:custom_trace.txt`, `/dump:custom_dump.txt`, and `/screenshot:custom_screenshot.png`, and confirm only the requested paths are updated.
 - Verify one headless `/trace /default-config /layout:<name> /screenshot /exit` run when validating the built-in config, and confirm the screenshot and trace use the requested named layout without editing `config.ini`.
 - Verify one headless `/trace /default-config /edit-layout /screenshot /exit` run when validating layout-guide rendering, and confirm the screenshot includes the layout edit guides.
+- Verify widget-local edit guides through an interactive `/edit-layout` UI run, hover `drive_usage_list`, and confirm the widget outline plus the `activity_width` and `free_width` guides appear inside that widget and drag live.
 - Verify headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit` and `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit` when validating size-ruler grouping and numbering, and inspect the trace for consecutive `renderer:layout_similarity_group` ordinals that match the visible rulers.
 - When `/scale:<value>` is involved, confirm the screenshot uses the expected multiplied pixel dimensions while preserving the same logical composition.
 - For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm that editing the selected fake file changes the next one-second refresh without touching live providers, and verify one run with `/fake:custom_fake.txt`.

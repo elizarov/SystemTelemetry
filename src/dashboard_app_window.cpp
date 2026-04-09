@@ -317,6 +317,20 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_LBUTTONDOWN:
         if (isEditingLayout_) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            size_t widgetGuideIndex = 0;
+            const DashboardRenderer::WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
+            if (widgetGuide != nullptr) {
+                activeWidgetEditDrag_ = WidgetEditDragState{
+                    *widgetGuide,
+                    widgetGuide->value,
+                    widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y};
+                renderer_.SetActiveWidgetEditGuide(std::optional<DashboardRenderer::WidgetEditGuide>(activeWidgetEditDrag_->guide));
+                hoveredEditableWidget_ = widgetGuide->widget;
+                hoveredWidgetEditGuideIndex_ = widgetGuideIndex;
+                renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
+                SetCapture(hwnd_);
+                return 0;
+            }
             size_t guideIndex = 0;
             const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
             if (guide != nullptr) {
@@ -339,6 +353,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             if (activeLayoutDrag_.has_value()) {
                 UpdateLayoutDrag(clientPoint);
+            } else if (activeWidgetEditDrag_.has_value()) {
+                UpdateWidgetEditDrag(clientPoint);
             } else {
                 RefreshLayoutEditHover(clientPoint);
             }
@@ -346,6 +362,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         }
         break;
     case WM_LBUTTONUP:
+        if (activeWidgetEditDrag_.has_value()) {
+            activeWidgetEditDrag_.reset();
+            renderer_.SetActiveWidgetEditGuide(std::nullopt);
+            ReleaseCapture();
+            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            RefreshLayoutEditHover(clientPoint);
+            return 0;
+        }
         if (activeLayoutDrag_.has_value()) {
             activeLayoutDrag_.reset();
             renderer_.SetActiveLayoutEditGuide(std::nullopt);
@@ -372,6 +396,12 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         }
         break;
     case WM_CAPTURECHANGED:
+        if (activeWidgetEditDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
+            activeWidgetEditDrag_.reset();
+            renderer_.SetActiveWidgetEditGuide(std::nullopt);
+            InvalidateRect(hwnd_, nullptr, FALSE);
+            return 0;
+        }
         if (activeLayoutDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
             activeLayoutDrag_.reset();
             renderer_.SetActiveLayoutEditGuide(std::nullopt);
@@ -381,7 +411,9 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         break;
     case WM_SETCURSOR:
         if (LOWORD(lParam) == HTCLIENT && isEditingLayout_) {
-            if (activeLayoutDrag_.has_value()) {
+            if (activeWidgetEditDrag_.has_value()) {
+                SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+            } else if (activeLayoutDrag_.has_value()) {
                 const auto& guide = activeLayoutDrag_->guide;
                 SetCursor(LoadCursorW(nullptr,
                     guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));

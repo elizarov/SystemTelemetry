@@ -23,6 +23,78 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
     ResolveNodeWidgetsInternal(node, rect, widgets, cardReferenceStack, "", "", {});
 }
 
+void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget) {
+    const int labelWidth = std::max(1, measuredWidths_.driveLabel);
+    const int percentWidth = std::max(1, measuredWidths_.drivePercent);
+    const int freeWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.freeWidth));
+    const int activityWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.activityWidth));
+    const int barGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.barGap));
+    const int valueGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.valueGap));
+    const int hitInset = std::max(3, ScaleLogical(4));
+
+    RECT labelRect{
+        widget.rect.left,
+        widget.rect.top,
+        std::min(widget.rect.right, static_cast<LONG>(widget.rect.left + labelWidth)),
+        widget.rect.bottom};
+    RECT readRect{
+        std::min(widget.rect.right, static_cast<LONG>(labelRect.right + barGap)),
+        widget.rect.top,
+        std::min(widget.rect.right, static_cast<LONG>(labelRect.right + barGap + activityWidth)),
+        widget.rect.bottom};
+    RECT writeRect{
+        std::min(widget.rect.right, static_cast<LONG>(readRect.right + valueGap)),
+        widget.rect.top,
+        std::min(widget.rect.right, static_cast<LONG>(readRect.right + valueGap + activityWidth)),
+        widget.rect.bottom};
+    RECT freeRect{
+        std::max(widget.rect.left, static_cast<LONG>(widget.rect.right - freeWidth)),
+        widget.rect.top,
+        widget.rect.right,
+        widget.rect.bottom};
+    RECT pctRect{
+        std::max(widget.rect.left, static_cast<LONG>(freeRect.left - valueGap - percentWidth)),
+        widget.rect.top,
+        std::max(widget.rect.left, static_cast<LONG>(freeRect.left - valueGap)),
+        widget.rect.bottom};
+    if (pctRect.left < writeRect.right) {
+        return;
+    }
+
+    const auto addVerticalGuide = [&](int guideId, int x, WidgetEditParameter parameter, int value, int dragDirection) {
+        const int clampedX = std::clamp(x, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
+        WidgetEditGuide guide;
+        guide.axis = LayoutGuideAxis::Vertical;
+        guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        guide.parameter = parameter;
+        guide.guideId = guideId;
+        guide.widgetRect = widget.rect;
+        guide.lineRect = RECT{clampedX, widget.rect.top, clampedX + 1, widget.rect.bottom};
+        guide.hitRect = RECT{clampedX - hitInset, widget.rect.top, clampedX + hitInset + 1, widget.rect.bottom};
+        guide.value = value;
+        guide.dragDirection = dragDirection;
+        widgetEditGuides_.push_back(std::move(guide));
+    };
+
+    addVerticalGuide(0, readRect.right, WidgetEditParameter::DriveUsageActivityWidth,
+        config_.layout.driveUsageList.activityWidth, 1);
+    addVerticalGuide(1, writeRect.right, WidgetEditParameter::DriveUsageActivityWidth,
+        config_.layout.driveUsageList.activityWidth, 1);
+    addVerticalGuide(2, freeRect.left, WidgetEditParameter::DriveUsageFreeWidth,
+        config_.layout.driveUsageList.freeWidth, -1);
+}
+
+void DashboardRenderer::BuildWidgetEditGuides() {
+    widgetEditGuides_.clear();
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            if (widget.kind == WidgetKind::DriveUsageList) {
+                AddDriveUsageWidgetEditGuides(widget);
+            }
+        }
+    }
+}
+
 void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const RECT& rect, const std::vector<RECT>& childRects,
     int gap, const std::string& renderCardId, const std::string& editCardId, const std::vector<size_t>& nodePath) {
     if (!IsContainerNode(node) || childRects.size() < 2) {
@@ -205,6 +277,7 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
 bool DashboardRenderer::ResolveLayout() {
     resolvedLayout_ = {};
     layoutEditGuides_.clear();
+    widgetEditGuides_.clear();
     resolvedLayout_.windowWidth = WindowWidth();
     resolvedLayout_.windowHeight = WindowHeight();
 
@@ -361,6 +434,8 @@ bool DashboardRenderer::ResolveLayout() {
         std::max(1, ScaleLogical(config_.layout.gauge.minRadius));
     WriteTrace("renderer:layout_global_gauge_radius count=" + std::to_string(gaugeCount) +
         " value=" + std::to_string(resolvedLayout_.globalGaugeRadius));
+
+    BuildWidgetEditGuides();
 
     WriteTrace("renderer:layout_done cards=" + std::to_string(resolvedLayout_.cards.size()));
     return true;

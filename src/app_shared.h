@@ -233,6 +233,12 @@ struct LayoutDragState {
     int dragStartCoordinate = 0;
 };
 
+struct WidgetEditDragState {
+    DashboardRenderer::WidgetEditGuide guide;
+    int initialValue = 0;
+    int dragStartCoordinate = 0;
+};
+
 NamedLayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name);
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId);
 LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector<size_t>& path);
@@ -293,11 +299,15 @@ private:
     void StopLayoutEditMode();
     void RefreshLayoutEditHover(POINT clientPoint);
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
+    const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(POINT clientPoint, size_t* index = nullptr) const;
+    std::optional<DashboardRenderer::LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
         const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
     std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag, const std::vector<int>& freeWeights);
     bool ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights);
     bool UpdateLayoutDrag(POINT clientPoint);
+    bool ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, int value);
+    bool UpdateWidgetEditDrag(POINT clientPoint);
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -344,5 +354,8 @@ private:
     std::vector<NetworkMenuOption> networkMenuOptions_;
     std::vector<StorageDriveMenuOption> storageDriveMenuOptions_;
     std::optional<size_t> hoveredLayoutGuideIndex_;
+    std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget_;
+    std::optional<size_t> hoveredWidgetEditGuideIndex_;
     std::optional<LayoutDragState> activeLayoutDrag_;
+    std::optional<WidgetEditDragState> activeWidgetEditDrag_;
 };

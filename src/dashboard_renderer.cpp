@@ -255,6 +255,36 @@ void DashboardRenderer::DrawTextBlock(HDC hdc, const RECT& rect, const std::stri
     SelectObject(hdc, oldFont);
 }
 
+void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc) const {
+    if (!showLayoutEditGuides_ || !hoveredEditableWidget_.has_value()) {
+        return;
+    }
+
+    const ResolvedWidgetLayout* hoveredWidget = nullptr;
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            if (MatchesWidgetIdentity(widget, *hoveredEditableWidget_)) {
+                hoveredWidget = &widget;
+                break;
+            }
+        }
+        if (hoveredWidget != nullptr) {
+            break;
+        }
+    }
+    if (hoveredWidget == nullptr) {
+        return;
+    }
+
+    HPEN pen = CreatePen(PS_SOLID, 1, LayoutGuideColor());
+    HGDIOBJ oldPen = SelectObject(hdc, pen);
+    HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
+    Rectangle(hdc, hoveredWidget->rect.left, hoveredWidget->rect.top, hoveredWidget->rect.right, hoveredWidget->rect.bottom);
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(pen);
+}
+
 void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
     if (!showLayoutEditGuides_ || layoutEditGuides_.empty()) {
         return;
@@ -272,6 +302,47 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
         }
     }
     SelectObject(hdc, oldPen);
+    DeleteObject(pen);
+}
+
+void DashboardRenderer::DrawWidgetEditGuides(HDC hdc) const {
+    if (!showLayoutEditGuides_ || widgetEditGuides_.empty()) {
+        return;
+    }
+
+    const auto shouldDraw = [&](const WidgetEditGuide& guide) {
+        if (activeWidgetEditGuide_.has_value()) {
+            return guide.widget.renderCardId == activeWidgetEditGuide_->widget.renderCardId &&
+                guide.widget.editCardId == activeWidgetEditGuide_->widget.editCardId &&
+                guide.widget.nodePath == activeWidgetEditGuide_->widget.nodePath;
+        }
+        if (!hoveredEditableWidget_.has_value()) {
+            return false;
+        }
+        return guide.widget.renderCardId == hoveredEditableWidget_->renderCardId &&
+            guide.widget.editCardId == hoveredEditableWidget_->editCardId &&
+            guide.widget.nodePath == hoveredEditableWidget_->nodePath;
+    };
+
+    HPEN pen = CreatePen(PS_SOLID, 1, LayoutGuideColor());
+    HPEN activePen = CreatePen(PS_SOLID, std::max(1, ScaleLogical(2)), LayoutGuideColor());
+    HGDIOBJ oldPen = SelectObject(hdc, pen);
+    for (const auto& guide : widgetEditGuides_) {
+        if (!shouldDraw(guide)) {
+            continue;
+        }
+        const bool active = activeWidgetEditGuide_.has_value() &&
+            guide.parameter == activeWidgetEditGuide_->parameter &&
+            guide.guideId == activeWidgetEditGuide_->guideId &&
+            guide.widget.renderCardId == activeWidgetEditGuide_->widget.renderCardId &&
+            guide.widget.editCardId == activeWidgetEditGuide_->widget.editCardId &&
+            guide.widget.nodePath == activeWidgetEditGuide_->widget.nodePath;
+        SelectObject(hdc, active ? activePen : pen);
+        MoveToEx(hdc, guide.lineRect.left, guide.lineRect.top, nullptr);
+        LineTo(hdc, guide.lineRect.left, guide.lineRect.bottom);
+    }
+    SelectObject(hdc, oldPen);
+    DeleteObject(activePen);
     DeleteObject(pen);
 }
 
@@ -905,7 +976,9 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
             DrawResolvedWidget(hdc, widget, metrics);
         }
     }
+    DrawHoveredWidgetHighlight(hdc);
     DrawLayoutEditGuides(hdc);
+    DrawWidgetEditGuides(hdc);
     DrawLayoutSimilarityIndicators(hdc);
 }
 
