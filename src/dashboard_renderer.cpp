@@ -339,7 +339,11 @@ void DashboardRenderer::DrawWidgetEditGuides(HDC hdc) const {
             guide.widget.nodePath == activeWidgetEditGuide_->widget.nodePath;
         SelectObject(hdc, active ? activePen : pen);
         MoveToEx(hdc, guide.lineRect.left, guide.lineRect.top, nullptr);
-        LineTo(hdc, guide.lineRect.left, guide.lineRect.bottom);
+        if (guide.axis == LayoutGuideAxis::Vertical) {
+            LineTo(hdc, guide.lineRect.left, guide.lineRect.bottom);
+        } else {
+            LineTo(hdc, guide.lineRect.right, guide.lineRect.top);
+        }
     }
     SelectObject(hdc, oldPen);
     DeleteObject(activePen);

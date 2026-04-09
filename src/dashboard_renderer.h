@@ -56,6 +56,7 @@ public:
         DriveUsageActivityWidth,
         DriveUsageFreeWidth,
         ThroughputAxisPadding,
+        ThroughputHeaderGap,
     };
 
     struct WidgetEditGuide {

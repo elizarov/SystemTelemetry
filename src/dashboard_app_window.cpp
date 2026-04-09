@@ -412,7 +412,9 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_SETCURSOR:
         if (LOWORD(lParam) == HTCLIENT && isEditingLayout_) {
             if (activeWidgetEditDrag_.has_value()) {
-                SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+                const auto& guide = activeWidgetEditDrag_->guide;
+                SetCursor(LoadCursorW(nullptr,
+                    guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
             } else if (activeLayoutDrag_.has_value()) {
                 const auto& guide = activeLayoutDrag_->guide;
                 SetCursor(LoadCursorW(nullptr,

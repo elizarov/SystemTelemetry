@@ -110,20 +110,33 @@ void DashboardRenderer::AddThroughputWidgetEditGuide(const ResolvedWidgetLayout&
         widget.rect.right, widget.rect.bottom};
     const int axisWidth = std::max(1, measuredWidths_.throughputAxis);
     const int hitInset = std::max(3, ScaleLogical(4));
+    const auto addGuide = [&](LayoutGuideAxis axis, int guideId, WidgetEditParameter parameter, const RECT& lineRect,
+        const RECT& hitRect, int value, int dragDirection) {
+        WidgetEditGuide guide;
+        guide.axis = axis;
+        guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        guide.parameter = parameter;
+        guide.guideId = guideId;
+        guide.widgetRect = widget.rect;
+        guide.lineRect = lineRect;
+        guide.hitRect = hitRect;
+        guide.value = value;
+        guide.dragDirection = dragDirection;
+        widgetEditGuides_.push_back(std::move(guide));
+    };
+
     const int x = std::clamp(static_cast<int>(graphRect.left) + axisWidth,
         static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
+    addGuide(LayoutGuideAxis::Vertical, 0, WidgetEditParameter::ThroughputAxisPadding,
+        RECT{x, graphRect.top, x + 1, graphRect.bottom},
+        RECT{x - hitInset, graphRect.top, x + hitInset + 1, graphRect.bottom},
+        config_.layout.throughput.axisPadding, 1);
 
-    WidgetEditGuide guide;
-    guide.axis = LayoutGuideAxis::Vertical;
-    guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = WidgetEditParameter::ThroughputAxisPadding;
-    guide.guideId = 0;
-    guide.widgetRect = widget.rect;
-    guide.lineRect = RECT{x, graphRect.top, x + 1, graphRect.bottom};
-    guide.hitRect = RECT{x - hitInset, graphRect.top, x + hitInset + 1, graphRect.bottom};
-    guide.value = config_.layout.throughput.axisPadding;
-    guide.dragDirection = 1;
-    widgetEditGuides_.push_back(std::move(guide));
+    const int y = std::clamp(static_cast<int>(graphRect.top), static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
+    addGuide(LayoutGuideAxis::Horizontal, 1, WidgetEditParameter::ThroughputHeaderGap,
+        RECT{widget.rect.left, y, widget.rect.right, y + 1},
+        RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1},
+        config_.layout.throughput.headerGap, 1);
 }
 
 void DashboardRenderer::BuildWidgetEditGuides() {

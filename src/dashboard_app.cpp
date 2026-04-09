@@ -664,7 +664,8 @@ void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
     }
 
     if (widgetGuide != nullptr) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+        SetCursor(LoadCursorW(nullptr,
+            widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
     } else if (layoutGuide != nullptr) {
         SetCursor(LoadCursorW(nullptr,
             layoutGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
@@ -698,6 +699,9 @@ bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide
         break;
     case DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding:
         config_.layout.throughput.axisPadding = clampedValue;
+        break;
+    case DashboardRenderer::WidgetEditParameter::ThroughputHeaderGap:
+        config_.layout.throughput.headerGap = clampedValue;
         break;
     default:
         return false;
