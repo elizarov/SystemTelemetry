@@ -1,4 +1,5 @@
 #include "config.h"
+#include "config_resolution.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -975,98 +976,10 @@ std::string BuildSavedConfigText(const std::string& initialText, const AppConfig
     return JoinConfigLines(lines);
 }
 
-void AddUniqueValue(std::vector<std::string>& values, const std::string& value) {
-    if (value.empty()) {
-        return;
-    }
-
-    for (const auto& existing : values) {
-        if (existing == value) {
-            return;
-        }
-    }
-    values.push_back(value);
-}
-
-std::string NormalizeDriveLetter(const std::string& drive) {
-    const std::string trimmed = Trim(drive);
-    if (trimmed.empty()) {
-        return {};
-    }
-
-    const unsigned char ch = static_cast<unsigned char>(trimmed.front());
-    if (!std::isalpha(ch)) {
-        return {};
-    }
-    return std::string(1, static_cast<char>(std::toupper(ch)));
-}
-
-std::string ExtractMetricReference(const std::string& token) {
-    const size_t equals = token.find('=');
-    return Trim(token.substr(0, equals));
-}
-
-void CollectLayoutBindingsRecursive(const LayoutNodeConfig& node,
-    std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
-    for (const std::string& token : Split(node.parameter, ',')) {
-        const std::string metricRef = ExtractMetricReference(token);
-        if (metricRef.rfind("board.temp.", 0) == 0) {
-            AddUniqueValue(boardTemperatures, metricRef.substr(std::string("board.temp.").size()));
-        } else if (metricRef.rfind("board.fan.", 0) == 0) {
-            AddUniqueValue(boardFans, metricRef.substr(std::string("board.fan.").size()));
-        }
-    }
-
-    for (const auto& child : node.children) {
-        CollectLayoutBindingsRecursive(child, boardTemperatures, boardFans);
-    }
-}
-
 }  // namespace
 
 std::string LoadEmbeddedConfigTemplate() {
     return LoadUtf8Resource(IDR_CONFIG_TEMPLATE, RT_RCDATA);
-}
-
-struct LayoutBindingSelection {
-    std::vector<std::string> boardTemperatureNames;
-    std::vector<std::string> boardFanNames;
-};
-
-static LayoutBindingSelection CollectLayoutBindings(const LayoutConfig& layout) {
-    std::vector<std::string> boardTemperatures;
-    std::vector<std::string> boardFans;
-    for (const auto& card : layout.cards) {
-        CollectLayoutBindingsRecursive(card.layout, boardTemperatures, boardFans);
-    }
-
-    LayoutBindingSelection result;
-    result.boardTemperatureNames = std::move(boardTemperatures);
-    result.boardFanNames = std::move(boardFans);
-    return result;
-}
-
-bool SelectResolvedLayout(AppConfig& config, const std::string& requestedName) {
-    const NamedLayoutSectionConfig* selected = nullptr;
-    if (!requestedName.empty()) {
-        for (const auto& layout : config.layouts) {
-            if (layout.name == requestedName) {
-                selected = &layout;
-                break;
-            }
-        }
-    }
-    if (selected == nullptr && !config.layouts.empty()) {
-        selected = &config.layouts.front();
-    }
-    if (selected == nullptr) {
-        return false;
-    }
-
-    config.display.layout = selected->name;
-    config.layout.structure.window = selected->window;
-    config.layout.structure.cardsLayout = selected->cardsLayout;
-    return true;
 }
 
 AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay) {
@@ -1079,11 +992,7 @@ AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay) {
     SelectResolvedLayout(config, config.display.layout);
 
     const LayoutBindingSelection layoutBindings = CollectLayoutBindings(config.layout);
-    std::vector<std::string> normalizedDrives;
-    for (const auto& drive : config.storage.drives) {
-        AddUniqueValue(normalizedDrives, NormalizeDriveLetter(drive));
-    }
-    config.storage.drives = std::move(normalizedDrives);
+    config.storage.drives = NormalizeConfiguredDrives(config.storage.drives);
     config.board.requestedTemperatureNames = layoutBindings.boardTemperatureNames;
     config.board.requestedFanNames = layoutBindings.boardFanNames;
     return config;

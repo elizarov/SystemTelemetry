@@ -66,6 +66,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_commands.cpp
     src/layout_edit_service.cpp
     src/config.cpp
+    src/config_resolution.cpp
     src/layout_snap_solver.cpp
     src/telemetry.cpp
     src/telemetry_storage_network.cpp
@@ -175,6 +176,8 @@ target_link_libraries(gtest_main PUBLIC gtest)
 add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_commands_tests.cpp
+    tests/config_resolution_tests.cpp
+    src/config_resolution.cpp
     src/layout_edit_commands.cpp
     src/layout_snap_solver.cpp
 )
