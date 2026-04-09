@@ -223,8 +223,7 @@ void LayoutEditController::StartSession() {
     SyncRendererInteractionState();
 }
 
-void LayoutEditController::StopSession(HWND hwnd, bool showLayoutEditGuidesAfterStop) {
-    (void) hwnd;
+void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
     ClearInteractionState();
     host_.LayoutEditOverlayState().showLayoutEditGuides = showLayoutEditGuidesAfterStop;
     SyncRendererInteractionState();
@@ -259,7 +258,7 @@ const DashboardRenderer::WidgetEditGuide* LayoutEditController::HitTestWidgetEdi
     return nullptr;
 }
 
-void LayoutEditController::RefreshHover(HWND hwnd, POINT clientPoint) {
+void LayoutEditController::RefreshHover(POINT clientPoint) {
     if (activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
         activeTextEditDrag_.has_value() || activeBarEditDrag_.has_value() || activeGaugeEditDrag_.has_value()) {
         return;
@@ -357,7 +356,7 @@ void LayoutEditController::RefreshHover(HWND hwnd, POINT clientPoint) {
         host_.InvalidateLayoutEdit();
     }
 
-    SetCursorForPoint(hwnd, clientPoint);
+    SetCursorForPoint(clientPoint);
 }
 
 bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
@@ -431,9 +430,9 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
     return false;
 }
 
-bool LayoutEditController::HandleMouseMove(HWND hwnd, POINT clientPoint) {
+bool LayoutEditController::HandleMouseMove(POINT clientPoint) {
     if (activeLayoutDrag_.has_value()) {
-        return UpdateLayoutDrag(hwnd, clientPoint);
+        return UpdateLayoutDrag(clientPoint);
     }
     if (activeGaugeEditDrag_.has_value()) {
         return UpdateGaugeEditDrag(clientPoint);
@@ -448,11 +447,11 @@ bool LayoutEditController::HandleMouseMove(HWND hwnd, POINT clientPoint) {
         return UpdateWidgetEditDrag(clientPoint);
     }
 
-    RefreshHover(hwnd, clientPoint);
+    RefreshHover(clientPoint);
     return true;
 }
 
-bool LayoutEditController::HandleLButtonUp(HWND hwnd, POINT clientPoint) {
+bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
     bool released = false;
     if (activeGaugeEditDrag_.has_value()) {
         activeGaugeEditDrag_.reset();
@@ -477,7 +476,7 @@ bool LayoutEditController::HandleLButtonUp(HWND hwnd, POINT clientPoint) {
 
     SyncRendererInteractionState();
     ReleaseCapture();
-    RefreshHover(hwnd, clientPoint);
+    RefreshHover(clientPoint);
     return true;
 }
 
@@ -532,7 +531,7 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     POINT cursor{};
     GetCursorPos(&cursor);
     ScreenToClient(hwnd, &cursor);
-    RefreshHover(hwnd, cursor);
+    RefreshHover(cursor);
     return true;
 }
 
@@ -575,8 +574,7 @@ void LayoutEditController::ClearInteractionState() {
     activeGaugeEditDrag_.reset();
 }
 
-void LayoutEditController::SetCursorForPoint(HWND hwnd, POINT clientPoint) {
-    (void) hwnd;
+void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
     if (hoveredEditableTextAnchor_.has_value()) {
         SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
         return;
@@ -657,7 +655,7 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
     return std::nullopt;
 }
 
-bool LayoutEditController::UpdateLayoutDrag(HWND hwnd, POINT clientPoint) {
+bool LayoutEditController::UpdateLayoutDrag(POINT clientPoint) {
     LayoutDragState& drag = *activeLayoutDrag_;
     const int currentCoordinate = drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
     const int delta = currentCoordinate - drag.dragStartCoordinate;
@@ -695,7 +693,7 @@ bool LayoutEditController::UpdateLayoutDrag(HWND hwnd, POINT clientPoint) {
     }
 
     SyncRendererInteractionState();
-    RefreshHover(hwnd, clientPoint);
+    RefreshHover(clientPoint);
     return true;
 }
 

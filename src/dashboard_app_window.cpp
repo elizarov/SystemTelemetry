@@ -321,14 +321,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_MOUSEMOVE:
         if (state.isEditingLayout) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            layoutEditController_.HandleMouseMove(hwnd_, clientPoint);
+            layoutEditController_.HandleMouseMove(clientPoint);
             return 0;
         }
         break;
     case WM_LBUTTONUP:
         if (state.isEditingLayout) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            if (layoutEditController_.HandleLButtonUp(hwnd_, clientPoint)) {
+            if (layoutEditController_.HandleLButtonUp(clientPoint)) {
                 return 0;
             }
         }

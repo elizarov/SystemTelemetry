@@ -323,7 +323,7 @@ void DashboardController::StopLayoutEditMode(DashboardShellHost& shell, LayoutEd
         return;
     }
     state_.isEditingLayout = false;
-    controller.StopSession(shell.WindowHandle(), diagnosticsEditLayout);
+    controller.StopSession(diagnosticsEditLayout);
     shell.RendererEditOverlayState().showLayoutEditGuides = diagnosticsEditLayout;
 }
 

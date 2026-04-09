@@ -69,11 +69,11 @@ public:
     explicit LayoutEditController(LayoutEditHost& host);
 
     void StartSession();
-    void StopSession(HWND hwnd, bool showLayoutEditGuidesAfterStop);
+    void StopSession(bool showLayoutEditGuidesAfterStop);
 
     bool HandleLButtonDown(HWND hwnd, POINT clientPoint);
-    bool HandleMouseMove(HWND hwnd, POINT clientPoint);
-    bool HandleLButtonUp(HWND hwnd, POINT clientPoint);
+    bool HandleMouseMove(POINT clientPoint);
+    bool HandleLButtonUp(POINT clientPoint);
     bool HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner);
     bool HandleSetCursor(HWND hwnd);
 
@@ -111,15 +111,15 @@ private:
 
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
     const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(POINT clientPoint, size_t* index = nullptr) const;
-    void RefreshHover(HWND hwnd, POINT clientPoint);
-    bool UpdateLayoutDrag(HWND hwnd, POINT clientPoint);
+    void RefreshHover(POINT clientPoint);
+    bool UpdateLayoutDrag(POINT clientPoint);
     bool UpdateWidgetEditDrag(POINT clientPoint);
     bool UpdateTextEditDrag(POINT clientPoint);
     bool UpdateBarEditDrag(POINT clientPoint);
     bool UpdateGaugeEditDrag(POINT clientPoint);
     void SyncRendererInteractionState();
     void ClearInteractionState();
-    void SetCursorForPoint(HWND hwnd, POINT clientPoint);
+    void SetCursorForPoint(POINT clientPoint);
     std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag,
         const std::vector<int>& freeWeights);
 
