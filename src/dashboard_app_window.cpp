@@ -4,6 +4,7 @@
 #include <cstdio>
 
 void DashboardApp::ShowContextMenu(POINT screenPoint) {
+    DashboardSessionState& state = controller_->State();
     HMENU menu = CreatePopupMenu();
     HMENU diagnosticsMenu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
@@ -11,45 +12,45 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU storageDrivesMenu = CreatePopupMenu();
     HMENU configureDisplayMenu = CreatePopupMenu();
     const UINT autoStartFlags = MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
-    layoutMenuOptions_.clear();
-    for (size_t i = 0; i < config_.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax; ++i) {
+    state.layoutMenuOptions.clear();
+    for (size_t i = 0; i < state.config.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax; ++i) {
         LayoutMenuOption option;
         option.commandId = kCommandLayoutBase + static_cast<UINT>(i);
-        option.name = config_.layouts[i].name;
-        layoutMenuOptions_.push_back(option);
+        option.name = state.config.layouts[i].name;
+        state.layoutMenuOptions.push_back(option);
     }
-    if (layoutMenuOptions_.empty()) {
+    if (state.layoutMenuOptions.empty()) {
         AppendMenuW(layoutMenu, MF_STRING | MF_GRAYED, kCommandLayoutBase, L"No layouts found");
     } else {
-        for (const auto& option : layoutMenuOptions_) {
+        for (const auto& option : state.layoutMenuOptions) {
             const std::wstring label = WideFromUtf8(option.name);
-            const UINT flags = MF_STRING | (config_.display.layout == option.name ? MF_CHECKED : MF_UNCHECKED);
+            const UINT flags = MF_STRING | (state.config.display.layout == option.name ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(layoutMenu, flags, option.commandId, label.c_str());
             SetMenuItemRadioStyle(layoutMenu, option.commandId);
         }
     }
-    networkMenuOptions_.clear();
-    const auto& networkCandidates = telemetry_->NetworkAdapterCandidates();
+    state.networkMenuOptions.clear();
+    const auto& networkCandidates = state.telemetry->NetworkAdapterCandidates();
     for (size_t i = 0; i < networkCandidates.size() && (kCommandNetworkAdapterBase + i) <= kCommandNetworkAdapterMax; ++i) {
         NetworkMenuOption option;
         option.commandId = kCommandNetworkAdapterBase + static_cast<UINT>(i);
         option.adapterName = networkCandidates[i].adapterName;
         option.ipAddress = networkCandidates[i].ipAddress;
         option.selected = networkCandidates[i].selected;
-        networkMenuOptions_.push_back(std::move(option));
+        state.networkMenuOptions.push_back(std::move(option));
     }
-    if (networkMenuOptions_.empty()) {
+    if (state.networkMenuOptions.empty()) {
         AppendMenuW(networkMenu, MF_STRING | MF_GRAYED, kCommandNetworkAdapterBase, L"No adapters found");
     } else {
-        for (const auto& option : networkMenuOptions_) {
+        for (const auto& option : state.networkMenuOptions) {
             const std::wstring label = WideFromUtf8(FormatNetworkFooterText(option.adapterName, option.ipAddress));
             const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(networkMenu, flags, option.commandId, label.c_str());
             SetMenuItemRadioStyle(networkMenu, option.commandId);
         }
     }
-    storageDriveMenuOptions_.clear();
-    const auto& storageDriveCandidates = telemetry_->StorageDriveCandidates();
+    state.storageDriveMenuOptions.clear();
+    const auto& storageDriveCandidates = state.telemetry->StorageDriveCandidates();
     for (size_t i = 0; i < storageDriveCandidates.size() && (kCommandStorageDriveBase + i) <= kCommandStorageDriveMax; ++i) {
         StorageDriveMenuOption option;
         option.commandId = kCommandStorageDriveBase + static_cast<UINT>(i);
@@ -57,22 +58,22 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         option.volumeLabel = storageDriveCandidates[i].volumeLabel;
         option.totalGb = storageDriveCandidates[i].totalGb;
         option.selected = storageDriveCandidates[i].selected;
-        storageDriveMenuOptions_.push_back(std::move(option));
+        state.storageDriveMenuOptions.push_back(std::move(option));
     }
-    if (storageDriveMenuOptions_.empty()) {
+    if (state.storageDriveMenuOptions.empty()) {
         AppendMenuW(storageDrivesMenu, MF_STRING | MF_GRAYED, kCommandStorageDriveBase, L"No drives found");
     } else {
-        for (const auto& option : storageDriveMenuOptions_) {
+        for (const auto& option : state.storageDriveMenuOptions) {
             const std::wstring label = WideFromUtf8(FormatStorageDriveMenuText(option));
             const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(storageDrivesMenu, flags, option.commandId, label.c_str());
         }
     }
-    configDisplayOptions_ = EnumerateDisplayMenuOptions(config_);
-    if (configDisplayOptions_.empty()) {
+    state.configDisplayOptions = EnumerateDisplayMenuOptions(state.config);
+    if (state.configDisplayOptions.empty()) {
         AppendMenuW(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, L"No displays found");
     } else {
-        for (const auto& option : configDisplayOptions_) {
+        for (const auto& option : state.configDisplayOptions) {
             const std::wstring label = WideFromUtf8(option.displayName);
             const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED);
             AppendMenuW(configureDisplayMenu, flags, option.commandId, label.c_str());
@@ -83,7 +84,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveDumpAs, L"Save Dump To...");
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
-    AppendMenuW(menu, MF_STRING | (isEditingLayout_ ? MF_CHECKED : MF_UNCHECKED), kCommandEditLayout, L"Edit layout");
+    AppendMenuW(menu, MF_STRING | (state.isEditingLayout ? MF_CHECKED : MF_UNCHECKED), kCommandEditLayout, L"Edit layout");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
@@ -105,7 +106,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         StartMoveMode();
         break;
     case kCommandEditLayout:
-        if (isEditingLayout_) {
+        if (state.isEditingLayout) {
             StopLayoutEditMode();
         } else {
             StartLayoutEditMode();
@@ -139,33 +140,33 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         break;
     default:
         if (selected >= kCommandLayoutBase && selected <= kCommandLayoutMax) {
-            const auto it = std::find_if(layoutMenuOptions_.begin(), layoutMenuOptions_.end(),
+            const auto it = std::find_if(state.layoutMenuOptions.begin(), state.layoutMenuOptions.end(),
                 [selected](const LayoutMenuOption& option) { return option.commandId == selected; });
-            if (it != layoutMenuOptions_.end() && !SwitchLayout(it->name)) {
+            if (it != state.layoutMenuOptions.end() && !SwitchLayout(it->name)) {
                 MessageBoxW(hwnd_, L"Failed to switch layout.", L"System Telemetry", MB_ICONERROR);
             }
             break;
         }
         if (selected >= kCommandNetworkAdapterBase && selected <= kCommandNetworkAdapterMax) {
-            const auto it = std::find_if(networkMenuOptions_.begin(), networkMenuOptions_.end(),
+            const auto it = std::find_if(state.networkMenuOptions.begin(), state.networkMenuOptions.end(),
                 [selected](const NetworkMenuOption& option) { return option.commandId == selected; });
-            if (it != networkMenuOptions_.end()) {
+            if (it != state.networkMenuOptions.end()) {
                 SelectNetworkAdapter(*it);
             }
             break;
         }
         if (selected >= kCommandStorageDriveBase && selected <= kCommandStorageDriveMax) {
-            const auto it = std::find_if(storageDriveMenuOptions_.begin(), storageDriveMenuOptions_.end(),
+            const auto it = std::find_if(state.storageDriveMenuOptions.begin(), state.storageDriveMenuOptions.end(),
                 [selected](const StorageDriveMenuOption& option) { return option.commandId == selected; });
-            if (it != storageDriveMenuOptions_.end()) {
+            if (it != state.storageDriveMenuOptions.end()) {
                 ToggleStorageDrive(*it);
             }
             break;
         }
         if (selected >= kCommandConfigureDisplayBase && selected <= kCommandConfigureDisplayMax) {
-            const auto it = std::find_if(configDisplayOptions_.begin(), configDisplayOptions_.end(),
+            const auto it = std::find_if(state.configDisplayOptions.begin(), state.configDisplayOptions.end(),
                 [selected](const DisplayMenuOption& option) { return option.commandId == selected; });
-            if (it != configDisplayOptions_.end()) {
+            if (it != state.configDisplayOptions.end()) {
                 ConfigureDisplay(*it);
             }
         }
@@ -267,6 +268,7 @@ LRESULT CALLBACK DashboardApp::WndProcThunk(HWND hwnd, UINT message, WPARAM wPar
 }
 
 LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
+    DashboardSessionState& state = controller_->State();
     switch (message) {
     case WM_CREATE:
         currentDpi_ = CurrentWindowDpi();
@@ -289,16 +291,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             RetryConfigPlacementIfPending();
             return 0;
         }
-        telemetry_->UpdateSnapshot();
-        if (diagnostics_ != nullptr &&
-            std::chrono::steady_clock::now() - lastDiagnosticsOutput_ >= std::chrono::seconds(1)) {
-            if (!WriteDiagnosticsOutputs()) {
-                DestroyWindow(hwnd_);
-                return 0;
-            }
-            lastDiagnosticsOutput_ = std::chrono::steady_clock::now();
+        if (!controller_->HandleRefreshTimer(*this)) {
+            DestroyWindow(hwnd_);
+            return 0;
         }
-        InvalidateRect(hwnd_, nullptr, FALSE);
         return 0;
     case WM_CONTEXTMENU: {
         POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
@@ -308,14 +304,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             point.x = rect.left + 24;
             point.y = rect.top + 24;
         }
-        if (isMoving_) {
+        if (state.isMoving) {
             StopMoveMode();
         }
         ShowContextMenu(point);
         return 0;
     }
     case WM_LBUTTONDOWN:
-        if (isEditingLayout_) {
+        if (state.isEditingLayout) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             if (layoutEditController_.HandleLButtonDown(hwnd_, clientPoint)) {
                 return 0;
@@ -323,43 +319,43 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         }
         break;
     case WM_MOUSEMOVE:
-        if (isEditingLayout_) {
+        if (state.isEditingLayout) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             layoutEditController_.HandleMouseMove(hwnd_, clientPoint);
             return 0;
         }
         break;
     case WM_LBUTTONUP:
-        if (isEditingLayout_) {
+        if (state.isEditingLayout) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             if (layoutEditController_.HandleLButtonUp(hwnd_, clientPoint)) {
                 return 0;
             }
         }
-        if (isMoving_) {
+        if (state.isMoving) {
             StopMoveMode();
             return 0;
         }
         break;
     case WM_KEYDOWN:
         if (wParam == VK_ESCAPE) {
-            if (isEditingLayout_) {
+            if (state.isEditingLayout) {
                 StopLayoutEditMode();
                 return 0;
             }
-            if (isMoving_) {
+            if (state.isMoving) {
                 StopMoveMode();
                 return 0;
             }
         }
         break;
     case WM_CAPTURECHANGED:
-        if (isEditingLayout_ && layoutEditController_.HandleCaptureChanged(hwnd_, reinterpret_cast<HWND>(lParam))) {
+        if (state.isEditingLayout && layoutEditController_.HandleCaptureChanged(hwnd_, reinterpret_cast<HWND>(lParam))) {
             return 0;
         }
         break;
     case WM_SETCURSOR:
-        if (LOWORD(lParam) == HTCLIENT && isEditingLayout_) {
+        if (LOWORD(lParam) == HTCLIENT && state.isEditingLayout) {
             layoutEditController_.HandleSetCursor(hwnd_);
             return TRUE;
         }
@@ -408,8 +404,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         KillTimer(hwnd_, kRefreshTimerId);
         KillTimer(hwnd_, kMoveTimerId);
         KillTimer(hwnd_, kPlacementTimerId);
-        if (diagnostics_ != nullptr) {
-            diagnostics_->WriteTraceMarker("diagnostics:ui_done");
+        if (state.diagnostics != nullptr) {
+            state.diagnostics->WriteTraceMarker("diagnostics:ui_done");
         }
         RemoveTrayIcon();
         ReleaseFonts();
@@ -449,8 +445,8 @@ void DashboardApp::Paint() {
     DeleteObject(background);
     SetBkMode(memDc, TRANSPARENT);
 
-    DrawLayout(memDc, telemetry_->Snapshot());
-    if (isMoving_) {
+    DrawLayout(memDc, controller_->State().telemetry->Snapshot());
+    if (controller_->State().isMoving) {
         DrawMoveOverlay(memDc);
     }
 

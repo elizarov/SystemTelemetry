@@ -58,9 +58,13 @@ add_executable(SystemTelemetry WIN32
     src/app_main.cpp
     src/app_diagnostics.cpp
     src/app_platform.cpp
+    src/dashboard_services.cpp
+    src/dashboard_controller.cpp
     src/dashboard_app.cpp
     src/dashboard_app_window.cpp
     src/layout_edit_controller.cpp
+    src/layout_edit_commands.cpp
+    src/layout_edit_service.cpp
     src/config.cpp
     src/layout_snap_solver.cpp
     src/telemetry.cpp
@@ -170,6 +174,8 @@ target_link_libraries(gtest_main PUBLIC gtest)
 
 add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
+    tests/layout_edit_commands_tests.cpp
+    src/layout_edit_commands.cpp
     src/layout_snap_solver.cpp
 )
 target_include_directories(SystemTelemetryTests PRIVATE

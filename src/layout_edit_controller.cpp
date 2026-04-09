@@ -411,8 +411,9 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
     size_t guideIndex = 0;
     const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
     if (guide != nullptr) {
-        const LayoutNodeConfig* guideNode = FindGuideNode(host_.LayoutEditConfig(), LayoutEditHost::LayoutTarget::ForGuide(*guide));
-        const std::vector<int> initialWeights = SeedLayoutGuideWeights(*guide, guideNode);
+        const LayoutNodeConfig* guideNode = layout_edit::FindGuideNode(
+            host_.LayoutEditConfig(), LayoutEditHost::LayoutTarget::ForGuide(*guide));
+        const std::vector<int> initialWeights = layout_edit::SeedGuideWeights(*guide, guideNode);
         activeLayoutDrag_ = LayoutDragState{
             *guide,
             initialWeights,
