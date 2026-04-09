@@ -251,6 +251,12 @@ struct BarEditDragState {
     int dragStartCoordinate = 0;
 };
 
+struct GaugeEditDragState {
+    DashboardRenderer::EditableGaugeKey key;
+    int initialValue = 0;
+    int dragStartCoordinate = 0;
+};
+
 NamedLayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name);
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId);
 LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector<size_t>& path);
@@ -317,6 +323,7 @@ private:
     std::optional<DashboardRenderer::EditableTextKey> HitTestEditableTextAnchor(POINT clientPoint) const;
     std::optional<DashboardRenderer::EditableBarKey> HitTestEditableBar(POINT clientPoint) const;
     std::optional<DashboardRenderer::EditableBarKey> HitTestEditableBarAnchor(POINT clientPoint) const;
+    std::optional<DashboardRenderer::EditableGaugeKey> HitTestEditableGaugeAnchor(POINT clientPoint) const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
         const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
     std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag, const std::vector<int>& freeWeights);
@@ -328,6 +335,8 @@ private:
     bool UpdateTextEditDrag(POINT clientPoint);
     bool ApplyBarEditValue(const DashboardRenderer::EditableBarKey& key, int value);
     bool UpdateBarEditDrag(POINT clientPoint);
+    bool ApplyGaugeEditValue(const DashboardRenderer::EditableGaugeKey& key, int value);
+    bool UpdateGaugeEditDrag(POINT clientPoint);
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -380,8 +389,10 @@ private:
     std::optional<DashboardRenderer::EditableTextKey> hoveredEditableTextAnchor_;
     std::optional<DashboardRenderer::EditableBarKey> hoveredEditableBar_;
     std::optional<DashboardRenderer::EditableBarKey> hoveredEditableBarAnchor_;
+    std::optional<DashboardRenderer::EditableGaugeKey> hoveredEditableGaugeAnchor_;
     std::optional<LayoutDragState> activeLayoutDrag_;
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
     std::optional<TextEditDragState> activeTextEditDrag_;
     std::optional<BarEditDragState> activeBarEditDrag_;
+    std::optional<GaugeEditDragState> activeGaugeEditDrag_;
 };

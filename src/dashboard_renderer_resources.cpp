@@ -475,6 +475,14 @@ void DashboardRenderer::SetActiveEditableBar(const std::optional<EditableBarKey>
     activeEditableBar_ = key;
 }
 
+void DashboardRenderer::SetHoveredEditableGauge(const std::optional<EditableGaugeKey>& key) {
+    hoveredEditableGauge_ = key;
+}
+
+void DashboardRenderer::SetActiveEditableGauge(const std::optional<EditableGaugeKey>& key) {
+    activeEditableGauge_ = key;
+}
+
 void DashboardRenderer::SetSimilarityIndicatorMode(SimilarityIndicatorMode mode) {
     similarityIndicatorMode_ = mode;
 }
@@ -680,6 +688,25 @@ std::optional<DashboardRenderer::EditableBarRegion> DashboardRenderer::FindEdita
     return *it;
 }
 
+std::optional<DashboardRenderer::EditableGaugeKey> DashboardRenderer::HitTestEditableGaugeAnchor(POINT clientPoint) const {
+    for (auto it = editableGaugeRegions_.rbegin(); it != editableGaugeRegions_.rend(); ++it) {
+        if (PtInRect(&it->anchorHitRect, clientPoint)) {
+            return it->key;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<DashboardRenderer::EditableGaugeRegion> DashboardRenderer::FindEditableGaugeRegion(
+    const EditableGaugeKey& key) const {
+    const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
+        [&](const EditableGaugeRegion& region) { return MatchesEditableGaugeKey(region.key, key); });
+    if (it == editableGaugeRegions_.end()) {
+        return std::nullopt;
+    }
+    return *it;
+}
+
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstEditableWidgetByTypeName(
     const std::string& widgetTypeName) const {
     const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
@@ -751,6 +778,8 @@ void DashboardRenderer::Shutdown() {
     measuredWidths_ = {};
     resolvedLayout_ = {};
     editableTextRegions_.clear();
+    editableBarRegions_.clear();
+    editableGaugeRegions_.clear();
     ReleasePanelIcons();
     ShutdownGdiplus();
 }

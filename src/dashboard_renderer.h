@@ -96,6 +96,24 @@ public:
         int value = 0;
     };
 
+    enum class GaugeAnchorParameter {
+        SegmentCount,
+    };
+
+    struct EditableGaugeKey {
+        LayoutWidgetIdentity widget;
+        GaugeAnchorParameter parameter = GaugeAnchorParameter::SegmentCount;
+        int anchorId = 0;
+    };
+
+    struct EditableGaugeRegion {
+        EditableGaugeKey key;
+        RECT gaugeRect{};
+        RECT anchorRect{};
+        RECT anchorHitRect{};
+        int value = 0;
+    };
+
     enum class WidgetEditParameter {
         MetricListLabelWidth,
         MetricListVerticalGap,
@@ -159,6 +177,8 @@ public:
     void SetActiveEditableText(const std::optional<EditableTextKey>& key);
     void SetHoveredEditableBar(const std::optional<EditableBarKey>& key);
     void SetActiveEditableBar(const std::optional<EditableBarKey>& key);
+    void SetHoveredEditableGauge(const std::optional<EditableGaugeKey>& key);
+    void SetActiveEditableGauge(const std::optional<EditableGaugeKey>& key);
     void SetSimilarityIndicatorMode(SimilarityIndicatorMode mode);
     double RenderScale() const;
     int WindowWidth() const;
@@ -185,6 +205,8 @@ public:
     std::optional<EditableBarKey> HitTestEditableBar(POINT clientPoint) const;
     std::optional<EditableBarKey> HitTestEditableBarAnchor(POINT clientPoint) const;
     std::optional<EditableBarRegion> FindEditableBarRegion(const EditableBarKey& key) const;
+    std::optional<EditableGaugeKey> HitTestEditableGaugeAnchor(POINT clientPoint) const;
+    std::optional<EditableGaugeRegion> FindEditableGaugeRegion(const EditableGaugeKey& key) const;
     std::optional<LayoutWidgetIdentity> FindFirstEditableWidgetByTypeName(const std::string& widgetTypeName) const;
 
     bool Initialize(HWND hwnd = nullptr);
@@ -296,6 +318,7 @@ private:
     void DrawHoveredWidgetHighlight(HDC hdc) const;
     void DrawHoveredEditableTextHighlight(HDC hdc) const;
     void DrawHoveredEditableBarHighlight(HDC hdc) const;
+    void DrawHoveredEditableGaugeHighlight(HDC hdc) const;
     void DrawLayoutEditGuides(HDC hdc) const;
     void DrawWidgetEditGuides(HDC hdc) const;
     void DrawLayoutSimilarityIndicators(HDC hdc) const;
@@ -348,11 +371,13 @@ private:
     bool MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
     bool MatchesEditableTextKey(const EditableTextKey& left, const EditableTextKey& right) const;
     bool MatchesEditableBarKey(const EditableBarKey& left, const EditableBarKey& right) const;
+    bool MatchesEditableGaugeKey(const EditableGaugeKey& left, const EditableGaugeKey& right) const;
     bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const;
     bool MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const;
     EditableTextBinding MakeEditableTextBinding(const ResolvedWidgetLayout& widget, FontRole fontRole, int textId,
         int fontSize) const;
     void RegisterEditableBarRegion(const EditableBarKey& key, const RECT& barRect, int value);
+    void RegisterEditableGaugeRegion(const EditableGaugeKey& key, const RECT& gaugeRect, const RECT& anchorRect, int value);
     static bool IsContainerNode(const LayoutNodeConfig& node);
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
@@ -371,12 +396,15 @@ private:
     std::vector<WidgetEditGuide> widgetEditGuides_;
     std::vector<EditableTextRegion> editableTextRegions_;
     std::vector<EditableBarRegion> editableBarRegions_;
+    std::vector<EditableGaugeRegion> editableGaugeRegions_;
     std::optional<LayoutWidgetIdentity> hoveredEditableWidget_;
     std::optional<WidgetEditGuide> activeWidgetEditGuide_;
     std::optional<EditableTextKey> hoveredEditableText_;
     std::optional<EditableTextKey> activeEditableText_;
     std::optional<EditableBarKey> hoveredEditableBar_;
     std::optional<EditableBarKey> activeEditableBar_;
+    std::optional<EditableGaugeKey> hoveredEditableGauge_;
+    std::optional<EditableGaugeKey> activeEditableGauge_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

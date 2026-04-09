@@ -147,6 +147,25 @@ void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color,
         static_cast<INT>(clampedDiameter));
 }
 
+void FillDiamond(HDC hdc, const RECT& rect, COLORREF color) {
+    const int width = std::max(1, static_cast<int>(rect.right - rect.left));
+    const int height = std::max(1, static_cast<int>(rect.bottom - rect.top));
+    const int centerX = rect.left + (width / 2);
+    const int centerY = rect.top + (height / 2);
+    Gdiplus::Point points[] = {
+        Gdiplus::Point(centerX, rect.top),
+        Gdiplus::Point(rect.right - 1, centerY),
+        Gdiplus::Point(centerX, rect.bottom - 1),
+        Gdiplus::Point(rect.left, centerY),
+    };
+
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    Gdiplus::SolidBrush brush(Gdiplus::Color(255, GetRValue(color), GetGValue(color), GetBValue(color)));
+    graphics.FillPolygon(&brush, points, static_cast<INT>(std::size(points)));
+}
+
 void DrawSegmentIndicator(HDC hdc, const RECT& rect, int segmentCount, int segmentGap, double ratio,
     COLORREF trackColor, COLORREF accentColor) {
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
@@ -459,6 +478,46 @@ void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc) const {
         static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
 }
 
+void DashboardRenderer::DrawHoveredEditableGaugeHighlight(HDC hdc) const {
+    if (!showLayoutEditGuides_) {
+        return;
+    }
+
+    const EditableGaugeRegion* highlighted = nullptr;
+    bool active = false;
+    if (activeEditableGauge_.has_value()) {
+        const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
+            [&](const EditableGaugeRegion& region) { return MatchesEditableGaugeKey(region.key, *activeEditableGauge_); });
+        if (it != editableGaugeRegions_.end()) {
+            highlighted = &(*it);
+            active = true;
+        }
+    }
+    if (highlighted == nullptr && hoveredEditableGauge_.has_value()) {
+        const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
+            [&](const EditableGaugeRegion& region) { return MatchesEditableGaugeKey(region.key, *hoveredEditableGauge_); });
+        if (it != editableGaugeRegions_.end()) {
+            highlighted = &(*it);
+        }
+    }
+    if (highlighted == nullptr && hoveredEditableWidget_.has_value()) {
+        const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
+            [&](const EditableGaugeRegion& region) {
+                return region.key.widget.renderCardId == hoveredEditableWidget_->renderCardId &&
+                    region.key.widget.editCardId == hoveredEditableWidget_->editCardId &&
+                    region.key.widget.nodePath == hoveredEditableWidget_->nodePath;
+            });
+        if (it != editableGaugeRegions_.end()) {
+            highlighted = &(*it);
+        }
+    }
+    if (highlighted == nullptr) {
+        return;
+    }
+
+    FillDiamond(hdc, highlighted->anchorRect, active ? ActiveEditColor() : LayoutGuideColor());
+}
+
 void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
     if (!showLayoutEditGuides_ || layoutEditGuides_.empty()) {
         return;
@@ -565,6 +624,14 @@ bool DashboardRenderer::MatchesEditableBarKey(const EditableBarKey& left, const 
         left.widget.nodePath == right.widget.nodePath;
 }
 
+bool DashboardRenderer::MatchesEditableGaugeKey(const EditableGaugeKey& left, const EditableGaugeKey& right) const {
+    return left.parameter == right.parameter &&
+        left.anchorId == right.anchorId &&
+        left.widget.renderCardId == right.widget.renderCardId &&
+        left.widget.editCardId == right.widget.editCardId &&
+        left.widget.nodePath == right.widget.nodePath;
+}
+
 bool DashboardRenderer::MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const {
     return left.axis == right.axis &&
         left.parameter == right.parameter &&
@@ -612,6 +679,23 @@ void DashboardRenderer::RegisterEditableBarRegion(const EditableBarKey& key, con
     };
     region.value = value;
     editableBarRegions_.push_back(std::move(region));
+}
+
+void DashboardRenderer::RegisterEditableGaugeRegion(
+    const EditableGaugeKey& key, const RECT& gaugeRect, const RECT& anchorRect, int value) {
+    EditableGaugeRegion region;
+    region.key = key;
+    region.gaugeRect = gaugeRect;
+    region.anchorRect = anchorRect;
+    const int anchorHitInset = std::max(3, ScaleLogical(4));
+    region.anchorHitRect = RECT{
+        region.anchorRect.left - anchorHitInset,
+        region.anchorRect.top - anchorHitInset,
+        region.anchorRect.right + anchorHitInset,
+        region.anchorRect.bottom + anchorHitInset
+    };
+    region.value = value;
+    editableGaugeRegions_.push_back(std::move(region));
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
@@ -861,6 +945,20 @@ void DashboardRenderer::DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, i
             0, segmentCount - 1);
     const double gaugeStart = 90.0 + gapSweep / 2.0;
     const float segmentRadius = static_cast<float>(radius);
+    const int anchorSize = std::max(4, ScaleLogical(6));
+    const int anchorHalf = anchorSize / 2;
+    const int outerRadius = radius + static_cast<int>(std::ceil(static_cast<double>(segmentThickness) / 2.0f));
+    const RECT anchorRect{
+        cx - anchorHalf,
+        cy - outerRadius - anchorHalf,
+        cx - anchorHalf + anchorSize,
+        cy - outerRadius - anchorHalf + anchorSize
+    };
+    RegisterEditableGaugeRegion(EditableGaugeKey{
+        LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        GaugeAnchorParameter::SegmentCount,
+        0,
+    }, widget.rect, anchorRect, config_.layout.gauge.segmentCount);
 
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -1262,6 +1360,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
     editableTextRegions_.clear();
     editableBarRegions_.clear();
+    editableGaugeRegions_.clear();
     DashboardMetricSource metrics(snapshot, config_.metricScales);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
@@ -1272,6 +1371,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
     DrawHoveredWidgetHighlight(hdc);
     DrawHoveredEditableTextHighlight(hdc);
     DrawHoveredEditableBarHighlight(hdc);
+    DrawHoveredEditableGaugeHighlight(hdc);
     DrawLayoutEditGuides(hdc);
     DrawWidgetEditGuides(hdc);
     DrawLayoutSimilarityIndicators(hdc);
