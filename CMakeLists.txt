@@ -69,6 +69,8 @@ add_executable(SystemTelemetry WIN32
     src/config_resolution.cpp
     src/layout_snap_solver.cpp
     src/telemetry.cpp
+    src/telemetry_retained_history.cpp
+    src/telemetry_storage_source.cpp
     src/telemetry_storage_network.cpp
     src/telemetry_runtime.cpp
     src/telemetry_runtime_fake.cpp
@@ -178,9 +180,11 @@ add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_commands_tests.cpp
     tests/config_resolution_tests.cpp
+    tests/telemetry_retained_history_tests.cpp
     src/config_resolution.cpp
     src/layout_edit_commands.cpp
     src/layout_snap_solver.cpp
+    src/telemetry_retained_history.cpp
 )
 target_include_directories(SystemTelemetryTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"

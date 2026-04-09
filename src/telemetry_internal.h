@@ -21,9 +21,8 @@
 #include "board_vendor.h"
 #include "gpu_vendor.h"
 #include "telemetry.h"
+#include "telemetry_retained_history.h"
 #include "trace.h"
-
-constexpr size_t kRecentHistorySamples = 60;
 
 struct DriveCounterState {
     std::string label;
@@ -50,8 +49,6 @@ std::string ToLowerAscii(std::string value);
 std::string FormatScalarMetric(const ScalarMetric& metric, int precision);
 std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(const std::vector<std::string>& names, const char* unit);
 bool HasAvailableMetricValue(const std::vector<NamedScalarMetric>& metrics);
-RetainedHistorySeries CreateRetainedHistorySeries(const std::string& seriesRef);
-double ResolveScaleRatio(double value, double scale);
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, const wchar_t* path, PDH_HCOUNTER* counter);
 bool ContainsInsensitive(const std::wstring& value, const std::string& needle);
 bool EqualsInsensitive(const std::wstring& value, const std::string& needle);
@@ -78,10 +75,7 @@ struct TelemetryCollector::Impl {
     void RefreshStorageDriveCandidates();
     void RefreshDriveUsage();
     void UpdateNetworkState(bool initializeOnly);
-    void PushRetainedHistorySample(const std::string& seriesRef, double value);
-    void PushBoardMetricHistorySamples();
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
-    static void PushHistorySample(std::vector<double>& history, double value);
     void Trace(const char* text) const;
     void Trace(const std::string& text) const;
 
@@ -89,6 +83,7 @@ struct TelemetryCollector::Impl {
     SystemSnapshot snapshot_;
     std::vector<NetworkAdapterCandidate> networkAdapterCandidates_;
     std::vector<StorageDriveCandidate> storageDriveCandidates_;
+    RetainedHistoryStore retainedHistoryStore_;
     tracing::Trace trace_;
     std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
     std::unique_ptr<BoardVendorTelemetryProvider> boardProvider_;

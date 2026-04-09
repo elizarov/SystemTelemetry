@@ -1,0 +1,58 @@
+#include "telemetry_retained_history.h"
+
+#include <vector>
+
+namespace {
+
+constexpr size_t kRecentHistorySamples = 60;
+
+RetainedHistorySeries CreateRetainedHistorySeries(const std::string& seriesRef) {
+    RetainedHistorySeries history;
+    history.seriesRef = seriesRef;
+    history.samples.assign(kRecentHistorySamples, 0.0);
+    return history;
+}
+
+double ResolveScaleRatio(double value, double scale) {
+    if (scale <= 0.0) {
+        return 0.0;
+    }
+    return value / scale;
+}
+
+void PushHistorySample(std::vector<double>& history, double value) {
+    if (history.empty()) {
+        return;
+    }
+    history.erase(history.begin());
+    history.push_back(value);
+}
+
+}  // namespace
+
+void RetainedHistoryStore::Reset(SystemSnapshot& snapshot) const {
+    snapshot.retainedHistories.clear();
+    snapshot.retainedHistoryIndexByRef.clear();
+}
+
+void RetainedHistoryStore::PushSample(SystemSnapshot& snapshot, const std::string& seriesRef, double value) const {
+    auto it = snapshot.retainedHistoryIndexByRef.find(seriesRef);
+    if (it == snapshot.retainedHistoryIndexByRef.end()) {
+        const size_t index = snapshot.retainedHistories.size();
+        snapshot.retainedHistories.push_back(CreateRetainedHistorySeries(seriesRef));
+        snapshot.retainedHistoryIndexByRef.emplace(seriesRef, index);
+        it = snapshot.retainedHistoryIndexByRef.find(seriesRef);
+    }
+    PushHistorySample(snapshot.retainedHistories[it->second].samples, value);
+}
+
+void RetainedHistoryStore::PushBoardMetricSamples(SystemSnapshot& snapshot, const MetricScaleConfig& scales) const {
+    for (const auto& metric : snapshot.boardTemperatures) {
+        PushSample(snapshot, "board.temp." + metric.name,
+            ResolveScaleRatio(metric.metric.value.value_or(0.0), scales.boardTemperatureC));
+    }
+    for (const auto& metric : snapshot.boardFans) {
+        PushSample(snapshot, "board.fan." + metric.name,
+            ResolveScaleRatio(metric.metric.value.value_or(0.0), scales.boardFanRpm));
+    }
+}
