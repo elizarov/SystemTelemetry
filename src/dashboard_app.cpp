@@ -26,6 +26,30 @@ bool EditableBarKeyEquals(const DashboardRenderer::EditableBarKey& left,
         left.barId == right.barId;
 }
 
+double NormalizeDegrees(double degrees) {
+    double normalized = std::fmod(degrees, 360.0);
+    if (normalized < 0.0) {
+        normalized += 360.0;
+    }
+    return normalized;
+}
+
+std::optional<double> ComputeGaugeSweepDegrees(POINT origin, POINT clientPoint) {
+    const double dx = static_cast<double>(clientPoint.x - origin.x);
+    const double dy = static_cast<double>(clientPoint.y - origin.y);
+    if (std::abs(dx) < 0.001 && std::abs(dy) < 0.001) {
+        return std::nullopt;
+    }
+
+    double endAngle = NormalizeDegrees(std::atan2(dy, dx) * 180.0 / 3.14159265358979323846);
+    if (endAngle > 90.0 && endAngle < 270.0) {
+        endAngle = NormalizeDegrees(540.0 - endAngle);
+    }
+
+    const double gapHalf = NormalizeDegrees(90.0 - endAngle);
+    return std::clamp(360.0 - (gapHalf * 2.0), 0.0, 360.0);
+}
+
 }
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
@@ -760,7 +784,8 @@ void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
         SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
     } else if (widgetGuide != nullptr) {
         SetCursor(LoadCursorW(nullptr,
-            widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+            widgetGuide->angularDrag ? IDC_CROSS
+            : widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
     } else if (layoutGuide != nullptr) {
         SetCursor(LoadCursorW(nullptr,
             layoutGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
@@ -780,32 +805,34 @@ bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGu
     return true;
 }
 
-bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, int value) {
-    const int clampedValue = std::max(1, value);
+bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, double value) {
     switch (guide.parameter) {
     case DashboardRenderer::WidgetEditParameter::MetricListLabelWidth:
-        config_.layout.metricList.labelWidth = clampedValue;
+        config_.layout.metricList.labelWidth = std::max(1, static_cast<int>(std::lround(value)));
         break;
     case DashboardRenderer::WidgetEditParameter::MetricListVerticalGap:
-        config_.layout.metricList.verticalGap = clampedValue;
+        config_.layout.metricList.verticalGap = std::max(1, static_cast<int>(std::lround(value)));
         break;
     case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
-        config_.layout.driveUsageList.activityWidth = clampedValue;
+        config_.layout.driveUsageList.activityWidth = std::max(1, static_cast<int>(std::lround(value)));
         break;
     case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
-        config_.layout.driveUsageList.freeWidth = clampedValue;
+        config_.layout.driveUsageList.freeWidth = std::max(1, static_cast<int>(std::lround(value)));
         break;
     case DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap:
-        config_.layout.driveUsageList.headerGap = clampedValue;
+        config_.layout.driveUsageList.headerGap = std::max(1, static_cast<int>(std::lround(value)));
         break;
     case DashboardRenderer::WidgetEditParameter::DriveUsageRowGap:
-        config_.layout.driveUsageList.rowGap = clampedValue;
+        config_.layout.driveUsageList.rowGap = std::max(1, static_cast<int>(std::lround(value)));
         break;
     case DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding:
-        config_.layout.throughput.axisPadding = clampedValue;
+        config_.layout.throughput.axisPadding = std::max(1, static_cast<int>(std::lround(value)));
         break;
     case DashboardRenderer::WidgetEditParameter::ThroughputHeaderGap:
-        config_.layout.throughput.headerGap = clampedValue;
+        config_.layout.throughput.headerGap = std::max(1, static_cast<int>(std::lround(value)));
+        break;
+    case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees:
+        config_.layout.gauge.sweepDegrees = std::clamp(value, 0.0, 360.0);
         break;
     default:
         return false;
@@ -972,11 +999,20 @@ bool DashboardApp::UpdateWidgetEditDrag(POINT clientPoint) {
     }
 
     WidgetEditDragState& drag = *activeWidgetEditDrag_;
-    const int currentCoordinate = drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
-    const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;
-    const int logicalDelta = static_cast<int>(std::lround(
-        static_cast<double>(pixelDelta * drag.guide.dragDirection) / std::max(0.1, renderer_.RenderScale())));
-    const int nextValue = std::max(1, drag.initialValue + logicalDelta);
+    double nextValue = drag.initialValue;
+    if (drag.guide.angularDrag) {
+        const auto sweepDegrees = ComputeGaugeSweepDegrees(drag.guide.dragOrigin, clientPoint);
+        if (!sweepDegrees.has_value()) {
+            return true;
+        }
+        nextValue = *sweepDegrees;
+    } else {
+        const int currentCoordinate = drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
+        const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;
+        const int logicalDelta = static_cast<int>(std::lround(
+            static_cast<double>(pixelDelta * drag.guide.dragDirection) / std::max(0.1, renderer_.RenderScale())));
+        nextValue = std::max(1.0, drag.initialValue + static_cast<double>(logicalDelta));
+    }
     if (!ApplyWidgetEditValue(drag.guide, nextValue)) {
         return false;
     }

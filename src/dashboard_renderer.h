@@ -105,6 +105,7 @@ public:
         DriveUsageRowGap,
         ThroughputAxisPadding,
         ThroughputHeaderGap,
+        GaugeSweepDegrees,
     };
 
     struct WidgetEditGuide {
@@ -113,9 +114,12 @@ public:
         WidgetEditParameter parameter = WidgetEditParameter::DriveUsageActivityWidth;
         int guideId = 0;
         RECT widgetRect{};
-        RECT lineRect{};
+        POINT drawStart{};
+        POINT drawEnd{};
         RECT hitRect{};
-        int value = 0;
+        POINT dragOrigin{};
+        double value = 0.0;
+        bool angularDrag = false;
         int dragDirection = 1;
     };
 
@@ -316,6 +320,7 @@ private:
     void AddMetricListWidgetEditGuides(const ResolvedWidgetLayout& widget);
     void AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget);
     void AddThroughputWidgetEditGuide(const ResolvedWidgetLayout& widget);
+    void AddGaugeWidgetEditGuide(const ResolvedWidgetLayout& widget);
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();

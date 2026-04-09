@@ -1,6 +1,7 @@
 #include "dashboard_renderer.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <string>
 #include <vector>
@@ -14,6 +15,23 @@ bool ContainsCardReference(const std::vector<std::string>& stack, const std::str
 std::string FormatRect(const RECT& rect) {
     return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," +
         std::to_string(rect.right) + "," + std::to_string(rect.bottom) + ")";
+}
+
+POINT PolarPoint(int cx, int cy, int radius, double angleDegrees) {
+    const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
+    return POINT{
+        cx + static_cast<LONG>(std::lround(std::cos(radians) * static_cast<double>(radius))),
+        cy + static_cast<LONG>(std::lround(std::sin(radians) * static_cast<double>(radius)))
+    };
+}
+
+RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
+    return RECT{
+        std::min(start.x, end.x) - inset,
+        std::min(start.y, end.y) - inset,
+        std::max(start.x, end.x) + inset + 1,
+        std::max(start.y, end.y) + inset + 1
+    };
 }
 
 }  // namespace
@@ -44,7 +62,10 @@ void DashboardRenderer::AddMetricListWidgetEditGuides(const ResolvedWidgetLayout
         guide.parameter = parameter;
         guide.guideId = guideId;
         guide.widgetRect = widget.rect;
-        guide.lineRect = lineRect;
+        guide.drawStart = POINT{lineRect.left, lineRect.top};
+        guide.drawEnd = axis == LayoutGuideAxis::Vertical
+            ? POINT{lineRect.left, lineRect.bottom}
+            : POINT{lineRect.right, lineRect.top};
         guide.hitRect = hitRect;
         guide.value = value;
         guide.dragDirection = dragDirection;
@@ -118,7 +139,8 @@ void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout
         guide.parameter = parameter;
         guide.guideId = guideId;
         guide.widgetRect = widget.rect;
-        guide.lineRect = RECT{clampedX, widget.rect.top, clampedX + 1, widget.rect.bottom};
+        guide.drawStart = POINT{clampedX, widget.rect.top};
+        guide.drawEnd = POINT{clampedX, widget.rect.bottom};
         guide.hitRect = RECT{clampedX - hitInset, widget.rect.top, clampedX + hitInset + 1, widget.rect.bottom};
         guide.value = value;
         guide.dragDirection = dragDirection;
@@ -132,7 +154,8 @@ void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout
         guide.parameter = parameter;
         guide.guideId = guideId;
         guide.widgetRect = widget.rect;
-        guide.lineRect = RECT{widget.rect.left, clampedY, widget.rect.right, clampedY + 1};
+        guide.drawStart = POINT{widget.rect.left, clampedY};
+        guide.drawEnd = POINT{widget.rect.right, clampedY};
         guide.hitRect = RECT{widget.rect.left, clampedY - hitInset, widget.rect.right, clampedY + hitInset + 1};
         guide.value = value;
         guide.dragDirection = dragDirection;
@@ -169,7 +192,10 @@ void DashboardRenderer::AddThroughputWidgetEditGuide(const ResolvedWidgetLayout&
         guide.parameter = parameter;
         guide.guideId = guideId;
         guide.widgetRect = widget.rect;
-        guide.lineRect = lineRect;
+        guide.drawStart = POINT{lineRect.left, lineRect.top};
+        guide.drawEnd = axis == LayoutGuideAxis::Vertical
+            ? POINT{lineRect.left, lineRect.bottom}
+            : POINT{lineRect.right, lineRect.top};
         guide.hitRect = hitRect;
         guide.value = value;
         guide.dragDirection = dragDirection;
@@ -190,10 +216,47 @@ void DashboardRenderer::AddThroughputWidgetEditGuide(const ResolvedWidgetLayout&
         config_.layout.throughput.headerGap, 1);
 }
 
+void DashboardRenderer::AddGaugeWidgetEditGuide(const ResolvedWidgetLayout& widget) {
+    const int radius = std::min(std::max(1, resolvedLayout_.globalGaugeRadius), GaugeRadiusForRect(widget.rect));
+    if (radius <= 0) {
+        return;
+    }
+
+    const int cx = widget.rect.left + std::max(0L, widget.rect.right - widget.rect.left) / 2;
+    const int cy = widget.rect.top + std::max(0L, widget.rect.bottom - widget.rect.top) / 2;
+    const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
+    const double gapSweep = std::max(0.0, 360.0 - totalSweep);
+    const double endAngle = 90.0 + gapSweep / 2.0 + totalSweep;
+    const POINT center{cx, cy};
+    const int ringThickness = std::max(1, ScaleLogical(config_.layout.gauge.ringThickness));
+    const int guideInset = std::max(2, ringThickness / 2);
+    const int guideOverhang = std::max(3, ScaleLogical(6));
+    const POINT guideStart = PolarPoint(cx, cy, std::max(1, radius - guideInset), endAngle);
+    const POINT guideEnd = PolarPoint(cx, cy, radius + guideOverhang, endAngle);
+    const int hitInset = std::max(4, ScaleLogical(5));
+
+    WidgetEditGuide guide;
+    guide.axis = LayoutGuideAxis::Vertical;
+    guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    guide.parameter = WidgetEditParameter::GaugeSweepDegrees;
+    guide.guideId = 0;
+    guide.widgetRect = widget.rect;
+    guide.drawStart = guideStart;
+    guide.drawEnd = guideEnd;
+    guide.hitRect = ExpandSegmentBounds(guideStart, guideEnd, hitInset);
+    guide.dragOrigin = center;
+    guide.value = totalSweep;
+    guide.angularDrag = true;
+    widgetEditGuides_.push_back(std::move(guide));
+}
+
 void DashboardRenderer::BuildWidgetEditGuides() {
     widgetEditGuides_.clear();
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
+            if (widget.kind == WidgetKind::Gauge) {
+                AddGaugeWidgetEditGuide(widget);
+            }
             if (widget.kind == WidgetKind::MetricList) {
                 AddMetricListWidgetEditGuides(widget);
             }

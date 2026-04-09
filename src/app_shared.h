@@ -235,7 +235,7 @@ struct LayoutDragState {
 
 struct WidgetEditDragState {
     DashboardRenderer::WidgetEditGuide guide;
-    int initialValue = 0;
+    double initialValue = 0.0;
     int dragStartCoordinate = 0;
 };
 
@@ -322,7 +322,7 @@ private:
     std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag, const std::vector<int>& freeWeights);
     bool ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights);
     bool UpdateLayoutDrag(POINT clientPoint);
-    bool ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, int value);
+    bool ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, double value);
     bool UpdateWidgetEditDrag(POINT clientPoint);
     bool ApplyTextEditValue(const DashboardRenderer::EditableTextKey& key, int value);
     bool UpdateTextEditDrag(POINT clientPoint);

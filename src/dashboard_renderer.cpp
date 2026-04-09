@@ -511,12 +511,8 @@ void DashboardRenderer::DrawWidgetEditGuides(HDC hdc) const {
         }
         const bool active = activeWidgetEditGuide_.has_value() && MatchesWidgetEditGuide(guide, *activeWidgetEditGuide_);
         SelectObject(hdc, active ? activePen : pen);
-        MoveToEx(hdc, guide.lineRect.left, guide.lineRect.top, nullptr);
-        if (guide.axis == LayoutGuideAxis::Vertical) {
-            LineTo(hdc, guide.lineRect.left, guide.lineRect.bottom);
-        } else {
-            LineTo(hdc, guide.lineRect.right, guide.lineRect.top);
-        }
+        MoveToEx(hdc, guide.drawStart.x, guide.drawStart.y, nullptr);
+        LineTo(hdc, guide.drawEnd.x, guide.drawEnd.y);
     }
     SelectObject(hdc, oldPen);
     DeleteObject(activePen);
