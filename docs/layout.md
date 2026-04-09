@@ -36,7 +36,7 @@ The language is centered around the dashboard shape:
 
 The language has nine levels:
 
-1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, `[clock_time]`, and `[clock_date]`
+1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, and `[network_footer]`
 2. Runtime selection sections such as `[display]`, `[network]`, and `[storage]`
 3. Board sensor mapping in `[board]`
 4. Named dashboard structure sections in `[layout.<name>]`
@@ -80,8 +80,6 @@ Supported widget geometry keys:
 - `[gauge]`: `preferred_size`, `outer_padding`, `min_radius`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`
 - `[text]`: `preferred_padding`
 - `[network_footer]`: `preferred_padding`
-- `[clock_time]`: `padding`
-- `[clock_date]`: `padding`
 
 `[layout_editor]` owns interactive layout-edit affordance tuning:
 
@@ -194,30 +192,25 @@ Supported layout kinds:
 
 - `rows(...)`
 - `columns(...)`
-- `stack(...)`
-- `stack_top(...)`
-- `center(...)`
 
 ### Meaning
 
-- `rows(...)` splits dashboard cards vertically into weighted row groups, with an optional row-group weight written as `rows:weight(...)`
+- `rows(...)` splits content vertically into weighted children, with child weights written as `child:weight`
 - `columns(...)` splits content horizontally into weighted children, with child weights written as `child:weight`
-- `stack(...)` splits content vertically into weighted children, with child weights written as `child:weight`
-- `stack_top(...)` packs children from the top using their preferred heights and leaves any remaining space below
-- `center(...)` creates a centered vertical stack
 
 `metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + [metric_list].vertical_gap + [metric_list].bar_height`.
-`drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].vertical_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].vertical_gap` when placed inside a top-packed stack.
+`drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].vertical_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].vertical_gap`.
 Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching widget-section `*_padding` keys.
 
 Nested layout expressions are allowed.
 Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is a card-layout reference and resolves to that referenced card's layout during layout resolution.
-In a regular vertical `stack(...)`, fixed-height widgets such as `text`, `network_footer`, and `spacer` keep their preferred height and the remaining space goes to flexible siblings.
+In a vertical `rows(...)` container, fixed-height direct children such as `text`, `network_footer`, and `spacer` keep their preferred height and the remaining space goes to flexible siblings when no `vertical_spring` is present.
+When one or more direct `vertical_spring` children are present in `rows(...)`, every spring absorbs the remaining height before normal weighted stretching and multiple springs divide that height by weight.
 Interactive layout editing applies only to `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
 
 Example:
 
-- `columns(stack:5(throughput:4(storage.read),throughput:4(storage.write)), drive_usage_list:7)`
+- `columns(rows:5(throughput:4(storage.read),throughput:4(storage.write)), rows:7(drive_usage_list,vertical_spring))`
 - `columns(storage_throughput:5, storage_usage:7)`
 
 ## Widget names
@@ -230,6 +223,7 @@ Supported widget names:
 - `throughput`
 - `network_footer`
 - `spacer`
+- `vertical_spring`
 - `drive_usage_list`
 - `clock_time`
 - `clock_date`
@@ -252,6 +246,7 @@ Examples:
 - `drive_usage_list`
 
 `spacer` reserves layout space without drawing content.
+`vertical_spring` draws nothing and absorbs remaining height inside a vertical `rows(...)` container.
 
 Supported metric references include:
 
@@ -330,9 +325,9 @@ Static sizing rules:
 - header height comes from config
 - metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
 - drive-usage widgets reserve a dedicated header row and use fixed-width read/write activity columns from `[drive_usage_list]`
-- widget-specific heights, paddings, widths, segment counts, and gauge/throughput chrome come from their matching widget sections, while fixed text columns derive from measured text widths plus their matching widget-section padding
+- widget-specific heights, paddings, widths, segment counts, and gauge/throughput chrome come from their matching widget sections, while fixed text columns and clock preferred heights derive directly from measured font metrics plus their matching documented padding where applicable
 - throughput sections follow the configured vertical rhythm
-- centered time/date widgets use weighted slots from `center(...)`
+- centered time/date layouts use `rows(vertical_spring, ..., vertical_spring)` so springs balance the surrounding free space
 - repeated lists such as drives divide their assigned area using the item count from config
 
 ## Validation rules

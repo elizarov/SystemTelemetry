@@ -224,18 +224,6 @@ struct NetworkFooterWidgetConfig {
     CONFIG_SECTION("network_footer");
 };
 
-struct ClockTimeWidgetConfig {
-    CONFIG_REFLECTED_STRUCT(ClockTimeWidgetConfig)
-    CONFIG_VALUE(int, padding, "padding");
-    CONFIG_SECTION("clock_time");
-};
-
-struct ClockDateWidgetConfig {
-    CONFIG_REFLECTED_STRUCT(ClockDateWidgetConfig)
-    CONFIG_VALUE(int, padding, "padding");
-    CONFIG_SECTION("clock_date");
-};
-
 struct LayoutEditorConfig {
     CONFIG_REFLECTED_STRUCT(LayoutEditorConfig)
     CONFIG_VALUE(int, sizeSimilarityThreshold, "size_similarity_threshold");
@@ -253,8 +241,6 @@ struct LayoutConfig {
     CONFIG_SECTION_VALUE(GaugeWidgetConfig, gauge);
     CONFIG_SECTION_VALUE(TextWidgetConfig, text);
     CONFIG_SECTION_VALUE(NetworkFooterWidgetConfig, networkFooter);
-    CONFIG_SECTION_VALUE(ClockTimeWidgetConfig, clockTime);
-    CONFIG_SECTION_VALUE(ClockDateWidgetConfig, clockDate);
     CONFIG_SECTION_VALUE(LayoutEditorConfig, layoutEditor);
     CONFIG_SECTION_VALUE(UiFontSetConfig, fonts);
     CONFIG_DYNAMIC_SECTION_VALUE(LayoutCardConfig, cards, id);

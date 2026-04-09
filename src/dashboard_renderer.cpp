@@ -102,7 +102,7 @@ UINT GetPanelIconResourceId(const std::string& iconName) {
 }
 
 bool IsCardContainerNode(const LayoutNodeConfig& node) {
-    return node.name == "columns" || node.name == "stack" || node.name == "stack_top" || node.name == "center";
+    return node.name == "columns" || node.name == "rows";
 }
 
 bool IsDashboardContainerNode(const LayoutNodeConfig& node) {
@@ -655,7 +655,7 @@ int DashboardRenderer::EffectiveDriveRowHeight() const {
 }
 
 int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) const {
-    if (node.name == "stack_top") {
+    if (node.name == "rows") {
         int total = 0;
         for (size_t i = 0; i < node.children.size(); ++i) {
             total += PreferredNodeHeight(node.children[i], 0);
@@ -665,6 +665,14 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         }
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(total));
         return total;
+    }
+    if (node.name == "columns") {
+        int tallest = 0;
+        for (const auto& child : node.children) {
+            tallest = std::max(tallest, PreferredNodeHeight(child, 0));
+        }
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(tallest));
+        return tallest;
     }
     if (node.name == "text") {
         const int height = fontHeights_.label + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
@@ -680,6 +688,10 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         const int height = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
+    }
+    if (node.name == "vertical_spring") {
+        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=0");
+        return 0;
     }
     if (node.name == "metric_list") {
         const std::string param = node.parameter;
@@ -703,12 +715,12 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return height;
     }
     if (node.name == "clock_time") {
-        const int height = fontHeights_.big + std::max(0, ScaleLogical(config_.layout.clockTime.padding));
+        const int height = fontHeights_.big;
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
     if (node.name == "clock_date") {
-        const int height = fontHeights_.value + std::max(0, ScaleLogical(config_.layout.clockDate.padding));
+        const int height = fontHeights_.value;
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
@@ -736,7 +748,7 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
         widget.kind = WidgetKind::Text;
         widget.binding.metric = node.parameter;
         widget.preferredHeight = fontHeights_.label + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
-        widget.fixedPreferredHeightInStack = true;
+        widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "gauge") {
         widget.kind = WidgetKind::Gauge;
         widget.binding.metric = node.parameter;
@@ -753,27 +765,29 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
     } else if (node.name == "network_footer") {
         widget.kind = WidgetKind::NetworkFooter;
         widget.preferredHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
-        widget.fixedPreferredHeightInStack = true;
+        widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "spacer") {
         widget.kind = WidgetKind::Spacer;
         widget.preferredHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
-        widget.fixedPreferredHeightInStack = true;
+        widget.fixedPreferredHeightInRows = true;
+    } else if (node.name == "vertical_spring") {
+        widget.kind = WidgetKind::VerticalSpring;
     } else if (node.name == "drive_usage_list") {
         widget.kind = WidgetKind::DriveUsageList;
         const int count = static_cast<int>(config_.storage.drives.size());
         widget.preferredHeight = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
     } else if (node.name == "clock_time") {
         widget.kind = WidgetKind::ClockTime;
-        widget.preferredHeight = fontHeights_.big + std::max(0, ScaleLogical(config_.layout.clockTime.padding));
+        widget.preferredHeight = fontHeights_.big;
     } else if (node.name == "clock_date") {
         widget.kind = WidgetKind::ClockDate;
-        widget.preferredHeight = fontHeights_.value + std::max(0, ScaleLogical(config_.layout.clockDate.padding));
+        widget.preferredHeight = fontHeights_.value;
     }
     return widget;
 }
 
-bool DashboardRenderer::UsesFixedPreferredHeightInStack(const ResolvedWidgetLayout& widget) const {
-    return widget.fixedPreferredHeightInStack;
+bool DashboardRenderer::UsesFixedPreferredHeightInRows(const ResolvedWidgetLayout& widget) const {
+    return widget.fixedPreferredHeightInRows;
 }
 
 const LayoutCardConfig* DashboardRenderer::FindCardConfigById(const std::string& id) const {
@@ -855,40 +869,27 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     }
 
     const bool horizontal = node.name == "columns";
-    const bool topPacked = node.name == "stack_top";
     const int gap = horizontal ? ScaleLogical(config_.layout.cardStyle.columnGap) : ScaleLogical(config_.layout.cardStyle.widgetLineGap);
-    if (topPacked) {
-        int cursor = static_cast<int>(rect.top);
-        for (size_t i = 0; i < node.children.size(); ++i) {
-            const auto& child = node.children[i];
-            int preferred = PreferredNodeHeight(child, static_cast<int>(rect.right - rect.left));
-            if (preferred <= 0) {
-                preferred = std::max(0, (static_cast<int>(rect.bottom) - cursor) / static_cast<int>(node.children.size() - i));
-            }
-            if (cursor >= static_cast<int>(rect.bottom)) {
-                break;
-            }
-            RECT childRect{rect.left, cursor, rect.right, std::min(static_cast<int>(rect.bottom), cursor + preferred)};
-            WriteTrace("renderer:layout_top_packed_child parent=\"" + node.name + "\" child=\"" + child.name +
-                "\" preferred=" + std::to_string(preferred) + " gap=" + std::to_string(gap) +
-                " " + FormatRect(childRect));
-            std::vector<size_t> childPath = nodePath;
-            childPath.push_back(i);
-            ResolveNodeWidgetsInternal(child, childRect, widgets, cardReferenceStack, cardId, childPath);
-            cursor = static_cast<int>(childRect.bottom) + gap;
-        }
-        return;
-    }
 
     const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
         gap * static_cast<int>(std::max<size_t>(0, node.children.size() - 1));
     int reservedPreferred = 0;
     int totalWeight = 0;
+    int springWeight = 0;
+    const bool rowsUseSprings = !horizontal && std::any_of(node.children.begin(), node.children.end(), [&](const auto& child) {
+        return ResolveWidgetLayout(child, RECT{}).kind == WidgetKind::VerticalSpring;
+    });
     if (!horizontal) {
         for (const auto& child : node.children) {
             const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-            if (UsesFixedPreferredHeightInStack(resolvedChild)) {
+            if (resolvedChild.kind == WidgetKind::VerticalSpring) {
+                springWeight += std::max(1, child.weight);
+                continue;
+            }
+            if (UsesFixedPreferredHeightInRows(resolvedChild)) {
                 reservedPreferred += std::max(0, resolvedChild.preferredHeight);
+            } else if (rowsUseSprings) {
+                reservedPreferred += std::max(0, PreferredNodeHeight(child, static_cast<int>(rect.right - rect.left)));
             } else {
                 totalWeight += std::max(1, child.weight);
             }
@@ -911,19 +912,29 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     for (size_t i = 0; i < node.children.size(); ++i) {
         const auto& child = node.children[i];
         const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-        const bool fixedPreferred = !horizontal && UsesFixedPreferredHeightInStack(resolvedChild);
-        const int childWeight = fixedPreferred ? 0 : std::max(1, child.weight);
+        const bool fixedPreferred = !horizontal && UsesFixedPreferredHeightInRows(resolvedChild);
+        const bool verticalSpring = !horizontal && resolvedChild.kind == WidgetKind::VerticalSpring;
+        const bool preferredPacked = !horizontal && rowsUseSprings && !verticalSpring;
+        const int childWeight = (fixedPreferred || preferredPacked) ? 0 : std::max(1, child.weight);
         const int remainingWeight = std::max(1, totalWeight);
         int size = 0;
         if (fixedPreferred) {
             size = std::max(0, resolvedChild.preferredHeight);
+        } else if (preferredPacked) {
+            size = std::max(0, PreferredNodeHeight(child, static_cast<int>(rect.right - rect.left)));
+        } else if (verticalSpring) {
+            if (i + 1 == node.children.size()) {
+                size = remainingDistributable;
+            } else {
+                size = std::max(0, remainingDistributable * std::max(1, child.weight) / std::max(1, springWeight));
+            }
         } else if (i + 1 == node.children.size()) {
             size = (horizontal ? rect.right : rect.bottom) - cursor;
         } else {
             size = std::max(0, remainingDistributable * childWeight / remainingWeight);
         }
         const int remainingExtent = std::max(0, static_cast<int>((horizontal ? rect.right : rect.bottom) - cursor));
-        size = std::min(size, remainingExtent);
+        size = std::min(std::max(0, size), remainingExtent);
 
         RECT childRect = rect;
         if (horizontal) {
@@ -945,7 +956,10 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         ResolveNodeWidgetsInternal(child, childRect, widgets, cardReferenceStack, cardId, childPath);
         cursor += size + gap;
         remainingAvailable -= size;
-        if (!fixedPreferred) {
+        if (verticalSpring) {
+            remainingDistributable -= size;
+            springWeight -= std::max(1, child.weight);
+        } else if (!fixedPreferred && !preferredPacked) {
             remainingDistributable -= size;
             totalWeight -= childWeight;
         }
@@ -1655,6 +1669,7 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
         }
         return;
     case WidgetKind::Spacer:
+    case WidgetKind::VerticalSpring:
         return;
     case WidgetKind::DriveUsageList:
         DrawDriveUsageWidget(hdc, widget.rect, metrics.ResolveDriveRows());

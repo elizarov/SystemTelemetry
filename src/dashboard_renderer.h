@@ -90,6 +90,7 @@ private:
         Throughput,
         NetworkFooter,
         Spacer,
+        VerticalSpring,
         DriveUsageList,
         ClockTime,
         ClockDate,
@@ -102,7 +103,7 @@ private:
         std::string cardId;
         WidgetBinding binding;
         int preferredHeight = 0;
-        bool fixedPreferredHeightInStack = false;
+        bool fixedPreferredHeightInRows = false;
     };
 
     struct SimilarityIndicator {
@@ -167,7 +168,7 @@ private:
     void DrawThroughputWidget(HDC hdc, const RECT& rect, const DashboardThroughputMetric& metric);
     void DrawDriveUsageWidget(HDC hdc, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
     ResolvedWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
-    bool UsesFixedPreferredHeightInStack(const ResolvedWidgetLayout& widget) const;
+    bool UsesFixedPreferredHeightInRows(const ResolvedWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node, const RECT& rect, const std::vector<RECT>& childRects,
         int gap, const std::string& cardId, const std::vector<size_t>& nodePath);

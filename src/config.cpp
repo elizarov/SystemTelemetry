@@ -555,8 +555,7 @@ public:
 
 private:
     static bool IsContainer(const std::string& name) {
-        return name == "rows" || name == "columns" || name == "stack" ||
-            name == "stack_top" || name == "center";
+        return name == "rows" || name == "columns";
     }
 
     void SkipWhitespace() {
@@ -659,9 +658,9 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
 }
 
 bool IsWidgetOrContainerNodeName(const std::string& name) {
-    return name == "rows" || name == "columns" || name == "stack" || name == "stack_top" || name == "center" ||
+    return name == "rows" || name == "columns" ||
         name == "text" || name == "gauge" || name == "metric_list" || name == "throughput" ||
-        name == "network_footer" || name == "spacer" || name == "drive_usage_list" ||
+        name == "network_footer" || name == "spacer" || name == "vertical_spring" || name == "drive_usage_list" ||
         name == "clock_time" || name == "clock_date";
 }
 
