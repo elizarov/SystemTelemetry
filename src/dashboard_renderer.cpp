@@ -1159,18 +1159,16 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
 
     RECT headerLabelRect{}, headerReadRect{}, headerWriteRect{}, headerBarRect{}, headerPctRect{}, headerFreeRect{};
     resolveColumns(header, headerLabelRect, headerReadRect, headerWriteRect, headerBarRect, headerPctRect, headerFreeRect);
-    const int activityAnchorWidth = std::max(8, ScaleLogical(14));
-    const int activityAnchorHeight = std::max(6, ScaleLogical(8));
+    const int activityAnchorSize = std::max(8, ScaleLogical(10));
     const int activityAnchorCenterX = headerReadRect.left + std::max(0L, headerWriteRect.right - headerReadRect.left) / 2;
-    const int activityAnchorBandTop = std::min(static_cast<int>(rect.bottom), static_cast<int>(header.bottom));
-    const int activityAnchorBandBottom = std::max(activityAnchorBandTop, static_cast<int>(rect.bottom));
-    const int activityAnchorCenterY = activityAnchorBandTop +
-        std::max(0, (activityAnchorBandBottom - activityAnchorBandTop) / 2);
+    const int firstRowTop = std::min(static_cast<int>(rect.bottom), static_cast<int>(header.bottom));
+    const int firstRowBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(header.bottom + rowHeight));
+    const int activityAnchorCenterY = firstRowTop + std::max(0, (firstRowBottom - firstRowTop) / 2);
     RECT activityAnchorRect{
-        activityAnchorCenterX - (activityAnchorWidth / 2),
-        activityAnchorCenterY - (activityAnchorHeight / 2),
-        activityAnchorCenterX - (activityAnchorWidth / 2) + activityAnchorWidth,
-        activityAnchorCenterY - (activityAnchorHeight / 2) + activityAnchorHeight
+        activityAnchorCenterX - (activityAnchorSize / 2),
+        activityAnchorCenterY - (activityAnchorSize / 2),
+        activityAnchorCenterX - (activityAnchorSize / 2) + activityAnchorSize,
+        activityAnchorCenterY - (activityAnchorSize / 2) + activityAnchorSize
     };
     RegisterEditableAnchorRegion(EditableAnchorKey{
         LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
