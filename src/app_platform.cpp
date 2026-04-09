@@ -77,6 +77,14 @@ std::string FormatHresult(HRESULT value) {
     return buffer;
 }
 
+std::filesystem::path CaptureLaunchWorkingDirectory() {
+    try {
+        return std::filesystem::current_path();
+    } catch (...) {
+        return {};
+    }
+}
+
 std::filesystem::path GetExecutableDirectory() {
     wchar_t modulePath[MAX_PATH];
     const DWORD length = GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
@@ -87,7 +95,15 @@ std::filesystem::path GetExecutableDirectory() {
 }
 
 std::filesystem::path GetWorkingDirectory() {
-    return std::filesystem::current_path();
+    static const std::filesystem::path workingDirectory = CaptureLaunchWorkingDirectory();
+    if (!workingDirectory.empty()) {
+        return workingDirectory;
+    }
+    try {
+        return std::filesystem::current_path();
+    } catch (...) {
+        return {};
+    }
 }
 
 std::filesystem::path ResolveExecutableRelativePath(const std::filesystem::path& configuredPath) {

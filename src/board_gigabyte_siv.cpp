@@ -275,48 +275,53 @@ bool InitializeGigabyteRuntime(GigabyteRuntimeContext^ context, tracing::Trace& 
     }
 
     try {
-        Environment::CurrentDirectory = context->sivDirectory;
+        String^ originalDirectory = Environment::CurrentDirectory;
         GigabyteAssemblyResolver::EnsureInstalled(context->sivDirectory);
+        try {
+            Environment::CurrentDirectory = context->sivDirectory;
 
-        array<String^>^ preloadFiles = Directory::GetFiles(context->sivDirectory, "Gigabyte*.dll");
-        for each (String ^ filePath in preloadFiles) {
-            try {
-                Assembly::LoadFrom(filePath);
-                trace.Write("gigabyte_siv:assembly_preload path=\"" + Utf8FromManagedString(filePath) + "\"");
-            } catch (Exception^) {
+            array<String^>^ preloadFiles = Directory::GetFiles(context->sivDirectory, "Gigabyte*.dll");
+            for each (String ^ filePath in preloadFiles) {
+                try {
+                    Assembly::LoadFrom(filePath);
+                    trace.Write("gigabyte_siv:assembly_preload path=\"" + Utf8FromManagedString(filePath) + "\"");
+                } catch (Exception^) {
+                }
             }
+
+            context->engineAssembly = Assembly::LoadFrom(context->engineAssemblyPath);
+            context->commonAssembly = Assembly::LoadFrom(context->commonAssemblyPath);
+            context->monitorType = context->engineAssembly->GetType("Gigabyte.Engine.EnvironmentControl.HardwareMonitor.HardwareMonitorControlModule", true);
+            context->sourceType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitorSourceTypes", true);
+            context->sensorType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.SensorTypes", true);
+            context->sensorDataType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredData", true);
+            context->collectionType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredDataCollection", true);
+            context->initializeMethod = context->monitorType->GetMethod("Initialize", gcnew array<Type^>{ context->sourceType });
+            context->getCurrentMethod = context->monitorType->GetMethod("GetCurrentMonitoredData", gcnew array<Type^>{ context->sensorType, context->collectionType->MakeByRefType() });
+            context->titleProperty = context->sensorDataType->GetProperty("Title");
+            context->valueProperty = context->sensorDataType->GetProperty("Value");
+            context->unitProperty = context->sensorDataType->GetProperty("Unit");
+
+            if (context->initializeMethod == nullptr || context->getCurrentMethod == nullptr ||
+                context->titleProperty == nullptr || context->valueProperty == nullptr || context->unitProperty == nullptr) {
+                diagnostics = "Gigabyte hardware-monitor reflection members were not found.";
+                return false;
+            }
+
+            context->monitor = Activator::CreateInstance(context->monitorType);
+            context->sourceHwRegister = Enum::Parse(context->sourceType, "HwRegister", false);
+            context->sensorFan = Enum::Parse(context->sensorType, "Fan", false);
+            context->sensorTemperature = Enum::Parse(context->sensorType, "Temperature", false);
+
+            trace.Write("gigabyte_siv:monitor_created type=\"" + Utf8FromManagedString(context->monitor->GetType()->FullName) + "\"");
+            context->initializeMethod->Invoke(context->monitor, gcnew array<Object^>{ context->sourceHwRegister });
+            trace.Write("gigabyte_siv:initialize_success source=HwRegister");
+            context->loaded = true;
+            diagnostics = "Gigabyte SIV hardware-monitor runtime initialized.";
+            return true;
+        } finally {
+            Environment::CurrentDirectory = originalDirectory;
         }
-
-        context->engineAssembly = Assembly::LoadFrom(context->engineAssemblyPath);
-        context->commonAssembly = Assembly::LoadFrom(context->commonAssemblyPath);
-        context->monitorType = context->engineAssembly->GetType("Gigabyte.Engine.EnvironmentControl.HardwareMonitor.HardwareMonitorControlModule", true);
-        context->sourceType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitorSourceTypes", true);
-        context->sensorType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.SensorTypes", true);
-        context->sensorDataType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredData", true);
-        context->collectionType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredDataCollection", true);
-        context->initializeMethod = context->monitorType->GetMethod("Initialize", gcnew array<Type^>{ context->sourceType });
-        context->getCurrentMethod = context->monitorType->GetMethod("GetCurrentMonitoredData", gcnew array<Type^>{ context->sensorType, context->collectionType->MakeByRefType() });
-        context->titleProperty = context->sensorDataType->GetProperty("Title");
-        context->valueProperty = context->sensorDataType->GetProperty("Value");
-        context->unitProperty = context->sensorDataType->GetProperty("Unit");
-
-        if (context->initializeMethod == nullptr || context->getCurrentMethod == nullptr ||
-            context->titleProperty == nullptr || context->valueProperty == nullptr || context->unitProperty == nullptr) {
-            diagnostics = "Gigabyte hardware-monitor reflection members were not found.";
-            return false;
-        }
-
-        context->monitor = Activator::CreateInstance(context->monitorType);
-        context->sourceHwRegister = Enum::Parse(context->sourceType, "HwRegister", false);
-        context->sensorFan = Enum::Parse(context->sensorType, "Fan", false);
-        context->sensorTemperature = Enum::Parse(context->sensorType, "Temperature", false);
-
-        trace.Write("gigabyte_siv:monitor_created type=\"" + Utf8FromManagedString(context->monitor->GetType()->FullName) + "\"");
-        context->initializeMethod->Invoke(context->monitor, gcnew array<Object^>{ context->sourceHwRegister });
-        trace.Write("gigabyte_siv:initialize_success source=HwRegister");
-        context->loaded = true;
-        diagnostics = "Gigabyte SIV hardware-monitor runtime initialized.";
-        return true;
     } catch (Exception^ ex) {
         diagnostics = Utf8FromManagedString(ex->ToString());
         trace.Write("gigabyte_siv:initialize_exception " + diagnostics);

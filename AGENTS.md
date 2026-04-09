@@ -37,3 +37,4 @@ Validation workflow:
 - If rebuilt defaults seem unchanged, check the executable-side `config.ini` first; it overlays the embedded `resources/config.ini` template and `Save Config` preserves that live file.
 - When restoring saved placement across monitors with different DPI scales, do not pre-scale the destination window size before the move; let `WM_DPICHANGED` apply the monitor transition first or the bounds can be double-scaled.
 - Login startup and monitor hotplug can race ahead of monitor enumeration; when `display.monitor_name` is configured, keep a placement watch armed until the target display becomes enumerable instead of locking in a fallback monitor.
+- Gigabyte SIV assembly loading may temporarily need the SIV install directory as the process current directory, but always restore the original launch working directory afterward so diagnostics paths and Save dialogs keep using the startup folder.
