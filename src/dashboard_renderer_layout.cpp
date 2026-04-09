@@ -34,6 +34,40 @@ RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
     };
 }
 
+struct GaugeSegmentLayout {
+    int segmentCount = 1;
+    double totalSweep = 0.0;
+    double segmentGap = 0.0;
+    double segmentSweep = 0.0;
+    double maxSegmentSweep = 0.0;
+    double gaugeStart = 90.0;
+    double gaugeEnd = 90.0;
+};
+
+GaugeSegmentLayout ComputeGaugeSegmentLayout(double requestedSweep, int requestedSegmentCount, double requestedSegmentGap) {
+    GaugeSegmentLayout layout;
+    layout.segmentCount = std::max(1, requestedSegmentCount);
+    layout.totalSweep = std::clamp(requestedSweep, 0.0, 360.0);
+    const double gapSweep = std::max(0.0, 360.0 - layout.totalSweep);
+    layout.gaugeStart = 90.0 + (gapSweep / 2.0);
+    layout.gaugeEnd = layout.gaugeStart + layout.totalSweep;
+
+    if (layout.segmentCount <= 1) {
+        layout.segmentGap = 0.0;
+        layout.segmentSweep = layout.totalSweep;
+        layout.maxSegmentSweep = layout.totalSweep;
+        return layout;
+    }
+
+    layout.maxSegmentSweep = layout.totalSweep / static_cast<double>(layout.segmentCount);
+    const double maxSegmentGap = layout.totalSweep / static_cast<double>(layout.segmentCount - 1);
+    layout.segmentGap = std::clamp(requestedSegmentGap, 0.0, maxSegmentGap);
+    layout.segmentSweep = std::max(0.0,
+        (layout.totalSweep - (layout.segmentGap * static_cast<double>(layout.segmentCount - 1))) /
+            static_cast<double>(layout.segmentCount));
+    return layout;
+}
+
 }  // namespace
 
 void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
@@ -224,14 +258,10 @@ void DashboardRenderer::AddGaugeWidgetEditGuide(const ResolvedWidgetLayout& widg
 
     const int cx = widget.rect.left + std::max(0L, widget.rect.right - widget.rect.left) / 2;
     const int cy = widget.rect.top + std::max(0L, widget.rect.bottom - widget.rect.top) / 2;
-    const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
-    const double gapSweep = std::max(0.0, 360.0 - totalSweep);
-    const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
-    const double slotSweep = totalSweep / static_cast<double>(segmentCount);
-    const double segmentGap = std::clamp(config_.layout.gauge.segmentGapDegrees, 0.0, slotSweep);
-    const double segmentSweep = std::clamp(slotSweep - segmentGap, 0.0, slotSweep);
-    const double gaugeStart = 90.0 + gapSweep / 2.0;
-    const double endAngle = 90.0 + gapSweep / 2.0 + totalSweep;
+    const GaugeSegmentLayout gaugeLayout = ComputeGaugeSegmentLayout(
+        config_.layout.gauge.sweepDegrees,
+        config_.layout.gauge.segmentCount,
+        config_.layout.gauge.segmentGapDegrees);
     const POINT center{cx, cy};
     const int ringThickness = std::max(1, ScaleLogical(config_.layout.gauge.ringThickness));
     const int guideHalfExtension = std::max(1, ringThickness / 2);
@@ -260,9 +290,10 @@ void DashboardRenderer::AddGaugeWidgetEditGuide(const ResolvedWidgetLayout& widg
         widgetEditGuides_.push_back(std::move(guide));
     };
 
-    addRadialGuide(WidgetEditParameter::GaugeSweepDegrees, 0, endAngle, totalSweep, 0.0, 360.0);
-    addRadialGuide(WidgetEditParameter::GaugeSegmentGapDegrees, 1, gaugeStart + segmentSweep,
-        segmentGap, gaugeStart, gaugeStart + slotSweep);
+    addRadialGuide(WidgetEditParameter::GaugeSweepDegrees, 0, gaugeLayout.gaugeEnd, gaugeLayout.totalSweep, 0.0, 360.0);
+    addRadialGuide(WidgetEditParameter::GaugeSegmentGapDegrees, gaugeLayout.segmentCount,
+        gaugeLayout.gaugeStart + gaugeLayout.segmentSweep,
+        gaugeLayout.segmentGap, gaugeLayout.gaugeStart, gaugeLayout.gaugeStart + gaugeLayout.maxSegmentSweep);
 }
 
 void DashboardRenderer::BuildWidgetEditGuides() {

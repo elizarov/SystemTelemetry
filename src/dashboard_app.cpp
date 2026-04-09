@@ -85,10 +85,16 @@ std::optional<double> ComputeGaugeSegmentGapDegrees(const DashboardRenderer::Wid
     if (!pointerAngle.has_value()) {
         return std::nullopt;
     }
+    if (guide.guideId <= 0) {
+        return 0.0;
+    }
     const double clampedAngle = ClampAngleToRange(*pointerAngle, guide.angularMin, guide.angularMax);
-    const double slotSweep = std::max(0.0, guide.angularMax - guide.angularMin);
-    const double segmentSweep = std::clamp(clampedAngle - guide.angularMin, 0.0, slotSweep);
-    return std::clamp(slotSweep - segmentSweep, 0.0, slotSweep);
+    const double maxSegmentSweep = std::max(0.0, guide.angularMax - guide.angularMin);
+    const double segmentSweep = std::clamp(clampedAngle - guide.angularMin, 0.0, maxSegmentSweep);
+    const double segmentCount = static_cast<double>(guide.guideId + 1);
+    const double segmentGap = (maxSegmentSweep - segmentSweep) * segmentCount / (segmentCount - 1.0);
+    const double maxSegmentGap = maxSegmentSweep * segmentCount / (segmentCount - 1.0);
+    return std::clamp(segmentGap, 0.0, maxSegmentGap);
 }
 
 }
@@ -902,8 +908,10 @@ bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide
     case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees: {
         const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
         const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
-        const double slotSweep = totalSweep / static_cast<double>(segmentCount);
-        config_.layout.gauge.segmentGapDegrees = std::clamp(value, 0.0, slotSweep);
+        const double maxSegmentGap = segmentCount <= 1
+            ? 0.0
+            : totalSweep / static_cast<double>(segmentCount - 1);
+        config_.layout.gauge.segmentGapDegrees = std::clamp(value, 0.0, maxSegmentGap);
         break;
     }
     default:

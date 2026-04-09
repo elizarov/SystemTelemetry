@@ -18,6 +18,41 @@
 
 namespace {
 
+struct GaugeSegmentLayout {
+    int segmentCount = 1;
+    double totalSweep = 0.0;
+    double gapSweep = 360.0;
+    double segmentGap = 0.0;
+    double segmentSweep = 0.0;
+    double pitchSweep = 0.0;
+    double gaugeStart = 90.0;
+    double gaugeEnd = 90.0;
+};
+
+GaugeSegmentLayout ComputeGaugeSegmentLayout(double requestedSweep, int requestedSegmentCount, double requestedSegmentGap) {
+    GaugeSegmentLayout layout;
+    layout.segmentCount = std::max(1, requestedSegmentCount);
+    layout.totalSweep = std::clamp(requestedSweep, 0.0, 360.0);
+    layout.gapSweep = std::max(0.0, 360.0 - layout.totalSweep);
+    layout.gaugeStart = 90.0 + (layout.gapSweep / 2.0);
+    layout.gaugeEnd = layout.gaugeStart + layout.totalSweep;
+
+    if (layout.segmentCount <= 1) {
+        layout.segmentGap = 0.0;
+        layout.segmentSweep = layout.totalSweep;
+        layout.pitchSweep = layout.totalSweep;
+        return layout;
+    }
+
+    const double maxSegmentGap = layout.totalSweep / static_cast<double>(layout.segmentCount - 1);
+    layout.segmentGap = std::clamp(requestedSegmentGap, 0.0, maxSegmentGap);
+    layout.segmentSweep = std::max(0.0,
+        (layout.totalSweep - (layout.segmentGap * static_cast<double>(layout.segmentCount - 1))) /
+            static_cast<double>(layout.segmentCount));
+    layout.pitchSweep = layout.segmentSweep + layout.segmentGap;
+    return layout;
+}
+
 COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
 }
@@ -930,11 +965,11 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
 void DashboardRenderer::DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, int cx, int cy, int radius,
     const DashboardGaugeMetric& metric, const std::string& label) {
     const float segmentThickness = static_cast<float>(std::max(1, ScaleLogical(config_.layout.gauge.ringThickness)));
-    const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
-    const double totalSweep = std::max(0.0, config_.layout.gauge.sweepDegrees);
-    const double gapSweep = std::max(0.0, 360.0 - totalSweep);
-    const double slotSweep = totalSweep / static_cast<double>(segmentCount);
-    const double segmentSweep = std::clamp(slotSweep - config_.layout.gauge.segmentGapDegrees, 0.0, slotSweep);
+    const GaugeSegmentLayout gaugeLayout = ComputeGaugeSegmentLayout(
+        config_.layout.gauge.sweepDegrees,
+        config_.layout.gauge.segmentCount,
+        config_.layout.gauge.segmentGapDegrees);
+    const int segmentCount = gaugeLayout.segmentCount;
     const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
     const int filledSegments = clampedPercent <= 0.0 ? 0
         : std::clamp(static_cast<int>(std::ceil(clampedPercent * static_cast<double>(segmentCount) / 100.0)),
@@ -943,7 +978,6 @@ void DashboardRenderer::DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, i
     const int peakSegment = clampedPeakRatio <= 0.0 ? -1
         : std::clamp(static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(segmentCount))) - 1,
             0, segmentCount - 1);
-    const double gaugeStart = 90.0 + gapSweep / 2.0;
     const float segmentRadius = static_cast<float>(radius);
     const int anchorSize = std::max(4, ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
@@ -969,18 +1003,18 @@ void DashboardRenderer::DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, i
     const Gdiplus::Color ghostColor(96, GetRValue(AccentColor()), GetGValue(AccentColor()), GetBValue(AccentColor()));
 
     for (int i = 0; i < segmentCount; ++i) {
-        const double slotStart = gaugeStart + slotSweep * static_cast<double>(i);
+        const double slotStart = gaugeLayout.gaugeStart + gaugeLayout.pitchSweep * static_cast<double>(i);
         FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
-            segmentThickness, slotStart, segmentSweep, trackColor);
+            segmentThickness, slotStart, gaugeLayout.segmentSweep, trackColor);
 
         if (renderMode_ != RenderMode::Blank && i < filledSegments) {
             FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
-                segmentThickness, slotStart, segmentSweep, usageColor);
+                segmentThickness, slotStart, gaugeLayout.segmentSweep, usageColor);
         }
 
         if (renderMode_ != RenderMode::Blank && i == peakSegment) {
             FillGaugeSegment(graphics, static_cast<float>(cx), static_cast<float>(cy), segmentRadius,
-                segmentThickness, slotStart, segmentSweep, ghostColor);
+                segmentThickness, slotStart, gaugeLayout.segmentSweep, ghostColor);
         }
     }
 
