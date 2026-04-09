@@ -8,7 +8,12 @@
 #include <string>
 #include <vector>
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
+#include <commdlg.h>
+#include <shellapi.h>
 
 #include "app_constants.h"
 #include "config.h"
@@ -61,6 +66,20 @@ std::optional<double> TryParseScaleValue(const std::wstring& text);
 std::optional<double> GetScaleSwitchValue();
 std::optional<std::string> GetLayoutSwitchValue();
 bool ApplyDiagnosticsLayoutOverride(AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
+std::filesystem::path ResolveDiagnosticsOutputPath(
+    const std::filesystem::path& workingDirectory,
+    const std::filesystem::path& configuredPath,
+    const wchar_t* defaultFileName);
+std::optional<std::filesystem::path> PromptSavePath(
+    HWND owner,
+    const std::filesystem::path& initialDirectory,
+    const wchar_t* defaultFileName,
+    const wchar_t* filter,
+    const wchar_t* defaultExtension);
+bool CanWriteRuntimeConfig(const std::filesystem::path& path);
+std::filesystem::path CreateTempFilePath(const wchar_t* prefix);
+std::filesystem::path CreateElevatedSaveConfigTempPath();
+int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath);
 
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
     const AppConfig& runtimeConfig,

@@ -1,5 +1,6 @@
 #include "app_diagnostics.h"
-#include "app_platform.h"
+#include "app_paths.h"
+#include "app_strings.h"
 #include "config_parser.h"
 #include "config_writer.h"
 
@@ -299,6 +300,45 @@ void DiagnosticsSession::ShowFileOpenError(const char* label, const std::filesys
         std::string("Failed to open ") + label + ":\n" + Utf8FromWide(path.wstring()));
     ReportError("diagnostics:file_open_failed label=\"" + std::string(label) + "\" path=\"" +
         Utf8FromWide(path.wstring()) + "\"", message);
+}
+
+std::filesystem::path ResolveDiagnosticsOutputPath(
+    const std::filesystem::path& workingDirectory,
+    const std::filesystem::path& configuredPath,
+    const wchar_t* defaultFileName) {
+    if (configuredPath.empty()) {
+        return workingDirectory / defaultFileName;
+    }
+    if (configuredPath.is_absolute()) {
+        return configuredPath;
+    }
+    return workingDirectory / configuredPath;
+}
+
+std::optional<std::filesystem::path> PromptSavePath(
+    HWND owner,
+    const std::filesystem::path& initialDirectory,
+    const wchar_t* defaultFileName,
+    const wchar_t* filter,
+    const wchar_t* defaultExtension) {
+    wchar_t fileBuffer[MAX_PATH] = {};
+    wcsncpy_s(fileBuffer, defaultFileName != nullptr ? defaultFileName : L"", _TRUNCATE);
+
+    std::wstring initialDirectoryText = initialDirectory.wstring();
+    OPENFILENAMEW dialog{};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = owner;
+    dialog.lpstrFilter = filter;
+    dialog.lpstrFile = fileBuffer;
+    dialog.nMaxFile = ARRAYSIZE(fileBuffer);
+    dialog.lpstrInitialDir = initialDirectoryText.empty() ? nullptr : initialDirectoryText.c_str();
+    dialog.lpstrDefExt = defaultExtension;
+    dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (!GetSaveFileNameW(&dialog)) {
+        return std::nullopt;
+    }
+    return std::filesystem::path(dialog.lpstrFile);
 }
 
 bool CanWriteRuntimeConfig(const std::filesystem::path& path) {

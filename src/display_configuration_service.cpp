@@ -1,7 +1,12 @@
 #include "display_configuration_service.h"
 
 #include <fstream>
+#include <shellapi.h>
 
+#include "app_display_config.h"
+#include "app_diagnostics.h"
+#include "app_monitor.h"
+#include "app_paths.h"
 #include "config_writer.h"
 
 bool DisplayConfigurationService::ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) const {

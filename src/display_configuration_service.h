@@ -1,9 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <ostream>
 
 #include "app_diagnostics.h"
-#include "app_platform.h"
+#include "app_monitor.h"
+#include "config.h"
+#include "snapshot_dump.h"
 
 class DisplayConfigurationService {
 public:

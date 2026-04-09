@@ -57,7 +57,13 @@ add_executable(SystemTelemetry WIN32
     resources/SystemTelemetry.rc
     src/app_main.cpp
     src/app_diagnostics.cpp
-    src/app_platform.cpp
+    src/app_autostart.cpp
+    src/app_config_io.cpp
+    src/app_display_config.cpp
+    src/app_monitor.cpp
+    src/app_paths.cpp
+    src/app_strings.cpp
+    src/app_win32_ui.cpp
     src/display_configuration_service.cpp
     src/dashboard_controller.cpp
     src/dashboard_app.cpp
