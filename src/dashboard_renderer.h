@@ -55,6 +55,7 @@ public:
         MetricListLabelWidth,
         DriveUsageActivityWidth,
         DriveUsageFreeWidth,
+        ThroughputAxisPadding,
     };
 
     struct WidgetEditGuide {
@@ -231,6 +232,7 @@ private:
     void BuildWidgetEditGuides();
     void AddMetricListWidgetEditGuides(const ResolvedWidgetLayout& widget);
     void AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget);
+    void AddThroughputWidgetEditGuide(const ResolvedWidgetLayout& widget);
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();

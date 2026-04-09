@@ -696,6 +696,9 @@ bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide
     case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
         config_.layout.driveUsageList.freeWidth = clampedValue;
         break;
+    case DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding:
+        config_.layout.throughput.axisPadding = clampedValue;
+        break;
     default:
         return false;
     }

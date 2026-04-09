@@ -386,6 +386,7 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     config_ = config;
     if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
         fonts_.label != nullptr && fonts_.smallFont != nullptr) {
+        MeasureFonts();
         ResolveLayout();
     }
 }

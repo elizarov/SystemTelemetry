@@ -208,6 +208,7 @@ When one or more direct `vertical_spring` children are present in `rows(...)`, e
 Interactive layout editing always exposes the container guides for `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, snaps to the nearest same-type exact-size group as soon as the similarity ruler threshold is reached by iteratively re-evaluating nested weighted layouts, lets `Alt` temporarily bypass that snap and continue free dragging, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
 When the pointer hovers a non-empty widget in layout-edit mode, the renderer outlines that widget's resolved box and shows any widget-local size guides that widget supports.
 `metric_list(...)` exposes a vertical guide for `[metric_list].label_width` at the label/value split.
+`throughput(...)` exposes a vertical guide for `[throughput].axis_padding` at the graph's left plot edge so the scale gutter can be widened or narrowed live.
 `drive_usage_list(...)` exposes guides for `[drive_usage_list].activity_width` on both activity columns and `[drive_usage_list].free_width` on the free-space column.
 
 Example:

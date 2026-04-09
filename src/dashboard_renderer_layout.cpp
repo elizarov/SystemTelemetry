@@ -103,12 +103,38 @@ void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout
         config_.layout.driveUsageList.freeWidth, -1);
 }
 
+void DashboardRenderer::AddThroughputWidgetEditGuide(const ResolvedWidgetLayout& widget) {
+    const int lineHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.valuePadding));
+    RECT valueRect{widget.rect.left, widget.rect.top, widget.rect.right, std::min(widget.rect.bottom, widget.rect.top + lineHeight)};
+    RECT graphRect{widget.rect.left, std::min(widget.rect.bottom, valueRect.bottom + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
+        widget.rect.right, widget.rect.bottom};
+    const int axisWidth = std::max(1, measuredWidths_.throughputAxis);
+    const int hitInset = std::max(3, ScaleLogical(4));
+    const int x = std::clamp(static_cast<int>(graphRect.left) + axisWidth,
+        static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
+
+    WidgetEditGuide guide;
+    guide.axis = LayoutGuideAxis::Vertical;
+    guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    guide.parameter = WidgetEditParameter::ThroughputAxisPadding;
+    guide.guideId = 0;
+    guide.widgetRect = widget.rect;
+    guide.lineRect = RECT{x, graphRect.top, x + 1, graphRect.bottom};
+    guide.hitRect = RECT{x - hitInset, graphRect.top, x + hitInset + 1, graphRect.bottom};
+    guide.value = config_.layout.throughput.axisPadding;
+    guide.dragDirection = 1;
+    widgetEditGuides_.push_back(std::move(guide));
+}
+
 void DashboardRenderer::BuildWidgetEditGuides() {
     widgetEditGuides_.clear();
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (widget.kind == WidgetKind::MetricList) {
                 AddMetricListWidgetEditGuides(widget);
+            }
+            if (widget.kind == WidgetKind::Throughput) {
+                AddThroughputWidgetEditGuide(widget);
             }
             if (widget.kind == WidgetKind::DriveUsageList) {
                 AddDriveUsageWidgetEditGuides(widget);
