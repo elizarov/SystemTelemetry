@@ -1,4 +1,5 @@
 #include "app_diagnostics.h"
+#include "app_startup.h"
 #include "dashboard_app.h"
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
