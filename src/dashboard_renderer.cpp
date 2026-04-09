@@ -741,7 +741,15 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
         DrawPanelIcon(hdc, card.iconName, card.iconRect);
     }
     if (!card.title.empty()) {
-        DrawTextBlock(hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+            EditableTextBinding{
+                EditableTextKey{
+                    LayoutWidgetIdentity{card.id, card.id, {}},
+                    FontRole::Title,
+                    0,
+                },
+                config_.layout.fonts.title.size,
+            });
     }
 }
 
