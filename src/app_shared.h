@@ -231,9 +231,9 @@ NamedLayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::st
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId);
 LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector<size_t>& path);
 const LayoutNodeConfig* FindLayoutNodeByPath(const LayoutNodeConfig& root, const std::vector<size_t>& path);
-const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide);
+const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditHost::LayoutTarget& target);
 std::vector<int> SeedLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const LayoutNodeConfig* node);
-bool ApplyLayoutGuideWeightsToConfig(AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights);
+bool ApplyLayoutGuideWeightsToConfig(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
 void SetMenuItemRadioStyle(HMENU menu, UINT commandId);
 std::string FormatNetworkFooterText(const std::string& adapterName, const std::string& ipAddress);
 std::string FormatStorageDriveSize(double totalGb);
@@ -285,9 +285,9 @@ private:
     bool IsLayoutEditMode() const;
     void StartLayoutEditMode();
     void StopLayoutEditMode();
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
-    bool ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights);
+    bool ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();

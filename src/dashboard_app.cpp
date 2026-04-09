@@ -572,8 +572,8 @@ void DashboardApp::StopLayoutEditMode() {
     layoutEditController_.StopSession(hwnd_, diagnosticsOptions_.editLayout);
 }
 
-bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights) {
-    if (!ApplyLayoutGuideWeightsToConfig(config_, guide, weights)) {
+bool DashboardApp::ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
+    if (!ApplyLayoutGuideWeightsToConfig(config_, target, weights)) {
         return false;
     }
 
@@ -694,10 +694,10 @@ bool DashboardApp::ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& targe
     return true;
 }
 
-std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
+std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) {
     AppConfig candidateConfig = config_;
-    if (!ApplyLayoutGuideWeightsToConfig(candidateConfig, guide, weights)) {
+    if (!ApplyLayoutGuideWeightsToConfig(candidateConfig, target, weights)) {
         return std::nullopt;
     }
     renderer_.SetConfig(candidateConfig);

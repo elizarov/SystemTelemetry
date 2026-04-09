@@ -449,17 +449,17 @@ const LayoutNodeConfig* FindLayoutNodeByPath(const LayoutNodeConfig& root, const
     return node;
 }
 
-const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
-    if (guide.editCardId.empty()) {
-        return FindLayoutNodeByPath(config.layout.structure.cardsLayout, guide.nodePath);
+const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditHost::LayoutTarget& target) {
+    if (target.editCardId.empty()) {
+        return FindLayoutNodeByPath(config.layout.structure.cardsLayout, target.nodePath);
     }
     const auto cardIt = std::find_if(config.layout.cards.begin(), config.layout.cards.end(), [&](const auto& card) {
-        return card.id == guide.editCardId;
+        return card.id == target.editCardId;
     });
     if (cardIt == config.layout.cards.end()) {
         return nullptr;
     }
-    return FindLayoutNodeByPath(cardIt->layout, guide.nodePath);
+    return FindLayoutNodeByPath(cardIt->layout, target.nodePath);
 }
 
 std::vector<int> SeedLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const LayoutNodeConfig* node) {
@@ -487,7 +487,7 @@ std::vector<int> SeedLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide
     return weights;
 }
 
-bool ApplyLayoutGuideWeightsToConfig(AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights) {
+bool ApplyLayoutGuideWeightsToConfig(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
     if (weights.size() < 2) {
         return false;
     }
@@ -503,16 +503,16 @@ bool ApplyLayoutGuideWeightsToConfig(AppConfig& config, const DashboardRenderer:
     };
 
     bool updated = false;
-    if (guide.editCardId.empty()) {
-        updated = applyWeights(FindLayoutNodeByPath(config.layout.structure.cardsLayout, guide.nodePath));
+    if (target.editCardId.empty()) {
+        updated = applyWeights(FindLayoutNodeByPath(config.layout.structure.cardsLayout, target.nodePath));
         if (!updated) {
             return false;
         }
         if (NamedLayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
-            applyWeights(FindLayoutNodeByPath(namedLayout->cardsLayout, guide.nodePath));
+            applyWeights(FindLayoutNodeByPath(namedLayout->cardsLayout, target.nodePath));
         }
-    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, guide.editCardId)) {
-        updated = applyWeights(FindLayoutNodeByPath(card->layout, guide.nodePath));
+    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, target.editCardId)) {
+        updated = applyWeights(FindLayoutNodeByPath(card->layout, target.nodePath));
     }
 
     return updated;

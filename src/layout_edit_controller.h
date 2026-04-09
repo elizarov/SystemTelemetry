@@ -46,10 +46,17 @@ public:
         static ValueTarget ForEditableGauge(const DashboardRenderer::EditableGaugeKey& key);
     };
 
+    struct LayoutTarget {
+        std::string editCardId;
+        std::vector<size_t> nodePath;
+
+        static LayoutTarget ForGuide(const DashboardRenderer::LayoutEditGuide& guide);
+    };
+
     virtual const AppConfig& LayoutEditConfig() const = 0;
     virtual DashboardRenderer& LayoutEditRenderer() = 0;
-    virtual bool ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights) = 0;
-    virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
+    virtual bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) = 0;
+    virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget,
         DashboardRenderer::LayoutGuideAxis axis) = 0;
     virtual bool ApplyLayoutEditValue(const ValueTarget& target, double value) = 0;

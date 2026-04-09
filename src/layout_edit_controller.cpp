@@ -208,6 +208,13 @@ LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableGauge(const 
     return target;
 }
 
+LayoutEditHost::LayoutTarget LayoutEditHost::LayoutTarget::ForGuide(const DashboardRenderer::LayoutEditGuide& guide) {
+    LayoutTarget target;
+    target.editCardId = guide.editCardId;
+    target.nodePath = guide.nodePath;
+    return target;
+}
+
 LayoutEditController::LayoutEditController(LayoutEditHost& host) : host_(host) {}
 
 void LayoutEditController::StartSession() {
@@ -404,7 +411,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
     size_t guideIndex = 0;
     const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
     if (guide != nullptr) {
-        const LayoutNodeConfig* guideNode = FindGuideNode(host_.LayoutEditConfig(), *guide);
+        const LayoutNodeConfig* guideNode = FindGuideNode(host_.LayoutEditConfig(), LayoutEditHost::LayoutTarget::ForGuide(*guide));
         const std::vector<int> initialWeights = SeedLayoutGuideWeights(*guide, guideNode);
         activeLayoutDrag_ = LayoutDragState{
             *guide,
@@ -631,7 +638,8 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
                 std::vector<int> attemptWeights = freeWeights;
                 attemptWeights[index] = firstWeight;
                 attemptWeights[index + 1] = combined - firstWeight;
-                return host_.EvaluateLayoutWidgetExtentForWeights(drag.guide, attemptWeights, candidate.widget, drag.guide.axis);
+                return host_.EvaluateLayoutWidgetExtentForWeights(
+                    LayoutEditHost::LayoutTarget::ForGuide(drag.guide), attemptWeights, candidate.widget, drag.guide.axis);
             });
         if (!snappedWeight.has_value()) {
             continue;
@@ -668,7 +676,7 @@ bool LayoutEditController::UpdateLayoutDrag(HWND hwnd, POINT clientPoint) {
             weights = *snappedWeights;
         }
     }
-    if (!host_.ApplyLayoutGuideWeights(drag.guide, weights)) {
+    if (!host_.ApplyLayoutGuideWeights(LayoutEditHost::LayoutTarget::ForGuide(drag.guide), weights)) {
         return false;
     }
 
