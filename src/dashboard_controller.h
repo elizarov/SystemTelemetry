@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "app_diagnostics.h"
+#include "app_display_config.h"
 #include "app_monitor.h"
-#include "display_configuration_service.h"
 #include "layout_edit_controller.h"
 
 struct DashboardSessionState {
@@ -81,5 +81,4 @@ private:
     bool ApplyConfiguredWallpaper();
 
     DashboardSessionState state_{};
-    DisplayConfigurationService displayConfigurationService_{};
 };

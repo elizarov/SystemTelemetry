@@ -52,7 +52,7 @@ void DashboardController::SyncRuntimeAndRenderer(DashboardShellHost& shell, bool
 }
 
 bool DashboardController::ApplyConfiguredWallpaper() {
-    return displayConfigurationService_.ApplyConfiguredWallpaper(
+    return ::ApplyConfiguredWallpaper(
         state_.config, state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr);
 }
 
@@ -233,7 +233,7 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
     updatedConfig.display.monitorName = option.configMonitorName;
     updatedConfig.display.position = {};
     updatedConfig.display.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
-    if (!displayConfigurationService_.ConfigureDisplay(
+    if (!::ConfigureDisplay(
             updatedConfig,
             state_.telemetry->Dump(),
             option.dpi,
