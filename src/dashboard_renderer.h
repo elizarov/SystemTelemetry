@@ -55,6 +55,8 @@ public:
         MetricListLabelWidth,
         DriveUsageActivityWidth,
         DriveUsageFreeWidth,
+        DriveUsageHeaderGap,
+        DriveUsageRowGap,
         ThroughputAxisPadding,
         ThroughputHeaderGap,
     };

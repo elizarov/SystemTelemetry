@@ -43,6 +43,8 @@ void DashboardRenderer::AddMetricListWidgetEditGuides(const ResolvedWidgetLayout
 }
 
 void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget) {
+    const int headerHeight = EffectiveDriveHeaderHeight();
+    const int rowHeight = EffectiveDriveRowHeight();
     const int labelWidth = std::max(1, measuredWidths_.driveLabel);
     const int percentWidth = std::max(1, measuredWidths_.drivePercent);
     const int freeWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.freeWidth));
@@ -94,6 +96,20 @@ void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout
         guide.dragDirection = dragDirection;
         widgetEditGuides_.push_back(std::move(guide));
     };
+    const auto addHorizontalGuide = [&](int guideId, int y, WidgetEditParameter parameter, int value, int dragDirection) {
+        const int clampedY = std::clamp(y, static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
+        WidgetEditGuide guide;
+        guide.axis = LayoutGuideAxis::Horizontal;
+        guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        guide.parameter = parameter;
+        guide.guideId = guideId;
+        guide.widgetRect = widget.rect;
+        guide.lineRect = RECT{widget.rect.left, clampedY, widget.rect.right, clampedY + 1};
+        guide.hitRect = RECT{widget.rect.left, clampedY - hitInset, widget.rect.right, clampedY + hitInset + 1};
+        guide.value = value;
+        guide.dragDirection = dragDirection;
+        widgetEditGuides_.push_back(std::move(guide));
+    };
 
     addVerticalGuide(0, readRect.right, WidgetEditParameter::DriveUsageActivityWidth,
         config_.layout.driveUsageList.activityWidth, 1);
@@ -101,6 +117,16 @@ void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout
         config_.layout.driveUsageList.activityWidth, 1);
     addVerticalGuide(2, freeRect.left, WidgetEditParameter::DriveUsageFreeWidth,
         config_.layout.driveUsageList.freeWidth, -1);
+    addHorizontalGuide(3, widget.rect.top + headerHeight, WidgetEditParameter::DriveUsageHeaderGap,
+        config_.layout.driveUsageList.headerGap, 1);
+    for (int rowIndex = 0;; ++rowIndex) {
+        const int y = widget.rect.top + headerHeight + ((rowIndex + 1) * rowHeight);
+        if (y >= widget.rect.bottom) {
+            break;
+        }
+        addHorizontalGuide(4 + rowIndex, y, WidgetEditParameter::DriveUsageRowGap,
+            config_.layout.driveUsageList.rowGap, 1);
+    }
 }
 
 void DashboardRenderer::AddThroughputWidgetEditGuide(const ResolvedWidgetLayout& widget) {

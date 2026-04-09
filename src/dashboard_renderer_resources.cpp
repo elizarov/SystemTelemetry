@@ -773,10 +773,10 @@ int DashboardRenderer::EffectiveMetricRowHeight() const {
 }
 
 int DashboardRenderer::EffectiveDriveHeaderHeight() const {
-    const int verticalGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.verticalGap));
-    const int computed = fontHeights_.smallText + verticalGap;
+    const int headerGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.headerGap));
+    const int computed = fontHeights_.smallText + headerGap;
     WriteTrace("renderer:layout_drive_header_height text=" + std::to_string(fontHeights_.smallText) +
-        " gap=" + std::to_string(verticalGap) +
+        " gap=" + std::to_string(headerGap) +
         " effective=" + std::to_string(computed));
     return computed;
 }
@@ -784,11 +784,11 @@ int DashboardRenderer::EffectiveDriveHeaderHeight() const {
 int DashboardRenderer::EffectiveDriveRowHeight() const {
     const int textHeight = std::max(fontHeights_.label, fontHeights_.smallText);
     const int barHeight = std::max(1, ScaleLogical(config_.layout.driveUsageList.barHeight));
-    const int verticalGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.verticalGap));
-    const int computed = std::max(textHeight, barHeight) + verticalGap;
+    const int rowGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.rowGap));
+    const int computed = std::max(textHeight, barHeight) + rowGap;
     WriteTrace("renderer:layout_drive_row_height text=" + std::to_string(textHeight) +
         " bar=" + std::to_string(barHeight) +
-        " gap=" + std::to_string(verticalGap) +
+        " gap=" + std::to_string(rowGap) +
         " effective=" + std::to_string(computed));
     return computed;
 }

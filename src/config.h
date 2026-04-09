@@ -171,7 +171,8 @@ struct DriveUsageListWidgetConfig {
     CONFIG_VALUE(int, valueGap, "value_gap");
     CONFIG_VALUE(int, percentGap, "percent_gap");
     CONFIG_VALUE(int, barHeight, "bar_height");
-    CONFIG_VALUE(int, verticalGap, "vertical_gap");
+    CONFIG_VALUE(int, headerGap, "header_gap");
+    CONFIG_VALUE(int, rowGap, "row_gap");
     CONFIG_VALUE(int, percentPadding, "percent_padding");
     CONFIG_VALUE(int, activitySegments, "activity_segments");
     CONFIG_VALUE(int, activitySegmentGap, "activity_segment_gap");

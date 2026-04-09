@@ -75,7 +75,7 @@ Widget-specific sizing lives in dedicated sections named exactly after the widge
 Supported widget geometry keys:
 
 - `[metric_list]`: `label_width`, `value_gap`, `bar_height`, `vertical_gap`
-- `[drive_usage_list]`: `free_width`, `activity_width`, `bar_gap`, `value_gap`, `percent_gap`, `bar_height`, `vertical_gap`, `percent_padding`, `activity_segments`, `activity_segment_gap`
+- `[drive_usage_list]`: `free_width`, `activity_width`, `bar_gap`, `value_gap`, `percent_gap`, `bar_height`, `header_gap`, `row_gap`, `percent_padding`, `activity_segments`, `activity_segment_gap`
 - `[throughput]`: `header_gap`, `graph_height`, `value_padding`, `label_padding`, `axis_padding`, `scale_label_padding`, `scale_label_min_height`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
 - `[gauge]`: `preferred_size`, `outer_padding`, `min_radius`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`
 - `[text]`: `preferred_padding`
@@ -198,7 +198,7 @@ Supported layout kinds:
 - `columns(...)` splits content horizontally into weighted children, with child weights written as `child:weight`
 
 `metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + [metric_list].vertical_gap + [metric_list].bar_height`.
-`drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].vertical_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].vertical_gap`.
+`drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].header_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].row_gap`.
 Throughput label width, throughput axis width, drive label width, and drive percent width are measured from the configured fonts at layout load, then padded by their matching widget-section `*_padding` keys.
 
 Nested layout expressions are allowed.
@@ -210,7 +210,7 @@ When the pointer hovers a non-empty widget in layout-edit mode, the renderer out
 `metric_list(...)` exposes a vertical guide for `[metric_list].label_width` at the label/value split.
 `throughput(...)` exposes a vertical guide for `[throughput].axis_padding` at the graph's left plot edge so the scale gutter can be widened or narrowed live.
 `throughput(...)` also exposes a horizontal guide for `[throughput].header_gap` at the boundary between the value header row and the graph body.
-`drive_usage_list(...)` exposes guides for `[drive_usage_list].activity_width` on both activity columns and `[drive_usage_list].free_width` on the free-space column.
+`drive_usage_list(...)` exposes guides for `[drive_usage_list].activity_width` on both activity columns, `[drive_usage_list].free_width` on the free-space column, `[drive_usage_list].header_gap` below the header band, and `[drive_usage_list].row_gap` below each visible row.
 
 Example:
 
