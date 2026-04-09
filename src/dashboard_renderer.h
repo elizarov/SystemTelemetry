@@ -72,6 +72,12 @@ public:
         Diamond,
     };
 
+    enum class AnchorDragAxis {
+        Horizontal,
+        Vertical,
+        Both,
+    };
+
     struct EditableAnchorKey {
         LayoutWidgetIdentity widget;
         AnchorEditParameter parameter = AnchorEditParameter::MetricListBarHeight;
@@ -84,7 +90,7 @@ public:
         RECT anchorRect{};
         RECT anchorHitRect{};
         AnchorShape shape = AnchorShape::Circle;
-        LayoutGuideAxis dragAxis = LayoutGuideAxis::Vertical;
+        AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
         int value = 0;
     };
 
@@ -280,7 +286,7 @@ private:
         EditableAnchorKey key;
         int value = 0;
         AnchorShape shape = AnchorShape::Circle;
-        LayoutGuideAxis dragAxis = LayoutGuideAxis::Vertical;
+        AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
     };
 
     struct TextLayoutResult {
@@ -345,7 +351,7 @@ private:
     EditableAnchorBinding MakeEditableTextBinding(const ResolvedWidgetLayout& widget, AnchorEditParameter parameter,
         int anchorId, int value) const;
     void RegisterEditableAnchorRegion(const EditableAnchorKey& key, const RECT& targetRect, const RECT& anchorRect,
-        AnchorShape shape, LayoutGuideAxis dragAxis, int value);
+        AnchorShape shape, AnchorDragAxis dragAxis, int value);
     static bool IsContainerNode(const LayoutNodeConfig& node);
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;

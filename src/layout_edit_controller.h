@@ -92,9 +92,9 @@ private:
 
     struct AnchorEditDragState {
         DashboardRenderer::EditableAnchorKey key;
-        DashboardRenderer::LayoutGuideAxis dragAxis = DashboardRenderer::LayoutGuideAxis::Vertical;
+        DashboardRenderer::AnchorDragAxis dragAxis = DashboardRenderer::AnchorDragAxis::Vertical;
         int initialValue = 0;
-        int dragStartCoordinate = 0;
+        POINT dragStartPoint{};
     };
 
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;

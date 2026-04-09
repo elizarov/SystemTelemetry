@@ -594,13 +594,13 @@ DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBind
         },
         value,
         AnchorShape::Circle,
-        LayoutGuideAxis::Vertical,
+        AnchorDragAxis::Vertical,
     };
 }
 
 void DashboardRenderer::RegisterEditableAnchorRegion(
     const EditableAnchorKey& key, const RECT& targetRect, const RECT& anchorRect, AnchorShape shape,
-    LayoutGuideAxis dragAxis, int value) {
+    AnchorDragAxis dragAxis, int value) {
     if (anchorRect.right <= anchorRect.left || anchorRect.bottom <= anchorRect.top) {
         return;
     }
@@ -847,7 +847,7 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
                 },
                 config_.layout.fonts.title.size,
                 AnchorShape::Circle,
-                LayoutGuideAxis::Vertical,
+                AnchorDragAxis::Vertical,
             });
     }
 }
@@ -882,7 +882,7 @@ void DashboardRenderer::DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, i
         LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
         AnchorEditParameter::SegmentCount,
         0,
-    }, widget.rect, anchorRect, AnchorShape::Diamond, LayoutGuideAxis::Vertical, config_.layout.gauge.segmentCount);
+    }, widget.rect, anchorRect, AnchorShape::Diamond, AnchorDragAxis::Both, config_.layout.gauge.segmentCount);
 
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -991,7 +991,7 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const ResolvedWidgetLayout& widge
         LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
         AnchorEditParameter::MetricListBarHeight,
         rowIndex,
-    }, barRect, metricBarAnchorRect, AnchorShape::Circle, LayoutGuideAxis::Horizontal, config_.layout.metricList.barHeight);
+    }, barRect, metricBarAnchorRect, AnchorShape::Circle, AnchorDragAxis::Horizontal, config_.layout.metricList.barHeight);
 }
 
 void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
@@ -1175,7 +1175,7 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
         AnchorEditParameter::DriveUsageActivitySegments,
         0,
     }, RECT{headerReadRect.left, rect.top, headerWriteRect.right, rect.bottom}, activityAnchorRect,
-        AnchorShape::Diamond, LayoutGuideAxis::Vertical,
+        AnchorShape::Diamond, AnchorDragAxis::Both,
         config_.layout.driveUsageList.activitySegments);
     RECT usageHeaderRect{headerBarRect.left, header.top, headerPctRect.right, header.bottom};
     RECT headerReadLabelRect{headerReadRect.left - valueGap, headerReadRect.top, headerReadRect.right + valueGap, headerReadRect.bottom};
@@ -1231,7 +1231,7 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
             LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             AnchorEditParameter::DriveUsageBarHeight,
             static_cast<int>(rowIndex),
-        }, barRect, driveBarAnchorRect, AnchorShape::Circle, LayoutGuideAxis::Horizontal,
+        }, barRect, driveBarAnchorRect, AnchorShape::Circle, AnchorDragAxis::Horizontal,
             config_.layout.driveUsageList.barHeight);
 
         if (renderMode_ != RenderMode::Blank) {

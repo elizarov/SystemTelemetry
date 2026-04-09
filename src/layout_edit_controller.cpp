@@ -297,8 +297,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
     if (hoveredEditableAnchor_.has_value()) {
         const auto region = renderer.FindEditableAnchorRegion(*hoveredEditableAnchor_);
         if (region.has_value() && PtInRect(&region->anchorHitRect, clientPoint)) {
-            const int dragStartCoordinate = region->dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
-            activeAnchorEditDrag_ = AnchorEditDragState{region->key, region->dragAxis, region->value, dragStartCoordinate};
+            activeAnchorEditDrag_ = AnchorEditDragState{region->key, region->dragAxis, region->value, clientPoint};
             hoveredEditableWidget_ = region->key.widget;
             SyncRendererInteractionState();
             SetCapture(hwnd);
@@ -402,7 +401,8 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
 bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     if (activeAnchorEditDrag_.has_value()) {
         SetCursor(LoadCursorW(nullptr,
-            activeAnchorEditDrag_->dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+            activeAnchorEditDrag_->dragAxis == DashboardRenderer::AnchorDragAxis::Both ? IDC_SIZEALL :
+            activeAnchorEditDrag_->dragAxis == DashboardRenderer::AnchorDragAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return true;
     }
     if (activeWidgetEditDrag_.has_value()) {
@@ -454,8 +454,10 @@ void LayoutEditController::ClearInteractionState() {
 void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
     if (hoveredEditableAnchor_.has_value()) {
         const auto region = host_.LayoutEditRenderer().FindEditableAnchorRegion(*hoveredEditableAnchor_);
-        const auto dragAxis = region.has_value() ? region->dragAxis : DashboardRenderer::LayoutGuideAxis::Vertical;
-        SetCursor(LoadCursorW(nullptr, dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+        const auto dragAxis = region.has_value() ? region->dragAxis : DashboardRenderer::AnchorDragAxis::Vertical;
+        SetCursor(LoadCursorW(nullptr,
+            dragAxis == DashboardRenderer::AnchorDragAxis::Both ? IDC_SIZEALL :
+            dragAxis == DashboardRenderer::AnchorDragAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return;
     }
 
@@ -622,9 +624,16 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
 
 bool LayoutEditController::UpdateAnchorEditDrag(POINT clientPoint) {
     AnchorEditDragState& drag = *activeAnchorEditDrag_;
-    const int currentCoordinate = drag.dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
-    const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;
-    const double scaleDivisor = drag.dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? 4.0 : 1.0;
+    int pixelDelta = 0;
+    double scaleDivisor = drag.dragAxis == DashboardRenderer::AnchorDragAxis::Vertical ? 4.0 : 1.0;
+    if (drag.dragAxis == DashboardRenderer::AnchorDragAxis::Both) {
+        pixelDelta = (clientPoint.x - drag.dragStartPoint.x) + (clientPoint.y - drag.dragStartPoint.y);
+        scaleDivisor = 4.0;
+    } else {
+        const int currentCoordinate = drag.dragAxis == DashboardRenderer::AnchorDragAxis::Vertical ? clientPoint.x : clientPoint.y;
+        const int startCoordinate = drag.dragAxis == DashboardRenderer::AnchorDragAxis::Vertical ? drag.dragStartPoint.x : drag.dragStartPoint.y;
+        pixelDelta = currentCoordinate - startCoordinate;
+    }
     const int logicalDelta = static_cast<int>(std::lround(
         static_cast<double>(pixelDelta) / (std::max)(0.1, host_.LayoutEditRenderer().RenderScale() * scaleDivisor)));
     const int nextValue = (std::max)(1, drag.initialValue + logicalDelta);
