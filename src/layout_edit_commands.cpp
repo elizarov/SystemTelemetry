@@ -42,11 +42,17 @@ bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, do
     case Field::MetricListVerticalGap:
         ApplyPositiveInt(&LayoutConfig::metricList, &MetricListWidgetConfig::verticalGap, config, value);
         return true;
+    case Field::DriveUsageLabelGap:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::labelGap, config, value);
+        return true;
     case Field::DriveUsageBarGap:
         ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::barGap, config, value);
         return true;
-    case Field::DriveUsageValueGap:
-        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::valueGap, config, value);
+    case Field::DriveUsageRwGap:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::rwGap, config, value);
+        return true;
+    case Field::DriveUsagePercentGap:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::percentGap, config, value);
         return true;
     case Field::DriveUsageActivityWidth:
         ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::activityWidth, config, value);

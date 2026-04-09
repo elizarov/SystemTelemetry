@@ -169,11 +169,12 @@ struct MetricListWidgetConfig {
 
 struct DriveUsageListWidgetConfig {
     CONFIG_REFLECTED_STRUCT(DriveUsageListWidgetConfig)
-    CONFIG_VALUE(int, freeWidth, "free_width");
+    CONFIG_VALUE(int, labelGap, "label_gap");
     CONFIG_VALUE(int, activityWidth, "activity_width");
+    CONFIG_VALUE(int, rwGap, "rw_gap");
     CONFIG_VALUE(int, barGap, "bar_gap");
-    CONFIG_VALUE(int, valueGap, "value_gap");
     CONFIG_VALUE(int, percentGap, "percent_gap");
+    CONFIG_VALUE(int, freeWidth, "free_width");
     CONFIG_VALUE(int, barHeight, "bar_height");
     CONFIG_VALUE(int, headerGap, "header_gap");
     CONFIG_VALUE(int, rowGap, "row_gap");

@@ -75,7 +75,7 @@ Widget-specific sizing lives in dedicated sections named exactly after the widge
 Supported widget geometry keys:
 
 - `[metric_list]`: `label_width`, `bar_height`, `vertical_gap`
-- `[drive_usage_list]`: `free_width`, `activity_width`, `bar_gap`, `value_gap`, `percent_gap`, `bar_height`, `header_gap`, `row_gap`, `percent_padding`, `activity_segments`, `activity_segment_gap`
+- `[drive_usage_list]`: `label_gap`, `activity_width`, `rw_gap`, `bar_gap`, `percent_gap`, `free_width`, `bar_height`, `header_gap`, `row_gap`, `percent_padding`, `activity_segments`, `activity_segment_gap`
 - `[throughput]`: `header_gap`, `graph_height`, `value_padding`, `label_padding`, `axis_padding`, `scale_label_padding`, `scale_label_min_height`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
 - `[gauge]`: `preferred_size`, `outer_padding`, `min_radius`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`
 - `[text]`: `preferred_padding`
@@ -220,7 +220,7 @@ When the pointer hovers a non-empty widget in layout-edit mode, the renderer out
 `metric_list(...)` also exposes horizontal guides after each visible non-empty row for `[metric_list].vertical_gap`.
 `throughput(...)` exposes a vertical guide for `[throughput].axis_padding` at the graph's left plot edge so the scale gutter can be widened or narrowed live.
 `throughput(...)` also exposes a horizontal guide for `[throughput].header_gap` at the boundary between the value header row and the graph body.
-`drive_usage_list(...)` exposes vertical guides for `[drive_usage_list].bar_gap` at the left edge of the `R` activity column, `[drive_usage_list].value_gap` at the left edge of the `W` activity column, `[drive_usage_list].activity_width` at the right edge of the `W` activity column, and `[drive_usage_list].free_width` on the free-space column, plus horizontal guides for `[drive_usage_list].header_gap` below the header band and `[drive_usage_list].row_gap` after each visible non-empty row.
+`drive_usage_list(...)` exposes vertical guides for `[drive_usage_list].label_gap` at the left edge of the `R` activity column, `[drive_usage_list].rw_gap` at the left edge of the `W` activity column, `[drive_usage_list].bar_gap` at the left edge of the usage bar, `[drive_usage_list].percent_gap` at the right edge of the usage bar, `[drive_usage_list].activity_width` at the right edge of the `W` activity column, and `[drive_usage_list].free_width` on the free-space column, plus horizontal guides for `[drive_usage_list].header_gap` below the header band and `[drive_usage_list].row_gap` after each visible non-empty row.
 `drive_usage_list(...)` also exposes a diamond anchor centered in the read/write activity band so `[drive_usage_list].activity_segments` can be dragged live in either axis.
 
 Example:

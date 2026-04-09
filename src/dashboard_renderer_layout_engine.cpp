@@ -285,10 +285,11 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
         const int rowHeight = renderer.EffectiveDriveRowHeight();
         const int labelWidth = (std::max)(1, renderer.measuredWidths_.driveLabel);
         const int percentWidth = (std::max)(1, renderer.measuredWidths_.drivePercent);
-        const int freeWidth = (std::max)(1, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.freeWidth));
+        const int labelGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.labelGap));
         const int activityWidth = (std::max)(1, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.activityWidth));
+        const int rwGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.rwGap));
         const int barGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.barGap));
-        const int valueGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.valueGap));
+        const int freeWidth = (std::max)(1, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.freeWidth));
         const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
         const int totalRows = static_cast<int>(renderer.config_.storage.drives.size());
         const int availableRowPixels = (std::max)(0, static_cast<int>(widget.rect.bottom - widget.rect.top) - headerHeight);
@@ -302,14 +303,14 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
             (std::min)(widget.rect.right, static_cast<LONG>(widget.rect.left + labelWidth)),
             widget.rect.bottom};
         RECT readRect{
-            (std::min)(widget.rect.right, static_cast<LONG>(labelRect.right + barGap)),
+            (std::min)(widget.rect.right, static_cast<LONG>(labelRect.right + labelGap)),
             widget.rect.top,
-            (std::min)(widget.rect.right, static_cast<LONG>(labelRect.right + barGap + activityWidth)),
+            (std::min)(widget.rect.right, static_cast<LONG>(labelRect.right + labelGap + activityWidth)),
             widget.rect.bottom};
         RECT writeRect{
-            (std::min)(widget.rect.right, static_cast<LONG>(readRect.right + valueGap)),
+            (std::min)(widget.rect.right, static_cast<LONG>(readRect.right + rwGap)),
             widget.rect.top,
-            (std::min)(widget.rect.right, static_cast<LONG>(readRect.right + valueGap + activityWidth)),
+            (std::min)(widget.rect.right, static_cast<LONG>(readRect.right + rwGap + activityWidth)),
             widget.rect.bottom};
         RECT freeRect{
             (std::max)(widget.rect.left, static_cast<LONG>(widget.rect.right - freeWidth)),
@@ -317,9 +318,15 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
             widget.rect.right,
             widget.rect.bottom};
         RECT pctRect{
-            (std::max)(widget.rect.left, static_cast<LONG>(freeRect.left - valueGap - percentWidth)),
+            (std::max)(widget.rect.left, static_cast<LONG>(freeRect.left - percentWidth)),
             widget.rect.top,
-            (std::max)(widget.rect.left, static_cast<LONG>(freeRect.left - valueGap)),
+            freeRect.left,
+            widget.rect.bottom};
+        RECT barRect{
+            (std::min)(widget.rect.right, static_cast<LONG>(writeRect.right + barGap)),
+            widget.rect.top,
+            (std::max)((std::min)(widget.rect.right, static_cast<LONG>(writeRect.right + barGap)),
+                static_cast<LONG>(pctRect.left - renderer.ScaleLogical(renderer.config_.layout.driveUsageList.percentGap))),
             widget.rect.bottom};
         if (pctRect.left < writeRect.right) {
             return;
@@ -356,19 +363,23 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
             renderer.widgetEditGuides_.push_back(std::move(guide));
         };
 
-        addVerticalGuide(0, readRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageBarGap,
+        addVerticalGuide(0, readRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageLabelGap,
+            renderer.config_.layout.driveUsageList.labelGap, 1);
+        addVerticalGuide(1, writeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageRwGap,
+            renderer.config_.layout.driveUsageList.rwGap, 1);
+        addVerticalGuide(2, barRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageBarGap,
             renderer.config_.layout.driveUsageList.barGap, 1);
-        addVerticalGuide(1, writeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageValueGap,
-            renderer.config_.layout.driveUsageList.valueGap, 1);
-        addVerticalGuide(2, writeRect.right, DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth,
+        addVerticalGuide(3, barRect.right, DashboardRenderer::WidgetEditParameter::DriveUsagePercentGap,
+            renderer.config_.layout.driveUsageList.percentGap, -1);
+        addVerticalGuide(4, writeRect.right, DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth,
             renderer.config_.layout.driveUsageList.activityWidth, 1);
-        addVerticalGuide(3, freeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth,
+        addVerticalGuide(5, freeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth,
             renderer.config_.layout.driveUsageList.freeWidth, -1);
-        addHorizontalGuide(4, widget.rect.top + headerHeight, DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap,
+        addHorizontalGuide(6, widget.rect.top + headerHeight, DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap,
             renderer.config_.layout.driveUsageList.headerGap, 1);
         for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {
             const int y = widget.rect.top + headerHeight + ((rowIndex + 1) * rowHeight);
-            addHorizontalGuide(5 + rowIndex, y, DashboardRenderer::WidgetEditParameter::DriveUsageRowGap,
+            addHorizontalGuide(7 + rowIndex, y, DashboardRenderer::WidgetEditParameter::DriveUsageRowGap,
                 renderer.config_.layout.driveUsageList.rowGap, 1);
         }
     };

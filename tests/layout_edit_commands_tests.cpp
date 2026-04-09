@@ -68,13 +68,23 @@ TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
 
     ASSERT_TRUE(layout_edit::ApplyValue(
         config,
+        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageLabelGap),
+        13.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config,
         MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageBarGap),
         11.4));
     ASSERT_TRUE(layout_edit::ApplyValue(
         config,
-        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageValueGap),
+        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageRwGap),
         7.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config,
+        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsagePercentGap),
+        9.4));
 
+    EXPECT_EQ(config.layout.driveUsageList.labelGap, 13);
     EXPECT_EQ(config.layout.driveUsageList.barGap, 11);
-    EXPECT_EQ(config.layout.driveUsageList.valueGap, 8);
+    EXPECT_EQ(config.layout.driveUsageList.rwGap, 8);
+    EXPECT_EQ(config.layout.driveUsageList.percentGap, 9);
 }

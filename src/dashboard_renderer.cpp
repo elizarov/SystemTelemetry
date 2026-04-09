@@ -1125,11 +1125,12 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
     const int rowHeight = EffectiveDriveRowHeight();
     const int labelWidth = std::max(1, measuredWidths_.driveLabel);
     const int percentWidth = std::max(1, measuredWidths_.drivePercent);
-    const int freeWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.freeWidth));
+    const int labelGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.labelGap));
     const int activityWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.activityWidth));
+    const int rwGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.rwGap));
     const int barGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.barGap));
-    const int valueGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.valueGap));
     const int percentGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.percentGap));
+    const int freeWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.freeWidth));
     const int driveBarHeight = std::max(1, ScaleLogical(config_.layout.driveUsageList.barHeight));
     const int activitySegments = std::max(1, config_.layout.driveUsageList.activitySegments);
     const int activitySegmentGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.activitySegmentGap));
@@ -1144,13 +1145,13 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
     const auto resolveColumns = [&](const RECT& band, RECT& labelRect, RECT& readRect, RECT& writeRect,
         RECT& barRect, RECT& pctRect, RECT& freeRect) {
         labelRect = {band.left, band.top, std::min(band.right, static_cast<LONG>(band.left + labelWidth)), band.bottom};
-        readRect = {std::min(band.right, static_cast<LONG>(labelRect.right + barGap)), band.top,
-            std::min(band.right, static_cast<LONG>(labelRect.right + barGap + activityWidth)), band.bottom};
-        writeRect = {std::min(band.right, static_cast<LONG>(readRect.right + valueGap)), band.top,
-            std::min(band.right, static_cast<LONG>(readRect.right + valueGap + activityWidth)), band.bottom};
+        readRect = {std::min(band.right, static_cast<LONG>(labelRect.right + labelGap)), band.top,
+            std::min(band.right, static_cast<LONG>(labelRect.right + labelGap + activityWidth)), band.bottom};
+        writeRect = {std::min(band.right, static_cast<LONG>(readRect.right + rwGap)), band.top,
+            std::min(band.right, static_cast<LONG>(readRect.right + rwGap + activityWidth)), band.bottom};
         freeRect = {std::max(band.left, static_cast<LONG>(band.right - freeWidth)), band.top, band.right, band.bottom};
-        pctRect = {std::max(band.left, static_cast<LONG>(freeRect.left - valueGap - percentWidth)), band.top,
-            std::max(band.left, static_cast<LONG>(freeRect.left - valueGap)), band.bottom};
+        pctRect = {std::max(band.left, static_cast<LONG>(freeRect.left - percentWidth)), band.top,
+            freeRect.left, band.bottom};
         barRect = {std::min(band.right, static_cast<LONG>(writeRect.right + barGap)), band.top,
             std::max(std::min(band.right, static_cast<LONG>(writeRect.right + barGap)),
                 static_cast<LONG>(pctRect.left - percentGap)), band.bottom};
@@ -1177,8 +1178,8 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
         AnchorShape::Diamond, AnchorDragAxis::Both,
         config_.layout.driveUsageList.activitySegments);
     RECT usageHeaderRect{headerBarRect.left, header.top, headerPctRect.right, header.bottom};
-    RECT headerReadLabelRect{headerReadRect.left - valueGap, headerReadRect.top, headerReadRect.right + valueGap, headerReadRect.bottom};
-    RECT headerWriteLabelRect{headerWriteRect.left - valueGap, headerWriteRect.top, headerWriteRect.right + valueGap, headerWriteRect.bottom};
+    RECT headerReadLabelRect{headerReadRect.left - rwGap, headerReadRect.top, headerReadRect.right + rwGap, headerReadRect.bottom};
+    RECT headerWriteLabelRect{headerWriteRect.left - rwGap, headerWriteRect.top, headerWriteRect.right + rwGap, headerWriteRect.bottom};
     DrawTextBlock(hdc, headerReadLabelRect, "R", fonts_.smallFont, MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
         MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 0, config_.layout.fonts.smallText.size));
