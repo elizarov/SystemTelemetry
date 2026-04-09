@@ -32,7 +32,8 @@ public:
 
     struct LayoutEditGuide {
         LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
-        std::string cardId;
+        std::string renderCardId;
+        std::string editCardId;
         std::vector<size_t> nodePath;
         size_t separatorIndex = 0;
         RECT containerRect{};
@@ -40,6 +41,7 @@ public:
         RECT hitRect{};
         int gap = 0;
         std::vector<int> childExtents;
+        std::vector<bool> childFixedExtents;
         std::vector<RECT> childRects;
     };
 
@@ -171,9 +173,10 @@ private:
     bool UsesFixedPreferredHeightInRows(const ResolvedWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node, const RECT& rect, const std::vector<RECT>& childRects,
-        int gap, const std::string& cardId, const std::vector<size_t>& nodePath);
+        int gap, const std::string& renderCardId, const std::string& editCardId, const std::vector<size_t>& nodePath);
     void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets,
-        std::vector<std::string>& cardReferenceStack, const std::string& cardId, const std::vector<size_t>& nodePath);
+        std::vector<std::string>& cardReferenceStack, const std::string& renderCardId, const std::string& editCardId,
+        const std::vector<size_t>& nodePath);
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();

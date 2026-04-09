@@ -992,6 +992,55 @@ LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector
     return node;
 }
 
+const LayoutNodeConfig* FindLayoutNodeByPath(const LayoutNodeConfig& root, const std::vector<size_t>& path) {
+    const LayoutNodeConfig* node = &root;
+    for (size_t index : path) {
+        if (index >= node->children.size()) {
+            return nullptr;
+        }
+        node = &node->children[index];
+    }
+    return node;
+}
+
+const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+    if (guide.editCardId.empty()) {
+        return FindLayoutNodeByPath(config.layout.structure.cardsLayout, guide.nodePath);
+    }
+    const auto cardIt = std::find_if(config.layout.cards.begin(), config.layout.cards.end(), [&](const auto& card) {
+        return card.id == guide.editCardId;
+    });
+    if (cardIt == config.layout.cards.end()) {
+        return nullptr;
+    }
+    return FindLayoutNodeByPath(cardIt->layout, guide.nodePath);
+}
+
+std::vector<int> SeedLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const LayoutNodeConfig* node) {
+    if (node == nullptr || node->children.size() != guide.childExtents.size()) {
+        return guide.childExtents;
+    }
+
+    std::vector<int> weights;
+    weights.reserve(node->children.size());
+    for (size_t i = 0; i < node->children.size(); ++i) {
+        weights.push_back(std::max(1, guide.childExtents[i]));
+    }
+
+    std::vector<bool> fixed = guide.childFixedExtents;
+    if (fixed.size() != weights.size()) {
+        fixed.assign(weights.size(), false);
+    }
+
+    for (size_t i = 0; i < weights.size(); ++i) {
+        if (fixed[i]) {
+            weights[i] = std::max(1, node->children[i].weight);
+        }
+    }
+
+    return weights;
+}
+
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
     const auto it = std::find_if(layout.cards.begin(), layout.cards.end(), [&](LayoutCardConfig& card) {
         return card.id == cardId;
@@ -2100,7 +2149,7 @@ bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGu
     };
 
     bool updated = false;
-    if (guide.cardId.empty()) {
+    if (guide.editCardId.empty()) {
         updated = applyWeights(FindLayoutNodeByPath(config_.layout.structure.cardsLayout, guide.nodePath));
         if (!updated) {
             return false;
@@ -2109,7 +2158,7 @@ bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGu
             applyWeights(FindLayoutNodeByPath(namedLayout->cardsLayout, guide.nodePath));
         }
     } else {
-        if (LayoutCardConfig* card = FindCardLayoutById(config_.layout, guide.cardId)) {
+        if (LayoutCardConfig* card = FindCardLayoutById(config_.layout, guide.editCardId)) {
             updated = applyWeights(FindLayoutNodeByPath(card->layout, guide.nodePath));
         }
     }
@@ -2150,7 +2199,8 @@ bool DashboardApp::UpdateLayoutDrag(POINT clientPoint) {
     }
     const auto& guides = renderer_.LayoutEditGuides();
     const auto guideIt = std::find_if(guides.begin(), guides.end(), [&](const DashboardRenderer::LayoutEditGuide& candidate) {
-        return candidate.cardId == drag.guide.cardId &&
+        return candidate.renderCardId == drag.guide.renderCardId &&
+            candidate.editCardId == drag.guide.editCardId &&
             candidate.nodePath == drag.guide.nodePath &&
             candidate.separatorIndex == drag.guide.separatorIndex;
     });
@@ -2607,9 +2657,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             size_t guideIndex = 0;
             const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
             if (guide != nullptr) {
+                const LayoutNodeConfig* guideNode = FindGuideNode(config_, *guide);
                 activeLayoutDrag_ = LayoutDragState{
                     *guide,
-                    guide->childExtents,
+                    SeedLayoutGuideWeights(*guide, guideNode),
                     guide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y};
                 renderer_.SetActiveLayoutEditGuide(std::optional<DashboardRenderer::LayoutEditGuide>(activeLayoutDrag_->guide));
                 hoveredLayoutGuideIndex_ = guideIndex;

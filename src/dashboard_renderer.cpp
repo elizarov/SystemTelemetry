@@ -779,9 +779,11 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
     } else if (node.name == "clock_time") {
         widget.kind = WidgetKind::ClockTime;
         widget.preferredHeight = fontHeights_.big;
+        widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "clock_date") {
         widget.kind = WidgetKind::ClockDate;
         widget.preferredHeight = fontHeights_.value;
+        widget.fixedPreferredHeightInRows = true;
     }
     return widget;
 }
@@ -799,26 +801,38 @@ const LayoutCardConfig* DashboardRenderer::FindCardConfigById(const std::string&
 
 void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
     std::vector<std::string> cardReferenceStack;
-    ResolveNodeWidgetsInternal(node, rect, widgets, cardReferenceStack, "", {});
+    ResolveNodeWidgetsInternal(node, rect, widgets, cardReferenceStack, "", "", {});
 }
 
 void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const RECT& rect, const std::vector<RECT>& childRects,
-    int gap, const std::string& cardId, const std::vector<size_t>& nodePath) {
+    int gap, const std::string& renderCardId, const std::string& editCardId, const std::vector<size_t>& nodePath) {
     if (!IsEditableContainerNode(node) || childRects.size() < 2) {
         return;
     }
 
     const bool horizontal = node.name == "columns";
     const int hitInset = std::max(3, ScaleLogical(4));
+    std::vector<bool> childFixedExtents;
+    childFixedExtents.reserve(node.children.size());
+    for (const auto& child : node.children) {
+        const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
+        childFixedExtents.push_back(!horizontal &&
+            (UsesFixedPreferredHeightInRows(resolvedChild) || resolvedChild.kind == WidgetKind::VerticalSpring));
+    }
     for (size_t i = 0; i + 1 < childRects.size(); ++i) {
+        if (!horizontal && (childFixedExtents[i] || childFixedExtents[i + 1])) {
+            continue;
+        }
         LayoutEditGuide guide;
         guide.axis = horizontal ? LayoutGuideAxis::Vertical : LayoutGuideAxis::Horizontal;
-        guide.cardId = cardId;
+        guide.renderCardId = renderCardId;
+        guide.editCardId = editCardId;
         guide.nodePath = nodePath;
         guide.separatorIndex = i;
         guide.containerRect = rect;
         guide.gap = gap;
         guide.childExtents.reserve(childRects.size());
+        guide.childFixedExtents = childFixedExtents;
         guide.childRects = childRects;
         for (const RECT& childRect : childRects) {
             guide.childExtents.push_back(horizontal ? (childRect.right - childRect.left) : (childRect.bottom - childRect.top));
@@ -839,7 +853,7 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const R
 
 void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node, const RECT& rect,
     std::vector<ResolvedWidgetLayout>& widgets, std::vector<std::string>& cardReferenceStack,
-    const std::string& cardId, const std::vector<size_t>& nodePath) {
+    const std::string& renderCardId, const std::string& editCardId, const std::vector<size_t>& nodePath) {
     WriteTrace("renderer:layout_resolve_node name=\"" + node.name + "\" weight=" + std::to_string(node.weight) +
         " " + FormatRect(rect) + " children=" + std::to_string(node.children.size()));
     if (node.cardReference) {
@@ -854,13 +868,13 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         }
         WriteTrace("renderer:layout_card_ref id=\"" + node.name + "\" " + FormatRect(rect));
         cardReferenceStack.push_back(node.name);
-        ResolveNodeWidgetsInternal(referencedCard->layout, rect, widgets, cardReferenceStack, cardId, nodePath);
+        ResolveNodeWidgetsInternal(referencedCard->layout, rect, widgets, cardReferenceStack, renderCardId, node.name, {});
         cardReferenceStack.pop_back();
         return;
     }
     if (!IsCardContainerNode(node)) {
         ResolvedWidgetLayout widget = ResolveWidgetLayout(node, rect);
-        widget.cardId = cardId;
+        widget.cardId = renderCardId;
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
             (widget.binding.metric.empty() ? "" : " metric=\"" + widget.binding.metric + "\"") +
             (widget.binding.param.empty() ? "" : " param=\"" + widget.binding.param + "\""));
@@ -953,7 +967,7 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         childRects.push_back(childRect);
         std::vector<size_t> childPath = nodePath;
         childPath.push_back(i);
-        ResolveNodeWidgetsInternal(child, childRect, widgets, cardReferenceStack, cardId, childPath);
+        ResolveNodeWidgetsInternal(child, childRect, widgets, cardReferenceStack, renderCardId, editCardId, childPath);
         cursor += size + gap;
         remainingAvailable -= size;
         if (verticalSpring) {
@@ -964,7 +978,7 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
             totalWeight -= childWeight;
         }
     }
-    AddLayoutEditGuide(node, rect, childRects, gap, cardId, nodePath);
+    AddLayoutEditGuide(node, rect, childRects, gap, renderCardId, editCardId, nodePath);
 }
 
 bool DashboardRenderer::ResolveLayout() {
@@ -1038,7 +1052,7 @@ bool DashboardRenderer::ResolveLayout() {
             " icon=" + FormatRect(card.iconRect) +
             " content=" + FormatRect(card.contentRect));
         std::vector<std::string> cardReferenceStack;
-        ResolveNodeWidgetsInternal(cardIt->layout, card.contentRect, card.widgets, cardReferenceStack, card.id, {});
+        ResolveNodeWidgetsInternal(cardIt->layout, card.contentRect, card.widgets, cardReferenceStack, card.id, card.id, {});
         resolvedLayout_.cards.push_back(std::move(card));
     };
 
@@ -1095,7 +1109,7 @@ bool DashboardRenderer::ResolveLayout() {
                 remainingAvailable -= size;
                 remainingWeight -= childWeight;
             }
-            AddLayoutEditGuide(node, rect, childRects, gap, "", nodePath);
+            AddLayoutEditGuide(node, rect, childRects, gap, "", "", nodePath);
         };
 
     resolveDashboardNode(config_.layout.structure.cardsLayout, dashboardRect, {});
@@ -1167,7 +1181,7 @@ int DashboardRenderer::WidgetExtentForAxis(const ResolvedWidgetLayout& widget, L
 }
 
 bool DashboardRenderer::IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const {
-    if (!guide.cardId.empty() && widget.cardId != guide.cardId) {
+    if (!guide.renderCardId.empty() && widget.cardId != guide.renderCardId) {
         return false;
     }
     return widget.rect.left >= guide.containerRect.left &&
