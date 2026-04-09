@@ -77,6 +77,15 @@ std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(const std::vector<std
     return metrics;
 }
 
+bool HasAvailableMetricValue(const std::vector<NamedScalarMetric>& metrics) {
+    for (const auto& metric : metrics) {
+        if (metric.metric.value.has_value()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 RetainedHistorySeries CreateRetainedHistorySeries(const std::string& seriesRef) {
     RetainedHistorySeries history;
     history.seriesRef = seriesRef;
@@ -149,7 +158,7 @@ std::string CollapseAsciiWhitespace(std::string value) {
     return collapsed;
 }
 
-std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
+std::optional<std::wstring> ReadRegistryWideString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
     DWORD type = 0;
     DWORD bytes = 0;
     const LONG probe = RegGetValueW(root, subKey, valueName, RRF_RT_REG_SZ, &type, nullptr, &bytes);
@@ -163,10 +172,18 @@ std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, 
         return std::nullopt;
     }
 
-    if (!value.empty() && value.back() == L'\0') {
+    while (!value.empty() && value.back() == L'\0') {
         value.pop_back();
     }
-    return Utf8FromWide(value);
+    return value;
+}
+
+std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
+    const auto value = ReadRegistryWideString(root, subKey, valueName);
+    if (!value.has_value()) {
+        return std::nullopt;
+    }
+    return Utf8FromWide(*value);
 }
 
 std::string DetectCpuNameFromCpuid() {

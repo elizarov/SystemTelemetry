@@ -19,6 +19,8 @@
 #using <System.dll>
 
 #include "board_vendor.h"
+#include "app_shared.h"
+#include "telemetry_internal.h"
 #include "trace.h"
 #include "utf8.h"
 
@@ -52,64 +54,6 @@ struct GigabyteSnapshot {
     std::vector<TemperatureReading> temperatures;
 };
 
-std::optional<std::wstring> ReadRegistryWideString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
-    DWORD type = 0;
-    DWORD bytes = 0;
-    const LONG probe = RegGetValueW(root, subKey, valueName, RRF_RT_REG_SZ, &type, nullptr, &bytes);
-    if (probe != ERROR_SUCCESS || bytes < sizeof(wchar_t)) {
-        return std::nullopt;
-    }
-
-    std::wstring value(bytes / sizeof(wchar_t), L'\0');
-    const LONG status = RegGetValueW(root, subKey, valueName, RRF_RT_REG_SZ, &type, value.data(), &bytes);
-    if (status != ERROR_SUCCESS) {
-        return std::nullopt;
-    }
-
-    while (!value.empty() && value.back() == L'\0') {
-        value.pop_back();
-    }
-    return value;
-}
-
-std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
-    const auto value = ReadRegistryWideString(root, subKey, valueName);
-    if (!value.has_value()) {
-        return std::nullopt;
-    }
-    return Utf8FromWide(*value);
-}
-
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
-}
-
-bool ContainsInsensitive(const std::string& value, const std::string& needle) {
-    if (needle.empty()) {
-        return true;
-    }
-    return ToLower(value).find(ToLower(needle)) != std::string::npos;
-}
-
-bool EqualsInsensitive(const std::string& left, const std::string& right) {
-    return ToLower(left) == ToLower(right);
-}
-
-bool EqualsInsensitive(const std::wstring& left, const std::wstring& right) {
-    if (left.size() != right.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < left.size(); ++i) {
-        if (::towlower(left[i]) != ::towlower(right[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
 template <typename Reading>
 const Reading* FindReadingByName(const std::vector<Reading>& readings, const std::string& requestedName) {
     if (requestedName.empty()) {
@@ -122,26 +66,6 @@ const Reading* FindReadingByName(const std::vector<Reading>& readings, const std
         }
     }
     return nullptr;
-}
-
-std::wstring CombinePath(const std::wstring& directory, const wchar_t* name) {
-    std::wstring path = directory;
-    if (!path.empty() && path.back() != L'\\' && path.back() != L'/') {
-        path += L'\\';
-    }
-    path += name;
-    return path;
-}
-
-std::string JoinNames(const std::vector<std::string>& names) {
-    std::string joined;
-    for (size_t i = 0; i < names.size(); ++i) {
-        if (i != 0) {
-            joined += ",";
-        }
-        joined += names[i];
-    }
-    return joined;
 }
 
 std::string Utf8FromManagedString(String^ value) {
@@ -262,8 +186,8 @@ bool InitializeGigabyteRuntime(GigabyteRuntimeContext^ context, tracing::Trace& 
     }
 
     context->sivDirectory = ManagedStringFromWide(*discoveredDirectory);
-    context->engineAssemblyPath = ManagedStringFromWide(CombinePath(*discoveredDirectory, kEngineEnvironmentControlDll));
-    context->commonAssemblyPath = ManagedStringFromWide(CombinePath(*discoveredDirectory, kEnvironmentControlCommonDll));
+    context->engineAssemblyPath = ManagedStringFromWide((std::filesystem::path(*discoveredDirectory) / kEngineEnvironmentControlDll).wstring());
+    context->commonAssemblyPath = ManagedStringFromWide((std::filesystem::path(*discoveredDirectory) / kEnvironmentControlCommonDll).wstring());
 
     if (!File::Exists(context->engineAssemblyPath)) {
         diagnostics = "Gigabyte.Engine.EnvironmentControl.dll was not found.";
@@ -391,6 +315,16 @@ bool CaptureGigabyteSnapshot(GigabyteRuntimeContext^ context, GigabyteSnapshot& 
     }
 }
 
+std::string ResolveMappedSensorName(
+    const std::unordered_map<std::string, std::string>& sensorNames,
+    const std::string& logicalName) {
+    const auto it = sensorNames.find(logicalName);
+    if (it != sensorNames.end() && !it->second.empty()) {
+        return it->second;
+    }
+    return logicalName;
+}
+
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
     explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace) : trace_(trace), runtime_(gcnew GigabyteRuntimeContext()) {}
@@ -415,7 +349,7 @@ public:
             return false;
         }
 
-        loadedLibrary_ = Utf8FromWide(CombinePath(*sivDirectory, kEngineEnvironmentControlDll));
+        loadedLibrary_ = Utf8FromWide((std::filesystem::path(*sivDirectory) / kEngineEnvironmentControlDll).wstring());
         diagnostics_ = "Gigabyte SIV provider ready.";
         initialized_ = true;
         return true;
@@ -465,19 +399,11 @@ public:
 
 private:
     std::string ResolveTemperatureSensorName(const std::string& logicalName) const {
-        const auto it = config_.board.temperatureSensorNames.find(logicalName);
-        if (it != config_.board.temperatureSensorNames.end() && !it->second.empty()) {
-            return it->second;
-        }
-        return logicalName;
+        return ResolveMappedSensorName(config_.board.temperatureSensorNames, logicalName);
     }
 
     std::string ResolveFanSensorName(const std::string& logicalName) const {
-        const auto it = config_.board.fanSensorNames.find(logicalName);
-        if (it != config_.board.fanSensorNames.end() && !it->second.empty()) {
-            return it->second;
-        }
-        return logicalName;
+        return ResolveMappedSensorName(config_.board.fanSensorNames, logicalName);
     }
 
     tracing::Trace& trace() {
@@ -485,44 +411,27 @@ private:
         return trace_ != nullptr ? *trace_ : nullTrace;
     }
 
-    static bool HasAvailableMetricValue(const std::vector<NamedScalarMetric>& metrics) {
-        for (const auto& metric : metrics) {
-            if (metric.metric.value.has_value()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     std::vector<NamedScalarMetric> BuildRequestedTemperatures() const {
-        std::vector<NamedScalarMetric> metrics;
-        metrics.reserve(config_.board.requestedTemperatureNames.size());
-        for (const auto& requestedName : config_.board.requestedTemperatureNames) {
-            NamedScalarMetric metric;
-            metric.name = requestedName;
-            metric.metric.unit = "\xC2\xB0""C";
+        std::vector<NamedScalarMetric> metrics =
+            CreateRequestedBoardMetrics(config_.board.requestedTemperatureNames, "\xC2\xB0""C");
+        for (auto& metric : metrics) {
             if (const TemperatureReading* reading =
-                    FindReadingByName(tempReadings_, ResolveTemperatureSensorName(requestedName));
+                    FindReadingByName(tempReadings_, ResolveTemperatureSensorName(metric.name));
                 reading != nullptr) {
                 metric.metric.value = reading->celsius;
             }
-            metrics.push_back(std::move(metric));
         }
         return metrics;
     }
 
     std::vector<NamedScalarMetric> BuildRequestedFans() const {
-        std::vector<NamedScalarMetric> metrics;
-        metrics.reserve(config_.board.requestedFanNames.size());
-        for (const auto& requestedName : config_.board.requestedFanNames) {
-            NamedScalarMetric metric;
-            metric.name = requestedName;
-            metric.metric.unit = "RPM";
-            if (const FanReading* reading = FindReadingByName(fanReadings_, ResolveFanSensorName(requestedName));
+        std::vector<NamedScalarMetric> metrics =
+            CreateRequestedBoardMetrics(config_.board.requestedFanNames, "RPM");
+        for (auto& metric : metrics) {
+            if (const FanReading* reading = FindReadingByName(fanReadings_, ResolveFanSensorName(metric.name));
                 reading != nullptr) {
                 metric.metric.value = reading->rpm;
             }
-            metrics.push_back(std::move(metric));
         }
         return metrics;
     }

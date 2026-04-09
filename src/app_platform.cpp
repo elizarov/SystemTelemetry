@@ -59,6 +59,33 @@ bool ContainsInsensitive(const std::string& value, const std::string& needle) {
     return ToLower(value).find(ToLower(needle)) != std::string::npos;
 }
 
+bool EqualsInsensitive(const std::string& left, const std::string& right) {
+    return ToLower(left) == ToLower(right);
+}
+
+bool EqualsInsensitive(const std::wstring& left, const std::wstring& right) {
+    if (left.size() != right.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < left.size(); ++i) {
+        if (::towlower(left[i]) != ::towlower(right[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::string JoinNames(const std::vector<std::string>& names) {
+    std::string joined;
+    for (size_t i = 0; i < names.size(); ++i) {
+        if (i != 0) {
+            joined += ",";
+        }
+        joined += names[i];
+    }
+    return joined;
+}
+
 bool RectsEqual(const RECT& lhs, const RECT& rhs) {
     return lhs.left == rhs.left && lhs.top == rhs.top && lhs.right == rhs.right && lhs.bottom == rhs.bottom;
 }
