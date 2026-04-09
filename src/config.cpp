@@ -1,4 +1,5 @@
 #include "config.h"
+
 bool SelectLayout(AppConfig& config, const std::string& name) {
     if (name.empty()) {
         return false;

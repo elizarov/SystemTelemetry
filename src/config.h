@@ -266,8 +266,4 @@ struct AppConfig {
     CONFIG_BINDING_LIST();
 };
 
-std::string LoadEmbeddedConfigTemplate();
-AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay = true);
-bool SaveConfig(const std::filesystem::path& path, const AppConfig& config);
-bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config);
 bool SelectLayout(AppConfig& config, const std::string& name);

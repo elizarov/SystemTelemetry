@@ -1,4 +1,5 @@
 #include "app_shared.h"
+#include "config_writer.h"
 
 #include <cstdio>
 

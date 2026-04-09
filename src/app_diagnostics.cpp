@@ -1,5 +1,7 @@
 #include "app_diagnostics.h"
 #include "app_platform.h"
+#include "config_parser.h"
+#include "config_writer.h"
 
 #include <cmath>
 #include <cstdio>

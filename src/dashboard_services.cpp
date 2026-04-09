@@ -2,6 +2,8 @@
 
 #include <fstream>
 
+#include "config_writer.h"
+
 AppConfig DefaultConfigPersistenceService::LoadRuntimeConfig(const DiagnosticsOptions& options) const {
     return ::LoadRuntimeConfig(options);
 }

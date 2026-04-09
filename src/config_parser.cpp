@@ -1,4 +1,4 @@
-#include "config.h"
+#include "config_parser.h"
 #include "config_resolution.h"
 
 #ifndef NOMINMAX
@@ -412,6 +412,8 @@ bool LayoutExpressionParser::ParseParameter(std::string& parameter) {
     return true;
 }
 
+}  // namespace
+
 bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
     node = {};
     LayoutExpressionParser parser(text);
@@ -420,6 +422,8 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
     }
     return parser.AtEnd();
 }
+
+namespace {
 
 bool IsWidgetOrContainerNodeName(const std::string& name) {
     return name == "rows" || name == "columns" ||

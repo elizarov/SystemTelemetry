@@ -1,4 +1,5 @@
-#include "config.h"
+#include "config_parser.h"
+#include "config_writer.h"
 
 #include <algorithm>
 #include <cctype>
@@ -34,6 +35,8 @@ std::string FormatFontSpec(const UiFontConfig& font) {
     return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
 }
 
+}  // namespace
+
 std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
     std::string text = node.name;
     if (node.weight != 1) {
@@ -53,6 +56,8 @@ std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
     }
     return text;
 }
+
+namespace {
 
 template <typename Codec, typename Value>
 std::string EncodeConfigValue(const Value& value);
@@ -391,6 +396,8 @@ void SaveKnownStructuredSectionDifferences(const AppConfig& config, const AppCon
     SaveKnownSectionDifferences<AppConfig::BindingList>(config, compareConfig, updateKey);
 }
 
+}  // namespace
+
 std::string BuildSavedConfigText(const std::string& initialText, const AppConfig& config, const AppConfig* compareConfig) {
     std::vector<std::string> lines = SplitConfigLines(initialText);
 
@@ -489,8 +496,6 @@ std::string BuildSavedConfigText(const std::string& initialText, const AppConfig
     }
     return JoinConfigLines(lines);
 }
-
-}  // namespace
 
 bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
     const AppConfig compareConfig = LoadConfig(path);

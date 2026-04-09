@@ -1,4 +1,6 @@
 #include "app_shared.h"
+#include "config_parser.h"
+#include "config_writer.h"
 
 #include <cmath>
 #include <cstdio>
