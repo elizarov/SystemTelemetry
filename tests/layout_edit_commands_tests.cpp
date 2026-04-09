@@ -65,6 +65,10 @@ TEST(LayoutEditCommands, UpdatesDriveUsageActivitySegmentsThroughCommands) {
 
 TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
     AppConfig config;
+    config.layout.fonts.label.size = 15;
+    config.layout.fonts.smallText.size = 13;
+    config.layout.driveUsageList.barHeight = 10;
+    config.layout.driveUsageList.activitySegments = 4;
 
     ASSERT_TRUE(layout_edit::ApplyValue(
         config,
@@ -91,5 +95,20 @@ TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
     EXPECT_EQ(config.layout.driveUsageList.barGap, 11);
     EXPECT_EQ(config.layout.driveUsageList.rwGap, 8);
     EXPECT_EQ(config.layout.driveUsageList.percentGap, 9);
+    EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 3);
+}
+
+TEST(LayoutEditCommands, ClampsDriveUsageActivitySegmentGapToAvailableRowHeight) {
+    AppConfig config;
+    config.layout.fonts.label.size = 15;
+    config.layout.fonts.smallText.size = 13;
+    config.layout.driveUsageList.barHeight = 10;
+    config.layout.driveUsageList.activitySegments = 4;
+
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config,
+        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageActivitySegmentGap),
+        99.0));
+
     EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 3);
 }

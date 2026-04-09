@@ -26,6 +26,38 @@ RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
     };
 }
 
+int ClampStackedSegmentGap(int height, int segmentCount, int gap) {
+    if (segmentCount <= 1) {
+        return 0;
+    }
+    const int maxGap = (std::max)(0, (height - segmentCount) / (segmentCount - 1));
+    return std::clamp((std::max)(0, gap), 0, maxGap);
+}
+
+int ComputeLowestStackedSegmentTop(int top, int height, int width, int segmentCount, int segmentGap) {
+    if (segmentCount <= 0 || height <= 0 || width <= 0) {
+        return top;
+    }
+
+    const int clampedGap = ClampStackedSegmentGap(height, segmentCount, segmentGap);
+    const int totalGap = clampedGap * (segmentCount - 1);
+    const int availableHeight = (std::max)(segmentCount, height - totalGap);
+    const int baseSegmentHeight = (std::max)(1, availableHeight / segmentCount);
+    const int remainder = (std::max)(0, availableHeight - (baseSegmentHeight * segmentCount));
+    const int maxVisualHeight = (std::max)(2, width / 2);
+
+    int currentTop = top;
+    int lastSegmentTop = top;
+    for (int index = segmentCount - 1; index >= 0; --index) {
+        const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
+        const int segmentHeight = baseSegmentHeight + extra;
+        const int visualHeight = (std::min)(segmentHeight, maxVisualHeight);
+        lastSegmentTop = currentTop + (std::max)(0, (segmentHeight - visualHeight) / 2);
+        currentTop = lastSegmentTop + visualHeight + clampedGap;
+    }
+    return lastSegmentTop;
+}
+
 std::string FormatRect(const RECT& rect) {
     return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," +
         std::to_string(rect.right) + "," + std::to_string(rect.bottom) + ")";
@@ -290,7 +322,6 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
         const int activityWidth = (std::max)(1, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.activityWidth));
         const int rwGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.rwGap));
         const int barGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.barGap));
-        const int activitySegmentGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.activitySegmentGap));
         const int freeWidth = (std::max)(1, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.freeWidth));
         const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
         const int totalRows = static_cast<int>(renderer.config_.storage.drives.size());
@@ -386,17 +417,19 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
             const int rowPixelHeight = rowHeight;
             const int rowContentHeight = (std::max)(renderer.fontHeights_.label,
                 (std::max)(renderer.fontHeights_.smallText, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.barHeight)));
+            const int activitySegmentGap = ClampStackedSegmentGap(
+                rowContentHeight,
+                renderer.config_.layout.driveUsageList.activitySegments,
+                renderer.ScaleLogical(renderer.config_.layout.driveUsageList.activitySegmentGap));
             const int contentTop = widget.rect.top + headerHeight + (std::max)(0, (rowPixelHeight - rowContentHeight) / 2);
             const RECT activityBandRect{readRect.left, contentTop, writeRect.right, contentTop + rowContentHeight};
-            const int segmentCount = (std::max)(1, renderer.config_.layout.driveUsageList.activitySegments);
-            const int totalGap = activitySegmentGap * (segmentCount - 1);
-            const int availableHeight = (std::max)(segmentCount, rowContentHeight - totalGap);
-            const int baseSegmentHeight = (std::max)(1, availableHeight / segmentCount);
-            const int remainder = (std::max)(0, availableHeight - (baseSegmentHeight * segmentCount));
-            const int bottomSegmentHeight = baseSegmentHeight + (remainder > 0 ? 1 : 0);
-            const int bottomVisualHeight = (std::min)(bottomSegmentHeight, (std::max)(2, activityWidth / 2));
-            const int bottomSegmentTop = activityBandRect.bottom - bottomSegmentHeight + (std::max)(0, (bottomSegmentHeight - bottomVisualHeight) / 2);
-            addHorizontalGuide(7, bottomSegmentTop, DashboardRenderer::WidgetEditParameter::DriveUsageActivitySegmentGap,
+            const int lowestSegmentTop = ComputeLowestStackedSegmentTop(
+                activityBandRect.top,
+                rowContentHeight,
+                activityWidth,
+                renderer.config_.layout.driveUsageList.activitySegments,
+                activitySegmentGap);
+            addHorizontalGuide(7, lowestSegmentTop, DashboardRenderer::WidgetEditParameter::DriveUsageActivitySegmentGap,
                 renderer.config_.layout.driveUsageList.activitySegmentGap, 1, activityBandRect.left, activityBandRect.right);
         }
         for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {

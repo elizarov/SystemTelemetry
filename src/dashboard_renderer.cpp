@@ -209,7 +209,9 @@ void DrawSegmentIndicator(HDC hdc, const RECT& rect, int segmentCount, int segme
         return;
     }
 
-    const int totalGap = std::max(0, segmentGap) * std::max(0, segmentCount - 1);
+    const int maxGap = segmentCount <= 1 ? 0 : std::max(0, (height - segmentCount) / (segmentCount - 1));
+    const int clampedGap = std::clamp(std::max(0, segmentGap), 0, maxGap);
+    const int totalGap = clampedGap * std::max(0, segmentCount - 1);
     const int availableHeight = std::max(segmentCount, height - totalGap);
     const int baseSegmentHeight = std::max(1, availableHeight / segmentCount);
     const int remainder = std::max(0, availableHeight - (baseSegmentHeight * segmentCount));
@@ -235,7 +237,7 @@ void DrawSegmentIndicator(HDC hdc, const RECT& rect, int segmentCount, int segme
             DeleteObject(fillBrush);
         }
 
-        top = segmentRect.bottom + std::max(0, segmentGap);
+        top = segmentRect.bottom + clampedGap;
     }
 }
 
@@ -1163,7 +1165,8 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
     const int activityAnchorCenterX = headerReadRect.left + std::max(0L, headerWriteRect.right - headerReadRect.left) / 2;
     const int firstRowTop = std::min(static_cast<int>(rect.bottom), static_cast<int>(header.bottom));
     const int firstRowBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(header.bottom + rowHeight));
-    const int activityAnchorCenterY = firstRowTop + std::max(0, (firstRowBottom - firstRowTop) / 2);
+    const int firstRowContentTop = firstRowTop + std::max(0, ((firstRowBottom - firstRowTop) - rowContentHeight) / 2);
+    const int activityAnchorCenterY = firstRowContentTop;
     RECT activityAnchorRect{
         activityAnchorCenterX - (activityAnchorSize / 2),
         activityAnchorCenterY - (activityAnchorSize / 2),

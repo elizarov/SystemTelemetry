@@ -11,6 +11,10 @@ int ClampPositiveInt(double value) {
     return (std::max)(1, static_cast<int>(std::lround(value)));
 }
 
+int ClampNonNegativeInt(double value) {
+    return (std::max)(0, static_cast<int>(std::lround(value)));
+}
+
 double ClampGaugeSweepDegrees(double value) {
     return std::clamp(value, 0.0, 360.0);
 }
@@ -20,6 +24,19 @@ double ClampGaugeSegmentGapDegrees(const AppConfig& config, double value) {
     const int segmentCount = (std::max)(1, config.layout.gauge.segmentCount);
     const double maxSegmentGap = segmentCount <= 1 ? 0.0 : totalSweep / static_cast<double>(segmentCount - 1);
     return std::clamp(value, 0.0, maxSegmentGap);
+}
+
+int ClampDriveUsageActivitySegmentGap(const AppConfig& config, double value) {
+    const int segmentCount = (std::max)(1, config.layout.driveUsageList.activitySegments);
+    if (segmentCount <= 1) {
+        return 0;
+    }
+
+    const int rowContentHeight = (std::max)(
+        config.layout.fonts.label.size,
+        (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
+    const int maxGap = (std::max)(0, (rowContentHeight - segmentCount) / (segmentCount - 1));
+    return std::clamp(ClampNonNegativeInt(value), 0, maxGap);
 }
 
 template <typename Section>
@@ -61,7 +78,7 @@ bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, do
         ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::freeWidth, config, value);
         return true;
     case Field::DriveUsageActivitySegmentGap:
-        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::activitySegmentGap, config, value);
+        config.layout.driveUsageList.activitySegmentGap = ClampDriveUsageActivitySegmentGap(config, value);
         return true;
     case Field::DriveUsageHeaderGap:
         ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::headerGap, config, value);
