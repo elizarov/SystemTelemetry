@@ -4,7 +4,7 @@
 #include <cstdio>
 
 void DashboardApp::ShowContextMenu(POINT screenPoint) {
-    DashboardSessionState& state = controller_->State();
+    DashboardSessionState& state = controller_.State();
     HMENU menu = CreatePopupMenu();
     HMENU diagnosticsMenu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
@@ -268,7 +268,7 @@ LRESULT CALLBACK DashboardApp::WndProcThunk(HWND hwnd, UINT message, WPARAM wPar
 }
 
 LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
-    DashboardSessionState& state = controller_->State();
+    DashboardSessionState& state = controller_.State();
     switch (message) {
     case WM_CREATE:
         currentDpi_ = CurrentWindowDpi();
@@ -291,7 +291,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             RetryConfigPlacementIfPending();
             return 0;
         }
-        if (!controller_->HandleRefreshTimer(*this)) {
+        if (!controller_.HandleRefreshTimer(*this)) {
             DestroyWindow(hwnd_);
             return 0;
         }
@@ -445,8 +445,8 @@ void DashboardApp::Paint() {
     DeleteObject(background);
     SetBkMode(memDc, TRANSPARENT);
 
-    DrawLayout(memDc, controller_->State().telemetry->Snapshot());
-    if (controller_->State().isMoving) {
+    DrawLayout(memDc, controller_.State().telemetry->Snapshot());
+    if (controller_.State().isMoving) {
         DrawMoveOverlay(memDc);
     }
 

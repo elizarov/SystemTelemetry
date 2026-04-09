@@ -4,12 +4,12 @@
 #include <cstdio>
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
-    : controller_(std::make_unique<DashboardController>()), diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this) {}
+    : diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this) {}
 
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
-    controller_->State().config = config;
+    controller_.State().config = config;
     renderer_.SetConfig(config);
-    rendererEditOverlayState_.showLayoutEditGuides = controller_->State().isEditingLayout || diagnosticsOptions_.editLayout;
+    rendererEditOverlayState_.showLayoutEditGuides = controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
     rendererEditOverlayState_.similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions_);
 }
 
@@ -25,11 +25,11 @@ UINT DashboardApp::CurrentWindowDpi() const {
 }
 
 bool DashboardApp::IsLayoutEditMode() const {
-    return controller_->State().isEditingLayout;
+    return controller_.State().isEditingLayout;
 }
 
 const AppConfig& DashboardApp::LayoutEditConfig() const {
-    return controller_->State().config;
+    return controller_.State().config;
 }
 
 DashboardRenderer& DashboardApp::LayoutEditRenderer() {
@@ -54,7 +54,7 @@ int DashboardApp::WindowHeight() const {
 
 bool DashboardApp::Initialize(HINSTANCE instance) {
     instance_ = instance;
-    if (!controller_->InitializeSession(*this, diagnosticsOptions_)) {
+    if (!controller_.InitializeSession(*this, diagnosticsOptions_)) {
         return false;
     }
 
@@ -76,7 +76,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         return false;
     }
 
-    const AppConfig& config = controller_->State().config;
+    const AppConfig& config = controller_.State().config;
     RECT placement{100, 100, 100 + WindowWidth(), 100 + WindowHeight()};
     currentDpi_ = GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
     if (const auto monitor = FindTargetMonitor(config.display.monitorName); monitor.has_value()) {
@@ -109,7 +109,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 }
 
 void DashboardApp::ApplyConfigPlacement() {
-    const AppConfig& config = controller_->State().config;
+    const AppConfig& config = controller_.State().config;
     UINT targetDpi = hwnd_ != nullptr ? CurrentWindowDpi() : GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
     int left = 100 + ScaleLogicalToPhysical(config.display.position.x, targetDpi);
     int top = 100 + ScaleLogicalToPhysical(config.display.position.y, targetDpi);
@@ -137,27 +137,27 @@ void DashboardApp::ApplyConfigPlacement() {
 }
 
 void DashboardApp::StartPlacementWatch() {
-    if (hwnd_ == nullptr || controller_->State().config.display.monitorName.empty()) {
+    if (hwnd_ == nullptr || controller_.State().config.display.monitorName.empty()) {
         StopPlacementWatch();
         return;
     }
     SetTimer(hwnd_, kPlacementTimerId, kPlacementTimerMs, nullptr);
-    controller_->State().placementWatchActive = true;
+    controller_.State().placementWatchActive = true;
 }
 
 void DashboardApp::StopPlacementWatch() {
     if (hwnd_ != nullptr) {
         KillTimer(hwnd_, kPlacementTimerId);
     }
-    controller_->State().placementWatchActive = false;
+    controller_.State().placementWatchActive = false;
 }
 
 void DashboardApp::RetryConfigPlacementIfPending() {
-    if (!controller_->State().placementWatchActive || hwnd_ == nullptr || controller_->State().isMoving) {
+    if (!controller_.State().placementWatchActive || hwnd_ == nullptr || controller_.State().isMoving) {
         return;
     }
-    if (controller_->State().config.display.monitorName.empty() ||
-        FindTargetMonitor(controller_->State().config.display.monitorName).has_value()) {
+    if (controller_.State().config.display.monitorName.empty() ||
+        FindTargetMonitor(controller_.State().config.display.monitorName).has_value()) {
         ApplyConfigPlacement();
         ApplyConfiguredWallpaper();
         movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
@@ -167,8 +167,8 @@ void DashboardApp::RetryConfigPlacementIfPending() {
 }
 
 bool DashboardApp::InitializeFonts() {
-    renderer_.SetConfig(controller_->State().config);
-    renderer_.SetTraceOutput(controller_->State().diagnostics != nullptr ? controller_->State().diagnostics->TraceStream() : nullptr);
+    renderer_.SetConfig(controller_.State().config);
+    renderer_.SetTraceOutput(controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
     return renderer_.Initialize(hwnd_);
 }
 
@@ -177,19 +177,19 @@ void DashboardApp::ReleaseFonts() {
 }
 
 COLORREF DashboardApp::BackgroundColor() const {
-    return ToColorRef(controller_->State().config.layout.colors.backgroundColor);
+    return ToColorRef(controller_.State().config.layout.colors.backgroundColor);
 }
 
 COLORREF DashboardApp::ForegroundColor() const {
-    return ToColorRef(controller_->State().config.layout.colors.foregroundColor);
+    return ToColorRef(controller_.State().config.layout.colors.foregroundColor);
 }
 
 COLORREF DashboardApp::AccentColor() const {
-    return ToColorRef(controller_->State().config.layout.colors.accentColor);
+    return ToColorRef(controller_.State().config.layout.colors.accentColor);
 }
 
 COLORREF DashboardApp::MutedTextColor() const {
-    return ToColorRef(controller_->State().config.layout.colors.mutedTextColor);
+    return ToColorRef(controller_.State().config.layout.colors.mutedTextColor);
 }
 
 HICON DashboardApp::LoadAppIcon(int width, int height) {
@@ -198,9 +198,9 @@ HICON DashboardApp::LoadAppIcon(int width, int height) {
 }
 
 bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
-    renderer_.SetConfig(controller_->State().config);
-    rendererEditOverlayState_.showLayoutEditGuides = controller_->State().isEditingLayout || diagnosticsOptions_.editLayout;
-    renderer_.SetTraceOutput(controller_->State().diagnostics != nullptr ? controller_->State().diagnostics->TraceStream() : nullptr);
+    renderer_.SetConfig(controller_.State().config);
+    rendererEditOverlayState_.showLayoutEditGuides = controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
+    renderer_.SetTraceOutput(controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
     if (!renderer_.Initialize(hwnd_)) {
         return false;
     }
@@ -232,7 +232,7 @@ bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
 }
 
 bool DashboardApp::WriteDiagnosticsOutputs() {
-    return controller_->WriteDiagnosticsOutputs();
+    return controller_.WriteDiagnosticsOutputs();
 }
 
 std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
@@ -243,27 +243,27 @@ std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
 }
 
 AppConfig DashboardApp::BuildCurrentConfigForSaving() const {
-    return controller_->BuildCurrentConfigForSaving(const_cast<DashboardApp&>(*this));
+    return controller_.BuildCurrentConfigForSaving(const_cast<DashboardApp&>(*this));
 }
 
 void DashboardApp::SaveDumpAs() {
-    controller_->SaveDumpAs(*this);
+    controller_.SaveDumpAs(*this);
 }
 
 void DashboardApp::SaveScreenshotAs() {
-    controller_->SaveScreenshotAs(*this, diagnosticsOptions_);
+    controller_.SaveScreenshotAs(*this, diagnosticsOptions_);
 }
 
 void DashboardApp::SaveFullConfigAs() {
-    controller_->SaveFullConfigAs(*this);
+    controller_.SaveFullConfigAs(*this);
 }
 
 bool DashboardApp::IsAutoStartEnabled() const {
-    return controller_->IsAutoStartEnabled();
+    return controller_.IsAutoStartEnabled();
 }
 
 void DashboardApp::ToggleAutoStart() {
-    controller_->ToggleAutoStart(*this);
+    controller_.ToggleAutoStart(*this);
 }
 
 void DashboardApp::BringOnTop() {
@@ -273,53 +273,53 @@ void DashboardApp::BringOnTop() {
 }
 
 bool DashboardApp::ReloadConfigFromDisk() {
-    return controller_->ReloadConfigFromDisk(*this, diagnosticsOptions_, layoutEditController_);
+    return controller_.ReloadConfigFromDisk(*this, diagnosticsOptions_, layoutEditController_);
 }
 
 bool DashboardApp::ApplyConfiguredWallpaper() {
-    return ::ApplyConfiguredWallpaper(controller_->State().config,
-        controller_->State().diagnostics != nullptr ? controller_->State().diagnostics->TraceStream() : nullptr);
+    return ::ApplyConfiguredWallpaper(controller_.State().config,
+        controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
 }
 
 bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
-    return controller_->ConfigureDisplay(*this, option);
+    return controller_.ConfigureDisplay(*this, option);
 }
 
 bool DashboardApp::SwitchLayout(const std::string& layoutName) {
-    return controller_->SwitchLayout(*this, layoutName, layoutEditController_, diagnosticsOptions_.editLayout);
+    return controller_.SwitchLayout(*this, layoutName, layoutEditController_, diagnosticsOptions_.editLayout);
 }
 
 void DashboardApp::SelectNetworkAdapter(const NetworkMenuOption& option) {
-    controller_->SelectNetworkAdapter(*this, option);
+    controller_.SelectNetworkAdapter(*this, option);
 }
 
 void DashboardApp::ToggleStorageDrive(const StorageDriveMenuOption& option) {
-    controller_->ToggleStorageDrive(*this, option);
+    controller_.ToggleStorageDrive(*this, option);
 }
 
 void DashboardApp::StartLayoutEditMode() {
-    controller_->StartLayoutEditMode(*this, layoutEditController_);
+    controller_.StartLayoutEditMode(*this, layoutEditController_);
 }
 
 void DashboardApp::StopLayoutEditMode() {
-    controller_->StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
+    controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
 }
 
 bool DashboardApp::ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
-    return controller_->ApplyLayoutGuideWeights(*this, target, weights);
+    return controller_.ApplyLayoutGuideWeights(*this, target, weights);
 }
 
 bool DashboardApp::ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& target, double value) {
-    return controller_->ApplyLayoutEditValue(*this, target, value);
+    return controller_.ApplyLayoutEditValue(*this, target, value);
 }
 
 std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) {
-    return controller_->EvaluateLayoutWidgetExtentForWeights(*this, target, weights, widget, axis);
+    return controller_.EvaluateLayoutWidgetExtentForWeights(*this, target, weights, widget, axis);
 }
 
 void DashboardApp::UpdateConfigFromCurrentPlacement() {
-    controller_->UpdateConfigFromCurrentPlacement(*this);
+    controller_.UpdateConfigFromCurrentPlacement(*this);
 }
 
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {
@@ -391,20 +391,20 @@ void DashboardApp::RemoveTrayIcon() {
 }
 
 void DashboardApp::StartMoveMode() {
-    if (controller_->State().isEditingLayout) {
+    if (controller_.State().isEditingLayout) {
         StopLayoutEditMode();
     }
-    controller_->State().isMoving = true;
+    controller_.State().isMoving = true;
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
     UpdateMoveTracking();
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 void DashboardApp::StopMoveMode() {
-    if (!controller_->State().isMoving) {
+    if (!controller_.State().isMoving) {
         return;
     }
-    controller_->State().isMoving = false;
+    controller_.State().isMoving = false;
     KillTimer(hwnd_, kMoveTimerId);
     InvalidateRect(hwnd_, nullptr, FALSE);
 }

@@ -13,7 +13,6 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <memory>
 #include <optional>
 #include <string>
 
@@ -107,7 +106,7 @@ private:
     HWND hwnd_ = nullptr;
     DashboardRenderer renderer_;
     DashboardRenderer::EditOverlayState rendererEditOverlayState_{};
-    std::unique_ptr<IDashboardController> controller_;
+    DashboardController controller_{};
     NOTIFYICONDATAW trayIcon_{};
     MonitorPlacementInfo movePlacementInfo_{};
     HICON appIconLarge_ = nullptr;
