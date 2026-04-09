@@ -22,15 +22,8 @@ bool EditableTextKeyEquals(const DashboardRenderer::EditableTextKey& left,
         left.textId == right.textId;
 }
 
-bool EditableBarKeyEquals(const DashboardRenderer::EditableBarKey& left,
-    const DashboardRenderer::EditableBarKey& right) {
-    return WidgetIdentityEquals(left.widget, right.widget) &&
-        left.parameter == right.parameter &&
-        left.barId == right.barId;
-}
-
-bool EditableGaugeKeyEquals(const DashboardRenderer::EditableGaugeKey& left,
-    const DashboardRenderer::EditableGaugeKey& right) {
+bool EditableAnchorKeyEquals(const DashboardRenderer::EditableAnchorKey& left,
+    const DashboardRenderer::EditableAnchorKey& right) {
     return WidgetIdentityEquals(left.widget, right.widget) &&
         left.parameter == right.parameter &&
         left.anchorId == right.anchorId;
@@ -179,27 +172,20 @@ LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableText(const D
     return target;
 }
 
-LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableBar(const DashboardRenderer::EditableBarKey& key) {
+LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableAnchor(const DashboardRenderer::EditableAnchorKey& key) {
     ValueTarget target;
     switch (key.parameter) {
-    case DashboardRenderer::BarEditParameter::MetricListBarHeight:
+    case DashboardRenderer::AnchorEditParameter::MetricListBarHeight:
         target.field = Field::MetricListBarHeight;
         break;
-    case DashboardRenderer::BarEditParameter::DriveUsageBarHeight:
+    case DashboardRenderer::AnchorEditParameter::DriveUsageBarHeight:
         target.field = Field::DriveUsageBarHeight;
         break;
-    default:
-        target.field = Field::MetricListBarHeight;
-        break;
-    }
-    return target;
-}
-
-LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableGauge(const DashboardRenderer::EditableGaugeKey& key) {
-    ValueTarget target;
-    switch (key.parameter) {
-    case DashboardRenderer::GaugeAnchorParameter::SegmentCount:
+    case DashboardRenderer::AnchorEditParameter::SegmentCount:
         target.field = Field::GaugeSegmentCount;
+        break;
+    case DashboardRenderer::AnchorEditParameter::DriveUsageActivitySegments:
+        target.field = Field::DriveUsageActivitySegments;
         break;
     default:
         target.field = Field::GaugeSegmentCount;
@@ -260,26 +246,23 @@ const DashboardRenderer::WidgetEditGuide* LayoutEditController::HitTestWidgetEdi
 
 void LayoutEditController::RefreshHover(POINT clientPoint) {
     if (activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
-        activeTextEditDrag_.has_value() || activeBarEditDrag_.has_value() || activeGaugeEditDrag_.has_value()) {
+        activeTextEditDrag_.has_value() || activeAnchorEditDrag_.has_value()) {
         return;
     }
 
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
-    const std::optional<DashboardRenderer::EditableGaugeKey> nextHoveredGaugeAnchor = renderer.HitTestEditableGaugeAnchor(clientPoint);
-    const std::optional<DashboardRenderer::EditableBarKey> nextHoveredBarAnchor = renderer.HitTestEditableBarAnchor(clientPoint);
-    std::optional<DashboardRenderer::EditableBarKey> nextHoveredBar = nextHoveredBarAnchor;
-    if (!nextHoveredBar.has_value()) {
-        nextHoveredBar = renderer.HitTestEditableBar(clientPoint);
+    const std::optional<DashboardRenderer::EditableAnchorKey> nextHoveredAnchorHandle = renderer.HitTestEditableAnchorHandle(clientPoint);
+    std::optional<DashboardRenderer::EditableAnchorKey> nextHoveredAnchor = nextHoveredAnchorHandle;
+    if (!nextHoveredAnchor.has_value()) {
+        nextHoveredAnchor = renderer.HitTestEditableAnchorTarget(clientPoint);
     }
     const std::optional<DashboardRenderer::EditableTextKey> nextHoveredTextAnchor = renderer.HitTestEditableTextAnchor(clientPoint);
     std::optional<DashboardRenderer::EditableTextKey> nextHoveredText = nextHoveredTextAnchor;
     if (!nextHoveredText.has_value()) {
         nextHoveredText = renderer.HitTestEditableText(clientPoint);
     }
-    const std::optional<DashboardRenderer::LayoutWidgetIdentity> nextHoveredWidget = nextHoveredGaugeAnchor.has_value()
-        ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredGaugeAnchor->widget)
-        : nextHoveredBar.has_value()
-        ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredBar->widget)
+    const std::optional<DashboardRenderer::LayoutWidgetIdentity> nextHoveredWidget = nextHoveredAnchor.has_value()
+        ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredAnchor->widget)
         : nextHoveredText.has_value()
         ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredText->widget)
         : renderer.HitTestEditableWidget(clientPoint);
@@ -305,24 +288,11 @@ void LayoutEditController::RefreshHover(POINT clientPoint) {
         hoveredEditableTextAnchor_ = nextHoveredTextAnchor;
         hoverChanged = true;
     }
-    if (hoveredEditableBar_.has_value() != nextHoveredBar.has_value() ||
-        (hoveredEditableBar_.has_value() && nextHoveredBar.has_value() &&
-            !EditableBarKeyEquals(*hoveredEditableBar_, *nextHoveredBar))) {
-        hoveredEditableBar_ = nextHoveredBar;
-        host_.LayoutEditOverlayState().hoveredEditableBar = hoveredEditableBar_;
-        hoverChanged = true;
-    }
-    if (hoveredEditableBarAnchor_.has_value() != nextHoveredBarAnchor.has_value() ||
-        (hoveredEditableBarAnchor_.has_value() && nextHoveredBarAnchor.has_value() &&
-            !EditableBarKeyEquals(*hoveredEditableBarAnchor_, *nextHoveredBarAnchor))) {
-        hoveredEditableBarAnchor_ = nextHoveredBarAnchor;
-        hoverChanged = true;
-    }
-    if (hoveredEditableGaugeAnchor_.has_value() != nextHoveredGaugeAnchor.has_value() ||
-        (hoveredEditableGaugeAnchor_.has_value() && nextHoveredGaugeAnchor.has_value() &&
-            !EditableGaugeKeyEquals(*hoveredEditableGaugeAnchor_, *nextHoveredGaugeAnchor))) {
-        hoveredEditableGaugeAnchor_ = nextHoveredGaugeAnchor;
-        host_.LayoutEditOverlayState().hoveredEditableGauge = hoveredEditableGaugeAnchor_;
+    if (hoveredEditableAnchor_.has_value() != nextHoveredAnchor.has_value() ||
+        (hoveredEditableAnchor_.has_value() && nextHoveredAnchor.has_value() &&
+            !EditableAnchorKeyEquals(*hoveredEditableAnchor_, *nextHoveredAnchor))) {
+        hoveredEditableAnchor_ = nextHoveredAnchor;
+        host_.LayoutEditOverlayState().hoveredEditableAnchor = hoveredEditableAnchor_;
         hoverChanged = true;
     }
 
@@ -361,21 +331,11 @@ void LayoutEditController::RefreshHover(POINT clientPoint) {
 
 bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
-    if (hoveredEditableGaugeAnchor_.has_value()) {
-        const auto region = renderer.FindEditableGaugeRegion(*hoveredEditableGaugeAnchor_);
-        if (region.has_value()) {
-            activeGaugeEditDrag_ = GaugeEditDragState{region->key, region->value, clientPoint.x};
-            hoveredEditableWidget_ = region->key.widget;
-            SyncRendererInteractionState();
-            SetCapture(hwnd);
-            return true;
-        }
-    }
-    if (hoveredEditableBarAnchor_.has_value()) {
-        const auto region = renderer.FindEditableBarRegion(*hoveredEditableBarAnchor_);
-        if (region.has_value()) {
-            activeBarEditDrag_ = BarEditDragState{region->key, region->value, clientPoint.y};
-            hoveredEditableBar_ = region->key;
+    if (hoveredEditableAnchor_.has_value()) {
+        const auto region = renderer.FindEditableAnchorRegion(*hoveredEditableAnchor_);
+        if (region.has_value() && PtInRect(&region->anchorHitRect, clientPoint)) {
+            const int dragStartCoordinate = region->dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
+            activeAnchorEditDrag_ = AnchorEditDragState{region->key, region->dragAxis, region->value, dragStartCoordinate};
             hoveredEditableWidget_ = region->key.widget;
             SyncRendererInteractionState();
             SetCapture(hwnd);
@@ -434,11 +394,8 @@ bool LayoutEditController::HandleMouseMove(POINT clientPoint) {
     if (activeLayoutDrag_.has_value()) {
         return UpdateLayoutDrag(clientPoint);
     }
-    if (activeGaugeEditDrag_.has_value()) {
-        return UpdateGaugeEditDrag(clientPoint);
-    }
-    if (activeBarEditDrag_.has_value()) {
-        return UpdateBarEditDrag(clientPoint);
+    if (activeAnchorEditDrag_.has_value()) {
+        return UpdateAnchorEditDrag(clientPoint);
     }
     if (activeTextEditDrag_.has_value()) {
         return UpdateTextEditDrag(clientPoint);
@@ -453,11 +410,8 @@ bool LayoutEditController::HandleMouseMove(POINT clientPoint) {
 
 bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
     bool released = false;
-    if (activeGaugeEditDrag_.has_value()) {
-        activeGaugeEditDrag_.reset();
-        released = true;
-    } else if (activeBarEditDrag_.has_value()) {
-        activeBarEditDrag_.reset();
+    if (activeAnchorEditDrag_.has_value()) {
+        activeAnchorEditDrag_.reset();
         released = true;
     } else if (activeTextEditDrag_.has_value()) {
         activeTextEditDrag_.reset();
@@ -485,14 +439,13 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
         return false;
     }
 
-    const bool hadActiveDrag = activeGaugeEditDrag_.has_value() || activeBarEditDrag_.has_value() ||
+    const bool hadActiveDrag = activeAnchorEditDrag_.has_value() ||
         activeTextEditDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeLayoutDrag_.has_value();
     if (!hadActiveDrag) {
         return false;
     }
 
-    activeGaugeEditDrag_.reset();
-    activeBarEditDrag_.reset();
+    activeAnchorEditDrag_.reset();
     activeTextEditDrag_.reset();
     activeWidgetEditDrag_.reset();
     activeLayoutDrag_.reset();
@@ -502,12 +455,9 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
 }
 
 bool LayoutEditController::HandleSetCursor(HWND hwnd) {
-    if (activeGaugeEditDrag_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
-        return true;
-    }
-    if (activeBarEditDrag_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
+    if (activeAnchorEditDrag_.has_value()) {
+        SetCursor(LoadCursorW(nullptr,
+            activeAnchorEditDrag_->dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return true;
     }
     if (activeTextEditDrag_.has_value()) {
@@ -539,8 +489,7 @@ void LayoutEditController::SyncRendererInteractionState() {
     DashboardRenderer::EditOverlayState& overlayState = host_.LayoutEditOverlayState();
     overlayState.hoveredEditableWidget = hoveredEditableWidget_;
     overlayState.hoveredEditableText = hoveredEditableText_;
-    overlayState.hoveredEditableBar = hoveredEditableBar_;
-    overlayState.hoveredEditableGauge = hoveredEditableGaugeAnchor_;
+    overlayState.hoveredEditableAnchor = hoveredEditableAnchor_;
     overlayState.activeLayoutEditGuide = activeLayoutDrag_.has_value()
         ? std::optional<DashboardRenderer::LayoutEditGuide>(activeLayoutDrag_->guide)
         : std::nullopt;
@@ -550,11 +499,8 @@ void LayoutEditController::SyncRendererInteractionState() {
     overlayState.activeEditableText = activeTextEditDrag_.has_value()
         ? std::optional<DashboardRenderer::EditableTextKey>(activeTextEditDrag_->key)
         : std::nullopt;
-    overlayState.activeEditableBar = activeBarEditDrag_.has_value()
-        ? std::optional<DashboardRenderer::EditableBarKey>(activeBarEditDrag_->key)
-        : std::nullopt;
-    overlayState.activeEditableGauge = activeGaugeEditDrag_.has_value()
-        ? std::optional<DashboardRenderer::EditableGaugeKey>(activeGaugeEditDrag_->key)
+    overlayState.activeEditableAnchor = activeAnchorEditDrag_.has_value()
+        ? std::optional<DashboardRenderer::EditableAnchorKey>(activeAnchorEditDrag_->key)
         : std::nullopt;
 }
 
@@ -564,14 +510,11 @@ void LayoutEditController::ClearInteractionState() {
     hoveredWidgetEditGuideIndex_.reset();
     hoveredEditableText_.reset();
     hoveredEditableTextAnchor_.reset();
-    hoveredEditableBar_.reset();
-    hoveredEditableBarAnchor_.reset();
-    hoveredEditableGaugeAnchor_.reset();
+    hoveredEditableAnchor_.reset();
     activeLayoutDrag_.reset();
     activeWidgetEditDrag_.reset();
     activeTextEditDrag_.reset();
-    activeBarEditDrag_.reset();
-    activeGaugeEditDrag_.reset();
+    activeAnchorEditDrag_.reset();
 }
 
 void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
@@ -579,12 +522,10 @@ void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
         SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
         return;
     }
-    if (hoveredEditableGaugeAnchor_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
-        return;
-    }
-    if (hoveredEditableBarAnchor_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
+    if (hoveredEditableAnchor_.has_value()) {
+        const auto region = host_.LayoutEditRenderer().FindEditableAnchorRegion(*hoveredEditableAnchor_);
+        const auto dragAxis = region.has_value() ? region->dragAxis : DashboardRenderer::LayoutGuideAxis::Vertical;
+        SetCursor(LoadCursorW(nullptr, dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return;
     }
 
@@ -763,27 +704,15 @@ bool LayoutEditController::UpdateTextEditDrag(POINT clientPoint) {
     return updated;
 }
 
-bool LayoutEditController::UpdateBarEditDrag(POINT clientPoint) {
-    BarEditDragState& drag = *activeBarEditDrag_;
-    const int pixelDelta = clientPoint.y - drag.dragStartCoordinate;
+bool LayoutEditController::UpdateAnchorEditDrag(POINT clientPoint) {
+    AnchorEditDragState& drag = *activeAnchorEditDrag_;
+    const int currentCoordinate = drag.dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
+    const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;
+    const double scaleDivisor = drag.dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? 4.0 : 1.0;
     const int logicalDelta = static_cast<int>(std::lround(
-        static_cast<double>(pixelDelta) / (std::max)(0.1, host_.LayoutEditRenderer().RenderScale())));
+        static_cast<double>(pixelDelta) / (std::max)(0.1, host_.LayoutEditRenderer().RenderScale() * scaleDivisor)));
     const int nextValue = (std::max)(1, drag.initialValue + logicalDelta);
-    const bool updated = host_.ApplyLayoutEditValue(LayoutEditHost::ValueTarget::ForEditableBar(drag.key),
-        static_cast<double>(nextValue));
-    if (updated) {
-        SyncRendererInteractionState();
-    }
-    return updated;
-}
-
-bool LayoutEditController::UpdateGaugeEditDrag(POINT clientPoint) {
-    GaugeEditDragState& drag = *activeGaugeEditDrag_;
-    const int pixelDelta = clientPoint.x - drag.dragStartCoordinate;
-    const int logicalDelta = static_cast<int>(std::lround(
-        static_cast<double>(pixelDelta) / (std::max)(0.1, host_.LayoutEditRenderer().RenderScale() * 4.0)));
-    const int nextValue = (std::max)(1, drag.initialValue + logicalDelta);
-    const bool updated = host_.ApplyLayoutEditValue(LayoutEditHost::ValueTarget::ForEditableGauge(drag.key),
+    const bool updated = host_.ApplyLayoutEditValue(LayoutEditHost::ValueTarget::ForEditableAnchor(drag.key),
         static_cast<double>(nextValue));
     if (updated) {
         SyncRendererInteractionState();

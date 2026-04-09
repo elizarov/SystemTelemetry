@@ -54,6 +54,9 @@ bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, do
     case Field::DriveUsageRowGap:
         ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::rowGap, config, value);
         return true;
+    case Field::DriveUsageActivitySegments:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::activitySegments, config, value);
+        return true;
     case Field::ThroughputAxisPadding:
         ApplyPositiveInt(&LayoutConfig::throughput, &ThroughputWidgetConfig::axisPadding, config, value);
         return true;

@@ -20,6 +20,7 @@ public:
             DriveUsageFreeWidth,
             DriveUsageHeaderGap,
             DriveUsageRowGap,
+            DriveUsageActivitySegments,
             ThroughputAxisPadding,
             ThroughputHeaderGap,
             GaugeSweepDegrees,
@@ -42,8 +43,7 @@ public:
 
         static ValueTarget ForWidgetGuide(const DashboardRenderer::WidgetEditGuide& guide);
         static ValueTarget ForEditableText(const DashboardRenderer::EditableTextKey& key);
-        static ValueTarget ForEditableBar(const DashboardRenderer::EditableBarKey& key);
-        static ValueTarget ForEditableGauge(const DashboardRenderer::EditableGaugeKey& key);
+        static ValueTarget ForEditableAnchor(const DashboardRenderer::EditableAnchorKey& key);
     };
 
     struct LayoutTarget {
@@ -97,14 +97,9 @@ private:
         int dragStartCoordinate = 0;
     };
 
-    struct BarEditDragState {
-        DashboardRenderer::EditableBarKey key;
-        int initialValue = 0;
-        int dragStartCoordinate = 0;
-    };
-
-    struct GaugeEditDragState {
-        DashboardRenderer::EditableGaugeKey key;
+    struct AnchorEditDragState {
+        DashboardRenderer::EditableAnchorKey key;
+        DashboardRenderer::LayoutGuideAxis dragAxis = DashboardRenderer::LayoutGuideAxis::Vertical;
         int initialValue = 0;
         int dragStartCoordinate = 0;
     };
@@ -115,8 +110,7 @@ private:
     bool UpdateLayoutDrag(POINT clientPoint);
     bool UpdateWidgetEditDrag(POINT clientPoint);
     bool UpdateTextEditDrag(POINT clientPoint);
-    bool UpdateBarEditDrag(POINT clientPoint);
-    bool UpdateGaugeEditDrag(POINT clientPoint);
+    bool UpdateAnchorEditDrag(POINT clientPoint);
     void SyncRendererInteractionState();
     void ClearInteractionState();
     void SetCursorForPoint(POINT clientPoint);
@@ -129,12 +123,9 @@ private:
     std::optional<size_t> hoveredWidgetEditGuideIndex_;
     std::optional<DashboardRenderer::EditableTextKey> hoveredEditableText_;
     std::optional<DashboardRenderer::EditableTextKey> hoveredEditableTextAnchor_;
-    std::optional<DashboardRenderer::EditableBarKey> hoveredEditableBar_;
-    std::optional<DashboardRenderer::EditableBarKey> hoveredEditableBarAnchor_;
-    std::optional<DashboardRenderer::EditableGaugeKey> hoveredEditableGaugeAnchor_;
+    std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor_;
     std::optional<LayoutDragState> activeLayoutDrag_;
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
     std::optional<TextEditDragState> activeTextEditDrag_;
-    std::optional<BarEditDragState> activeBarEditDrag_;
-    std::optional<GaugeEditDragState> activeGaugeEditDrag_;
+    std::optional<AnchorEditDragState> activeAnchorEditDrag_;
 };

@@ -468,29 +468,40 @@ void DashboardRenderer::DrawHoveredEditableTextHighlight(HDC hdc, const EditOver
         static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
 }
 
-void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc, const EditOverlayState& overlayState) const {
+void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides) {
         return;
     }
 
-    const EditableBarRegion* highlighted = nullptr;
+    const EditableAnchorRegion* highlighted = nullptr;
     bool active = false;
-    if (overlayState.activeEditableBar.has_value()) {
-        const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
-            [&](const EditableBarRegion& region) {
-                return MatchesEditableBarKey(region.key, *overlayState.activeEditableBar);
+    if (overlayState.activeEditableAnchor.has_value()) {
+        const auto it = std::find_if(editableAnchorRegions_.begin(), editableAnchorRegions_.end(),
+            [&](const EditableAnchorRegion& region) {
+                return MatchesEditableAnchorKey(region.key, *overlayState.activeEditableAnchor);
             });
-        if (it != editableBarRegions_.end()) {
+        if (it != editableAnchorRegions_.end()) {
             highlighted = &(*it);
             active = true;
         }
     }
-    if (highlighted == nullptr && overlayState.hoveredEditableBar.has_value()) {
-        const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
-            [&](const EditableBarRegion& region) {
-                return MatchesEditableBarKey(region.key, *overlayState.hoveredEditableBar);
+    if (highlighted == nullptr && overlayState.hoveredEditableAnchor.has_value()) {
+        const auto it = std::find_if(editableAnchorRegions_.begin(), editableAnchorRegions_.end(),
+            [&](const EditableAnchorRegion& region) {
+                return MatchesEditableAnchorKey(region.key, *overlayState.hoveredEditableAnchor);
             });
-        if (it != editableBarRegions_.end()) {
+        if (it != editableAnchorRegions_.end()) {
+            highlighted = &(*it);
+        }
+    }
+    if (highlighted == nullptr && overlayState.hoveredEditableWidget.has_value()) {
+        const auto it = std::find_if(editableAnchorRegions_.begin(), editableAnchorRegions_.end(),
+            [&](const EditableAnchorRegion& region) {
+                return region.key.widget.renderCardId == overlayState.hoveredEditableWidget->renderCardId &&
+                    region.key.widget.editCardId == overlayState.hoveredEditableWidget->editCardId &&
+                    region.key.widget.nodePath == overlayState.hoveredEditableWidget->nodePath;
+            });
+        if (it != editableAnchorRegions_.end()) {
             highlighted = &(*it);
         }
     }
@@ -502,67 +513,30 @@ void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc, const EditOverl
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    Gdiplus::Pen pen(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
-        static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
-    pen.SetDashStyle(Gdiplus::DashStyleDot);
-    const RECT& barRect = highlighted->barRect;
-    graphics.DrawRectangle(&pen,
-        static_cast<Gdiplus::REAL>(barRect.left),
-        static_cast<Gdiplus::REAL>(barRect.top),
-        static_cast<Gdiplus::REAL>(std::max<LONG>(1, barRect.right - barRect.left)),
-        static_cast<Gdiplus::REAL>(std::max<LONG>(1, barRect.bottom - barRect.top)));
-
-    const RECT& anchorRect = highlighted->anchorRect;
-    Gdiplus::SolidBrush fill(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)));
-    graphics.FillEllipse(&fill,
-        static_cast<Gdiplus::REAL>(anchorRect.left),
-        static_cast<Gdiplus::REAL>(anchorRect.top),
-        static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
-        static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
-}
-
-void DashboardRenderer::DrawHoveredEditableGaugeHighlight(HDC hdc, const EditOverlayState& overlayState) const {
-    if (!overlayState.showLayoutEditGuides) {
-        return;
+    if (highlighted->targetRect.right > highlighted->targetRect.left &&
+        highlighted->targetRect.bottom > highlighted->targetRect.top) {
+        Gdiplus::Pen pen(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
+            static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
+        pen.SetDashStyle(Gdiplus::DashStyleDot);
+        const RECT& targetRect = highlighted->targetRect;
+        graphics.DrawRectangle(&pen,
+            static_cast<Gdiplus::REAL>(targetRect.left),
+            static_cast<Gdiplus::REAL>(targetRect.top),
+            static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.right - targetRect.left)),
+            static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.bottom - targetRect.top)));
     }
 
-    const EditableGaugeRegion* highlighted = nullptr;
-    bool active = false;
-    if (overlayState.activeEditableGauge.has_value()) {
-        const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
-            [&](const EditableGaugeRegion& region) {
-                return MatchesEditableGaugeKey(region.key, *overlayState.activeEditableGauge);
-            });
-        if (it != editableGaugeRegions_.end()) {
-            highlighted = &(*it);
-            active = true;
-        }
+    if (highlighted->shape == AnchorShape::Circle) {
+        const RECT& anchorRect = highlighted->anchorRect;
+        Gdiplus::SolidBrush fill(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)));
+        graphics.FillEllipse(&fill,
+            static_cast<Gdiplus::REAL>(anchorRect.left),
+            static_cast<Gdiplus::REAL>(anchorRect.top),
+            static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
+            static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
+    } else {
+        FillDiamond(hdc, highlighted->anchorRect, outlineColor);
     }
-    if (highlighted == nullptr && overlayState.hoveredEditableGauge.has_value()) {
-        const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
-            [&](const EditableGaugeRegion& region) {
-                return MatchesEditableGaugeKey(region.key, *overlayState.hoveredEditableGauge);
-            });
-        if (it != editableGaugeRegions_.end()) {
-            highlighted = &(*it);
-        }
-    }
-    if (highlighted == nullptr && overlayState.hoveredEditableWidget.has_value()) {
-        const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
-            [&](const EditableGaugeRegion& region) {
-                return region.key.widget.renderCardId == overlayState.hoveredEditableWidget->renderCardId &&
-                    region.key.widget.editCardId == overlayState.hoveredEditableWidget->editCardId &&
-                    region.key.widget.nodePath == overlayState.hoveredEditableWidget->nodePath;
-            });
-        if (it != editableGaugeRegions_.end()) {
-            highlighted = &(*it);
-        }
-    }
-    if (highlighted == nullptr) {
-        return;
-    }
-
-    FillDiamond(hdc, highlighted->anchorRect, active ? ActiveEditColor() : LayoutGuideColor());
 }
 
 void DashboardRenderer::DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const {
@@ -665,15 +639,7 @@ bool DashboardRenderer::MatchesLayoutEditGuide(const LayoutEditGuide& left, cons
         left.separatorIndex == right.separatorIndex;
 }
 
-bool DashboardRenderer::MatchesEditableBarKey(const EditableBarKey& left, const EditableBarKey& right) const {
-    return left.parameter == right.parameter &&
-        left.barId == right.barId &&
-        left.widget.renderCardId == right.widget.renderCardId &&
-        left.widget.editCardId == right.widget.editCardId &&
-        left.widget.nodePath == right.widget.nodePath;
-}
-
-bool DashboardRenderer::MatchesEditableGaugeKey(const EditableGaugeKey& left, const EditableGaugeKey& right) const {
+bool DashboardRenderer::MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const {
     return left.parameter == right.parameter &&
         left.anchorId == right.anchorId &&
         left.widget.renderCardId == right.widget.renderCardId &&
@@ -702,39 +668,15 @@ DashboardRenderer::EditableTextBinding DashboardRenderer::MakeEditableTextBindin
     };
 }
 
-void DashboardRenderer::RegisterEditableBarRegion(const EditableBarKey& key, const RECT& barRect, int value) {
-    if (barRect.right <= barRect.left || barRect.bottom <= barRect.top) {
+void DashboardRenderer::RegisterEditableAnchorRegion(
+    const EditableAnchorKey& key, const RECT& targetRect, const RECT& anchorRect, AnchorShape shape,
+    LayoutGuideAxis dragAxis, int value) {
+    if (anchorRect.right <= anchorRect.left || anchorRect.bottom <= anchorRect.top) {
         return;
     }
-    const int anchorSize = std::max(4, ScaleLogical(6));
-    const int anchorHalf = anchorSize / 2;
-    const int anchorCenterX = static_cast<int>(barRect.left) + std::max(0, static_cast<int>(barRect.right - barRect.left) / 2);
-    const int anchorCenterY = static_cast<int>(barRect.bottom);
-    EditableBarRegion region;
+    EditableAnchorRegion region;
     region.key = key;
-    region.barRect = barRect;
-    region.anchorRect = RECT{
-        anchorCenterX - anchorHalf,
-        anchorCenterY - anchorHalf,
-        anchorCenterX - anchorHalf + anchorSize,
-        anchorCenterY - anchorHalf + anchorSize
-    };
-    const int anchorHitInset = std::max(3, ScaleLogical(4));
-    region.anchorHitRect = RECT{
-        region.anchorRect.left - anchorHitInset,
-        region.anchorRect.top - anchorHitInset,
-        region.anchorRect.right + anchorHitInset,
-        region.anchorRect.bottom + anchorHitInset
-    };
-    region.value = value;
-    editableBarRegions_.push_back(std::move(region));
-}
-
-void DashboardRenderer::RegisterEditableGaugeRegion(
-    const EditableGaugeKey& key, const RECT& gaugeRect, const RECT& anchorRect, int value) {
-    EditableGaugeRegion region;
-    region.key = key;
-    region.gaugeRect = gaugeRect;
+    region.targetRect = targetRect;
     region.anchorRect = anchorRect;
     const int anchorHitInset = std::max(3, ScaleLogical(4));
     region.anchorHitRect = RECT{
@@ -743,8 +685,10 @@ void DashboardRenderer::RegisterEditableGaugeRegion(
         region.anchorRect.right + anchorHitInset,
         region.anchorRect.bottom + anchorHitInset
     };
+    region.shape = shape;
+    region.dragAxis = dragAxis;
     region.value = value;
-    editableGaugeRegions_.push_back(std::move(region));
+    editableAnchorRegions_.push_back(std::move(region));
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const {
@@ -1002,11 +946,11 @@ void DashboardRenderer::DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, i
         cx - anchorHalf + anchorSize,
         cy - outerRadius - anchorHalf + anchorSize
     };
-    RegisterEditableGaugeRegion(EditableGaugeKey{
+    RegisterEditableAnchorRegion(EditableAnchorKey{
         LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-        GaugeAnchorParameter::SegmentCount,
+        AnchorEditParameter::SegmentCount,
         0,
-    }, widget.rect, anchorRect, config_.layout.gauge.segmentCount);
+    }, widget.rect, anchorRect, AnchorShape::Diamond, LayoutGuideAxis::Vertical, config_.layout.gauge.segmentCount);
 
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -1102,11 +1046,20 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const ResolvedWidgetLayout& widge
     const int barTop = std::max(static_cast<int>(rect.top), barBottom - metricBarHeight);
     RECT barRect{valueRect.left, barTop, rect.right, barBottom};
     DrawPillBar(hdc, barRect, row.ratio, row.peakRatio, renderMode_ != RenderMode::Blank);
-    RegisterEditableBarRegion(EditableBarKey{
+    const int metricBarAnchorSize = std::max(4, ScaleLogical(6));
+    const int metricBarAnchorCenterX = static_cast<int>(barRect.left) + std::max(0, static_cast<int>(barRect.right - barRect.left) / 2);
+    const int metricBarAnchorCenterY = static_cast<int>(barRect.bottom);
+    RECT metricBarAnchorRect{
+        metricBarAnchorCenterX - (metricBarAnchorSize / 2),
+        metricBarAnchorCenterY - (metricBarAnchorSize / 2),
+        metricBarAnchorCenterX - (metricBarAnchorSize / 2) + metricBarAnchorSize,
+        metricBarAnchorCenterY - (metricBarAnchorSize / 2) + metricBarAnchorSize
+    };
+    RegisterEditableAnchorRegion(EditableAnchorKey{
         LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-        BarEditParameter::MetricListBarHeight,
+        AnchorEditParameter::MetricListBarHeight,
         rowIndex,
-    }, barRect, config_.layout.metricList.barHeight);
+    }, barRect, metricBarAnchorRect, AnchorShape::Circle, LayoutGuideAxis::Horizontal, config_.layout.metricList.barHeight);
 }
 
 void DashboardRenderer::DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue,
@@ -1274,6 +1227,26 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
 
     RECT headerLabelRect{}, headerReadRect{}, headerWriteRect{}, headerBarRect{}, headerPctRect{}, headerFreeRect{};
     resolveColumns(header, headerLabelRect, headerReadRect, headerWriteRect, headerBarRect, headerPctRect, headerFreeRect);
+    const int activityAnchorWidth = std::max(8, ScaleLogical(14));
+    const int activityAnchorHeight = std::max(6, ScaleLogical(8));
+    const int activityAnchorCenterX = headerReadRect.left + std::max(0L, headerWriteRect.right - headerReadRect.left) / 2;
+    const int activityAnchorBandTop = std::min(static_cast<int>(rect.bottom), static_cast<int>(header.bottom));
+    const int activityAnchorBandBottom = std::max(activityAnchorBandTop, static_cast<int>(rect.bottom));
+    const int activityAnchorCenterY = activityAnchorBandTop +
+        std::max(0, (activityAnchorBandBottom - activityAnchorBandTop) / 2);
+    RECT activityAnchorRect{
+        activityAnchorCenterX - (activityAnchorWidth / 2),
+        activityAnchorCenterY - (activityAnchorHeight / 2),
+        activityAnchorCenterX - (activityAnchorWidth / 2) + activityAnchorWidth,
+        activityAnchorCenterY - (activityAnchorHeight / 2) + activityAnchorHeight
+    };
+    RegisterEditableAnchorRegion(EditableAnchorKey{
+        LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        AnchorEditParameter::DriveUsageActivitySegments,
+        0,
+    }, RECT{headerReadRect.left, rect.top, headerWriteRect.right, rect.bottom}, activityAnchorRect,
+        AnchorShape::Diamond, LayoutGuideAxis::Vertical,
+        config_.layout.driveUsageList.activitySegments);
     RECT usageHeaderRect{headerBarRect.left, header.top, headerPctRect.right, header.bottom};
     RECT headerReadLabelRect{headerReadRect.left - valueGap, headerReadRect.top, headerReadRect.right + valueGap, headerReadRect.bottom};
     RECT headerWriteLabelRect{headerWriteRect.left - valueGap, headerWriteRect.top, headerWriteRect.right + valueGap, headerWriteRect.bottom};
@@ -1315,11 +1288,21 @@ void DashboardRenderer::DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout
             renderMode_ == RenderMode::Blank ? 0.0 : drive.writeActivity,
             ToColorRef(config_.layout.colors.trackColor), AccentColor());
         DrawPillBar(hdc, barRect, drive.usedPercent / 100.0, std::nullopt, renderMode_ != RenderMode::Blank);
-        RegisterEditableBarRegion(EditableBarKey{
+        const int driveBarAnchorSize = std::max(4, ScaleLogical(6));
+        const int driveBarAnchorCenterX = static_cast<int>(barRect.left) + std::max(0, static_cast<int>(barRect.right - barRect.left) / 2);
+        const int driveBarAnchorCenterY = static_cast<int>(barRect.bottom);
+        RECT driveBarAnchorRect{
+            driveBarAnchorCenterX - (driveBarAnchorSize / 2),
+            driveBarAnchorCenterY - (driveBarAnchorSize / 2),
+            driveBarAnchorCenterX - (driveBarAnchorSize / 2) + driveBarAnchorSize,
+            driveBarAnchorCenterY - (driveBarAnchorSize / 2) + driveBarAnchorSize
+        };
+        RegisterEditableAnchorRegion(EditableAnchorKey{
             LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            BarEditParameter::DriveUsageBarHeight,
+            AnchorEditParameter::DriveUsageBarHeight,
             static_cast<int>(rowIndex),
-        }, barRect, config_.layout.driveUsageList.barHeight);
+        }, barRect, driveBarAnchorRect, AnchorShape::Circle, LayoutGuideAxis::Horizontal,
+            config_.layout.driveUsageList.barHeight);
 
         if (renderMode_ != RenderMode::Blank) {
             char percent[16];
@@ -1411,8 +1394,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
     editableTextRegions_.clear();
-    editableBarRegions_.clear();
-    editableGaugeRegions_.clear();
+    editableAnchorRegions_.clear();
     DashboardMetricSource metrics(snapshot, config_.metricScales);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
@@ -1422,8 +1404,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const Edit
     }
     DrawHoveredWidgetHighlight(hdc, overlayState);
     DrawHoveredEditableTextHighlight(hdc, overlayState);
-    DrawHoveredEditableBarHighlight(hdc, overlayState);
-    DrawHoveredEditableGaugeHighlight(hdc, overlayState);
+    DrawHoveredEditableAnchorHighlight(hdc, overlayState);
     DrawLayoutEditGuides(hdc, overlayState);
     DrawWidgetEditGuides(hdc, overlayState);
     DrawLayoutSimilarityIndicators(hdc, overlayState);

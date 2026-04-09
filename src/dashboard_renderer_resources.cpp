@@ -627,17 +627,17 @@ std::optional<DashboardRenderer::EditableTextRegion> DashboardRenderer::FindEdit
     return *it;
 }
 
-std::optional<DashboardRenderer::EditableBarKey> DashboardRenderer::HitTestEditableBar(POINT clientPoint) const {
-    for (auto it = editableBarRegions_.rbegin(); it != editableBarRegions_.rend(); ++it) {
-        if (PtInRect(&it->barRect, clientPoint)) {
+std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(POINT clientPoint) const {
+    for (auto it = editableAnchorRegions_.rbegin(); it != editableAnchorRegions_.rend(); ++it) {
+        if (PtInRect(&it->targetRect, clientPoint)) {
             return it->key;
         }
     }
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::EditableBarKey> DashboardRenderer::HitTestEditableBarAnchor(POINT clientPoint) const {
-    for (auto it = editableBarRegions_.rbegin(); it != editableBarRegions_.rend(); ++it) {
+std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(POINT clientPoint) const {
+    for (auto it = editableAnchorRegions_.rbegin(); it != editableAnchorRegions_.rend(); ++it) {
         if (PtInRect(&it->anchorHitRect, clientPoint)) {
             return it->key;
         }
@@ -645,29 +645,11 @@ std::optional<DashboardRenderer::EditableBarKey> DashboardRenderer::HitTestEdita
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::EditableBarRegion> DashboardRenderer::FindEditableBarRegion(const EditableBarKey& key) const {
-    const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
-        [&](const EditableBarRegion& region) { return MatchesEditableBarKey(region.key, key); });
-    if (it == editableBarRegions_.end()) {
-        return std::nullopt;
-    }
-    return *it;
-}
-
-std::optional<DashboardRenderer::EditableGaugeKey> DashboardRenderer::HitTestEditableGaugeAnchor(POINT clientPoint) const {
-    for (auto it = editableGaugeRegions_.rbegin(); it != editableGaugeRegions_.rend(); ++it) {
-        if (PtInRect(&it->anchorHitRect, clientPoint)) {
-            return it->key;
-        }
-    }
-    return std::nullopt;
-}
-
-std::optional<DashboardRenderer::EditableGaugeRegion> DashboardRenderer::FindEditableGaugeRegion(
-    const EditableGaugeKey& key) const {
-    const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
-        [&](const EditableGaugeRegion& region) { return MatchesEditableGaugeKey(region.key, key); });
-    if (it == editableGaugeRegions_.end()) {
+std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
+    const EditableAnchorKey& key) const {
+    const auto it = std::find_if(editableAnchorRegions_.begin(), editableAnchorRegions_.end(),
+        [&](const EditableAnchorRegion& region) { return MatchesEditableAnchorKey(region.key, key); });
+    if (it == editableAnchorRegions_.end()) {
         return std::nullopt;
     }
     return *it;
@@ -744,8 +726,7 @@ void DashboardRenderer::Shutdown() {
     measuredWidths_ = {};
     resolvedLayout_ = {};
     editableTextRegions_.clear();
-    editableBarRegions_.clear();
-    editableGaugeRegions_.clear();
+    editableAnchorRegions_.clear();
     ReleasePanelIcons();
     ShutdownGdiplus();
 }

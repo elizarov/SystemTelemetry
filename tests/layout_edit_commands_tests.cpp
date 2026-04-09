@@ -51,3 +51,14 @@ TEST(LayoutEditCommands, UpdatesMetricListAndGaugeFieldsThroughCommands) {
     EXPECT_EQ(config.layout.metricList.barHeight, 17);
     EXPECT_EQ(config.layout.gauge.segmentCount, 6);
 }
+
+TEST(LayoutEditCommands, UpdatesDriveUsageActivitySegmentsThroughCommands) {
+    AppConfig config;
+
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config,
+        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageActivitySegments),
+        5.6));
+
+    EXPECT_EQ(config.layout.driveUsageList.activitySegments, 6);
+}
