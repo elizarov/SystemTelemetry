@@ -468,6 +468,81 @@ const std::vector<DashboardRenderer::LayoutEditGuide>& DashboardRenderer::Layout
     return layoutEditGuides_;
 }
 
+int DashboardRenderer::LayoutSimilarityThreshold() const {
+    return std::max(0, ScaleLogical(config_.layout.layoutEditor.sizeSimilarityThreshold));
+}
+
+std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
+    const LayoutEditGuide& guide) const {
+    struct SimilarityTypeKey {
+        WidgetKind kind = WidgetKind::Unknown;
+        int extent = 0;
+
+        bool operator<(const SimilarityTypeKey& other) const {
+            if (kind != other.kind) {
+                return kind < other.kind;
+            }
+            return extent < other.extent;
+        }
+    };
+
+    std::vector<const ResolvedWidgetLayout*> allWidgets = CollectSimilarityIndicatorWidgets(guide.axis);
+    std::vector<const ResolvedWidgetLayout*> affectedWidgets;
+    for (const ResolvedWidgetLayout* widget : allWidgets) {
+        if (IsWidgetAffectedByGuide(*widget, guide)) {
+            affectedWidgets.push_back(widget);
+        }
+    }
+
+    std::map<SimilarityTypeKey, size_t> groupOrderByType;
+    std::map<SimilarityTypeKey, size_t> groupCountByType;
+    for (size_t i = 0; i < allWidgets.size(); ++i) {
+        const ResolvedWidgetLayout* widget = allWidgets[i];
+        const SimilarityTypeKey typeKey{widget->kind, WidgetExtentForAxis(*widget, guide.axis)};
+        groupCountByType[typeKey] += 1;
+        groupOrderByType.try_emplace(typeKey, i);
+    }
+
+    std::vector<LayoutGuideSnapCandidate> candidates;
+    for (const ResolvedWidgetLayout* affected : affectedWidgets) {
+        const int startExtent = WidgetExtentForAxis(*affected, guide.axis);
+        if (startExtent <= 0) {
+            continue;
+        }
+        for (const auto& entry : groupOrderByType) {
+            if (entry.first.kind != affected->kind || groupCountByType[entry.first] < 2) {
+                continue;
+            }
+            candidates.push_back(LayoutGuideSnapCandidate{
+                {affected->cardId, affected->editCardId, affected->nodePath},
+                entry.first.extent,
+                startExtent,
+                std::abs(entry.first.extent - startExtent),
+                entry.second,
+            });
+        }
+    }
+
+    std::stable_sort(candidates.begin(), candidates.end(), [](const auto& left, const auto& right) {
+        if (left.startDistance != right.startDistance) {
+            return left.startDistance < right.startDistance;
+        }
+        return left.groupOrder < right.groupOrder;
+    });
+    return candidates;
+}
+
+std::optional<int> DashboardRenderer::FindLayoutWidgetExtent(const LayoutWidgetIdentity& identity, LayoutGuideAxis axis) const {
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            if (MatchesWidgetIdentity(widget, identity)) {
+                return WidgetExtentForAxis(widget, axis);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 bool DashboardRenderer::Initialize(HWND hwnd) {
     hwnd_ = hwnd;
     lastError_.clear();
@@ -935,6 +1010,8 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     if (!IsCardContainerNode(node)) {
         ResolvedWidgetLayout widget = ResolveWidgetLayout(node, rect);
         widget.cardId = renderCardId;
+        widget.editCardId = editCardId;
+        widget.nodePath = nodePath;
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
             (widget.binding.metric.empty() ? "" : " metric=\"" + widget.binding.metric + "\"") +
             (widget.binding.param.empty() ? "" : " param=\"" + widget.binding.param + "\""));
@@ -1250,8 +1327,14 @@ bool DashboardRenderer::IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widg
         widget.rect.bottom <= guide.containerRect.bottom;
 }
 
+bool DashboardRenderer::MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const {
+    return widget.cardId == identity.renderCardId &&
+        widget.editCardId == identity.editCardId &&
+        widget.nodePath == identity.nodePath;
+}
+
 void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
-    const int threshold = std::max(0, ScaleLogical(config_.layout.layoutEditor.sizeSimilarityThreshold));
+    const int threshold = LayoutSimilarityThreshold();
     if (threshold <= 0) {
         return;
     }

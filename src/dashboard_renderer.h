@@ -45,6 +45,20 @@ public:
         std::vector<RECT> childRects;
     };
 
+    struct LayoutWidgetIdentity {
+        std::string renderCardId;
+        std::string editCardId;
+        std::vector<size_t> nodePath;
+    };
+
+    struct LayoutGuideSnapCandidate {
+        LayoutWidgetIdentity widget;
+        int targetExtent = 0;
+        int startExtent = 0;
+        int startDistance = 0;
+        size_t groupOrder = 0;
+    };
+
     enum class RenderMode {
         Normal,
         Blank,
@@ -78,6 +92,9 @@ public:
     HFONT SmallFont() const;
     void SetTraceOutput(std::ostream* traceOutput);
     const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
+    int LayoutSimilarityThreshold() const;
+    std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
+    std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -110,6 +127,8 @@ private:
         WidgetKind kind = WidgetKind::Unknown;
         RECT rect{};
         std::string cardId;
+        std::string editCardId;
+        std::vector<size_t> nodePath;
         WidgetBinding binding;
         int preferredHeight = 0;
         bool fixedPreferredHeightInRows = false;
@@ -203,6 +222,7 @@ private:
     std::vector<const ResolvedWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
     int WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const;
+    bool MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
 

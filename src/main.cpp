@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -1002,8 +1003,12 @@ struct StorageDriveMenuOption {
 struct LayoutDragState {
     DashboardRenderer::LayoutEditGuide guide;
     std::vector<int> initialWeights;
+    std::vector<DashboardRenderer::LayoutGuideSnapCandidate> snapCandidates;
     int dragStartCoordinate = 0;
 };
+
+NamedLayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name);
+LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId);
 
 LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector<size_t>& path) {
     LayoutNodeConfig* node = &root;
@@ -1063,6 +1068,37 @@ std::vector<int> SeedLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide
     }
 
     return weights;
+}
+
+bool ApplyLayoutGuideWeightsToConfig(AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights) {
+    if (weights.size() < 2) {
+        return false;
+    }
+
+    const auto applyWeights = [&](LayoutNodeConfig* node) -> bool {
+        if (node == nullptr || node->children.size() != weights.size()) {
+            return false;
+        }
+        for (size_t i = 0; i < weights.size(); ++i) {
+            node->children[i].weight = std::max(1, weights[i]);
+        }
+        return true;
+    };
+
+    bool updated = false;
+    if (guide.editCardId.empty()) {
+        updated = applyWeights(FindLayoutNodeByPath(config.layout.structure.cardsLayout, guide.nodePath));
+        if (!updated) {
+            return false;
+        }
+        if (NamedLayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
+            applyWeights(FindLayoutNodeByPath(namedLayout->cardsLayout, guide.nodePath));
+        }
+    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, guide.editCardId)) {
+        updated = applyWeights(FindLayoutNodeByPath(card->layout, guide.nodePath));
+    }
+
+    return updated;
 }
 
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
@@ -1494,6 +1530,9 @@ private:
     void StopLayoutEditMode();
     void RefreshLayoutEditHover(POINT clientPoint);
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
+        const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
+    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag, const std::vector<int>& freeWeights);
     bool ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights);
     bool UpdateLayoutDrag(POINT clientPoint);
     void StartMoveMode();
@@ -2165,36 +2204,7 @@ void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
 }
 
 bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights) {
-    if (weights.size() < 2) {
-        return false;
-    }
-
-    const auto applyWeights = [&](LayoutNodeConfig* node) -> bool {
-        if (node == nullptr || node->children.size() != weights.size()) {
-            return false;
-        }
-        for (size_t i = 0; i < weights.size(); ++i) {
-            node->children[i].weight = std::max(1, weights[i]);
-        }
-        return true;
-    };
-
-    bool updated = false;
-    if (guide.editCardId.empty()) {
-        updated = applyWeights(FindLayoutNodeByPath(config_.layout.structure.cardsLayout, guide.nodePath));
-        if (!updated) {
-            return false;
-        }
-        if (NamedLayoutSectionConfig* namedLayout = FindNamedLayoutByName(config_, config_.display.layout)) {
-            applyWeights(FindLayoutNodeByPath(namedLayout->cardsLayout, guide.nodePath));
-        }
-    } else {
-        if (LayoutCardConfig* card = FindCardLayoutById(config_.layout, guide.editCardId)) {
-            updated = applyWeights(FindLayoutNodeByPath(card->layout, guide.nodePath));
-        }
-    }
-
-    if (!updated) {
+    if (!ApplyLayoutGuideWeightsToConfig(config_, guide, weights)) {
         return false;
     }
 
@@ -2202,6 +2212,84 @@ bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGu
     telemetry_->SetEffectiveConfig(config_);
     InvalidateRect(hwnd_, nullptr, FALSE);
     return true;
+}
+
+std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
+    const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) {
+    AppConfig candidateConfig = config_;
+    if (!ApplyLayoutGuideWeightsToConfig(candidateConfig, guide, weights)) {
+        return std::nullopt;
+    }
+    renderer_.SetConfig(candidateConfig);
+    return renderer_.FindLayoutWidgetExtent(widget, axis);
+}
+
+std::optional<std::vector<int>> DashboardApp::FindSnappedLayoutGuideWeights(
+    const LayoutDragState& drag, const std::vector<int>& freeWeights) {
+    const int threshold = renderer_.LayoutSimilarityThreshold();
+    if (threshold <= 0 || drag.snapCandidates.empty()) {
+        return std::nullopt;
+    }
+
+    const size_t index = drag.guide.separatorIndex;
+    if (index + 1 >= freeWeights.size()) {
+        return std::nullopt;
+    }
+
+    const int combined = freeWeights[index] + freeWeights[index + 1];
+    if (combined <= 1) {
+        return std::nullopt;
+    }
+
+    for (const auto& candidate : drag.snapCandidates) {
+        const std::optional<int> currentExtent = EvaluateLayoutWidgetExtentForWeights(
+            drag.guide, freeWeights, candidate.widget, drag.guide.axis);
+        if (!currentExtent.has_value() || std::abs(*currentExtent - candidate.targetExtent) > threshold) {
+            continue;
+        }
+
+        std::map<int, std::optional<int>> extentCache;
+        auto evaluateExtent = [&](int firstWeight) -> std::optional<int> {
+            const auto cached = extentCache.find(firstWeight);
+            if (cached != extentCache.end()) {
+                return cached->second;
+            }
+            std::vector<int> attemptWeights = freeWeights;
+            attemptWeights[index] = firstWeight;
+            attemptWeights[index + 1] = combined - firstWeight;
+            std::optional<int> extent =
+                EvaluateLayoutWidgetExtentForWeights(drag.guide, attemptWeights, candidate.widget, drag.guide.axis);
+            extentCache.emplace(firstWeight, extent);
+            return extent;
+        };
+
+        const int centerWeight = freeWeights[index];
+        const int maxDistance = std::max(centerWeight - 1, (combined - 1) - centerWeight);
+        for (int distance = 0; distance <= maxDistance; ++distance) {
+            const int lowProbe = centerWeight - distance;
+            if (lowProbe >= 1) {
+                const std::optional<int> lowExtent = evaluateExtent(lowProbe);
+                if (lowExtent.has_value() && *lowExtent == candidate.targetExtent) {
+                    std::vector<int> exact = freeWeights;
+                    exact[index] = lowProbe;
+                    exact[index + 1] = combined - lowProbe;
+                    return exact;
+                }
+            }
+            const int highProbe = centerWeight + distance;
+            if (distance > 0 && highProbe <= (combined - 1)) {
+                const std::optional<int> highExtent = evaluateExtent(highProbe);
+                if (highExtent.has_value() && *highExtent == candidate.targetExtent) {
+                    std::vector<int> exact = freeWeights;
+                    exact[index] = highProbe;
+                    exact[index + 1] = combined - highProbe;
+                    return exact;
+                }
+            }
+        }
+    }
+
+    return std::nullopt;
 }
 
 bool DashboardApp::UpdateLayoutDrag(POINT clientPoint) {
@@ -2225,6 +2313,11 @@ bool DashboardApp::UpdateLayoutDrag(POINT clientPoint) {
     std::vector<int> weights = drag.initialWeights;
     weights[index] = std::clamp(drag.initialWeights[index] + delta, 1, combined - 1);
     weights[index + 1] = combined - weights[index];
+    if ((GetKeyState(VK_MENU) & 0x8000) == 0) {
+        if (const auto snappedWeights = FindSnappedLayoutGuideWeights(drag, weights); snappedWeights.has_value()) {
+            weights = *snappedWeights;
+        }
+    }
     if (!ApplyLayoutGuideWeights(drag.guide, weights)) {
         return false;
     }
@@ -2689,9 +2782,11 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
             if (guide != nullptr) {
                 const LayoutNodeConfig* guideNode = FindGuideNode(config_, *guide);
+                const std::vector<int> initialWeights = SeedLayoutGuideWeights(*guide, guideNode);
                 activeLayoutDrag_ = LayoutDragState{
                     *guide,
-                    SeedLayoutGuideWeights(*guide, guideNode),
+                    initialWeights,
+                    renderer_.CollectLayoutGuideSnapCandidates(*guide),
                     guide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y};
                 renderer_.SetActiveLayoutEditGuide(std::optional<DashboardRenderer::LayoutEditGuide>(activeLayoutDrag_->guide));
                 hoveredLayoutGuideIndex_ = guideIndex;

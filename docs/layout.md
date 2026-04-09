@@ -206,7 +206,7 @@ Nested layout expressions are allowed.
 Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is a card-layout reference and resolves to that referenced card's layout during layout resolution.
 In a vertical `rows(...)` container, fixed-height direct children such as `text`, `network_footer`, and `spacer` keep their preferred height and the remaining space goes to flexible siblings when no `vertical_spring` is present.
 When one or more direct `vertical_spring` children are present in `rows(...)`, every spring absorbs the remaining height before normal weighted stretching and multiple springs divide that height by weight.
-Interactive layout editing applies only to `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
+Interactive layout editing applies only to `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, snaps to the nearest same-type exact-size group as soon as the similarity ruler threshold is reached by iteratively re-evaluating nested weighted layouts, lets `Alt` temporarily bypass that snap and continue free dragging, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
 
 Example:
 
