@@ -8,7 +8,7 @@
 
 void TelemetryCollector::Impl::EnumerateDrives() {
     snapshot_.drives.clear();
-    driveCounters_.clear();
+    storage_.driveCounters.clear();
     for (const auto& drive : config_.storage.drives) {
         const std::string letter = NormalizeDriveLetter(drive);
         if (letter.empty()) {
@@ -21,19 +21,19 @@ void TelemetryCollector::Impl::EnumerateDrives() {
         snapshot_.drives.push_back(std::move(info));
         Trace(("telemetry:drive_config label=" + label).c_str());
 
-        if (storageQuery_ != nullptr) {
+        if (storage_.query != nullptr) {
             const std::wstring logicalDisk = WideFromUtf8(label);
             DriveCounterState counters;
             counters.label = label;
             const std::wstring readPath = L"\\LogicalDisk(" + logicalDisk + L")\\Disk Read Bytes/sec";
             const std::wstring writePath = L"\\LogicalDisk(" + logicalDisk + L")\\Disk Write Bytes/sec";
-            const PDH_STATUS readStatus = AddCounterCompat(storageQuery_, readPath.c_str(), &counters.readCounter);
-            const PDH_STATUS writeStatus = AddCounterCompat(storageQuery_, writePath.c_str(), &counters.writeCounter);
+            const PDH_STATUS readStatus = AddCounterCompat(storage_.query, readPath.c_str(), &counters.readCounter);
+            const PDH_STATUS writeStatus = AddCounterCompat(storage_.query, writePath.c_str(), &counters.writeCounter);
             Trace(("telemetry:pdh_add drive_read label=" + label + " path=\"" + Utf8FromWide(readPath) + "\" " +
                 tracing::Trace::FormatPdhStatus("status", readStatus)).c_str());
             Trace(("telemetry:pdh_add drive_write label=" + label + " path=\"" + Utf8FromWide(writePath) + "\" " +
                 tracing::Trace::FormatPdhStatus("status", writeStatus)).c_str());
-            driveCounters_.push_back(std::move(counters));
+            storage_.driveCounters.push_back(std::move(counters));
         }
     }
     Trace(("telemetry:drive_enumerate count=" + std::to_string(snapshot_.drives.size())).c_str());
@@ -41,7 +41,7 @@ void TelemetryCollector::Impl::EnumerateDrives() {
 }
 
 void TelemetryCollector::Impl::RefreshStorageDriveCandidates() {
-    storageDriveCandidates_.clear();
+    storage_.driveCandidates.clear();
 
     const DWORD bufferLength = GetLogicalDriveStringsW(0, nullptr);
     if (bufferLength == 0) {
@@ -81,37 +81,37 @@ void TelemetryCollector::Impl::RefreshStorageDriveCandidates() {
         candidate.totalGb = totalBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
         candidate.driveType = driveType;
         candidate.selected = std::find(config_.storage.drives.begin(), config_.storage.drives.end(), candidate.letter) != config_.storage.drives.end();
-        storageDriveCandidates_.push_back(std::move(candidate));
+        storage_.driveCandidates.push_back(std::move(candidate));
     }
 
-    std::sort(storageDriveCandidates_.begin(), storageDriveCandidates_.end(), [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) {
+    std::sort(storage_.driveCandidates.begin(), storage_.driveCandidates.end(), [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) {
         return lhs.letter < rhs.letter;
     });
-    Trace(("telemetry:storage_candidates count=" + std::to_string(storageDriveCandidates_.size())).c_str());
+    Trace(("telemetry:storage_candidates count=" + std::to_string(storage_.driveCandidates.size())).c_str());
 }
 
 void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
-    if (storageQuery_ == nullptr) {
+    if (storage_.query == nullptr) {
         Trace("telemetry:storage_rates skipped=no_query");
         return;
     }
 
-    const PDH_STATUS collectStatus = PdhCollectQueryData(storageQuery_);
+    const PDH_STATUS collectStatus = PdhCollectQueryData(storage_.query);
     Trace(("telemetry:storage_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
 
     PDH_FMT_COUNTERVALUE value{};
     PDH_STATUS readStatus = PDH_INVALID_DATA;
     PDH_STATUS writeStatus = PDH_INVALID_DATA;
 
-    if (storageReadCounter_ != nullptr &&
-        (readStatus = PdhGetFormattedCounterValue(storageReadCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
+    if (storage_.readCounter != nullptr &&
+        (readStatus = PdhGetFormattedCounterValue(storage_.readCounter, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
         snapshot_.storage.readMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
     } else if (!initializeOnly) {
         snapshot_.storage.readMbps = 0.0;
     }
 
-    if (storageWriteCounter_ != nullptr &&
-        (writeStatus = PdhGetFormattedCounterValue(storageWriteCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
+    if (storage_.writeCounter != nullptr &&
+        (writeStatus = PdhGetFormattedCounterValue(storage_.writeCounter, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
         snapshot_.storage.writeMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
     } else if (!initializeOnly) {
         snapshot_.storage.writeMbps = 0.0;
@@ -156,19 +156,19 @@ void TelemetryCollector::Impl::RefreshDriveUsage() {
         drive.usedPercent = std::clamp((1.0 - (freeGb / totalGb)) * 100.0, 0.0, 100.0);
         drive.readMbps = 0.0;
         drive.writeMbps = 0.0;
-        const auto counterIt = std::find_if(driveCounters_.begin(), driveCounters_.end(), [&](const DriveCounterState& counters) {
+        const auto counterIt = std::find_if(storage_.driveCounters.begin(), storage_.driveCounters.end(), [&](const DriveCounterState& counters) {
             return counters.label == drive.label;
         });
         PDH_STATUS readStatus = PDH_CSTATUS_NO_OBJECT;
         PDH_STATUS writeStatus = PDH_CSTATUS_NO_OBJECT;
         PDH_FMT_COUNTERVALUE value{};
-        if (counterIt != driveCounters_.end() && counterIt->readCounter != nullptr) {
+        if (counterIt != storage_.driveCounters.end() && counterIt->readCounter != nullptr) {
             readStatus = PdhGetFormattedCounterValue(counterIt->readCounter, PDH_FMT_DOUBLE, nullptr, &value);
             if (readStatus == ERROR_SUCCESS) {
                 drive.readMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
             }
         }
-        if (counterIt != driveCounters_.end() && counterIt->writeCounter != nullptr) {
+        if (counterIt != storage_.driveCounters.end() && counterIt->writeCounter != nullptr) {
             writeStatus = PdhGetFormattedCounterValue(counterIt->writeCounter, PDH_FMT_DOUBLE, nullptr, &value);
             if (writeStatus == ERROR_SUCCESS) {
                 drive.writeMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));

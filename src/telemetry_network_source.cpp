@@ -225,13 +225,13 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         }
     }
 
-    networkAdapterCandidates_.clear();
-    networkAdapterCandidates_.reserve(candidates.size());
+    network_.adapterCandidates.clear();
+    network_.adapterCandidates.reserve(candidates.size());
     for (auto& candidate : candidates) {
         if (selected != nullptr && candidate.interfaceIndex == selected->InterfaceIndex) {
             candidate.candidate.selected = true;
         }
-        networkAdapterCandidates_.push_back(std::move(candidate.candidate));
+        network_.adapterCandidates.push_back(std::move(candidate.candidate));
     }
 
     if (selected != nullptr) {
@@ -243,18 +243,18 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
             " ip=" + selectedInfo.ipAddress).c_str());
         snapshot_.network.adapterName = Utf8FromWide(
             selected->Alias[0] != L'\0' ? std::wstring_view(selected->Alias) : std::wstring_view(selected->Description));
-        if (selectedIndex_ != selected->InterfaceIndex) {
-            selectedIndex_ = selected->InterfaceIndex;
-            previousInOctets_ = selected->InOctets;
-            previousOutOctets_ = selected->OutOctets;
-            previousNetworkTick_ = now;
+        if (network_.selectedIndex != selected->InterfaceIndex) {
+            network_.selectedIndex = selected->InterfaceIndex;
+            network_.previousInOctets = selected->InOctets;
+            network_.previousOutOctets = selected->OutOctets;
+            network_.previousTick = now;
         } else if (!initializeOnly) {
-            const double seconds = std::chrono::duration<double>(now - previousNetworkTick_).count();
+            const double seconds = std::chrono::duration<double>(now - network_.previousTick).count();
             if (seconds > 0.0) {
                 snapshot_.network.downloadMbps =
-                    ((selected->InOctets - previousInOctets_) / seconds) / (1024.0 * 1024.0);
+                    ((selected->InOctets - network_.previousInOctets) / seconds) / (1024.0 * 1024.0);
                 snapshot_.network.uploadMbps =
-                    ((selected->OutOctets - previousOutOctets_) / seconds) / (1024.0 * 1024.0);
+                    ((selected->OutOctets - network_.previousOutOctets) / seconds) / (1024.0 * 1024.0);
                 retainedHistoryStore_.PushSample(snapshot_, "network.upload", snapshot_.network.uploadMbps);
                 retainedHistoryStore_.PushSample(snapshot_, "network.download", snapshot_.network.downloadMbps);
                 Trace(("telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
@@ -262,9 +262,9 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
                     " upload_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.network.uploadMbps, 3) +
                     " download_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.network.downloadMbps, 3)).c_str());
             }
-            previousInOctets_ = selected->InOctets;
-            previousOutOctets_ = selected->OutOctets;
-            previousNetworkTick_ = now;
+            network_.previousInOctets = selected->InOctets;
+            network_.previousOutOctets = selected->OutOctets;
+            network_.previousTick = now;
         }
 
         snapshot_.network.ipAddress = selectedInfo.ipAddress;

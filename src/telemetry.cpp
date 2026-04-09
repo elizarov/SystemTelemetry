@@ -36,8 +36,8 @@ TelemetryCollector::Impl::~Impl() {
     if (gpuMemoryQuery_ != nullptr) {
         PdhCloseQuery(gpuMemoryQuery_);
     }
-    if (storageQuery_ != nullptr) {
-        PdhCloseQuery(storageQuery_);
+    if (storage_.query != nullptr) {
+        PdhCloseQuery(storage_.query);
     }
     WSACleanup();
 }
@@ -142,17 +142,17 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     const PDH_STATUS gpuMemoryCollectStatus = PdhCollectQueryData(impl_->gpuMemoryQuery_);
     impl_->trace_.Write(("telemetry:pdh_collect gpu_memory_query " + tracing::Trace::FormatPdhStatus("status", gpuMemoryCollectStatus)).c_str());
 
-    const PDH_STATUS storageQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->storageQuery_);
+    const PDH_STATUS storageQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->storage_.query);
     impl_->trace_.Write(("telemetry:pdh_open storage_query " + tracing::Trace::FormatPdhStatus("status", storageQueryStatus)).c_str());
     const PDH_STATUS storageReadStatus = AddCounterCompat(
-        impl_->storageQuery_, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &impl_->storageReadCounter_);
+        impl_->storage_.query, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &impl_->storage_.readCounter);
     impl_->trace_.Write(("telemetry:pdh_add storage_read path=\"\\\\PhysicalDisk(_Total)\\\\Disk Read Bytes/sec\" " +
         tracing::Trace::FormatPdhStatus("status", storageReadStatus)).c_str());
     const PDH_STATUS storageWriteStatus = AddCounterCompat(
-        impl_->storageQuery_, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &impl_->storageWriteCounter_);
+        impl_->storage_.query, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &impl_->storage_.writeCounter);
     impl_->trace_.Write(("telemetry:pdh_add storage_write path=\"\\\\PhysicalDisk(_Total)\\\\Disk Write Bytes/sec\" " +
         tracing::Trace::FormatPdhStatus("status", storageWriteStatus)).c_str());
-    const PDH_STATUS storageCollectStatus = PdhCollectQueryData(impl_->storageQuery_);
+    const PDH_STATUS storageCollectStatus = PdhCollectQueryData(impl_->storage_.query);
     impl_->trace_.Write(("telemetry:pdh_collect storage_query " + tracing::Trace::FormatPdhStatus("status", storageCollectStatus)).c_str());
 
     impl_->RefreshStorageDriveCandidates();
@@ -202,11 +202,11 @@ AppConfig TelemetryCollector::EffectiveConfig() const {
 }
 
 const std::vector<NetworkAdapterCandidate>& TelemetryCollector::NetworkAdapterCandidates() const {
-    return impl_->networkAdapterCandidates_;
+    return impl_->network_.adapterCandidates;
 }
 
 const std::vector<StorageDriveCandidate>& TelemetryCollector::StorageDriveCandidates() const {
-    return impl_->storageDriveCandidates_;
+    return impl_->storage_.driveCandidates;
 }
 
 void TelemetryCollector::SetPreferredNetworkAdapterName(std::string adapterName) {

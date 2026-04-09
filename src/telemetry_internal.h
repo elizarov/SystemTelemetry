@@ -30,6 +30,22 @@ struct DriveCounterState {
 };
 
 struct TelemetryCollector::Impl {
+    struct StorageState {
+        std::vector<StorageDriveCandidate> driveCandidates;
+        PDH_HQUERY query = nullptr;
+        PDH_HCOUNTER readCounter = nullptr;
+        PDH_HCOUNTER writeCounter = nullptr;
+        std::vector<DriveCounterState> driveCounters;
+    };
+
+    struct NetworkState {
+        std::vector<NetworkAdapterCandidate> adapterCandidates;
+        ULONG selectedIndex = 0;
+        uint64_t previousInOctets = 0;
+        uint64_t previousOutOctets = 0;
+        std::chrono::steady_clock::time_point previousTick{};
+    };
+
     ~Impl();
 
     void UpdateCpu();
@@ -49,8 +65,8 @@ struct TelemetryCollector::Impl {
 
     AppConfig config_;
     SystemSnapshot snapshot_;
-    std::vector<NetworkAdapterCandidate> networkAdapterCandidates_;
-    std::vector<StorageDriveCandidate> storageDriveCandidates_;
+    StorageState storage_;
+    NetworkState network_;
     RetainedHistoryStore retainedHistoryStore_;
     tracing::Trace trace_;
     std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
@@ -70,13 +86,4 @@ struct TelemetryCollector::Impl {
     PDH_HCOUNTER gpuLoadCounter_ = nullptr;
     PDH_HQUERY gpuMemoryQuery_ = nullptr;
     PDH_HCOUNTER gpuDedicatedCounter_ = nullptr;
-    PDH_HQUERY storageQuery_ = nullptr;
-    PDH_HCOUNTER storageReadCounter_ = nullptr;
-    PDH_HCOUNTER storageWriteCounter_ = nullptr;
-    std::vector<DriveCounterState> driveCounters_;
-
-    ULONG selectedIndex_ = 0;
-    uint64_t previousInOctets_ = 0;
-    uint64_t previousOutOctets_ = 0;
-    std::chrono::steady_clock::time_point previousNetworkTick_{};
 };
