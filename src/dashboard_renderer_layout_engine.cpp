@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <limits>
 
 namespace {
 
@@ -289,6 +290,7 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
         const int activityWidth = (std::max)(1, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.activityWidth));
         const int rwGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.rwGap));
         const int barGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.barGap));
+        const int activitySegmentGap = (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.activitySegmentGap));
         const int freeWidth = (std::max)(1, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.freeWidth));
         const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
         const int totalRows = static_cast<int>(renderer.config_.storage.drives.size());
@@ -347,17 +349,20 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
             guide.dragDirection = dragDirection;
             renderer.widgetEditGuides_.push_back(std::move(guide));
         };
-        const auto addHorizontalGuide = [&](int guideId, int y, DashboardRenderer::WidgetEditParameter parameter, int value, int dragDirection) {
+        const auto addHorizontalGuide = [&](int guideId, int y, DashboardRenderer::WidgetEditParameter parameter, int value, int dragDirection,
+            int left = std::numeric_limits<int>::min(), int right = std::numeric_limits<int>::max()) {
             const int clampedY = std::clamp(y, static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
+            const int guideLeft = std::clamp(left, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
+            const int guideRight = std::clamp(right, guideLeft, static_cast<int>(widget.rect.right));
             DashboardRenderer::WidgetEditGuide guide;
             guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
             guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
             guide.parameter = parameter;
             guide.guideId = guideId;
             guide.widgetRect = widget.rect;
-            guide.drawStart = POINT{widget.rect.left, clampedY};
-            guide.drawEnd = POINT{widget.rect.right, clampedY};
-            guide.hitRect = RECT{widget.rect.left, clampedY - hitInset, widget.rect.right, clampedY + hitInset + 1};
+            guide.drawStart = POINT{guideLeft, clampedY};
+            guide.drawEnd = POINT{guideRight, clampedY};
+            guide.hitRect = RECT{guideLeft, clampedY - hitInset, guideRight, clampedY + hitInset + 1};
             guide.value = value;
             guide.dragDirection = dragDirection;
             renderer.widgetEditGuides_.push_back(std::move(guide));
@@ -377,9 +382,26 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
             renderer.config_.layout.driveUsageList.freeWidth, -1);
         addHorizontalGuide(6, widget.rect.top + headerHeight, DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap,
             renderer.config_.layout.driveUsageList.headerGap, 1);
+        if (visibleRows > 0 && renderer.config_.layout.driveUsageList.activitySegments > 1) {
+            const int rowPixelHeight = rowHeight;
+            const int rowContentHeight = (std::max)(renderer.fontHeights_.label,
+                (std::max)(renderer.fontHeights_.smallText, renderer.ScaleLogical(renderer.config_.layout.driveUsageList.barHeight)));
+            const int contentTop = widget.rect.top + headerHeight + (std::max)(0, (rowPixelHeight - rowContentHeight) / 2);
+            const RECT activityBandRect{readRect.left, contentTop, writeRect.right, contentTop + rowContentHeight};
+            const int segmentCount = (std::max)(1, renderer.config_.layout.driveUsageList.activitySegments);
+            const int totalGap = activitySegmentGap * (segmentCount - 1);
+            const int availableHeight = (std::max)(segmentCount, rowContentHeight - totalGap);
+            const int baseSegmentHeight = (std::max)(1, availableHeight / segmentCount);
+            const int remainder = (std::max)(0, availableHeight - (baseSegmentHeight * segmentCount));
+            const int bottomSegmentHeight = baseSegmentHeight + (remainder > 0 ? 1 : 0);
+            const int bottomVisualHeight = (std::min)(bottomSegmentHeight, (std::max)(2, activityWidth / 2));
+            const int bottomSegmentTop = activityBandRect.bottom - bottomSegmentHeight + (std::max)(0, (bottomSegmentHeight - bottomVisualHeight) / 2);
+            addHorizontalGuide(7, bottomSegmentTop, DashboardRenderer::WidgetEditParameter::DriveUsageActivitySegmentGap,
+                renderer.config_.layout.driveUsageList.activitySegmentGap, 1, activityBandRect.left, activityBandRect.right);
+        }
         for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {
             const int y = widget.rect.top + headerHeight + ((rowIndex + 1) * rowHeight);
-            addHorizontalGuide(7 + rowIndex, y, DashboardRenderer::WidgetEditParameter::DriveUsageRowGap,
+            addHorizontalGuide(8 + rowIndex, y, DashboardRenderer::WidgetEditParameter::DriveUsageRowGap,
                 renderer.config_.layout.driveUsageList.rowGap, 1);
         }
     };

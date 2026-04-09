@@ -22,6 +22,7 @@ public:
             DriveUsagePercentGap,
             DriveUsageActivityWidth,
             DriveUsageFreeWidth,
+            DriveUsageActivitySegmentGap,
             DriveUsageHeaderGap,
             DriveUsageRowGap,
             DriveUsageActivitySegments,

@@ -115,6 +115,9 @@ LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForWidgetGuide(const Da
     case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
         target.field = Field::DriveUsageFreeWidth;
         break;
+    case DashboardRenderer::WidgetEditParameter::DriveUsageActivitySegmentGap:
+        target.field = Field::DriveUsageActivitySegmentGap;
+        break;
     case DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap:
         target.field = Field::DriveUsageHeaderGap;
         break;

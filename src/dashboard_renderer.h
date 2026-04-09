@@ -103,6 +103,7 @@ public:
         DriveUsagePercentGap,
         DriveUsageActivityWidth,
         DriveUsageFreeWidth,
+        DriveUsageActivitySegmentGap,
         DriveUsageHeaderGap,
         DriveUsageRowGap,
         ThroughputAxisPadding,

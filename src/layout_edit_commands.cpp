@@ -60,6 +60,9 @@ bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, do
     case Field::DriveUsageFreeWidth:
         ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::freeWidth, config, value);
         return true;
+    case Field::DriveUsageActivitySegmentGap:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::activitySegmentGap, config, value);
+        return true;
     case Field::DriveUsageHeaderGap:
         ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::headerGap, config, value);
         return true;

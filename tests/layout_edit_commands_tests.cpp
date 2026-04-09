@@ -82,9 +82,14 @@ TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
         config,
         MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsagePercentGap),
         9.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config,
+        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageActivitySegmentGap),
+        3.2));
 
     EXPECT_EQ(config.layout.driveUsageList.labelGap, 13);
     EXPECT_EQ(config.layout.driveUsageList.barGap, 11);
     EXPECT_EQ(config.layout.driveUsageList.rwGap, 8);
     EXPECT_EQ(config.layout.driveUsageList.percentGap, 9);
+    EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 3);
 }
