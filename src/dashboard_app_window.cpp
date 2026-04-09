@@ -317,80 +317,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_LBUTTONDOWN:
         if (isEditingLayout_) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            if (hoveredEditableGaugeAnchor_.has_value()) {
-                const auto region = renderer_.FindEditableGaugeRegion(*hoveredEditableGaugeAnchor_);
-                if (region.has_value()) {
-                    activeGaugeEditDrag_ = GaugeEditDragState{
-                        region->key,
-                        region->value,
-                        clientPoint.x};
-                    hoveredEditableWidget_ = region->key.widget;
-                    renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-                    renderer_.SetHoveredEditableGauge(hoveredEditableGaugeAnchor_);
-                    renderer_.SetActiveEditableGauge(region->key);
-                    SetCapture(hwnd_);
-                    return 0;
-                }
-            }
-            if (hoveredEditableBarAnchor_.has_value()) {
-                const auto region = renderer_.FindEditableBarRegion(*hoveredEditableBarAnchor_);
-                if (region.has_value()) {
-                    activeBarEditDrag_ = BarEditDragState{
-                        region->key,
-                        region->value,
-                        clientPoint.y};
-                    hoveredEditableBar_ = region->key;
-                    hoveredEditableWidget_ = region->key.widget;
-                    renderer_.SetHoveredEditableBar(hoveredEditableBar_);
-                    renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-                    renderer_.SetActiveEditableBar(region->key);
-                    SetCapture(hwnd_);
-                    return 0;
-                }
-            }
-            if (hoveredEditableTextAnchor_.has_value()) {
-                const auto region = renderer_.FindEditableTextRegion(*hoveredEditableTextAnchor_);
-                if (region.has_value()) {
-                    activeTextEditDrag_ = TextEditDragState{
-                        region->key,
-                        region->fontSize,
-                        clientPoint.x};
-                    hoveredEditableText_ = region->key;
-                    hoveredEditableWidget_ = region->key.widget;
-                    renderer_.SetHoveredEditableText(hoveredEditableText_);
-                    renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-                    renderer_.SetActiveEditableText(region->key);
-                    SetCapture(hwnd_);
-                    return 0;
-                }
-            }
-            size_t widgetGuideIndex = 0;
-            const DashboardRenderer::WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
-            if (widgetGuide != nullptr) {
-                activeWidgetEditDrag_ = WidgetEditDragState{
-                    *widgetGuide,
-                    widgetGuide->value,
-                    widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y};
-                renderer_.SetActiveWidgetEditGuide(std::optional<DashboardRenderer::WidgetEditGuide>(activeWidgetEditDrag_->guide));
-                hoveredEditableWidget_ = widgetGuide->widget;
-                hoveredWidgetEditGuideIndex_ = widgetGuideIndex;
-                renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-                SetCapture(hwnd_);
-                return 0;
-            }
-            size_t guideIndex = 0;
-            const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
-            if (guide != nullptr) {
-                const LayoutNodeConfig* guideNode = FindGuideNode(config_, *guide);
-                const std::vector<int> initialWeights = SeedLayoutGuideWeights(*guide, guideNode);
-                activeLayoutDrag_ = LayoutDragState{
-                    *guide,
-                    initialWeights,
-                    renderer_.CollectLayoutGuideSnapCandidates(*guide),
-                    guide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y};
-                renderer_.SetActiveLayoutEditGuide(std::optional<DashboardRenderer::LayoutEditGuide>(activeLayoutDrag_->guide));
-                hoveredLayoutGuideIndex_ = guideIndex;
-                SetCapture(hwnd_);
+            if (layoutEditController_.HandleLButtonDown(hwnd_, clientPoint)) {
                 return 0;
             }
         }
@@ -398,62 +325,16 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_MOUSEMOVE:
         if (isEditingLayout_) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            if (activeLayoutDrag_.has_value()) {
-                UpdateLayoutDrag(clientPoint);
-            } else if (activeGaugeEditDrag_.has_value()) {
-                UpdateGaugeEditDrag(clientPoint);
-            } else if (activeBarEditDrag_.has_value()) {
-                UpdateBarEditDrag(clientPoint);
-            } else if (activeTextEditDrag_.has_value()) {
-                UpdateTextEditDrag(clientPoint);
-            } else if (activeWidgetEditDrag_.has_value()) {
-                UpdateWidgetEditDrag(clientPoint);
-            } else {
-                RefreshLayoutEditHover(clientPoint);
-            }
+            layoutEditController_.HandleMouseMove(hwnd_, clientPoint);
             return 0;
         }
         break;
     case WM_LBUTTONUP:
-        if (activeGaugeEditDrag_.has_value()) {
-            activeGaugeEditDrag_.reset();
-            renderer_.SetActiveEditableGauge(std::nullopt);
-            ReleaseCapture();
+        if (isEditingLayout_) {
             POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            RefreshLayoutEditHover(clientPoint);
-            return 0;
-        }
-        if (activeBarEditDrag_.has_value()) {
-            activeBarEditDrag_.reset();
-            renderer_.SetActiveEditableBar(std::nullopt);
-            ReleaseCapture();
-            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            RefreshLayoutEditHover(clientPoint);
-            return 0;
-        }
-        if (activeTextEditDrag_.has_value()) {
-            activeTextEditDrag_.reset();
-            renderer_.SetActiveEditableText(std::nullopt);
-            ReleaseCapture();
-            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            RefreshLayoutEditHover(clientPoint);
-            return 0;
-        }
-        if (activeWidgetEditDrag_.has_value()) {
-            activeWidgetEditDrag_.reset();
-            renderer_.SetActiveWidgetEditGuide(std::nullopt);
-            ReleaseCapture();
-            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            RefreshLayoutEditHover(clientPoint);
-            return 0;
-        }
-        if (activeLayoutDrag_.has_value()) {
-            activeLayoutDrag_.reset();
-            renderer_.SetActiveLayoutEditGuide(std::nullopt);
-            ReleaseCapture();
-            POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-            RefreshLayoutEditHover(clientPoint);
-            return 0;
+            if (layoutEditController_.HandleLButtonUp(hwnd_, clientPoint)) {
+                return 0;
+            }
         }
         if (isMoving_) {
             StopMoveMode();
@@ -473,60 +354,13 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         }
         break;
     case WM_CAPTURECHANGED:
-        if (activeGaugeEditDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
-            activeGaugeEditDrag_.reset();
-            renderer_.SetActiveEditableGauge(std::nullopt);
-            InvalidateRect(hwnd_, nullptr, FALSE);
-            return 0;
-        }
-        if (activeBarEditDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
-            activeBarEditDrag_.reset();
-            renderer_.SetActiveEditableBar(std::nullopt);
-            InvalidateRect(hwnd_, nullptr, FALSE);
-            return 0;
-        }
-        if (activeTextEditDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
-            activeTextEditDrag_.reset();
-            renderer_.SetActiveEditableText(std::nullopt);
-            InvalidateRect(hwnd_, nullptr, FALSE);
-            return 0;
-        }
-        if (activeWidgetEditDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
-            activeWidgetEditDrag_.reset();
-            renderer_.SetActiveWidgetEditGuide(std::nullopt);
-            InvalidateRect(hwnd_, nullptr, FALSE);
-            return 0;
-        }
-        if (activeLayoutDrag_.has_value() && reinterpret_cast<HWND>(lParam) != hwnd_) {
-            activeLayoutDrag_.reset();
-            renderer_.SetActiveLayoutEditGuide(std::nullopt);
-            InvalidateRect(hwnd_, nullptr, FALSE);
+        if (isEditingLayout_ && layoutEditController_.HandleCaptureChanged(hwnd_, reinterpret_cast<HWND>(lParam))) {
             return 0;
         }
         break;
     case WM_SETCURSOR:
         if (LOWORD(lParam) == HTCLIENT && isEditingLayout_) {
-            if (activeGaugeEditDrag_.has_value()) {
-                SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
-            } else if (activeBarEditDrag_.has_value()) {
-                SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
-            } else if (activeTextEditDrag_.has_value()) {
-                SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
-            } else if (activeWidgetEditDrag_.has_value()) {
-                const auto& guide = activeWidgetEditDrag_->guide;
-                SetCursor(LoadCursorW(nullptr,
-                    guide.angularDrag ? IDC_CROSS
-                    : guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
-            } else if (activeLayoutDrag_.has_value()) {
-                const auto& guide = activeLayoutDrag_->guide;
-                SetCursor(LoadCursorW(nullptr,
-                    guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
-            } else {
-                POINT cursor{};
-                GetCursorPos(&cursor);
-                ScreenToClient(hwnd_, &cursor);
-                RefreshLayoutEditHover(cursor);
-            }
+            layoutEditController_.HandleSetCursor(hwnd_);
             return TRUE;
         }
         break;

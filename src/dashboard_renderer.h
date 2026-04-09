@@ -169,6 +169,9 @@ public:
     void SetConfig(const AppConfig& config);
     void SetRenderScale(double scale);
     void SetRenderMode(RenderMode mode);
+    void BeginLayoutEditSession();
+    void EndLayoutEditSession(bool showLayoutEditGuides);
+    bool SetLayoutEditPreviewWidgetType(const std::string& widgetTypeName);
     void SetShowLayoutEditGuides(bool show);
     void SetActiveLayoutEditGuide(const std::optional<LayoutEditGuide>& guide);
     void SetHoveredEditableWidget(const std::optional<LayoutWidgetIdentity>& widget);
@@ -207,7 +210,6 @@ public:
     std::optional<EditableBarRegion> FindEditableBarRegion(const EditableBarKey& key) const;
     std::optional<EditableGaugeKey> HitTestEditableGaugeAnchor(POINT clientPoint) const;
     std::optional<EditableGaugeRegion> FindEditableGaugeRegion(const EditableGaugeKey& key) const;
-    std::optional<LayoutWidgetIdentity> FindFirstEditableWidgetByTypeName(const std::string& widgetTypeName) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -347,6 +349,8 @@ private:
     void AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget);
     void AddThroughputWidgetEditGuide(const ResolvedWidgetLayout& widget);
     void AddGaugeWidgetEditGuide(const ResolvedWidgetLayout& widget);
+    void ClearLayoutEditInteractionState();
+    std::optional<LayoutWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();

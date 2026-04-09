@@ -1,0 +1,118 @@
+#pragma once
+
+#include <optional>
+#include <vector>
+
+#include <windows.h>
+
+#include "config.h"
+#include "dashboard_renderer.h"
+
+class LayoutEditHost {
+public:
+    virtual ~LayoutEditHost() = default;
+
+    struct ValueTarget {
+        enum class Kind {
+            WidgetGuide,
+            EditableText,
+            EditableBar,
+            EditableGauge,
+        };
+
+        Kind kind = Kind::WidgetGuide;
+        DashboardRenderer::WidgetEditGuide widgetGuide;
+        DashboardRenderer::EditableTextKey textKey;
+        DashboardRenderer::EditableBarKey barKey;
+        DashboardRenderer::EditableGaugeKey gaugeKey;
+
+        static ValueTarget ForWidgetGuide(const DashboardRenderer::WidgetEditGuide& guide);
+        static ValueTarget ForEditableText(const DashboardRenderer::EditableTextKey& key);
+        static ValueTarget ForEditableBar(const DashboardRenderer::EditableBarKey& key);
+        static ValueTarget ForEditableGauge(const DashboardRenderer::EditableGaugeKey& key);
+    };
+
+    virtual const AppConfig& LayoutEditConfig() const = 0;
+    virtual DashboardRenderer& LayoutEditRenderer() = 0;
+    virtual bool ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights) = 0;
+    virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
+        const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget,
+        DashboardRenderer::LayoutGuideAxis axis) = 0;
+    virtual bool ApplyLayoutEditValue(const ValueTarget& target, double value) = 0;
+    virtual void InvalidateLayoutEdit() = 0;
+};
+
+class LayoutEditController {
+public:
+    explicit LayoutEditController(LayoutEditHost& host);
+
+    void StartSession();
+    void StopSession(HWND hwnd, bool showLayoutEditGuidesAfterStop);
+
+    bool HandleLButtonDown(HWND hwnd, POINT clientPoint);
+    bool HandleMouseMove(HWND hwnd, POINT clientPoint);
+    bool HandleLButtonUp(HWND hwnd, POINT clientPoint);
+    bool HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner);
+    bool HandleSetCursor(HWND hwnd);
+
+private:
+    struct LayoutDragState {
+        DashboardRenderer::LayoutEditGuide guide;
+        std::vector<int> initialWeights;
+        std::vector<DashboardRenderer::LayoutGuideSnapCandidate> snapCandidates;
+        int dragStartCoordinate = 0;
+    };
+
+    struct WidgetEditDragState {
+        DashboardRenderer::WidgetEditGuide guide;
+        double initialValue = 0.0;
+        int dragStartCoordinate = 0;
+    };
+
+    struct TextEditDragState {
+        DashboardRenderer::EditableTextKey key;
+        int initialValue = 0;
+        int dragStartCoordinate = 0;
+    };
+
+    struct BarEditDragState {
+        DashboardRenderer::EditableBarKey key;
+        int initialValue = 0;
+        int dragStartCoordinate = 0;
+    };
+
+    struct GaugeEditDragState {
+        DashboardRenderer::EditableGaugeKey key;
+        int initialValue = 0;
+        int dragStartCoordinate = 0;
+    };
+
+    const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
+    const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(POINT clientPoint, size_t* index = nullptr) const;
+    void RefreshHover(HWND hwnd, POINT clientPoint);
+    bool UpdateLayoutDrag(HWND hwnd, POINT clientPoint);
+    bool UpdateWidgetEditDrag(POINT clientPoint);
+    bool UpdateTextEditDrag(POINT clientPoint);
+    bool UpdateBarEditDrag(POINT clientPoint);
+    bool UpdateGaugeEditDrag(POINT clientPoint);
+    void SyncRendererInteractionState();
+    void ClearInteractionState();
+    void SetCursorForPoint(HWND hwnd, POINT clientPoint);
+    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag,
+        const std::vector<int>& freeWeights);
+
+    LayoutEditHost& host_;
+    std::optional<size_t> hoveredLayoutGuideIndex_;
+    std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget_;
+    std::optional<size_t> hoveredWidgetEditGuideIndex_;
+    std::optional<DashboardRenderer::EditableTextKey> hoveredEditableText_;
+    std::optional<DashboardRenderer::EditableTextKey> hoveredEditableTextAnchor_;
+    std::optional<DashboardRenderer::EditableBarKey> hoveredEditableBar_;
+    std::optional<DashboardRenderer::EditableBarKey> hoveredEditableBarAnchor_;
+    std::optional<DashboardRenderer::EditableGaugeKey> hoveredEditableGaugeAnchor_;
+    std::optional<LayoutDragState> activeLayoutDrag_;
+    std::optional<WidgetEditDragState> activeWidgetEditDrag_;
+    std::optional<TextEditDragState> activeTextEditDrag_;
+    std::optional<BarEditDragState> activeBarEditDrag_;
+    std::optional<GaugeEditDragState> activeGaugeEditDrag_;
+};

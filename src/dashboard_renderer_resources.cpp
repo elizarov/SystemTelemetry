@@ -443,6 +443,25 @@ void DashboardRenderer::SetRenderMode(RenderMode mode) {
     renderMode_ = mode;
 }
 
+void DashboardRenderer::BeginLayoutEditSession() {
+    showLayoutEditGuides_ = true;
+    ClearLayoutEditInteractionState();
+}
+
+void DashboardRenderer::EndLayoutEditSession(bool showLayoutEditGuides) {
+    showLayoutEditGuides_ = showLayoutEditGuides;
+    ClearLayoutEditInteractionState();
+}
+
+bool DashboardRenderer::SetLayoutEditPreviewWidgetType(const std::string& widgetTypeName) {
+    const auto widget = FindFirstLayoutEditPreviewWidget(widgetTypeName);
+    if (!widget.has_value()) {
+        return false;
+    }
+    hoveredEditableWidget_ = widget;
+    return true;
+}
+
 void DashboardRenderer::SetShowLayoutEditGuides(bool show) {
     showLayoutEditGuides_ = show;
 }
@@ -707,7 +726,19 @@ std::optional<DashboardRenderer::EditableGaugeRegion> DashboardRenderer::FindEdi
     return *it;
 }
 
-std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstEditableWidgetByTypeName(
+void DashboardRenderer::ClearLayoutEditInteractionState() {
+    activeLayoutEditGuide_.reset();
+    hoveredEditableWidget_.reset();
+    activeWidgetEditGuide_.reset();
+    hoveredEditableText_.reset();
+    activeEditableText_.reset();
+    hoveredEditableBar_.reset();
+    activeEditableBar_.reset();
+    hoveredEditableGauge_.reset();
+    activeEditableGauge_.reset();
+}
+
+std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
     const std::string& widgetTypeName) const {
     const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
     auto matchesType = [&](WidgetKind kind) {

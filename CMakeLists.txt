@@ -60,6 +60,7 @@ add_executable(SystemTelemetry WIN32
     src/app_platform.cpp
     src/dashboard_app.cpp
     src/dashboard_app_window.cpp
+    src/layout_edit_controller.cpp
     src/config.cpp
     src/layout_snap_solver.cpp
     src/telemetry.cpp

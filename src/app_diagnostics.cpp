@@ -440,14 +440,12 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnap
         return false;
     }
     if (!editLayoutWidgetName.empty()) {
-        const auto widget = renderer.FindFirstEditableWidgetByTypeName(editLayoutWidgetName);
-        if (!widget.has_value()) {
+        if (!renderer.SetLayoutEditPreviewWidgetType(editLayoutWidgetName)) {
             if (errorText != nullptr) {
                 *errorText = "renderer:edit_layout_widget_not_found name=\"" + editLayoutWidgetName + "\"";
             }
             return false;
         }
-        renderer.SetHoveredEditableWidget(widget);
         WriteOptionalTrace(traceStream, "diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
     }
     const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot);

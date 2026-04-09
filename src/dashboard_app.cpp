@@ -3,103 +3,8 @@
 #include <cmath>
 #include <cstdio>
 
-namespace {
-
-bool WidgetIdentityEquals(const DashboardRenderer::LayoutWidgetIdentity& left,
-    const DashboardRenderer::LayoutWidgetIdentity& right) {
-    return left.renderCardId == right.renderCardId &&
-        left.editCardId == right.editCardId &&
-        left.nodePath == right.nodePath;
-}
-
-bool EditableTextKeyEquals(const DashboardRenderer::EditableTextKey& left,
-    const DashboardRenderer::EditableTextKey& right) {
-    return WidgetIdentityEquals(left.widget, right.widget) &&
-        left.fontRole == right.fontRole &&
-        left.textId == right.textId;
-}
-
-bool EditableBarKeyEquals(const DashboardRenderer::EditableBarKey& left,
-    const DashboardRenderer::EditableBarKey& right) {
-    return WidgetIdentityEquals(left.widget, right.widget) &&
-        left.parameter == right.parameter &&
-        left.barId == right.barId;
-}
-
-bool EditableGaugeKeyEquals(const DashboardRenderer::EditableGaugeKey& left,
-    const DashboardRenderer::EditableGaugeKey& right) {
-    return WidgetIdentityEquals(left.widget, right.widget) &&
-        left.parameter == right.parameter &&
-        left.anchorId == right.anchorId;
-}
-
-double NormalizeDegrees(double degrees) {
-    double normalized = std::fmod(degrees, 360.0);
-    if (normalized < 0.0) {
-        normalized += 360.0;
-    }
-    return normalized;
-}
-
-std::optional<double> ComputeGaugeSweepDegrees(POINT origin, POINT clientPoint) {
-    const double dx = static_cast<double>(clientPoint.x - origin.x);
-    const double dy = static_cast<double>(clientPoint.y - origin.y);
-    if (std::abs(dx) < 0.001 && std::abs(dy) < 0.001) {
-        return std::nullopt;
-    }
-
-    double endAngle = NormalizeDegrees(std::atan2(dy, dx) * 180.0 / 3.14159265358979323846);
-    if (endAngle > 90.0 && endAngle < 270.0) {
-        endAngle = NormalizeDegrees(540.0 - endAngle);
-    }
-
-    const double gapHalf = NormalizeDegrees(90.0 - endAngle);
-    return std::clamp(360.0 - (gapHalf * 2.0), 0.0, 360.0);
-}
-
-std::optional<double> ComputeGaugePointerAngle(POINT origin, POINT clientPoint) {
-    const double dx = static_cast<double>(clientPoint.x - origin.x);
-    const double dy = static_cast<double>(clientPoint.y - origin.y);
-    if (std::abs(dx) < 0.001 && std::abs(dy) < 0.001) {
-        return std::nullopt;
-    }
-    return NormalizeDegrees(std::atan2(dy, dx) * 180.0 / 3.14159265358979323846);
-}
-
-double ClampAngleToRange(double angleDegrees, double angularMin, double angularMax) {
-    double best = std::clamp(angleDegrees, angularMin, angularMax);
-    double bestDistance = std::abs(best - angleDegrees);
-    for (double candidate : {angleDegrees - 360.0, angleDegrees + 360.0}) {
-        const double clamped = std::clamp(candidate, angularMin, angularMax);
-        const double distance = std::abs(clamped - candidate);
-        if (distance < bestDistance) {
-            best = clamped;
-            bestDistance = distance;
-        }
-    }
-    return best;
-}
-
-std::optional<double> ComputeGaugeSegmentGapDegrees(const DashboardRenderer::WidgetEditGuide& guide, POINT clientPoint) {
-    const auto pointerAngle = ComputeGaugePointerAngle(guide.dragOrigin, clientPoint);
-    if (!pointerAngle.has_value()) {
-        return std::nullopt;
-    }
-    if (guide.guideId <= 0) {
-        return 0.0;
-    }
-    const double clampedAngle = ClampAngleToRange(*pointerAngle, guide.angularMin, guide.angularMax);
-    const double maxSegmentSweep = std::max(0.0, guide.angularMax - guide.angularMin);
-    const double segmentSweep = std::clamp(clampedAngle - guide.angularMin, 0.0, maxSegmentSweep);
-    const double segmentCount = static_cast<double>(guide.guideId + 1);
-    const double segmentGap = (maxSegmentSweep - segmentSweep) * segmentCount / (segmentCount - 1.0);
-    const double maxSegmentGap = maxSegmentSweep * segmentCount / (segmentCount - 1.0);
-    return std::clamp(segmentGap, 0.0, maxSegmentGap);
-}
-
-}
-
-DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions) : diagnosticsOptions_(diagnosticsOptions) {}
+DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
+    : diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this) {}
 
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
     config_ = config;
@@ -121,6 +26,18 @@ UINT DashboardApp::CurrentWindowDpi() const {
 
 bool DashboardApp::IsLayoutEditMode() const {
     return isEditingLayout_;
+}
+
+const AppConfig& DashboardApp::LayoutEditConfig() const {
+    return config_;
+}
+
+DashboardRenderer& DashboardApp::LayoutEditRenderer() {
+    return renderer_;
+}
+
+void DashboardApp::InvalidateLayoutEdit() {
+    InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 int DashboardApp::WindowWidth() const {
@@ -163,7 +80,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     }
     if (diagnosticsOptions_.editLayout) {
         isEditingLayout_ = true;
-        renderer_.SetShowLayoutEditGuides(true);
+        layoutEditController_.StartSession();
     }
 
     ApplyConfiguredWallpaper();
@@ -643,30 +560,8 @@ void DashboardApp::StartLayoutEditMode() {
         StopMoveMode();
     }
     isEditingLayout_ = true;
-    renderer_.SetShowLayoutEditGuides(true);
-    renderer_.SetActiveLayoutEditGuide(std::nullopt);
-    renderer_.SetHoveredEditableWidget(std::nullopt);
-    renderer_.SetActiveWidgetEditGuide(std::nullopt);
-    renderer_.SetHoveredEditableText(std::nullopt);
-    renderer_.SetActiveEditableText(std::nullopt);
-    renderer_.SetHoveredEditableBar(std::nullopt);
-    renderer_.SetActiveEditableBar(std::nullopt);
-    renderer_.SetHoveredEditableGauge(std::nullopt);
-    renderer_.SetActiveEditableGauge(std::nullopt);
-    hoveredLayoutGuideIndex_.reset();
-    hoveredEditableWidget_.reset();
-    hoveredWidgetEditGuideIndex_.reset();
-    hoveredEditableText_.reset();
-    hoveredEditableTextAnchor_.reset();
-    hoveredEditableBar_.reset();
-    hoveredEditableBarAnchor_.reset();
-    hoveredEditableGaugeAnchor_.reset();
-    activeLayoutDrag_.reset();
-    activeWidgetEditDrag_.reset();
-    activeTextEditDrag_.reset();
-    activeBarEditDrag_.reset();
-    activeGaugeEditDrag_.reset();
-    InvalidateRect(hwnd_, nullptr, FALSE);
+    layoutEditController_.StartSession();
+    InvalidateLayoutEdit();
 }
 
 void DashboardApp::StopLayoutEditMode() {
@@ -674,195 +569,7 @@ void DashboardApp::StopLayoutEditMode() {
         return;
     }
     isEditingLayout_ = false;
-    renderer_.SetShowLayoutEditGuides(diagnosticsOptions_.editLayout);
-    renderer_.SetActiveLayoutEditGuide(std::nullopt);
-    renderer_.SetHoveredEditableWidget(std::nullopt);
-    renderer_.SetActiveWidgetEditGuide(std::nullopt);
-    renderer_.SetHoveredEditableText(std::nullopt);
-    renderer_.SetActiveEditableText(std::nullopt);
-    renderer_.SetHoveredEditableBar(std::nullopt);
-    renderer_.SetActiveEditableBar(std::nullopt);
-    renderer_.SetHoveredEditableGauge(std::nullopt);
-    renderer_.SetActiveEditableGauge(std::nullopt);
-    hoveredLayoutGuideIndex_.reset();
-    hoveredEditableWidget_.reset();
-    hoveredWidgetEditGuideIndex_.reset();
-    hoveredEditableText_.reset();
-    hoveredEditableTextAnchor_.reset();
-    hoveredEditableBar_.reset();
-    hoveredEditableBarAnchor_.reset();
-    hoveredEditableGaugeAnchor_.reset();
-    activeLayoutDrag_.reset();
-    activeWidgetEditDrag_.reset();
-    activeTextEditDrag_.reset();
-    activeBarEditDrag_.reset();
-    activeGaugeEditDrag_.reset();
-    ReleaseCapture();
-    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
-    InvalidateRect(hwnd_, nullptr, FALSE);
-}
-
-const DashboardRenderer::LayoutEditGuide* DashboardApp::HitTestLayoutGuide(POINT clientPoint, size_t* index) const {
-    const auto& guides = renderer_.LayoutEditGuides();
-    for (size_t i = 0; i < guides.size(); ++i) {
-        if (PtInRect(&guides[i].hitRect, clientPoint)) {
-            if (index != nullptr) {
-                *index = i;
-            }
-            return &guides[i];
-        }
-    }
-    return nullptr;
-}
-
-const DashboardRenderer::WidgetEditGuide* DashboardApp::HitTestWidgetEditGuide(POINT clientPoint, size_t* index) const {
-    const auto& guides = renderer_.WidgetEditGuides();
-    for (size_t i = 0; i < guides.size(); ++i) {
-        if (PtInRect(&guides[i].hitRect, clientPoint)) {
-            if (index != nullptr) {
-                *index = i;
-            }
-            return &guides[i];
-        }
-    }
-    return nullptr;
-}
-
-std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardApp::HitTestEditableWidget(POINT clientPoint) const {
-    return renderer_.HitTestEditableWidget(clientPoint);
-}
-
-std::optional<DashboardRenderer::EditableTextKey> DashboardApp::HitTestEditableText(POINT clientPoint) const {
-    return renderer_.HitTestEditableText(clientPoint);
-}
-
-std::optional<DashboardRenderer::EditableTextKey> DashboardApp::HitTestEditableTextAnchor(POINT clientPoint) const {
-    return renderer_.HitTestEditableTextAnchor(clientPoint);
-}
-
-std::optional<DashboardRenderer::EditableBarKey> DashboardApp::HitTestEditableBar(POINT clientPoint) const {
-    return renderer_.HitTestEditableBar(clientPoint);
-}
-
-std::optional<DashboardRenderer::EditableBarKey> DashboardApp::HitTestEditableBarAnchor(POINT clientPoint) const {
-    return renderer_.HitTestEditableBarAnchor(clientPoint);
-}
-
-std::optional<DashboardRenderer::EditableGaugeKey> DashboardApp::HitTestEditableGaugeAnchor(POINT clientPoint) const {
-    return renderer_.HitTestEditableGaugeAnchor(clientPoint);
-}
-
-void DashboardApp::RefreshLayoutEditHover(POINT clientPoint) {
-    if (!isEditingLayout_ || activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
-        activeTextEditDrag_.has_value() || activeBarEditDrag_.has_value() || activeGaugeEditDrag_.has_value()) {
-        return;
-    }
-    const std::optional<DashboardRenderer::EditableGaugeKey> nextHoveredGaugeAnchor = HitTestEditableGaugeAnchor(clientPoint);
-    const std::optional<DashboardRenderer::EditableBarKey> nextHoveredBarAnchor = HitTestEditableBarAnchor(clientPoint);
-    std::optional<DashboardRenderer::EditableBarKey> nextHoveredBar = nextHoveredBarAnchor;
-    if (!nextHoveredBar.has_value()) {
-        nextHoveredBar = HitTestEditableBar(clientPoint);
-    }
-    const std::optional<DashboardRenderer::EditableTextKey> nextHoveredTextAnchor = HitTestEditableTextAnchor(clientPoint);
-    std::optional<DashboardRenderer::EditableTextKey> nextHoveredText = nextHoveredTextAnchor;
-    if (!nextHoveredText.has_value()) {
-        nextHoveredText = HitTestEditableText(clientPoint);
-    }
-    const std::optional<DashboardRenderer::LayoutWidgetIdentity> nextHoveredWidget = nextHoveredGaugeAnchor.has_value()
-        ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredGaugeAnchor->widget)
-        : nextHoveredBar.has_value()
-        ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredBar->widget)
-        : nextHoveredText.has_value()
-        ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredText->widget)
-        : HitTestEditableWidget(clientPoint);
-    bool hoverChanged = (hoveredEditableWidget_.has_value() != nextHoveredWidget.has_value());
-    if (!hoverChanged && hoveredEditableWidget_.has_value() && nextHoveredWidget.has_value()) {
-        hoverChanged = !WidgetIdentityEquals(*hoveredEditableWidget_, *nextHoveredWidget);
-    }
-    if (hoverChanged) {
-        hoveredEditableWidget_ = nextHoveredWidget;
-        renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-    }
-    if (hoveredEditableText_.has_value() != nextHoveredText.has_value() ||
-        (hoveredEditableText_.has_value() && nextHoveredText.has_value() &&
-            !EditableTextKeyEquals(*hoveredEditableText_, *nextHoveredText))) {
-        hoveredEditableText_ = nextHoveredText;
-        renderer_.SetHoveredEditableText(hoveredEditableText_);
-        hoverChanged = true;
-    }
-    if (hoveredEditableTextAnchor_.has_value() != nextHoveredTextAnchor.has_value() ||
-        (hoveredEditableTextAnchor_.has_value() && nextHoveredTextAnchor.has_value() &&
-            !EditableTextKeyEquals(*hoveredEditableTextAnchor_, *nextHoveredTextAnchor))) {
-        hoveredEditableTextAnchor_ = nextHoveredTextAnchor;
-        hoverChanged = true;
-    }
-    if (hoveredEditableBar_.has_value() != nextHoveredBar.has_value() ||
-        (hoveredEditableBar_.has_value() && nextHoveredBar.has_value() &&
-            !EditableBarKeyEquals(*hoveredEditableBar_, *nextHoveredBar))) {
-        hoveredEditableBar_ = nextHoveredBar;
-        renderer_.SetHoveredEditableBar(hoveredEditableBar_);
-        hoverChanged = true;
-    }
-    if (hoveredEditableBarAnchor_.has_value() != nextHoveredBarAnchor.has_value() ||
-        (hoveredEditableBarAnchor_.has_value() && nextHoveredBarAnchor.has_value() &&
-            !EditableBarKeyEquals(*hoveredEditableBarAnchor_, *nextHoveredBarAnchor))) {
-        hoveredEditableBarAnchor_ = nextHoveredBarAnchor;
-        hoverChanged = true;
-    }
-    if (hoveredEditableGaugeAnchor_.has_value() != nextHoveredGaugeAnchor.has_value() ||
-        (hoveredEditableGaugeAnchor_.has_value() && nextHoveredGaugeAnchor.has_value() &&
-            !EditableGaugeKeyEquals(*hoveredEditableGaugeAnchor_, *nextHoveredGaugeAnchor))) {
-        hoveredEditableGaugeAnchor_ = nextHoveredGaugeAnchor;
-        renderer_.SetHoveredEditableGauge(hoveredEditableGaugeAnchor_);
-        hoverChanged = true;
-    }
-
-    size_t widgetGuideIndex = 0;
-    const DashboardRenderer::WidgetEditGuide* widgetGuide = nullptr;
-    if (hoveredEditableWidget_.has_value()) {
-        widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
-        if (widgetGuide != nullptr && !WidgetIdentityEquals(widgetGuide->widget, *hoveredEditableWidget_)) {
-            widgetGuide = nullptr;
-        }
-    }
-    const std::optional<size_t> nextWidgetGuideIndex = widgetGuide != nullptr
-        ? std::optional<size_t>(widgetGuideIndex)
-        : std::nullopt;
-    if (hoveredWidgetEditGuideIndex_ != nextWidgetGuideIndex) {
-        hoveredWidgetEditGuideIndex_ = nextWidgetGuideIndex;
-        hoverChanged = true;
-    }
-
-    size_t layoutGuideIndex = 0;
-    const DashboardRenderer::LayoutEditGuide* layoutGuide = HitTestLayoutGuide(clientPoint, &layoutGuideIndex);
-    const std::optional<size_t> nextLayoutGuideIndex = layoutGuide != nullptr
-        ? std::optional<size_t>(layoutGuideIndex)
-        : std::nullopt;
-    if (hoveredLayoutGuideIndex_ != nextLayoutGuideIndex) {
-        hoveredLayoutGuideIndex_ = nextLayoutGuideIndex;
-        hoverChanged = true;
-    }
-
-    if (hoverChanged) {
-        InvalidateRect(hwnd_, nullptr, FALSE);
-    }
-
-    if (hoveredEditableTextAnchor_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
-    } else if (hoveredEditableGaugeAnchor_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
-    } else if (hoveredEditableBarAnchor_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
-    } else if (widgetGuide != nullptr) {
-        SetCursor(LoadCursorW(nullptr,
-            widgetGuide->angularDrag ? IDC_CROSS
-            : widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
-    } else if (layoutGuide != nullptr) {
-        SetCursor(LoadCursorW(nullptr,
-            layoutGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
-    } else {
-        SetCursor(LoadCursorW(nullptr, IDC_ARROW));
-    }
+    layoutEditController_.StopSession(hwnd_, diagnosticsOptions_.editLayout);
 }
 
 bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights) {
@@ -876,42 +583,108 @@ bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGu
     return true;
 }
 
-bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, double value) {
-    switch (guide.parameter) {
-    case DashboardRenderer::WidgetEditParameter::MetricListLabelWidth:
-        config_.layout.metricList.labelWidth = std::max(1, static_cast<int>(std::lround(value)));
+bool DashboardApp::ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& target, double value) {
+    switch (target.kind) {
+    case LayoutEditHost::ValueTarget::Kind::WidgetGuide:
+        switch (target.widgetGuide.parameter) {
+        case DashboardRenderer::WidgetEditParameter::MetricListLabelWidth:
+            config_.layout.metricList.labelWidth = std::max(1, static_cast<int>(std::lround(value)));
+            break;
+        case DashboardRenderer::WidgetEditParameter::MetricListVerticalGap:
+            config_.layout.metricList.verticalGap = std::max(1, static_cast<int>(std::lround(value)));
+            break;
+        case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
+            config_.layout.driveUsageList.activityWidth = std::max(1, static_cast<int>(std::lround(value)));
+            break;
+        case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
+            config_.layout.driveUsageList.freeWidth = std::max(1, static_cast<int>(std::lround(value)));
+            break;
+        case DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap:
+            config_.layout.driveUsageList.headerGap = std::max(1, static_cast<int>(std::lround(value)));
+            break;
+        case DashboardRenderer::WidgetEditParameter::DriveUsageRowGap:
+            config_.layout.driveUsageList.rowGap = std::max(1, static_cast<int>(std::lround(value)));
+            break;
+        case DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding:
+            config_.layout.throughput.axisPadding = std::max(1, static_cast<int>(std::lround(value)));
+            break;
+        case DashboardRenderer::WidgetEditParameter::ThroughputHeaderGap:
+            config_.layout.throughput.headerGap = std::max(1, static_cast<int>(std::lround(value)));
+            break;
+        case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees:
+            config_.layout.gauge.sweepDegrees = std::clamp(value, 0.0, 360.0);
+            break;
+        case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees: {
+            const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
+            const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
+            const double maxSegmentGap = segmentCount <= 1
+                ? 0.0
+                : totalSweep / static_cast<double>(segmentCount - 1);
+            config_.layout.gauge.segmentGapDegrees = std::clamp(value, 0.0, maxSegmentGap);
+            break;
+        }
+        default:
+            return false;
+        }
         break;
-    case DashboardRenderer::WidgetEditParameter::MetricListVerticalGap:
-        config_.layout.metricList.verticalGap = std::max(1, static_cast<int>(std::lround(value)));
+    case LayoutEditHost::ValueTarget::Kind::EditableText: {
+        const int clampedValue = std::max(1, static_cast<int>(std::lround(value)));
+        switch (target.textKey.fontRole) {
+        case DashboardRenderer::FontRole::Title:
+            config_.layout.fonts.title.size = clampedValue;
+            break;
+        case DashboardRenderer::FontRole::Big:
+            config_.layout.fonts.big.size = clampedValue;
+            break;
+        case DashboardRenderer::FontRole::Value:
+            config_.layout.fonts.value.size = clampedValue;
+            break;
+        case DashboardRenderer::FontRole::Label:
+            config_.layout.fonts.label.size = clampedValue;
+            break;
+        case DashboardRenderer::FontRole::Text:
+            config_.layout.fonts.text.size = clampedValue;
+            break;
+        case DashboardRenderer::FontRole::Small:
+            config_.layout.fonts.smallText.size = clampedValue;
+            break;
+        case DashboardRenderer::FontRole::Footer:
+            config_.layout.fonts.footer.size = clampedValue;
+            break;
+        case DashboardRenderer::FontRole::ClockTime:
+            config_.layout.fonts.clockTime.size = clampedValue;
+            break;
+        case DashboardRenderer::FontRole::ClockDate:
+            config_.layout.fonts.clockDate.size = clampedValue;
+            break;
+        default:
+            return false;
+        }
         break;
-    case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
-        config_.layout.driveUsageList.activityWidth = std::max(1, static_cast<int>(std::lround(value)));
+    }
+    case LayoutEditHost::ValueTarget::Kind::EditableBar: {
+        const int clampedValue = std::max(1, static_cast<int>(std::lround(value)));
+        switch (target.barKey.parameter) {
+        case DashboardRenderer::BarEditParameter::MetricListBarHeight:
+            config_.layout.metricList.barHeight = clampedValue;
+            break;
+        case DashboardRenderer::BarEditParameter::DriveUsageBarHeight:
+            config_.layout.driveUsageList.barHeight = clampedValue;
+            break;
+        default:
+            return false;
+        }
         break;
-    case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
-        config_.layout.driveUsageList.freeWidth = std::max(1, static_cast<int>(std::lround(value)));
-        break;
-    case DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap:
-        config_.layout.driveUsageList.headerGap = std::max(1, static_cast<int>(std::lround(value)));
-        break;
-    case DashboardRenderer::WidgetEditParameter::DriveUsageRowGap:
-        config_.layout.driveUsageList.rowGap = std::max(1, static_cast<int>(std::lround(value)));
-        break;
-    case DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding:
-        config_.layout.throughput.axisPadding = std::max(1, static_cast<int>(std::lround(value)));
-        break;
-    case DashboardRenderer::WidgetEditParameter::ThroughputHeaderGap:
-        config_.layout.throughput.headerGap = std::max(1, static_cast<int>(std::lround(value)));
-        break;
-    case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees:
-        config_.layout.gauge.sweepDegrees = std::clamp(value, 0.0, 360.0);
-        break;
-    case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees: {
-        const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
-        const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
-        const double maxSegmentGap = segmentCount <= 1
-            ? 0.0
-            : totalSweep / static_cast<double>(segmentCount - 1);
-        config_.layout.gauge.segmentGapDegrees = std::clamp(value, 0.0, maxSegmentGap);
+    }
+    case LayoutEditHost::ValueTarget::Kind::EditableGauge: {
+        const int clampedValue = std::max(1, static_cast<int>(std::lround(value)));
+        switch (target.gaugeKey.parameter) {
+        case DashboardRenderer::GaugeAnchorParameter::SegmentCount:
+            config_.layout.gauge.segmentCount = clampedValue;
+            break;
+        default:
+            return false;
+        }
         break;
     }
     default:
@@ -920,58 +693,6 @@ bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide
 
     renderer_.SetConfig(config_);
     telemetry_->SetEffectiveConfig(config_);
-    if (hoveredEditableWidget_.has_value()) {
-        renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-    }
-    InvalidateRect(hwnd_, nullptr, FALSE);
-    return true;
-}
-
-bool DashboardApp::ApplyTextEditValue(const DashboardRenderer::EditableTextKey& key, int value) {
-    const int clampedValue = std::max(1, value);
-    switch (key.fontRole) {
-    case DashboardRenderer::FontRole::Title:
-        config_.layout.fonts.title.size = clampedValue;
-        break;
-    case DashboardRenderer::FontRole::Big:
-        config_.layout.fonts.big.size = clampedValue;
-        break;
-    case DashboardRenderer::FontRole::Value:
-        config_.layout.fonts.value.size = clampedValue;
-        break;
-    case DashboardRenderer::FontRole::Label:
-        config_.layout.fonts.label.size = clampedValue;
-        break;
-    case DashboardRenderer::FontRole::Text:
-        config_.layout.fonts.text.size = clampedValue;
-        break;
-    case DashboardRenderer::FontRole::Small:
-        config_.layout.fonts.smallText.size = clampedValue;
-        break;
-    case DashboardRenderer::FontRole::Footer:
-        config_.layout.fonts.footer.size = clampedValue;
-        break;
-    case DashboardRenderer::FontRole::ClockTime:
-        config_.layout.fonts.clockTime.size = clampedValue;
-        break;
-    case DashboardRenderer::FontRole::ClockDate:
-        config_.layout.fonts.clockDate.size = clampedValue;
-        break;
-    default:
-        return false;
-    }
-
-    renderer_.SetConfig(config_);
-    telemetry_->SetEffectiveConfig(config_);
-    if (hoveredEditableWidget_.has_value()) {
-        renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-    }
-    if (hoveredEditableText_.has_value()) {
-        renderer_.SetHoveredEditableText(hoveredEditableText_);
-    }
-    if (activeTextEditDrag_.has_value()) {
-        renderer_.SetActiveEditableText(activeTextEditDrag_->key);
-    }
     InvalidateRect(hwnd_, nullptr, FALSE);
     return true;
 }
@@ -984,240 +705,6 @@ std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const Dash
     }
     renderer_.SetConfig(candidateConfig);
     return renderer_.FindLayoutWidgetExtent(widget, axis);
-}
-
-std::optional<std::vector<int>> DashboardApp::FindSnappedLayoutGuideWeights(
-    const LayoutDragState& drag, const std::vector<int>& freeWeights) {
-    const int threshold = renderer_.LayoutSimilarityThreshold();
-    if (threshold <= 0 || drag.snapCandidates.empty()) {
-        return std::nullopt;
-    }
-
-    const size_t index = drag.guide.separatorIndex;
-    if (index + 1 >= freeWeights.size()) {
-        return std::nullopt;
-    }
-
-    const int combined = freeWeights[index] + freeWeights[index + 1];
-    if (combined <= 1) {
-        return std::nullopt;
-    }
-
-    for (const auto& candidate : drag.snapCandidates) {
-        const auto snappedWeight = layout_snap_solver::FindNearestSnapWeight(
-            freeWeights[index], combined, threshold, {layout_snap_solver::SnapCandidate{
-                candidate.targetExtent,
-                candidate.startDistance,
-                candidate.groupOrder,
-            }}, [&](int firstWeight) -> std::optional<int> {
-                std::vector<int> attemptWeights = freeWeights;
-                attemptWeights[index] = firstWeight;
-                attemptWeights[index + 1] = combined - firstWeight;
-                return EvaluateLayoutWidgetExtentForWeights(drag.guide, attemptWeights, candidate.widget, drag.guide.axis);
-            });
-        if (!snappedWeight.has_value()) {
-            continue;
-        }
-
-        std::vector<int> exact = freeWeights;
-        exact[index] = *snappedWeight;
-        exact[index + 1] = combined - *snappedWeight;
-        return exact;
-    }
-
-    return std::nullopt;
-}
-
-bool DashboardApp::UpdateLayoutDrag(POINT clientPoint) {
-    if (!activeLayoutDrag_.has_value()) {
-        return false;
-    }
-
-    LayoutDragState& drag = *activeLayoutDrag_;
-    const int currentCoordinate = drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
-    const int delta = currentCoordinate - drag.dragStartCoordinate;
-    const size_t index = drag.guide.separatorIndex;
-    if (index + 1 >= drag.initialWeights.size()) {
-        return false;
-    }
-
-    const int combined = drag.initialWeights[index] + drag.initialWeights[index + 1];
-    if (combined <= 1) {
-        return false;
-    }
-
-    std::vector<int> weights = drag.initialWeights;
-    weights[index] = std::clamp(drag.initialWeights[index] + delta, 1, combined - 1);
-    weights[index + 1] = combined - weights[index];
-    if ((GetKeyState(VK_MENU) & 0x8000) == 0) {
-        if (const auto snappedWeights = FindSnappedLayoutGuideWeights(drag, weights); snappedWeights.has_value()) {
-            weights = *snappedWeights;
-        }
-    }
-    if (!ApplyLayoutGuideWeights(drag.guide, weights)) {
-        return false;
-    }
-    const auto& guides = renderer_.LayoutEditGuides();
-    const auto guideIt = std::find_if(guides.begin(), guides.end(), [&](const DashboardRenderer::LayoutEditGuide& candidate) {
-        return candidate.renderCardId == drag.guide.renderCardId &&
-            candidate.editCardId == drag.guide.editCardId &&
-            candidate.nodePath == drag.guide.nodePath &&
-            candidate.separatorIndex == drag.guide.separatorIndex;
-    });
-    if (guideIt != guides.end()) {
-        drag.guide = *guideIt;
-        renderer_.SetActiveLayoutEditGuide(std::optional<DashboardRenderer::LayoutEditGuide>(drag.guide));
-    }
-
-    RefreshLayoutEditHover(clientPoint);
-    return true;
-}
-
-bool DashboardApp::UpdateWidgetEditDrag(POINT clientPoint) {
-    if (!activeWidgetEditDrag_.has_value()) {
-        return false;
-    }
-
-    WidgetEditDragState& drag = *activeWidgetEditDrag_;
-    double nextValue = drag.initialValue;
-    if (drag.guide.angularDrag) {
-        switch (drag.guide.parameter) {
-        case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees: {
-            const auto sweepDegrees = ComputeGaugeSweepDegrees(drag.guide.dragOrigin, clientPoint);
-            if (!sweepDegrees.has_value()) {
-                return true;
-            }
-            nextValue = *sweepDegrees;
-            break;
-        }
-        case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees: {
-            const auto segmentGapDegrees = ComputeGaugeSegmentGapDegrees(drag.guide, clientPoint);
-            if (!segmentGapDegrees.has_value()) {
-                return true;
-            }
-            nextValue = *segmentGapDegrees;
-            break;
-        }
-        default:
-            return false;
-        }
-    } else {
-        const int currentCoordinate = drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
-        const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;
-        const int logicalDelta = static_cast<int>(std::lround(
-            static_cast<double>(pixelDelta * drag.guide.dragDirection) / std::max(0.1, renderer_.RenderScale())));
-        nextValue = std::max(1.0, drag.initialValue + static_cast<double>(logicalDelta));
-    }
-    if (!ApplyWidgetEditValue(drag.guide, nextValue)) {
-        return false;
-    }
-
-    const auto& guides = renderer_.WidgetEditGuides();
-    const auto guideIt = std::find_if(guides.begin(), guides.end(), [&](const DashboardRenderer::WidgetEditGuide& candidate) {
-        return candidate.parameter == drag.guide.parameter &&
-            candidate.guideId == drag.guide.guideId &&
-            candidate.widget.renderCardId == drag.guide.widget.renderCardId &&
-            candidate.widget.editCardId == drag.guide.widget.editCardId &&
-            candidate.widget.nodePath == drag.guide.widget.nodePath;
-    });
-    if (guideIt != guides.end()) {
-        drag.guide = *guideIt;
-        renderer_.SetActiveWidgetEditGuide(drag.guide);
-    }
-
-    return true;
-}
-
-bool DashboardApp::UpdateTextEditDrag(POINT clientPoint) {
-    if (!activeTextEditDrag_.has_value()) {
-        return false;
-    }
-
-    TextEditDragState& drag = *activeTextEditDrag_;
-    const int pixelDelta = clientPoint.x - drag.dragStartCoordinate;
-    const int logicalDelta = static_cast<int>(std::lround(
-        static_cast<double>(pixelDelta) / std::max(0.1, renderer_.RenderScale())));
-    const int nextValue = std::max(1, drag.initialValue + logicalDelta);
-    return ApplyTextEditValue(drag.key, nextValue);
-}
-
-bool DashboardApp::ApplyBarEditValue(const DashboardRenderer::EditableBarKey& key, int value) {
-    const int clampedValue = std::max(1, value);
-    switch (key.parameter) {
-    case DashboardRenderer::BarEditParameter::MetricListBarHeight:
-        config_.layout.metricList.barHeight = clampedValue;
-        break;
-    case DashboardRenderer::BarEditParameter::DriveUsageBarHeight:
-        config_.layout.driveUsageList.barHeight = clampedValue;
-        break;
-    default:
-        return false;
-    }
-
-    renderer_.SetConfig(config_);
-    telemetry_->SetEffectiveConfig(config_);
-    if (hoveredEditableWidget_.has_value()) {
-        renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-    }
-    if (hoveredEditableBar_.has_value()) {
-        renderer_.SetHoveredEditableBar(hoveredEditableBar_);
-    }
-    if (activeBarEditDrag_.has_value()) {
-        renderer_.SetActiveEditableBar(activeBarEditDrag_->key);
-    }
-    InvalidateRect(hwnd_, nullptr, FALSE);
-    return true;
-}
-
-bool DashboardApp::UpdateBarEditDrag(POINT clientPoint) {
-    if (!activeBarEditDrag_.has_value()) {
-        return false;
-    }
-
-    BarEditDragState& drag = *activeBarEditDrag_;
-    const int pixelDelta = clientPoint.y - drag.dragStartCoordinate;
-    const int logicalDelta = static_cast<int>(std::lround(
-        static_cast<double>(pixelDelta) / std::max(0.1, renderer_.RenderScale())));
-    const int nextValue = std::max(1, drag.initialValue + logicalDelta);
-    return ApplyBarEditValue(drag.key, nextValue);
-}
-
-bool DashboardApp::ApplyGaugeEditValue(const DashboardRenderer::EditableGaugeKey& key, int value) {
-    const int clampedValue = std::max(1, value);
-    switch (key.parameter) {
-    case DashboardRenderer::GaugeAnchorParameter::SegmentCount:
-        config_.layout.gauge.segmentCount = clampedValue;
-        break;
-    default:
-        return false;
-    }
-
-    renderer_.SetConfig(config_);
-    telemetry_->SetEffectiveConfig(config_);
-    if (hoveredEditableWidget_.has_value()) {
-        renderer_.SetHoveredEditableWidget(hoveredEditableWidget_);
-    }
-    if (hoveredEditableGaugeAnchor_.has_value()) {
-        renderer_.SetHoveredEditableGauge(hoveredEditableGaugeAnchor_);
-    }
-    if (activeGaugeEditDrag_.has_value()) {
-        renderer_.SetActiveEditableGauge(activeGaugeEditDrag_->key);
-    }
-    InvalidateRect(hwnd_, nullptr, FALSE);
-    return true;
-}
-
-bool DashboardApp::UpdateGaugeEditDrag(POINT clientPoint) {
-    if (!activeGaugeEditDrag_.has_value()) {
-        return false;
-    }
-
-    GaugeEditDragState& drag = *activeGaugeEditDrag_;
-    const int pixelDelta = clientPoint.x - drag.dragStartCoordinate;
-    const int logicalDelta = static_cast<int>(std::lround(
-        static_cast<double>(pixelDelta) / std::max(0.1, renderer_.RenderScale() * 4.0)));
-    const int nextValue = std::max(1, drag.initialValue + logicalDelta);
-    return ApplyGaugeEditValue(drag.key, nextValue);
 }
 
 void DashboardApp::UpdateConfigFromCurrentPlacement() {

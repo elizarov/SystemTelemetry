@@ -22,6 +22,7 @@
 #include "../resources/resource.h"
 #include "config.h"
 #include "dashboard_renderer.h"
+#include "layout_edit_controller.h"
 #include "layout_snap_solver.h"
 #include "snapshot_dump.h"
 #include "telemetry.h"
@@ -226,37 +227,6 @@ struct StorageDriveMenuOption {
     bool selected = false;
 };
 
-struct LayoutDragState {
-    DashboardRenderer::LayoutEditGuide guide;
-    std::vector<int> initialWeights;
-    std::vector<DashboardRenderer::LayoutGuideSnapCandidate> snapCandidates;
-    int dragStartCoordinate = 0;
-};
-
-struct WidgetEditDragState {
-    DashboardRenderer::WidgetEditGuide guide;
-    double initialValue = 0.0;
-    int dragStartCoordinate = 0;
-};
-
-struct TextEditDragState {
-    DashboardRenderer::EditableTextKey key;
-    int initialValue = 0;
-    int dragStartCoordinate = 0;
-};
-
-struct BarEditDragState {
-    DashboardRenderer::EditableBarKey key;
-    int initialValue = 0;
-    int dragStartCoordinate = 0;
-};
-
-struct GaugeEditDragState {
-    DashboardRenderer::EditableGaugeKey key;
-    int initialValue = 0;
-    int dragStartCoordinate = 0;
-};
-
 NamedLayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name);
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId);
 LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector<size_t>& path);
@@ -277,7 +247,7 @@ MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd);
 HFONT CreateUiFont(const UiFontConfig& font);
 void ShutdownPreviousInstance();
 
-class DashboardApp {
+class DashboardApp : private LayoutEditHost {
 public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {});
     bool Initialize(HINSTANCE instance);
@@ -315,28 +285,9 @@ private:
     bool IsLayoutEditMode() const;
     void StartLayoutEditMode();
     void StopLayoutEditMode();
-    void RefreshLayoutEditHover(POINT clientPoint);
-    const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
-    const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(POINT clientPoint, size_t* index = nullptr) const;
-    std::optional<DashboardRenderer::LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
-    std::optional<DashboardRenderer::EditableTextKey> HitTestEditableText(POINT clientPoint) const;
-    std::optional<DashboardRenderer::EditableTextKey> HitTestEditableTextAnchor(POINT clientPoint) const;
-    std::optional<DashboardRenderer::EditableBarKey> HitTestEditableBar(POINT clientPoint) const;
-    std::optional<DashboardRenderer::EditableBarKey> HitTestEditableBarAnchor(POINT clientPoint) const;
-    std::optional<DashboardRenderer::EditableGaugeKey> HitTestEditableGaugeAnchor(POINT clientPoint) const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const DashboardRenderer::LayoutEditGuide& guide,
         const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
-    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag, const std::vector<int>& freeWeights);
     bool ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const std::vector<int>& weights);
-    bool UpdateLayoutDrag(POINT clientPoint);
-    bool ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, double value);
-    bool UpdateWidgetEditDrag(POINT clientPoint);
-    bool ApplyTextEditValue(const DashboardRenderer::EditableTextKey& key, int value);
-    bool UpdateTextEditDrag(POINT clientPoint);
-    bool ApplyBarEditValue(const DashboardRenderer::EditableBarKey& key, int value);
-    bool UpdateBarEditDrag(POINT clientPoint);
-    bool ApplyGaugeEditValue(const DashboardRenderer::EditableGaugeKey& key, int value);
-    bool UpdateGaugeEditDrag(POINT clientPoint);
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -362,6 +313,11 @@ private:
         COLORREF color, UINT format);
     void DrawLayout(HDC hdc, const SystemSnapshot& snapshot);
 
+    const AppConfig& LayoutEditConfig() const override;
+    DashboardRenderer& LayoutEditRenderer() override;
+    bool ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& target, double value) override;
+    void InvalidateLayoutEdit() override;
+
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
     AppConfig config_;
@@ -382,17 +338,5 @@ private:
     std::vector<LayoutMenuOption> layoutMenuOptions_;
     std::vector<NetworkMenuOption> networkMenuOptions_;
     std::vector<StorageDriveMenuOption> storageDriveMenuOptions_;
-    std::optional<size_t> hoveredLayoutGuideIndex_;
-    std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget_;
-    std::optional<size_t> hoveredWidgetEditGuideIndex_;
-    std::optional<DashboardRenderer::EditableTextKey> hoveredEditableText_;
-    std::optional<DashboardRenderer::EditableTextKey> hoveredEditableTextAnchor_;
-    std::optional<DashboardRenderer::EditableBarKey> hoveredEditableBar_;
-    std::optional<DashboardRenderer::EditableBarKey> hoveredEditableBarAnchor_;
-    std::optional<DashboardRenderer::EditableGaugeKey> hoveredEditableGaugeAnchor_;
-    std::optional<LayoutDragState> activeLayoutDrag_;
-    std::optional<WidgetEditDragState> activeWidgetEditDrag_;
-    std::optional<TextEditDragState> activeTextEditDrag_;
-    std::optional<BarEditDragState> activeBarEditDrag_;
-    std::optional<GaugeEditDragState> activeGaugeEditDrag_;
+    LayoutEditController layoutEditController_;
 };
