@@ -104,29 +104,107 @@ std::optional<double> ComputeGaugeSegmentGapDegrees(const DashboardRenderer::Wid
 
 LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForWidgetGuide(const DashboardRenderer::WidgetEditGuide& guide) {
     ValueTarget target;
-    target.kind = Kind::WidgetGuide;
-    target.widgetGuide = guide;
+    switch (guide.parameter) {
+    case DashboardRenderer::WidgetEditParameter::MetricListLabelWidth:
+        target.field = Field::MetricListLabelWidth;
+        break;
+    case DashboardRenderer::WidgetEditParameter::MetricListVerticalGap:
+        target.field = Field::MetricListVerticalGap;
+        break;
+    case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
+        target.field = Field::DriveUsageActivityWidth;
+        break;
+    case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
+        target.field = Field::DriveUsageFreeWidth;
+        break;
+    case DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap:
+        target.field = Field::DriveUsageHeaderGap;
+        break;
+    case DashboardRenderer::WidgetEditParameter::DriveUsageRowGap:
+        target.field = Field::DriveUsageRowGap;
+        break;
+    case DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding:
+        target.field = Field::ThroughputAxisPadding;
+        break;
+    case DashboardRenderer::WidgetEditParameter::ThroughputHeaderGap:
+        target.field = Field::ThroughputHeaderGap;
+        break;
+    case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees:
+        target.field = Field::GaugeSweepDegrees;
+        break;
+    case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees:
+        target.field = Field::GaugeSegmentGapDegrees;
+        break;
+    default:
+        target.field = Field::MetricListLabelWidth;
+        break;
+    }
     return target;
 }
 
 LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableText(const DashboardRenderer::EditableTextKey& key) {
     ValueTarget target;
-    target.kind = Kind::EditableText;
-    target.textKey = key;
+    switch (key.fontRole) {
+    case DashboardRenderer::FontRole::Title:
+        target.field = Field::FontTitle;
+        break;
+    case DashboardRenderer::FontRole::Big:
+        target.field = Field::FontBig;
+        break;
+    case DashboardRenderer::FontRole::Value:
+        target.field = Field::FontValue;
+        break;
+    case DashboardRenderer::FontRole::Label:
+        target.field = Field::FontLabel;
+        break;
+    case DashboardRenderer::FontRole::Text:
+        target.field = Field::FontText;
+        break;
+    case DashboardRenderer::FontRole::Small:
+        target.field = Field::FontSmall;
+        break;
+    case DashboardRenderer::FontRole::Footer:
+        target.field = Field::FontFooter;
+        break;
+    case DashboardRenderer::FontRole::ClockTime:
+        target.field = Field::FontClockTime;
+        break;
+    case DashboardRenderer::FontRole::ClockDate:
+        target.field = Field::FontClockDate;
+        break;
+    default:
+        target.field = Field::FontLabel;
+        break;
+    }
     return target;
 }
 
 LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableBar(const DashboardRenderer::EditableBarKey& key) {
     ValueTarget target;
-    target.kind = Kind::EditableBar;
-    target.barKey = key;
+    switch (key.parameter) {
+    case DashboardRenderer::BarEditParameter::MetricListBarHeight:
+        target.field = Field::MetricListBarHeight;
+        break;
+    case DashboardRenderer::BarEditParameter::DriveUsageBarHeight:
+        target.field = Field::DriveUsageBarHeight;
+        break;
+    default:
+        target.field = Field::MetricListBarHeight;
+        break;
+    }
     return target;
 }
 
 LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableGauge(const DashboardRenderer::EditableGaugeKey& key) {
     ValueTarget target;
-    target.kind = Kind::EditableGauge;
-    target.gaugeKey = key;
+    switch (key.parameter) {
+    case DashboardRenderer::GaugeAnchorParameter::SegmentCount:
+        target.field = Field::GaugeSegmentCount;
+        break;
+    default:
+        target.field = Field::GaugeSegmentCount;
+        break;
+    }
     return target;
 }
 

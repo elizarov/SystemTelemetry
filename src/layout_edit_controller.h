@@ -13,18 +13,32 @@ public:
     virtual ~LayoutEditHost() = default;
 
     struct ValueTarget {
-        enum class Kind {
-            WidgetGuide,
-            EditableText,
-            EditableBar,
-            EditableGauge,
+        enum class Field {
+            MetricListLabelWidth,
+            MetricListVerticalGap,
+            DriveUsageActivityWidth,
+            DriveUsageFreeWidth,
+            DriveUsageHeaderGap,
+            DriveUsageRowGap,
+            ThroughputAxisPadding,
+            ThroughputHeaderGap,
+            GaugeSweepDegrees,
+            GaugeSegmentGapDegrees,
+            FontTitle,
+            FontBig,
+            FontValue,
+            FontLabel,
+            FontText,
+            FontSmall,
+            FontFooter,
+            FontClockTime,
+            FontClockDate,
+            MetricListBarHeight,
+            DriveUsageBarHeight,
+            GaugeSegmentCount,
         };
 
-        Kind kind = Kind::WidgetGuide;
-        DashboardRenderer::WidgetEditGuide widgetGuide;
-        DashboardRenderer::EditableTextKey textKey;
-        DashboardRenderer::EditableBarKey barKey;
-        DashboardRenderer::EditableGaugeKey gaugeKey;
+        Field field = Field::MetricListLabelWidth;
 
         static ValueTarget ForWidgetGuide(const DashboardRenderer::WidgetEditGuide& guide);
         static ValueTarget ForEditableText(const DashboardRenderer::EditableTextKey& key);

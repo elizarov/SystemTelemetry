@@ -584,77 +584,79 @@ bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGu
 }
 
 bool DashboardApp::ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& target, double value) {
-    switch (target.kind) {
-    case LayoutEditHost::ValueTarget::Kind::WidgetGuide:
-        switch (target.widgetGuide.parameter) {
-        case DashboardRenderer::WidgetEditParameter::MetricListLabelWidth:
-            config_.layout.metricList.labelWidth = std::max(1, static_cast<int>(std::lround(value)));
-            break;
-        case DashboardRenderer::WidgetEditParameter::MetricListVerticalGap:
-            config_.layout.metricList.verticalGap = std::max(1, static_cast<int>(std::lround(value)));
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
-            config_.layout.driveUsageList.activityWidth = std::max(1, static_cast<int>(std::lround(value)));
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
-            config_.layout.driveUsageList.freeWidth = std::max(1, static_cast<int>(std::lround(value)));
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap:
-            config_.layout.driveUsageList.headerGap = std::max(1, static_cast<int>(std::lround(value)));
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageRowGap:
-            config_.layout.driveUsageList.rowGap = std::max(1, static_cast<int>(std::lround(value)));
-            break;
-        case DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding:
-            config_.layout.throughput.axisPadding = std::max(1, static_cast<int>(std::lround(value)));
-            break;
-        case DashboardRenderer::WidgetEditParameter::ThroughputHeaderGap:
-            config_.layout.throughput.headerGap = std::max(1, static_cast<int>(std::lround(value)));
-            break;
-        case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees:
-            config_.layout.gauge.sweepDegrees = std::clamp(value, 0.0, 360.0);
-            break;
-        case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees: {
-            const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
-            const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
-            const double maxSegmentGap = segmentCount <= 1
-                ? 0.0
-                : totalSweep / static_cast<double>(segmentCount - 1);
-            config_.layout.gauge.segmentGapDegrees = std::clamp(value, 0.0, maxSegmentGap);
-            break;
-        }
-        default:
-            return false;
-        }
+    switch (target.field) {
+    case LayoutEditHost::ValueTarget::Field::MetricListLabelWidth:
+        config_.layout.metricList.labelWidth = std::max(1, static_cast<int>(std::lround(value)));
         break;
-    case LayoutEditHost::ValueTarget::Kind::EditableText: {
+    case LayoutEditHost::ValueTarget::Field::MetricListVerticalGap:
+        config_.layout.metricList.verticalGap = std::max(1, static_cast<int>(std::lround(value)));
+        break;
+    case LayoutEditHost::ValueTarget::Field::DriveUsageActivityWidth:
+        config_.layout.driveUsageList.activityWidth = std::max(1, static_cast<int>(std::lround(value)));
+        break;
+    case LayoutEditHost::ValueTarget::Field::DriveUsageFreeWidth:
+        config_.layout.driveUsageList.freeWidth = std::max(1, static_cast<int>(std::lround(value)));
+        break;
+    case LayoutEditHost::ValueTarget::Field::DriveUsageHeaderGap:
+        config_.layout.driveUsageList.headerGap = std::max(1, static_cast<int>(std::lround(value)));
+        break;
+    case LayoutEditHost::ValueTarget::Field::DriveUsageRowGap:
+        config_.layout.driveUsageList.rowGap = std::max(1, static_cast<int>(std::lround(value)));
+        break;
+    case LayoutEditHost::ValueTarget::Field::ThroughputAxisPadding:
+        config_.layout.throughput.axisPadding = std::max(1, static_cast<int>(std::lround(value)));
+        break;
+    case LayoutEditHost::ValueTarget::Field::ThroughputHeaderGap:
+        config_.layout.throughput.headerGap = std::max(1, static_cast<int>(std::lround(value)));
+        break;
+    case LayoutEditHost::ValueTarget::Field::GaugeSweepDegrees:
+        config_.layout.gauge.sweepDegrees = std::clamp(value, 0.0, 360.0);
+        break;
+    case LayoutEditHost::ValueTarget::Field::GaugeSegmentGapDegrees: {
+        const double totalSweep = std::clamp(config_.layout.gauge.sweepDegrees, 0.0, 360.0);
+        const int segmentCount = std::max(1, config_.layout.gauge.segmentCount);
+        const double maxSegmentGap = segmentCount <= 1
+            ? 0.0
+            : totalSweep / static_cast<double>(segmentCount - 1);
+        config_.layout.gauge.segmentGapDegrees = std::clamp(value, 0.0, maxSegmentGap);
+        break;
+    }
+    case LayoutEditHost::ValueTarget::Field::FontTitle:
+    case LayoutEditHost::ValueTarget::Field::FontBig:
+    case LayoutEditHost::ValueTarget::Field::FontValue:
+    case LayoutEditHost::ValueTarget::Field::FontLabel:
+    case LayoutEditHost::ValueTarget::Field::FontText:
+    case LayoutEditHost::ValueTarget::Field::FontSmall:
+    case LayoutEditHost::ValueTarget::Field::FontFooter:
+    case LayoutEditHost::ValueTarget::Field::FontClockTime:
+    case LayoutEditHost::ValueTarget::Field::FontClockDate: {
         const int clampedValue = std::max(1, static_cast<int>(std::lround(value)));
-        switch (target.textKey.fontRole) {
-        case DashboardRenderer::FontRole::Title:
+        switch (target.field) {
+        case LayoutEditHost::ValueTarget::Field::FontTitle:
             config_.layout.fonts.title.size = clampedValue;
             break;
-        case DashboardRenderer::FontRole::Big:
+        case LayoutEditHost::ValueTarget::Field::FontBig:
             config_.layout.fonts.big.size = clampedValue;
             break;
-        case DashboardRenderer::FontRole::Value:
+        case LayoutEditHost::ValueTarget::Field::FontValue:
             config_.layout.fonts.value.size = clampedValue;
             break;
-        case DashboardRenderer::FontRole::Label:
+        case LayoutEditHost::ValueTarget::Field::FontLabel:
             config_.layout.fonts.label.size = clampedValue;
             break;
-        case DashboardRenderer::FontRole::Text:
+        case LayoutEditHost::ValueTarget::Field::FontText:
             config_.layout.fonts.text.size = clampedValue;
             break;
-        case DashboardRenderer::FontRole::Small:
+        case LayoutEditHost::ValueTarget::Field::FontSmall:
             config_.layout.fonts.smallText.size = clampedValue;
             break;
-        case DashboardRenderer::FontRole::Footer:
+        case LayoutEditHost::ValueTarget::Field::FontFooter:
             config_.layout.fonts.footer.size = clampedValue;
             break;
-        case DashboardRenderer::FontRole::ClockTime:
+        case LayoutEditHost::ValueTarget::Field::FontClockTime:
             config_.layout.fonts.clockTime.size = clampedValue;
             break;
-        case DashboardRenderer::FontRole::ClockDate:
+        case LayoutEditHost::ValueTarget::Field::FontClockDate:
             config_.layout.fonts.clockDate.size = clampedValue;
             break;
         default:
@@ -662,13 +664,14 @@ bool DashboardApp::ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& targe
         }
         break;
     }
-    case LayoutEditHost::ValueTarget::Kind::EditableBar: {
+    case LayoutEditHost::ValueTarget::Field::MetricListBarHeight:
+    case LayoutEditHost::ValueTarget::Field::DriveUsageBarHeight: {
         const int clampedValue = std::max(1, static_cast<int>(std::lround(value)));
-        switch (target.barKey.parameter) {
-        case DashboardRenderer::BarEditParameter::MetricListBarHeight:
+        switch (target.field) {
+        case LayoutEditHost::ValueTarget::Field::MetricListBarHeight:
             config_.layout.metricList.barHeight = clampedValue;
             break;
-        case DashboardRenderer::BarEditParameter::DriveUsageBarHeight:
+        case LayoutEditHost::ValueTarget::Field::DriveUsageBarHeight:
             config_.layout.driveUsageList.barHeight = clampedValue;
             break;
         default:
@@ -676,15 +679,9 @@ bool DashboardApp::ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& targe
         }
         break;
     }
-    case LayoutEditHost::ValueTarget::Kind::EditableGauge: {
+    case LayoutEditHost::ValueTarget::Field::GaugeSegmentCount: {
         const int clampedValue = std::max(1, static_cast<int>(std::lround(value)));
-        switch (target.gaugeKey.parameter) {
-        case DashboardRenderer::GaugeAnchorParameter::SegmentCount:
-            config_.layout.gauge.segmentCount = clampedValue;
-            break;
-        default:
-            return false;
-        }
+        config_.layout.gauge.segmentCount = clampedValue;
         break;
     }
     default:
