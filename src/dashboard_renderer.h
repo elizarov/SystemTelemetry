@@ -52,6 +52,7 @@ public:
     };
 
     enum class WidgetEditParameter {
+        MetricListLabelWidth,
         DriveUsageActivityWidth,
         DriveUsageFreeWidth,
     };
@@ -116,6 +117,7 @@ public:
     std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
     std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
     std::optional<LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
+    std::optional<LayoutWidgetIdentity> FindFirstEditableWidgetByTypeName(const std::string& widgetTypeName) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -227,6 +229,7 @@ private:
         std::vector<std::string>& cardReferenceStack, const std::string& renderCardId, const std::string& editCardId,
         const std::vector<size_t>& nodePath);
     void BuildWidgetEditGuides();
+    void AddMetricListWidgetEditGuides(const ResolvedWidgetLayout& widget);
     void AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget);
 
     bool InitializeGdiplus();

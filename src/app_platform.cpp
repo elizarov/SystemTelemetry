@@ -894,6 +894,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         DashboardRenderer::RenderMode::Blank,
         false,
         DashboardRenderer::SimilarityIndicatorMode::ActiveGuide,
+        std::string{},
         nullptr,
         &screenshotError);
     const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config);

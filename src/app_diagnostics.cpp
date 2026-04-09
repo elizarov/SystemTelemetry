@@ -117,6 +117,8 @@ DiagnosticsOptions GetDiagnosticsOptions() {
             options.layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::HorizontalSizes;
         } else if (mode == "vertical-sizes") {
             options.layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::VerticalSizes;
+        } else if (!mode.empty()) {
+            options.editLayoutWidgetName = mode;
         }
     }
     if (const auto layoutName = GetLayoutSwitchValue(); layoutName.has_value()) {
@@ -260,6 +262,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     if (options_.screenshot && !SaveDumpScreenshot(
             screenshotPath_, dump.snapshot, config, options_.exit ? options_.scale : 1.0,
             GetDiagnosticsRenderMode(options_), options_.editLayout, GetSimilarityIndicatorMode(options_),
+            options_.editLayoutWidgetName,
             TraceStream(), &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
@@ -421,7 +424,7 @@ bool ReloadTelemetryRuntimeFromDisk(
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
     double scale, DashboardRenderer::RenderMode renderMode, bool showLayoutEditGuides,
-    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
+    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode, const std::string& editLayoutWidgetName,
     std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
     renderer.SetConfig(config);
@@ -435,6 +438,17 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnap
             *errorText = renderer.LastError();
         }
         return false;
+    }
+    if (!editLayoutWidgetName.empty()) {
+        const auto widget = renderer.FindFirstEditableWidgetByTypeName(editLayoutWidgetName);
+        if (!widget.has_value()) {
+            if (errorText != nullptr) {
+                *errorText = "renderer:edit_layout_widget_not_found name=\"" + editLayoutWidgetName + "\"";
+            }
+            return false;
+        }
+        renderer.SetHoveredEditableWidget(widget);
+        WriteOptionalTrace(traceStream, "diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
     }
     const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot);
     if (!saved && errorText != nullptr) {

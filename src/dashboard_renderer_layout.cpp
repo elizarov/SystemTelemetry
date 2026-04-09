@@ -23,6 +23,25 @@ void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const R
     ResolveNodeWidgetsInternal(node, rect, widgets, cardReferenceStack, "", "", {});
 }
 
+void DashboardRenderer::AddMetricListWidgetEditGuides(const ResolvedWidgetLayout& widget) {
+    const int labelWidth = std::max(1, ScaleLogical(config_.layout.metricList.labelWidth));
+    const int hitInset = std::max(3, ScaleLogical(4));
+    const int x = std::clamp(static_cast<int>(widget.rect.left) + labelWidth,
+        static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
+
+    WidgetEditGuide guide;
+    guide.axis = LayoutGuideAxis::Vertical;
+    guide.widget = LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    guide.parameter = WidgetEditParameter::MetricListLabelWidth;
+    guide.guideId = 0;
+    guide.widgetRect = widget.rect;
+    guide.lineRect = RECT{x, widget.rect.top, x + 1, widget.rect.bottom};
+    guide.hitRect = RECT{x - hitInset, widget.rect.top, x + hitInset + 1, widget.rect.bottom};
+    guide.value = config_.layout.metricList.labelWidth;
+    guide.dragDirection = 1;
+    widgetEditGuides_.push_back(std::move(guide));
+}
+
 void DashboardRenderer::AddDriveUsageWidgetEditGuides(const ResolvedWidgetLayout& widget) {
     const int labelWidth = std::max(1, measuredWidths_.driveLabel);
     const int percentWidth = std::max(1, measuredWidths_.drivePercent);
@@ -88,6 +107,9 @@ void DashboardRenderer::BuildWidgetEditGuides() {
     widgetEditGuides_.clear();
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
+            if (widget.kind == WidgetKind::MetricList) {
+                AddMetricListWidgetEditGuides(widget);
+            }
             if (widget.kind == WidgetKind::DriveUsageList) {
                 AddDriveUsageWidgetEditGuides(widget);
             }

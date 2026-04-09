@@ -35,6 +35,12 @@ std::string Trim(std::string value) {
     return std::string(first, last);
 }
 
+std::string ToLowerAscii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(),
+        [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return value;
+}
+
 std::string FormatWin32Error(DWORD error) {
     if (error == 0) {
         return "win32=0";
@@ -547,6 +553,46 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
                 widget.kind != WidgetKind::VerticalSpring &&
                 widget.kind != WidgetKind::Unknown;
             if (!hoverableWidget || !PtInRect(&widget.rect, clientPoint)) {
+                continue;
+            }
+            return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstEditableWidgetByTypeName(
+    const std::string& widgetTypeName) const {
+    const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
+    auto matchesType = [&](WidgetKind kind) {
+        switch (kind) {
+        case WidgetKind::Text:
+            return normalizedName == "text";
+        case WidgetKind::Gauge:
+            return normalizedName == "gauge";
+        case WidgetKind::MetricList:
+            return normalizedName == "metric_list";
+        case WidgetKind::Throughput:
+            return normalizedName == "throughput";
+        case WidgetKind::NetworkFooter:
+            return normalizedName == "network_footer";
+        case WidgetKind::DriveUsageList:
+            return normalizedName == "drive_usage_list";
+        case WidgetKind::ClockTime:
+            return normalizedName == "clock_time";
+        case WidgetKind::ClockDate:
+            return normalizedName == "clock_date";
+        default:
+            return false;
+        }
+    };
+
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            const bool hoverableWidget = widget.kind != WidgetKind::Spacer &&
+                widget.kind != WidgetKind::VerticalSpring &&
+                widget.kind != WidgetKind::Unknown;
+            if (!hoverableWidget || !matchesType(widget.kind)) {
                 continue;
             }
             return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};

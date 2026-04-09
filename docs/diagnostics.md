@@ -16,6 +16,7 @@ This document is the single maintained source of truth for diagnostics command b
 - `/default-config` suppresses loading the executable-side `config.ini` overlay and uses only the embedded `resources/config.ini` defaults for the current process.
 - `/blank` switches screenshot rendering into a blank background mode that keeps static dashboard chrome and static text such as CPU and GPU names while omitting dynamic metric text, time, date, plots, leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 - `/scale:<value>` multiplies headless `/screenshot /exit` render size, including all measured layout geometry, and accepts fractional values such as `1.5`.
+- `/edit-layout:<widget-name>` keeps layout-edit guides enabled and, for screenshots, forces the first visible widget of that type into the same outline and widget-guide state that live UI hover would show.
 - `/edit-layout:horizonatal-sizes` turns on layout-edit guides plus every visible horizontal size ruler and its exact-match numbering for diagnostics screenshots without requiring an active drag.
 - `/edit-layout:vertical-sizes` turns on layout-edit guides plus every visible vertical size ruler and its exact-match numbering for diagnostics screenshots without requiring an active drag.
 - `/blank` cannot be combined with `/fake`.
@@ -44,7 +45,8 @@ This document is the single maintained source of truth for diagnostics command b
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
 - With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
 - With `/blank`, the application keeps the normal layout, panel chrome, card headers, CPU and GPU names, drive labels, and empty chart or bar tracks while suppressing dynamic metric rendering.
-- `/edit-layout` diagnostics outputs always include the resolved container guides, while widget-local guides appear only when the live UI is hovering a supported widget.
+- `/edit-layout` diagnostics outputs always include the resolved container guides, while widget-local guides appear only when the live UI is hovering a supported widget or when `/edit-layout:<widget-name>` forces one supported widget type.
+- `/edit-layout:<widget-name>` fails the screenshot export when the requested widget type does not exist in the active layout.
 
 ## Failures and trace coverage
 
@@ -81,7 +83,8 @@ This document is the single maintained source of truth for diagnostics command b
 - Verify one headless run that supplies explicit output filenames such as `/trace:custom_trace.txt`, `/dump:custom_dump.txt`, and `/screenshot:custom_screenshot.png`, and confirm only the requested paths are updated.
 - Verify one headless `/trace /default-config /layout:<name> /screenshot /exit` run when validating the built-in config, and confirm the screenshot and trace use the requested named layout without editing `config.ini`.
 - Verify one headless `/trace /default-config /edit-layout /screenshot /exit` run when validating layout-guide rendering, and confirm the screenshot includes the layout edit guides.
-- Verify widget-local edit guides through an interactive `/edit-layout` UI run, hover `drive_usage_list`, and confirm the widget outline plus the `activity_width` and `free_width` guides appear inside that widget and drag live.
+- Verify one headless `/trace /default-config /edit-layout:metric_list /screenshot /exit` run when validating widget-local metric-list guides, and confirm the screenshot includes the metric-list outline plus its `label_width` guide without needing live hover.
+- Verify widget-local edit guides through an interactive `/edit-layout` UI run, hover `metric_list` and `drive_usage_list`, and confirm the widget outline plus the `label_width`, `activity_width`, and `free_width` guides appear inside those widgets and drag live.
 - Verify headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit` and `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit` when validating size-ruler grouping and numbering, and inspect the trace for consecutive `renderer:layout_similarity_group` ordinals that match the visible rulers.
 - When `/scale:<value>` is involved, confirm the screenshot uses the expected multiplied pixel dimensions while preserving the same logical composition.
 - For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm that editing the selected fake file changes the next one-second refresh without touching live providers, and verify one run with `/fake:custom_fake.txt`.

@@ -324,6 +324,7 @@ void DashboardApp::SaveScreenshotAs() {
             GetDiagnosticsRenderMode(diagnosticsOptions_),
             isEditingLayout_ || diagnosticsOptions_.editLayout,
             GetSimilarityIndicatorMode(diagnosticsOptions_),
+            diagnosticsOptions_.editLayoutWidgetName,
             diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
             &errorText)) {
         std::string message = "Failed to save screenshot:\n" + Utf8FromWide(path->wstring());
@@ -424,6 +425,7 @@ bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
             DashboardRenderer::RenderMode::Blank,
             false,
             DashboardRenderer::SimilarityIndicatorMode::ActiveGuide,
+            std::string{},
             diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
             &screenshotError);
         if (saved) {
@@ -685,6 +687,9 @@ bool DashboardApp::ApplyLayoutGuideWeights(const DashboardRenderer::LayoutEditGu
 bool DashboardApp::ApplyWidgetEditValue(const DashboardRenderer::WidgetEditGuide& guide, int value) {
     const int clampedValue = std::max(1, value);
     switch (guide.parameter) {
+    case DashboardRenderer::WidgetEditParameter::MetricListLabelWidth:
+        config_.layout.metricList.labelWidth = clampedValue;
+        break;
     case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
         config_.layout.driveUsageList.activityWidth = clampedValue;
         break;

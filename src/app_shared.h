@@ -82,7 +82,7 @@ std::filesystem::path GetRuntimeConfigPath();
 AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options);
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
     double scale, DashboardRenderer::RenderMode renderMode, bool showLayoutEditGuides,
-    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
+    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode, const std::string& editLayoutWidgetName,
     std::ostream* traceStream = nullptr,
     std::string* errorText = nullptr);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
