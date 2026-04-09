@@ -452,8 +452,9 @@ void LayoutEditController::ClearInteractionState() {
 }
 
 void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
-    if (hoveredEditableAnchor_.has_value()) {
-        const auto region = host_.LayoutEditRenderer().FindEditableAnchorRegion(*hoveredEditableAnchor_);
+    if (const auto hoveredAnchorHandle = host_.LayoutEditRenderer().HitTestEditableAnchorHandle(clientPoint);
+        hoveredAnchorHandle.has_value()) {
+        const auto region = host_.LayoutEditRenderer().FindEditableAnchorRegion(*hoveredAnchorHandle);
         const auto dragAxis = region.has_value() ? region->dragAxis : DashboardRenderer::AnchorDragAxis::Vertical;
         SetCursor(LoadCursorW(nullptr,
             dragAxis == DashboardRenderer::AnchorDragAxis::Both ? IDC_SIZEALL :
