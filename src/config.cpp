@@ -464,16 +464,6 @@ std::string ReadFileUtf8(const std::filesystem::path& path) {
     return text;
 }
 
-bool WriteFileUtf8(const std::filesystem::path& path, const std::string& text) {
-    std::ofstream output(path, std::ios::binary | std::ios::trunc);
-    if (!output.is_open()) {
-        return false;
-    }
-
-    output.write(text.data(), static_cast<std::streamsize>(text.size()));
-    return output.good();
-}
-
 std::string LoadUtf8Resource(WORD resourceId, const wchar_t* resourceType) {
     HMODULE module = GetModuleHandleW(nullptr);
     if (module == nullptr) {
@@ -825,157 +815,6 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
     }
 }
 
-void ReplaceOrAppendKey(std::vector<std::string>& lines, size_t sectionStart, size_t sectionEnd,
-    const std::string& key, const std::string& value) {
-    for (size_t i = sectionStart + 1; i < sectionEnd; ++i) {
-        const std::string trimmed = Trim(lines[i]);
-        if (trimmed.empty() || trimmed[0] == ';' || trimmed[0] == '#') {
-            continue;
-        }
-        const size_t eq = trimmed.find('=');
-        if (eq == std::string::npos) {
-            continue;
-        }
-        if (Trim(trimmed.substr(0, eq)) == key) {
-            lines[i] = key + " = " + value;
-            return;
-        }
-    }
-
-    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
-}
-
-std::vector<std::string> SplitConfigLines(const std::string& text) {
-    std::vector<std::string> lines;
-    std::stringstream stream(text);
-    std::string line;
-    while (std::getline(stream, line)) {
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        lines.push_back(line);
-    }
-    return lines;
-}
-
-std::string JoinConfigLines(const std::vector<std::string>& lines) {
-    std::string output;
-    for (const std::string& line : lines) {
-        output += line;
-        output += "\r\n";
-    }
-    return output;
-}
-
-template <typename UpdateKeyFn>
-void SaveKnownStructuredSections(const AppConfig& config, UpdateKeyFn&& updateKey) {
-    SaveKnownSections<AppConfig::BindingList>(config, updateKey);
-}
-
-template <typename UpdateKeyFn>
-void SaveKnownStructuredSectionDifferences(const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn&& updateKey) {
-    SaveKnownSectionDifferences<AppConfig::BindingList>(config, compareConfig, updateKey);
-}
-
-std::string BuildSavedConfigText(const std::string& initialText, const AppConfig& config, const AppConfig* compareConfig) {
-    std::vector<std::string> lines = SplitConfigLines(initialText);
-
-    const auto findSectionIndex = [&lines](const std::string& sectionName) -> size_t {
-        for (size_t i = 0; i < lines.size(); ++i) {
-            if (Trim(lines[i]) == sectionName) {
-                return i;
-            }
-        }
-        return lines.size();
-    };
-
-    const auto ensureSection = [&lines, &findSectionIndex](const std::string& sectionName) -> size_t {
-        const size_t existingIndex = findSectionIndex(sectionName);
-        if (existingIndex < lines.size()) {
-            return existingIndex;
-        }
-        if (!lines.empty() && !lines.back().empty()) {
-            lines.push_back("");
-        }
-        lines.push_back(sectionName);
-        return lines.size() - 1;
-    };
-
-    const auto ensureSectionAfter = [&lines, &findSectionIndex](const std::string& sectionName,
-                                    const std::string& afterSectionName) -> size_t {
-        const size_t existingIndex = findSectionIndex(sectionName);
-        if (existingIndex < lines.size()) {
-            return existingIndex;
-        }
-
-        const size_t afterIndex = findSectionIndex(afterSectionName);
-        if (afterIndex >= lines.size()) {
-            if (!lines.empty() && !lines.back().empty()) {
-                lines.push_back("");
-            }
-            lines.push_back(sectionName);
-            return lines.size() - 1;
-        }
-
-        size_t insertIndex = afterIndex + 1;
-        while (insertIndex < lines.size()) {
-            const std::string next = Trim(lines[insertIndex]);
-            if (!next.empty() && next.front() == '[' && next.back() == ']') {
-                break;
-            }
-            ++insertIndex;
-        }
-
-        std::vector<std::string> insertedLines;
-        if (insertIndex > 0 && !lines[insertIndex - 1].empty()) {
-            insertedLines.push_back("");
-        }
-        insertedLines.push_back(sectionName);
-        if (insertIndex < lines.size() && !lines[insertIndex].empty()) {
-            insertedLines.push_back("");
-        }
-
-        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(insertIndex),
-            insertedLines.begin(), insertedLines.end());
-        return insertIndex + (insertedLines.front().empty() ? 1 : 0);
-    };
-
-    const auto findSectionEnd = [&lines](size_t sectionStart) -> size_t {
-        size_t sectionEnd = lines.size();
-        for (size_t j = sectionStart + 1; j < lines.size(); ++j) {
-            const std::string next = Trim(lines[j]);
-            if (!next.empty() && next.front() == '[' && next.back() == ']') {
-                sectionEnd = j;
-                break;
-            }
-        }
-        return sectionEnd;
-    };
-
-    const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd](
-        const std::string& sectionName,
-        const std::string& key,
-        const std::string& value) {
-        size_t sectionStart = sectionName == "[storage]"
-            ? ensureSectionAfter(sectionName, "[network]")
-            : sectionName == "[board]"
-                ? ensureSectionAfter(sectionName, "[storage]")
-                : ensureSection(sectionName);
-        if (Trim(lines[sectionStart]) != sectionName) {
-            lines[sectionStart] = sectionName;
-        }
-        const size_t sectionEnd = findSectionEnd(sectionStart);
-        ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value);
-    };
-
-    if (compareConfig == nullptr) {
-        SaveKnownStructuredSections(config, updateKey);
-    } else {
-        SaveKnownStructuredSectionDifferences(config, compareConfig, updateKey);
-    }
-    return JoinConfigLines(lines);
-}
-
 }  // namespace
 
 std::string LoadEmbeddedConfigTemplate() {
@@ -996,17 +835,6 @@ AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay) {
     config.board.requestedTemperatureNames = layoutBindings.boardTemperatureNames;
     config.board.requestedFanNames = layoutBindings.boardFanNames;
     return config;
-}
-
-bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
-    const AppConfig compareConfig = LoadConfig(path);
-    const std::string output = BuildSavedConfigText(ReadFileUtf8(path), config, &compareConfig);
-    return WriteFileUtf8(path, output);
-}
-
-bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) {
-    const std::string output = BuildSavedConfigText(LoadEmbeddedConfigTemplate(), config, nullptr);
-    return WriteFileUtf8(path, output);
 }
 
 bool SelectLayout(AppConfig& config, const std::string& name) {
