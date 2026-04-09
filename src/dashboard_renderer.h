@@ -51,33 +51,16 @@ public:
         std::vector<size_t> nodePath;
     };
 
-    enum class FontRole {
-        Title,
-        Big,
-        Value,
-        Label,
-        Text,
-        Small,
-        Footer,
-        ClockTime,
-        ClockDate,
-    };
-
-    struct EditableTextKey {
-        LayoutWidgetIdentity widget;
-        FontRole fontRole = FontRole::Label;
-        int textId = 0;
-    };
-
-    struct EditableTextRegion {
-        EditableTextKey key;
-        RECT textRect{};
-        RECT anchorRect{};
-        RECT anchorHitRect{};
-        int fontSize = 0;
-    };
-
     enum class AnchorEditParameter {
+        FontTitle,
+        FontBig,
+        FontValue,
+        FontLabel,
+        FontText,
+        FontSmall,
+        FontFooter,
+        FontClockTime,
+        FontClockDate,
         MetricListBarHeight,
         DriveUsageBarHeight,
         SegmentCount,
@@ -160,8 +143,6 @@ public:
         std::optional<LayoutEditGuide> activeLayoutEditGuide;
         std::optional<LayoutWidgetIdentity> hoveredEditableWidget;
         std::optional<WidgetEditGuide> activeWidgetEditGuide;
-        std::optional<EditableTextKey> hoveredEditableText;
-        std::optional<EditableTextKey> activeEditableText;
         std::optional<EditableAnchorKey> hoveredEditableAnchor;
         std::optional<EditableAnchorKey> activeEditableAnchor;
     };
@@ -192,9 +173,6 @@ public:
     std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
     std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
     std::optional<LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
-    std::optional<EditableTextKey> HitTestEditableText(POINT clientPoint) const;
-    std::optional<EditableTextKey> HitTestEditableTextAnchor(POINT clientPoint) const;
-    std::optional<EditableTextRegion> FindEditableTextRegion(const EditableTextKey& key) const;
     std::optional<EditableAnchorKey> HitTestEditableAnchorTarget(POINT clientPoint) const;
     std::optional<EditableAnchorKey> HitTestEditableAnchorHandle(POINT clientPoint) const;
     std::optional<EditableAnchorRegion> FindEditableAnchorRegion(const EditableAnchorKey& key) const;
@@ -298,9 +276,11 @@ private:
         HFONT clockDate = nullptr;
     };
 
-    struct EditableTextBinding {
-        EditableTextKey key;
-        int fontSize = 0;
+    struct EditableAnchorBinding {
+        EditableAnchorKey key;
+        int value = 0;
+        AnchorShape shape = AnchorShape::Circle;
+        LayoutGuideAxis dragAxis = LayoutGuideAxis::Vertical;
     };
 
     struct TextLayoutResult {
@@ -309,9 +289,8 @@ private:
 
     TextLayoutResult MeasureTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
     TextLayoutResult DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color,
-        UINT format, const std::optional<EditableTextBinding>& editable = std::nullopt);
+        UINT format, const std::optional<EditableAnchorBinding>& editable = std::nullopt);
     void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawHoveredEditableTextHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawWidgetEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
@@ -325,7 +304,7 @@ private:
     void DrawMetricRow(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardMetricRow& row, int rowIndex);
     void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue, double guideStepMbps,
         double timeMarkerOffsetSamples, double timeMarkerIntervalSamples,
-        const std::optional<EditableTextBinding>& maxLabelEditable = std::nullopt);
+        const std::optional<EditableAnchorBinding>& maxLabelEditable = std::nullopt);
     void DrawThroughputWidget(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardThroughputMetric& metric);
     void DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
     ResolvedWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
@@ -360,12 +339,11 @@ private:
     int WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const;
     bool MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
-    bool MatchesEditableTextKey(const EditableTextKey& left, const EditableTextKey& right) const;
     bool MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const;
     bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const;
     bool MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const;
-    EditableTextBinding MakeEditableTextBinding(const ResolvedWidgetLayout& widget, FontRole fontRole, int textId,
-        int fontSize) const;
+    EditableAnchorBinding MakeEditableTextBinding(const ResolvedWidgetLayout& widget, AnchorEditParameter parameter,
+        int anchorId, int value) const;
     void RegisterEditableAnchorRegion(const EditableAnchorKey& key, const RECT& targetRect, const RECT& anchorRect,
         AnchorShape shape, LayoutGuideAxis dragAxis, int value);
     static bool IsContainerNode(const LayoutNodeConfig& node);
@@ -383,7 +361,6 @@ private:
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<WidgetEditGuide> widgetEditGuides_;
-    std::vector<EditableTextRegion> editableTextRegions_;
     std::vector<EditableAnchorRegion> editableAnchorRegions_;
     std::string lastError_;
     double renderScale_ = 1.0;

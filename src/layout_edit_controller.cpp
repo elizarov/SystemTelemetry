@@ -15,13 +15,6 @@ bool WidgetIdentityEquals(const DashboardRenderer::LayoutWidgetIdentity& left,
         left.nodePath == right.nodePath;
 }
 
-bool EditableTextKeyEquals(const DashboardRenderer::EditableTextKey& left,
-    const DashboardRenderer::EditableTextKey& right) {
-    return WidgetIdentityEquals(left.widget, right.widget) &&
-        left.fontRole == right.fontRole &&
-        left.textId == right.textId;
-}
-
 bool EditableAnchorKeyEquals(const DashboardRenderer::EditableAnchorKey& left,
     const DashboardRenderer::EditableAnchorKey& right) {
     return WidgetIdentityEquals(left.widget, right.widget) &&
@@ -135,46 +128,36 @@ LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForWidgetGuide(const Da
     return target;
 }
 
-LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableText(const DashboardRenderer::EditableTextKey& key) {
-    ValueTarget target;
-    switch (key.fontRole) {
-    case DashboardRenderer::FontRole::Title:
-        target.field = Field::FontTitle;
-        break;
-    case DashboardRenderer::FontRole::Big:
-        target.field = Field::FontBig;
-        break;
-    case DashboardRenderer::FontRole::Value:
-        target.field = Field::FontValue;
-        break;
-    case DashboardRenderer::FontRole::Label:
-        target.field = Field::FontLabel;
-        break;
-    case DashboardRenderer::FontRole::Text:
-        target.field = Field::FontText;
-        break;
-    case DashboardRenderer::FontRole::Small:
-        target.field = Field::FontSmall;
-        break;
-    case DashboardRenderer::FontRole::Footer:
-        target.field = Field::FontFooter;
-        break;
-    case DashboardRenderer::FontRole::ClockTime:
-        target.field = Field::FontClockTime;
-        break;
-    case DashboardRenderer::FontRole::ClockDate:
-        target.field = Field::FontClockDate;
-        break;
-    default:
-        target.field = Field::FontLabel;
-        break;
-    }
-    return target;
-}
-
 LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableAnchor(const DashboardRenderer::EditableAnchorKey& key) {
     ValueTarget target;
     switch (key.parameter) {
+    case DashboardRenderer::AnchorEditParameter::FontTitle:
+        target.field = Field::FontTitle;
+        break;
+    case DashboardRenderer::AnchorEditParameter::FontBig:
+        target.field = Field::FontBig;
+        break;
+    case DashboardRenderer::AnchorEditParameter::FontValue:
+        target.field = Field::FontValue;
+        break;
+    case DashboardRenderer::AnchorEditParameter::FontLabel:
+        target.field = Field::FontLabel;
+        break;
+    case DashboardRenderer::AnchorEditParameter::FontText:
+        target.field = Field::FontText;
+        break;
+    case DashboardRenderer::AnchorEditParameter::FontSmall:
+        target.field = Field::FontSmall;
+        break;
+    case DashboardRenderer::AnchorEditParameter::FontFooter:
+        target.field = Field::FontFooter;
+        break;
+    case DashboardRenderer::AnchorEditParameter::FontClockTime:
+        target.field = Field::FontClockTime;
+        break;
+    case DashboardRenderer::AnchorEditParameter::FontClockDate:
+        target.field = Field::FontClockDate;
+        break;
     case DashboardRenderer::AnchorEditParameter::MetricListBarHeight:
         target.field = Field::MetricListBarHeight;
         break;
@@ -246,7 +229,7 @@ const DashboardRenderer::WidgetEditGuide* LayoutEditController::HitTestWidgetEdi
 
 void LayoutEditController::RefreshHover(POINT clientPoint) {
     if (activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
-        activeTextEditDrag_.has_value() || activeAnchorEditDrag_.has_value()) {
+        activeAnchorEditDrag_.has_value()) {
         return;
     }
 
@@ -256,15 +239,8 @@ void LayoutEditController::RefreshHover(POINT clientPoint) {
     if (!nextHoveredAnchor.has_value()) {
         nextHoveredAnchor = renderer.HitTestEditableAnchorTarget(clientPoint);
     }
-    const std::optional<DashboardRenderer::EditableTextKey> nextHoveredTextAnchor = renderer.HitTestEditableTextAnchor(clientPoint);
-    std::optional<DashboardRenderer::EditableTextKey> nextHoveredText = nextHoveredTextAnchor;
-    if (!nextHoveredText.has_value()) {
-        nextHoveredText = renderer.HitTestEditableText(clientPoint);
-    }
     const std::optional<DashboardRenderer::LayoutWidgetIdentity> nextHoveredWidget = nextHoveredAnchor.has_value()
         ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredAnchor->widget)
-        : nextHoveredText.has_value()
-        ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredText->widget)
         : renderer.HitTestEditableWidget(clientPoint);
 
     bool hoverChanged = (hoveredEditableWidget_.has_value() != nextHoveredWidget.has_value());
@@ -274,19 +250,6 @@ void LayoutEditController::RefreshHover(POINT clientPoint) {
     if (hoverChanged) {
         hoveredEditableWidget_ = nextHoveredWidget;
         host_.LayoutEditOverlayState().hoveredEditableWidget = hoveredEditableWidget_;
-    }
-    if (hoveredEditableText_.has_value() != nextHoveredText.has_value() ||
-        (hoveredEditableText_.has_value() && nextHoveredText.has_value() &&
-            !EditableTextKeyEquals(*hoveredEditableText_, *nextHoveredText))) {
-        hoveredEditableText_ = nextHoveredText;
-        host_.LayoutEditOverlayState().hoveredEditableText = hoveredEditableText_;
-        hoverChanged = true;
-    }
-    if (hoveredEditableTextAnchor_.has_value() != nextHoveredTextAnchor.has_value() ||
-        (hoveredEditableTextAnchor_.has_value() && nextHoveredTextAnchor.has_value() &&
-            !EditableTextKeyEquals(*hoveredEditableTextAnchor_, *nextHoveredTextAnchor))) {
-        hoveredEditableTextAnchor_ = nextHoveredTextAnchor;
-        hoverChanged = true;
     }
     if (hoveredEditableAnchor_.has_value() != nextHoveredAnchor.has_value() ||
         (hoveredEditableAnchor_.has_value() && nextHoveredAnchor.has_value() &&
@@ -342,17 +305,6 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
             return true;
         }
     }
-    if (hoveredEditableTextAnchor_.has_value()) {
-        const auto region = renderer.FindEditableTextRegion(*hoveredEditableTextAnchor_);
-        if (region.has_value()) {
-            activeTextEditDrag_ = TextEditDragState{region->key, region->fontSize, clientPoint.x};
-            hoveredEditableText_ = region->key;
-            hoveredEditableWidget_ = region->key.widget;
-            SyncRendererInteractionState();
-            SetCapture(hwnd);
-            return true;
-        }
-    }
 
     size_t widgetGuideIndex = 0;
     const DashboardRenderer::WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
@@ -397,9 +349,6 @@ bool LayoutEditController::HandleMouseMove(POINT clientPoint) {
     if (activeAnchorEditDrag_.has_value()) {
         return UpdateAnchorEditDrag(clientPoint);
     }
-    if (activeTextEditDrag_.has_value()) {
-        return UpdateTextEditDrag(clientPoint);
-    }
     if (activeWidgetEditDrag_.has_value()) {
         return UpdateWidgetEditDrag(clientPoint);
     }
@@ -412,9 +361,6 @@ bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
     bool released = false;
     if (activeAnchorEditDrag_.has_value()) {
         activeAnchorEditDrag_.reset();
-        released = true;
-    } else if (activeTextEditDrag_.has_value()) {
-        activeTextEditDrag_.reset();
         released = true;
     } else if (activeWidgetEditDrag_.has_value()) {
         activeWidgetEditDrag_.reset();
@@ -440,13 +386,12 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
     }
 
     const bool hadActiveDrag = activeAnchorEditDrag_.has_value() ||
-        activeTextEditDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeLayoutDrag_.has_value();
+        activeWidgetEditDrag_.has_value() || activeLayoutDrag_.has_value();
     if (!hadActiveDrag) {
         return false;
     }
 
     activeAnchorEditDrag_.reset();
-    activeTextEditDrag_.reset();
     activeWidgetEditDrag_.reset();
     activeLayoutDrag_.reset();
     SyncRendererInteractionState();
@@ -458,10 +403,6 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     if (activeAnchorEditDrag_.has_value()) {
         SetCursor(LoadCursorW(nullptr,
             activeAnchorEditDrag_->dragAxis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
-        return true;
-    }
-    if (activeTextEditDrag_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
         return true;
     }
     if (activeWidgetEditDrag_.has_value()) {
@@ -488,16 +429,12 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
 void LayoutEditController::SyncRendererInteractionState() {
     DashboardRenderer::EditOverlayState& overlayState = host_.LayoutEditOverlayState();
     overlayState.hoveredEditableWidget = hoveredEditableWidget_;
-    overlayState.hoveredEditableText = hoveredEditableText_;
     overlayState.hoveredEditableAnchor = hoveredEditableAnchor_;
     overlayState.activeLayoutEditGuide = activeLayoutDrag_.has_value()
         ? std::optional<DashboardRenderer::LayoutEditGuide>(activeLayoutDrag_->guide)
         : std::nullopt;
     overlayState.activeWidgetEditGuide = activeWidgetEditDrag_.has_value()
         ? std::optional<DashboardRenderer::WidgetEditGuide>(activeWidgetEditDrag_->guide)
-        : std::nullopt;
-    overlayState.activeEditableText = activeTextEditDrag_.has_value()
-        ? std::optional<DashboardRenderer::EditableTextKey>(activeTextEditDrag_->key)
         : std::nullopt;
     overlayState.activeEditableAnchor = activeAnchorEditDrag_.has_value()
         ? std::optional<DashboardRenderer::EditableAnchorKey>(activeAnchorEditDrag_->key)
@@ -508,20 +445,13 @@ void LayoutEditController::ClearInteractionState() {
     hoveredLayoutGuideIndex_.reset();
     hoveredEditableWidget_.reset();
     hoveredWidgetEditGuideIndex_.reset();
-    hoveredEditableText_.reset();
-    hoveredEditableTextAnchor_.reset();
     hoveredEditableAnchor_.reset();
     activeLayoutDrag_.reset();
     activeWidgetEditDrag_.reset();
-    activeTextEditDrag_.reset();
     activeAnchorEditDrag_.reset();
 }
 
 void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
-    if (hoveredEditableTextAnchor_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
-        return;
-    }
     if (hoveredEditableAnchor_.has_value()) {
         const auto region = host_.LayoutEditRenderer().FindEditableAnchorRegion(*hoveredEditableAnchor_);
         const auto dragAxis = region.has_value() ? region->dragAxis : DashboardRenderer::LayoutGuideAxis::Vertical;
@@ -688,20 +618,6 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
 
     SyncRendererInteractionState();
     return true;
-}
-
-bool LayoutEditController::UpdateTextEditDrag(POINT clientPoint) {
-    TextEditDragState& drag = *activeTextEditDrag_;
-    const int pixelDelta = clientPoint.x - drag.dragStartCoordinate;
-    const int logicalDelta = static_cast<int>(std::lround(
-        static_cast<double>(pixelDelta) / (std::max)(0.1, host_.LayoutEditRenderer().RenderScale())));
-    const int nextValue = (std::max)(1, drag.initialValue + logicalDelta);
-    const bool updated = host_.ApplyLayoutEditValue(LayoutEditHost::ValueTarget::ForEditableText(drag.key),
-        static_cast<double>(nextValue));
-    if (updated) {
-        SyncRendererInteractionState();
-    }
-    return updated;
 }
 
 bool LayoutEditController::UpdateAnchorEditDrag(POINT clientPoint) {

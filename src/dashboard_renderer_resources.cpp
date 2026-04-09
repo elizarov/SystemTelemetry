@@ -600,33 +600,6 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::EditableTextKey> DashboardRenderer::HitTestEditableText(POINT clientPoint) const {
-    for (auto it = editableTextRegions_.rbegin(); it != editableTextRegions_.rend(); ++it) {
-        if (PtInRect(&it->textRect, clientPoint)) {
-            return it->key;
-        }
-    }
-    return std::nullopt;
-}
-
-std::optional<DashboardRenderer::EditableTextKey> DashboardRenderer::HitTestEditableTextAnchor(POINT clientPoint) const {
-    for (auto it = editableTextRegions_.rbegin(); it != editableTextRegions_.rend(); ++it) {
-        if (PtInRect(&it->anchorHitRect, clientPoint)) {
-            return it->key;
-        }
-    }
-    return std::nullopt;
-}
-
-std::optional<DashboardRenderer::EditableTextRegion> DashboardRenderer::FindEditableTextRegion(const EditableTextKey& key) const {
-    const auto it = std::find_if(editableTextRegions_.begin(), editableTextRegions_.end(),
-        [&](const EditableTextRegion& region) { return MatchesEditableTextKey(region.key, key); });
-    if (it == editableTextRegions_.end()) {
-        return std::nullopt;
-    }
-    return *it;
-}
-
 std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(POINT clientPoint) const {
     for (auto it = editableAnchorRegions_.rbegin(); it != editableAnchorRegions_.rend(); ++it) {
         if (PtInRect(&it->targetRect, clientPoint)) {
@@ -725,7 +698,6 @@ void DashboardRenderer::Shutdown() {
     fontHeights_ = {};
     measuredWidths_ = {};
     resolvedLayout_ = {};
-    editableTextRegions_.clear();
     editableAnchorRegions_.clear();
     ReleasePanelIcons();
     ShutdownGdiplus();

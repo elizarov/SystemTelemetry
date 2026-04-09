@@ -42,7 +42,6 @@ public:
         Field field = Field::MetricListLabelWidth;
 
         static ValueTarget ForWidgetGuide(const DashboardRenderer::WidgetEditGuide& guide);
-        static ValueTarget ForEditableText(const DashboardRenderer::EditableTextKey& key);
         static ValueTarget ForEditableAnchor(const DashboardRenderer::EditableAnchorKey& key);
     };
 
@@ -91,12 +90,6 @@ private:
         int dragStartCoordinate = 0;
     };
 
-    struct TextEditDragState {
-        DashboardRenderer::EditableTextKey key;
-        int initialValue = 0;
-        int dragStartCoordinate = 0;
-    };
-
     struct AnchorEditDragState {
         DashboardRenderer::EditableAnchorKey key;
         DashboardRenderer::LayoutGuideAxis dragAxis = DashboardRenderer::LayoutGuideAxis::Vertical;
@@ -109,7 +102,6 @@ private:
     void RefreshHover(POINT clientPoint);
     bool UpdateLayoutDrag(POINT clientPoint);
     bool UpdateWidgetEditDrag(POINT clientPoint);
-    bool UpdateTextEditDrag(POINT clientPoint);
     bool UpdateAnchorEditDrag(POINT clientPoint);
     void SyncRendererInteractionState();
     void ClearInteractionState();
@@ -121,11 +113,8 @@ private:
     std::optional<size_t> hoveredLayoutGuideIndex_;
     std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget_;
     std::optional<size_t> hoveredWidgetEditGuideIndex_;
-    std::optional<DashboardRenderer::EditableTextKey> hoveredEditableText_;
-    std::optional<DashboardRenderer::EditableTextKey> hoveredEditableTextAnchor_;
     std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor_;
     std::optional<LayoutDragState> activeLayoutDrag_;
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
-    std::optional<TextEditDragState> activeTextEditDrag_;
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
 };
