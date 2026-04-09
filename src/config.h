@@ -103,7 +103,6 @@ struct ColorConfig {
     CONFIG_VALUE(unsigned int, trackColor, "track_color");
     CONFIG_VALUE(unsigned int, panelFillColor, "panel_fill_color");
     CONFIG_VALUE(unsigned int, graphBackgroundColor, "graph_background_color");
-    CONFIG_VALUE(unsigned int, graphGridColor, "graph_grid_color");
     CONFIG_VALUE(unsigned int, graphAxisColor, "graph_axis_color");
     CONFIG_VALUE(unsigned int, graphMarkerColor, "graph_marker_color");
     CONFIG_SECTION("colors");
@@ -173,7 +172,6 @@ struct DriveUsageListWidgetConfig {
     CONFIG_VALUE(int, percentGap, "percent_gap");
     CONFIG_VALUE(int, barHeight, "bar_height");
     CONFIG_VALUE(int, verticalGap, "vertical_gap");
-    CONFIG_VALUE(int, labelPadding, "label_padding");
     CONFIG_VALUE(int, percentPadding, "percent_padding");
     CONFIG_VALUE(int, activitySegments, "activity_segments");
     CONFIG_VALUE(int, activitySegmentGap, "activity_segment_gap");
