@@ -108,10 +108,10 @@ private:
     bool ApplyConfiguredWallpaper();
 
     DashboardSessionState state_{};
-    DefaultConfigPersistenceService configPersistenceService_{};
-    DefaultDiagnosticsService diagnosticsService_{};
-    DefaultDisplayConfigurationService displayConfigurationService_{};
-    DefaultAutoStartService autoStartService_{};
-    DefaultDashboardSessionService dashboardSessionService_{};
-    DefaultLayoutEditingService layoutEditingService_{};
+    ConfigPersistenceService configPersistenceService_{};
+    DiagnosticsService diagnosticsService_{};
+    DisplayConfigurationService displayConfigurationService_{};
+    AutoStartService autoStartService_{};
+    DashboardSessionService dashboardSessionService_{};
+    LayoutEditingService layoutEditingService_{};
 };

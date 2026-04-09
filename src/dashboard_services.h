@@ -6,106 +6,51 @@
 #include "app_platform.h"
 #include "layout_edit_service.h"
 
-class IConfigPersistenceService {
+class ConfigPersistenceService {
 public:
-    virtual ~IConfigPersistenceService() = default;
-    virtual AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) const = 0;
-    virtual bool SaveRuntimeConfig(const std::filesystem::path& path, const AppConfig& config, HWND owner) const = 0;
-    virtual bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) const = 0;
+    AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) const;
+    bool SaveRuntimeConfig(const std::filesystem::path& path, const AppConfig& config, HWND owner) const;
+    bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) const;
 };
 
-class IDiagnosticsService {
+class DiagnosticsService {
 public:
-    virtual ~IDiagnosticsService() = default;
-    virtual std::unique_ptr<DiagnosticsSession> CreateSession(const DiagnosticsOptions& options) const = 0;
-    virtual bool WriteOutputs(DiagnosticsSession* session, const TelemetryDump& dump, const AppConfig& config) const = 0;
-    virtual bool ReloadTelemetryRuntime(const std::filesystem::path& configPath, AppConfig& activeConfig,
-        std::unique_ptr<TelemetryRuntime>& telemetry, const DiagnosticsOptions& diagnosticsOptions,
-        DiagnosticsSession* diagnostics) const = 0;
-};
-
-class IDisplayConfigurationService {
-public:
-    virtual ~IDisplayConfigurationService() = default;
-    virtual bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) const = 0;
-    virtual std::vector<DisplayMenuOption> EnumerateDisplayOptions(const AppConfig& config) const = 0;
-    virtual std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName) const = 0;
-    virtual bool ConfigureDisplay(const AppConfig& config, const TelemetryDump& dump, UINT targetDpi,
-        std::ostream* traceStream, HWND owner) const = 0;
-};
-
-class IAutoStartService {
-public:
-    virtual ~IAutoStartService() = default;
-    virtual bool IsEnabled() const = 0;
-    virtual bool Update(bool enabled, HWND owner) const = 0;
-};
-
-class IDashboardSessionService {
-public:
-    virtual ~IDashboardSessionService() = default;
-    virtual std::unique_ptr<TelemetryRuntime> InitializeRuntime(const AppConfig& config,
-        const DiagnosticsOptions& options, std::ostream* traceStream) const = 0;
-    virtual void UpdateSnapshot(TelemetryRuntime& telemetry) const = 0;
-    virtual void SetPreferredNetworkAdapter(TelemetryRuntime& telemetry, const std::string& adapterName) const = 0;
-    virtual void SetSelectedStorageDrives(TelemetryRuntime& telemetry, const std::vector<std::string>& driveLetters) const = 0;
-};
-
-class ILayoutEditingService {
-public:
-    virtual ~ILayoutEditingService() = default;
-    virtual bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) const = 0;
-    virtual bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, double value) const = 0;
-    virtual std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer, const AppConfig& baseConfig,
-        const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights,
-        const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) const = 0;
-};
-
-class DefaultConfigPersistenceService : public IConfigPersistenceService {
-public:
-    AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) const override;
-    bool SaveRuntimeConfig(const std::filesystem::path& path, const AppConfig& config, HWND owner) const override;
-    bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) const override;
-};
-
-class DefaultDiagnosticsService : public IDiagnosticsService {
-public:
-    std::unique_ptr<DiagnosticsSession> CreateSession(const DiagnosticsOptions& options) const override;
-    bool WriteOutputs(DiagnosticsSession* session, const TelemetryDump& dump, const AppConfig& config) const override;
+    std::unique_ptr<DiagnosticsSession> CreateSession(const DiagnosticsOptions& options) const;
+    bool WriteOutputs(DiagnosticsSession* session, const TelemetryDump& dump, const AppConfig& config) const;
     bool ReloadTelemetryRuntime(const std::filesystem::path& configPath, AppConfig& activeConfig,
         std::unique_ptr<TelemetryRuntime>& telemetry, const DiagnosticsOptions& diagnosticsOptions,
-        DiagnosticsSession* diagnostics) const override;
+        DiagnosticsSession* diagnostics) const;
 };
 
-class DefaultDisplayConfigurationService : public IDisplayConfigurationService {
+class DisplayConfigurationService {
 public:
-    bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) const override;
-    std::vector<DisplayMenuOption> EnumerateDisplayOptions(const AppConfig& config) const override;
-    std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName) const override;
+    bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) const;
+    std::vector<DisplayMenuOption> EnumerateDisplayOptions(const AppConfig& config) const;
+    std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName) const;
     bool ConfigureDisplay(const AppConfig& config, const TelemetryDump& dump, UINT targetDpi,
-        std::ostream* traceStream, HWND owner) const override;
+        std::ostream* traceStream, HWND owner) const;
 };
 
-class DefaultAutoStartService : public IAutoStartService {
+class AutoStartService {
 public:
-    bool IsEnabled() const override;
-    bool Update(bool enabled, HWND owner) const override;
+    bool IsEnabled() const;
+    bool Update(bool enabled, HWND owner) const;
 };
 
-class DefaultDashboardSessionService : public IDashboardSessionService {
+class DashboardSessionService {
 public:
     std::unique_ptr<TelemetryRuntime> InitializeRuntime(const AppConfig& config,
-        const DiagnosticsOptions& options, std::ostream* traceStream) const override;
-    void UpdateSnapshot(TelemetryRuntime& telemetry) const override;
-    void SetPreferredNetworkAdapter(TelemetryRuntime& telemetry, const std::string& adapterName) const override;
-    void SetSelectedStorageDrives(TelemetryRuntime& telemetry, const std::vector<std::string>& driveLetters) const override;
+        const DiagnosticsOptions& options, std::ostream* traceStream) const;
+    void UpdateSnapshot(TelemetryRuntime& telemetry) const;
+    void SetPreferredNetworkAdapter(TelemetryRuntime& telemetry, const std::string& adapterName) const;
+    void SetSelectedStorageDrives(TelemetryRuntime& telemetry, const std::vector<std::string>& driveLetters) const;
 };
 
-class DefaultLayoutEditingService : public ILayoutEditingService {
+class LayoutEditingService {
 public:
-    bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) const override;
-    bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, double value) const override;
+    bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) const;
+    bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, double value) const;
     std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer, const AppConfig& baseConfig,
         const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights,
-        const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) const override;
+        const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) const;
 };
