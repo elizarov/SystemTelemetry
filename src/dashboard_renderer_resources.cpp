@@ -443,67 +443,14 @@ void DashboardRenderer::SetRenderMode(RenderMode mode) {
     renderMode_ = mode;
 }
 
-void DashboardRenderer::BeginLayoutEditSession() {
-    showLayoutEditGuides_ = true;
-    ClearLayoutEditInteractionState();
-}
-
-void DashboardRenderer::EndLayoutEditSession(bool showLayoutEditGuides) {
-    showLayoutEditGuides_ = showLayoutEditGuides;
-    ClearLayoutEditInteractionState();
-}
-
-bool DashboardRenderer::SetLayoutEditPreviewWidgetType(const std::string& widgetTypeName) {
+bool DashboardRenderer::SetLayoutEditPreviewWidgetType(
+    EditOverlayState& overlayState, const std::string& widgetTypeName) const {
     const auto widget = FindFirstLayoutEditPreviewWidget(widgetTypeName);
     if (!widget.has_value()) {
         return false;
     }
-    hoveredEditableWidget_ = widget;
+    overlayState.hoveredEditableWidget = widget;
     return true;
-}
-
-void DashboardRenderer::SetShowLayoutEditGuides(bool show) {
-    showLayoutEditGuides_ = show;
-}
-
-void DashboardRenderer::SetActiveLayoutEditGuide(const std::optional<LayoutEditGuide>& guide) {
-    activeLayoutEditGuide_ = guide;
-}
-
-void DashboardRenderer::SetHoveredEditableWidget(const std::optional<LayoutWidgetIdentity>& widget) {
-    hoveredEditableWidget_ = widget;
-}
-
-void DashboardRenderer::SetActiveWidgetEditGuide(const std::optional<WidgetEditGuide>& guide) {
-    activeWidgetEditGuide_ = guide;
-}
-
-void DashboardRenderer::SetHoveredEditableText(const std::optional<EditableTextKey>& key) {
-    hoveredEditableText_ = key;
-}
-
-void DashboardRenderer::SetActiveEditableText(const std::optional<EditableTextKey>& key) {
-    activeEditableText_ = key;
-}
-
-void DashboardRenderer::SetHoveredEditableBar(const std::optional<EditableBarKey>& key) {
-    hoveredEditableBar_ = key;
-}
-
-void DashboardRenderer::SetActiveEditableBar(const std::optional<EditableBarKey>& key) {
-    activeEditableBar_ = key;
-}
-
-void DashboardRenderer::SetHoveredEditableGauge(const std::optional<EditableGaugeKey>& key) {
-    hoveredEditableGauge_ = key;
-}
-
-void DashboardRenderer::SetActiveEditableGauge(const std::optional<EditableGaugeKey>& key) {
-    activeEditableGauge_ = key;
-}
-
-void DashboardRenderer::SetSimilarityIndicatorMode(SimilarityIndicatorMode mode) {
-    similarityIndicatorMode_ = mode;
 }
 
 double DashboardRenderer::RenderScale() const {
@@ -724,18 +671,6 @@ std::optional<DashboardRenderer::EditableGaugeRegion> DashboardRenderer::FindEdi
         return std::nullopt;
     }
     return *it;
-}
-
-void DashboardRenderer::ClearLayoutEditInteractionState() {
-    activeLayoutEditGuide_.reset();
-    hoveredEditableWidget_.reset();
-    activeWidgetEditGuide_.reset();
-    hoveredEditableText_.reset();
-    activeEditableText_.reset();
-    hoveredEditableBar_.reset();
-    activeEditableBar_.reset();
-    hoveredEditableGauge_.reset();
-    activeEditableGauge_.reset();
 }
 
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(

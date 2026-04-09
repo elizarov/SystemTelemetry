@@ -40,6 +40,8 @@ public:
     HWND WindowHandle() const override;
     DashboardRenderer& Renderer() override;
     const DashboardRenderer& Renderer() const override;
+    DashboardRenderer::EditOverlayState& RendererEditOverlayState() override;
+    const DashboardRenderer::EditOverlayState& RendererEditOverlayState() const override;
     UINT CurrentWindowDpi() const override;
     void ApplyConfigPlacement() override;
     void InvalidateShell() override;
@@ -96,12 +98,14 @@ private:
 
     const AppConfig& LayoutEditConfig() const override;
     DashboardRenderer& LayoutEditRenderer() override;
+    DashboardRenderer::EditOverlayState& LayoutEditOverlayState() override;
     bool ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& target, double value) override;
     void InvalidateLayoutEdit() override;
 
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
     DashboardRenderer renderer_;
+    DashboardRenderer::EditOverlayState rendererEditOverlayState_{};
     std::unique_ptr<IDashboardController> controller_;
     NOTIFYICONDATAW trayIcon_{};
     MonitorPlacementInfo movePlacementInfo_{};

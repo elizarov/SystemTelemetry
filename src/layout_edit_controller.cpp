@@ -218,14 +218,16 @@ LayoutEditHost::LayoutTarget LayoutEditHost::LayoutTarget::ForGuide(const Dashbo
 LayoutEditController::LayoutEditController(LayoutEditHost& host) : host_(host) {}
 
 void LayoutEditController::StartSession() {
-    host_.LayoutEditRenderer().BeginLayoutEditSession();
+    host_.LayoutEditOverlayState().showLayoutEditGuides = true;
     ClearInteractionState();
+    SyncRendererInteractionState();
 }
 
 void LayoutEditController::StopSession(HWND hwnd, bool showLayoutEditGuidesAfterStop) {
     (void) hwnd;
-    host_.LayoutEditRenderer().EndLayoutEditSession(showLayoutEditGuidesAfterStop);
     ClearInteractionState();
+    host_.LayoutEditOverlayState().showLayoutEditGuides = showLayoutEditGuidesAfterStop;
+    SyncRendererInteractionState();
     ReleaseCapture();
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
     host_.InvalidateLayoutEdit();
@@ -289,13 +291,13 @@ void LayoutEditController::RefreshHover(HWND hwnd, POINT clientPoint) {
     }
     if (hoverChanged) {
         hoveredEditableWidget_ = nextHoveredWidget;
-        renderer.SetHoveredEditableWidget(hoveredEditableWidget_);
+        host_.LayoutEditOverlayState().hoveredEditableWidget = hoveredEditableWidget_;
     }
     if (hoveredEditableText_.has_value() != nextHoveredText.has_value() ||
         (hoveredEditableText_.has_value() && nextHoveredText.has_value() &&
             !EditableTextKeyEquals(*hoveredEditableText_, *nextHoveredText))) {
         hoveredEditableText_ = nextHoveredText;
-        renderer.SetHoveredEditableText(hoveredEditableText_);
+        host_.LayoutEditOverlayState().hoveredEditableText = hoveredEditableText_;
         hoverChanged = true;
     }
     if (hoveredEditableTextAnchor_.has_value() != nextHoveredTextAnchor.has_value() ||
@@ -308,7 +310,7 @@ void LayoutEditController::RefreshHover(HWND hwnd, POINT clientPoint) {
         (hoveredEditableBar_.has_value() && nextHoveredBar.has_value() &&
             !EditableBarKeyEquals(*hoveredEditableBar_, *nextHoveredBar))) {
         hoveredEditableBar_ = nextHoveredBar;
-        renderer.SetHoveredEditableBar(hoveredEditableBar_);
+        host_.LayoutEditOverlayState().hoveredEditableBar = hoveredEditableBar_;
         hoverChanged = true;
     }
     if (hoveredEditableBarAnchor_.has_value() != nextHoveredBarAnchor.has_value() ||
@@ -321,7 +323,7 @@ void LayoutEditController::RefreshHover(HWND hwnd, POINT clientPoint) {
         (hoveredEditableGaugeAnchor_.has_value() && nextHoveredGaugeAnchor.has_value() &&
             !EditableGaugeKeyEquals(*hoveredEditableGaugeAnchor_, *nextHoveredGaugeAnchor))) {
         hoveredEditableGaugeAnchor_ = nextHoveredGaugeAnchor;
-        renderer.SetHoveredEditableGauge(hoveredEditableGaugeAnchor_);
+        host_.LayoutEditOverlayState().hoveredEditableGauge = hoveredEditableGaugeAnchor_;
         hoverChanged = true;
     }
 
@@ -535,26 +537,26 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
 }
 
 void LayoutEditController::SyncRendererInteractionState() {
-    DashboardRenderer& renderer = host_.LayoutEditRenderer();
-    renderer.SetHoveredEditableWidget(hoveredEditableWidget_);
-    renderer.SetHoveredEditableText(hoveredEditableText_);
-    renderer.SetHoveredEditableBar(hoveredEditableBar_);
-    renderer.SetHoveredEditableGauge(hoveredEditableGaugeAnchor_);
-    renderer.SetActiveLayoutEditGuide(activeLayoutDrag_.has_value()
+    DashboardRenderer::EditOverlayState& overlayState = host_.LayoutEditOverlayState();
+    overlayState.hoveredEditableWidget = hoveredEditableWidget_;
+    overlayState.hoveredEditableText = hoveredEditableText_;
+    overlayState.hoveredEditableBar = hoveredEditableBar_;
+    overlayState.hoveredEditableGauge = hoveredEditableGaugeAnchor_;
+    overlayState.activeLayoutEditGuide = activeLayoutDrag_.has_value()
         ? std::optional<DashboardRenderer::LayoutEditGuide>(activeLayoutDrag_->guide)
-        : std::nullopt);
-    renderer.SetActiveWidgetEditGuide(activeWidgetEditDrag_.has_value()
+        : std::nullopt;
+    overlayState.activeWidgetEditGuide = activeWidgetEditDrag_.has_value()
         ? std::optional<DashboardRenderer::WidgetEditGuide>(activeWidgetEditDrag_->guide)
-        : std::nullopt);
-    renderer.SetActiveEditableText(activeTextEditDrag_.has_value()
+        : std::nullopt;
+    overlayState.activeEditableText = activeTextEditDrag_.has_value()
         ? std::optional<DashboardRenderer::EditableTextKey>(activeTextEditDrag_->key)
-        : std::nullopt);
-    renderer.SetActiveEditableBar(activeBarEditDrag_.has_value()
+        : std::nullopt;
+    overlayState.activeEditableBar = activeBarEditDrag_.has_value()
         ? std::optional<DashboardRenderer::EditableBarKey>(activeBarEditDrag_->key)
-        : std::nullopt);
-    renderer.SetActiveEditableGauge(activeGaugeEditDrag_.has_value()
+        : std::nullopt;
+    overlayState.activeEditableGauge = activeGaugeEditDrag_.has_value()
         ? std::optional<DashboardRenderer::EditableGaugeKey>(activeGaugeEditDrag_->key)
-        : std::nullopt);
+        : std::nullopt;
 }
 
 void LayoutEditController::ClearInteractionState() {

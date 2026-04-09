@@ -55,6 +55,7 @@ public:
 
     virtual const AppConfig& LayoutEditConfig() const = 0;
     virtual DashboardRenderer& LayoutEditRenderer() = 0;
+    virtual DashboardRenderer::EditOverlayState& LayoutEditOverlayState() = 0;
     virtual bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) = 0;
     virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget,

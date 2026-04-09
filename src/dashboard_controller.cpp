@@ -15,7 +15,7 @@ const DashboardSessionState& DashboardController::State() const {
 
 void DashboardController::SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides) {
     shell.Renderer().SetConfig(state_.config);
-    shell.Renderer().SetShowLayoutEditGuides(showLayoutEditGuides);
+    shell.RendererEditOverlayState().showLayoutEditGuides = showLayoutEditGuides;
 }
 
 void DashboardController::SyncRuntimeAndRenderer(DashboardShellHost& shell, bool showLayoutEditGuides) {
@@ -37,7 +37,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     }
 
     SyncRenderer(shell, diagnosticsOptions.editLayout);
-    shell.Renderer().SetSimilarityIndicatorMode(GetSimilarityIndicatorMode(diagnosticsOptions));
+    shell.RendererEditOverlayState().similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions);
     shell.Renderer().SetTraceOutput(nullptr);
 
     if (diagnosticsOptions.HasAnyOutput()) {
@@ -288,7 +288,7 @@ void DashboardController::StartLayoutEditMode(DashboardShellHost& shell, LayoutE
         return;
     }
     state_.isEditingLayout = true;
-    shell.Renderer().SetShowLayoutEditGuides(true);
+    shell.RendererEditOverlayState().showLayoutEditGuides = true;
     controller.StartSession();
     shell.InvalidateShell();
 }
@@ -298,8 +298,8 @@ void DashboardController::StopLayoutEditMode(DashboardShellHost& shell, LayoutEd
         return;
     }
     state_.isEditingLayout = false;
-    shell.Renderer().SetShowLayoutEditGuides(diagnosticsEditLayout);
     controller.StopSession(shell.WindowHandle(), diagnosticsEditLayout);
+    shell.RendererEditOverlayState().showLayoutEditGuides = diagnosticsEditLayout;
 }
 
 bool DashboardController::ApplyLayoutGuideWeights(DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target,

@@ -468,5 +468,5 @@ void DashboardApp::DrawTextBlock(HDC hdc, const RECT& rect, const std::string& t
 }
 
 void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
-    renderer_.Draw(hdc, snapshot);
+    renderer_.Draw(hdc, snapshot, rendererEditOverlayState_);
 }

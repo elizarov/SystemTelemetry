@@ -427,11 +427,12 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnap
     DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode, const std::string& editLayoutWidgetName,
     std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
+    DashboardRenderer::EditOverlayState overlayState;
+    overlayState.showLayoutEditGuides = showLayoutEditGuides;
+    overlayState.similarityIndicatorMode = similarityIndicatorMode;
     renderer.SetRenderScale(scale);
     renderer.SetConfig(config);
     renderer.SetRenderMode(renderMode);
-    renderer.SetShowLayoutEditGuides(showLayoutEditGuides);
-    renderer.SetSimilarityIndicatorMode(similarityIndicatorMode);
     renderer.SetTraceOutput(traceStream);
     if (!renderer.Initialize()) {
         if (errorText != nullptr) {
@@ -440,7 +441,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnap
         return false;
     }
     if (!editLayoutWidgetName.empty()) {
-        if (!renderer.SetLayoutEditPreviewWidgetType(editLayoutWidgetName)) {
+        if (!renderer.SetLayoutEditPreviewWidgetType(overlayState, editLayoutWidgetName)) {
             if (errorText != nullptr) {
                 *errorText = "renderer:edit_layout_widget_not_found name=\"" + editLayoutWidgetName + "\"";
             }
@@ -448,7 +449,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnap
         }
         WriteOptionalTrace(traceStream, "diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
     }
-    const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot);
+    const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot, overlayState);
     if (!saved && errorText != nullptr) {
         *errorText = renderer.LastError();
     }

@@ -29,6 +29,8 @@ public:
     virtual HWND WindowHandle() const = 0;
     virtual DashboardRenderer& Renderer() = 0;
     virtual const DashboardRenderer& Renderer() const = 0;
+    virtual DashboardRenderer::EditOverlayState& RendererEditOverlayState() = 0;
+    virtual const DashboardRenderer::EditOverlayState& RendererEditOverlayState() const = 0;
     virtual UINT CurrentWindowDpi() const = 0;
     virtual bool InitializeFonts() = 0;
     virtual void ReleaseFonts() = 0;

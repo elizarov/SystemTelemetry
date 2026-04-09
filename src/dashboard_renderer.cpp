@@ -385,15 +385,15 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(HDC hdc, co
     return result;
 }
 
-void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc) const {
-    if (!showLayoutEditGuides_ || !hoveredEditableWidget_.has_value()) {
+void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const {
+    if (!overlayState.showLayoutEditGuides || !overlayState.hoveredEditableWidget.has_value()) {
         return;
     }
 
     const ResolvedWidgetLayout* hoveredWidget = nullptr;
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (MatchesWidgetIdentity(widget, *hoveredEditableWidget_)) {
+            if (MatchesWidgetIdentity(widget, *overlayState.hoveredEditableWidget)) {
                 hoveredWidget = &widget;
                 break;
             }
@@ -415,24 +415,28 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc) const {
     DeleteObject(pen);
 }
 
-void DashboardRenderer::DrawHoveredEditableTextHighlight(HDC hdc) const {
-    if (!showLayoutEditGuides_) {
+void DashboardRenderer::DrawHoveredEditableTextHighlight(HDC hdc, const EditOverlayState& overlayState) const {
+    if (!overlayState.showLayoutEditGuides) {
         return;
     }
 
     const EditableTextRegion* highlighted = nullptr;
     bool active = false;
-    if (activeEditableText_.has_value()) {
+    if (overlayState.activeEditableText.has_value()) {
         const auto it = std::find_if(editableTextRegions_.begin(), editableTextRegions_.end(),
-            [&](const EditableTextRegion& region) { return MatchesEditableTextKey(region.key, *activeEditableText_); });
+            [&](const EditableTextRegion& region) {
+                return MatchesEditableTextKey(region.key, *overlayState.activeEditableText);
+            });
         if (it != editableTextRegions_.end()) {
             highlighted = &(*it);
             active = true;
         }
     }
-    if (highlighted == nullptr && hoveredEditableText_.has_value()) {
+    if (highlighted == nullptr && overlayState.hoveredEditableText.has_value()) {
         const auto it = std::find_if(editableTextRegions_.begin(), editableTextRegions_.end(),
-            [&](const EditableTextRegion& region) { return MatchesEditableTextKey(region.key, *hoveredEditableText_); });
+            [&](const EditableTextRegion& region) {
+                return MatchesEditableTextKey(region.key, *overlayState.hoveredEditableText);
+            });
         if (it != editableTextRegions_.end()) {
             highlighted = &(*it);
         }
@@ -464,24 +468,28 @@ void DashboardRenderer::DrawHoveredEditableTextHighlight(HDC hdc) const {
         static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
 }
 
-void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc) const {
-    if (!showLayoutEditGuides_) {
+void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc, const EditOverlayState& overlayState) const {
+    if (!overlayState.showLayoutEditGuides) {
         return;
     }
 
     const EditableBarRegion* highlighted = nullptr;
     bool active = false;
-    if (activeEditableBar_.has_value()) {
+    if (overlayState.activeEditableBar.has_value()) {
         const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
-            [&](const EditableBarRegion& region) { return MatchesEditableBarKey(region.key, *activeEditableBar_); });
+            [&](const EditableBarRegion& region) {
+                return MatchesEditableBarKey(region.key, *overlayState.activeEditableBar);
+            });
         if (it != editableBarRegions_.end()) {
             highlighted = &(*it);
             active = true;
         }
     }
-    if (highlighted == nullptr && hoveredEditableBar_.has_value()) {
+    if (highlighted == nullptr && overlayState.hoveredEditableBar.has_value()) {
         const auto it = std::find_if(editableBarRegions_.begin(), editableBarRegions_.end(),
-            [&](const EditableBarRegion& region) { return MatchesEditableBarKey(region.key, *hoveredEditableBar_); });
+            [&](const EditableBarRegion& region) {
+                return MatchesEditableBarKey(region.key, *overlayState.hoveredEditableBar);
+            });
         if (it != editableBarRegions_.end()) {
             highlighted = &(*it);
         }
@@ -513,34 +521,38 @@ void DashboardRenderer::DrawHoveredEditableBarHighlight(HDC hdc) const {
         static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
 }
 
-void DashboardRenderer::DrawHoveredEditableGaugeHighlight(HDC hdc) const {
-    if (!showLayoutEditGuides_) {
+void DashboardRenderer::DrawHoveredEditableGaugeHighlight(HDC hdc, const EditOverlayState& overlayState) const {
+    if (!overlayState.showLayoutEditGuides) {
         return;
     }
 
     const EditableGaugeRegion* highlighted = nullptr;
     bool active = false;
-    if (activeEditableGauge_.has_value()) {
+    if (overlayState.activeEditableGauge.has_value()) {
         const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
-            [&](const EditableGaugeRegion& region) { return MatchesEditableGaugeKey(region.key, *activeEditableGauge_); });
+            [&](const EditableGaugeRegion& region) {
+                return MatchesEditableGaugeKey(region.key, *overlayState.activeEditableGauge);
+            });
         if (it != editableGaugeRegions_.end()) {
             highlighted = &(*it);
             active = true;
         }
     }
-    if (highlighted == nullptr && hoveredEditableGauge_.has_value()) {
+    if (highlighted == nullptr && overlayState.hoveredEditableGauge.has_value()) {
         const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
-            [&](const EditableGaugeRegion& region) { return MatchesEditableGaugeKey(region.key, *hoveredEditableGauge_); });
+            [&](const EditableGaugeRegion& region) {
+                return MatchesEditableGaugeKey(region.key, *overlayState.hoveredEditableGauge);
+            });
         if (it != editableGaugeRegions_.end()) {
             highlighted = &(*it);
         }
     }
-    if (highlighted == nullptr && hoveredEditableWidget_.has_value()) {
+    if (highlighted == nullptr && overlayState.hoveredEditableWidget.has_value()) {
         const auto it = std::find_if(editableGaugeRegions_.begin(), editableGaugeRegions_.end(),
             [&](const EditableGaugeRegion& region) {
-                return region.key.widget.renderCardId == hoveredEditableWidget_->renderCardId &&
-                    region.key.widget.editCardId == hoveredEditableWidget_->editCardId &&
-                    region.key.widget.nodePath == hoveredEditableWidget_->nodePath;
+                return region.key.widget.renderCardId == overlayState.hoveredEditableWidget->renderCardId &&
+                    region.key.widget.editCardId == overlayState.hoveredEditableWidget->editCardId &&
+                    region.key.widget.nodePath == overlayState.hoveredEditableWidget->nodePath;
             });
         if (it != editableGaugeRegions_.end()) {
             highlighted = &(*it);
@@ -553,8 +565,8 @@ void DashboardRenderer::DrawHoveredEditableGaugeHighlight(HDC hdc) const {
     FillDiamond(hdc, highlighted->anchorRect, active ? ActiveEditColor() : LayoutGuideColor());
 }
 
-void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
-    if (!showLayoutEditGuides_ || layoutEditGuides_.empty()) {
+void DashboardRenderer::DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const {
+    if (!overlayState.showLayoutEditGuides || layoutEditGuides_.empty()) {
         return;
     }
 
@@ -562,7 +574,8 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
     HPEN activePen = CreatePen(PS_SOLID, 1, ActiveEditColor());
     HGDIOBJ oldPen = SelectObject(hdc, pen);
     for (const auto& guide : layoutEditGuides_) {
-        const bool active = activeLayoutEditGuide_.has_value() && MatchesLayoutEditGuide(guide, *activeLayoutEditGuide_);
+        const bool active = overlayState.activeLayoutEditGuide.has_value() &&
+            MatchesLayoutEditGuide(guide, *overlayState.activeLayoutEditGuide);
         SelectObject(hdc, active ? activePen : pen);
         if (guide.axis == LayoutGuideAxis::Vertical) {
             MoveToEx(hdc, guide.lineRect.left, guide.lineRect.top, nullptr);
@@ -577,23 +590,23 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc) const {
     DeleteObject(pen);
 }
 
-void DashboardRenderer::DrawWidgetEditGuides(HDC hdc) const {
-    if (!showLayoutEditGuides_ || widgetEditGuides_.empty()) {
+void DashboardRenderer::DrawWidgetEditGuides(HDC hdc, const EditOverlayState& overlayState) const {
+    if (!overlayState.showLayoutEditGuides || widgetEditGuides_.empty()) {
         return;
     }
 
     const auto shouldDraw = [&](const WidgetEditGuide& guide) {
-        if (activeWidgetEditGuide_.has_value()) {
-            return guide.widget.renderCardId == activeWidgetEditGuide_->widget.renderCardId &&
-                guide.widget.editCardId == activeWidgetEditGuide_->widget.editCardId &&
-                guide.widget.nodePath == activeWidgetEditGuide_->widget.nodePath;
+        if (overlayState.activeWidgetEditGuide.has_value()) {
+            return guide.widget.renderCardId == overlayState.activeWidgetEditGuide->widget.renderCardId &&
+                guide.widget.editCardId == overlayState.activeWidgetEditGuide->widget.editCardId &&
+                guide.widget.nodePath == overlayState.activeWidgetEditGuide->widget.nodePath;
         }
-        if (!hoveredEditableWidget_.has_value()) {
+        if (!overlayState.hoveredEditableWidget.has_value()) {
             return false;
         }
-        return guide.widget.renderCardId == hoveredEditableWidget_->renderCardId &&
-            guide.widget.editCardId == hoveredEditableWidget_->editCardId &&
-            guide.widget.nodePath == hoveredEditableWidget_->nodePath;
+        return guide.widget.renderCardId == overlayState.hoveredEditableWidget->renderCardId &&
+            guide.widget.editCardId == overlayState.hoveredEditableWidget->editCardId &&
+            guide.widget.nodePath == overlayState.hoveredEditableWidget->nodePath;
     };
 
     HPEN pen = CreatePen(PS_SOLID, 1, LayoutGuideColor());
@@ -603,7 +616,8 @@ void DashboardRenderer::DrawWidgetEditGuides(HDC hdc) const {
         if (!shouldDraw(guide)) {
             continue;
         }
-        const bool active = activeWidgetEditGuide_.has_value() && MatchesWidgetEditGuide(guide, *activeWidgetEditGuide_);
+        const bool active = overlayState.activeWidgetEditGuide.has_value() &&
+            MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
         SelectObject(hdc, active ? activePen : pen);
         MoveToEx(hdc, guide.drawStart.x, guide.drawStart.y, nullptr);
         LineTo(hdc, guide.drawEnd.x, guide.drawEnd.y);
@@ -733,7 +747,7 @@ void DashboardRenderer::RegisterEditableGaugeRegion(
     editableGaugeRegions_.push_back(std::move(region));
 }
 
-void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
+void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const {
     const int threshold = LayoutSimilarityThreshold();
     if (threshold <= 0) {
         return;
@@ -755,21 +769,21 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
     const char* axisLabel = "horizontal";
     std::vector<const ResolvedWidgetLayout*> affectedWidgets;
     std::vector<const ResolvedWidgetLayout*> allWidgets;
-    if (similarityIndicatorMode_ == SimilarityIndicatorMode::AllHorizontal) {
+    if (overlayState.similarityIndicatorMode == SimilarityIndicatorMode::AllHorizontal) {
         axis = LayoutGuideAxis::Vertical;
         axisLabel = "horizontal";
         allWidgets = CollectSimilarityIndicatorWidgets(axis);
         affectedWidgets = allWidgets;
-    } else if (similarityIndicatorMode_ == SimilarityIndicatorMode::AllVertical) {
+    } else if (overlayState.similarityIndicatorMode == SimilarityIndicatorMode::AllVertical) {
         axis = LayoutGuideAxis::Horizontal;
         axisLabel = "vertical";
         allWidgets = CollectSimilarityIndicatorWidgets(axis);
         affectedWidgets = allWidgets;
     } else {
-        if (!activeLayoutEditGuide_.has_value()) {
+        if (!overlayState.activeLayoutEditGuide.has_value()) {
             return;
         }
-        const LayoutEditGuide& guide = *activeLayoutEditGuide_;
+        const LayoutEditGuide& guide = *overlayState.activeLayoutEditGuide;
         axis = guide.axis;
         axisLabel = axis == LayoutGuideAxis::Vertical ? "horizontal" : "vertical";
         allWidgets = CollectSimilarityIndicatorWidgets(axis);
@@ -1392,6 +1406,10 @@ void DashboardRenderer::DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& 
 }
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
+    Draw(hdc, snapshot, EditOverlayState{});
+}
+
+void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
     editableTextRegions_.clear();
     editableBarRegions_.clear();
     editableGaugeRegions_.clear();
@@ -1402,16 +1420,21 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
             DrawResolvedWidget(hdc, widget, metrics);
         }
     }
-    DrawHoveredWidgetHighlight(hdc);
-    DrawHoveredEditableTextHighlight(hdc);
-    DrawHoveredEditableBarHighlight(hdc);
-    DrawHoveredEditableGaugeHighlight(hdc);
-    DrawLayoutEditGuides(hdc);
-    DrawWidgetEditGuides(hdc);
-    DrawLayoutSimilarityIndicators(hdc);
+    DrawHoveredWidgetHighlight(hdc, overlayState);
+    DrawHoveredEditableTextHighlight(hdc, overlayState);
+    DrawHoveredEditableBarHighlight(hdc, overlayState);
+    DrawHoveredEditableGaugeHighlight(hdc, overlayState);
+    DrawLayoutEditGuides(hdc, overlayState);
+    DrawWidgetEditGuides(hdc, overlayState);
+    DrawLayoutSimilarityIndicators(hdc, overlayState);
 }
 
 bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
+    return SaveSnapshotPng(imagePath, snapshot, EditOverlayState{});
+}
+
+bool DashboardRenderer::SaveSnapshotPng(
+    const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
     if (!Initialize(hwnd_)) {
         return false;
     }
@@ -1451,7 +1474,7 @@ bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, 
     FillRect(memDc, &client, background);
     DeleteObject(background);
     SetBkMode(memDc, TRANSPARENT);
-    Draw(memDc, snapshot);
+    Draw(memDc, snapshot, overlayState);
 
     CLSID pngClsid{};
     Gdiplus::Bitmap image(bitmap, nullptr);

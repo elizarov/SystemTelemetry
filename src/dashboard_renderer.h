@@ -163,26 +163,27 @@ public:
         AllVertical,
     };
 
+    struct EditOverlayState {
+        bool showLayoutEditGuides = false;
+        SimilarityIndicatorMode similarityIndicatorMode = SimilarityIndicatorMode::ActiveGuide;
+        std::optional<LayoutEditGuide> activeLayoutEditGuide;
+        std::optional<LayoutWidgetIdentity> hoveredEditableWidget;
+        std::optional<WidgetEditGuide> activeWidgetEditGuide;
+        std::optional<EditableTextKey> hoveredEditableText;
+        std::optional<EditableTextKey> activeEditableText;
+        std::optional<EditableBarKey> hoveredEditableBar;
+        std::optional<EditableBarKey> activeEditableBar;
+        std::optional<EditableGaugeKey> hoveredEditableGauge;
+        std::optional<EditableGaugeKey> activeEditableGauge;
+    };
+
     DashboardRenderer();
     ~DashboardRenderer();
 
     void SetConfig(const AppConfig& config);
     void SetRenderScale(double scale);
     void SetRenderMode(RenderMode mode);
-    void BeginLayoutEditSession();
-    void EndLayoutEditSession(bool showLayoutEditGuides);
-    bool SetLayoutEditPreviewWidgetType(const std::string& widgetTypeName);
-    void SetShowLayoutEditGuides(bool show);
-    void SetActiveLayoutEditGuide(const std::optional<LayoutEditGuide>& guide);
-    void SetHoveredEditableWidget(const std::optional<LayoutWidgetIdentity>& widget);
-    void SetActiveWidgetEditGuide(const std::optional<WidgetEditGuide>& guide);
-    void SetHoveredEditableText(const std::optional<EditableTextKey>& key);
-    void SetActiveEditableText(const std::optional<EditableTextKey>& key);
-    void SetHoveredEditableBar(const std::optional<EditableBarKey>& key);
-    void SetActiveEditableBar(const std::optional<EditableBarKey>& key);
-    void SetHoveredEditableGauge(const std::optional<EditableGaugeKey>& key);
-    void SetActiveEditableGauge(const std::optional<EditableGaugeKey>& key);
-    void SetSimilarityIndicatorMode(SimilarityIndicatorMode mode);
+    bool SetLayoutEditPreviewWidgetType(EditOverlayState& overlayState, const std::string& widgetTypeName) const;
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
@@ -215,7 +216,10 @@ public:
     void Shutdown();
 
     void Draw(HDC hdc, const SystemSnapshot& snapshot);
+    void Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
+    bool SaveSnapshotPng(
+        const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     const std::string& LastError() const;
 
 private:
@@ -319,13 +323,13 @@ private:
     TextLayoutResult MeasureTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
     TextLayoutResult DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color,
         UINT format, const std::optional<EditableTextBinding>& editable = std::nullopt);
-    void DrawHoveredWidgetHighlight(HDC hdc) const;
-    void DrawHoveredEditableTextHighlight(HDC hdc) const;
-    void DrawHoveredEditableBarHighlight(HDC hdc) const;
-    void DrawHoveredEditableGaugeHighlight(HDC hdc) const;
-    void DrawLayoutEditGuides(HDC hdc) const;
-    void DrawWidgetEditGuides(HDC hdc) const;
-    void DrawLayoutSimilarityIndicators(HDC hdc) const;
+    void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawHoveredEditableTextHighlight(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawHoveredEditableBarHighlight(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawHoveredEditableGaugeHighlight(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawWidgetEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
@@ -347,7 +351,6 @@ private:
         std::vector<std::string>& cardReferenceStack, const std::string& renderCardId, const std::string& editCardId,
         const std::vector<size_t>& nodePath);
     void BuildWidgetEditGuides();
-    void ClearLayoutEditInteractionState();
     std::optional<LayoutWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
 
     bool InitializeGdiplus();
@@ -394,22 +397,11 @@ private:
     MeasuredWidths measuredWidths_{}; 
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
-    std::optional<LayoutEditGuide> activeLayoutEditGuide_;
     std::vector<WidgetEditGuide> widgetEditGuides_;
     std::vector<EditableTextRegion> editableTextRegions_;
     std::vector<EditableBarRegion> editableBarRegions_;
     std::vector<EditableGaugeRegion> editableGaugeRegions_;
-    std::optional<LayoutWidgetIdentity> hoveredEditableWidget_;
-    std::optional<WidgetEditGuide> activeWidgetEditGuide_;
-    std::optional<EditableTextKey> hoveredEditableText_;
-    std::optional<EditableTextKey> activeEditableText_;
-    std::optional<EditableBarKey> hoveredEditableBar_;
-    std::optional<EditableBarKey> activeEditableBar_;
-    std::optional<EditableGaugeKey> hoveredEditableGauge_;
-    std::optional<EditableGaugeKey> activeEditableGauge_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;
-    SimilarityIndicatorMode similarityIndicatorMode_ = SimilarityIndicatorMode::ActiveGuide;
-    bool showLayoutEditGuides_ = false;
 };

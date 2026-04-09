@@ -8,8 +8,8 @@ DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
     controller_->State().config = config;
     renderer_.SetConfig(config);
-    renderer_.SetShowLayoutEditGuides(controller_->State().isEditingLayout || diagnosticsOptions_.editLayout);
-    renderer_.SetSimilarityIndicatorMode(GetSimilarityIndicatorMode(diagnosticsOptions_));
+    rendererEditOverlayState_.showLayoutEditGuides = controller_->State().isEditingLayout || diagnosticsOptions_.editLayout;
+    rendererEditOverlayState_.similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions_);
 }
 
 void DashboardApp::UpdateRendererScale(double scale) {
@@ -33,6 +33,10 @@ const AppConfig& DashboardApp::LayoutEditConfig() const {
 
 DashboardRenderer& DashboardApp::LayoutEditRenderer() {
     return renderer_;
+}
+
+DashboardRenderer::EditOverlayState& DashboardApp::LayoutEditOverlayState() {
+    return rendererEditOverlayState_;
 }
 
 void DashboardApp::InvalidateLayoutEdit() {
@@ -194,12 +198,12 @@ HICON DashboardApp::LoadAppIcon(int width, int height) {
 
 bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
     renderer_.SetConfig(controller_->State().config);
-    renderer_.SetShowLayoutEditGuides(controller_->State().isEditingLayout || diagnosticsOptions_.editLayout);
+    rendererEditOverlayState_.showLayoutEditGuides = controller_->State().isEditingLayout || diagnosticsOptions_.editLayout;
     renderer_.SetTraceOutput(controller_->State().diagnostics != nullptr ? controller_->State().diagnostics->TraceStream() : nullptr);
     if (!renderer_.Initialize(hwnd_)) {
         return false;
     }
-    return renderer_.SaveSnapshotPng(imagePath, snapshot);
+    return renderer_.SaveSnapshotPng(imagePath, snapshot, rendererEditOverlayState_);
 }
 
 bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
@@ -433,6 +437,14 @@ DashboardRenderer& DashboardApp::Renderer() {
 
 const DashboardRenderer& DashboardApp::Renderer() const {
     return renderer_;
+}
+
+DashboardRenderer::EditOverlayState& DashboardApp::RendererEditOverlayState() {
+    return rendererEditOverlayState_;
+}
+
+const DashboardRenderer::EditOverlayState& DashboardApp::RendererEditOverlayState() const {
+    return rendererEditOverlayState_;
 }
 
 void DashboardApp::InvalidateShell() {
