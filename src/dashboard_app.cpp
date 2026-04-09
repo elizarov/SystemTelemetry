@@ -414,7 +414,8 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         AppendMenuW(storageDrivesMenu, MF_STRING | MF_GRAYED, kCommandStorageDriveBase, L"No drives found");
     } else {
         for (const auto& option : state.storageDriveMenuOptions) {
-            const std::wstring label = WideFromUtf8(FormatStorageDriveMenuText(option));
+            const std::wstring label = WideFromUtf8(
+                FormatStorageDriveMenuText(option.driveLetter, option.volumeLabel, option.totalGb));
             const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(storageDrivesMenu, flags, option.commandId, label.c_str());
         }

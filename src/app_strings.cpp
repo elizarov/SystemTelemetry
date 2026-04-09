@@ -71,6 +71,15 @@ std::string FormatNetworkFooterText(const std::string& adapterName, const std::s
     return adapterName + " | " + ipAddress;
 }
 
+std::string FormatStorageDriveMenuText(const std::string& driveLetter, const std::string& volumeLabel, double totalGb) {
+    std::string text = driveLetter + ":";
+    if (!volumeLabel.empty()) {
+        text += " | " + volumeLabel;
+    }
+    text += " | " + FormatStorageDriveSize(totalGb);
+    return text;
+}
+
 std::string FormatStorageDriveSize(double totalGb) {
     char buffer[64];
     if (totalGb >= 1024.0) {

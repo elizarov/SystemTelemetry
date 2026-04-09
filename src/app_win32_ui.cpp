@@ -45,15 +45,6 @@ void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
     SetMenuItemInfoW(menu, commandId, FALSE, &info);
 }
 
-std::string FormatStorageDriveMenuText(const StorageDriveMenuOption& option) {
-    std::string text = option.driveLetter + ":";
-    if (!option.volumeLabel.empty()) {
-        text += " | " + option.volumeLabel;
-    }
-    text += " | " + FormatStorageDriveSize(option.totalGb);
-    return text;
-}
-
 HFONT CreateUiFont(const UiFontConfig& font) {
     const std::wstring face = WideFromUtf8(font.face);
     return CreateFontW(-font.size, 0, 0, 0, font.weight, FALSE, FALSE, FALSE,
