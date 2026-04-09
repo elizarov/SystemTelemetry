@@ -55,10 +55,15 @@ if(NOT MSCOREE_LIB)
 endif()
 add_executable(SystemTelemetry WIN32
     resources/SystemTelemetry.rc
-    src/main.cpp
+    src/app_main.cpp
+    src/app_diagnostics.cpp
+    src/app_platform.cpp
+    src/dashboard_app.cpp
+    src/dashboard_app_window.cpp
     src/config.cpp
     src/layout_snap_solver.cpp
     src/telemetry.cpp
+    src/telemetry_storage_network.cpp
     src/telemetry_runtime.cpp
     src/telemetry_runtime_fake.cpp
     src/snapshot_dump.cpp
@@ -66,6 +71,8 @@ add_executable(SystemTelemetry WIN32
     src/gpu_amd_adl.cpp
     src/board_vendor.cpp
     src/dashboard_metrics.cpp
+    src/dashboard_renderer_resources.cpp
+    src/dashboard_renderer_layout.cpp
     src/dashboard_renderer.cpp
     src/utf8.cpp
     src/trace.cpp
