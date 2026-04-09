@@ -7,6 +7,12 @@
 #include "config.h"
 #include "telemetry.h"
 
+enum class DiagnosticsLayoutSimilarityMode {
+    None,
+    HorizontalSizes,
+    VerticalSizes,
+};
+
 struct DiagnosticsOptions {
     bool trace = false;
     bool dump = false;
@@ -19,6 +25,7 @@ struct DiagnosticsOptions {
     bool defaultConfig = false;
     bool saveConfig = false;
     bool saveFullConfig = false;
+    DiagnosticsLayoutSimilarityMode layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::None;
     double scale = 1.0;
     std::string layoutName;
     std::filesystem::path tracePath;

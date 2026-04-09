@@ -94,6 +94,7 @@ Examples include:
 - The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
 - The popup menu must provide an `Edit layout` toggle that switches the dashboard into interactive layout-edit mode, shows that item checked while the mode is active, and lets the same menu item turn the mode back off.
 - The command line must accept `/edit-layout` to start the dashboard with layout-edit guides already enabled, and that same switch must make diagnostics screenshots render the guides.
+- The command line must also accept `/edit-layout:horizonatal-sizes` and `/edit-layout:vertical-sizes` for diagnostics validation, rendering and numbering every visible horizontal size ruler or every visible vertical size ruler without requiring an active drag.
 - The popup menu must provide a `Layout` submenu that lists every configured layout name, shows the active layout with a radio check, and on selection switches `display.layout`, reapplies the active named layout, and resizes the window immediately.
 - The popup menu must provide a `Network` submenu that lists every runtime network candidate with an IPv4 address, using the same `adapter name | IP address` footer text shown by the network footer widget.
 - The `Network` submenu must show a radio check on the adapter currently selected by the runtime selection flow, even when `network.adapter_name` is empty or no longer matches any current adapter.
@@ -118,8 +119,9 @@ Examples include:
 - While layout-edit mode is active, the renderer must draw thin config-colored separator guides over every resolved `rows(...)` and `columns(...)` split and update the cursor to the matching horizontal or vertical resize shape when the pointer hovers a draggable guide.
 - Horizontal guides in `rows(...)` must not be drawn next to direct fixed-height children or `vertical_spring` children whose size is not editable through row weights.
 - Dragging a layout-edit guide must adjust the two adjacent child weights live, immediately relayout and repaint the dashboard, and reseed the dragged container's editable integer weights from the current resolved child extents when the drag begins, excluding any direct fixed-height row children and any `vertical_spring` children from that reseeded total.
-- While a layout-edit guide drag is active, the renderer must compare each affected descendant widget against every other widget of the same type in the active layout and draw paired measurement rulers on widgets whose dragged-axis size differs by no more than the configured threshold.
-- When two same-type widgets match exactly on the dragged axis, the measurement ruler on each widget must show a special center marker that pinpoints the exact equal-size moment.
+- While a layout-edit guide drag is active, the renderer must compare each affected descendant widget against every other widget of the same type in the active layout and draw paired measurement rulers on widgets whose dragged-axis size differs by no more than the configured threshold, while skipping `vertical_spring` widgets and any widgets whose row height is fixed.
+- When multiple same-type widgets in one vertical or horizontal stack share the same dragged-axis extent by construction, the measurement ruler for that type and extent must draw only on the first widget in that stack, both for the widgets being edited and for matching widgets elsewhere in the active layout.
+- When same-type widgets match exactly on the dragged axis, the measurement ruler must show centered notch markers instead of the previous exact-match box, with the notch count coming from that exact-match type's active drag ordinal where a type is the widget type plus the matched dragged-axis extent.
 - Pressing `Esc` must exit either move mode or layout-edit mode.
 
 Diagnostics requirements live in `docs/diagnostics.md`.

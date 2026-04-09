@@ -16,6 +16,8 @@ This document is the single maintained source of truth for diagnostics command b
 - `/default-config` suppresses loading the executable-side `config.ini` overlay and uses only the embedded `resources/config.ini` defaults for the current process.
 - `/blank` switches screenshot rendering into a blank background mode that keeps static dashboard chrome and static text such as CPU and GPU names while omitting dynamic metric text, time, date, plots, leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 - `/scale:<value>` multiplies headless `/screenshot /exit` render size, including all measured layout geometry, and accepts fractional values such as `1.5`.
+- `/edit-layout:horizonatal-sizes` turns on layout-edit guides plus every visible horizontal size ruler and its exact-match numbering for diagnostics screenshots without requiring an active drag.
+- `/edit-layout:vertical-sizes` turns on layout-edit guides plus every visible vertical size ruler and its exact-match numbering for diagnostics screenshots without requiring an active drag.
 - `/blank` cannot be combined with `/fake`.
 
 ## Output files
@@ -78,6 +80,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Verify one headless run that supplies explicit output filenames such as `/trace:custom_trace.txt`, `/dump:custom_dump.txt`, and `/screenshot:custom_screenshot.png`, and confirm only the requested paths are updated.
 - Verify one headless `/trace /default-config /layout:<name> /screenshot /exit` run when validating the built-in config, and confirm the screenshot and trace use the requested named layout without editing `config.ini`.
 - Verify one headless `/trace /default-config /edit-layout /screenshot /exit` run when validating layout-guide rendering, and confirm the screenshot includes the layout edit guides.
+- Verify headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit` and `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit` when validating size-ruler grouping and numbering, and inspect the trace for consecutive `renderer:layout_similarity_group` ordinals that match the visible rulers.
 - When `/scale:<value>` is involved, confirm the screenshot uses the expected multiplied pixel dimensions while preserving the same logical composition.
 - For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm that editing the selected fake file changes the next one-second refresh without touching live providers, and verify one run with `/fake:custom_fake.txt`.
 - Verify `/blank /fake` fails before startup.

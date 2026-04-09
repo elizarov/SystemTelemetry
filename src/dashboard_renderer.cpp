@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <map>
 #include <memory>
 #include <objidl.h>
 #include <optional>
@@ -411,6 +412,10 @@ void DashboardRenderer::SetActiveLayoutEditGuide(const std::optional<LayoutEditG
     activeLayoutEditGuide_ = guide;
 }
 
+void DashboardRenderer::SetSimilarityIndicatorMode(SimilarityIndicatorMode mode) {
+    similarityIndicatorMode_ = mode;
+}
+
 double DashboardRenderer::RenderScale() const {
     return renderScale_;
 }
@@ -652,6 +657,61 @@ int DashboardRenderer::EffectiveDriveRowHeight() const {
         " gap=" + std::to_string(verticalGap) +
         " effective=" + std::to_string(computed));
     return computed;
+}
+
+bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const ResolvedWidgetLayout& widget) const {
+    if (widget.kind == WidgetKind::VerticalSpring) {
+        return false;
+    }
+    if (UsesFixedPreferredHeightInRows(widget)) {
+        return false;
+    }
+    return widget.kind != WidgetKind::Unknown;
+}
+
+bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const {
+    const int extent = WidgetExtentForAxis(widget, axis);
+    if (extent <= 0) {
+        return false;
+    }
+
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& candidate : card.widgets) {
+            if (&candidate == &widget || candidate.cardId != widget.cardId || candidate.kind != widget.kind) {
+                continue;
+            }
+            if (!SupportsLayoutSimilarityIndicator(candidate) || WidgetExtentForAxis(candidate, axis) != extent) {
+                continue;
+            }
+
+            if (axis == LayoutGuideAxis::Vertical) {
+                if (candidate.rect.left == widget.rect.left && candidate.rect.right == widget.rect.right &&
+                    candidate.rect.top < widget.rect.top) {
+                    return false;
+                }
+            } else {
+                if (candidate.rect.top == widget.rect.top && candidate.rect.bottom == widget.rect.bottom &&
+                    candidate.rect.left < widget.rect.left) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+std::vector<const DashboardRenderer::ResolvedWidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWidgets(
+    LayoutGuideAxis axis) const {
+    std::vector<const ResolvedWidgetLayout*> widgets;
+    for (const auto& card : resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            if (!SupportsLayoutSimilarityIndicator(widget) || !IsFirstWidgetForSimilarityIndicator(widget, axis)) {
+                continue;
+            }
+            widgets.push_back(&widget);
+        }
+    }
+    return widgets;
 }
 
 int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) const {
@@ -1191,27 +1251,48 @@ bool DashboardRenderer::IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widg
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
-    if (!activeLayoutEditGuide_.has_value()) {
-        return;
-    }
-
-    const LayoutEditGuide& guide = *activeLayoutEditGuide_;
     const int threshold = std::max(0, ScaleLogical(config_.layout.layoutEditor.sizeSimilarityThreshold));
     if (threshold <= 0) {
         return;
     }
 
-    struct WidgetRef {
-        const ResolvedWidgetLayout* widget = nullptr;
+    struct SimilarityTypeKey {
+        WidgetKind kind = WidgetKind::Unknown;
+        int extent = 0;
+
+        bool operator<(const SimilarityTypeKey& other) const {
+            if (kind != other.kind) {
+                return kind < other.kind;
+            }
+            return extent < other.extent;
+        }
     };
 
-    std::vector<WidgetRef> allWidgets;
-    std::vector<WidgetRef> affectedWidgets;
-    for (const auto& card : resolvedLayout_.cards) {
-        for (const auto& widget : card.widgets) {
-            allWidgets.push_back(WidgetRef{&widget});
-            if (IsWidgetAffectedByGuide(widget, guide)) {
-                affectedWidgets.push_back(WidgetRef{&widget});
+    LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
+    const char* axisLabel = "horizontal";
+    std::vector<const ResolvedWidgetLayout*> affectedWidgets;
+    std::vector<const ResolvedWidgetLayout*> allWidgets;
+    if (similarityIndicatorMode_ == SimilarityIndicatorMode::AllHorizontal) {
+        axis = LayoutGuideAxis::Vertical;
+        axisLabel = "horizontal";
+        allWidgets = CollectSimilarityIndicatorWidgets(axis);
+        affectedWidgets = allWidgets;
+    } else if (similarityIndicatorMode_ == SimilarityIndicatorMode::AllVertical) {
+        axis = LayoutGuideAxis::Horizontal;
+        axisLabel = "vertical";
+        allWidgets = CollectSimilarityIndicatorWidgets(axis);
+        affectedWidgets = allWidgets;
+    } else {
+        if (!activeLayoutEditGuide_.has_value()) {
+            return;
+        }
+        const LayoutEditGuide& guide = *activeLayoutEditGuide_;
+        axis = guide.axis;
+        axisLabel = axis == LayoutGuideAxis::Vertical ? "horizontal" : "vertical";
+        allWidgets = CollectSimilarityIndicatorWidgets(axis);
+        for (const ResolvedWidgetLayout* widget : allWidgets) {
+            if (IsWidgetAffectedByGuide(*widget, guide)) {
+                affectedWidgets.push_back(widget);
             }
         }
     }
@@ -1219,38 +1300,86 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
         return;
     }
 
-    std::vector<SimilarityIndicator> indicators;
-    for (const WidgetRef affected : affectedWidgets) {
-        const int affectedExtent = WidgetExtentForAxis(*affected.widget, guide.axis);
+    std::set<const ResolvedWidgetLayout*> visibleWidgets;
+    std::map<const ResolvedWidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
+    for (const ResolvedWidgetLayout* affected : affectedWidgets) {
+        const int affectedExtent = WidgetExtentForAxis(*affected, axis);
         if (affectedExtent <= 0) {
             continue;
         }
-        for (const WidgetRef candidate : allWidgets) {
-            if (candidate.widget == affected.widget || candidate.widget->kind != affected.widget->kind) {
+        const SimilarityTypeKey typeKey{affected->kind, affectedExtent};
+        bool hasExactMatch = false;
+        for (const ResolvedWidgetLayout* candidate : allWidgets) {
+            if (candidate == affected || candidate->kind != affected->kind) {
                 continue;
             }
-            const int candidateExtent = WidgetExtentForAxis(*candidate.widget, guide.axis);
+            const int candidateExtent = WidgetExtentForAxis(*candidate, axis);
             if (candidateExtent <= 0 || std::abs(candidateExtent - affectedExtent) > threshold) {
                 continue;
             }
-            indicators.push_back(SimilarityIndicator{guide.axis, affected.widget->rect, candidateExtent == affectedExtent});
-            indicators.push_back(SimilarityIndicator{guide.axis, candidate.widget->rect, candidateExtent == affectedExtent});
+            visibleWidgets.insert(affected);
+            visibleWidgets.insert(candidate);
+            if (candidateExtent == affectedExtent) {
+                hasExactMatch = true;
+                exactTypeByWidget.try_emplace(candidate, typeKey);
+            }
         }
+        if (hasExactMatch) {
+            exactTypeByWidget.try_emplace(affected, typeKey);
+        }
+    }
+
+    std::map<SimilarityTypeKey, int> exactTypeOrdinals;
+    int nextOrdinal = 1;
+    for (const ResolvedWidgetLayout* widget : allWidgets) {
+        if (!visibleWidgets.contains(widget)) {
+            continue;
+        }
+        const auto exactIt = exactTypeByWidget.find(widget);
+        if (exactIt == exactTypeByWidget.end() || exactTypeOrdinals.contains(exactIt->second)) {
+            continue;
+        }
+        exactTypeOrdinals[exactIt->second] = nextOrdinal++;
+    }
+
+    std::vector<SimilarityIndicator> indicators;
+    indicators.reserve(visibleWidgets.size());
+    for (const ResolvedWidgetLayout* widget : allWidgets) {
+        if (!visibleWidgets.contains(widget)) {
+            continue;
+        }
+        const auto exactIt = exactTypeByWidget.find(widget);
+        const int exactTypeOrdinal = exactIt == exactTypeByWidget.end()
+            ? 0
+            : exactTypeOrdinals[exactIt->second];
+        indicators.push_back(SimilarityIndicator{
+            axis,
+            widget->rect,
+            exactTypeOrdinal,
+        });
     }
     if (indicators.empty()) {
         return;
+    }
+
+    if (traceOutput_ != nullptr) {
+        for (const auto& entry : exactTypeOrdinals) {
+            WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
+                "\" kind=" + std::to_string(static_cast<int>(entry.first.kind)) +
+                " extent=" + std::to_string(entry.first.extent) +
+                " ordinal=" + std::to_string(entry.second));
+        }
     }
 
     const COLORREF color = LayoutGuideColor();
     const int inset = std::max(2, ScaleLogical(4));
     const int cap = std::max(3, ScaleLogical(4));
     const int offset = std::max(4, ScaleLogical(6));
-    const int exactRadius = std::max(2, ScaleLogical(2));
+    const int notchDepth = std::max(3, ScaleLogical(4));
+    const int notchSpacing = std::max(3, ScaleLogical(4));
 
     HPEN pen = CreatePen(PS_SOLID, 1, color);
-    HBRUSH brush = CreateSolidBrush(color);
     HGDIOBJ oldPen = SelectObject(hdc, pen);
-    HGDIOBJ oldBrush = SelectObject(hdc, brush);
     for (const SimilarityIndicator& indicator : indicators) {
         const RECT& rect = indicator.rect;
         if (indicator.axis == LayoutGuideAxis::Vertical) {
@@ -1259,13 +1388,22 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
             const int right = rect.right - inset;
             MoveToEx(hdc, left, y, nullptr);
             LineTo(hdc, right, y);
-            MoveToEx(hdc, left, y - cap, nullptr);
-            LineTo(hdc, left, y + cap + 1);
-            MoveToEx(hdc, right, y - cap, nullptr);
-            LineTo(hdc, right, y + cap + 1);
-            if (indicator.exact) {
+            MoveToEx(hdc, left + cap, y - cap, nullptr);
+            LineTo(hdc, left, y);
+            LineTo(hdc, left + cap, y + cap + 1);
+            MoveToEx(hdc, right - cap, y - cap, nullptr);
+            LineTo(hdc, right, y);
+            LineTo(hdc, right - cap, y + cap + 1);
+            if (indicator.exactTypeOrdinal > 0) {
                 const int cx = left + std::max(0, (right - left) / 2);
-                Rectangle(hdc, cx - exactRadius, y - exactRadius, cx + exactRadius + 1, y + exactRadius + 1);
+                const int count = indicator.exactTypeOrdinal;
+                const int totalWidth = (count - 1) * notchSpacing;
+                int notchX = cx - (totalWidth / 2);
+                for (int i = 0; i < count; ++i) {
+                    MoveToEx(hdc, notchX, y - notchDepth, nullptr);
+                    LineTo(hdc, notchX, y + notchDepth + 1);
+                    notchX += notchSpacing;
+                }
             }
         } else {
             const int x = rect.left + offset;
@@ -1273,19 +1411,26 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc) const {
             const int bottom = rect.bottom - inset;
             MoveToEx(hdc, x, top, nullptr);
             LineTo(hdc, x, bottom);
-            MoveToEx(hdc, x - cap, top, nullptr);
-            LineTo(hdc, x + cap + 1, top);
-            MoveToEx(hdc, x - cap, bottom, nullptr);
-            LineTo(hdc, x + cap + 1, bottom);
-            if (indicator.exact) {
+            MoveToEx(hdc, x - cap, top + cap, nullptr);
+            LineTo(hdc, x, top);
+            LineTo(hdc, x + cap + 1, top + cap);
+            MoveToEx(hdc, x - cap, bottom - cap, nullptr);
+            LineTo(hdc, x, bottom);
+            LineTo(hdc, x + cap + 1, bottom - cap);
+            if (indicator.exactTypeOrdinal > 0) {
                 const int cy = top + std::max(0, (bottom - top) / 2);
-                Rectangle(hdc, x - exactRadius, cy - exactRadius, x + exactRadius + 1, cy + exactRadius + 1);
+                const int count = indicator.exactTypeOrdinal;
+                const int totalHeight = (count - 1) * notchSpacing;
+                int notchY = cy - (totalHeight / 2);
+                for (int i = 0; i < count; ++i) {
+                    MoveToEx(hdc, x - notchDepth, notchY, nullptr);
+                    LineTo(hdc, x + notchDepth + 1, notchY);
+                    notchY += notchSpacing;
+                }
             }
         }
     }
-    SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);
-    DeleteObject(brush);
     DeleteObject(pen);
 }
 

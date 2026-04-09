@@ -50,6 +50,12 @@ public:
         Blank,
     };
 
+    enum class SimilarityIndicatorMode {
+        ActiveGuide,
+        AllHorizontal,
+        AllVertical,
+    };
+
     DashboardRenderer();
     ~DashboardRenderer();
 
@@ -58,6 +64,7 @@ public:
     void SetRenderMode(RenderMode mode);
     void SetShowLayoutEditGuides(bool show);
     void SetActiveLayoutEditGuide(const std::optional<LayoutEditGuide>& guide);
+    void SetSimilarityIndicatorMode(SimilarityIndicatorMode mode);
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
@@ -111,7 +118,7 @@ private:
     struct SimilarityIndicator {
         LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
         RECT rect{};
-        bool exact = false;
+        int exactTypeOrdinal = 0;
     };
 
     struct ResolvedCardLayout {
@@ -191,6 +198,9 @@ private:
     int EffectiveMetricRowHeight() const;
     int EffectiveDriveHeaderHeight() const;
     int EffectiveDriveRowHeight() const;
+    bool SupportsLayoutSimilarityIndicator(const ResolvedWidgetLayout& widget) const;
+    bool IsFirstWidgetForSimilarityIndicator(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
+    std::vector<const ResolvedWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
     int WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const;
     int ScaleLogical(int value) const;
@@ -210,5 +220,6 @@ private:
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;
+    SimilarityIndicatorMode similarityIndicatorMode_ = SimilarityIndicatorMode::ActiveGuide;
     bool showLayoutEditGuides_ = false;
 };

@@ -148,6 +148,7 @@ AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options);
 class DashboardApp;
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
     double scale, DashboardRenderer::RenderMode renderMode, bool showLayoutEditGuides,
+    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
     std::ostream* traceStream = nullptr,
     std::string* errorText = nullptr);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
@@ -155,6 +156,7 @@ bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig
 DiagnosticsOptions GetDiagnosticsOptions();
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options);
+DashboardRenderer::SimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options);
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream);
 int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPath, const std::filesystem::path& sourceDumpPath,
     const std::filesystem::path& targetConfigPath, const std::filesystem::path& targetImagePath);
@@ -501,6 +503,18 @@ DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions&
     return options.blank ? DashboardRenderer::RenderMode::Blank : DashboardRenderer::RenderMode::Normal;
 }
 
+DashboardRenderer::SimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options) {
+    switch (options.layoutSimilarityMode) {
+    case DiagnosticsLayoutSimilarityMode::HorizontalSizes:
+        return DashboardRenderer::SimilarityIndicatorMode::AllHorizontal;
+    case DiagnosticsLayoutSimilarityMode::VerticalSizes:
+        return DashboardRenderer::SimilarityIndicatorMode::AllVertical;
+    case DiagnosticsLayoutSimilarityMode::None:
+    default:
+        return DashboardRenderer::SimilarityIndicatorMode::ActiveGuide;
+    }
+}
+
 DiagnosticsOptions GetDiagnosticsOptions() {
     DiagnosticsOptions options;
     options.trace = HasSwitch("/trace");
@@ -512,6 +526,15 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.editLayout = HasSwitch("/edit-layout");
     options.reload = HasSwitch("/reload");
     options.defaultConfig = HasSwitch("/default-config");
+    if (const auto editLayoutValue = GetColonSwitchValue(L"/edit-layout"); editLayoutValue.has_value()) {
+        const std::string mode = ToLower(Trim(Utf8FromWide(*editLayoutValue)));
+        options.editLayout = true;
+        if (mode == "horizontal-sizes" || mode == "horizonatal-sizes") {
+            options.layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::HorizontalSizes;
+        } else if (mode == "vertical-sizes") {
+            options.layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::VerticalSizes;
+        }
+    }
     if (const auto layoutName = GetLayoutSwitchValue(); layoutName.has_value()) {
         options.layoutName = *layoutName;
     }
@@ -652,7 +675,8 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     std::string screenshotError;
     if (options_.screenshot && !SaveDumpScreenshot(
             screenshotPath_, dump.snapshot, config, options_.exit ? options_.scale : 1.0,
-            GetDiagnosticsRenderMode(options_), options_.editLayout, TraceStream(), &screenshotError)) {
+            GetDiagnosticsRenderMode(options_), options_.editLayout, GetSimilarityIndicatorMode(options_),
+            TraceStream(), &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
         std::string traceText = "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
@@ -1418,6 +1442,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         ScaleFromDpi(targetMonitor->dpi),
         DashboardRenderer::RenderMode::Blank,
         false,
+        DashboardRenderer::SimilarityIndicatorMode::ActiveGuide,
         nullptr,
         &screenshotError);
     const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config);
@@ -1526,6 +1551,7 @@ void DashboardApp::SetRenderConfig(const AppConfig& config) {
     config_ = config;
     renderer_.SetConfig(config);
     renderer_.SetShowLayoutEditGuides(isEditingLayout_ || diagnosticsOptions_.editLayout);
+    renderer_.SetSimilarityIndicatorMode(GetSimilarityIndicatorMode(diagnosticsOptions_));
 }
 
 void DashboardApp::UpdateRendererScale(double scale) {
@@ -1559,6 +1585,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     }
     renderer_.SetConfig(config_);
     renderer_.SetShowLayoutEditGuides(diagnosticsOptions_.editLayout);
+    renderer_.SetSimilarityIndicatorMode(GetSimilarityIndicatorMode(diagnosticsOptions_));
     renderer_.SetTraceOutput(nullptr);
     telemetry_ = CreateTelemetryRuntime(diagnosticsOptions_, GetWorkingDirectory());
     if (diagnosticsOptions_.HasAnyOutput()) {
@@ -1827,6 +1854,7 @@ void DashboardApp::SaveScreenshotAs() {
             1.0,
             GetDiagnosticsRenderMode(diagnosticsOptions_),
             isEditingLayout_ || diagnosticsOptions_.editLayout,
+            GetSimilarityIndicatorMode(diagnosticsOptions_),
             diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
             &errorText)) {
         std::string message = "Failed to save screenshot:\n" + Utf8FromWide(path->wstring());
@@ -1871,12 +1899,14 @@ void DashboardApp::ToggleAutoStart() {
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
     double scale, DashboardRenderer::RenderMode renderMode, bool showLayoutEditGuides,
+    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
     std::ostream* traceStream, std::string* errorText) {
     DashboardRenderer renderer;
     renderer.SetConfig(config);
     renderer.SetRenderScale(scale);
     renderer.SetRenderMode(renderMode);
     renderer.SetShowLayoutEditGuides(showLayoutEditGuides);
+    renderer.SetSimilarityIndicatorMode(similarityIndicatorMode);
     renderer.SetTraceOutput(traceStream);
     if (!renderer.Initialize()) {
         if (errorText != nullptr) {
@@ -1948,6 +1978,7 @@ bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
             ScaleFromDpi(option.dpi),
             DashboardRenderer::RenderMode::Blank,
             false,
+            DashboardRenderer::SimilarityIndicatorMode::ActiveGuide,
             diagnostics_ != nullptr ? diagnostics_->TraceStream() : nullptr,
             &screenshotError);
         if (saved) {
