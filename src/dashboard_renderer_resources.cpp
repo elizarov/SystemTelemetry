@@ -842,8 +842,7 @@ bool DashboardRenderer::MeasureFonts() {
     measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx +
         std::max(0, ScaleLogical(config_.layout.throughput.axisPadding));
     measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx;
-    measuredWidths_.drivePercent = MeasureTextSize(hdc, fonts_.label, "100%").cx +
-        std::max(0, ScaleLogical(config_.layout.driveUsageList.percentPadding));
+    measuredWidths_.drivePercent = MeasureTextSize(hdc, fonts_.label, "100%").cx;
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
     WriteTrace("renderer:font_metrics title=" + std::to_string(fontHeights_.title) +
         " big=" + std::to_string(fontHeights_.big) +
