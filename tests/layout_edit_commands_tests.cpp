@@ -62,3 +62,19 @@ TEST(LayoutEditCommands, UpdatesDriveUsageActivitySegmentsThroughCommands) {
 
     EXPECT_EQ(config.layout.driveUsageList.activitySegments, 6);
 }
+
+TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
+    AppConfig config;
+
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config,
+        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageBarGap),
+        11.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config,
+        MakeTarget(LayoutEditHost::ValueTarget::Field::DriveUsageValueGap),
+        7.6));
+
+    EXPECT_EQ(config.layout.driveUsageList.barGap, 11);
+    EXPECT_EQ(config.layout.driveUsageList.valueGap, 8);
+}

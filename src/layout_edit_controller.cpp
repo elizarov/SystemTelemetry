@@ -97,6 +97,12 @@ LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForWidgetGuide(const Da
     case DashboardRenderer::WidgetEditParameter::MetricListVerticalGap:
         target.field = Field::MetricListVerticalGap;
         break;
+    case DashboardRenderer::WidgetEditParameter::DriveUsageBarGap:
+        target.field = Field::DriveUsageBarGap;
+        break;
+    case DashboardRenderer::WidgetEditParameter::DriveUsageValueGap:
+        target.field = Field::DriveUsageValueGap;
+        break;
     case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
         target.field = Field::DriveUsageActivityWidth;
         break;

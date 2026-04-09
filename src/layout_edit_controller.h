@@ -16,6 +16,8 @@ public:
         enum class Field {
             MetricListLabelWidth,
             MetricListVerticalGap,
+            DriveUsageBarGap,
+            DriveUsageValueGap,
             DriveUsageActivityWidth,
             DriveUsageFreeWidth,
             DriveUsageHeaderGap,

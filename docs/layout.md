@@ -220,7 +220,7 @@ When the pointer hovers a non-empty widget in layout-edit mode, the renderer out
 `metric_list(...)` also exposes horizontal guides after each visible non-empty row for `[metric_list].vertical_gap`.
 `throughput(...)` exposes a vertical guide for `[throughput].axis_padding` at the graph's left plot edge so the scale gutter can be widened or narrowed live.
 `throughput(...)` also exposes a horizontal guide for `[throughput].header_gap` at the boundary between the value header row and the graph body.
-`drive_usage_list(...)` exposes guides for `[drive_usage_list].activity_width` on both activity columns, `[drive_usage_list].free_width` on the free-space column, `[drive_usage_list].header_gap` below the header band, and `[drive_usage_list].row_gap` after each visible non-empty row.
+`drive_usage_list(...)` exposes vertical guides for `[drive_usage_list].bar_gap` at the left edge of the `R` activity column, `[drive_usage_list].value_gap` at the left edge of the `W` activity column, `[drive_usage_list].activity_width` at the right edge of the `W` activity column, and `[drive_usage_list].free_width` on the free-space column, plus horizontal guides for `[drive_usage_list].header_gap` below the header band and `[drive_usage_list].row_gap` after each visible non-empty row.
 `drive_usage_list(...)` also exposes a diamond anchor centered in the read/write activity band so `[drive_usage_list].activity_segments` can be dragged live in either axis.
 
 Example:

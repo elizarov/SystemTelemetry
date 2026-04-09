@@ -356,17 +356,19 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
             renderer.widgetEditGuides_.push_back(std::move(guide));
         };
 
-        addVerticalGuide(0, readRect.right, DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth,
+        addVerticalGuide(0, readRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageBarGap,
+            renderer.config_.layout.driveUsageList.barGap, 1);
+        addVerticalGuide(1, writeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageValueGap,
+            renderer.config_.layout.driveUsageList.valueGap, 1);
+        addVerticalGuide(2, writeRect.right, DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth,
             renderer.config_.layout.driveUsageList.activityWidth, 1);
-        addVerticalGuide(1, writeRect.right, DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth,
-            renderer.config_.layout.driveUsageList.activityWidth, 1);
-        addVerticalGuide(2, freeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth,
+        addVerticalGuide(3, freeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth,
             renderer.config_.layout.driveUsageList.freeWidth, -1);
-        addHorizontalGuide(3, widget.rect.top + headerHeight, DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap,
+        addHorizontalGuide(4, widget.rect.top + headerHeight, DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap,
             renderer.config_.layout.driveUsageList.headerGap, 1);
         for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {
             const int y = widget.rect.top + headerHeight + ((rowIndex + 1) * rowHeight);
-            addHorizontalGuide(4 + rowIndex, y, DashboardRenderer::WidgetEditParameter::DriveUsageRowGap,
+            addHorizontalGuide(5 + rowIndex, y, DashboardRenderer::WidgetEditParameter::DriveUsageRowGap,
                 renderer.config_.layout.driveUsageList.rowGap, 1);
         }
     };
