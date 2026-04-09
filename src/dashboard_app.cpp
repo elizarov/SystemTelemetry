@@ -242,67 +242,15 @@ std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
     return PromptSavePath(hwnd_, GetWorkingDirectory(), defaultFileName, filter, defaultExtension);
 }
 
-AppConfig DashboardApp::BuildCurrentConfigForSaving() const {
-    return controller_.BuildCurrentConfigForSaving(const_cast<DashboardApp&>(*this));
-}
-
-void DashboardApp::SaveDumpAs() {
-    controller_.SaveDumpAs(*this);
-}
-
-void DashboardApp::SaveScreenshotAs() {
-    controller_.SaveScreenshotAs(*this, diagnosticsOptions_);
-}
-
-void DashboardApp::SaveFullConfigAs() {
-    controller_.SaveFullConfigAs(*this);
-}
-
-bool DashboardApp::IsAutoStartEnabled() const {
-    return controller_.IsAutoStartEnabled();
-}
-
-void DashboardApp::ToggleAutoStart() {
-    controller_.ToggleAutoStart(*this);
-}
-
 void DashboardApp::BringOnTop() {
     ShowWindow(hwnd_, SW_SHOWNORMAL);
     SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     SetForegroundWindow(hwnd_);
 }
 
-bool DashboardApp::ReloadConfigFromDisk() {
-    return controller_.ReloadConfigFromDisk(*this, diagnosticsOptions_, layoutEditController_);
-}
-
 bool DashboardApp::ApplyConfiguredWallpaper() {
     return ::ApplyConfiguredWallpaper(controller_.State().config,
         controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
-}
-
-bool DashboardApp::ConfigureDisplay(const DisplayMenuOption& option) {
-    return controller_.ConfigureDisplay(*this, option);
-}
-
-bool DashboardApp::SwitchLayout(const std::string& layoutName) {
-    return controller_.SwitchLayout(*this, layoutName, layoutEditController_, diagnosticsOptions_.editLayout);
-}
-
-void DashboardApp::SelectNetworkAdapter(const NetworkMenuOption& option) {
-    controller_.SelectNetworkAdapter(*this, option);
-}
-
-void DashboardApp::ToggleStorageDrive(const StorageDriveMenuOption& option) {
-    controller_.ToggleStorageDrive(*this, option);
-}
-
-void DashboardApp::StartLayoutEditMode() {
-    controller_.StartLayoutEditMode(*this, layoutEditController_);
-}
-
-void DashboardApp::StopLayoutEditMode() {
-    controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
 }
 
 bool DashboardApp::ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
@@ -316,10 +264,6 @@ bool DashboardApp::ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& targe
 std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) {
     return controller_.EvaluateLayoutWidgetExtentForWeights(*this, target, weights, widget, axis);
-}
-
-void DashboardApp::UpdateConfigFromCurrentPlacement() {
-    controller_.UpdateConfigFromCurrentPlacement(*this);
 }
 
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {
@@ -392,7 +336,7 @@ void DashboardApp::RemoveTrayIcon() {
 
 void DashboardApp::StartMoveMode() {
     if (controller_.State().isEditingLayout) {
-        StopLayoutEditMode();
+        controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
     }
     controller_.State().isMoving = true;
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);

@@ -3,6 +3,28 @@
 #include <algorithm>
 #include <fstream>
 
+#include "config_writer.h"
+#include "layout_edit_service.h"
+
+namespace {
+
+std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOptions& options) {
+    auto session = std::make_unique<DiagnosticsSession>(options);
+    if (!session->Initialize()) {
+        return nullptr;
+    }
+    return session;
+}
+
+bool SaveRuntimeConfig(const std::filesystem::path& path, const AppConfig& config, HWND owner) {
+    if (CanWriteRuntimeConfig(path)) {
+        return SaveConfig(path, config);
+    }
+    return SaveConfigElevated(path, config, owner);
+}
+
+}  // namespace
+
 DashboardController::DashboardController() = default;
 
 DashboardSessionState& DashboardController::State() {
@@ -31,7 +53,7 @@ bool DashboardController::ApplyConfiguredWallpaper() {
 }
 
 bool DashboardController::InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
-    state_.config = configPersistenceService_.LoadRuntimeConfig(diagnosticsOptions);
+    state_.config = LoadRuntimeConfig(diagnosticsOptions);
     if (!ApplyDiagnosticsLayoutOverride(state_.config, diagnosticsOptions)) {
         return false;
     }
@@ -41,7 +63,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     shell.Renderer().SetTraceOutput(nullptr);
 
     if (diagnosticsOptions.HasAnyOutput()) {
-        state_.diagnostics = diagnosticsService_.CreateSession(diagnosticsOptions);
+        state_.diagnostics = CreateDiagnosticsSession(diagnosticsOptions);
         if (state_.diagnostics == nullptr) {
             return false;
         }
@@ -49,7 +71,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         state_.diagnostics->WriteTraceMarker("diagnostics:telemetry_initialize_begin");
     }
 
-    state_.telemetry = dashboardSessionService_.InitializeRuntime(
+    state_.telemetry = InitializeTelemetryRuntimeInstance(
         state_.config, diagnosticsOptions, state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr);
     if (state_.telemetry == nullptr) {
         if (state_.diagnostics != nullptr) {
@@ -73,7 +95,7 @@ bool DashboardController::HandleRefreshTimer(DashboardShellHost& shell) {
     if (state_.telemetry == nullptr) {
         return false;
     }
-    dashboardSessionService_.UpdateSnapshot(*state_.telemetry);
+    state_.telemetry->UpdateSnapshot();
     if (state_.diagnostics != nullptr &&
         std::chrono::steady_clock::now() - state_.lastDiagnosticsOutput >= std::chrono::seconds(1)) {
         if (!WriteDiagnosticsOutputs()) {
@@ -90,15 +112,14 @@ bool DashboardController::WriteDiagnosticsOutputs() {
         return true;
     }
     state_.diagnostics->WriteTraceMarker("diagnostics:write_outputs_begin");
-    const bool ok = diagnosticsService_.WriteOutputs(
-        state_.diagnostics.get(), state_.telemetry->Dump(), state_.telemetry->EffectiveConfig());
+    const bool ok = state_.diagnostics->WriteOutputs(state_.telemetry->Dump(), state_.telemetry->EffectiveConfig());
     state_.diagnostics->WriteTraceMarker(ok ? "diagnostics:write_outputs_done" : "diagnostics:write_outputs_failed");
     return ok;
 }
 
 bool DashboardController::ReloadConfigFromDisk(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller) {
     StopLayoutEditMode(shell, controller, diagnosticsOptions.editLayout);
-    if (!diagnosticsService_.ReloadTelemetryRuntime(
+    if (!ReloadTelemetryRuntimeFromDisk(
             GetRuntimeConfigPath(), state_.config, state_.telemetry, diagnosticsOptions, state_.diagnostics.get())) {
         shell.ReleaseFonts();
         shell.InitializeFonts();
@@ -180,18 +201,18 @@ void DashboardController::SaveFullConfigAs(DashboardShellHost& shell) {
     if (!path.has_value()) {
         return;
     }
-    if (!configPersistenceService_.SaveFullConfig(*path, BuildCurrentConfigForSaving(shell))) {
+    if (!SaveFullConfig(*path, BuildCurrentConfigForSaving(shell))) {
         shell.ShowError(WideFromUtf8("Failed to save full config file:\n" + Utf8FromWide(path->wstring())));
     }
 }
 
 bool DashboardController::IsAutoStartEnabled() const {
-    return autoStartService_.IsEnabled();
+    return IsAutoStartEnabledForCurrentExecutable();
 }
 
 void DashboardController::ToggleAutoStart(DashboardShellHost& shell) {
     const bool enable = !IsAutoStartEnabled();
-    if (!autoStartService_.Update(enable, shell.WindowHandle())) {
+    if (!UpdateAutoStartRegistration(enable, shell.WindowHandle())) {
         std::wstring message = L"Failed to ";
         message += enable ? L"enable" : L"disable";
         message += L" auto-start on user logon.";
@@ -259,8 +280,8 @@ void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const 
         return;
     }
     state_.config.network.adapterName = option.adapterName;
-    dashboardSessionService_.SetPreferredNetworkAdapter(*state_.telemetry, option.adapterName);
-    dashboardSessionService_.UpdateSnapshot(*state_.telemetry);
+    state_.telemetry->SetPreferredNetworkAdapterName(option.adapterName);
+    state_.telemetry->UpdateSnapshot();
     shell.InvalidateShell();
 }
 
@@ -278,8 +299,8 @@ void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const St
     std::sort(driveLetters.begin(), driveLetters.end());
     state_.config.storage.drives = driveLetters;
     SyncRenderer(shell, state_.isEditingLayout);
-    dashboardSessionService_.SetSelectedStorageDrives(*state_.telemetry, driveLetters);
-    dashboardSessionService_.UpdateSnapshot(*state_.telemetry);
+    state_.telemetry->SetSelectedStorageDrives(driveLetters);
+    state_.telemetry->UpdateSnapshot();
     shell.InvalidateShell();
 }
 
@@ -304,7 +325,7 @@ void DashboardController::StopLayoutEditMode(DashboardShellHost& shell, LayoutEd
 
 bool DashboardController::ApplyLayoutGuideWeights(DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights) {
-    if (!layoutEditingService_.ApplyGuideWeights(state_.config, target, weights)) {
+    if (!layout_edit::ApplyGuideWeights(state_.config, target, weights)) {
         return false;
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
@@ -313,7 +334,7 @@ bool DashboardController::ApplyLayoutGuideWeights(DashboardShellHost& shell, con
 }
 
 bool DashboardController::ApplyLayoutEditValue(DashboardShellHost& shell, const LayoutEditHost::ValueTarget& target, double value) {
-    if (!layoutEditingService_.ApplyValue(state_.config, target, value)) {
+    if (!layout_edit::ApplyValue(state_.config, target, value)) {
         return false;
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
@@ -324,8 +345,7 @@ bool DashboardController::ApplyLayoutEditValue(DashboardShellHost& shell, const 
 std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
     const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights,
     const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) {
-    return layoutEditingService_.EvaluateWidgetExtentForGuideWeights(
-        shell.Renderer(), state_.config, target, weights, widget, axis);
+    return layout_edit::EvaluateWidgetExtentForGuideWeights(shell.Renderer(), state_.config, target, weights, widget, axis);
 }
 
 AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {
@@ -340,7 +360,7 @@ AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& s
 void DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& shell) {
     const std::filesystem::path configPath = GetRuntimeConfigPath();
     AppConfig config = BuildCurrentConfigForSaving(shell);
-    if (!configPersistenceService_.SaveRuntimeConfig(configPath, config, shell.WindowHandle())) {
+    if (!SaveRuntimeConfig(configPath, config, shell.WindowHandle())) {
         shell.ShowError(WideFromUtf8("Failed to save " + Utf8FromWide(configPath.wstring()) + "."));
         return;
     }

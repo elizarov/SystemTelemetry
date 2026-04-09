@@ -11,7 +11,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU networkMenu = CreatePopupMenu();
     HMENU storageDrivesMenu = CreatePopupMenu();
     HMENU configureDisplayMenu = CreatePopupMenu();
-    const UINT autoStartFlags = MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
+    const UINT autoStartFlags = MF_STRING | (controller_.IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     state.layoutMenuOptions.clear();
     for (size_t i = 0; i < state.config.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax; ++i) {
         LayoutMenuOption option;
@@ -107,33 +107,33 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         break;
     case kCommandEditLayout:
         if (state.isEditingLayout) {
-            StopLayoutEditMode();
+            controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
         } else {
-            StartLayoutEditMode();
+            controller_.StartLayoutEditMode(*this, layoutEditController_);
         }
         break;
     case kCommandBringOnTop:
         BringOnTop();
         break;
     case kCommandReloadConfig:
-        if (!ReloadConfigFromDisk()) {
+        if (!controller_.ReloadConfigFromDisk(*this, diagnosticsOptions_, layoutEditController_)) {
             MessageBoxW(hwnd_, L"Failed to reload config.ini.", L"System Telemetry", MB_ICONERROR);
         }
         break;
     case kCommandSaveConfig:
-        UpdateConfigFromCurrentPlacement();
+        controller_.UpdateConfigFromCurrentPlacement(*this);
         break;
     case kCommandAutoStart:
-        ToggleAutoStart();
+        controller_.ToggleAutoStart(*this);
         break;
     case kCommandSaveDumpAs:
-        SaveDumpAs();
+        controller_.SaveDumpAs(*this);
         break;
     case kCommandSaveScreenshotAs:
-        SaveScreenshotAs();
+        controller_.SaveScreenshotAs(*this, diagnosticsOptions_);
         break;
     case kCommandSaveFullConfigAs:
-        SaveFullConfigAs();
+        controller_.SaveFullConfigAs(*this);
         break;
     case kCommandExit:
         DestroyWindow(hwnd_);
@@ -142,7 +142,8 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         if (selected >= kCommandLayoutBase && selected <= kCommandLayoutMax) {
             const auto it = std::find_if(state.layoutMenuOptions.begin(), state.layoutMenuOptions.end(),
                 [selected](const LayoutMenuOption& option) { return option.commandId == selected; });
-            if (it != state.layoutMenuOptions.end() && !SwitchLayout(it->name)) {
+            if (it != state.layoutMenuOptions.end() &&
+                !controller_.SwitchLayout(*this, it->name, layoutEditController_, diagnosticsOptions_.editLayout)) {
                 MessageBoxW(hwnd_, L"Failed to switch layout.", L"System Telemetry", MB_ICONERROR);
             }
             break;
@@ -151,7 +152,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
             const auto it = std::find_if(state.networkMenuOptions.begin(), state.networkMenuOptions.end(),
                 [selected](const NetworkMenuOption& option) { return option.commandId == selected; });
             if (it != state.networkMenuOptions.end()) {
-                SelectNetworkAdapter(*it);
+                controller_.SelectNetworkAdapter(*this, *it);
             }
             break;
         }
@@ -159,7 +160,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
             const auto it = std::find_if(state.storageDriveMenuOptions.begin(), state.storageDriveMenuOptions.end(),
                 [selected](const StorageDriveMenuOption& option) { return option.commandId == selected; });
             if (it != state.storageDriveMenuOptions.end()) {
-                ToggleStorageDrive(*it);
+                controller_.ToggleStorageDrive(*this, *it);
             }
             break;
         }
@@ -167,7 +168,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
             const auto it = std::find_if(state.configDisplayOptions.begin(), state.configDisplayOptions.end(),
                 [selected](const DisplayMenuOption& option) { return option.commandId == selected; });
             if (it != state.configDisplayOptions.end()) {
-                ConfigureDisplay(*it);
+                controller_.ConfigureDisplay(*this, *it);
             }
         }
         break;
@@ -340,7 +341,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     case WM_KEYDOWN:
         if (wParam == VK_ESCAPE) {
             if (state.isEditingLayout) {
-                StopLayoutEditMode();
+                controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
                 return 0;
             }
             if (state.isMoving) {

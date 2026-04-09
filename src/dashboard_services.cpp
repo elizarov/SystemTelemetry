@@ -4,39 +4,6 @@
 
 #include "config_writer.h"
 
-AppConfig ConfigPersistenceService::LoadRuntimeConfig(const DiagnosticsOptions& options) const {
-    return ::LoadRuntimeConfig(options);
-}
-
-bool ConfigPersistenceService::SaveRuntimeConfig(const std::filesystem::path& path, const AppConfig& config, HWND owner) const {
-    if (CanWriteRuntimeConfig(path)) {
-        return SaveConfig(path, config);
-    }
-    return SaveConfigElevated(path, config, owner);
-}
-
-bool ConfigPersistenceService::SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) const {
-    return ::SaveFullConfig(path, config);
-}
-
-std::unique_ptr<DiagnosticsSession> DiagnosticsService::CreateSession(const DiagnosticsOptions& options) const {
-    auto session = std::make_unique<DiagnosticsSession>(options);
-    if (!session->Initialize()) {
-        return nullptr;
-    }
-    return session;
-}
-
-bool DiagnosticsService::WriteOutputs(DiagnosticsSession* session, const TelemetryDump& dump, const AppConfig& config) const {
-    return session != nullptr ? session->WriteOutputs(dump, config) : true;
-}
-
-bool DiagnosticsService::ReloadTelemetryRuntime(const std::filesystem::path& configPath, AppConfig& activeConfig,
-    std::unique_ptr<TelemetryRuntime>& telemetry, const DiagnosticsOptions& diagnosticsOptions,
-    DiagnosticsSession* diagnostics) const {
-    return ReloadTelemetryRuntimeFromDisk(configPath, activeConfig, telemetry, diagnosticsOptions, diagnostics);
-}
-
 bool DisplayConfigurationService::ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) const {
     return ::ApplyConfiguredWallpaper(config, traceStream);
 }
@@ -129,44 +96,4 @@ bool DisplayConfigurationService::ConfigureDisplay(const AppConfig& config, cons
     std::filesystem::remove(tempConfigPath, ignored);
     std::filesystem::remove(tempDumpPath, ignored);
     return exitCode == 0;
-}
-
-bool AutoStartService::IsEnabled() const {
-    return IsAutoStartEnabledForCurrentExecutable();
-}
-
-bool AutoStartService::Update(bool enabled, HWND owner) const {
-    return UpdateAutoStartRegistration(enabled, owner);
-}
-
-std::unique_ptr<TelemetryRuntime> DashboardSessionService::InitializeRuntime(const AppConfig& config,
-    const DiagnosticsOptions& options, std::ostream* traceStream) const {
-    return InitializeTelemetryRuntimeInstance(config, options, traceStream);
-}
-
-void DashboardSessionService::UpdateSnapshot(TelemetryRuntime& telemetry) const {
-    telemetry.UpdateSnapshot();
-}
-
-void DashboardSessionService::SetPreferredNetworkAdapter(TelemetryRuntime& telemetry, const std::string& adapterName) const {
-    telemetry.SetPreferredNetworkAdapterName(adapterName);
-}
-
-void DashboardSessionService::SetSelectedStorageDrives(TelemetryRuntime& telemetry, const std::vector<std::string>& driveLetters) const {
-    telemetry.SetSelectedStorageDrives(driveLetters);
-}
-
-bool LayoutEditingService::ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& target,
-    const std::vector<int>& weights) const {
-    return layout_edit::ApplyGuideWeights(config, target, weights);
-}
-
-bool LayoutEditingService::ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, double value) const {
-    return layout_edit::ApplyValue(config, target, value);
-}
-
-std::optional<int> LayoutEditingService::EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer, const AppConfig& baseConfig,
-    const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights,
-    const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) const {
-    return layout_edit::EvaluateWidgetExtentForGuideWeights(renderer, baseConfig, target, weights, widget, axis);
 }

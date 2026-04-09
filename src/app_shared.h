@@ -32,11 +32,6 @@ public:
     void ReleaseFonts() override;
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
     bool WriteDiagnosticsOutputs();
-    void SaveDumpAs();
-    void SaveScreenshotAs();
-    void SaveFullConfigAs();
-    bool IsAutoStartEnabled() const;
-    void ToggleAutoStart();
     HWND WindowHandle() const override;
     DashboardRenderer& Renderer() override;
     const DashboardRenderer& Renderer() const override;
@@ -59,22 +54,12 @@ private:
     void Paint();
     void ShowContextMenu(POINT screenPoint);
     void BringOnTop();
-    bool ReloadConfigFromDisk();
-    AppConfig BuildCurrentConfigForSaving() const;
-    void UpdateConfigFromCurrentPlacement();
     bool ApplyConfiguredWallpaper();
-    bool ConfigureDisplay(const DisplayMenuOption& option);
-    bool SwitchLayout(const std::string& layoutName);
-    void SelectNetworkAdapter(const NetworkMenuOption& option);
-    void ToggleStorageDrive(const StorageDriveMenuOption& option);
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     bool IsLayoutEditMode() const;
-    void StartLayoutEditMode();
-    void StopLayoutEditMode();
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
-    bool ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -99,6 +84,7 @@ private:
     const AppConfig& LayoutEditConfig() const override;
     DashboardRenderer& LayoutEditRenderer() override;
     DashboardRenderer::EditOverlayState& LayoutEditOverlayState() override;
+    bool ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) override;
     bool ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& target, double value) override;
     void InvalidateLayoutEdit() override;
 

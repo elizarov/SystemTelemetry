@@ -1,9 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
+#include "app_diagnostics.h"
 #include "app_platform.h"
 #include "dashboard_services.h"
 #include "layout_edit_controller.h"
@@ -79,10 +81,5 @@ private:
     bool ApplyConfiguredWallpaper();
 
     DashboardSessionState state_{};
-    ConfigPersistenceService configPersistenceService_{};
-    DiagnosticsService diagnosticsService_{};
     DisplayConfigurationService displayConfigurationService_{};
-    AutoStartService autoStartService_{};
-    DashboardSessionService dashboardSessionService_{};
-    LayoutEditingService layoutEditingService_{};
 };
