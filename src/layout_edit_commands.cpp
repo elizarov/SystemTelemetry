@@ -2,17 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <memory>
 
 namespace layout_edit {
 
 namespace {
-
-class EditCommand {
-public:
-    virtual ~EditCommand() = default;
-    virtual void Apply(AppConfig& config) const = 0;
-};
 
 class EditCommandValidator {
 public:
@@ -28,137 +21,93 @@ public:
         const double totalSweep = ClampGaugeSweepDegrees(config.layout.gauge.sweepDegrees);
         const int segmentCount = (std::max)(1, config.layout.gauge.segmentCount);
         const double maxSegmentGap = segmentCount <= 1 ? 0.0 : totalSweep / static_cast<double>(segmentCount - 1);
-        return std::clamp(value, 0.0, maxSegmentGap);
+            return std::clamp(value, 0.0, maxSegmentGap);
     }
 };
 
 template <typename Section>
-class SetPositiveIntCommand final : public EditCommand {
-public:
-    SetPositiveIntCommand(Section LayoutConfig::* section, int Section::* member, int value)
-        : section_(section), member_(member), value_(value) {}
+void ApplyPositiveInt(Section LayoutConfig::* section, int Section::* member, AppConfig& config, double value) {
+    (config.layout.*section).*member = EditCommandValidator::ClampPositiveInt(value);
+}
 
-    void Apply(AppConfig& config) const override {
-        (config.layout.*section_).*member_ = value_;
-    }
-
-private:
-    Section LayoutConfig::* section_;
-    int Section::* member_;
-    int value_;
-};
-
-class SetFontSizeCommand final : public EditCommand {
-public:
-    SetFontSizeCommand(UiFontConfig UiFontSetConfig::* font, int value)
-        : font_(font), value_(value) {}
-
-    void Apply(AppConfig& config) const override {
-        (config.layout.fonts.*font_).size = value_;
-    }
-
-private:
-    UiFontConfig UiFontSetConfig::* font_;
-    int value_;
-};
-
-class SetGaugeSweepDegreesCommand final : public EditCommand {
-public:
-    explicit SetGaugeSweepDegreesCommand(double value) : value_(value) {}
-
-    void Apply(AppConfig& config) const override {
-        config.layout.gauge.sweepDegrees = value_;
-    }
-
-private:
-    double value_;
-};
-
-class SetGaugeSegmentGapDegreesCommand final : public EditCommand {
-public:
-    explicit SetGaugeSegmentGapDegreesCommand(double value) : value_(value) {}
-
-    void Apply(AppConfig& config) const override {
-        config.layout.gauge.segmentGapDegrees = value_;
-    }
-
-private:
-    double value_;
-};
-
-std::unique_ptr<EditCommand> CreateEditCommand(const AppConfig& config, const LayoutEditHost::ValueTarget& target, double value) {
-    using Field = LayoutEditHost::ValueTarget::Field;
-    switch (target.field) {
-    case Field::MetricListLabelWidth:
-        return std::make_unique<SetPositiveIntCommand<MetricListWidgetConfig>>(
-            &LayoutConfig::metricList, &MetricListWidgetConfig::labelWidth, EditCommandValidator::ClampPositiveInt(value));
-    case Field::MetricListVerticalGap:
-        return std::make_unique<SetPositiveIntCommand<MetricListWidgetConfig>>(
-            &LayoutConfig::metricList, &MetricListWidgetConfig::verticalGap, EditCommandValidator::ClampPositiveInt(value));
-    case Field::DriveUsageActivityWidth:
-        return std::make_unique<SetPositiveIntCommand<DriveUsageListWidgetConfig>>(
-            &LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::activityWidth, EditCommandValidator::ClampPositiveInt(value));
-    case Field::DriveUsageFreeWidth:
-        return std::make_unique<SetPositiveIntCommand<DriveUsageListWidgetConfig>>(
-            &LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::freeWidth, EditCommandValidator::ClampPositiveInt(value));
-    case Field::DriveUsageHeaderGap:
-        return std::make_unique<SetPositiveIntCommand<DriveUsageListWidgetConfig>>(
-            &LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::headerGap, EditCommandValidator::ClampPositiveInt(value));
-    case Field::DriveUsageRowGap:
-        return std::make_unique<SetPositiveIntCommand<DriveUsageListWidgetConfig>>(
-            &LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::rowGap, EditCommandValidator::ClampPositiveInt(value));
-    case Field::ThroughputAxisPadding:
-        return std::make_unique<SetPositiveIntCommand<ThroughputWidgetConfig>>(
-            &LayoutConfig::throughput, &ThroughputWidgetConfig::axisPadding, EditCommandValidator::ClampPositiveInt(value));
-    case Field::ThroughputHeaderGap:
-        return std::make_unique<SetPositiveIntCommand<ThroughputWidgetConfig>>(
-            &LayoutConfig::throughput, &ThroughputWidgetConfig::headerGap, EditCommandValidator::ClampPositiveInt(value));
-    case Field::GaugeSweepDegrees:
-        return std::make_unique<SetGaugeSweepDegreesCommand>(EditCommandValidator::ClampGaugeSweepDegrees(value));
-    case Field::GaugeSegmentGapDegrees:
-        return std::make_unique<SetGaugeSegmentGapDegreesCommand>(
-            EditCommandValidator::ClampGaugeSegmentGapDegrees(config, value));
-    case Field::FontTitle:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::title, EditCommandValidator::ClampPositiveInt(value));
-    case Field::FontBig:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::big, EditCommandValidator::ClampPositiveInt(value));
-    case Field::FontValue:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::value, EditCommandValidator::ClampPositiveInt(value));
-    case Field::FontLabel:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::label, EditCommandValidator::ClampPositiveInt(value));
-    case Field::FontText:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::text, EditCommandValidator::ClampPositiveInt(value));
-    case Field::FontSmall:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::smallText, EditCommandValidator::ClampPositiveInt(value));
-    case Field::FontFooter:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::footer, EditCommandValidator::ClampPositiveInt(value));
-    case Field::FontClockTime:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::clockTime, EditCommandValidator::ClampPositiveInt(value));
-    case Field::FontClockDate:
-        return std::make_unique<SetFontSizeCommand>(&UiFontSetConfig::clockDate, EditCommandValidator::ClampPositiveInt(value));
-    case Field::MetricListBarHeight:
-        return std::make_unique<SetPositiveIntCommand<MetricListWidgetConfig>>(
-            &LayoutConfig::metricList, &MetricListWidgetConfig::barHeight, EditCommandValidator::ClampPositiveInt(value));
-    case Field::DriveUsageBarHeight:
-        return std::make_unique<SetPositiveIntCommand<DriveUsageListWidgetConfig>>(
-            &LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::barHeight, EditCommandValidator::ClampPositiveInt(value));
-    case Field::GaugeSegmentCount:
-        return std::make_unique<SetPositiveIntCommand<GaugeWidgetConfig>>(
-            &LayoutConfig::gauge, &GaugeWidgetConfig::segmentCount, EditCommandValidator::ClampPositiveInt(value));
-    default:
-        return nullptr;
-    }
+void ApplyFontSize(UiFontConfig UiFontSetConfig::* font, AppConfig& config, double value) {
+    (config.layout.fonts.*font).size = EditCommandValidator::ClampPositiveInt(value);
 }
 
 }  // namespace
 
 bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, double value) {
-    std::unique_ptr<EditCommand> command = CreateEditCommand(config, target, value);
-    if (command == nullptr) {
+    using Field = LayoutEditHost::ValueTarget::Field;
+    switch (target.field) {
+    case Field::MetricListLabelWidth:
+        ApplyPositiveInt(&LayoutConfig::metricList, &MetricListWidgetConfig::labelWidth, config, value);
+        return true;
+    case Field::MetricListVerticalGap:
+        ApplyPositiveInt(&LayoutConfig::metricList, &MetricListWidgetConfig::verticalGap, config, value);
+        return true;
+    case Field::DriveUsageActivityWidth:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::activityWidth, config, value);
+        return true;
+    case Field::DriveUsageFreeWidth:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::freeWidth, config, value);
+        return true;
+    case Field::DriveUsageHeaderGap:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::headerGap, config, value);
+        return true;
+    case Field::DriveUsageRowGap:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::rowGap, config, value);
+        return true;
+    case Field::ThroughputAxisPadding:
+        ApplyPositiveInt(&LayoutConfig::throughput, &ThroughputWidgetConfig::axisPadding, config, value);
+        return true;
+    case Field::ThroughputHeaderGap:
+        ApplyPositiveInt(&LayoutConfig::throughput, &ThroughputWidgetConfig::headerGap, config, value);
+        return true;
+    case Field::GaugeSweepDegrees:
+        config.layout.gauge.sweepDegrees = EditCommandValidator::ClampGaugeSweepDegrees(value);
+        return true;
+    case Field::GaugeSegmentGapDegrees:
+        config.layout.gauge.segmentGapDegrees = EditCommandValidator::ClampGaugeSegmentGapDegrees(config, value);
+        return true;
+    case Field::FontTitle:
+        ApplyFontSize(&UiFontSetConfig::title, config, value);
+        return true;
+    case Field::FontBig:
+        ApplyFontSize(&UiFontSetConfig::big, config, value);
+        return true;
+    case Field::FontValue:
+        ApplyFontSize(&UiFontSetConfig::value, config, value);
+        return true;
+    case Field::FontLabel:
+        ApplyFontSize(&UiFontSetConfig::label, config, value);
+        return true;
+    case Field::FontText:
+        ApplyFontSize(&UiFontSetConfig::text, config, value);
+        return true;
+    case Field::FontSmall:
+        ApplyFontSize(&UiFontSetConfig::smallText, config, value);
+        return true;
+    case Field::FontFooter:
+        ApplyFontSize(&UiFontSetConfig::footer, config, value);
+        return true;
+    case Field::FontClockTime:
+        ApplyFontSize(&UiFontSetConfig::clockTime, config, value);
+        return true;
+    case Field::FontClockDate:
+        ApplyFontSize(&UiFontSetConfig::clockDate, config, value);
+        return true;
+    case Field::MetricListBarHeight:
+        ApplyPositiveInt(&LayoutConfig::metricList, &MetricListWidgetConfig::barHeight, config, value);
+        return true;
+    case Field::DriveUsageBarHeight:
+        ApplyPositiveInt(&LayoutConfig::driveUsageList, &DriveUsageListWidgetConfig::barHeight, config, value);
+        return true;
+    case Field::GaugeSegmentCount:
+        ApplyPositiveInt(&LayoutConfig::gauge, &GaugeWidgetConfig::segmentCount, config, value);
+        return true;
+    default:
         return false;
     }
-    command->Apply(config);
-    return true;
 }
 
 }  // namespace layout_edit
