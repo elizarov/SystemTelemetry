@@ -6,7 +6,7 @@
 - Use `devenv.cmd` to activate the development environment when needed.
 - Keep machine-specific compiler/tool paths in `devenv.cmd`, and document the expected `devenv.cmd` contract in `devenv.md`.
 - Keep `docs/build.md` as the single maintained source of truth for build prerequisites, build invocation, and developer-facing setup notes; other docs should link to it instead of repeating that material.
-- Keep all sources in `src`.
+- Keep production sources in `src` and unit tests plus vendored test support in `tests`.
 - Keep generated build outputs inside `build\` so the project root stays clean.
 - Keep the CMake build tree under `build\cmake\` so generated project files, dependency state, and object directories stay inside `build\` as well.
 - When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.

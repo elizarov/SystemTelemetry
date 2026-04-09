@@ -494,31 +494,28 @@ std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::Coll
         }
     }
 
-    std::map<SimilarityTypeKey, size_t> groupOrderByType;
-    std::map<SimilarityTypeKey, size_t> groupCountByType;
-    for (size_t i = 0; i < allWidgets.size(); ++i) {
-        const ResolvedWidgetLayout* widget = allWidgets[i];
-        const SimilarityTypeKey typeKey{widget->kind, WidgetExtentForAxis(*widget, guide.axis)};
-        groupCountByType[typeKey] += 1;
-        groupOrderByType.try_emplace(typeKey, i);
-    }
-
     std::vector<LayoutGuideSnapCandidate> candidates;
     for (const ResolvedWidgetLayout* affected : affectedWidgets) {
         const int startExtent = WidgetExtentForAxis(*affected, guide.axis);
         if (startExtent <= 0) {
             continue;
         }
-        for (const auto& entry : groupOrderByType) {
-            if (entry.first.kind != affected->kind || groupCountByType[entry.first] < 2) {
+        std::set<SimilarityTypeKey> seenTargets;
+        for (size_t i = 0; i < allWidgets.size(); ++i) {
+            const ResolvedWidgetLayout* target = allWidgets[i];
+            if (target == affected || target->kind != affected->kind) {
+                continue;
+            }
+            const SimilarityTypeKey typeKey{target->kind, WidgetExtentForAxis(*target, guide.axis)};
+            if (!seenTargets.insert(typeKey).second) {
                 continue;
             }
             candidates.push_back(LayoutGuideSnapCandidate{
                 {affected->cardId, affected->editCardId, affected->nodePath},
-                entry.first.extent,
+                typeKey.extent,
                 startExtent,
-                std::abs(entry.first.extent - startExtent),
-                entry.second,
+                std::abs(typeKey.extent - startExtent),
+                i,
             });
         }
     }

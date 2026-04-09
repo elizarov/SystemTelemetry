@@ -21,6 +21,12 @@ build.cmd
 
 All build artifacts are kept under `build\`.
 
+Run unit tests from the generated CMake tree after a successful build:
+
+```bat
+ctest --test-dir build\cmake -C Release --output-on-failure
+```
+
 Diagnostics validation commands and output expectations are documented in [docs/diagnostics.md](diagnostics.md).
 
 ## Telemetry provider notes

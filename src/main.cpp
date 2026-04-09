@@ -15,7 +15,6 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
-#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -23,6 +22,7 @@
 #include "../resources/resource.h"
 #include "config.h"
 #include "dashboard_renderer.h"
+#include "layout_snap_solver.h"
 #include "snapshot_dump.h"
 #include "telemetry.h"
 #include "telemetry_runtime.h"
@@ -2242,51 +2242,25 @@ std::optional<std::vector<int>> DashboardApp::FindSnappedLayoutGuideWeights(
     }
 
     for (const auto& candidate : drag.snapCandidates) {
-        const std::optional<int> currentExtent = EvaluateLayoutWidgetExtentForWeights(
-            drag.guide, freeWeights, candidate.widget, drag.guide.axis);
-        if (!currentExtent.has_value() || std::abs(*currentExtent - candidate.targetExtent) > threshold) {
-            continue;
-        }
-
-        std::map<int, std::optional<int>> extentCache;
-        auto evaluateExtent = [&](int firstWeight) -> std::optional<int> {
-            const auto cached = extentCache.find(firstWeight);
-            if (cached != extentCache.end()) {
-                return cached->second;
-            }
+        const auto snappedWeight = layout_snap_solver::FindNearestSnapWeight(
+        freeWeights[index], combined, threshold, {layout_snap_solver::SnapCandidate{
+            candidate.targetExtent,
+            candidate.startDistance,
+            candidate.groupOrder,
+        }}, [&](int firstWeight) -> std::optional<int> {
             std::vector<int> attemptWeights = freeWeights;
             attemptWeights[index] = firstWeight;
             attemptWeights[index + 1] = combined - firstWeight;
-            std::optional<int> extent =
-                EvaluateLayoutWidgetExtentForWeights(drag.guide, attemptWeights, candidate.widget, drag.guide.axis);
-            extentCache.emplace(firstWeight, extent);
-            return extent;
-        };
-
-        const int centerWeight = freeWeights[index];
-        const int maxDistance = std::max(centerWeight - 1, (combined - 1) - centerWeight);
-        for (int distance = 0; distance <= maxDistance; ++distance) {
-            const int lowProbe = centerWeight - distance;
-            if (lowProbe >= 1) {
-                const std::optional<int> lowExtent = evaluateExtent(lowProbe);
-                if (lowExtent.has_value() && *lowExtent == candidate.targetExtent) {
-                    std::vector<int> exact = freeWeights;
-                    exact[index] = lowProbe;
-                    exact[index + 1] = combined - lowProbe;
-                    return exact;
-                }
-            }
-            const int highProbe = centerWeight + distance;
-            if (distance > 0 && highProbe <= (combined - 1)) {
-                const std::optional<int> highExtent = evaluateExtent(highProbe);
-                if (highExtent.has_value() && *highExtent == candidate.targetExtent) {
-                    std::vector<int> exact = freeWeights;
-                    exact[index] = highProbe;
-                    exact[index + 1] = combined - highProbe;
-                    return exact;
-                }
-            }
+            return EvaluateLayoutWidgetExtentForWeights(drag.guide, attemptWeights, candidate.widget, drag.guide.axis);
+        });
+        if (!snappedWeight.has_value()) {
+            continue;
         }
+
+        std::vector<int> exact = freeWeights;
+        exact[index] = *snappedWeight;
+        exact[index + 1] = combined - *snappedWeight;
+        return exact;
     }
 
     return std::nullopt;

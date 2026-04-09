@@ -57,6 +57,7 @@ add_executable(SystemTelemetry WIN32
     resources/SystemTelemetry.rc
     src/main.cpp
     src/config.cpp
+    src/layout_snap_solver.cpp
     src/telemetry.cpp
     src/telemetry_runtime.cpp
     src/telemetry_runtime_fake.cpp
@@ -145,4 +146,48 @@ set_target_properties(SystemTelemetry PROPERTIES
     OUTPUT_NAME "SystemTelemetry"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
+
+enable_testing()
+
+add_library(gtest INTERFACE)
+target_include_directories(gtest INTERFACE
+    "${CMAKE_SOURCE_DIR}/tests/gtest/include"
+    "${CMAKE_SOURCE_DIR}/src"
+)
+
+add_library(gtest_main STATIC
+    tests/gtest/src/gtest_main.cpp
+)
+target_link_libraries(gtest_main PUBLIC gtest)
+
+add_executable(SystemTelemetryTests
+    tests/layout_snap_solver_tests.cpp
+    src/layout_snap_solver.cpp
+)
+target_include_directories(SystemTelemetryTests PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_compile_definitions(SystemTelemetryTests PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+)
+target_compile_options(SystemTelemetryTests PRIVATE
+    /EHsc
+    /W4
+    /permissive-
+    /Zi
+)
+target_link_options(SystemTelemetryTests PRIVATE
+    /DEBUG
+    /INCREMENTAL
+)
+target_link_libraries(SystemTelemetryTests PRIVATE
+    gtest_main
+)
+set_target_properties(SystemTelemetryTests PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
+)
+
+add_test(NAME SystemTelemetryTests COMMAND SystemTelemetryTests)
 
