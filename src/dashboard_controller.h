@@ -7,7 +7,7 @@
 
 #include "app_diagnostics.h"
 #include "app_platform.h"
-#include "dashboard_services.h"
+#include "display_configuration_service.h"
 #include "layout_edit_controller.h"
 
 struct DashboardSessionState {
