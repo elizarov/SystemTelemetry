@@ -4,8 +4,6 @@
 #include <cctype>
 #include <cstdio>
 
-#include "trace.h"
-
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -55,14 +53,6 @@ std::string JoinNames(const std::vector<std::string>& names) {
         joined += names[i];
     }
     return joined;
-}
-
-void WriteOptionalTrace(std::ostream* traceStream, const std::string& text) {
-    if (traceStream == nullptr) {
-        return;
-    }
-    tracing::Trace trace(traceStream);
-    trace.Write(text);
 }
 
 std::string FormatHresult(HRESULT value) {

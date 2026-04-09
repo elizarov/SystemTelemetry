@@ -490,7 +490,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnap
             }
             return false;
         }
-        WriteOptionalTrace(traceStream, "diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
+        tracing::Trace(traceStream).Write("diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
     }
     const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot, overlayState);
     if (!saved && errorText != nullptr) {
