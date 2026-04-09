@@ -9,7 +9,7 @@ This document is the single maintained source of truth for diagnostics command b
 - `/screenshot[:path]` writes a rendered dashboard PNG to `telemetry_screenshot.png` in the current working directory, or to the optional target path.
 - `/save-config[:path]` writes a minimal INI overlay to `telemetry_config.ini` in the current working directory, or to the optional target path.
 - `/save-full-config[:path]` writes a full embedded-template-shaped INI export to `telemetry_full_config.ini` in the current working directory, or to the optional target path.
-- `/reload` forces a config reload through the normal live-dashboard reload path before headless diagnostics outputs are exported.
+- `/reload` forces a config reload through the live-dashboard reload path before headless diagnostics outputs are exported.
 - `/exit` runs diagnostics as a one-shot headless export path instead of starting the dashboard UI.
 - `/fake[:path]` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` in the current working directory, or from the optional fake dump path.
 - `/layout:<name>` overrides `display.layout` for the current process so diagnostics can validate a named layout without editing `config.ini`.
@@ -32,7 +32,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Trace output appends plain UTF-8 text without a BOM and uses the prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
 - Dump output overwrites with a stable text format that can be copied directly into the default fake file or a `/fake` target file.
 - Screenshot output overwrites with only the rendered dashboard PNG.
-- `/save-config` overwrites with only the changed live values relative to the target file's current loaded config state.
+- `/save-config` overwrites with only the changed live values relative to the target file's loaded config state.
 - `/save-full-config` overwrites with the full embedded-template line structure updated to the live config values.
 
 ## Runtime behavior
@@ -41,7 +41,7 @@ This document is the single maintained source of truth for diagnostics command b
 - In UI-attached mode, trace logging continues for the process lifetime, while dump and screenshot outputs refresh once per second from the latest snapshot.
 - With `/exit`, the application initializes telemetry from the normal runtime `config.ini`, performs the first update, optionally writes the requested outputs once, and exits without starting the GUI.
 - With `/default-config`, the application skips the executable-side `config.ini` overlay and keeps only the embedded default config for startup and `/reload` diagnostics runs.
-- With `/layout:<name>`, the application applies that named layout after loading `config.ini` and keeps that override active for the rest of the process, including `/reload` diagnostics runs.
+- With `/layout:<name>`, the application applies that named layout after loading `config.ini` and keeps that override active for the process lifetime, including `/reload` diagnostics runs.
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
 - With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
 - With `/blank`, the application keeps the normal layout, panel chrome, card headers, CPU and GPU names, drive labels, and empty chart or bar tracks while suppressing dynamic metric rendering.
@@ -59,8 +59,8 @@ This document is the single maintained source of truth for diagnostics command b
 
 ## Dump content
 
-- The dump includes only the current runtime snapshot model that `/fake` loads and the dashboard renders, including retained histories, configured drive rows with per-drive read and write MB/s, and the full local date and time down to milliseconds.
-- The dump schema reflects the current runtime model directly and removes obsolete compatibility keys instead of keeping null placeholders.
+- The dump includes only the runtime snapshot model that `/fake` loads and the dashboard renders, including retained histories, configured drive rows with per-drive read and write MB/s, and the full local date and time down to milliseconds.
+- The dump schema reflects the runtime snapshot model directly and includes only fields that the runtime loads and renders.
 - Provider diagnostics and provider-specific debug details stay in trace output instead of being duplicated into the dump schema.
 
 ## Single-instance behavior

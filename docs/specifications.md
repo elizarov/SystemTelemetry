@@ -49,21 +49,21 @@ Examples include:
 
 - At runtime, the application must first load an embedded default `config.ini` resource, then read `config.ini` from the same directory as `SystemTelemetry.exe` when that file exists and overlay its values on top of the embedded defaults.
 - The embedded `resources/config.ini` template must remain the single maintained source of truth for config-file entries, and [docs/layout.md](layout.md) must remain the single maintained source of truth for config-language syntax, section ownership, and examples.
-- The config parser must accept only the documented current `resources/config.ini` key spellings and metric references; undocumented legacy aliases are not supported.
-- Before writing `config.ini` beside the executable, the application must verify that the current process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance.
-- The runtime executable must embed an application manifest that disables legacy file virtualization so `config.ini` reads and writes never fall back to a per-user `VirtualStore` shadow copy when the app is installed under `Program Files`.
+- The config parser must accept only the documented `resources/config.ini` key spellings and metric references.
+- Before writing `config.ini` beside the executable, the application must verify that the process can write there; when it cannot, `Save Config` must prompt for elevation and complete the save through an elevated helper instance.
+- The runtime executable must embed an application manifest that disables file virtualization so `config.ini` reads and writes target the executable-side file even when the app is installed under `Program Files`.
 - The runtime executable must also opt into per-monitor DPI awareness so Windows does not bitmap-scale a finished low-resolution dashboard surface on scaled displays.
-- `Save Config` must load the current executable-side `config.ini` through the normal startup overlay path into a comparison copy, update only the keys whose live in-memory values differ, and write those updates back into the existing INI text so unchanged explicit overrides and unknown lines remain intact.
+- `Save Config` must load the executable-side `config.ini` through the normal startup overlay path into a comparison copy, update only the keys whose live in-memory values differ, and write those updates back into the existing INI text so unchanged explicit overrides and unknown lines remain intact.
 - When `Save Config` creates `config.ini` beside the executable for the first time, it must write only the keys whose live in-memory values differ from the embedded defaults.
 - `Save Full Config To...` must export a complete config file by starting from the embedded `resources/config.ini` template text and updating every maintained config key with the live in-memory values so the exported file keeps the shipped line structure and comments.
 - The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
 - The `[display]` section must select the active dashboard layout by name through `display.layout`, and named dashboard size-and-card-placement definitions must live in `[layout.<name>]` sections.
 - The shipped config template must define `800x480` as the default active layout and also include an experimental `480x800` portrait layout for the same panel resolution.
-- The config overlay path must replace parsed layout expressions during overlay, so `config.ini` safely overrides `[layout.<name>]` and `[card.*]` layout trees without duplicating cards or widgets after save/reload cycles.
+- The config overlay path must replace parsed layout expressions during overlay, so `config.ini` overrides `[layout.<name>]` and `[card.*]` layout trees without duplicating cards or widgets.
 
 ### Layout and rendering behavior
 
-- The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using the current monitor DPI before rendering.
+- The configured `layout.window`, display `position`, and layout geometry/font sizes must be treated as logical units that are converted to native device pixels using monitor DPI before rendering.
 - When `display.monitor_name` targets a monitor that is not yet available during login startup, display-topology churn, or a temporary unplug, the UI must keep watching for that configured monitor instead of locking in a fallback monitor placement, and once the monitor is available it must apply the saved logical position there.
 - When `[display] wallpaper` is set to an image path, the runtime must resolve relative paths beside `SystemTelemetry.exe` and apply that image as the wallpaper for the configured display through Windows per-monitor wallpaper APIs during startup and config reload, retrying once the configured display becomes enumerable if startup monitor discovery races behind login or hotplug.
 - The layout engine must resolve row, card, and widget coordinates once after config load or reload and keep rendering in those static coordinates until the config is reloaded again.
@@ -76,7 +76,7 @@ Examples include:
 - In a vertical `rows(...)` container, direct `text` children must behave as fixed-height widgets at their preferred configured height, with the remaining vertical space going to flexible siblings unless one or more `vertical_spring` children consume that leftover first.
 - The dedicated `drive_usage_list` section must provide a drive-usage bar thickness setting plus separate header-gap and row-gap controls so storage header spacing and data-row spacing can be tuned independently from row content height and from the thinner CPU/GPU metric bars.
 - The dedicated `drive_usage_list` section must also provide one shared read/write activity-column width, the number of stacked activity segments, and the gap between those segments.
-- The dedicated `drive_usage_list` section must provide separate gap controls for the activity-to-usage transition and the usage-bar-to-percent transition so the storage row alignment can be tuned without changing every column spacing together.
+- The dedicated `drive_usage_list` section must provide separate gap controls for the activity-to-usage transition and the usage-bar-to-percent transition so storage row alignment can be tuned without changing every column spacing together.
 - The dedicated widget sections must own the widget-level geometry that affects visual rhythm, including metric bar thickness, throughput plot chrome sizes, gauge preferred size, and the fixed widths used by the storage drive row columns.
 - The renderer must not rely on buried widget-spacing or widget-geometry pixel literals for text, footer, clock, gauge, or throughput sizing; those visual sizes must come from `config.ini` widget sections, with only non-visual safety clamps left in code.
 - After the first layout pass resolves every gauge slot, the renderer must derive one shared fitted gauge radius from the most constrained resolved gauge bounds and use that same gauge size for every gauge render in the active layout.
@@ -87,7 +87,7 @@ Examples include:
 - In a vertical `rows(...)` container, any resolved fixed-height direct child must keep its preferred configured height and any remaining height reduction must be absorbed by flexible non-spring siblings such as throughput plots when no `vertical_spring` is present.
 - The shipped `network_footer` and `spacer` widgets must use the same fixed preferred height driven by `[fonts].footer` and `[network_footer].preferred_padding`.
 - The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
-- Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the live fill bar and peak ghost stay aligned after `[metric_scales]` changes.
+- Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the fill bar and peak ghost stay aligned.
 - The renderer must support a blank rendering mode that preserves panel chrome, card titles, card icons, CPU and GPU names, drive labels, and empty chart or bar tracks while omitting dynamic metric text, time, date, plot lines, chart leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 
 ### Runtime actions tied to config
@@ -99,12 +99,12 @@ Examples include:
 - The command line must also accept `/edit-layout:horizonatal-sizes` and `/edit-layout:vertical-sizes` for diagnostics validation, rendering and numbering every visible horizontal size ruler or every visible vertical size ruler without requiring an active drag.
 - The popup menu must provide a `Layout` submenu that lists every configured layout name, shows the active layout with a radio check, and on selection switches `display.layout`, reapplies the active named layout, and resizes the window immediately.
 - The popup menu must provide a `Network` submenu that lists every runtime network candidate with an IPv4 address, using the same `adapter name | IP address` footer text shown by the network footer widget.
-- The `Network` submenu must show a radio check on the adapter currently selected by the runtime selection flow, even when `network.adapter_name` is empty or no longer matches any current adapter.
+- The `Network` submenu must show a radio check on the adapter selected by the runtime selection flow, even when `network.adapter_name` is empty or does not match any enumerated adapter.
 - Selecting a `Network` submenu item must set `network.adapter_name` to that adapter name and apply the selection immediately without restarting the app.
 - The popup menu must provide a `Storage drives` submenu that lists every active non-network fixed or removable drive with a checkbox per drive.
 - Each `Storage drives` submenu item must show `drive letter | volume label | size`, omitting only the label text when the volume has no label.
 - Clicking a `Storage drives` submenu item must add or remove that drive letter in `[storage] drives`, keep the saved drive list sorted by drive letter, and refresh the storage usage list immediately without restarting the app.
-- The popup menu must provide a `Config To Display` submenu that lists every currently enumerable display by friendly name plus physical resolution, enables only displays whose resolution matches the dashboard's DPI-scaled window size for that display, and on selection must set `display.monitor_name`, set `display.position` to `0,0`, render a blank dashboard image to `telemetry_blank.png` beside the executable, set `display.wallpaper` to `telemetry_blank.png`, save the updated `config.ini`, and immediately apply that wallpaper to the selected display.
+- The popup menu must provide a `Config To Display` submenu that lists every enumerable display by friendly name plus physical resolution, enables only displays whose resolution matches the dashboard's DPI-scaled window size for that display, and on selection must set `display.monitor_name`, set `display.position` to `0,0`, render a blank dashboard image to `telemetry_blank.png` beside the executable, set `display.wallpaper` to `telemetry_blank.png`, save the updated `config.ini`, and immediately apply that wallpaper to the selected display.
 - The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
 - When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
 - The popup menu must expose an `Auto-start on user logon` toggle that shows a check mark only when the machine-wide `HKLM\Software\Microsoft\Windows\CurrentVersion\Run\SystemTelemetry` entry points to the running executable path, removes that entry when clicked while checked, and otherwise writes the running executable path there when clicked.
@@ -132,7 +132,7 @@ Examples include:
 - While a layout-edit guide drag is active, the renderer must compare each affected descendant widget against every other widget of the same type in the active layout and draw paired measurement rulers on widgets whose dragged-axis size differs by no more than the configured threshold, while skipping `vertical_spring` widgets and any widgets whose row height is fixed.
 - Once a dragged widget falls within the configured same-type size threshold that makes the ruler visible, the drag must snap to the nearest exact same-size group chosen from the drag-start layout, solving the snapped guide weights through iterative relayout passes so nested weighted hierarchies can converge on the matching extent; when multiple groups are equally close at drag start, the first group in layout order wins.
 - When multiple same-type widgets in one vertical or horizontal stack share the same dragged-axis extent by construction, the measurement ruler for that type and extent must draw only on the first widget in that stack, both for the widgets being edited and for matching widgets elsewhere in the active layout.
-- When same-type widgets match exactly on the dragged axis, the measurement ruler must show centered notch markers instead of the previous exact-match box, with the notch count coming from that exact-match type's active drag ordinal where a type is the widget type plus the matched dragged-axis extent.
+- When same-type widgets match exactly on the dragged axis, the measurement ruler must show centered notch markers, with the notch count coming from that exact-match type's active drag ordinal where a type is the widget type plus the matched dragged-axis extent.
 - Holding `Alt` during a layout-edit drag must temporarily disable same-size snapping while keeping the free-drag weight adjustment active.
 - Pressing `Esc` must exit either move mode or layout-edit mode.
 
@@ -212,7 +212,7 @@ While moving, show an overlay in the top-left corner with:
 - The move overlay should size and space itself from the actual UI font metrics and monitor scale.
 - The overlay content should be easy to copy into configuration.
 - The application must also read the saved relative X/Y coordinates from configuration at startup and place the window accordingly.
-- Add a `Save Config` action that writes the current display identifier and relative X/Y placement back to the config file while preserving all other settings and unchanged explicit overrides.
+- The application must provide a `Save Config` action that writes the display identifier and relative X/Y placement back to the config file while preserving all other settings and unchanged explicit overrides.
 - The `Save full config to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_full_config.ini`, and export the full embedded-template-shaped config with current live values.
 - The `Save dump to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_dump.txt`, and write the same text dump format used by diagnostics output.
 - The dump format contains only the snapshot fields that `/fake` loads and the dashboard renders; provider-debug details remain trace-only diagnostics data.

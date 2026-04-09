@@ -11,7 +11,7 @@ The language is static:
 
 - layout is loaded from config
 - the active named layout is selected by `display.layout`
-- coordinates are computed once after config load or reload
+- coordinates are computed during config load or reload
 - rendering uses those precomputed coordinates until the next reload
 
 ### Dashboard focus
@@ -113,7 +113,7 @@ Supported `[layout.<name>]` keys:
 - `widget_line_gap = pixels`
 
 Config sections, config keys, card ids, container names, widget names, icon names, and metric references are case-sensitive and must use their documented spelling exactly.
-Undocumented legacy key spellings and metric aliases are not supported.
+Undocumented key spellings and metric aliases are invalid.
 
 Example:
 
@@ -156,7 +156,7 @@ Each card section uses:
 - `icon = ...` when the card shows a header icon
 - `layout = ...`
 
-When both `title` and `icon` are omitted, the card has no header and the card content starts immediately after the card padding.
+When both `title` and `icon` are omitted, the card has no header and the card content starts after the card padding.
 
 Card layouts may reference another card id as a leaf layout node when they want to reuse that card's inner layout:
 
@@ -213,7 +213,7 @@ Throughput label width, throughput axis width, drive label width, and drive perc
 Nested layout expressions are allowed.
 Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is a card-layout reference and resolves to that referenced card's layout during layout resolution.
 In a vertical `rows(...)` container, fixed-height direct children such as `text`, `network_footer`, and `spacer` keep their preferred height and the remaining space goes to flexible siblings when no `vertical_spring` is present.
-When one or more direct `vertical_spring` children are present in `rows(...)`, every spring absorbs the remaining height before normal weighted stretching and multiple springs divide that height by weight.
+When one or more direct `vertical_spring` children are present in `rows(...)`, every spring absorbs the remaining height before weighted stretching and multiple springs divide that height by weight.
 Interactive layout editing always exposes the container guides for `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, snaps to the nearest same-type exact-size group as soon as the similarity ruler threshold is reached by iteratively re-evaluating nested weighted layouts, lets `Alt` temporarily bypass that snap and continue free dragging, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
 When the pointer hovers a non-empty widget in layout-edit mode, the renderer outlines that widget's resolved box and shows any widget-local size guides that widget supports.
 `metric_list(...)` exposes a vertical guide for `[metric_list].label_width` at the label/value split.
@@ -284,7 +284,7 @@ Supported metric references include:
 
 ## Drive and sensor selection
 
-Runtime storage-drive selection lives in `[storage]`, while board-sensor selection still comes from layout metric references.
+Runtime storage-drive selection lives in `[storage]`, while board-sensor selection comes from layout metric references.
 
 Example:
 
@@ -293,7 +293,7 @@ Example:
 - `metric_list(cpu.ram=RAM,board.temp.cpu=Temp,board.fan.cpu=Fan,board.fan.system=System Fan)`
 
 - `[storage] drives` defines the vertical drive-usage list contents and order.
-- Layout metric references still define which logical board temperature and fan metrics are requested from the board provider.
+- Layout metric references define which logical board temperature and fan metrics are requested from the board provider.
 - The `[board]` section maps those logical metric names to the board-specific sensor titles that the provider looks up.
 
 ## Consistency rules

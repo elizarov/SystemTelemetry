@@ -33,4 +33,4 @@
 - Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
 - Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.
 - Keep the embedded `resources/config.ini` template concise and mostly self-documenting; prefer short section-divider comments over long per-key comment blocks.
-- Remember that an executable-side `config.ini` overrides the rebuilt embedded template on load, `Save Config` updates only changed live values in that existing file, and `Save Full Config To...` exports the full embedded-template-shaped text; when a rebuilt default seems unchanged, inspect the live `config.ini` beside the executable first.
+- The executable-side `config.ini` overlays the embedded template on load, `Save Config` updates only changed live values in that file, and `Save Full Config To...` exports the full embedded-template-shaped text.
