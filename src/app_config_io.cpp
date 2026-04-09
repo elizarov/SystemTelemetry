@@ -2,6 +2,7 @@
 
 #include <shellapi.h>
 
+#include "app_command_line.h"
 #include "app_diagnostics.h"
 #include "app_paths.h"
 #include "config_writer.h"

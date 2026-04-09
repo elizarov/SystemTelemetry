@@ -18,6 +18,7 @@
 
 #include "../resources/resource.h"
 #include "app_autostart.h"
+#include "app_command_line.h"
 #include "app_constants.h"
 #include "app_diagnostics.h"
 #include "app_config_io.h"

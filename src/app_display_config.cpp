@@ -5,6 +5,7 @@
 
 #include <shobjidl.h>
 
+#include "app_command_line.h"
 #include "app_diagnostics.h"
 #include "app_monitor.h"
 #include "app_paths.h"
