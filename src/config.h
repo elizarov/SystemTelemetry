@@ -162,7 +162,6 @@ struct MetricScaleConfig {
 struct MetricListWidgetConfig {
     CONFIG_REFLECTED_STRUCT(MetricListWidgetConfig)
     CONFIG_VALUE(int, labelWidth, "label_width");
-    CONFIG_VALUE(int, valueGap, "value_gap");
     CONFIG_VALUE(int, barHeight, "bar_height");
     CONFIG_VALUE(int, verticalGap, "vertical_gap");
     CONFIG_SECTION("metric_list");

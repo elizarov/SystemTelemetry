@@ -74,7 +74,7 @@ Widget-specific sizing lives in dedicated sections named exactly after the widge
 
 Supported widget geometry keys:
 
-- `[metric_list]`: `label_width`, `value_gap`, `bar_height`, `vertical_gap`
+- `[metric_list]`: `label_width`, `bar_height`, `vertical_gap`
 - `[drive_usage_list]`: `free_width`, `activity_width`, `bar_gap`, `value_gap`, `percent_gap`, `bar_height`, `header_gap`, `row_gap`, `percent_padding`, `activity_segments`, `activity_segment_gap`
 - `[throughput]`: `header_gap`, `graph_height`, `value_padding`, `label_padding`, `axis_padding`, `scale_label_padding`, `scale_label_min_height`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
 - `[gauge]`: `preferred_size`, `outer_padding`, `min_radius`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`

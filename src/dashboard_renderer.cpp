@@ -963,9 +963,8 @@ void DashboardRenderer::DrawMetricRow(HDC hdc, const ResolvedWidgetLayout& widge
     const DashboardMetricRow& row, int rowIndex) {
     const int rowHeight = EffectiveMetricRowHeight();
     const int labelWidth = std::max(1, ScaleLogical(config_.layout.metricList.labelWidth));
-    const int valueGap = std::max(0, ScaleLogical(config_.layout.metricList.valueGap));
     RECT labelRect{rect.left, rect.top, std::min(rect.right, rect.left + labelWidth), rect.bottom};
-    RECT valueRect{std::min(rect.right, labelRect.right + valueGap), rect.top, rect.right, rect.bottom};
+    RECT valueRect{labelRect.right, rect.top, rect.right, rect.bottom};
     DrawTextBlock(hdc, labelRect, row.label, fonts_.label, MutedTextColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER,
         MakeEditableTextBinding(widget, AnchorEditParameter::FontLabel, rowIndex * 2, config_.layout.fonts.label.size));
     if (renderMode_ != RenderMode::Blank) {
