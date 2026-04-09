@@ -7,31 +7,28 @@ namespace layout_edit {
 
 namespace {
 
-class EditCommandValidator {
-public:
-    static int ClampPositiveInt(double value) {
-        return (std::max)(1, static_cast<int>(std::lround(value)));
-    }
+int ClampPositiveInt(double value) {
+    return (std::max)(1, static_cast<int>(std::lround(value)));
+}
 
-    static double ClampGaugeSweepDegrees(double value) {
-        return std::clamp(value, 0.0, 360.0);
-    }
+double ClampGaugeSweepDegrees(double value) {
+    return std::clamp(value, 0.0, 360.0);
+}
 
-    static double ClampGaugeSegmentGapDegrees(const AppConfig& config, double value) {
-        const double totalSweep = ClampGaugeSweepDegrees(config.layout.gauge.sweepDegrees);
-        const int segmentCount = (std::max)(1, config.layout.gauge.segmentCount);
-        const double maxSegmentGap = segmentCount <= 1 ? 0.0 : totalSweep / static_cast<double>(segmentCount - 1);
-            return std::clamp(value, 0.0, maxSegmentGap);
-    }
-};
+double ClampGaugeSegmentGapDegrees(const AppConfig& config, double value) {
+    const double totalSweep = ClampGaugeSweepDegrees(config.layout.gauge.sweepDegrees);
+    const int segmentCount = (std::max)(1, config.layout.gauge.segmentCount);
+    const double maxSegmentGap = segmentCount <= 1 ? 0.0 : totalSweep / static_cast<double>(segmentCount - 1);
+    return std::clamp(value, 0.0, maxSegmentGap);
+}
 
 template <typename Section>
 void ApplyPositiveInt(Section LayoutConfig::* section, int Section::* member, AppConfig& config, double value) {
-    (config.layout.*section).*member = EditCommandValidator::ClampPositiveInt(value);
+    (config.layout.*section).*member = ClampPositiveInt(value);
 }
 
 void ApplyFontSize(UiFontConfig UiFontSetConfig::* font, AppConfig& config, double value) {
-    (config.layout.fonts.*font).size = EditCommandValidator::ClampPositiveInt(value);
+    (config.layout.fonts.*font).size = ClampPositiveInt(value);
 }
 
 }  // namespace
@@ -64,10 +61,10 @@ bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, do
         ApplyPositiveInt(&LayoutConfig::throughput, &ThroughputWidgetConfig::headerGap, config, value);
         return true;
     case Field::GaugeSweepDegrees:
-        config.layout.gauge.sweepDegrees = EditCommandValidator::ClampGaugeSweepDegrees(value);
+        config.layout.gauge.sweepDegrees = ClampGaugeSweepDegrees(value);
         return true;
     case Field::GaugeSegmentGapDegrees:
-        config.layout.gauge.segmentGapDegrees = EditCommandValidator::ClampGaugeSegmentGapDegrees(config, value);
+        config.layout.gauge.segmentGapDegrees = ClampGaugeSegmentGapDegrees(config, value);
         return true;
     case Field::FontTitle:
         ApplyFontSize(&UiFontSetConfig::title, config, value);
