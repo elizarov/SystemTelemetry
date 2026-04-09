@@ -71,7 +71,7 @@ add_executable(SystemTelemetry WIN32
     src/telemetry.cpp
     src/telemetry_retained_history.cpp
     src/telemetry_storage_source.cpp
-    src/telemetry_storage_network.cpp
+    src/telemetry_network_source.cpp
     src/telemetry_runtime.cpp
     src/telemetry_runtime_fake.cpp
     src/snapshot_dump.cpp

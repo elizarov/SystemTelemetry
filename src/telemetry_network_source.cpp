@@ -5,6 +5,77 @@
 
 #include "utf8.h"
 
+namespace {
+
+struct NetworkCandidateState {
+    NetworkAdapterCandidate candidate;
+    ULONG interfaceIndex = 0;
+};
+
+bool AdapterMatchesRow(const IP_ADAPTER_ADDRESSES& adapter, const MIB_IF_ROW2& row) {
+    return adapter.Luid.Value == row.InterfaceLuid.Value ||
+        adapter.IfIndex == row.InterfaceIndex ||
+        adapter.Ipv6IfIndex == row.InterfaceIndex ||
+        (adapter.FriendlyName != nullptr && _wcsicmp(adapter.FriendlyName, row.Alias) == 0) ||
+        (adapter.Description != nullptr && _wcsicmp(adapter.Description, row.Description) == 0);
+}
+
+bool HasUsableGateway(const IP_ADAPTER_ADDRESSES& adapter) {
+    for (auto* gateway = adapter.FirstGatewayAddress; gateway != nullptr; gateway = gateway->Next) {
+        const sockaddr* address = gateway->Address.lpSockaddr;
+        if (address == nullptr) {
+            continue;
+        }
+        if (address->sa_family == AF_INET) {
+            const auto* ipv4 = reinterpret_cast<const sockaddr_in*>(address);
+            if (ipv4->sin_addr.S_un.S_addr != 0) {
+                return true;
+            }
+        } else if (address->sa_family == AF_INET6) {
+            const auto* ipv6 = reinterpret_cast<const sockaddr_in6*>(address);
+            static const IN6_ADDR zeroAddress{};
+            if (memcmp(&ipv6->sin6_addr, &zeroAddress, sizeof(zeroAddress)) != 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+AdapterSelectionInfo BuildAdapterSelectionInfo(const MIB_IF_ROW2& row, const IP_ADAPTER_ADDRESSES* addresses) {
+    AdapterSelectionInfo info;
+    for (auto* current = addresses; current != nullptr; current = current->Next) {
+        if (!AdapterMatchesRow(*current, row)) {
+            continue;
+        }
+
+        info.matched = true;
+        info.hasGateway = HasUsableGateway(*current);
+        for (auto* unicast = current->FirstUnicastAddress; unicast != nullptr; unicast = unicast->Next) {
+            if (unicast->Address.lpSockaddr == nullptr || unicast->Address.lpSockaddr->sa_family != AF_INET) {
+                continue;
+            }
+
+            wchar_t address[128];
+            DWORD length = ARRAYSIZE(address);
+            if (WSAAddressToStringW(
+                    unicast->Address.lpSockaddr,
+                    static_cast<DWORD>(unicast->Address.iSockaddrLength),
+                    nullptr,
+                    address,
+                    &length) == 0) {
+                info.hasIpv4 = true;
+                info.ipAddress = Utf8FromWide(address);
+                break;
+            }
+        }
+        break;
+    }
+    return info;
+}
+
+}  // namespace
+
 void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
     PMIB_IF_TABLE2 table = nullptr;
     const DWORD tableStatus = GetIfTable2(&table);

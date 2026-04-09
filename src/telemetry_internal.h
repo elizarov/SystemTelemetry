@@ -37,11 +37,6 @@ struct AdapterSelectionInfo {
     std::string ipAddress = "N/A";
 };
 
-struct NetworkCandidateState {
-    NetworkAdapterCandidate candidate;
-    ULONG interfaceIndex = 0;
-};
-
 std::string NormalizeDriveLetter(const std::string& drive);
 bool IsSelectableStorageDriveType(UINT driveType);
 std::string ReadVolumeLabel(const std::wstring& root);
@@ -57,9 +52,6 @@ std::string CollapseAsciiWhitespace(std::string value);
 std::optional<std::wstring> ReadRegistryWideString(HKEY root, const wchar_t* subKey, const wchar_t* valueName);
 std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName);
 std::string DetectCpuName();
-bool AdapterMatchesRow(const IP_ADAPTER_ADDRESSES& adapter, const MIB_IF_ROW2& row);
-bool HasUsableGateway(const IP_ADAPTER_ADDRESSES& adapter);
-AdapterSelectionInfo BuildAdapterSelectionInfo(const MIB_IF_ROW2& row, const IP_ADAPTER_ADDRESSES* addresses);
 
 struct TelemetryCollector::Impl {
     ~Impl();
