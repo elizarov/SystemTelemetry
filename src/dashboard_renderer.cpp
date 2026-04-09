@@ -609,17 +609,13 @@ void DashboardRenderer::RegisterEditableAnchorRegion(
     region.targetRect = targetRect;
     region.anchorRect = anchorRect;
     region.shape = shape;
-    if (shape == AnchorShape::Diamond) {
-        region.anchorHitRect = region.anchorRect;
-    } else {
-        const int anchorHitInset = std::max(3, ScaleLogical(4));
-        region.anchorHitRect = RECT{
-            region.anchorRect.left - anchorHitInset,
-            region.anchorRect.top - anchorHitInset,
-            region.anchorRect.right + anchorHitInset,
-            region.anchorRect.bottom + anchorHitInset
-        };
-    }
+    const int anchorHitInset = std::max(3, ScaleLogical(4));
+    region.anchorHitRect = RECT{
+        region.anchorRect.left - anchorHitInset,
+        region.anchorRect.top - anchorHitInset,
+        region.anchorRect.right + anchorHitInset,
+        region.anchorRect.bottom + anchorHitInset
+    };
     region.dragAxis = dragAxis;
     region.value = value;
     editableAnchorRegions_.push_back(std::move(region));
