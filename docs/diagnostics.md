@@ -15,7 +15,7 @@ This document is the single maintained source of truth for diagnostics command b
 - `/layout:<name>` overrides `display.layout` for the current process so diagnostics can validate a named layout without editing `config.ini`.
 - `/default-config` suppresses loading the executable-side `config.ini` overlay and uses only the embedded `resources/config.ini` defaults for the current process.
 - `/blank` switches screenshot rendering into a blank background mode that keeps static dashboard chrome and static text such as CPU and GPU names while omitting dynamic metric text, time, date, plots, leaders, peak ghosts, gauge fill, and drive activity or usage fill.
-- `/scale:<value>` multiplies headless `/screenshot /exit` render size, including all measured layout geometry, and accepts fractional values such as `1.5`.
+- `/scale:<value>` overrides `display.scale` for the current process, accepts fractional values such as `1.5`, and drives both live UI sizing and diagnostics screenshot rendering for that process.
 - `/edit-layout:<widget-name>` keeps layout-edit guides enabled and, for screenshots, forces the first visible widget of that type into the same outline and widget-guide state that live UI hover would show.
 - `/edit-layout:horizonatal-sizes` turns on layout-edit guides plus every visible horizontal size ruler and its exact-match numbering for diagnostics screenshots without requiring an active drag.
 - `/edit-layout:vertical-sizes` turns on layout-edit guides plus every visible vertical size ruler and its exact-match numbering for diagnostics screenshots without requiring an active drag.
@@ -42,6 +42,7 @@ This document is the single maintained source of truth for diagnostics command b
 - With `/exit`, the application initializes telemetry from the normal runtime `config.ini`, performs the first update, optionally writes the requested outputs once, and exits without starting the GUI.
 - With `/default-config`, the application skips the executable-side `config.ini` overlay and keeps only the embedded default config for startup and `/reload` diagnostics runs.
 - With `/layout:<name>`, the application applies that named layout after loading `config.ini` and keeps that override active for the process lifetime, including `/reload` diagnostics runs.
+- With `/scale:<value>`, the application replaces the loaded `display.scale` value for the process lifetime, including live UI sizing, `/reload` diagnostics runs, and screenshot exports.
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
 - With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
 - With `/blank`, the application keeps the normal layout, panel chrome, card headers, CPU and GPU names, drive labels, and empty chart or bar tracks while suppressing dynamic metric rendering.
@@ -92,6 +93,6 @@ This document is the single maintained source of truth for diagnostics command b
 - Verify interactive bar editing through an `/edit-layout` UI run, hover metric-list and drive-usage fill bars, confirm the dotted per-bar highlight and bottom-center anchor appear on hover, and confirm dragging that anchor up or down updates `[metric_list].bar_height` or `[drive_usage_list].bar_height` live.
 - Verify interactive guide and anchor drag feedback through an `/edit-layout` UI run, drag one container guide, one widget-local guide, one text anchor, one bar anchor, one gauge size anchor, the gauge `segment_count` anchor, one throughput size anchor, and the drive-usage `activity_segments` anchor, and confirm only the actively dragged guide or anchor switches to the configured `[colors].active_edit_color` while the rest of the edit visuals keep their existing widths and sizes.
 - Verify headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit` and `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit` when validating size-ruler grouping and numbering, and inspect the trace for consecutive `renderer:layout_similarity_group` ordinals that match the visible rulers.
-- When `/scale:<value>` is involved, confirm the screenshot uses the expected multiplied pixel dimensions while preserving the same logical composition.
+- When `/scale:<value>` is involved, confirm the screenshot uses the expected overridden scale-derived pixel dimensions while preserving the same logical composition.
 - For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm that editing the selected fake file changes the next one-second refresh without touching live providers, and verify one run with `/fake:custom_fake.txt`.
 - Verify `/blank /fake` fails before startup.

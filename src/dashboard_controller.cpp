@@ -178,7 +178,7 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
     if (!SaveDumpScreenshot(*path,
             state_.telemetry->Dump().snapshot,
             state_.telemetry->EffectiveConfig(),
-            1.0,
+            shell.CurrentRenderScale(),
             GetDiagnosticsRenderMode(diagnosticsOptions),
             state_.isEditingLayout || diagnosticsOptions.editLayout,
             GetSimilarityIndicatorMode(diagnosticsOptions),
@@ -219,17 +219,18 @@ void DashboardController::ToggleAutoStart(DashboardShellHost& shell) {
 }
 
 bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const DisplayMenuOption& option) {
-    if (state_.telemetry == nullptr || !option.layoutFits) {
+    if (state_.telemetry == nullptr || !option.layoutFits || option.fittedScale <= 0.0) {
         return false;
     }
 
     AppConfig updatedConfig = state_.telemetry->EffectiveConfig();
     updatedConfig.display.monitorName = option.configMonitorName;
     updatedConfig.display.position = {};
+    updatedConfig.display.scale = option.fittedScale;
     updatedConfig.display.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
     if (!::ConfigureDisplay(updatedConfig,
             state_.telemetry->Dump(),
-            option.dpi,
+            option.fittedScale,
             state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr,
             shell.WindowHandle())) {
         shell.ShowError(L"Failed to configure the selected display.");
@@ -269,6 +270,23 @@ bool DashboardController::SwitchLayout(DashboardShellHost& shell,
         return false;
     }
 
+    state_.placementWatchActive = true;
+    shell.ApplyConfigPlacement();
+    shell.InvalidateShell();
+    return true;
+}
+
+bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scale) {
+    const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
+    AppConfig updatedConfig = state_.config;
+    updatedConfig.display.monitorName =
+        !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
+    const double targetScale = HasExplicitDisplayScale(scale) ? scale : ScaleFromDpi(placement.dpi);
+    updatedConfig.display.position.x = ScalePhysicalToLogical(placement.physicalRelativePosition.x, targetScale);
+    updatedConfig.display.position.y = ScalePhysicalToLogical(placement.physicalRelativePosition.y, targetScale);
+    updatedConfig.display.scale = HasExplicitDisplayScale(scale) ? scale : 0.0;
+    state_.config = std::move(updatedConfig);
+    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.InvalidateShell();

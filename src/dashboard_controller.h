@@ -24,6 +24,7 @@ struct DashboardSessionState {
     std::vector<LayoutMenuOption> layoutMenuOptions;
     std::vector<NetworkMenuOption> networkMenuOptions;
     std::vector<StorageDriveMenuOption> storageDriveMenuOptions;
+    std::vector<ScaleMenuOption> scaleMenuOptions;
 };
 
 class DashboardShellHost {
@@ -35,6 +36,7 @@ public:
     virtual DashboardRenderer::EditOverlayState& RendererEditOverlayState() = 0;
     virtual const DashboardRenderer::EditOverlayState& RendererEditOverlayState() const = 0;
     virtual UINT CurrentWindowDpi() const = 0;
+    virtual double CurrentRenderScale() const = 0;
     virtual bool InitializeFonts() = 0;
     virtual void ReleaseFonts() = 0;
     virtual void ApplyConfigPlacement() = 0;
@@ -66,6 +68,7 @@ public:
         const std::string& layoutName,
         LayoutEditController& controller,
         bool diagnosticsEditLayout);
+    bool SetDisplayScale(DashboardShellHost& shell, double scale);
     void SelectNetworkAdapter(DashboardShellHost& shell, const NetworkMenuOption& option);
     void ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option);
     void StartLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller);

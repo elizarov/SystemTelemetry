@@ -45,6 +45,7 @@ public:
     DashboardRenderer::EditOverlayState& RendererEditOverlayState() override;
     const DashboardRenderer::EditOverlayState& RendererEditOverlayState() const override;
     UINT CurrentWindowDpi() const override;
+    double CurrentRenderScale() const override;
     void ApplyConfigPlacement() override;
     void InvalidateShell() override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
@@ -62,6 +63,8 @@ private:
     bool ApplyConfiguredWallpaper();
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
+    double ResolveCurrentDisplayScale(UINT dpi) const;
+    std::optional<double> PromptCustomScale() const;
     bool IsLayoutEditMode() const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights,

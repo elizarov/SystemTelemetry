@@ -1,4 +1,5 @@
 #include "app_diagnostics.h"
+#include "app_monitor.h"
 #include "app_paths.h"
 #include "app_strings.h"
 #include "config_parser.h"
@@ -128,6 +129,7 @@ DiagnosticsOptions GetDiagnosticsOptions() {
         options.layoutName = *layoutName;
     }
     if (const auto scale = GetScaleSwitchValue(); scale.has_value()) {
+        options.hasScaleOverride = true;
         options.scale = *scale;
     }
     if (const auto tracePath = GetColonSwitchValue(L"/trace"); tracePath.has_value()) {
@@ -191,6 +193,16 @@ bool ApplyDiagnosticsLayoutOverride(
     const std::wstring message = WideFromUtf8("Unknown layout name:\n" + options.layoutName);
     MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
     return false;
+}
+
+void ApplyDiagnosticsScaleOverride(AppConfig& config, const DiagnosticsOptions& options) {
+    if (options.hasScaleOverride) {
+        config.display.scale = options.scale;
+    }
+}
+
+double ResolveSavedScreenshotScale(const AppConfig& config) {
+    return HasExplicitDisplayScale(config.display.scale) ? config.display.scale : 1.0;
 }
 
 DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options) : options_(options) {}
@@ -265,7 +277,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     if (options_.screenshot && !SaveDumpScreenshot(screenshotPath_,
                                    dump.snapshot,
                                    config,
-                                   options_.exit ? options_.scale : 1.0,
+                                   ResolveSavedScreenshotScale(config),
                                    GetDiagnosticsRenderMode(options_),
                                    options_.editLayout,
                                    GetSimilarityIndicatorMode(options_),
@@ -442,6 +454,7 @@ bool ReloadTelemetryRuntimeFromDisk(const std::filesystem::path& configPath,
         }
         return false;
     }
+    ApplyDiagnosticsScaleOverride(effectiveReloadedConfig, diagnosticsOptions);
 
     telemetry.reset();
     std::unique_ptr<TelemetryRuntime> reloadedTelemetry = InitializeTelemetryRuntimeInstance(
@@ -514,7 +527,8 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         return 1;
     }
 
-    diagnostics.WriteTraceMarker("diagnostics:headless_start scale=" + std::to_string(diagnosticsOptions.scale));
+    diagnostics.WriteTraceMarker(
+        "diagnostics:headless_start scale=" + std::to_string(ResolveSavedScreenshotScale(config)));
     diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_begin");
 
     std::unique_ptr<TelemetryRuntime> telemetry =

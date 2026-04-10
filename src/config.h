@@ -48,6 +48,7 @@ struct DisplayConfig {
     CONFIG_VALUE(std::string, layout, "layout");
     CONFIG_VALUE(std::string, wallpaper, "wallpaper");
     CONFIG_VALUE(LogicalPointConfig, position, "position");
+    CONFIG_VALUE(double, scale, "scale");
     CONFIG_SECTION("display");
 };
 

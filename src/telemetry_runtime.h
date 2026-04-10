@@ -25,6 +25,7 @@ struct DiagnosticsOptions {
     bool defaultConfig = false;
     bool saveConfig = false;
     bool saveFullConfig = false;
+    bool hasScaleOverride = false;
     DiagnosticsLayoutSimilarityMode layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::None;
     double scale = 1.0;
     std::string layoutName;

@@ -1,6 +1,101 @@
 #include "dashboard_app.h"
 
+#include <cmath>
 #include <cstdio>
+#include <sstream>
+
+namespace {
+
+constexpr double kPredefinedDisplayScales[] = {1.0, 1.5, 2.0, 2.5, 3.0};
+constexpr double kScaleEpsilon = 0.0001;
+
+bool AreScalesEqual(double left, double right) {
+    return std::abs(left - right) < kScaleEpsilon;
+}
+
+bool IsPredefinedDisplayScale(double scale) {
+    for (double predefinedScale : kPredefinedDisplayScales) {
+        if (AreScalesEqual(scale, predefinedScale)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::wstring FormatScaleLabel(double scale) {
+    std::ostringstream stream;
+    stream.precision(12);
+    stream << (scale * 100.0);
+    std::string value = stream.str();
+    if (const size_t dot = value.find('.'); dot != std::string::npos) {
+        while (!value.empty() && value.back() == '0') {
+            value.pop_back();
+        }
+        if (!value.empty() && value.back() == '.') {
+            value.pop_back();
+        }
+    }
+    return WideFromUtf8(value + "%");
+}
+
+std::wstring FormatScalePercentageValue(double scale) {
+    std::ostringstream stream;
+    stream.precision(12);
+    stream << (scale * 100.0);
+    std::string value = stream.str();
+    if (const size_t dot = value.find('.'); dot != std::string::npos) {
+        while (!value.empty() && value.back() == '0') {
+            value.pop_back();
+        }
+        if (!value.empty() && value.back() == '.') {
+            value.pop_back();
+        }
+    }
+    return WideFromUtf8(value);
+}
+
+struct CustomScaleDialogState {
+    double initialScale = 1.0;
+    std::optional<double> result;
+};
+
+INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    auto* state = reinterpret_cast<CustomScaleDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
+    switch (message) {
+        case WM_INITDIALOG: {
+            state = reinterpret_cast<CustomScaleDialogState*>(lParam);
+            SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+            const std::wstring initialText = FormatScalePercentageValue(state->initialScale);
+            SetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, initialText.c_str());
+            SendDlgItemMessageW(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
+            return TRUE;
+        }
+        case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+                case IDOK: {
+                    wchar_t buffer[64] = {};
+                    GetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, buffer, ARRAYSIZE(buffer));
+                    const std::optional<double> percentage = TryParseScaleValue(buffer);
+                    if (!percentage.has_value()) {
+                        MessageBoxW(hwnd, L"Enter a positive percentage scale.", L"System Telemetry", MB_ICONERROR);
+                        SetFocus(GetDlgItem(hwnd, IDC_CUSTOM_SCALE_EDIT));
+                        SendDlgItemMessageW(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
+                        return TRUE;
+                    }
+                    state->result = *percentage / 100.0;
+                    EndDialog(hwnd, IDOK);
+                    return TRUE;
+                }
+                case IDCANCEL:
+                    EndDialog(hwnd, IDCANCEL);
+                    return TRUE;
+            }
+            break;
+    }
+    return FALSE;
+}
+
+}  // namespace
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
     : diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this) {}
@@ -22,6 +117,14 @@ UINT DashboardApp::CurrentWindowDpi() const {
         return GetDpiForWindow(hwnd_);
     }
     return currentDpi_;
+}
+
+double DashboardApp::CurrentRenderScale() const {
+    return renderer_.RenderScale();
+}
+
+double DashboardApp::ResolveCurrentDisplayScale(UINT dpi) const {
+    return ResolveDisplayScale(controller_.State().config, dpi);
 }
 
 bool DashboardApp::IsLayoutEditMode() const {
@@ -81,13 +184,13 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     currentDpi_ = GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
     if (const auto monitor = FindTargetMonitor(config.display.monitorName); monitor.has_value()) {
         currentDpi_ = monitor->dpi;
-        UpdateRendererScale(ScaleFromDpi(currentDpi_));
-        placement.left = monitor->rect.left + ScaleLogicalToPhysical(config.display.position.x, currentDpi_);
-        placement.top = monitor->rect.top + ScaleLogicalToPhysical(config.display.position.y, currentDpi_);
+        UpdateRendererScale(ResolveCurrentDisplayScale(currentDpi_));
+        placement.left = monitor->rect.left + ScaleLogicalToPhysical(config.display.position.x, CurrentRenderScale());
+        placement.top = monitor->rect.top + ScaleLogicalToPhysical(config.display.position.y, CurrentRenderScale());
     } else {
-        UpdateRendererScale(ScaleFromDpi(currentDpi_));
-        placement.left = 100 + ScaleLogicalToPhysical(config.display.position.x, currentDpi_);
-        placement.top = 100 + ScaleLogicalToPhysical(config.display.position.y, currentDpi_);
+        UpdateRendererScale(ResolveCurrentDisplayScale(currentDpi_));
+        placement.left = 100 + ScaleLogicalToPhysical(config.display.position.x, CurrentRenderScale());
+        placement.top = 100 + ScaleLogicalToPhysical(config.display.position.y, CurrentRenderScale());
     }
     placement.right = placement.left + WindowWidth();
     placement.bottom = placement.top + WindowHeight();
@@ -111,14 +214,16 @@ void DashboardApp::ApplyConfigPlacement() {
     const AppConfig& config = controller_.State().config;
     UINT targetDpi = hwnd_ != nullptr ? CurrentWindowDpi()
                                       : GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
-    int left = 100 + ScaleLogicalToPhysical(config.display.position.x, targetDpi);
-    int top = 100 + ScaleLogicalToPhysical(config.display.position.y, targetDpi);
+    double targetScale = ResolveCurrentDisplayScale(targetDpi);
+    int left = 100 + ScaleLogicalToPhysical(config.display.position.x, targetScale);
+    int top = 100 + ScaleLogicalToPhysical(config.display.position.y, targetScale);
     bool monitorResolved = config.display.monitorName.empty();
     if (const auto monitor = FindTargetMonitor(config.display.monitorName); monitor.has_value()) {
         monitorResolved = true;
         targetDpi = monitor->dpi;
-        left = monitor->rect.left + ScaleLogicalToPhysical(config.display.position.x, targetDpi);
-        top = monitor->rect.top + ScaleLogicalToPhysical(config.display.position.y, targetDpi);
+        targetScale = ResolveCurrentDisplayScale(targetDpi);
+        left = monitor->rect.left + ScaleLogicalToPhysical(config.display.position.x, targetScale);
+        top = monitor->rect.top + ScaleLogicalToPhysical(config.display.position.y, targetScale);
     }
 
     if (!monitorResolved) {
@@ -130,7 +235,9 @@ void DashboardApp::ApplyConfigPlacement() {
         SetWindowPos(hwnd_, HWND_TOP, left, top, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
-    if ((CurrentWindowDpi() != targetDpi || currentDpi_ != targetDpi) && !ApplyWindowDpi(targetDpi)) {
+    if ((CurrentWindowDpi() != targetDpi || currentDpi_ != targetDpi ||
+            !AreScalesEqual(CurrentRenderScale(), targetScale)) &&
+        !ApplyWindowDpi(targetDpi)) {
         return;
     }
     SetWindowPos(hwnd_, HWND_TOP, left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE);
@@ -160,7 +267,7 @@ void DashboardApp::RetryConfigPlacementIfPending() {
         FindTargetMonitor(controller_.State().config.display.monitorName).has_value()) {
         ApplyConfigPlacement();
         ApplyConfiguredWallpaper();
-        movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+        movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
         InvalidateRect(hwnd_, nullptr, FALSE);
         StopPlacementWatch();
     }
@@ -212,25 +319,27 @@ bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const
 
 bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
     const UINT targetDpi = std::max(kDefaultDpi, dpi);
-    if (currentDpi_ == targetDpi && suggestedRect == nullptr) {
+    const double targetScale = ResolveCurrentDisplayScale(targetDpi);
+    if (currentDpi_ == targetDpi && AreScalesEqual(CurrentRenderScale(), targetScale) && suggestedRect == nullptr) {
         return true;
     }
 
     currentDpi_ = targetDpi;
     ReleaseFonts();
-    UpdateRendererScale(ScaleFromDpi(currentDpi_));
+    UpdateRendererScale(targetScale);
     if (!InitializeFonts()) {
         return false;
     }
 
     if (suggestedRect != nullptr) {
-        SetWindowPos(hwnd_,
-            nullptr,
-            suggestedRect->left,
-            suggestedRect->top,
-            suggestedRect->right - suggestedRect->left,
-            suggestedRect->bottom - suggestedRect->top,
-            SWP_NOZORDER | SWP_NOACTIVATE);
+        const int width = HasExplicitDisplayScale(controller_.State().config.display.scale)
+                              ? WindowWidth()
+                              : suggestedRect->right - suggestedRect->left;
+        const int height = HasExplicitDisplayScale(controller_.State().config.display.scale)
+                               ? WindowHeight()
+                               : suggestedRect->bottom - suggestedRect->top;
+        SetWindowPos(
+            hwnd_, nullptr, suggestedRect->left, suggestedRect->top, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
     }
     return true;
 }
@@ -325,7 +434,7 @@ void DashboardApp::UpdateMoveTracking() {
     const int x = cursor.x - (WindowWidth() / 2);
     const int y = cursor.y - cursorOffset;
     SetWindowPos(hwnd_, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
-    movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+    movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
 }
 
 HWND DashboardApp::WindowHandle() const {
@@ -353,7 +462,8 @@ void DashboardApp::InvalidateShell() {
 }
 
 MonitorPlacementInfo DashboardApp::GetWindowPlacementInfo() const {
-    return hwnd_ != nullptr ? GetMonitorPlacementForWindow(hwnd_) : movePlacementInfo_;
+    return hwnd_ != nullptr ? GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale)
+                            : movePlacementInfo_;
 }
 
 void DashboardApp::ShowError(const std::wstring& message) const {
@@ -366,6 +476,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     HMENU diagnosticsMenu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
     HMENU networkMenu = CreatePopupMenu();
+    HMENU scaleMenu = CreatePopupMenu();
     HMENU storageDrivesMenu = CreatePopupMenu();
     HMENU configureDisplayMenu = CreatePopupMenu();
     const UINT autoStartFlags = MF_STRING | (controller_.IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
@@ -429,6 +540,42 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
             AppendMenuW(storageDrivesMenu, flags, option.commandId, label.c_str());
         }
     }
+    state.scaleMenuOptions.clear();
+    {
+        ScaleMenuOption option;
+        option.commandId = kCommandScaleBase;
+        option.label = "Default";
+        option.selected = !HasExplicitDisplayScale(state.config.display.scale);
+        option.isDefault = true;
+        state.scaleMenuOptions.push_back(option);
+    }
+    std::vector<double> scaleEntries(std::begin(kPredefinedDisplayScales), std::end(kPredefinedDisplayScales));
+    if (HasExplicitDisplayScale(state.config.display.scale) && !IsPredefinedDisplayScale(state.config.display.scale)) {
+        scaleEntries.push_back(state.config.display.scale);
+    }
+    std::sort(scaleEntries.begin(), scaleEntries.end());
+    scaleEntries.erase(std::unique(scaleEntries.begin(),
+                          scaleEntries.end(),
+                          [](double left, double right) { return AreScalesEqual(left, right); }),
+        scaleEntries.end());
+    for (size_t i = 0; i < scaleEntries.size() && (kCommandScaleBase + 1 + i) <= kCommandScaleMax; ++i) {
+        ScaleMenuOption option;
+        option.commandId = kCommandScaleBase + 1 + static_cast<UINT>(i);
+        option.scale = scaleEntries[i];
+        option.label = Utf8FromWide(FormatScaleLabel(option.scale));
+        option.selected = HasExplicitDisplayScale(state.config.display.scale) &&
+                          AreScalesEqual(state.config.display.scale, option.scale);
+        option.isCustomEntry = !IsPredefinedDisplayScale(option.scale);
+        state.scaleMenuOptions.push_back(std::move(option));
+    }
+    for (const auto& option : state.scaleMenuOptions) {
+        const std::wstring label = WideFromUtf8(option.label);
+        const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
+        AppendMenuW(scaleMenu, flags, option.commandId, label.c_str());
+        SetMenuItemRadioStyle(scaleMenu, option.commandId);
+    }
+    AppendMenuW(scaleMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(scaleMenu, MF_STRING, kCommandCustomScale, L"Custom...");
     state.configDisplayOptions = EnumerateDisplayMenuOptions(state.config);
     if (state.configDisplayOptions.empty()) {
         AppendMenuW(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, L"No displays found");
@@ -450,6 +597,7 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), L"Layout");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), L"Scale");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), L"Network");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), L"Storage drives");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), L"Config To Display");
@@ -500,6 +648,11 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         case kCommandSaveFullConfigAs:
             controller_.SaveFullConfigAs(*this);
             break;
+        case kCommandCustomScale:
+            if (const auto scale = PromptCustomScale(); scale.has_value()) {
+                controller_.SetDisplayScale(*this, *scale);
+            }
+            break;
         case kCommandExit:
             DestroyWindow(hwnd_);
             break;
@@ -539,9 +692,31 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
                 if (it != state.configDisplayOptions.end()) {
                     controller_.ConfigureDisplay(*this, *it);
                 }
+                break;
+            }
+            if (selected >= kCommandScaleBase && selected <= kCommandScaleMax) {
+                const auto it = std::find_if(state.scaleMenuOptions.begin(),
+                    state.scaleMenuOptions.end(),
+                    [selected](const ScaleMenuOption& option) { return option.commandId == selected; });
+                if (it != state.scaleMenuOptions.end()) {
+                    controller_.SetDisplayScale(*this, it->isDefault ? 0.0 : it->scale);
+                }
             }
             break;
     }
+}
+
+std::optional<double> DashboardApp::PromptCustomScale() const {
+    CustomScaleDialogState state;
+    state.initialScale = HasExplicitDisplayScale(controller_.State().config.display.scale)
+                             ? controller_.State().config.display.scale
+                             : ResolveCurrentDisplayScale(CurrentWindowDpi());
+    if (DialogBoxParamW(
+            instance_, MAKEINTRESOURCEW(IDD_CUSTOM_SCALE), hwnd_, CustomScaleDialogProc, reinterpret_cast<LPARAM>(&state)) ==
+        IDOK) {
+        return state.result;
+    }
+    return std::nullopt;
 }
 
 void DashboardApp::DrawMoveOverlay(HDC hdc) {
@@ -657,7 +832,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     switch (message) {
         case WM_CREATE:
             currentDpi_ = CurrentWindowDpi();
-            UpdateRendererScale(ScaleFromDpi(currentDpi_));
+            UpdateRendererScale(ResolveCurrentDisplayScale(currentDpi_));
             if (!InitializeFonts()) {
                 return -1;
             }
@@ -765,7 +940,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (!ApplyWindowDpi(HIWORD(wParam), reinterpret_cast<const RECT*>(lParam))) {
                 return -1;
             }
-            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
             InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
         case WM_DISPLAYCHANGE:
@@ -774,14 +949,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (!ApplyWindowDpi(CurrentWindowDpi())) {
                 return -1;
             }
-            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
             InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
         case WM_DEVICECHANGE:
         case WM_SETTINGCHANGE:
             StartPlacementWatch();
             RetryConfigPlacementIfPending();
-            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_);
+            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
             InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
         case WM_ERASEBKGND:

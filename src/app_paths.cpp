@@ -1,5 +1,6 @@
 #include "app_paths.h"
 
+#include "app_diagnostics.h"
 #include "config_parser.h"
 
 namespace {
@@ -59,5 +60,7 @@ std::filesystem::path GetRuntimeConfigPath() {
 }
 
 AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) {
-    return LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig);
+    AppConfig config = LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig);
+    ApplyDiagnosticsScaleOverride(config, options);
+    return config;
 }

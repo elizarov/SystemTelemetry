@@ -14,6 +14,8 @@ struct MonitorIdentity {
     std::string configName;
 };
 
+constexpr double kMonitorFitEpsilon = 0.0001;
+
 }  // namespace
 
 bool RectsEqual(const RECT& lhs, const RECT& rhs) {
@@ -49,23 +51,62 @@ double ScaleFromDpi(UINT dpi) {
     return static_cast<double>(std::max(kDefaultDpi, dpi)) / static_cast<double>(kDefaultDpi);
 }
 
-int ScaleLogicalToPhysical(int logicalValue, UINT dpi) {
+bool HasExplicitDisplayScale(double scale) {
+    return std::isfinite(scale) && scale > 0.0;
+}
+
+double ResolveDisplayScale(double configuredScale, UINT dpi) {
+    return HasExplicitDisplayScale(configuredScale) ? configuredScale : ScaleFromDpi(dpi);
+}
+
+double ResolveDisplayScale(const AppConfig& config, UINT dpi) {
+    return ResolveDisplayScale(config.display.scale, dpi);
+}
+
+int ScaleLogicalToPhysical(int logicalValue, double scale) {
     if (logicalValue == 0) {
         return 0;
     }
-    return static_cast<int>(std::lround(static_cast<double>(logicalValue) * ScaleFromDpi(dpi)));
+    return static_cast<int>(std::lround(static_cast<double>(logicalValue) * scale));
 }
 
-int ScalePhysicalToLogical(int physicalValue, UINT dpi) {
+int ScaleLogicalToPhysical(int logicalValue, UINT dpi) {
+    return ScaleLogicalToPhysical(logicalValue, ScaleFromDpi(dpi));
+}
+
+int ScalePhysicalToLogical(int physicalValue, double scale) {
     if (physicalValue == 0) {
         return 0;
     }
-    return static_cast<int>(std::lround(static_cast<double>(physicalValue) / ScaleFromDpi(dpi)));
+    return static_cast<int>(std::lround(static_cast<double>(physicalValue) / scale));
+}
+
+int ScalePhysicalToLogical(int physicalValue, UINT dpi) {
+    return ScalePhysicalToLogical(physicalValue, ScaleFromDpi(dpi));
+}
+
+SIZE ComputeWindowSizeForScale(const AppConfig& config, double scale) {
+    return SIZE{ScaleLogicalToPhysical(config.layout.structure.window.width, scale),
+        ScaleLogicalToPhysical(config.layout.structure.window.height, scale)};
 }
 
 SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi) {
-    return SIZE{ScaleLogicalToPhysical(config.layout.structure.window.width, dpi),
-        ScaleLogicalToPhysical(config.layout.structure.window.height, dpi)};
+    return ComputeWindowSizeForScale(config, ResolveDisplayScale(config, dpi));
+}
+
+double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LONG monitorHeight) {
+    if (config.layout.structure.window.width <= 0 || config.layout.structure.window.height <= 0 || monitorWidth <= 0 ||
+        monitorHeight <= 0) {
+        return 0.0;
+    }
+
+    const double widthScale = static_cast<double>(monitorWidth) / static_cast<double>(config.layout.structure.window.width);
+    const double heightScale =
+        static_cast<double>(monitorHeight) / static_cast<double>(config.layout.structure.window.height);
+    if (!std::isfinite(widthScale) || !std::isfinite(heightScale) || widthScale <= 0.0 || heightScale <= 0.0) {
+        return 0.0;
+    }
+    return std::abs(widthScale - heightScale) <= kMonitorFitEpsilon ? widthScale : 0.0;
 }
 
 std::string SimplifyDeviceName(const std::string& deviceName) {
@@ -159,10 +200,10 @@ std::vector<DisplayMenuOption> EnumerateDisplayMenuOptions(const AppConfig& conf
 
             const std::string deviceName = Utf8FromWide(info.szDevice);
             const MonitorIdentity identity = GetMonitorIdentity(deviceName);
-            const UINT dpi = GetMonitorDpi(monitor);
-            const SIZE scaledWindow = ComputeWindowSizeForDpi(*context->config, dpi);
             const LONG monitorWidth = info.rcMonitor.right - info.rcMonitor.left;
             const LONG monitorHeight = info.rcMonitor.bottom - info.rcMonitor.top;
+            const UINT dpi = GetMonitorDpi(monitor);
+            const double fittedScale = ComputeMonitorFittedScale(*context->config, monitorWidth, monitorHeight);
 
             DisplayMenuOption option;
             option.commandId = kCommandConfigureDisplayBase + static_cast<UINT>(context->results.size());
@@ -171,7 +212,8 @@ std::vector<DisplayMenuOption> EnumerateDisplayMenuOptions(const AppConfig& conf
             option.configMonitorName = !identity.configName.empty() ? identity.configName : deviceName;
             option.rect = info.rcMonitor;
             option.dpi = dpi;
-            option.layoutFits = scaledWindow.cx == monitorWidth && scaledWindow.cy == monitorHeight;
+            option.layoutFits = fittedScale > 0.0;
+            option.fittedScale = fittedScale;
             context->results.push_back(std::move(option));
             return context->results.size() < (kCommandConfigureDisplayMax - kCommandConfigureDisplayBase + 1);
         },
@@ -215,7 +257,7 @@ std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedN
     return context.result;
 }
 
-MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd) {
+MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd, double configuredScale) {
     MonitorPlacementInfo info;
     RECT windowRect{};
     GetWindowRect(hwnd, &windowRect);
@@ -230,8 +272,12 @@ MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd) {
         info.configMonitorName = identity.configName;
         info.monitorRect = monitorInfo.rcMonitor;
         info.dpi = GetMonitorDpi(monitor);
-        info.relativePosition.x = ScalePhysicalToLogical(windowRect.left - monitorInfo.rcMonitor.left, info.dpi);
-        info.relativePosition.y = ScalePhysicalToLogical(windowRect.top - monitorInfo.rcMonitor.top, info.dpi);
+        info.physicalRelativePosition.x = windowRect.left - monitorInfo.rcMonitor.left;
+        info.physicalRelativePosition.y = windowRect.top - monitorInfo.rcMonitor.top;
+        info.relativePosition.x = ScalePhysicalToLogical(windowRect.left - monitorInfo.rcMonitor.left,
+            ResolveDisplayScale(configuredScale, info.dpi));
+        info.relativePosition.y = ScalePhysicalToLogical(windowRect.top - monitorInfo.rcMonitor.top,
+            ResolveDisplayScale(configuredScale, info.dpi));
     }
     return info;
 }

@@ -99,7 +99,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
 }
 
 bool ConfigureDisplay(
-    const AppConfig& config, const TelemetryDump& dump, UINT targetDpi, std::ostream* traceStream, HWND owner) {
+    const AppConfig& config, const TelemetryDump& dump, double targetScale, std::ostream* traceStream, HWND owner) {
     const std::filesystem::path configPath = GetRuntimeConfigPath();
     const std::filesystem::path imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
 
@@ -108,7 +108,7 @@ bool ConfigureDisplay(
         const bool imageSaved = SaveDumpScreenshot(imagePath,
             dump.snapshot,
             config,
-            ScaleFromDpi(targetDpi),
+            targetScale,
             DashboardRenderer::RenderMode::Blank,
             false,
             DashboardRenderer::SimilarityIndicatorMode::ActiveGuide,
@@ -203,10 +203,19 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
     }
 
     std::string screenshotError;
+    const double targetScale = HasExplicitDisplayScale(config.display.scale)
+                                   ? config.display.scale
+                                   : ComputeMonitorFittedScale(config,
+                                         targetMonitor->rect.right - targetMonitor->rect.left,
+                                         targetMonitor->rect.bottom - targetMonitor->rect.top);
+    if (targetScale <= 0.0) {
+        return 1;
+    }
+
     const bool imageSaved = SaveDumpScreenshot(targetImagePath,
         dump.snapshot,
         config,
-        ScaleFromDpi(targetMonitor->dpi),
+        targetScale,
         DashboardRenderer::RenderMode::Blank,
         false,
         DashboardRenderer::SimilarityIndicatorMode::ActiveGuide,

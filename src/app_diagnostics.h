@@ -72,6 +72,7 @@ std::optional<double> GetScaleSwitchValue();
 std::optional<std::string> GetLayoutSwitchValue();
 bool ApplyDiagnosticsLayoutOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
+void ApplyDiagnosticsScaleOverride(AppConfig& config, const DiagnosticsOptions& options);
 std::filesystem::path ResolveDiagnosticsOutputPath(const std::filesystem::path& workingDirectory,
     const std::filesystem::path& configuredPath,
     const wchar_t* defaultFileName);

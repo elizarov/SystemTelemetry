@@ -1,3 +1,4 @@
+#include <winres.h>
 #include "resource.h"
 
 1 24 "SystemTelemetry.manifest"
@@ -8,3 +9,16 @@ IDR_PANEL_ICON_NETWORK PNG "network.png"
 IDR_PANEL_ICON_STORAGE PNG "storage.png"
 IDR_PANEL_ICON_TIME PNG "time.png"
 IDR_CONFIG_TEMPLATE RCDATA "config.ini"
+
+IDD_CUSTOM_SCALE DIALOGEX 0, 0, 176, 62
+STYLE WS_POPUP | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_DLGMODALFRAME
+CAPTION "Custom Scale"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT           "Scale percentage:", IDC_CUSTOM_SCALE_PROMPT, 8, 10, 74, 8
+    EDITTEXT        IDC_CUSTOM_SCALE_EDIT, 86, 8, 50, 14, ES_AUTOHSCROLL | ES_LEFT
+    LTEXT           "%", -1, 140, 10, 8, 8
+    DEFPUSHBUTTON   "OK", IDOK, 69, 38, 45, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 121, 38, 45, 14
+END
