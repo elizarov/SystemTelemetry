@@ -372,6 +372,7 @@ private:
     int EffectiveMetricRowHeight() const;
     int EffectiveDriveHeaderHeight() const;
     int EffectiveDriveRowHeight() const;
+    int EffectiveThroughputPreferredHeight() const;
     bool SupportsLayoutSimilarityIndicator(const ResolvedWidgetLayout& widget) const;
     bool IsFirstWidgetForSimilarityIndicator(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
     std::vector<const ResolvedWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;

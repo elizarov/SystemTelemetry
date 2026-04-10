@@ -863,9 +863,8 @@ bool DashboardRenderer::MeasureFonts() {
     fontHeights_.footer = measure(fonts_.footer);
     fontHeights_.clockTime = measure(fonts_.clockTime);
     fontHeights_.clockDate = measure(fonts_.clockDate);
-    measuredWidths_.throughputLabel = std::max(MeasureTextSize(hdc, fonts_.smallFont, "Read").cx,
-                                          MeasureTextSize(hdc, fonts_.smallFont, "Write").cx) +
-                                      std::max(0, ScaleLogical(config_.layout.throughput.labelPadding));
+    measuredWidths_.throughputLabel =
+        std::max(MeasureTextSize(hdc, fonts_.smallFont, "Read").cx, MeasureTextSize(hdc, fonts_.smallFont, "Write").cx);
     measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx +
                                      std::max(0, ScaleLogical(config_.layout.throughput.axisPadding));
     measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx;
@@ -1035,8 +1034,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return height;
     }
     if (node.name == "throughput") {
-        const int height = fontHeights_.smallText + ScaleLogical(config_.layout.throughput.headerGap) +
-                           std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
+        const int height = EffectiveThroughputPreferredHeight();
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
@@ -1061,6 +1059,14 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
 
 bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
     return node.name == "rows" || node.name == "columns";
+}
+
+int DashboardRenderer::EffectiveThroughputPreferredHeight() const {
+    const int headerHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.valuePadding));
+    const int graphLabelHeight =
+        std::max(fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.scaleLabelPadding)),
+            std::max(1, ScaleLogical(config_.layout.throughput.scaleLabelMinHeight)));
+    return headerHeight + std::max(0, ScaleLogical(config_.layout.throughput.headerGap)) + graphLabelHeight;
 }
 
 int DashboardRenderer::GaugeRadiusForRect(const RECT& rect) const {
@@ -1091,8 +1097,7 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(
     } else if (node.name == "throughput") {
         widget.kind = WidgetKind::Throughput;
         widget.binding.metric = node.parameter;
-        widget.preferredHeight = fontHeights_.smallText + ScaleLogical(config_.layout.throughput.headerGap) +
-                                 std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
+        widget.preferredHeight = EffectiveThroughputPreferredHeight();
     } else if (node.name == "network_footer") {
         widget.kind = WidgetKind::NetworkFooter;
         widget.preferredHeight =
