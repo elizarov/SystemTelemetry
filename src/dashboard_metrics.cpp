@@ -130,10 +130,7 @@ std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<Name
             ResolvePeakRatio(snapshot, metricHistoryRef, ratio)};
     }
 
-    ScalarMetric unavailable{std::nullopt,
-        std::string(suffix) == "Temp" ? "\xC2\xB0"
-                                        "C"
-                                      : "RPM"};
+    ScalarMetric unavailable{std::nullopt, std::string(suffix) == "Temp" ? "°C" : "RPM"};
     return DashboardMetricRow{BuildBoardMetricLabel(name, suffix),
         FormatScalarValue(unavailable, 0),
         0.0,
