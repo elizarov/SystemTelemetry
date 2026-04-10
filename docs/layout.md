@@ -76,7 +76,7 @@ Supported widget geometry keys:
 
 - `[metric_list]`: `label_width`, `bar_height`, `vertical_gap`
 - `[drive_usage_list]`: `label_gap`, `activity_width`, `rw_gap`, `bar_gap`, `percent_gap`, `free_width`, `bar_height`, `header_gap`, `row_gap`, `activity_segments`, `activity_segment_gap`
-- `[throughput]`: `header_gap`, `value_padding`, `axis_padding`, `scale_label_padding`, `scale_label_min_height`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
+- `[throughput]`: `header_gap`, `value_padding`, `axis_padding`, `scale_label_padding`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
 - `[gauge]`: `preferred_size`, `outer_padding`, `min_radius`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`
 - `[text]`: `preferred_padding`
 - `[network_footer]`: `preferred_padding`
@@ -208,7 +208,7 @@ Supported layout kinds:
 `network_footer` and `spacer` use a preferred height of `footer_font_height + [network_footer].preferred_padding`.
 `clock_time` uses a preferred height of `clock_time_font_height`.
 `clock_date` uses a preferred height of `clock_date_font_height`.
-`throughput(...)` uses a preferred height of `small_font_height + [throughput].value_padding + [throughput].header_gap + max(small_font_height + [throughput].scale_label_padding, [throughput].scale_label_min_height)`.
+`throughput(...)` uses a preferred height of `small_font_height + [throughput].value_padding + [throughput].header_gap + small_font_height + [throughput].scale_label_padding`.
 Throughput header labels use their actual rendered text width at draw time.
 Drive label width and drive percent width are measured from the configured fonts at layout load.
 Throughput axis width is measured from the configured fonts at layout load, then widened by `[throughput].axis_padding`.

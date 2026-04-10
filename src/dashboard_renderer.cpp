@@ -1080,8 +1080,7 @@ void DashboardRenderer::DrawGraph(HDC hdc,
 
     const int axisWidth = std::max(1, measuredWidths_.throughputAxis);
     const int labelBandHeight =
-        std::max(fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.scaleLabelPadding)),
-            std::max(1, ScaleLogical(config_.layout.throughput.scaleLabelMinHeight)));
+        fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.scaleLabelPadding));
     const int graphTop = std::min(rect.bottom - 1, rect.top + labelBandHeight);
     const int graphLeft = rect.left + axisWidth;
     const int leaderDiameter = std::max(0, ScaleLogical(config_.layout.throughput.leaderDiameter));

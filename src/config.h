@@ -189,7 +189,6 @@ struct ThroughputWidgetConfig {
     CONFIG_VALUE(int, valuePadding, "value_padding");
     CONFIG_VALUE(int, axisPadding, "axis_padding");
     CONFIG_VALUE(int, scaleLabelPadding, "scale_label_padding");
-    CONFIG_VALUE(int, scaleLabelMinHeight, "scale_label_min_height");
     CONFIG_VALUE(int, guideStrokeWidth, "guide_stroke_width");
     CONFIG_VALUE(int, plotStrokeWidth, "plot_stroke_width");
     CONFIG_VALUE(int, leaderDiameter, "leader_diameter");
