@@ -205,7 +205,8 @@ Supported layout kinds:
 `metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + [metric_list].vertical_gap + [metric_list].bar_height`.
 `drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].header_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].row_gap`.
 `text(...)` uses a preferred height of `text_font_height + [text].preferred_padding`.
-`network_footer` and `spacer` use a preferred height of `footer_font_height + [network_footer].preferred_padding`.
+`network_footer` uses a preferred height of `footer_font_height + [network_footer].preferred_padding`.
+`vertical_spacer(widget_name)` uses the preferred height of the referenced widget type.
 `clock_time` uses a preferred height of `clock_time_font_height`.
 `clock_date` uses a preferred height of `clock_date_font_height`.
 `throughput(...)` uses a preferred height of `small_font_height + [throughput].header_gap + small_font_height + [throughput].scale_label_padding`.
@@ -215,7 +216,7 @@ Throughput axis width is measured from the configured fonts at layout load, then
 
 Nested layout expressions are allowed.
 Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is a card-layout reference and resolves to that referenced card's layout during layout resolution.
-In a vertical `rows(...)` container, fixed-height direct children such as `text`, `network_footer`, and `spacer` keep their preferred height and the remaining space goes to flexible siblings when no `vertical_spring` is present.
+In a vertical `rows(...)` container, fixed-height direct children such as `text`, `network_footer`, and `vertical_spacer(...)` keep their preferred height and the remaining space goes to flexible siblings when no `vertical_spring` is present.
 When one or more direct `vertical_spring` children are present in `rows(...)`, every spring absorbs the remaining height before weighted stretching and multiple springs divide that height by weight.
 Interactive layout editing always exposes the container guides for `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, snaps to the nearest same-type exact-size group as soon as the similarity ruler threshold is reached by iteratively re-evaluating nested weighted layouts, lets `Alt` temporarily bypass that snap and continue free dragging, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
 When the pointer hovers a non-empty widget in layout-edit mode, the renderer outlines that widget's resolved box and shows any widget-local size guides that widget supports.
@@ -240,7 +241,7 @@ Supported widget names:
 - `metric_list`
 - `throughput`
 - `network_footer`
-- `spacer`
+- `vertical_spacer`
 - `vertical_spring`
 - `drive_usage_list`
 - `clock_time`
@@ -262,8 +263,9 @@ Examples:
 - `metric_list(cpu.ram,board.temp.cpu=Temp,cpu.clock,board.fan.cpu,board.fan.system=System Fan)`
 - `throughput(network.upload)`
 - `drive_usage_list`
+- `vertical_spacer(network_footer)`
 
-`spacer` reserves layout space without drawing content.
+`vertical_spacer(widget_name)` reserves the referenced widget's vertical layout space without drawing content.
 `vertical_spring` draws nothing and absorbs remaining height inside a vertical `rows(...)` container.
 
 Supported metric references include:
@@ -343,7 +345,7 @@ Static sizing rules:
 - header height comes from config
 - metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
 - drive-usage widgets reserve a dedicated header row and use fixed-width read/write activity columns from `[drive_usage_list]`
-- widget-specific heights, paddings, widths, segment counts, and gauge/throughput chrome come from their matching widget sections, while fixed text columns, text-widget preferred heights, footer or spacer preferred heights, and clock preferred heights derive directly from their documented measured font metrics plus their matching documented padding where applicable
+- widget-specific heights, paddings, widths, segment counts, and gauge/throughput chrome come from their matching widget sections, while fixed text columns, text-widget preferred heights, footer preferred heights, `vertical_spacer(...)` mirrored preferred heights, and clock preferred heights derive directly from their documented measured font metrics plus their matching documented padding where applicable
 - throughput sections follow the configured vertical rhythm
 - centered time/date layouts use `rows(vertical_spring, ..., vertical_spring)` so springs balance the surrounding free space
 - repeated lists such as drives divide their assigned area using the item count from config

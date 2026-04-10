@@ -27,7 +27,7 @@ enum class DashboardWidgetClass {
     MetricList,
     Throughput,
     NetworkFooter,
-    Spacer,
+    VerticalSpacer,
     VerticalSpring,
     DriveUsageList,
     ClockTime,

@@ -94,7 +94,7 @@ add_executable(SystemTelemetry WIN32
     src/widget/metric_list.cpp
     src/widget/throughput.cpp
     src/widget/network_footer.cpp
-    src/widget/spacer.cpp
+    src/widget/vertical_spacer.cpp
     src/widget/vertical_spring.cpp
     src/widget/drive_usage_list.cpp
     src/widget/clock_time.cpp

@@ -425,7 +425,7 @@ namespace {
 
 bool IsWidgetOrContainerNodeName(const std::string& name) {
     return name == "rows" || name == "columns" || name == "text" || name == "gauge" || name == "metric_list" ||
-           name == "throughput" || name == "network_footer" || name == "spacer" || name == "vertical_spring" ||
+           name == "throughput" || name == "network_footer" || name == "vertical_spacer" || name == "vertical_spring" ||
            name == "drive_usage_list" || name == "clock_time" || name == "clock_date";
 }
 

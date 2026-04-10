@@ -2,7 +2,7 @@
 
 #include "../widget.h"
 
-class SpacerWidget final : public DashboardWidget {
+class VerticalSpacerWidget final : public DashboardWidget {
 public:
     DashboardWidgetClass Class() const override;
     std::unique_ptr<DashboardWidget> Clone() const override;
@@ -10,4 +10,8 @@ public:
     int PreferredHeight(const DashboardRenderer& renderer) const override;
     bool UsesFixedPreferredHeightInRows() const override;
     bool IsHoverable() const override;
+
+private:
+    std::string referencedWidgetName_;
+    std::unique_ptr<DashboardWidget> referencedWidget_;
 };

@@ -8,7 +8,7 @@
 #include "widget/gauge.h"
 #include "widget/metric_list.h"
 #include "widget/network_footer.h"
-#include "widget/spacer.h"
+#include "widget/vertical_spacer.h"
 #include "widget/text.h"
 #include "widget/throughput.h"
 #include "widget/vertical_spring.h"
@@ -47,8 +47,8 @@ std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view na
     if (name == "network_footer") {
         return DashboardWidgetClass::NetworkFooter;
     }
-    if (name == "spacer") {
-        return DashboardWidgetClass::Spacer;
+    if (name == "vertical_spacer") {
+        return DashboardWidgetClass::VerticalSpacer;
     }
     if (name == "vertical_spring") {
         return DashboardWidgetClass::VerticalSpring;
@@ -77,8 +77,8 @@ std::string_view DashboardWidgetClassName(DashboardWidgetClass widgetClass) {
             return "throughput";
         case DashboardWidgetClass::NetworkFooter:
             return "network_footer";
-        case DashboardWidgetClass::Spacer:
-            return "spacer";
+        case DashboardWidgetClass::VerticalSpacer:
+            return "vertical_spacer";
         case DashboardWidgetClass::VerticalSpring:
             return "vertical_spring";
         case DashboardWidgetClass::DriveUsageList:
@@ -105,8 +105,8 @@ std::unique_ptr<DashboardWidget> CreateDashboardWidget(DashboardWidgetClass widg
             return std::make_unique<ThroughputWidget>();
         case DashboardWidgetClass::NetworkFooter:
             return std::make_unique<NetworkFooterWidget>();
-        case DashboardWidgetClass::Spacer:
-            return std::make_unique<SpacerWidget>();
+        case DashboardWidgetClass::VerticalSpacer:
+            return std::make_unique<VerticalSpacerWidget>();
         case DashboardWidgetClass::VerticalSpring:
             return std::make_unique<VerticalSpringWidget>();
         case DashboardWidgetClass::DriveUsageList:
