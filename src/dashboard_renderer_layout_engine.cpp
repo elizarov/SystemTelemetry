@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <map>
 
 namespace {
 
@@ -149,28 +150,20 @@ bool DashboardRendererLayoutEngine::ResolveLayout(DashboardRenderer& renderer) {
         return false;
     }
 
-    int gaugeCount = 0;
-    int globalGaugeRadius = 0;
-    for (const auto& card : renderer.resolvedLayout_.cards) {
-        for (const auto& widget : card.widgets) {
-            if (widget.widget == nullptr || widget.widget->Class() != DashboardWidgetClass::Gauge) {
+    std::map<DashboardWidgetClass, std::vector<DashboardWidgetLayout*>> widgetGroups;
+    for (auto& card : renderer.resolvedLayout_.cards) {
+        for (auto& widget : card.widgets) {
+            if (widget.widget == nullptr) {
                 continue;
             }
-
-            const int gaugeRadius = renderer.GaugeRadiusForRect(widget.rect);
-            if (gaugeCount == 0) {
-                globalGaugeRadius = gaugeRadius;
-            } else {
-                globalGaugeRadius = (std::min)(globalGaugeRadius, gaugeRadius);
-            }
-            ++gaugeCount;
+            widgetGroups[widget.widget->Class()].push_back(&widget);
         }
     }
-    renderer.resolvedLayout_.globalGaugeRadius =
-        gaugeCount > 0 ? globalGaugeRadius
-                       : (std::max)(1, renderer.ScaleLogical(renderer.config_.layout.gauge.minRadius));
-    renderer.WriteTrace("renderer:layout_global_gauge_radius count=" + std::to_string(gaugeCount) +
-                        " value=" + std::to_string(renderer.resolvedLayout_.globalGaugeRadius));
+    for (auto& [_, group] : widgetGroups) {
+        if (!group.empty() && group.front()->widget != nullptr) {
+            group.front()->widget->FinalizeLayoutGroup(renderer, group);
+        }
+    }
 
     BuildWidgetEditGuides(renderer);
 

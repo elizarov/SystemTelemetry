@@ -1,6 +1,10 @@
 #pragma once
 
+#include <memory>
+
 #include "../widget.h"
+
+struct GaugeSharedLayout;
 
 class GaugeWidget final : public DashboardWidget {
 public:
@@ -12,8 +16,10 @@ public:
         HDC hdc,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;
+    void FinalizeLayoutGroup(DashboardRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) override;
     void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
 
 private:
     std::string metric_;
+    std::shared_ptr<GaugeSharedLayout> sharedLayout_;
 };

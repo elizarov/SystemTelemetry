@@ -293,10 +293,6 @@ COLORREF DashboardRenderer::TrackColor() const {
     return ToColorRef(config_.layout.colors.trackColor);
 }
 
-int DashboardRenderer::GlobalGaugeRadius() const {
-    return resolvedLayout_.globalGaugeRadius;
-}
-
 std::vector<DashboardRenderer::WidgetEditGuide>& DashboardRenderer::WidgetEditGuidesMutable() {
     return widgetEditGuides_;
 }
@@ -770,14 +766,6 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
 
 bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
     return node.name == "rows" || node.name == "columns";
-}
-
-int DashboardRenderer::GaugeRadiusForRect(const RECT& rect) const {
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-    const int outerPadding = std::max(0, ScaleLogical(config_.layout.gauge.outerPadding));
-    const int fittedRadius = std::max(1, std::min(width, height) / 2 - outerPadding);
-    return fittedRadius;
 }
 
 const DashboardRenderer::ParsedWidgetInfo* DashboardRenderer::FindParsedWidgetInfo(const LayoutNodeConfig& node) const {

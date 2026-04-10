@@ -246,7 +246,6 @@ public:
     const Fonts& WidgetFonts() const;
     RenderMode CurrentRenderMode() const;
     COLORREF TrackColor() const;
-    int GlobalGaugeRadius() const;
     TextLayoutResult MeasureTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
     TextLayoutResult DrawTextBlock(HDC hdc,
@@ -267,7 +266,6 @@ public:
         int value);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
     int ScaleLogical(int value) const;
-    int GaugeRadiusForRect(const RECT& rect) const;
 
 private:
     friend struct DashboardRendererLayoutEngine;
@@ -293,7 +291,6 @@ private:
     struct ResolvedDashboardLayout {
         int windowWidth = 800;
         int windowHeight = 480;
-        int globalGaugeRadius = 0;
         std::vector<ResolvedCardLayout> cards;
     };
 

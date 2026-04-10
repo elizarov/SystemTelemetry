@@ -49,6 +49,8 @@ public:
         HDC hdc,
         const struct DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const;
+    virtual void FinalizeLayoutGroup(
+        DashboardRenderer& renderer, const std::vector<struct DashboardWidgetLayout*>& widgets);
     virtual void BuildEditGuides(DashboardRenderer& renderer, const struct DashboardWidgetLayout& widget) const;
 };
 

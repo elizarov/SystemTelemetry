@@ -10,6 +10,10 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+struct GaugeSharedLayout {
+    int radius = 1;
+};
+
 namespace {
 
 struct GaugeSegmentLayout {
@@ -116,6 +120,13 @@ RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
         ((std::max))(start.y, end.y) + inset + 1};
 }
 
+int GaugeRadiusForRect(const DashboardRenderer& renderer, const RECT& rect) {
+    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
+    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    const int outerPadding = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.outerPadding));
+    return std::max(1, std::min(width, height) / 2 - outerPadding);
+}
+
 }  // namespace
 
 DashboardWidgetClass GaugeWidget::Class() const {
@@ -128,6 +139,7 @@ std::unique_ptr<DashboardWidget> GaugeWidget::Clone() const {
 
 void GaugeWidget::Initialize(const LayoutNodeConfig& node) {
     metric_ = node.parameter;
+    sharedLayout_ = std::make_shared<GaugeSharedLayout>();
 }
 
 int GaugeWidget::PreferredHeight(const DashboardRenderer& renderer) const {
@@ -141,8 +153,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     const DashboardGaugeMetric metric = metrics.ResolveGauge(metric_);
     const int width = widget.rect.right - widget.rect.left;
     const int height = widget.rect.bottom - widget.rect.top;
-    const int radius =
-        (std::min)((std::max)(1, renderer.GlobalGaugeRadius()), renderer.GaugeRadiusForRect(widget.rect));
+    const int radius = sharedLayout_ != nullptr ? sharedLayout_->radius : GaugeRadiusForRect(renderer, widget.rect);
     const int cx = widget.rect.left + width / 2;
     const int cy = widget.rect.top + height / 2;
     const float segmentThickness =
@@ -260,8 +271,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
 }
 
 void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
-    const int radius =
-        (std::min)((std::max)(1, renderer.GlobalGaugeRadius()), renderer.GaugeRadiusForRect(widget.rect));
+    const int radius = sharedLayout_ != nullptr ? sharedLayout_->radius : GaugeRadiusForRect(renderer, widget.rect);
     if (radius <= 0) {
         return;
     }
@@ -314,4 +324,35 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
         gaugeLayout.segmentGap,
         gaugeLayout.gaugeStart,
         gaugeLayout.gaugeStart + gaugeLayout.maxSegmentSweep);
+}
+
+void GaugeWidget::FinalizeLayoutGroup(DashboardRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) {
+    auto sharedLayout = std::make_shared<GaugeSharedLayout>();
+    int gaugeCount = 0;
+    for (DashboardWidgetLayout* widget : widgets) {
+        if (widget == nullptr) {
+            continue;
+        }
+        GaugeWidget* gauge = dynamic_cast<GaugeWidget*>(widget->widget.get());
+        if (gauge == nullptr) {
+            continue;
+        }
+        const int gaugeRadius = GaugeRadiusForRect(renderer, widget->rect);
+        sharedLayout->radius = gaugeCount == 0 ? gaugeRadius : (std::min)(sharedLayout->radius, gaugeRadius);
+        ++gaugeCount;
+    }
+
+    if (gaugeCount == 0) {
+        sharedLayout->radius = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.minRadius));
+    }
+
+    for (DashboardWidgetLayout* widget : widgets) {
+        if (widget == nullptr) {
+            continue;
+        }
+        GaugeWidget* gauge = dynamic_cast<GaugeWidget*>(widget->widget.get());
+        if (gauge != nullptr) {
+            gauge->sharedLayout_ = sharedLayout;
+        }
+    }
 }
