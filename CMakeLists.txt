@@ -88,6 +88,17 @@ add_executable(SystemTelemetry WIN32
     src/gpu_amd_adl.cpp
     src/board_vendor.cpp
     src/dashboard_metrics.cpp
+    src/widget.cpp
+    src/widget/text.cpp
+    src/widget/gauge.cpp
+    src/widget/metric_list.cpp
+    src/widget/throughput.cpp
+    src/widget/network_footer.cpp
+    src/widget/spacer.cpp
+    src/widget/vertical_spring.cpp
+    src/widget/drive_usage_list.cpp
+    src/widget/clock_time.cpp
+    src/widget/clock_date.cpp
     src/dashboard_renderer_resources.cpp
     src/dashboard_renderer_layout_engine.cpp
     src/dashboard_renderer_layout.cpp

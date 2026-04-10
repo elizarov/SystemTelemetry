@@ -483,6 +483,38 @@ const std::string& DashboardRenderer::LastError() const {
     return lastError_;
 }
 
+const AppConfig& DashboardRenderer::Config() const {
+    return config_;
+}
+
+const DashboardRenderer::FontHeights& DashboardRenderer::FontMetrics() const {
+    return fontHeights_;
+}
+
+const DashboardRenderer::MeasuredWidths& DashboardRenderer::MeasuredTextWidths() const {
+    return measuredWidths_;
+}
+
+const DashboardRenderer::Fonts& DashboardRenderer::WidgetFonts() const {
+    return fonts_;
+}
+
+DashboardRenderer::RenderMode DashboardRenderer::CurrentRenderMode() const {
+    return renderMode_;
+}
+
+COLORREF DashboardRenderer::TrackColor() const {
+    return ToColorRef(config_.layout.colors.trackColor);
+}
+
+int DashboardRenderer::GlobalGaugeRadius() const {
+    return resolvedLayout_.globalGaugeRadius;
+}
+
+std::vector<DashboardRenderer::WidgetEditGuide>& DashboardRenderer::WidgetEditGuidesMutable() {
+    return widgetEditGuides_;
+}
+
 int DashboardRenderer::WindowWidth() const {
     return std::max(1, ScaleLogical(config_.layout.structure.window.width));
 }
@@ -542,38 +574,38 @@ int DashboardRenderer::LayoutSimilarityThreshold() const {
 std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
     const LayoutEditGuide& guide) const {
     struct SimilarityTypeKey {
-        WidgetKind kind = WidgetKind::Unknown;
+        std::string typeName;
         int extent = 0;
 
         bool operator<(const SimilarityTypeKey& other) const {
-            if (kind != other.kind) {
-                return kind < other.kind;
+            if (typeName != other.typeName) {
+                return typeName < other.typeName;
             }
             return extent < other.extent;
         }
     };
 
-    std::vector<const ResolvedWidgetLayout*> allWidgets = CollectSimilarityIndicatorWidgets(guide.axis);
-    std::vector<const ResolvedWidgetLayout*> affectedWidgets;
-    for (const ResolvedWidgetLayout* widget : allWidgets) {
+    std::vector<const DashboardWidgetLayout*> allWidgets = CollectSimilarityIndicatorWidgets(guide.axis);
+    std::vector<const DashboardWidgetLayout*> affectedWidgets;
+    for (const DashboardWidgetLayout* widget : allWidgets) {
         if (IsWidgetAffectedByGuide(*widget, guide)) {
             affectedWidgets.push_back(widget);
         }
     }
 
     std::vector<LayoutGuideSnapCandidate> candidates;
-    for (const ResolvedWidgetLayout* affected : affectedWidgets) {
+    for (const DashboardWidgetLayout* affected : affectedWidgets) {
         const int startExtent = WidgetExtentForAxis(*affected, guide.axis);
         if (startExtent <= 0) {
             continue;
         }
         std::set<SimilarityTypeKey> seenTargets;
         for (size_t i = 0; i < allWidgets.size(); ++i) {
-            const ResolvedWidgetLayout* target = allWidgets[i];
-            if (target == affected || target->kind != affected->kind) {
+            const DashboardWidgetLayout* target = allWidgets[i];
+            if (target == affected || target->typeName != affected->typeName) {
                 continue;
             }
-            const SimilarityTypeKey typeKey{target->kind, WidgetExtentForAxis(*target, guide.axis)};
+            const SimilarityTypeKey typeKey{target->typeName, WidgetExtentForAxis(*target, guide.axis)};
             if (!seenTargets.insert(typeKey).second) {
                 continue;
             }
@@ -612,9 +644,7 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     POINT clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            const bool hoverableWidget = widget.kind != WidgetKind::Spacer &&
-                                         widget.kind != WidgetKind::VerticalSpring &&
-                                         widget.kind != WidgetKind::Unknown;
+            const bool hoverableWidget = widget.widget != nullptr && widget.widget->IsHoverable();
             if (!hoverableWidget || !PtInRect(&widget.rect, clientPoint)) {
                 continue;
             }
@@ -658,35 +688,11 @@ std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEd
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
     const std::string& widgetTypeName) const {
     const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
-    auto matchesType = [&](WidgetKind kind) {
-        switch (kind) {
-            case WidgetKind::Text:
-                return normalizedName == "text";
-            case WidgetKind::Gauge:
-                return normalizedName == "gauge";
-            case WidgetKind::MetricList:
-                return normalizedName == "metric_list";
-            case WidgetKind::Throughput:
-                return normalizedName == "throughput";
-            case WidgetKind::NetworkFooter:
-                return normalizedName == "network_footer";
-            case WidgetKind::DriveUsageList:
-                return normalizedName == "drive_usage_list";
-            case WidgetKind::ClockTime:
-                return normalizedName == "clock_time";
-            case WidgetKind::ClockDate:
-                return normalizedName == "clock_date";
-            default:
-                return false;
-        }
-    };
 
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            const bool hoverableWidget = widget.kind != WidgetKind::Spacer &&
-                                         widget.kind != WidgetKind::VerticalSpring &&
-                                         widget.kind != WidgetKind::Unknown;
-            if (!hoverableWidget || !matchesType(widget.kind)) {
+            const bool hoverableWidget = widget.widget != nullptr && widget.widget->IsHoverable();
+            if (!hoverableWidget || widget.typeName != normalizedName) {
                 continue;
             }
             return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -918,18 +924,18 @@ int DashboardRenderer::EffectiveDriveRowHeight() const {
     return computed;
 }
 
-bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const ResolvedWidgetLayout& widget) const {
-    if (widget.kind == WidgetKind::VerticalSpring) {
+bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const {
+    if (widget.widget == nullptr || widget.widget->IsVerticalSpring()) {
         return false;
     }
     if (UsesFixedPreferredHeightInRows(widget)) {
         return false;
     }
-    return widget.kind != WidgetKind::Unknown;
+    return true;
 }
 
 bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(
-    const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const {
+    const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {
     const int extent = WidgetExtentForAxis(widget, axis);
     if (extent <= 0) {
         return false;
@@ -937,7 +943,7 @@ bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(
 
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& candidate : card.widgets) {
-            if (&candidate == &widget || candidate.cardId != widget.cardId || candidate.kind != widget.kind) {
+            if (&candidate == &widget || candidate.cardId != widget.cardId || candidate.typeName != widget.typeName) {
                 continue;
             }
             if (!SupportsLayoutSimilarityIndicator(candidate) || WidgetExtentForAxis(candidate, axis) != extent) {
@@ -960,9 +966,9 @@ bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(
     return true;
 }
 
-std::vector<const DashboardRenderer::ResolvedWidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWidgets(
+std::vector<const DashboardWidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWidgets(
     LayoutGuideAxis axis) const {
-    std::vector<const ResolvedWidgetLayout*> widgets;
+    std::vector<const DashboardWidgetLayout*> widgets;
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (!SupportsLayoutSimilarityIndicator(widget) || !IsFirstWidgetForSimilarityIndicator(widget, axis)) {
@@ -994,64 +1000,10 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(tallest));
         return tallest;
     }
-    if (node.name == "text") {
-        const int height = fontHeights_.text + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
-        return height;
-    }
-    if (node.name == "network_footer") {
-        const int height =
-            fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
-        return height;
-    }
-    if (node.name == "spacer") {
-        const int height =
-            fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
-        return height;
-    }
-    if (node.name == "vertical_spring") {
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=0");
-        return 0;
-    }
-    if (node.name == "metric_list") {
-        const std::string param = node.parameter;
-        const int count = static_cast<int>(Split(param, ',').size());
-        const int height = count * EffectiveMetricRowHeight();
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
-                   " value=" + std::to_string(height));
-        return height;
-    }
-    if (node.name == "drive_usage_list") {
-        const int count = static_cast<int>(config_.storage.drives.size());
-        const int height = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
-                   " value=" + std::to_string(height));
-        return height;
-    }
-    if (node.name == "throughput") {
-        const int height = EffectiveThroughputPreferredHeight();
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
-        return height;
-    }
-    if (node.name == "clock_time") {
-        const int height = fontHeights_.clockTime;
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
-        return height;
-    }
-    if (node.name == "clock_date") {
-        const int height = fontHeights_.clockDate;
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
-        return height;
-    }
-    if (node.name == "gauge") {
-        const int height = std::max(1, ScaleLogical(config_.layout.gauge.preferredSize));
-        WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
-        return height;
-    }
-    WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=0");
-    return 0;
+    const DashboardWidgetLayout widget = ResolveWidgetLayout(node, RECT{});
+    WriteTrace(
+        "renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(widget.preferredHeight));
+    return widget.preferredHeight;
 }
 
 bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
@@ -1073,56 +1025,20 @@ int DashboardRenderer::GaugeRadiusForRect(const RECT& rect) const {
     return fittedRadius;
 }
 
-DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(
-    const LayoutNodeConfig& node, const RECT& rect) const {
-    ResolvedWidgetLayout widget;
+DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const {
+    DashboardWidgetLayout widget;
     widget.rect = rect;
-    if (node.name == "text") {
-        widget.kind = WidgetKind::Text;
-        widget.binding.metric = node.parameter;
-        widget.preferredHeight = fontHeights_.text + std::max(0, ScaleLogical(config_.layout.text.preferredPadding));
-        widget.fixedPreferredHeightInRows = true;
-    } else if (node.name == "gauge") {
-        widget.kind = WidgetKind::Gauge;
-        widget.binding.metric = node.parameter;
-        widget.preferredHeight = std::max(1, ScaleLogical(config_.layout.gauge.preferredSize));
-    } else if (node.name == "metric_list") {
-        widget.kind = WidgetKind::MetricList;
-        widget.binding.param = node.parameter;
-        widget.preferredHeight = static_cast<int>(Split(node.parameter, ',').size()) * EffectiveMetricRowHeight();
-    } else if (node.name == "throughput") {
-        widget.kind = WidgetKind::Throughput;
-        widget.binding.metric = node.parameter;
-        widget.preferredHeight = EffectiveThroughputPreferredHeight();
-    } else if (node.name == "network_footer") {
-        widget.kind = WidgetKind::NetworkFooter;
-        widget.preferredHeight =
-            fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
-        widget.fixedPreferredHeightInRows = true;
-    } else if (node.name == "spacer") {
-        widget.kind = WidgetKind::Spacer;
-        widget.preferredHeight =
-            fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
-        widget.fixedPreferredHeightInRows = true;
-    } else if (node.name == "vertical_spring") {
-        widget.kind = WidgetKind::VerticalSpring;
-    } else if (node.name == "drive_usage_list") {
-        widget.kind = WidgetKind::DriveUsageList;
-        const int count = static_cast<int>(config_.storage.drives.size());
-        widget.preferredHeight = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
-    } else if (node.name == "clock_time") {
-        widget.kind = WidgetKind::ClockTime;
-        widget.preferredHeight = fontHeights_.clockTime;
-        widget.fixedPreferredHeightInRows = true;
-    } else if (node.name == "clock_date") {
-        widget.kind = WidgetKind::ClockDate;
-        widget.preferredHeight = fontHeights_.clockDate;
-        widget.fixedPreferredHeightInRows = true;
+    widget.widget = CreateDashboardWidget(node.name);
+    if (widget.widget != nullptr) {
+        widget.widget->Initialize(node);
+        widget.typeName = widget.widget->TypeName();
+        widget.preferredHeight = widget.widget->PreferredHeight(*this);
+        widget.fixedPreferredHeightInRows = widget.widget->UsesFixedPreferredHeightInRows();
     }
     return widget;
 }
 
-bool DashboardRenderer::UsesFixedPreferredHeightInRows(const ResolvedWidgetLayout& widget) const {
+bool DashboardRenderer::UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const {
     return widget.fixedPreferredHeightInRows;
 }
 

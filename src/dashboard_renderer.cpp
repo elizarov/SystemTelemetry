@@ -397,7 +397,7 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc, const EditOverlaySta
         return;
     }
 
-    const ResolvedWidgetLayout* hoveredWidget = nullptr;
+    const DashboardWidgetLayout* hoveredWidget = nullptr;
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (MatchesWidgetIdentity(widget, *overlayState.hoveredEditableWidget)) {
@@ -557,13 +557,13 @@ void DashboardRenderer::DrawWidgetEditGuides(HDC hdc, const EditOverlayState& ov
     DeleteObject(pen);
 }
 
-int DashboardRenderer::WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const {
+int DashboardRenderer::WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {
     return axis == LayoutGuideAxis::Vertical ? std::max(0, static_cast<int>(widget.rect.right - widget.rect.left))
                                              : std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
 }
 
 bool DashboardRenderer::IsWidgetAffectedByGuide(
-    const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const {
+    const DashboardWidgetLayout& widget, const LayoutEditGuide& guide) const {
     if (!guide.renderCardId.empty() && widget.cardId != guide.renderCardId) {
         return false;
     }
@@ -572,7 +572,7 @@ bool DashboardRenderer::IsWidgetAffectedByGuide(
 }
 
 bool DashboardRenderer::MatchesWidgetIdentity(
-    const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const {
+    const DashboardWidgetLayout& widget, const LayoutWidgetIdentity& identity) const {
     return widget.cardId == identity.renderCardId && widget.editCardId == identity.editCardId &&
            widget.nodePath == identity.nodePath;
 }
@@ -595,7 +595,7 @@ bool DashboardRenderer::MatchesWidgetEditGuide(const WidgetEditGuide& left, cons
 }
 
 DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBinding(
-    const ResolvedWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const {
+    const DashboardWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const {
     return EditableAnchorBinding{
         EditableAnchorKey{
             LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -639,12 +639,12 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
     }
 
     struct SimilarityTypeKey {
-        WidgetKind kind = WidgetKind::Unknown;
+        std::string typeName;
         int extent = 0;
 
         bool operator<(const SimilarityTypeKey& other) const {
-            if (kind != other.kind) {
-                return kind < other.kind;
+            if (typeName != other.typeName) {
+                return typeName < other.typeName;
             }
             return extent < other.extent;
         }
@@ -652,8 +652,8 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
 
     LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
     const char* axisLabel = "horizontal";
-    std::vector<const ResolvedWidgetLayout*> affectedWidgets;
-    std::vector<const ResolvedWidgetLayout*> allWidgets;
+    std::vector<const DashboardWidgetLayout*> affectedWidgets;
+    std::vector<const DashboardWidgetLayout*> allWidgets;
     if (overlayState.similarityIndicatorMode == SimilarityIndicatorMode::AllHorizontal) {
         axis = LayoutGuideAxis::Vertical;
         axisLabel = "horizontal";
@@ -672,7 +672,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
         axis = guide.axis;
         axisLabel = axis == LayoutGuideAxis::Vertical ? "horizontal" : "vertical";
         allWidgets = CollectSimilarityIndicatorWidgets(axis);
-        for (const ResolvedWidgetLayout* widget : allWidgets) {
+        for (const DashboardWidgetLayout* widget : allWidgets) {
             if (IsWidgetAffectedByGuide(*widget, guide)) {
                 affectedWidgets.push_back(widget);
             }
@@ -682,17 +682,17 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
         return;
     }
 
-    std::set<const ResolvedWidgetLayout*> visibleWidgets;
-    std::map<const ResolvedWidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
-    for (const ResolvedWidgetLayout* affected : affectedWidgets) {
+    std::set<const DashboardWidgetLayout*> visibleWidgets;
+    std::map<const DashboardWidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
+    for (const DashboardWidgetLayout* affected : affectedWidgets) {
         const int affectedExtent = WidgetExtentForAxis(*affected, axis);
         if (affectedExtent <= 0) {
             continue;
         }
-        const SimilarityTypeKey typeKey{affected->kind, affectedExtent};
+        const SimilarityTypeKey typeKey{affected->typeName, affectedExtent};
         bool hasExactMatch = false;
-        for (const ResolvedWidgetLayout* candidate : allWidgets) {
-            if (candidate == affected || candidate->kind != affected->kind) {
+        for (const DashboardWidgetLayout* candidate : allWidgets) {
+            if (candidate == affected || candidate->typeName != affected->typeName) {
                 continue;
             }
             const int candidateExtent = WidgetExtentForAxis(*candidate, axis);
@@ -713,7 +713,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
 
     std::map<SimilarityTypeKey, int> exactTypeOrdinals;
     int nextOrdinal = 1;
-    for (const ResolvedWidgetLayout* widget : allWidgets) {
+    for (const DashboardWidgetLayout* widget : allWidgets) {
         if (!visibleWidgets.contains(widget)) {
             continue;
         }
@@ -726,7 +726,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
 
     std::vector<SimilarityIndicator> indicators;
     indicators.reserve(visibleWidgets.size());
-    for (const ResolvedWidgetLayout* widget : allWidgets) {
+    for (const DashboardWidgetLayout* widget : allWidgets) {
         if (!visibleWidgets.contains(widget)) {
             continue;
         }
@@ -744,9 +744,9 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
 
     if (traceOutput_ != nullptr) {
         for (const auto& entry : exactTypeOrdinals) {
-            WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
-                       "\" kind=" + std::to_string(static_cast<int>(entry.first.kind)) +
-                       " extent=" + std::to_string(entry.first.extent) + " ordinal=" + std::to_string(entry.second));
+            WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) + "\" type=\"" +
+                       entry.first.typeName + " extent=" + std::to_string(entry.first.extent) +
+                       " ordinal=" + std::to_string(entry.second));
         }
     }
 
@@ -865,124 +865,6 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
     }
 }
 
-void DashboardRenderer::DrawGauge(HDC hdc,
-    const ResolvedWidgetLayout& widget,
-    int cx,
-    int cy,
-    int radius,
-    const DashboardGaugeMetric& metric,
-    const std::string& label) {
-    const float segmentThickness = static_cast<float>(std::max(1, ScaleLogical(config_.layout.gauge.ringThickness)));
-    const GaugeSegmentLayout gaugeLayout = ComputeGaugeSegmentLayout(
-        config_.layout.gauge.sweepDegrees, config_.layout.gauge.segmentCount, config_.layout.gauge.segmentGapDegrees);
-    const int segmentCount = gaugeLayout.segmentCount;
-    const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
-    const int filledSegments =
-        clampedPercent <= 0.0
-            ? 0
-            : std::clamp(static_cast<int>(std::ceil(clampedPercent * static_cast<double>(segmentCount) / 100.0)),
-                  1,
-                  segmentCount);
-    const double clampedPeakRatio = std::clamp(metric.peakRatio, 0.0, 1.0);
-    const int peakSegment =
-        clampedPeakRatio <= 0.0
-            ? -1
-            : std::clamp(static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(segmentCount))) - 1,
-                  0,
-                  segmentCount - 1);
-    const float segmentRadius = static_cast<float>(radius);
-    const int anchorSize = std::max(4, ScaleLogical(6));
-    const int anchorHalf = anchorSize / 2;
-    const int outerRadius = radius + static_cast<int>(std::ceil(static_cast<double>(segmentThickness) / 2.0f));
-    const RECT anchorRect{cx - anchorHalf,
-        cy - outerRadius - anchorHalf,
-        cx - anchorHalf + anchorSize,
-        cy - outerRadius - anchorHalf + anchorSize};
-    RegisterEditableAnchorRegion(
-        EditableAnchorKey{
-            LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            AnchorEditParameter::SegmentCount,
-            0,
-        },
-        widget.rect,
-        anchorRect,
-        AnchorShape::Diamond,
-        AnchorDragAxis::Both,
-        config_.layout.gauge.segmentCount);
-
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    const Gdiplus::Color trackColor(255,
-        GetRValue(ToColorRef(config_.layout.colors.trackColor)),
-        GetGValue(ToColorRef(config_.layout.colors.trackColor)),
-        GetBValue(ToColorRef(config_.layout.colors.trackColor)));
-    const Gdiplus::Color usageColor(255, GetRValue(AccentColor()), GetGValue(AccentColor()), GetBValue(AccentColor()));
-    const Gdiplus::Color ghostColor(96, GetRValue(AccentColor()), GetGValue(AccentColor()), GetBValue(AccentColor()));
-
-    for (int i = 0; i < segmentCount; ++i) {
-        const double slotStart = gaugeLayout.gaugeStart + gaugeLayout.pitchSweep * static_cast<double>(i);
-        FillGaugeSegment(graphics,
-            static_cast<float>(cx),
-            static_cast<float>(cy),
-            segmentRadius,
-            segmentThickness,
-            slotStart,
-            gaugeLayout.segmentSweep,
-            trackColor);
-
-        if (renderMode_ != RenderMode::Blank && i < filledSegments) {
-            FillGaugeSegment(graphics,
-                static_cast<float>(cx),
-                static_cast<float>(cy),
-                segmentRadius,
-                segmentThickness,
-                slotStart,
-                gaugeLayout.segmentSweep,
-                usageColor);
-        }
-
-        if (renderMode_ != RenderMode::Blank && i == peakSegment) {
-            FillGaugeSegment(graphics,
-                static_cast<float>(cx),
-                static_cast<float>(cy),
-                segmentRadius,
-                segmentThickness,
-                slotStart,
-                gaugeLayout.segmentSweep,
-                ghostColor);
-        }
-    }
-
-    const int halfWidth = std::max(1, ScaleLogical(config_.layout.gauge.textHalfWidth));
-    if (renderMode_ != RenderMode::Blank) {
-        RECT numberRect{cx - halfWidth,
-            cy - ScaleLogical(config_.layout.gauge.valueTop),
-            cx + halfWidth,
-            cy + ScaleLogical(config_.layout.gauge.valueBottom)};
-        char number[16];
-        sprintf_s(number, "%.0f%%", metric.percent);
-        DrawTextBlock(hdc,
-            numberRect,
-            number,
-            fonts_.big,
-            ForegroundColor(),
-            DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-            MakeEditableTextBinding(widget, AnchorEditParameter::FontBig, 0, config_.layout.fonts.big.size));
-    }
-    RECT labelRect{cx - halfWidth,
-        cy + ScaleLogical(config_.layout.gauge.labelTop),
-        cx + halfWidth,
-        cy + ScaleLogical(config_.layout.gauge.labelBottom)};
-    DrawTextBlock(hdc,
-        labelRect,
-        label,
-        fonts_.smallFont,
-        MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 1, config_.layout.fonts.smallText.size));
-}
-
 void DashboardRenderer::DrawPillBar(
     HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
     FillCapsule(hdc, rect, ToColorRef(config_.layout.colors.trackColor), 255);
@@ -1014,56 +896,6 @@ void DashboardRenderer::DrawPillBar(
         RECT markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
         FillCapsule(hdc, markerRect, AccentColor(), 96);
     }
-}
-
-void DashboardRenderer::DrawMetricRow(
-    HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardMetricRow& row, int rowIndex) {
-    const int rowHeight = EffectiveMetricRowHeight();
-    const int labelWidth = std::max(1, ScaleLogical(config_.layout.metricList.labelWidth));
-    RECT labelRect{rect.left, rect.top, std::min(rect.right, rect.left + labelWidth), rect.bottom};
-    RECT valueRect{labelRect.right, rect.top, rect.right, rect.bottom};
-    DrawTextBlock(hdc,
-        labelRect,
-        row.label,
-        fonts_.label,
-        MutedTextColor(),
-        DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-        MakeEditableTextBinding(widget, AnchorEditParameter::FontLabel, rowIndex * 2, config_.layout.fonts.label.size));
-    if (renderMode_ != RenderMode::Blank) {
-        DrawTextBlock(hdc,
-            valueRect,
-            row.valueText,
-            fonts_.value,
-            ForegroundColor(),
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-            MakeEditableTextBinding(
-                widget, AnchorEditParameter::FontValue, rowIndex * 2 + 1, config_.layout.fonts.value.size));
-    }
-
-    const int metricBarHeight = std::max(1, ScaleLogical(config_.layout.metricList.barHeight));
-    const int barBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(rect.top) + rowHeight);
-    const int barTop = std::max(static_cast<int>(rect.top), barBottom - metricBarHeight);
-    RECT barRect{valueRect.left, barTop, rect.right, barBottom};
-    DrawPillBar(hdc, barRect, row.ratio, row.peakRatio, renderMode_ != RenderMode::Blank);
-    const int metricBarAnchorSize = std::max(4, ScaleLogical(6));
-    const int metricBarAnchorCenterX =
-        static_cast<int>(barRect.left) + std::max(0, static_cast<int>(barRect.right - barRect.left) / 2);
-    const int metricBarAnchorCenterY = static_cast<int>(barRect.bottom);
-    RECT metricBarAnchorRect{metricBarAnchorCenterX - (metricBarAnchorSize / 2),
-        metricBarAnchorCenterY - (metricBarAnchorSize / 2),
-        metricBarAnchorCenterX - (metricBarAnchorSize / 2) + metricBarAnchorSize,
-        metricBarAnchorCenterY - (metricBarAnchorSize / 2) + metricBarAnchorSize};
-    RegisterEditableAnchorRegion(
-        EditableAnchorKey{
-            LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            AnchorEditParameter::MetricListBarHeight,
-            rowIndex,
-        },
-        barRect,
-        metricBarAnchorRect,
-        AnchorShape::Circle,
-        AnchorDragAxis::Horizontal,
-        config_.layout.metricList.barHeight);
 }
 
 void DashboardRenderer::DrawGraph(HDC hdc,
@@ -1174,331 +1006,12 @@ void DashboardRenderer::DrawGraph(HDC hdc,
     }
 }
 
-void DashboardRenderer::DrawThroughputWidget(
-    HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardThroughputMetric& metric) {
-    const int lineHeight = fontHeights_.smallText;
-    RECT valueRect{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + lineHeight)};
-    RECT graphRect{rect.left,
-        std::min(rect.bottom, valueRect.bottom + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
-        rect.right,
-        rect.bottom};
-    char buffer[64];
-    if (metric.valueMbps >= 100.0) {
-        sprintf_s(buffer, "%.0f MB/s", metric.valueMbps);
-    } else {
-        sprintf_s(buffer, "%.1f MB/s", metric.valueMbps);
-    }
-    const TextLayoutResult labelLayout = DrawTextBlock(hdc,
-        valueRect,
-        metric.label,
-        fonts_.smallFont,
-        MutedTextColor(),
-        DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-        MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 0, config_.layout.fonts.smallText.size));
-    RECT numberRect{std::min(valueRect.right,
-                        labelLayout.textRect.right + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
-        valueRect.top,
-        valueRect.right,
-        valueRect.bottom};
-    if (renderMode_ != RenderMode::Blank) {
-        DrawTextBlock(hdc,
-            numberRect,
-            buffer,
-            fonts_.smallFont,
-            ForegroundColor(),
-            DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-            MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 1, config_.layout.fonts.smallText.size));
-    }
-    DrawGraph(hdc,
-        graphRect,
-        metric.history,
-        metric.maxGraph,
-        metric.guideStepMbps,
-        metric.timeMarkerOffsetSamples,
-        metric.timeMarkerIntervalSamples,
-        MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 2, config_.layout.fonts.smallText.size));
-}
-
-void DashboardRenderer::DrawDriveUsageWidget(
-    HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const std::vector<DashboardDriveRow>& rows) {
-    const int headerHeight = EffectiveDriveHeaderHeight();
-    const int rowHeight = EffectiveDriveRowHeight();
-    const int labelWidth = std::max(1, measuredWidths_.driveLabel);
-    const int percentWidth = std::max(1, measuredWidths_.drivePercent);
-    const int labelGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.labelGap));
-    const int activityWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.activityWidth));
-    const int rwGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.rwGap));
-    const int barGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.barGap));
-    const int percentGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.percentGap));
-    const int freeWidth = std::max(1, ScaleLogical(config_.layout.driveUsageList.freeWidth));
-    const int driveBarHeight = std::max(1, ScaleLogical(config_.layout.driveUsageList.barHeight));
-    const int activitySegments = std::max(1, config_.layout.driveUsageList.activitySegments);
-    const int activitySegmentGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.activitySegmentGap));
-    const int rowContentHeight = std::max(fontHeights_.label, std::max(fontHeights_.smallText, driveBarHeight));
-
-    const int savedDc = SaveDC(hdc);
-    IntersectClipRect(hdc, rect.left, rect.top, rect.right, rect.bottom);
-
-    RECT header{rect.left, rect.top, rect.right, rect.top + headerHeight};
-    RECT row{rect.left, header.bottom, rect.right, header.bottom + rowHeight};
-
-    const auto resolveColumns = [&](const RECT& band,
-                                    RECT& labelRect,
-                                    RECT& readRect,
-                                    RECT& writeRect,
-                                    RECT& barRect,
-                                    RECT& pctRect,
-                                    RECT& freeRect) {
-        labelRect = {band.left, band.top, std::min(band.right, static_cast<LONG>(band.left + labelWidth)), band.bottom};
-        readRect = {std::min(band.right, static_cast<LONG>(labelRect.right + labelGap)),
-            band.top,
-            std::min(band.right, static_cast<LONG>(labelRect.right + labelGap + activityWidth)),
-            band.bottom};
-        writeRect = {std::min(band.right, static_cast<LONG>(readRect.right + rwGap)),
-            band.top,
-            std::min(band.right, static_cast<LONG>(readRect.right + rwGap + activityWidth)),
-            band.bottom};
-        freeRect = {std::max(band.left, static_cast<LONG>(band.right - freeWidth)), band.top, band.right, band.bottom};
-        pctRect = {
-            std::max(band.left, static_cast<LONG>(freeRect.left - percentWidth)), band.top, freeRect.left, band.bottom};
-        barRect = {std::min(band.right, static_cast<LONG>(writeRect.right + barGap)),
-            band.top,
-            std::max(std::min(band.right, static_cast<LONG>(writeRect.right + barGap)),
-                static_cast<LONG>(pctRect.left - percentGap)),
-            band.bottom};
-    };
-
-    RECT headerLabelRect{}, headerReadRect{}, headerWriteRect{}, headerBarRect{}, headerPctRect{}, headerFreeRect{};
-    resolveColumns(
-        header, headerLabelRect, headerReadRect, headerWriteRect, headerBarRect, headerPctRect, headerFreeRect);
-    const int activityAnchorSize = std::max(8, ScaleLogical(10));
-    const int activityAnchorCenterX =
-        headerReadRect.left + std::max(0L, headerWriteRect.right - headerReadRect.left) / 2;
-    const int firstRowTop = std::min(static_cast<int>(rect.bottom), static_cast<int>(header.bottom));
-    const int firstRowBottom = std::min(static_cast<int>(rect.bottom), static_cast<int>(header.bottom + rowHeight));
-    const int firstRowContentTop = firstRowTop + std::max(0, ((firstRowBottom - firstRowTop) - rowContentHeight) / 2);
-    const int activityAnchorCenterY = firstRowContentTop;
-    RECT activityAnchorRect{activityAnchorCenterX - (activityAnchorSize / 2),
-        activityAnchorCenterY - (activityAnchorSize / 2),
-        activityAnchorCenterX - (activityAnchorSize / 2) + activityAnchorSize,
-        activityAnchorCenterY - (activityAnchorSize / 2) + activityAnchorSize};
-    RegisterEditableAnchorRegion(
-        EditableAnchorKey{
-            LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            AnchorEditParameter::DriveUsageActivitySegments,
-            0,
-        },
-        RECT{headerReadRect.left, rect.top, headerWriteRect.right, rect.bottom},
-        activityAnchorRect,
-        AnchorShape::Diamond,
-        AnchorDragAxis::Both,
-        config_.layout.driveUsageList.activitySegments);
-    RECT usageHeaderRect{headerBarRect.left, header.top, headerPctRect.right, header.bottom};
-    RECT headerReadLabelRect{
-        headerReadRect.left - rwGap, headerReadRect.top, headerReadRect.right + rwGap, headerReadRect.bottom};
-    RECT headerWriteLabelRect{
-        headerWriteRect.left - rwGap, headerWriteRect.top, headerWriteRect.right + rwGap, headerWriteRect.bottom};
-    DrawTextBlock(hdc,
-        headerReadLabelRect,
-        "R",
-        fonts_.smallFont,
-        MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
-        MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 0, config_.layout.fonts.smallText.size));
-    DrawTextBlock(hdc,
-        headerWriteLabelRect,
-        "W",
-        fonts_.smallFont,
-        MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
-        MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 1, config_.layout.fonts.smallText.size));
-    DrawTextBlock(hdc,
-        usageHeaderRect,
-        "Usage",
-        fonts_.smallFont,
-        MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 2, config_.layout.fonts.smallText.size));
-    DrawTextBlock(hdc,
-        headerFreeRect,
-        "Free",
-        fonts_.smallFont,
-        MutedTextColor(),
-        DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-        MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 3, config_.layout.fonts.smallText.size));
-
-    for (size_t rowIndex = 0; rowIndex < rows.size(); ++rowIndex) {
-        const auto& drive = rows[rowIndex];
-        const int textBaseId = 100 + static_cast<int>(rowIndex) * 3;
-        RECT labelRect{}, readRect{}, writeRect{}, pctRect{}, freeRect{}, barBandRect{};
-        resolveColumns(row, labelRect, readRect, writeRect, barBandRect, pctRect, freeRect);
-        const int rowPixelHeight = static_cast<int>(row.bottom - row.top);
-        const int contentTop = static_cast<int>(row.top) + std::max(0, (rowPixelHeight - rowContentHeight) / 2);
-        RECT activityRect{0, contentTop, 0, contentTop + rowContentHeight};
-        RECT readIndicatorRect{readRect.left, activityRect.top, readRect.right, activityRect.bottom};
-        RECT writeIndicatorRect{writeRect.left, activityRect.top, writeRect.right, activityRect.bottom};
-        const int barTop = static_cast<int>(row.top) + std::max(0, (rowPixelHeight - driveBarHeight) / 2);
-        RECT barRect{barBandRect.left, barTop, barBandRect.right, barTop + driveBarHeight};
-
-        DrawTextBlock(hdc,
-            labelRect,
-            drive.label,
-            fonts_.label,
-            ForegroundColor(),
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-            MakeEditableTextBinding(
-                widget, AnchorEditParameter::FontLabel, textBaseId, config_.layout.fonts.label.size));
-        DrawSegmentIndicator(hdc,
-            readIndicatorRect,
-            activitySegments,
-            activitySegmentGap,
-            renderMode_ == RenderMode::Blank ? 0.0 : drive.readActivity,
-            ToColorRef(config_.layout.colors.trackColor),
-            AccentColor());
-        DrawSegmentIndicator(hdc,
-            writeIndicatorRect,
-            activitySegments,
-            activitySegmentGap,
-            renderMode_ == RenderMode::Blank ? 0.0 : drive.writeActivity,
-            ToColorRef(config_.layout.colors.trackColor),
-            AccentColor());
-        DrawPillBar(hdc, barRect, drive.usedPercent / 100.0, std::nullopt, renderMode_ != RenderMode::Blank);
-        const int driveBarAnchorSize = std::max(4, ScaleLogical(6));
-        const int driveBarAnchorCenterX =
-            static_cast<int>(barRect.left) + std::max(0, static_cast<int>(barRect.right - barRect.left) / 2);
-        const int driveBarAnchorCenterY = static_cast<int>(barRect.bottom);
-        RECT driveBarAnchorRect{driveBarAnchorCenterX - (driveBarAnchorSize / 2),
-            driveBarAnchorCenterY - (driveBarAnchorSize / 2),
-            driveBarAnchorCenterX - (driveBarAnchorSize / 2) + driveBarAnchorSize,
-            driveBarAnchorCenterY - (driveBarAnchorSize / 2) + driveBarAnchorSize};
-        RegisterEditableAnchorRegion(
-            EditableAnchorKey{
-                LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                AnchorEditParameter::DriveUsageBarHeight,
-                static_cast<int>(rowIndex),
-            },
-            barRect,
-            driveBarAnchorRect,
-            AnchorShape::Circle,
-            AnchorDragAxis::Horizontal,
-            config_.layout.driveUsageList.barHeight);
-
-        if (renderMode_ != RenderMode::Blank) {
-            char percent[16];
-            sprintf_s(percent, "%.0f%%", drive.usedPercent);
-            DrawTextBlock(hdc,
-                pctRect,
-                percent,
-                fonts_.label,
-                ForegroundColor(),
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-                MakeEditableTextBinding(
-                    widget, AnchorEditParameter::FontLabel, textBaseId + 1, config_.layout.fonts.label.size));
-            DrawTextBlock(hdc,
-                freeRect,
-                drive.freeText,
-                fonts_.smallFont,
-                MutedTextColor(),
-                DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-                MakeEditableTextBinding(
-                    widget, AnchorEditParameter::FontSmall, textBaseId + 2, config_.layout.fonts.smallText.size));
-        }
-
-        OffsetRect(&row, 0, rowHeight);
-        if (row.top >= rect.bottom) {
-            break;
-        }
-    }
-
-    RestoreDC(hdc, savedDc);
-}
-
 void DashboardRenderer::DrawResolvedWidget(
-    HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics) {
-    switch (widget.kind) {
-        case WidgetKind::Text:
-            DrawTextBlock(hdc,
-                widget.rect,
-                metrics.ResolveText(widget.binding.metric),
-                fonts_.text,
-                ForegroundColor(),
-                DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
-                MakeEditableTextBinding(widget, AnchorEditParameter::FontText, 0, config_.layout.fonts.text.size));
-            return;
-        case WidgetKind::Gauge: {
-            const DashboardGaugeMetric gaugeMetric = metrics.ResolveGauge(widget.binding.metric);
-            const int width = widget.rect.right - widget.rect.left;
-            const int height = widget.rect.bottom - widget.rect.top;
-            const int radius =
-                std::min(std::max(1, resolvedLayout_.globalGaugeRadius), GaugeRadiusForRect(widget.rect));
-            DrawGauge(
-                hdc, widget, widget.rect.left + width / 2, widget.rect.top + height / 2, radius, gaugeMetric, "Load");
-            return;
-        }
-        case WidgetKind::MetricList: {
-            const int rowHeight = EffectiveMetricRowHeight();
-            const int savedDc = SaveDC(hdc);
-            IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
-            RECT rowRect{widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.top + rowHeight};
-            int rowIndex = 0;
-            for (const auto& row : metrics.ResolveMetricList(ParseMetricListEntries(widget.binding.param))) {
-                DrawMetricRow(hdc, widget, rowRect, row, rowIndex++);
-                OffsetRect(&rowRect, 0, rowHeight);
-                if (rowRect.top >= widget.rect.bottom) {
-                    break;
-                }
-            }
-            RestoreDC(hdc, savedDc);
-            return;
-        }
-        case WidgetKind::Throughput:
-            DrawThroughputWidget(hdc, widget, widget.rect, metrics.ResolveThroughput(widget.binding.metric));
-            return;
-        case WidgetKind::NetworkFooter:
-            if (renderMode_ != RenderMode::Blank) {
-                DrawTextBlock(hdc,
-                    widget.rect,
-                    metrics.ResolveNetworkFooter(),
-                    fonts_.footer,
-                    MutedTextColor(),
-                    DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
-                    MakeEditableTextBinding(
-                        widget, AnchorEditParameter::FontFooter, 0, config_.layout.fonts.footer.size));
-            }
-            return;
-        case WidgetKind::Spacer:
-        case WidgetKind::VerticalSpring:
-            return;
-        case WidgetKind::DriveUsageList:
-            DrawDriveUsageWidget(hdc, widget, widget.rect, metrics.ResolveDriveRows());
-            return;
-        case WidgetKind::ClockTime:
-            if (renderMode_ != RenderMode::Blank) {
-                DrawTextBlock(hdc,
-                    widget.rect,
-                    metrics.ResolveClockTime(),
-                    fonts_.clockTime,
-                    ForegroundColor(),
-                    DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-                    MakeEditableTextBinding(
-                        widget, AnchorEditParameter::FontClockTime, 0, config_.layout.fonts.clockTime.size));
-            }
-            return;
-        case WidgetKind::ClockDate:
-            if (renderMode_ != RenderMode::Blank) {
-                DrawTextBlock(hdc,
-                    widget.rect,
-                    metrics.ResolveClockDate(),
-                    fonts_.clockDate,
-                    MutedTextColor(),
-                    DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-                    MakeEditableTextBinding(
-                        widget, AnchorEditParameter::FontClockDate, 0, config_.layout.fonts.clockDate.size));
-            }
-            return;
-        default:
-            return;
+    HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) {
+    if (widget.widget == nullptr) {
+        return;
     }
+    widget.widget->Draw(*this, hdc, widget, metrics);
 }
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {

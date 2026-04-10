@@ -1,0 +1,35 @@
+#include "network_footer.h"
+
+#include "../dashboard_metrics.h"
+#include "../dashboard_renderer.h"
+
+const char* NetworkFooterWidget::TypeName() const {
+    return "network_footer";
+}
+
+void NetworkFooterWidget::Initialize(const LayoutNodeConfig&) {}
+
+int NetworkFooterWidget::PreferredHeight(const DashboardRenderer& renderer) const {
+    return renderer.FontMetrics().footer +
+           (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.networkFooter.preferredPadding));
+}
+
+bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
+    return true;
+}
+
+void NetworkFooterWidget::Draw(
+    DashboardRenderer& renderer, HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
+        return;
+    }
+
+    renderer.DrawTextBlock(hdc,
+        widget.rect,
+        metrics.ResolveNetworkFooter(),
+        renderer.WidgetFonts().footer,
+        renderer.MutedTextColor(),
+        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
+        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontFooter, 0,
+            renderer.Config().layout.fonts.footer.size));
+}

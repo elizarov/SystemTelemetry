@@ -18,6 +18,7 @@
 
 #include "config.h"
 #include "dashboard_metrics.h"
+#include "widget.h"
 
 namespace Gdiplus {
 class Bitmap;
@@ -158,104 +159,6 @@ public:
         std::optional<EditableAnchorKey> activeEditableAnchor;
     };
 
-    DashboardRenderer();
-    ~DashboardRenderer();
-
-    void SetConfig(const AppConfig& config);
-    void SetRenderScale(double scale);
-    void SetRenderMode(RenderMode mode);
-    bool SetLayoutEditPreviewWidgetType(EditOverlayState& overlayState, const std::string& widgetTypeName) const;
-    double RenderScale() const;
-    int WindowWidth() const;
-    int WindowHeight() const;
-
-    COLORREF BackgroundColor() const;
-    COLORREF ForegroundColor() const;
-    COLORREF AccentColor() const;
-    COLORREF LayoutGuideColor() const;
-    COLORREF ActiveEditColor() const;
-    COLORREF MutedTextColor() const;
-    HFONT LabelFont() const;
-    HFONT SmallFont() const;
-    void SetTraceOutput(std::ostream* traceOutput);
-    const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
-    const std::vector<WidgetEditGuide>& WidgetEditGuides() const;
-    int LayoutSimilarityThreshold() const;
-    std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
-    std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
-    std::optional<LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
-    std::optional<EditableAnchorKey> HitTestEditableAnchorTarget(POINT clientPoint) const;
-    std::optional<EditableAnchorKey> HitTestEditableAnchorHandle(POINT clientPoint) const;
-    std::optional<EditableAnchorRegion> FindEditableAnchorRegion(const EditableAnchorKey& key) const;
-
-    bool Initialize(HWND hwnd = nullptr);
-    void Shutdown();
-
-    void Draw(HDC hdc, const SystemSnapshot& snapshot);
-    void Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
-    bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
-    bool SaveSnapshotPng(
-        const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
-    const std::string& LastError() const;
-
-private:
-    friend struct DashboardRendererLayoutEngine;
-
-    struct WidgetBinding {
-        std::string metric;
-        std::string param;
-    };
-
-    enum class WidgetKind {
-        Text,
-        Gauge,
-        MetricList,
-        Throughput,
-        NetworkFooter,
-        Spacer,
-        VerticalSpring,
-        DriveUsageList,
-        ClockTime,
-        ClockDate,
-        Unknown,
-    };
-
-    struct ResolvedWidgetLayout {
-        WidgetKind kind = WidgetKind::Unknown;
-        RECT rect{};
-        std::string cardId;
-        std::string editCardId;
-        std::vector<size_t> nodePath;
-        WidgetBinding binding;
-        int preferredHeight = 0;
-        bool fixedPreferredHeightInRows = false;
-    };
-
-    struct SimilarityIndicator {
-        LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
-        RECT rect{};
-        int exactTypeOrdinal = 0;
-    };
-
-    struct ResolvedCardLayout {
-        std::string id;
-        std::string title;
-        std::string iconName;
-        bool hasHeader = true;
-        RECT rect{};
-        RECT titleRect{};
-        RECT iconRect{};
-        RECT contentRect{};
-        std::vector<ResolvedWidgetLayout> widgets;
-    };
-
-    struct ResolvedDashboardLayout {
-        int windowWidth = 800;
-        int windowHeight = 480;
-        int globalGaugeRadius = 0;
-        std::vector<ResolvedCardLayout> cards;
-    };
-
     struct FontHeights {
         int title = 0;
         int big = 0;
@@ -297,6 +200,52 @@ private:
         RECT textRect{};
     };
 
+    DashboardRenderer();
+    ~DashboardRenderer();
+
+    void SetConfig(const AppConfig& config);
+    void SetRenderScale(double scale);
+    void SetRenderMode(RenderMode mode);
+    bool SetLayoutEditPreviewWidgetType(EditOverlayState& overlayState, const std::string& widgetTypeName) const;
+    double RenderScale() const;
+    int WindowWidth() const;
+    int WindowHeight() const;
+
+    COLORREF BackgroundColor() const;
+    COLORREF ForegroundColor() const;
+    COLORREF AccentColor() const;
+    COLORREF LayoutGuideColor() const;
+    COLORREF ActiveEditColor() const;
+    COLORREF MutedTextColor() const;
+    HFONT LabelFont() const;
+    HFONT SmallFont() const;
+    void SetTraceOutput(std::ostream* traceOutput);
+    const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
+    const std::vector<WidgetEditGuide>& WidgetEditGuides() const;
+    int LayoutSimilarityThreshold() const;
+    std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
+    std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
+    std::optional<LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
+    std::optional<EditableAnchorKey> HitTestEditableAnchorTarget(POINT clientPoint) const;
+    std::optional<EditableAnchorKey> HitTestEditableAnchorHandle(POINT clientPoint) const;
+    std::optional<EditableAnchorRegion> FindEditableAnchorRegion(const EditableAnchorKey& key) const;
+
+    bool Initialize(HWND hwnd = nullptr);
+    void Shutdown();
+
+    void Draw(HDC hdc, const SystemSnapshot& snapshot);
+    void Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
+    bool SaveSnapshotPng(
+        const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    const std::string& LastError() const;
+    const AppConfig& Config() const;
+    const FontHeights& FontMetrics() const;
+    const MeasuredWidths& MeasuredTextWidths() const;
+    const Fonts& WidgetFonts() const;
+    RenderMode CurrentRenderMode() const;
+    COLORREF TrackColor() const;
+    int GlobalGaugeRadius() const;
     TextLayoutResult MeasureTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
     TextLayoutResult DrawTextBlock(HDC hdc,
@@ -306,24 +255,7 @@ private:
         COLORREF color,
         UINT format,
         const std::optional<EditableAnchorBinding>& editable = std::nullopt);
-    void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawWidgetEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
-    void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
-    void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
-    void DrawGauge(HDC hdc,
-        const ResolvedWidgetLayout& widget,
-        int cx,
-        int cy,
-        int radius,
-        const DashboardGaugeMetric& metric,
-        const std::string& label);
-    void DrawMetricRow(
-        HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardMetricRow& row, int rowIndex);
     void DrawGraph(HDC hdc,
         const RECT& rect,
         const std::vector<double>& history,
@@ -332,12 +264,59 @@ private:
         double timeMarkerOffsetSamples,
         double timeMarkerIntervalSamples,
         const std::optional<EditableAnchorBinding>& maxLabelEditable = std::nullopt);
-    void DrawThroughputWidget(
-        HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardThroughputMetric& metric);
-    void DrawDriveUsageWidget(
-        HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
-    ResolvedWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
-    bool UsesFixedPreferredHeightInRows(const ResolvedWidgetLayout& widget) const;
+    EditableAnchorBinding MakeEditableTextBinding(
+        const DashboardWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const;
+    void RegisterEditableAnchorRegion(const EditableAnchorKey& key,
+        const RECT& targetRect,
+        const RECT& anchorRect,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        int value);
+    std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
+    int ScaleLogical(int value) const;
+    int GaugeRadiusForRect(const RECT& rect) const;
+    int EffectiveMetricRowHeight() const;
+    int EffectiveDriveHeaderHeight() const;
+    int EffectiveDriveRowHeight() const;
+    int EffectiveThroughputPreferredHeight() const;
+
+private:
+    friend struct DashboardRendererLayoutEngine;
+
+    struct SimilarityIndicator {
+        LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
+        RECT rect{};
+        int exactTypeOrdinal = 0;
+    };
+
+    struct ResolvedCardLayout {
+        std::string id;
+        std::string title;
+        std::string iconName;
+        bool hasHeader = true;
+        RECT rect{};
+        RECT titleRect{};
+        RECT iconRect{};
+        RECT contentRect{};
+        std::vector<DashboardWidgetLayout> widgets;
+    };
+
+    struct ResolvedDashboardLayout {
+        int windowWidth = 800;
+        int windowHeight = 480;
+        int globalGaugeRadius = 0;
+        std::vector<ResolvedCardLayout> cards;
+    };
+    void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawWidgetEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const;
+    void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
+    void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
+    void DrawResolvedWidget(HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
+    DashboardWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
+    bool UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
         const RECT& rect,
@@ -348,7 +327,7 @@ private:
         const std::vector<size_t>& nodePath);
     void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         const RECT& rect,
-        std::vector<ResolvedWidgetLayout>& widgets,
+        std::vector<DashboardWidgetLayout>& widgets,
         std::vector<std::string>& cardReferenceStack,
         const std::string& renderCardId,
         const std::string& editCardId,
@@ -364,33 +343,20 @@ private:
     void ReleasePanelIcons();
     bool MeasureFonts();
     bool ResolveLayout();
-    void ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets);
+    void ResolveNodeWidgets(
+        const LayoutNodeConfig& node, const RECT& rect, std::vector<DashboardWidgetLayout>& widgets);
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
-    int GaugeRadiusForRect(const RECT& rect) const;
     int EffectiveHeaderHeight() const;
-    int EffectiveMetricRowHeight() const;
-    int EffectiveDriveHeaderHeight() const;
-    int EffectiveDriveRowHeight() const;
-    int EffectiveThroughputPreferredHeight() const;
-    bool SupportsLayoutSimilarityIndicator(const ResolvedWidgetLayout& widget) const;
-    bool IsFirstWidgetForSimilarityIndicator(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
-    std::vector<const ResolvedWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
-    int WidgetExtentForAxis(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const;
-    bool IsWidgetAffectedByGuide(const ResolvedWidgetLayout& widget, const LayoutEditGuide& guide) const;
-    bool MatchesWidgetIdentity(const ResolvedWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
+    bool SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const;
+    bool IsFirstWidgetForSimilarityIndicator(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;
+    std::vector<const DashboardWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
+    int WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;
+    bool IsWidgetAffectedByGuide(const DashboardWidgetLayout& widget, const LayoutEditGuide& guide) const;
+    bool MatchesWidgetIdentity(const DashboardWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
     bool MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const;
     bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const;
     bool MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const;
-    EditableAnchorBinding MakeEditableTextBinding(
-        const ResolvedWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const;
-    void RegisterEditableAnchorRegion(const EditableAnchorKey& key,
-        const RECT& targetRect,
-        const RECT& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        int value);
     static bool IsContainerNode(const LayoutNodeConfig& node);
-    int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
 
     AppConfig config_;

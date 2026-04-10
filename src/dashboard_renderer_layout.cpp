@@ -21,7 +21,7 @@ std::string FormatRect(const RECT& rect) {
 }  // namespace
 
 void DashboardRenderer::ResolveNodeWidgets(
-    const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
+    const LayoutNodeConfig& node, const RECT& rect, std::vector<DashboardWidgetLayout>& widgets) {
     std::vector<std::string> cardReferenceStack;
     ResolveNodeWidgetsInternal(node, rect, widgets, cardReferenceStack, "", "", {});
 }
@@ -46,9 +46,10 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
     std::vector<bool> childFixedExtents;
     childFixedExtents.reserve(node.children.size());
     for (const auto& child : node.children) {
-        const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-        childFixedExtents.push_back(!horizontal && (UsesFixedPreferredHeightInRows(resolvedChild) ||
-                                                       resolvedChild.kind == WidgetKind::VerticalSpring));
+        const DashboardWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
+        childFixedExtents.push_back(
+            !horizontal && (UsesFixedPreferredHeightInRows(resolvedChild) ||
+                               (resolvedChild.widget != nullptr && resolvedChild.widget->IsVerticalSpring())));
     }
     for (size_t i = 0; i + 1 < childRects.size(); ++i) {
         if (!horizontal && (childFixedExtents[i] || childFixedExtents[i + 1])) {
@@ -85,7 +86,7 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
 
 void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     const RECT& rect,
-    std::vector<ResolvedWidgetLayout>& widgets,
+    std::vector<DashboardWidgetLayout>& widgets,
     std::vector<std::string>& cardReferenceStack,
     const std::string& renderCardId,
     const std::string& editCardId,
@@ -110,13 +111,12 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         return;
     }
     if (!IsContainerNode(node)) {
-        ResolvedWidgetLayout widget = ResolveWidgetLayout(node, rect);
+        DashboardWidgetLayout widget = ResolveWidgetLayout(node, rect);
         widget.cardId = renderCardId;
         widget.editCardId = editCardId;
         widget.nodePath = nodePath;
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
-                   (widget.binding.metric.empty() ? "" : " metric=\"" + widget.binding.metric + "\"") +
-                   (widget.binding.param.empty() ? "" : " param=\"" + widget.binding.param + "\""));
+                   (widget.typeName.empty() ? "" : " type=\"" + widget.typeName + "\""));
         widgets.push_back(std::move(widget));
         return;
     }
@@ -132,12 +132,13 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     int springWeight = 0;
     const bool rowsUseSprings =
         !horizontal && std::any_of(node.children.begin(), node.children.end(), [&](const auto& child) {
-            return ResolveWidgetLayout(child, RECT{}).kind == WidgetKind::VerticalSpring;
+            const DashboardWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
+            return resolvedChild.widget != nullptr && resolvedChild.widget->IsVerticalSpring();
         });
     if (!horizontal) {
         for (const auto& child : node.children) {
-            const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-            if (resolvedChild.kind == WidgetKind::VerticalSpring) {
+            const DashboardWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
+            if (resolvedChild.widget != nullptr && resolvedChild.widget->IsVerticalSpring()) {
                 springWeight += std::max(1, child.weight);
                 continue;
             }
@@ -166,9 +167,10 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     childRects.reserve(node.children.size());
     for (size_t i = 0; i < node.children.size(); ++i) {
         const auto& child = node.children[i];
-        const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
+        const DashboardWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
         const bool fixedPreferred = !horizontal && UsesFixedPreferredHeightInRows(resolvedChild);
-        const bool verticalSpring = !horizontal && resolvedChild.kind == WidgetKind::VerticalSpring;
+        const bool verticalSpring =
+            !horizontal && resolvedChild.widget != nullptr && resolvedChild.widget->IsVerticalSpring();
         const bool preferredPacked = !horizontal && rowsUseSprings && !verticalSpring;
         const int childWeight = (fixedPreferred || preferredPacked) ? 0 : std::max(1, child.weight);
         const int remainingWeight = std::max(1, totalWeight);
