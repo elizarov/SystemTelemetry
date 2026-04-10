@@ -14,6 +14,8 @@
 - Always use `build.cmd` for builds.
 - Run `build.cmd` outside the sandbox; CMake incremental generation/builds need file deletes, renames, and timestamp updates in `build\` that the sandbox denies with `Access is denied`.
 - Keep all build artifacts and temporary compiler files in `build\` so the repository root stays clean.
+- Keep the repo-level `.clang-format` in sync with the dominant non-vendored C++ style, especially the non-aligned wrapped-parameter and wrapped-argument layout used across the project.
+- Use the top-level `format.cmd` entry point for C++ formatting checks and fixes; `format` checks non-vendored project sources and `format fix` applies the repo style to those files.
 - Do not run build steps and validation runs in parallel; always finish the build first, then run validation commands sequentially against the freshly built artifacts.
 
 Validation workflow:

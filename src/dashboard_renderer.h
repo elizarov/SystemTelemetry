@@ -298,9 +298,15 @@ private:
         RECT textRect{};
     };
 
-    TextLayoutResult MeasureTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
-    TextLayoutResult DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color,
-        UINT format, const std::optional<EditableAnchorBinding>& editable = std::nullopt);
+    TextLayoutResult MeasureTextBlock(
+        HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
+    TextLayoutResult DrawTextBlock(HDC hdc,
+        const RECT& rect,
+        const std::string& text,
+        HFONT font,
+        COLORREF color,
+        UINT format,
+        const std::optional<EditableAnchorBinding>& editable = std::nullopt);
     void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
@@ -310,21 +316,43 @@ private:
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const ResolvedWidgetLayout& widget, const DashboardMetricSource& metrics);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
-    void DrawGauge(HDC hdc, const ResolvedWidgetLayout& widget, int cx, int cy, int radius,
-        const DashboardGaugeMetric& metric, const std::string& label);
-    void DrawMetricRow(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardMetricRow& row, int rowIndex);
-    void DrawGraph(HDC hdc, const RECT& rect, const std::vector<double>& history, double maxValue, double guideStepMbps,
-        double timeMarkerOffsetSamples, double timeMarkerIntervalSamples,
+    void DrawGauge(HDC hdc,
+        const ResolvedWidgetLayout& widget,
+        int cx,
+        int cy,
+        int radius,
+        const DashboardGaugeMetric& metric,
+        const std::string& label);
+    void DrawMetricRow(
+        HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardMetricRow& row, int rowIndex);
+    void DrawGraph(HDC hdc,
+        const RECT& rect,
+        const std::vector<double>& history,
+        double maxValue,
+        double guideStepMbps,
+        double timeMarkerOffsetSamples,
+        double timeMarkerIntervalSamples,
         const std::optional<EditableAnchorBinding>& maxLabelEditable = std::nullopt);
-    void DrawThroughputWidget(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardThroughputMetric& metric);
-    void DrawDriveUsageWidget(HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
+    void DrawThroughputWidget(
+        HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardThroughputMetric& metric);
+    void DrawDriveUsageWidget(
+        HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const std::vector<DashboardDriveRow>& rows);
     ResolvedWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
     bool UsesFixedPreferredHeightInRows(const ResolvedWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
-    void AddLayoutEditGuide(const LayoutNodeConfig& node, const RECT& rect, const std::vector<RECT>& childRects,
-        int gap, const std::string& renderCardId, const std::string& editCardId, const std::vector<size_t>& nodePath);
-    void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets,
-        std::vector<std::string>& cardReferenceStack, const std::string& renderCardId, const std::string& editCardId,
+    void AddLayoutEditGuide(const LayoutNodeConfig& node,
+        const RECT& rect,
+        const std::vector<RECT>& childRects,
+        int gap,
+        const std::string& renderCardId,
+        const std::string& editCardId,
+        const std::vector<size_t>& nodePath);
+    void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
+        const RECT& rect,
+        std::vector<ResolvedWidgetLayout>& widgets,
+        std::vector<std::string>& cardReferenceStack,
+        const std::string& renderCardId,
+        const std::string& editCardId,
         const std::vector<size_t>& nodePath);
     void BuildWidgetEditGuides();
     std::optional<LayoutWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
@@ -353,10 +381,14 @@ private:
     bool MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const;
     bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const;
     bool MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const;
-    EditableAnchorBinding MakeEditableTextBinding(const ResolvedWidgetLayout& widget, AnchorEditParameter parameter,
-        int anchorId, int value) const;
-    void RegisterEditableAnchorRegion(const EditableAnchorKey& key, const RECT& targetRect, const RECT& anchorRect,
-        AnchorShape shape, AnchorDragAxis dragAxis, int value);
+    EditableAnchorBinding MakeEditableTextBinding(
+        const ResolvedWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const;
+    void RegisterEditableAnchorRegion(const EditableAnchorKey& key,
+        const RECT& targetRect,
+        const RECT& anchorRect,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        int value);
     static bool IsContainerNode(const LayoutNodeConfig& node);
     int ScaleLogical(int value) const;
     void WriteTrace(const std::string& text) const;
@@ -368,7 +400,7 @@ private:
     std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
     Fonts fonts_{};
     FontHeights fontHeights_{};
-    MeasuredWidths measuredWidths_{}; 
+    MeasuredWidths measuredWidths_{};
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<WidgetEditGuide> widgetEditGuides_;

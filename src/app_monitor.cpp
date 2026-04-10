@@ -64,10 +64,8 @@ int ScalePhysicalToLogical(int physicalValue, UINT dpi) {
 }
 
 SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi) {
-    return SIZE{
-        ScaleLogicalToPhysical(config.layout.structure.window.width, dpi),
-        ScaleLogicalToPhysical(config.layout.structure.window.height, dpi)
-    };
+    return SIZE{ScaleLogicalToPhysical(config.layout.structure.window.width, dpi),
+        ScaleLogicalToPhysical(config.layout.structure.window.height, dpi)};
 }
 
 std::string SimplifyDeviceName(const std::string& deviceName) {
@@ -79,9 +77,7 @@ std::string SimplifyDeviceName(const std::string& deviceName) {
 
 bool IsUsefulFriendlyName(const std::string& name) {
     const std::string lowered = ToLower(name);
-    return !name.empty() &&
-        lowered != "generic pnp monitor" &&
-        lowered.find("\\\\?\\display") != 0;
+    return !name.empty() && lowered != "generic pnp monitor" && lowered.find("\\\\?\\display") != 0;
 }
 
 MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
@@ -151,7 +147,8 @@ std::vector<DisplayMenuOption> EnumerateDisplayMenuOptions(const AppConfig& conf
     } context{&config, {}};
 
     EnumDisplayMonitors(
-        nullptr, nullptr,
+        nullptr,
+        nullptr,
         [](HMONITOR monitor, HDC, LPRECT, LPARAM data) -> BOOL {
             auto* context = reinterpret_cast<SearchContext*>(data);
             MONITORINFOEXW info{};
@@ -169,7 +166,8 @@ std::vector<DisplayMenuOption> EnumerateDisplayMenuOptions(const AppConfig& conf
 
             DisplayMenuOption option;
             option.commandId = kCommandConfigureDisplayBase + static_cast<UINT>(context->results.size());
-            option.displayName = identity.displayName + " (" + std::to_string(monitorWidth) + "x" + std::to_string(monitorHeight) + ")";
+            option.displayName =
+                identity.displayName + " (" + std::to_string(monitorWidth) + "x" + std::to_string(monitorHeight) + ")";
             option.configMonitorName = !identity.configName.empty() ? identity.configName : deviceName;
             option.rect = info.rcMonitor;
             option.dpi = dpi;
@@ -192,7 +190,8 @@ std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedN
     } context{requestedName, std::nullopt};
 
     EnumDisplayMonitors(
-        nullptr, nullptr,
+        nullptr,
+        nullptr,
         [](HMONITOR monitor, HDC, LPRECT, LPARAM data) -> BOOL {
             auto* context = reinterpret_cast<SearchContext*>(data);
             MONITORINFOEXW info{};

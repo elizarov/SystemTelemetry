@@ -10,8 +10,7 @@
 namespace {
 
 std::filesystem::path ResolveFakePath(
-    const std::filesystem::path& workingDirectory,
-    const std::filesystem::path& configuredPath) {
+    const std::filesystem::path& workingDirectory, const std::filesystem::path& configuredPath) {
     if (configuredPath.empty()) {
         return workingDirectory / L"telemetry_fake.txt";
     }
@@ -98,8 +97,7 @@ private:
         if (!LoadTelemetryDump(input, loaded, &error)) {
             trace_.Write("fake:load_failed reason=parse error=\"" + error + "\"");
             if (required && showDialogs_) {
-                const std::wstring message =
-                    WideFromUtf8("Failed to parse fake telemetry file:\n" + error);
+                const std::wstring message = WideFromUtf8("Failed to parse fake telemetry file:\n" + error);
                 MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
             }
             return false;
@@ -126,12 +124,10 @@ private:
 std::unique_ptr<TelemetryRuntime> CreateRealTelemetryRuntime();
 
 std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(
-    const DiagnosticsOptions& options,
-    const std::filesystem::path& workingDirectory) {
+    const DiagnosticsOptions& options, const std::filesystem::path& workingDirectory) {
     if (options.fake) {
         return std::make_unique<FakeTelemetryRuntime>(
-            ResolveFakePath(workingDirectory, options.fakePath),
-            ShouldShowRuntimeDialogs(options));
+            ResolveFakePath(workingDirectory, options.fakePath), ShouldShowRuntimeDialogs(options));
     }
     return CreateRealTelemetryRuntime();
 }

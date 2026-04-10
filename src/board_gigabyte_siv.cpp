@@ -15,8 +15,8 @@
 #include <vcclr.h>
 #include <msclr\marshal_cppstd.h>
 
-#using <mscorlib.dll>
-#using <System.dll>
+#using < mscorlib.dll>
+#using < System.dll>
 
 #include "app_strings.h"
 #include "board_vendor.h"
@@ -68,19 +68,18 @@ const Reading* FindReadingByName(const std::vector<Reading>& readings, const std
     return nullptr;
 }
 
-std::string Utf8FromManagedString(String^ value) {
+std::string Utf8FromManagedString(String ^ value) {
     return value == nullptr ? std::string() : marshal_as<std::string>(value);
 }
 
-String^ ManagedStringFromWide(const std::wstring& value) {
-    return gcnew String(value.c_str());
-}
+String ^
+    ManagedStringFromWide(const std::wstring& value) { return gcnew String(value.c_str()); }
 
-String^ ManagedStringFromUtf8(const std::string& value) {
-    return gcnew String(WideFromUtf8(value).c_str());
-}
+    String
+    ^
+    ManagedStringFromUtf8(const std::string& value) { return gcnew String(WideFromUtf8(value).c_str()); }
 
-std::optional<std::wstring> FindInstalledSivDirectory() {
+    std::optional<std::wstring> FindInstalledSivDirectory() {
     HKEY uninstallKey = nullptr;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, kSivUninstallKey, 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
         return std::nullopt;
@@ -89,12 +88,14 @@ std::optional<std::wstring> FindInstalledSivDirectory() {
     DWORD index = 0;
     wchar_t childName[256];
     DWORD childNameLength = ARRAYSIZE(childName);
-    while (RegEnumKeyExW(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+    while (RegEnumKeyExW(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
+           ERROR_SUCCESS) {
         HKEY childKey = nullptr;
         if (RegOpenKeyExW(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
             const auto displayName = ReadRegistryWideString(childKey, nullptr, L"DisplayName");
-            const bool isSiv = displayName.has_value() &&
-                (EqualsInsensitive(*displayName, L"SIV") || EqualsInsensitive(*displayName, L"System Information Viewer"));
+            const bool isSiv =
+                displayName.has_value() && (EqualsInsensitive(*displayName, L"SIV") ||
+                                               EqualsInsensitive(*displayName, L"System Information Viewer"));
             if (isSiv) {
                 const auto installLocation = ReadRegistryWideString(childKey, nullptr, L"InstallLocation");
                 if (installLocation.has_value() && !installLocation->empty()) {
@@ -116,64 +117,67 @@ std::optional<std::wstring> FindInstalledSivDirectory() {
     return std::nullopt;
 }
 
-bool ManagedUnitEquals(String^ unit, String^ expected) {
+bool ManagedUnitEquals(String ^ unit, String ^ expected) {
     return String::Equals(unit, expected, StringComparison::OrdinalIgnoreCase);
 }
 
 ref class GigabyteAssemblyResolver abstract sealed {
 public:
-    static void EnsureInstalled(String^ directory) {
+    static void EnsureInstalled(String ^ directory) {
         toolDirectory_ = directory;
         if (installed_) {
             return;
         }
-        AppDomain::CurrentDomain->AssemblyResolve += gcnew ResolveEventHandler(&GigabyteAssemblyResolver::ResolveAssembly);
+        AppDomain::CurrentDomain->AssemblyResolve +=
+            gcnew ResolveEventHandler(&GigabyteAssemblyResolver::ResolveAssembly);
         installed_ = true;
     }
 
 private:
-    static Assembly^ ResolveAssembly(Object^, ResolveEventArgs^ args) {
-        if (String::IsNullOrWhiteSpace(toolDirectory_)) {
-            return nullptr;
+    static Assembly ^
+        ResolveAssembly(Object ^, ResolveEventArgs ^ args) {
+            if (String::IsNullOrWhiteSpace(toolDirectory_)) {
+                return nullptr;
+            }
+
+            AssemblyName ^ name = gcnew AssemblyName(args->Name);
+            String ^ candidate = Path::Combine(toolDirectory_, name->Name + ".dll");
+            if (!File::Exists(candidate)) {
+                return nullptr;
+            }
+            return Assembly::LoadFrom(candidate);
         }
 
-        AssemblyName^ name = gcnew AssemblyName(args->Name);
-        String^ candidate = Path::Combine(toolDirectory_, name->Name + ".dll");
-        if (!File::Exists(candidate)) {
-            return nullptr;
-        }
-        return Assembly::LoadFrom(candidate);
-    }
-
-    static String^ toolDirectory_ = nullptr;
+        static String
+        ^ toolDirectory_ = nullptr;
     static bool installed_ = false;
 };
 
 ref class GigabyteRuntimeContext sealed {
 public:
-    String^ sivDirectory = nullptr;
-    String^ engineAssemblyPath = nullptr;
-    String^ commonAssemblyPath = nullptr;
-    Assembly^ engineAssembly = nullptr;
-    Assembly^ commonAssembly = nullptr;
-    Type^ monitorType = nullptr;
-    Type^ sourceType = nullptr;
-    Type^ sensorType = nullptr;
-    Type^ sensorDataType = nullptr;
-    Type^ collectionType = nullptr;
-    MethodInfo^ initializeMethod = nullptr;
-    MethodInfo^ getCurrentMethod = nullptr;
-    PropertyInfo^ titleProperty = nullptr;
-    PropertyInfo^ valueProperty = nullptr;
-    PropertyInfo^ unitProperty = nullptr;
-    Object^ monitor = nullptr;
-    Object^ sourceHwRegister = nullptr;
-    Object^ sensorFan = nullptr;
-    Object^ sensorTemperature = nullptr;
+    String ^ sivDirectory = nullptr;
+    String ^ engineAssemblyPath = nullptr;
+    String ^ commonAssemblyPath = nullptr;
+    Assembly ^ engineAssembly = nullptr;
+    Assembly ^ commonAssembly = nullptr;
+    Type ^ monitorType = nullptr;
+    Type ^ sourceType = nullptr;
+    Type ^ sensorType = nullptr;
+    Type ^ sensorDataType = nullptr;
+    Type ^ collectionType = nullptr;
+    MethodInfo ^ initializeMethod = nullptr;
+    MethodInfo ^ getCurrentMethod = nullptr;
+    PropertyInfo ^ titleProperty = nullptr;
+    PropertyInfo ^ valueProperty = nullptr;
+    PropertyInfo ^ unitProperty = nullptr;
+    Object ^ monitor = nullptr;
+    Object ^ sourceHwRegister = nullptr;
+    Object ^ sensorFan = nullptr;
+    Object ^ sensorTemperature = nullptr;
     bool loaded = false;
 };
 
-bool InitializeGigabyteRuntime(GigabyteRuntimeContext^ context, tracing::Trace& trace, std::string& diagnostics) {
+bool InitializeGigabyteRuntime(GigabyteRuntimeContext ^ context, tracing::Trace& trace, std::string& diagnostics) {
     if (context->loaded) {
         return true;
     }
@@ -186,8 +190,10 @@ bool InitializeGigabyteRuntime(GigabyteRuntimeContext^ context, tracing::Trace& 
     }
 
     context->sivDirectory = ManagedStringFromWide(*discoveredDirectory);
-    context->engineAssemblyPath = ManagedStringFromWide((std::filesystem::path(*discoveredDirectory) / kEngineEnvironmentControlDll).wstring());
-    context->commonAssemblyPath = ManagedStringFromWide((std::filesystem::path(*discoveredDirectory) / kEnvironmentControlCommonDll).wstring());
+    context->engineAssemblyPath =
+        ManagedStringFromWide((std::filesystem::path(*discoveredDirectory) / kEngineEnvironmentControlDll).wstring());
+    context->commonAssemblyPath =
+        ManagedStringFromWide((std::filesystem::path(*discoveredDirectory) / kEnvironmentControlCommonDll).wstring());
 
     if (!File::Exists(context->engineAssemblyPath)) {
         diagnostics = "Gigabyte.Engine.EnvironmentControl.dll was not found.";
@@ -199,35 +205,43 @@ bool InitializeGigabyteRuntime(GigabyteRuntimeContext^ context, tracing::Trace& 
     }
 
     try {
-        String^ originalDirectory = Environment::CurrentDirectory;
+        String ^ originalDirectory = Environment::CurrentDirectory;
         GigabyteAssemblyResolver::EnsureInstalled(context->sivDirectory);
         try {
             Environment::CurrentDirectory = context->sivDirectory;
 
-            array<String^>^ preloadFiles = Directory::GetFiles(context->sivDirectory, "Gigabyte*.dll");
+            array<String ^> ^ preloadFiles = Directory::GetFiles(context->sivDirectory, "Gigabyte*.dll");
             for each (String ^ filePath in preloadFiles) {
                 try {
                     Assembly::LoadFrom(filePath);
                     trace.Write("gigabyte_siv:assembly_preload path=\"" + Utf8FromManagedString(filePath) + "\"");
-                } catch (Exception^) {
+                } catch (Exception ^) {
                 }
             }
 
             context->engineAssembly = Assembly::LoadFrom(context->engineAssemblyPath);
             context->commonAssembly = Assembly::LoadFrom(context->commonAssemblyPath);
-            context->monitorType = context->engineAssembly->GetType("Gigabyte.Engine.EnvironmentControl.HardwareMonitor.HardwareMonitorControlModule", true);
-            context->sourceType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitorSourceTypes", true);
-            context->sensorType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.SensorTypes", true);
-            context->sensorDataType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredData", true);
-            context->collectionType = context->commonAssembly->GetType("Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredDataCollection", true);
-            context->initializeMethod = context->monitorType->GetMethod("Initialize", gcnew array<Type^>{ context->sourceType });
-            context->getCurrentMethod = context->monitorType->GetMethod("GetCurrentMonitoredData", gcnew array<Type^>{ context->sensorType, context->collectionType->MakeByRefType() });
+            context->monitorType = context->engineAssembly->GetType(
+                "Gigabyte.Engine.EnvironmentControl.HardwareMonitor.HardwareMonitorControlModule", true);
+            context->sourceType = context->commonAssembly->GetType(
+                "Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitorSourceTypes", true);
+            context->sensorType = context->commonAssembly->GetType(
+                "Gigabyte.EnvironmentControl.Common.HardwareMonitor.SensorTypes", true);
+            context->sensorDataType = context->commonAssembly->GetType(
+                "Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredData", true);
+            context->collectionType = context->commonAssembly->GetType(
+                "Gigabyte.EnvironmentControl.Common.HardwareMonitor.HardwareMonitoredDataCollection", true);
+            context->initializeMethod =
+                context->monitorType->GetMethod("Initialize", gcnew array<Type ^>{context->sourceType});
+            context->getCurrentMethod = context->monitorType->GetMethod("GetCurrentMonitoredData",
+                gcnew array<Type ^>{context->sensorType, context->collectionType->MakeByRefType()});
             context->titleProperty = context->sensorDataType->GetProperty("Title");
             context->valueProperty = context->sensorDataType->GetProperty("Value");
             context->unitProperty = context->sensorDataType->GetProperty("Unit");
 
             if (context->initializeMethod == nullptr || context->getCurrentMethod == nullptr ||
-                context->titleProperty == nullptr || context->valueProperty == nullptr || context->unitProperty == nullptr) {
+                context->titleProperty == nullptr || context->valueProperty == nullptr ||
+                context->unitProperty == nullptr) {
                 diagnostics = "Gigabyte hardware-monitor reflection members were not found.";
                 return false;
             }
@@ -237,8 +251,9 @@ bool InitializeGigabyteRuntime(GigabyteRuntimeContext^ context, tracing::Trace& 
             context->sensorFan = Enum::Parse(context->sensorType, "Fan", false);
             context->sensorTemperature = Enum::Parse(context->sensorType, "Temperature", false);
 
-            trace.Write("gigabyte_siv:monitor_created type=\"" + Utf8FromManagedString(context->monitor->GetType()->FullName) + "\"");
-            context->initializeMethod->Invoke(context->monitor, gcnew array<Object^>{ context->sourceHwRegister });
+            trace.Write("gigabyte_siv:monitor_created type=\"" +
+                        Utf8FromManagedString(context->monitor->GetType()->FullName) + "\"");
+            context->initializeMethod->Invoke(context->monitor, gcnew array<Object ^>{context->sourceHwRegister});
             trace.Write("gigabyte_siv:initialize_success source=HwRegister");
             context->loaded = true;
             diagnostics = "Gigabyte SIV hardware-monitor runtime initialized.";
@@ -246,28 +261,29 @@ bool InitializeGigabyteRuntime(GigabyteRuntimeContext^ context, tracing::Trace& 
         } finally {
             Environment::CurrentDirectory = originalDirectory;
         }
-    } catch (Exception^ ex) {
+    } catch (Exception ^ ex) {
         diagnostics = Utf8FromManagedString(ex->ToString());
         trace.Write("gigabyte_siv:initialize_exception " + diagnostics);
         return false;
     }
 }
 
-
-void CollectManagedSensors(GigabyteRuntimeContext^ context, Object^ sensorKind,
-    std::vector<FanReading>* fans, std::vector<TemperatureReading>* temperatures) {
-    Object^ collection = Activator::CreateInstance(context->collectionType);
-    array<Object^>^ args = gcnew array<Object^>{ sensorKind, collection };
+void CollectManagedSensors(GigabyteRuntimeContext ^ context,
+    Object ^ sensorKind,
+    std::vector<FanReading>* fans,
+    std::vector<TemperatureReading>* temperatures) {
+    Object ^ collection = Activator::CreateInstance(context->collectionType);
+    array<Object ^> ^ args = gcnew array<Object ^>{sensorKind, collection};
     context->getCurrentMethod->Invoke(context->monitor, args);
-    IEnumerable^ enumerable = dynamic_cast<IEnumerable^>(args[1]);
+    IEnumerable ^ enumerable = dynamic_cast<IEnumerable ^>(args[1]);
     if (enumerable == nullptr) {
         throw gcnew InvalidOperationException("Gigabyte sensor collection did not implement IEnumerable.");
     }
 
     for each (Object ^ sensor in enumerable) {
-        String^ title = dynamic_cast<String^>(context->titleProperty->GetValue(sensor, nullptr));
-        Object^ valueObject = context->valueProperty->GetValue(sensor, nullptr);
-        String^ unit = dynamic_cast<String^>(context->unitProperty->GetValue(sensor, nullptr));
+        String ^ title = dynamic_cast<String ^>(context->titleProperty->GetValue(sensor, nullptr));
+        Object ^ valueObject = context->valueProperty->GetValue(sensor, nullptr);
+        String ^ unit = dynamic_cast<String ^>(context->unitProperty->GetValue(sensor, nullptr));
         const std::string titleUtf8 = Utf8FromManagedString(title);
         const double numericValue = Convert::ToDouble(valueObject, Globalization::CultureInfo::InvariantCulture);
 
@@ -275,18 +291,19 @@ void CollectManagedSensors(GigabyteRuntimeContext^ context, Object^ sensorKind,
             if (!ManagedUnitEquals(unit, "RPM")) {
                 continue;
             }
-            fans->push_back(FanReading{ titleUtf8, numericValue });
+            fans->push_back(FanReading{titleUtf8, numericValue});
         } else if (temperatures != nullptr) {
-            if (!ManagedUnitEquals(unit, gcnew String(L"\u2103")) && !ManagedUnitEquals(unit, gcnew String(L"\u00B0C"))) {
+            if (!ManagedUnitEquals(unit, gcnew String(L"\u2103")) &&
+                !ManagedUnitEquals(unit, gcnew String(L"\u00B0C"))) {
                 continue;
             }
-            temperatures->push_back(TemperatureReading{ titleUtf8, numericValue });
+            temperatures->push_back(TemperatureReading{titleUtf8, numericValue});
         }
     }
 }
 
-bool CaptureGigabyteSnapshot(GigabyteRuntimeContext^ context, GigabyteSnapshot& snapshot,
-    tracing::Trace& trace, std::string& diagnostics) {
+bool CaptureGigabyteSnapshot(
+    GigabyteRuntimeContext ^ context, GigabyteSnapshot& snapshot, tracing::Trace& trace, std::string& diagnostics) {
     snapshot = GigabyteSnapshot{};
 
     if (!InitializeGigabyteRuntime(context, trace, diagnostics)) {
@@ -301,13 +318,13 @@ bool CaptureGigabyteSnapshot(GigabyteRuntimeContext^ context, GigabyteSnapshot& 
 
         std::ostringstream details;
         details << "Gigabyte SIV hardware-monitor query completed."
-                << " fan_count=" << snapshot.fans.size()
-                << " temp_count=" << snapshot.temperatures.size();
+                << " fan_count=" << snapshot.fans.size() << " temp_count=" << snapshot.temperatures.size();
         snapshot.diagnostics = details.str();
         diagnostics = snapshot.diagnostics;
-        trace.Write("gigabyte_siv:snapshot_done fan_count=" + std::to_string(snapshot.fans.size()) + " temp_count=" + std::to_string(snapshot.temperatures.size()));
+        trace.Write("gigabyte_siv:snapshot_done fan_count=" + std::to_string(snapshot.fans.size()) +
+                    " temp_count=" + std::to_string(snapshot.temperatures.size()));
         return true;
-    } catch (Exception^ ex) {
+    } catch (Exception ^ ex) {
         diagnostics = Utf8FromManagedString(ex->ToString());
         snapshot.diagnostics = diagnostics;
         trace.Write("gigabyte_siv:snapshot_exception " + diagnostics);
@@ -316,8 +333,7 @@ bool CaptureGigabyteSnapshot(GigabyteRuntimeContext^ context, GigabyteSnapshot& 
 }
 
 std::string ResolveMappedSensorName(
-    const std::unordered_map<std::string, std::string>& sensorNames,
-    const std::string& logicalName) {
+    const std::unordered_map<std::string, std::string>& sensorNames, const std::string& logicalName) {
     const auto it = sensorNames.find(logicalName);
     if (it != sensorNames.end() && !it->second.empty()) {
         return it->second;
@@ -327,7 +343,8 @@ std::string ResolveMappedSensorName(
 
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace) : trace_(trace), runtime_(gcnew GigabyteRuntimeContext()) {}
+    explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace)
+        : trace_(trace), runtime_(gcnew GigabyteRuntimeContext()) {}
 
     bool Initialize(const AppConfig& config) override {
         config_ = config;
@@ -335,7 +352,8 @@ public:
 
         boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
         boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardProduct").value_or("");
-        trace().Write("gigabyte_siv:board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
+        trace().Write(
+            "gigabyte_siv:board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
 
         if (!ContainsInsensitive(boardManufacturer_, "gigabyte")) {
             diagnostics_ = "Baseboard manufacturer is not Gigabyte.";
@@ -412,8 +430,9 @@ private:
     }
 
     std::vector<NamedScalarMetric> BuildRequestedTemperatures() const {
-        std::vector<NamedScalarMetric> metrics =
-            CreateRequestedBoardMetrics(config_.board.requestedTemperatureNames, "\xC2\xB0""C");
+        std::vector<NamedScalarMetric> metrics = CreateRequestedBoardMetrics(config_.board.requestedTemperatureNames,
+            "\xC2\xB0"
+            "C");
         for (auto& metric : metrics) {
             if (const TemperatureReading* reading =
                     FindReadingByName(tempReadings_, ResolveTemperatureSensorName(metric.name));
@@ -425,8 +444,7 @@ private:
     }
 
     std::vector<NamedScalarMetric> BuildRequestedFans() const {
-        std::vector<NamedScalarMetric> metrics =
-            CreateRequestedBoardMetrics(config_.board.requestedFanNames, "RPM");
+        std::vector<NamedScalarMetric> metrics = CreateRequestedBoardMetrics(config_.board.requestedFanNames, "RPM");
         for (auto& metric : metrics) {
             if (const FanReading* reading = FindReadingByName(fanReadings_, ResolveFanSensorName(metric.name));
                 reading != nullptr) {
@@ -438,7 +456,7 @@ private:
 
     tracing::Trace* trace_ = nullptr;
     AppConfig config_{};
-    gcroot<GigabyteRuntimeContext^> runtime_;
+    gcroot<GigabyteRuntimeContext ^> runtime_;
     std::string boardManufacturer_;
     std::string boardProduct_;
     std::string loadedLibrary_;
@@ -453,7 +471,3 @@ private:
 std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(tracing::Trace* trace) {
     return std::make_unique<GigabyteSivBoardTelemetryProvider>(trace);
 }
-
-
-
-

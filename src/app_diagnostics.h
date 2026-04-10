@@ -23,9 +23,14 @@
 #include "trace.h"
 #include "utf8.h"
 
-bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    double scale, DashboardRenderer::RenderMode renderMode, bool showLayoutEditGuides,
-    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode, const std::string& editLayoutWidgetName,
+bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
+    const SystemSnapshot& snapshot,
+    const AppConfig& config,
+    double scale,
+    DashboardRenderer::RenderMode renderMode,
+    bool showLayoutEditGuides,
+    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
+    const std::string& editLayoutWidgetName,
     std::ostream* traceStream = nullptr,
     std::string* errorText = nullptr);
 
@@ -65,13 +70,12 @@ std::optional<std::wstring> GetColonSwitchValue(const std::wstring& target);
 std::optional<double> TryParseScaleValue(const std::wstring& text);
 std::optional<double> GetScaleSwitchValue();
 std::optional<std::string> GetLayoutSwitchValue();
-bool ApplyDiagnosticsLayoutOverride(AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
-std::filesystem::path ResolveDiagnosticsOutputPath(
-    const std::filesystem::path& workingDirectory,
+bool ApplyDiagnosticsLayoutOverride(
+    AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
+std::filesystem::path ResolveDiagnosticsOutputPath(const std::filesystem::path& workingDirectory,
     const std::filesystem::path& configuredPath,
     const wchar_t* defaultFileName);
-std::optional<std::filesystem::path> PromptSavePath(
-    HWND owner,
+std::optional<std::filesystem::path> PromptSavePath(HWND owner,
     const std::filesystem::path& initialDirectory,
     const wchar_t* defaultFileName,
     const wchar_t* filter,
@@ -82,11 +86,8 @@ std::filesystem::path CreateElevatedSaveConfigTempPath();
 int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath);
 
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
-    const AppConfig& runtimeConfig,
-    const DiagnosticsOptions& diagnosticsOptions,
-    std::ostream* traceStream);
-bool ReloadTelemetryRuntimeFromDisk(
-    const std::filesystem::path& configPath,
+    const AppConfig& runtimeConfig, const DiagnosticsOptions& diagnosticsOptions, std::ostream* traceStream);
+bool ReloadTelemetryRuntimeFromDisk(const std::filesystem::path& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryRuntime>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,

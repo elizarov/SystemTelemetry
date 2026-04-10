@@ -6,8 +6,11 @@
 
 namespace layout_snap_solver {
 
-std::optional<int> FindNearestSnapWeight(int currentWeight, int combinedWeight, int threshold,
-    const std::vector<SnapCandidate>& candidates, const ExtentEvaluator& evaluateExtent) {
+std::optional<int> FindNearestSnapWeight(int currentWeight,
+    int combinedWeight,
+    int threshold,
+    const std::vector<SnapCandidate>& candidates,
+    const ExtentEvaluator& evaluateExtent) {
     if (combinedWeight <= 1 || threshold <= 0 || !evaluateExtent) {
         return std::nullopt;
     }

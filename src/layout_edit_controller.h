@@ -62,7 +62,8 @@ public:
     virtual DashboardRenderer::EditOverlayState& LayoutEditOverlayState() = 0;
     virtual bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) = 0;
     virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
-        const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget,
+        const std::vector<int>& weights,
+        const DashboardRenderer::LayoutWidgetIdentity& widget,
         DashboardRenderer::LayoutGuideAxis axis) = 0;
     virtual bool ApplyLayoutEditValue(const ValueTarget& target, double value) = 0;
     virtual void InvalidateLayoutEdit() = 0;
@@ -111,8 +112,8 @@ private:
     void SyncRendererInteractionState();
     void ClearInteractionState();
     void SetCursorForPoint(POINT clientPoint);
-    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(const LayoutDragState& drag,
-        const std::vector<int>& freeWeights);
+    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(
+        const LayoutDragState& drag, const std::vector<int>& freeWeights);
 
     LayoutEditHost& host_;
     std::optional<size_t> hoveredLayoutGuideIndex_;

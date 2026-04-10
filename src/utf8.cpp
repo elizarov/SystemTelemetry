@@ -7,8 +7,7 @@
 
 namespace {
 
-template <typename CharT>
-int CheckedSize(size_t size) {
+template <typename CharT> int CheckedSize(size_t size) {
     return size > static_cast<size_t>(INT_MAX) ? -1 : static_cast<int>(size);
 }
 

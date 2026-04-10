@@ -23,9 +23,8 @@ std::wstring StripOuterQuotes(std::wstring value) {
 std::wstring NormalizeWindowsPath(std::wstring value) {
     value = StripOuterQuotes(std::move(value));
     std::replace(value.begin(), value.end(), L'/', L'\\');
-    std::transform(value.begin(), value.end(), value.begin(), [](wchar_t ch) {
-        return static_cast<wchar_t>(towlower(ch));
-    });
+    std::transform(
+        value.begin(), value.end(), value.begin(), [](wchar_t ch) { return static_cast<wchar_t>(towlower(ch)); });
     return value;
 }
 

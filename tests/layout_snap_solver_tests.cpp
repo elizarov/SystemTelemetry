@@ -23,7 +23,8 @@ int ComputeCpuGaugeWidth(int gaugeWeight) {
     const int dashboardWidth = kWindowWidth - (kOuterMargin * 2);
     const int cpuCardWidth = SplitWeightedFirstChild(dashboardWidth, kCardGap, kTopRowCpuWeight, kTopRowGpuWeight);
     const int cpuContentWidth = cpuCardWidth - (kCardPadding * 2);
-    return SplitWeightedFirstChild(cpuContentWidth, kWidgetColumnGap, gaugeWeight, kCpuInnerCombinedWeight - gaugeWeight);
+    return SplitWeightedFirstChild(
+        cpuContentWidth, kWidgetColumnGap, gaugeWeight, kCpuInnerCombinedWeight - gaugeWeight);
 }
 
 int ComputeGpuGaugeWidth() {
@@ -59,14 +60,11 @@ TEST(LayoutSnapSolver, FindsExactIntegerMatchThroughNestedWeights) {
     ASSERT_EQ(targetExtent, 129);
     ASSERT_TRUE(targetExtent - startExtent <= kThreshold);
 
-    const std::optional<int> snappedWeight = layout_snap_solver::FindNearestSnapWeight(
-        kCurrentGaugeWeight,
+    const std::optional<int> snappedWeight = layout_snap_solver::FindNearestSnapWeight(kCurrentGaugeWeight,
         kCombinedWeight,
         kThreshold,
         {layout_snap_solver::SnapCandidate{targetExtent, targetExtent - startExtent, 0}},
-        [](int firstWeight) -> std::optional<int> {
-            return ComputeCpuGaugeWidth(firstWeight);
-        });
+        [](int firstWeight) -> std::optional<int> { return ComputeCpuGaugeWidth(firstWeight); });
 
     ASSERT_TRUE(snappedWeight.has_value());
     EXPECT_EQ(ComputeCpuGaugeWidth(*snappedWeight), targetExtent);

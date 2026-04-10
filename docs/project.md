@@ -12,6 +12,8 @@
 - When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
 - Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
 - Always build through `build.cmd`.
+- Keep the repo-level `.clang-format` as the single maintained source of truth for C++ formatting rules.
+- Use the top-level `format.cmd` script as the maintained entry point for formatting non-vendored C++ sources; run `format` to check and `format fix` to apply the repo style.
 - Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
 - Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies `SystemTelemetry.exe` there, and leaves auto-start registration to the runtime popup-menu toggle.
 
@@ -22,6 +24,7 @@
 - `docs/layout.md` should capture the configuration language syntax, section ownership, and maintained inline language examples.
 - `docs/project.md` should capture project environment, build/setup expectations, and other engineering constraints that are not direct user-visible behavior.
 - `docs/architecture.md` should capture structural and code-organization details.
+- `.clang-format` should capture the maintained C++ formatting policy instead of duplicating style rules across docs or scripts.
 
 ## Implementation constraints
 

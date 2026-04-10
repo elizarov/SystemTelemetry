@@ -14,13 +14,14 @@ bool ContainsCardReference(const std::vector<std::string>& stack, const std::str
 }
 
 std::string FormatRect(const RECT& rect) {
-    return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," +
-        std::to_string(rect.right) + "," + std::to_string(rect.bottom) + ")";
+    return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," + std::to_string(rect.right) +
+           "," + std::to_string(rect.bottom) + ")";
 }
 
 }  // namespace
 
-void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
+void DashboardRenderer::ResolveNodeWidgets(
+    const LayoutNodeConfig& node, const RECT& rect, std::vector<ResolvedWidgetLayout>& widgets) {
     std::vector<std::string> cardReferenceStack;
     ResolveNodeWidgetsInternal(node, rect, widgets, cardReferenceStack, "", "", {});
 }
@@ -29,8 +30,13 @@ void DashboardRenderer::BuildWidgetEditGuides() {
     DashboardRendererLayoutEngine::BuildWidgetEditGuides(*this);
 }
 
-void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const RECT& rect, const std::vector<RECT>& childRects,
-    int gap, const std::string& renderCardId, const std::string& editCardId, const std::vector<size_t>& nodePath) {
+void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
+    const RECT& rect,
+    const std::vector<RECT>& childRects,
+    int gap,
+    const std::string& renderCardId,
+    const std::string& editCardId,
+    const std::vector<size_t>& nodePath) {
     if (!IsContainerNode(node) || childRects.size() < 2) {
         return;
     }
@@ -41,8 +47,8 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const R
     childFixedExtents.reserve(node.children.size());
     for (const auto& child : node.children) {
         const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-        childFixedExtents.push_back(!horizontal &&
-            (UsesFixedPreferredHeightInRows(resolvedChild) || resolvedChild.kind == WidgetKind::VerticalSpring));
+        childFixedExtents.push_back(!horizontal && (UsesFixedPreferredHeightInRows(resolvedChild) ||
+                                                       resolvedChild.kind == WidgetKind::VerticalSpring));
     }
     for (size_t i = 0; i + 1 < childRects.size(); ++i) {
         if (!horizontal && (childFixedExtents[i] || childFixedExtents[i + 1])) {
@@ -60,7 +66,8 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const R
         guide.childFixedExtents = childFixedExtents;
         guide.childRects = childRects;
         for (const RECT& childRect : childRects) {
-            guide.childExtents.push_back(horizontal ? (childRect.right - childRect.left) : (childRect.bottom - childRect.top));
+            guide.childExtents.push_back(
+                horizontal ? (childRect.right - childRect.left) : (childRect.bottom - childRect.top));
         }
 
         if (horizontal) {
@@ -76,11 +83,15 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node, const R
     }
 }
 
-void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node, const RECT& rect,
-    std::vector<ResolvedWidgetLayout>& widgets, std::vector<std::string>& cardReferenceStack,
-    const std::string& renderCardId, const std::string& editCardId, const std::vector<size_t>& nodePath) {
-    WriteTrace("renderer:layout_resolve_node name=\"" + node.name + "\" weight=" + std::to_string(node.weight) +
-        " " + FormatRect(rect) + " children=" + std::to_string(node.children.size()));
+void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
+    const RECT& rect,
+    std::vector<ResolvedWidgetLayout>& widgets,
+    std::vector<std::string>& cardReferenceStack,
+    const std::string& renderCardId,
+    const std::string& editCardId,
+    const std::vector<size_t>& nodePath) {
+    WriteTrace("renderer:layout_resolve_node name=\"" + node.name + "\" weight=" + std::to_string(node.weight) + " " +
+               FormatRect(rect) + " children=" + std::to_string(node.children.size()));
     if (node.cardReference) {
         if (ContainsCardReference(cardReferenceStack, node.name)) {
             WriteTrace("renderer:layout_card_ref_cycle id=\"" + node.name + "\"");
@@ -93,7 +104,8 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         }
         WriteTrace("renderer:layout_card_ref id=\"" + node.name + "\" " + FormatRect(rect));
         cardReferenceStack.push_back(node.name);
-        ResolveNodeWidgetsInternal(referencedCard->layout, rect, widgets, cardReferenceStack, renderCardId, node.name, {});
+        ResolveNodeWidgetsInternal(
+            referencedCard->layout, rect, widgets, cardReferenceStack, renderCardId, node.name, {});
         cardReferenceStack.pop_back();
         return;
     }
@@ -103,23 +115,25 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         widget.editCardId = editCardId;
         widget.nodePath = nodePath;
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
-            (widget.binding.metric.empty() ? "" : " metric=\"" + widget.binding.metric + "\"") +
-            (widget.binding.param.empty() ? "" : " param=\"" + widget.binding.param + "\""));
+                   (widget.binding.metric.empty() ? "" : " metric=\"" + widget.binding.metric + "\"") +
+                   (widget.binding.param.empty() ? "" : " param=\"" + widget.binding.param + "\""));
         widgets.push_back(std::move(widget));
         return;
     }
 
     const bool horizontal = node.name == "columns";
-    const int gap = horizontal ? ScaleLogical(config_.layout.cardStyle.columnGap) : ScaleLogical(config_.layout.cardStyle.widgetLineGap);
+    const int gap = horizontal ? ScaleLogical(config_.layout.cardStyle.columnGap)
+                               : ScaleLogical(config_.layout.cardStyle.widgetLineGap);
 
     const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
-        gap * static_cast<int>(std::max<size_t>(0, node.children.size() - 1));
+                               gap * static_cast<int>(std::max<size_t>(0, node.children.size() - 1));
     int reservedPreferred = 0;
     int totalWeight = 0;
     int springWeight = 0;
-    const bool rowsUseSprings = !horizontal && std::any_of(node.children.begin(), node.children.end(), [&](const auto& child) {
-        return ResolveWidgetLayout(child, RECT{}).kind == WidgetKind::VerticalSpring;
-    });
+    const bool rowsUseSprings =
+        !horizontal && std::any_of(node.children.begin(), node.children.end(), [&](const auto& child) {
+            return ResolveWidgetLayout(child, RECT{}).kind == WidgetKind::VerticalSpring;
+        });
     if (!horizontal) {
         for (const auto& child : node.children) {
             const ResolvedWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
@@ -187,10 +201,8 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         }
 
         WriteTrace("renderer:layout_weighted_child parent=\"" + node.name + "\" child=\"" + child.name +
-            "\" weight=" + std::to_string(childWeight) +
-            " gap=" + std::to_string(gap) +
-            " size=" + std::to_string(size) +
-            " " + FormatRect(childRect));
+                   "\" weight=" + std::to_string(childWeight) + " gap=" + std::to_string(gap) +
+                   " size=" + std::to_string(size) + " " + FormatRect(childRect));
         childRects.push_back(childRect);
         std::vector<size_t> childPath = nodePath;
         childPath.push_back(i);
@@ -211,4 +223,3 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
 bool DashboardRenderer::ResolveLayout() {
     return DashboardRendererLayoutEngine::ResolveLayout(*this);
 }
-

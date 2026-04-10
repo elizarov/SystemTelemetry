@@ -47,7 +47,18 @@ void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
 
 HFONT CreateUiFont(const UiFontConfig& font) {
     const std::wstring face = WideFromUtf8(font.face);
-    return CreateFontW(-font.size, 0, 0, 0, font.weight, FALSE, FALSE, FALSE,
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-        VARIABLE_PITCH, face.c_str());
+    return CreateFontW(-font.size,
+        0,
+        0,
+        0,
+        font.weight,
+        FALSE,
+        FALSE,
+        FALSE,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY,
+        VARIABLE_PITCH,
+        face.c_str());
 }

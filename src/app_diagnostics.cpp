@@ -46,8 +46,7 @@ std::optional<std::wstring> GetSwitchValue(const std::wstring& target) {
 
 std::optional<std::wstring> GetColonSwitchValue(const std::wstring& target) {
     for (const std::wstring& argument : GetCommandLineArguments()) {
-        if (argument.size() > target.size() &&
-            _wcsnicmp(argument.c_str(), target.c_str(), target.size()) == 0 &&
+        if (argument.size() > target.size() && _wcsnicmp(argument.c_str(), target.c_str(), target.size()) == 0 &&
             argument[target.size()] == L':') {
             return argument.substr(target.size() + 1);
         }
@@ -93,13 +92,13 @@ DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions&
 
 DashboardRenderer::SimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options) {
     switch (options.layoutSimilarityMode) {
-    case DiagnosticsLayoutSimilarityMode::HorizontalSizes:
-        return DashboardRenderer::SimilarityIndicatorMode::AllHorizontal;
-    case DiagnosticsLayoutSimilarityMode::VerticalSizes:
-        return DashboardRenderer::SimilarityIndicatorMode::AllVertical;
-    case DiagnosticsLayoutSimilarityMode::None:
-    default:
-        return DashboardRenderer::SimilarityIndicatorMode::ActiveGuide;
+        case DiagnosticsLayoutSimilarityMode::HorizontalSizes:
+            return DashboardRenderer::SimilarityIndicatorMode::AllHorizontal;
+        case DiagnosticsLayoutSimilarityMode::VerticalSizes:
+            return DashboardRenderer::SimilarityIndicatorMode::AllVertical;
+        case DiagnosticsLayoutSimilarityMode::None:
+        default:
+            return DashboardRenderer::SimilarityIndicatorMode::ActiveGuide;
     }
 }
 
@@ -172,7 +171,8 @@ bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
     return true;
 }
 
-bool ApplyDiagnosticsLayoutOverride(AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics) {
+bool ApplyDiagnosticsLayoutOverride(
+    AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics) {
     if (options.layoutName.empty()) {
         return true;
     }
@@ -188,8 +188,7 @@ bool ApplyDiagnosticsLayoutOverride(AppConfig& config, const DiagnosticsOptions&
         return false;
     }
 
-    const std::wstring message =
-        WideFromUtf8("Unknown layout name:\n" + options.layoutName);
+    const std::wstring message = WideFromUtf8("Unknown layout name:\n" + options.layoutName);
     MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
     return false;
 }
@@ -218,8 +217,8 @@ bool DiagnosticsSession::Initialize() {
             ResolveDiagnosticsOutputPath(workingDirectory, options_.saveConfigPath, kDefaultSavedConfigFileName);
     }
     if (options_.saveFullConfig) {
-        saveFullConfigPath_ =
-            ResolveDiagnosticsOutputPath(workingDirectory, options_.saveFullConfigPath, kDefaultSavedFullConfigFileName);
+        saveFullConfigPath_ = ResolveDiagnosticsOutputPath(
+            workingDirectory, options_.saveFullConfigPath, kDefaultSavedFullConfigFileName);
     }
     return true;
 }
@@ -263,14 +262,20 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     }
 
     std::string screenshotError;
-    if (options_.screenshot && !SaveDumpScreenshot(
-            screenshotPath_, dump.snapshot, config, options_.exit ? options_.scale : 1.0,
-            GetDiagnosticsRenderMode(options_), options_.editLayout, GetSimilarityIndicatorMode(options_),
-            options_.editLayoutWidgetName,
-            TraceStream(), &screenshotError)) {
+    if (options_.screenshot && !SaveDumpScreenshot(screenshotPath_,
+                                   dump.snapshot,
+                                   config,
+                                   options_.exit ? options_.scale : 1.0,
+                                   GetDiagnosticsRenderMode(options_),
+                                   options_.editLayout,
+                                   GetSimilarityIndicatorMode(options_),
+                                   options_.editLayoutWidgetName,
+                                   TraceStream(),
+                                   &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
-        std::string traceText = "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
+        std::string traceText =
+            "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
         if (!screenshotError.empty()) {
             traceText += " detail=\"" + screenshotError + "\"";
         }
@@ -288,7 +293,8 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     if (options_.saveFullConfig && !SaveFullConfig(saveFullConfigPath_, config)) {
         const std::wstring message =
             WideFromUtf8("Failed to save full config file:\n" + Utf8FromWide(saveFullConfigPath_.wstring()));
-        ReportError("diagnostics:full_config_save_failed path=\"" + Utf8FromWide(saveFullConfigPath_.wstring()) + "\"", message);
+        ReportError("diagnostics:full_config_save_failed path=\"" + Utf8FromWide(saveFullConfigPath_.wstring()) + "\"",
+            message);
         return false;
     }
 
@@ -296,14 +302,14 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
 }
 
 void DiagnosticsSession::ShowFileOpenError(const char* label, const std::filesystem::path& path) {
-    const std::wstring message = WideFromUtf8(
-        std::string("Failed to open ") + label + ":\n" + Utf8FromWide(path.wstring()));
+    const std::wstring message =
+        WideFromUtf8(std::string("Failed to open ") + label + ":\n" + Utf8FromWide(path.wstring()));
     ReportError("diagnostics:file_open_failed label=\"" + std::string(label) + "\" path=\"" +
-        Utf8FromWide(path.wstring()) + "\"", message);
+                    Utf8FromWide(path.wstring()) + "\"",
+        message);
 }
 
-std::filesystem::path ResolveDiagnosticsOutputPath(
-    const std::filesystem::path& workingDirectory,
+std::filesystem::path ResolveDiagnosticsOutputPath(const std::filesystem::path& workingDirectory,
     const std::filesystem::path& configuredPath,
     const wchar_t* defaultFileName) {
     if (configuredPath.empty()) {
@@ -315,8 +321,7 @@ std::filesystem::path ResolveDiagnosticsOutputPath(
     return workingDirectory / configuredPath;
 }
 
-std::optional<std::filesystem::path> PromptSavePath(
-    HWND owner,
+std::optional<std::filesystem::path> PromptSavePath(HWND owner,
     const std::filesystem::path& initialDirectory,
     const wchar_t* defaultFileName,
     const wchar_t* filter,
@@ -344,8 +349,7 @@ std::optional<std::filesystem::path> PromptSavePath(
 bool CanWriteRuntimeConfig(const std::filesystem::path& path) {
     const std::wstring widePath = path.wstring();
     if (std::filesystem::exists(path)) {
-        HANDLE file = CreateFileW(
-            widePath.c_str(),
+        HANDLE file = CreateFileW(widePath.c_str(),
             GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             nullptr,
@@ -360,11 +364,10 @@ bool CanWriteRuntimeConfig(const std::filesystem::path& path) {
     }
 
     const std::filesystem::path parent = path.has_parent_path() ? path.parent_path() : std::filesystem::current_path();
-    const std::wstring probeName =
-        L".config-write-test-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64()) + L".tmp";
+    const std::wstring probeName = L".config-write-test-" + std::to_wstring(GetCurrentProcessId()) + L"-" +
+                                   std::to_wstring(GetTickCount64()) + L".tmp";
     const std::filesystem::path probePath = parent / probeName;
-    HANDLE probe = CreateFileW(
-        probePath.wstring().c_str(),
+    HANDLE probe = CreateFileW(probePath.wstring().c_str(),
         GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         nullptr,
@@ -412,11 +415,8 @@ int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std
 }
 
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
-    const AppConfig& runtimeConfig,
-    const DiagnosticsOptions& diagnosticsOptions,
-    std::ostream* traceStream) {
-    std::unique_ptr<TelemetryRuntime> runtime =
-        CreateTelemetryRuntime(diagnosticsOptions, GetWorkingDirectory());
+    const AppConfig& runtimeConfig, const DiagnosticsOptions& diagnosticsOptions, std::ostream* traceStream) {
+    std::unique_ptr<TelemetryRuntime> runtime = CreateTelemetryRuntime(diagnosticsOptions, GetWorkingDirectory());
     if (runtime == nullptr) {
         return nullptr;
     }
@@ -426,8 +426,7 @@ std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
     return runtime;
 }
 
-bool ReloadTelemetryRuntimeFromDisk(
-    const std::filesystem::path& configPath,
+bool ReloadTelemetryRuntimeFromDisk(const std::filesystem::path& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryRuntime>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
@@ -465,10 +464,16 @@ bool ReloadTelemetryRuntimeFromDisk(
     return true;
 }
 
-bool SaveDumpScreenshot(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const AppConfig& config,
-    double scale, DashboardRenderer::RenderMode renderMode, bool showLayoutEditGuides,
-    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode, const std::string& editLayoutWidgetName,
-    std::ostream* traceStream, std::string* errorText) {
+bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
+    const SystemSnapshot& snapshot,
+    const AppConfig& config,
+    double scale,
+    DashboardRenderer::RenderMode renderMode,
+    bool showLayoutEditGuides,
+    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
+    const std::string& editLayoutWidgetName,
+    std::ostream* traceStream,
+    std::string* errorText) {
     DashboardRenderer renderer;
     DashboardRenderer::EditOverlayState overlayState;
     overlayState.showLayoutEditGuides = showLayoutEditGuides;
@@ -528,7 +533,8 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     telemetry->UpdateSnapshot();
     diagnostics.WriteTraceMarker("diagnostics:update_snapshot_done");
     if (diagnosticsOptions.reload) {
-        if (!ReloadTelemetryRuntimeFromDisk(GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, &diagnostics)) {
+        if (!ReloadTelemetryRuntimeFromDisk(
+                GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, &diagnostics)) {
             return 1;
         }
     }

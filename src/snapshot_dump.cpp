@@ -25,24 +25,24 @@ std::string EscapeString(const std::string& value) {
     escaped.reserve(value.size() + 8);
     for (unsigned char ch : value) {
         switch (ch) {
-        case '\\':
-            escaped += "\\\\";
-            break;
-        case '"':
-            escaped += "\\\"";
-            break;
-        case '\n':
-            escaped += "\\n";
-            break;
-        case '\r':
-            escaped += "\\r";
-            break;
-        case '\t':
-            escaped += "\\t";
-            break;
-        default:
-            escaped.push_back(static_cast<char>(ch));
-            break;
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\t':
+                escaped += "\\t";
+                break;
+            default:
+                escaped.push_back(static_cast<char>(ch));
+                break;
         }
     }
     return escaped;
@@ -60,23 +60,23 @@ bool UnescapeQuotedString(const std::string& text, std::string& value) {
         const char ch = text[i];
         if (escaped) {
             switch (ch) {
-            case '\\':
-                value.push_back('\\');
-                break;
-            case '"':
-                value.push_back('"');
-                break;
-            case 'n':
-                value.push_back('\n');
-                break;
-            case 'r':
-                value.push_back('\r');
-                break;
-            case 't':
-                value.push_back('\t');
-                break;
-            default:
-                return false;
+                case '\\':
+                    value.push_back('\\');
+                    break;
+                case '"':
+                    value.push_back('"');
+                    break;
+                case 'n':
+                    value.push_back('\n');
+                    break;
+                case 'r':
+                    value.push_back('\r');
+                    break;
+                case 't':
+                    value.push_back('\t');
+                    break;
+                default:
+                    return false;
             }
             escaped = false;
             continue;
@@ -104,12 +104,12 @@ void WriteDouble(std::ostream& output, const std::string& key, double value, int
     WriteLine(output, key, buffer);
 }
 
-template <typename T>
-void WriteInteger(std::ostream& output, const std::string& key, T value) {
+template <typename T> void WriteInteger(std::ostream& output, const std::string& key, T value) {
     WriteLine(output, key, std::to_string(static_cast<long long>(value)));
 }
 
-void WriteOptionalDouble(std::ostream& output, const std::string& key, const std::optional<double>& value, int precision = 6) {
+void WriteOptionalDouble(
+    std::ostream& output, const std::string& key, const std::optional<double>& value, int precision = 6) {
     if (!value.has_value()) {
         WriteLine(output, key, "null");
         return;
@@ -139,7 +139,8 @@ void WriteDoubleArray(std::ostream& output, const std::string& key, const std::v
     output << "]\n";
 }
 
-void WriteNamedScalarMetrics(std::ostream& output, const std::string& prefix, const std::vector<NamedScalarMetric>& metrics) {
+void WriteNamedScalarMetrics(
+    std::ostream& output, const std::string& prefix, const std::vector<NamedScalarMetric>& metrics) {
     WriteInteger(output, prefix + ".count", metrics.size());
     for (size_t i = 0; i < metrics.size(); ++i) {
         const std::string metricPrefix = prefix + "." + std::to_string(i);
@@ -149,7 +150,8 @@ void WriteNamedScalarMetrics(std::ostream& output, const std::string& prefix, co
     }
 }
 
-void WriteRetainedHistories(std::ostream& output, const std::string& prefix, const std::vector<RetainedHistorySeries>& histories) {
+void WriteRetainedHistories(
+    std::ostream& output, const std::string& prefix, const std::vector<RetainedHistorySeries>& histories) {
     WriteInteger(output, prefix + ".count", histories.size());
     for (size_t i = 0; i < histories.size(); ++i) {
         const std::string historyPrefix = prefix + "." + std::to_string(i);
@@ -193,7 +195,8 @@ bool ParseDoubleArray(const std::string& text, std::vector<double>& values) {
     size_t start = 0;
     while (start < body.size()) {
         size_t comma = body.find(',', start);
-        std::string token = TrimAsciiWhitespace(body.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+        std::string token =
+            TrimAsciiWhitespace(body.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
         double value = 0.0;
         if (!ParseStrictDouble(token, value)) {
             return false;
@@ -216,7 +219,8 @@ bool TryGetValue(const std::map<std::string, std::string>& values, const std::st
     return true;
 }
 
-bool LoadString(const std::map<std::string, std::string>& values, const std::string& key, std::string& field, std::string* error) {
+bool LoadString(
+    const std::map<std::string, std::string>& values, const std::string& key, std::string& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -230,7 +234,8 @@ bool LoadString(const std::map<std::string, std::string>& values, const std::str
     return true;
 }
 
-bool LoadDouble(const std::map<std::string, std::string>& values, const std::string& key, double& field, std::string* error) {
+bool LoadDouble(
+    const std::map<std::string, std::string>& values, const std::string& key, double& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -245,13 +250,15 @@ bool LoadDouble(const std::map<std::string, std::string>& values, const std::str
 }
 
 template <typename T>
-bool LoadUnsigned(const std::map<std::string, std::string>& values, const std::string& key, T& field, std::string* error) {
+bool LoadUnsigned(
+    const std::map<std::string, std::string>& values, const std::string& key, T& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
     }
     unsigned long long parsed = 0;
-    if (!ParseStrictUnsigned(text, parsed) || parsed > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
+    if (!ParseStrictUnsigned(text, parsed) ||
+        parsed > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
         if (error != nullptr) {
             *error = "Invalid integer for key: " + key;
         }
@@ -261,8 +268,10 @@ bool LoadUnsigned(const std::map<std::string, std::string>& values, const std::s
     return true;
 }
 
-bool LoadOptionalDouble(const std::map<std::string, std::string>& values, const std::string& key,
-    std::optional<double>& field, std::string* error) {
+bool LoadOptionalDouble(const std::map<std::string, std::string>& values,
+    const std::string& key,
+    std::optional<double>& field,
+    std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -283,8 +292,10 @@ bool LoadOptionalDouble(const std::map<std::string, std::string>& values, const 
 }
 
 template <typename T>
-bool LoadOptionalUnsigned(const std::map<std::string, std::string>& values, const std::string& key,
-    std::optional<T>& field, std::string* error) {
+bool LoadOptionalUnsigned(const std::map<std::string, std::string>& values,
+    const std::string& key,
+    std::optional<T>& field,
+    std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -294,7 +305,8 @@ bool LoadOptionalUnsigned(const std::map<std::string, std::string>& values, cons
         return true;
     }
     unsigned long long parsed = 0;
-    if (!ParseStrictUnsigned(text, parsed) || parsed > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
+    if (!ParseStrictUnsigned(text, parsed) ||
+        parsed > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
         if (error != nullptr) {
             *error = "Invalid optional integer for key: " + key;
         }
@@ -304,8 +316,10 @@ bool LoadOptionalUnsigned(const std::map<std::string, std::string>& values, cons
     return true;
 }
 
-bool LoadDoubleArrayField(const std::map<std::string, std::string>& values, const std::string& key,
-    std::vector<double>& field, std::string* error) {
+bool LoadDoubleArrayField(const std::map<std::string, std::string>& values,
+    const std::string& key,
+    std::vector<double>& field,
+    std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -319,8 +333,10 @@ bool LoadDoubleArrayField(const std::map<std::string, std::string>& values, cons
     return true;
 }
 
-bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values, const std::string& prefix,
-    std::vector<NamedScalarMetric>& field, std::string* error) {
+bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values,
+    const std::string& prefix,
+    std::vector<NamedScalarMetric>& field,
+    std::string* error) {
     size_t count = 0;
     if (!LoadUnsigned(values, prefix + ".count", count, error)) {
         return false;
@@ -341,8 +357,10 @@ bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values, co
     return true;
 }
 
-bool LoadRetainedHistories(const std::map<std::string, std::string>& values, const std::string& prefix,
-    std::vector<RetainedHistorySeries>& field, std::string* error) {
+bool LoadRetainedHistories(const std::map<std::string, std::string>& values,
+    const std::string& prefix,
+    std::vector<RetainedHistorySeries>& field,
+    std::string* error) {
     size_t count = 0;
     if (!LoadUnsigned(values, prefix + ".count", count, error)) {
         return false;

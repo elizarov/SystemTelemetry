@@ -46,11 +46,13 @@ void RetainedHistoryStore::PushSample(SystemSnapshot& snapshot, const std::strin
 
 void RetainedHistoryStore::PushBoardMetricSamples(SystemSnapshot& snapshot, const MetricScaleConfig& scales) const {
     for (const auto& metric : snapshot.boardTemperatures) {
-        PushSample(snapshot, "board.temp." + metric.name,
+        PushSample(snapshot,
+            "board.temp." + metric.name,
             ResolveScaleRatio(metric.metric.value.value_or(0.0), scales.boardTemperatureC));
     }
     for (const auto& metric : snapshot.boardFans) {
-        PushSample(snapshot, "board.fan." + metric.name,
+        PushSample(snapshot,
+            "board.fan." + metric.name,
             ResolveScaleRatio(metric.metric.value.value_or(0.0), scales.boardFanRpm));
     }
 }

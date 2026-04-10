@@ -12,7 +12,8 @@ std::string FormatTraceTimestamp() {
     GetLocalTime(&localTime);
 
     char buffer[40];
-    sprintf_s(buffer, "%04u-%02u-%02u %02u:%02u:%02u.%03u",
+    sprintf_s(buffer,
+        "%04u-%02u-%02u %02u:%02u:%02u.%03u",
         static_cast<unsigned>(localTime.wYear),
         static_cast<unsigned>(localTime.wMonth),
         static_cast<unsigned>(localTime.wDay),

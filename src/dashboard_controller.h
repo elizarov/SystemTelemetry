@@ -41,9 +41,7 @@ public:
     virtual void InvalidateShell() = 0;
     virtual MonitorPlacementInfo GetWindowPlacementInfo() const = 0;
     virtual std::optional<std::filesystem::path> PromptDiagnosticsSavePath(
-        const wchar_t* defaultFileName,
-        const wchar_t* filter,
-        const wchar_t* defaultExtension) const = 0;
+        const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const = 0;
     virtual void ShowError(const std::wstring& message) const = 0;
 };
 
@@ -56,23 +54,30 @@ public:
     bool InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     bool HandleRefreshTimer(DashboardShellHost& shell);
     bool WriteDiagnosticsOutputs();
-    bool ReloadConfigFromDisk(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller);
+    bool ReloadConfigFromDisk(
+        DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller);
     void SaveDumpAs(DashboardShellHost& shell);
     void SaveScreenshotAs(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     void SaveFullConfigAs(DashboardShellHost& shell);
     bool IsAutoStartEnabled() const;
     void ToggleAutoStart(DashboardShellHost& shell);
     bool ConfigureDisplay(DashboardShellHost& shell, const DisplayMenuOption& option);
-    bool SwitchLayout(DashboardShellHost& shell, const std::string& layoutName, LayoutEditController& controller, bool diagnosticsEditLayout);
+    bool SwitchLayout(DashboardShellHost& shell,
+        const std::string& layoutName,
+        LayoutEditController& controller,
+        bool diagnosticsEditLayout);
     void SelectNetworkAdapter(DashboardShellHost& shell, const NetworkMenuOption& option);
     void ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option);
     void StartLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller);
     void StopLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller, bool diagnosticsEditLayout);
-    bool ApplyLayoutGuideWeights(DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
+    bool ApplyLayoutGuideWeights(
+        DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
     bool ApplyLayoutEditValue(DashboardShellHost& shell, const LayoutEditHost::ValueTarget& target, double value);
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
-        const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights,
-        const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
+        const LayoutEditHost::LayoutTarget& target,
+        const std::vector<int>& weights,
+        const DashboardRenderer::LayoutWidgetIdentity& widget,
+        DashboardRenderer::LayoutGuideAxis axis);
     AppConfig BuildCurrentConfigForSaving(DashboardShellHost& shell) const;
     void UpdateConfigFromCurrentPlacement(DashboardShellHost& shell);
 

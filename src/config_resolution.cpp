@@ -51,8 +51,8 @@ std::string ExtractMetricReference(const std::string& token) {
     return Trim(token.substr(0, equals));
 }
 
-void CollectLayoutBindingsRecursive(const LayoutNodeConfig& node,
-    std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
+void CollectLayoutBindingsRecursive(
+    const LayoutNodeConfig& node, std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
     for (const std::string& token : Split(node.parameter, ',')) {
         const std::string metricRef = ExtractMetricReference(token);
         if (metricRef.rfind("board.temp.", 0) == 0) {

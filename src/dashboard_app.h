@@ -49,9 +49,7 @@ public:
     void InvalidateShell() override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
     std::optional<std::filesystem::path> PromptDiagnosticsSavePath(
-        const wchar_t* defaultFileName,
-        const wchar_t* filter,
-        const wchar_t* defaultExtension) const override;
+        const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const override;
     void ShowError(const std::wstring& message) const override;
 
 private:
@@ -66,7 +64,9 @@ private:
     void UpdateRendererScale(double scale);
     bool IsLayoutEditMode() const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
-        const std::vector<int>& weights, const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis);
+        const std::vector<int>& weights,
+        const DashboardRenderer::LayoutWidgetIdentity& widget,
+        DashboardRenderer::LayoutGuideAxis axis);
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -84,8 +84,7 @@ private:
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
 
-    void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font,
-        COLORREF color, UINT format);
+    void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawLayout(HDC hdc, const SystemSnapshot& snapshot);
 
     const AppConfig& LayoutEditConfig() const override;

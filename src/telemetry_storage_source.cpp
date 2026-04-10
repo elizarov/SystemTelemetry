@@ -30,9 +30,11 @@ void TelemetryCollector::Impl::EnumerateDrives() {
             const PDH_STATUS readStatus = AddCounterCompat(storage_.query, readPath.c_str(), &counters.readCounter);
             const PDH_STATUS writeStatus = AddCounterCompat(storage_.query, writePath.c_str(), &counters.writeCounter);
             Trace(("telemetry:pdh_add drive_read label=" + label + " path=\"" + Utf8FromWide(readPath) + "\" " +
-                tracing::Trace::FormatPdhStatus("status", readStatus)).c_str());
+                   tracing::Trace::FormatPdhStatus("status", readStatus))
+                    .c_str());
             Trace(("telemetry:pdh_add drive_write label=" + label + " path=\"" + Utf8FromWide(writePath) + "\" " +
-                tracing::Trace::FormatPdhStatus("status", writeStatus)).c_str());
+                   tracing::Trace::FormatPdhStatus("status", writeStatus))
+                    .c_str());
             storage_.driveCounters.push_back(std::move(counters));
         }
     }
@@ -64,14 +66,17 @@ void TelemetryCollector::Impl::RefreshStorageDriveCandidates() {
 
         const UINT driveType = GetDriveTypeW(root.c_str());
         if (!IsSelectableStorageDriveType(driveType)) {
-            Trace(("telemetry:storage_candidate_skip root=\"" + Utf8FromWide(root) + "\" type=" + std::to_string(driveType)).c_str());
+            Trace(("telemetry:storage_candidate_skip root=\"" + Utf8FromWide(root) +
+                   "\" type=" + std::to_string(driveType))
+                    .c_str());
             continue;
         }
 
         ULARGE_INTEGER totalBytes{};
         if (!GetDiskFreeSpaceExW(root.c_str(), nullptr, &totalBytes, nullptr) || totalBytes.QuadPart == 0) {
-            Trace(("telemetry:storage_candidate_skip root=\"" + Utf8FromWide(root) + "\" type=" + std::to_string(driveType) +
-                " total_bytes=" + std::to_string(totalBytes.QuadPart)).c_str());
+            Trace(("telemetry:storage_candidate_skip root=\"" + Utf8FromWide(root) +
+                   "\" type=" + std::to_string(driveType) + " total_bytes=" + std::to_string(totalBytes.QuadPart))
+                    .c_str());
             continue;
         }
 
@@ -80,13 +85,15 @@ void TelemetryCollector::Impl::RefreshStorageDriveCandidates() {
         candidate.volumeLabel = ReadVolumeLabel(root);
         candidate.totalGb = totalBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
         candidate.driveType = driveType;
-        candidate.selected = std::find(config_.storage.drives.begin(), config_.storage.drives.end(), candidate.letter) != config_.storage.drives.end();
+        candidate.selected =
+            std::find(config_.storage.drives.begin(), config_.storage.drives.end(), candidate.letter) !=
+            config_.storage.drives.end();
         storage_.driveCandidates.push_back(std::move(candidate));
     }
 
-    std::sort(storage_.driveCandidates.begin(), storage_.driveCandidates.end(), [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) {
-        return lhs.letter < rhs.letter;
-    });
+    std::sort(storage_.driveCandidates.begin(),
+        storage_.driveCandidates.end(),
+        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
     Trace(("telemetry:storage_candidates count=" + std::to_string(storage_.driveCandidates.size())).c_str());
 }
 
@@ -104,14 +111,16 @@ void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
     PDH_STATUS writeStatus = PDH_INVALID_DATA;
 
     if (storage_.readCounter != nullptr &&
-        (readStatus = PdhGetFormattedCounterValue(storage_.readCounter, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
+        (readStatus = PdhGetFormattedCounterValue(storage_.readCounter, PDH_FMT_DOUBLE, nullptr, &value)) ==
+            ERROR_SUCCESS) {
         snapshot_.storage.readMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
     } else if (!initializeOnly) {
         snapshot_.storage.readMbps = 0.0;
     }
 
     if (storage_.writeCounter != nullptr &&
-        (writeStatus = PdhGetFormattedCounterValue(storage_.writeCounter, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
+        (writeStatus = PdhGetFormattedCounterValue(storage_.writeCounter, PDH_FMT_DOUBLE, nullptr, &value)) ==
+            ERROR_SUCCESS) {
         snapshot_.storage.writeMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
     } else if (!initializeOnly) {
         snapshot_.storage.writeMbps = 0.0;
@@ -122,11 +131,11 @@ void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
         retainedHistoryStore_.PushSample(snapshot_, "storage.write", snapshot_.storage.writeMbps);
     }
 
-    Trace(("telemetry:storage_rates " +
-        tracing::Trace::FormatPdhStatus("read_status", readStatus) + " " +
-        tracing::Trace::FormatPdhStatus("write_status", writeStatus) +
-        " read_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.storage.readMbps, 3) +
-        " write_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.storage.writeMbps, 3)).c_str());
+    Trace(("telemetry:storage_rates " + tracing::Trace::FormatPdhStatus("read_status", readStatus) + " " +
+           tracing::Trace::FormatPdhStatus("write_status", writeStatus) +
+           " read_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.storage.readMbps, 3) +
+           " write_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.storage.writeMbps, 3))
+            .c_str());
 }
 
 void TelemetryCollector::Impl::RefreshDriveUsage() {
@@ -144,7 +153,8 @@ void TelemetryCollector::Impl::RefreshDriveUsage() {
         const BOOL diskOk = GetDiskFreeSpaceExW(root.c_str(), &freeBytes, &totalBytes, nullptr);
         if (!diskOk || totalBytes.QuadPart == 0) {
             Trace(("telemetry:drive_space label=" + drive.label + " ok=" + tracing::Trace::BoolText(diskOk != FALSE) +
-                " total_bytes=" + std::to_string(totalBytes.QuadPart)).c_str());
+                   " total_bytes=" + std::to_string(totalBytes.QuadPart))
+                    .c_str());
             continue;
         }
 
@@ -156,9 +166,9 @@ void TelemetryCollector::Impl::RefreshDriveUsage() {
         drive.usedPercent = std::clamp((1.0 - (freeGb / totalGb)) * 100.0, 0.0, 100.0);
         drive.readMbps = 0.0;
         drive.writeMbps = 0.0;
-        const auto counterIt = std::find_if(storage_.driveCounters.begin(), storage_.driveCounters.end(), [&](const DriveCounterState& counters) {
-            return counters.label == drive.label;
-        });
+        const auto counterIt = std::find_if(storage_.driveCounters.begin(),
+            storage_.driveCounters.end(),
+            [&](const DriveCounterState& counters) { return counters.label == drive.label; });
         PDH_STATUS readStatus = PDH_CSTATUS_NO_OBJECT;
         PDH_STATUS writeStatus = PDH_CSTATUS_NO_OBJECT;
         PDH_FMT_COUNTERVALUE value{};
@@ -174,14 +184,14 @@ void TelemetryCollector::Impl::RefreshDriveUsage() {
                 drive.writeMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
             }
         }
-        Trace(("telemetry:drive_space label=" + drive.label +
-            " total_bytes=" + std::to_string(totalBytes.QuadPart) +
-            " free_bytes=" + std::to_string(freeBytes.QuadPart) +
-            " used_percent=" + tracing::Trace::FormatValueDouble("value", drive.usedPercent, 1) +
-            " free_gb=" + tracing::Trace::FormatValueDouble("value", drive.freeGb, 1) +
-            " read_status=" + tracing::Trace::FormatPdhStatus("status", readStatus) +
-            " write_status=" + tracing::Trace::FormatPdhStatus("status", writeStatus) +
-            " read_mbps=" + tracing::Trace::FormatValueDouble("value", drive.readMbps, 3) +
-            " write_mbps=" + tracing::Trace::FormatValueDouble("value", drive.writeMbps, 3)).c_str());
+        Trace(("telemetry:drive_space label=" + drive.label + " total_bytes=" + std::to_string(totalBytes.QuadPart) +
+               " free_bytes=" + std::to_string(freeBytes.QuadPart) +
+               " used_percent=" + tracing::Trace::FormatValueDouble("value", drive.usedPercent, 1) +
+               " free_gb=" + tracing::Trace::FormatValueDouble("value", drive.freeGb, 1) +
+               " read_status=" + tracing::Trace::FormatPdhStatus("status", readStatus) +
+               " write_status=" + tracing::Trace::FormatPdhStatus("status", writeStatus) +
+               " read_mbps=" + tracing::Trace::FormatValueDouble("value", drive.readMbps, 3) +
+               " write_mbps=" + tracing::Trace::FormatValueDouble("value", drive.writeMbps, 3))
+                .c_str());
     }
 }

@@ -57,7 +57,6 @@ public:
 };
 
 std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(
-    const DiagnosticsOptions& options,
-    const std::filesystem::path& workingDirectory);
+    const DiagnosticsOptions& options, const std::filesystem::path& workingDirectory);
 
 bool ShouldShowRuntimeDialogs(const DiagnosticsOptions& options);

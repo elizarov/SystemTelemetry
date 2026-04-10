@@ -111,16 +111,13 @@ void ParseFontSpec(UiFontConfig& font, const std::string& value) {
     font.weight = ParseIntOrDefault(parts[2], font.weight);
 }
 
-template <typename Codec, typename Value>
-void DecodeConfigValue(Value& target, const std::string& value);
+template <typename Codec, typename Value> void DecodeConfigValue(Value& target, const std::string& value);
 
-template <>
-void DecodeConfigValue<configschema::IntCodec, int>(int& target, const std::string& value) {
+template <> void DecodeConfigValue<configschema::IntCodec, int>(int& target, const std::string& value) {
     target = ParseIntOrDefault(value, target);
 }
 
-template <>
-void DecodeConfigValue<configschema::DoubleCodec, double>(double& target, const std::string& value) {
+template <> void DecodeConfigValue<configschema::DoubleCodec, double>(double& target, const std::string& value) {
     target = ParseDoubleOrDefault(value, target);
 }
 
@@ -130,12 +127,14 @@ void DecodeConfigValue<configschema::StringCodec, std::string>(std::string& targ
 }
 
 template <>
-void DecodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(LogicalPointConfig& target, const std::string& value) {
+void DecodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(
+    LogicalPointConfig& target, const std::string& value) {
     ParseLogicalPoint(value, target);
 }
 
 template <>
-void DecodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(LogicalSizeConfig& target, const std::string& value) {
+void DecodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(
+    LogicalSizeConfig& target, const std::string& value) {
     ParseLogicalSize(value, target);
 }
 
@@ -150,27 +149,30 @@ void DecodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(UiFontConfig& 
 }
 
 template <>
-void DecodeConfigValue<configschema::StringCodec, std::vector<std::string>>(std::vector<std::string>& target, const std::string& value) {
+void DecodeConfigValue<configschema::StringCodec, std::vector<std::string>>(
+    std::vector<std::string>& target, const std::string& value) {
     target = Split(value, ',');
 }
 
 template <typename Section>
-bool ApplyStructuredSectionFields(typename Section::owner_type& owner, const std::string& key, const std::string& value) {
+bool ApplyStructuredSectionFields(
+    typename Section::owner_type& owner, const std::string& key, const std::string& value) {
     bool handled = false;
-    std::apply([&](auto... field) {
-        (..., [&] {
-            using Field = std::remove_cvref_t<decltype(field)>;
-            if (!handled && key == Field::key.view()) {
-                DecodeConfigValue<typename Field::codec_type>(owner.*(Field::member), value);
-                handled = true;
-            }
-        }());
-    }, Section::fields);
+    std::apply(
+        [&](auto... field) {
+            (..., [&] {
+                using Field = std::remove_cvref_t<decltype(field)>;
+                if (!handled && key == Field::key.view()) {
+                    DecodeConfigValue<typename Field::codec_type>(owner.*(Field::member), value);
+                    handled = true;
+                }
+            }());
+        },
+        Section::fields);
     return handled;
 }
 
-template <typename Codec, typename Owner>
-struct CustomSectionHandler {
+template <typename Codec, typename Owner> struct CustomSectionHandler {
     static bool Apply(Owner&, const std::string&, const std::string&) {
         return false;
     }
@@ -181,19 +183,19 @@ bool ApplySectionValue(typename Section::owner_type& owner, const std::string& k
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
         return ApplyStructuredSectionFields<Section>(owner, key, value);
     } else {
-        return CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::Apply(owner, key, value);
+        return CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::Apply(
+            owner, key, value);
     }
 }
 
-template <typename BindingList, typename Owner, typename Fn>
-void ForEachKnownBinding(Owner&& owner, Fn&& fn) {
-    std::apply([&](auto... binding) {
-        (..., fn(std::remove_cvref_t<decltype(binding)>{}, owner));
-    }, BindingList::bindings);
+template <typename BindingList, typename Owner, typename Fn> void ForEachKnownBinding(Owner&& owner, Fn&& fn) {
+    std::apply(
+        [&](auto... binding) { (..., fn(std::remove_cvref_t<decltype(binding)>{}, owner)); }, BindingList::bindings);
 }
 
 template <typename BindingList, typename Owner>
-bool DispatchKnownBindingSection(Owner& owner, const std::string& section, const std::string& key, const std::string& value) {
+bool DispatchKnownBindingSection(
+    Owner& owner, const std::string& section, const std::string& key, const std::string& value) {
     bool handled = false;
     ForEachKnownBinding<BindingList>(owner, [&](auto binding, auto& currentOwner) {
         using Binding = decltype(binding);
@@ -229,10 +231,8 @@ std::string ReadFileUtf8(const std::filesystem::path& path) {
     std::ostringstream buffer;
     buffer << input.rdbuf();
     std::string text = buffer.str();
-    if (text.size() >= 3 &&
-        static_cast<unsigned char>(text[0]) == 0xEF &&
-        static_cast<unsigned char>(text[1]) == 0xBB &&
-        static_cast<unsigned char>(text[2]) == 0xBF) {
+    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
+        static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
     }
     return text;
@@ -265,10 +265,8 @@ std::string LoadUtf8Resource(WORD resourceId, const wchar_t* resourceType) {
     }
 
     std::string text(static_cast<const char*>(resourceData), static_cast<size_t>(resourceSize));
-    if (text.size() >= 3 &&
-        static_cast<unsigned char>(text[0]) == 0xEF &&
-        static_cast<unsigned char>(text[1]) == 0xBB &&
-        static_cast<unsigned char>(text[2]) == 0xBF) {
+    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
+        static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
     }
     return text;
@@ -426,16 +424,14 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
 namespace {
 
 bool IsWidgetOrContainerNodeName(const std::string& name) {
-    return name == "rows" || name == "columns" ||
-        name == "text" || name == "gauge" || name == "metric_list" || name == "throughput" ||
-        name == "network_footer" || name == "spacer" || name == "vertical_spring" || name == "drive_usage_list" ||
-        name == "clock_time" || name == "clock_date";
+    return name == "rows" || name == "columns" || name == "text" || name == "gauge" || name == "metric_list" ||
+           name == "throughput" || name == "network_footer" || name == "spacer" || name == "vertical_spring" ||
+           name == "drive_usage_list" || name == "clock_time" || name == "clock_date";
 }
 
 void MarkCardReferencesRecursive(LayoutNodeConfig& node, const std::set<std::string>& cardIds) {
     node.cardReference = false;
-    if (node.children.empty() && node.parameter.empty() &&
-        !IsWidgetOrContainerNodeName(node.name) &&
+    if (node.children.empty() && node.parameter.empty() && !IsWidgetOrContainerNodeName(node.name) &&
         cardIds.find(node.name) != cardIds.end()) {
         node.cardReference = true;
     }
@@ -457,15 +453,15 @@ void MarkCardLayoutReferences(LayoutConfig& layout) {
 }
 
 template <>
-void DecodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(LayoutNodeConfig& target, const std::string& value) {
+void DecodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(
+    LayoutNodeConfig& target, const std::string& value) {
     LayoutNodeConfig parsed;
     if (ParseLayoutExpression(value, parsed)) {
         target = std::move(parsed);
     }
 }
 
-template <>
-struct CustomSectionHandler<configschema::BoardSectionCodec, BoardConfig> {
+template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardConfig> {
     static bool Apply(BoardConfig& board, const std::string& key, const std::string& value) {
         if (key.rfind("board.temp.", 0) == 0) {
             board.temperatureSensorNames[key.substr(std::string("board.temp.").size())] = value;

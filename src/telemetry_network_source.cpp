@@ -21,11 +21,10 @@ struct NetworkCandidateState {
 };
 
 bool AdapterMatchesRow(const IP_ADAPTER_ADDRESSES& adapter, const MIB_IF_ROW2& row) {
-    return adapter.Luid.Value == row.InterfaceLuid.Value ||
-        adapter.IfIndex == row.InterfaceIndex ||
-        adapter.Ipv6IfIndex == row.InterfaceIndex ||
-        (adapter.FriendlyName != nullptr && _wcsicmp(adapter.FriendlyName, row.Alias) == 0) ||
-        (adapter.Description != nullptr && _wcsicmp(adapter.Description, row.Description) == 0);
+    return adapter.Luid.Value == row.InterfaceLuid.Value || adapter.IfIndex == row.InterfaceIndex ||
+           adapter.Ipv6IfIndex == row.InterfaceIndex ||
+           (adapter.FriendlyName != nullptr && _wcsicmp(adapter.FriendlyName, row.Alias) == 0) ||
+           (adapter.Description != nullptr && _wcsicmp(adapter.Description, row.Description) == 0);
 }
 
 bool HasUsableGateway(const IP_ADAPTER_ADDRESSES& adapter) {
@@ -66,8 +65,7 @@ AdapterSelectionInfo BuildAdapterSelectionInfo(const MIB_IF_ROW2& row, const IP_
 
             wchar_t address[128];
             DWORD length = ARRAYSIZE(address);
-            if (WSAAddressToStringW(
-                    unicast->Address.lpSockaddr,
+            if (WSAAddressToStringW(unicast->Address.lpSockaddr,
                     static_cast<DWORD>(unicast->Address.iSockaddrLength),
                     nullptr,
                     address,
@@ -89,18 +87,20 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
     const DWORD tableStatus = GetIfTable2(&table);
     if (tableStatus != NO_ERROR || table == nullptr) {
         Trace(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) +
-            " table=" + tracing::Trace::BoolText(table != nullptr)).c_str());
+               " table=" + tracing::Trace::BoolText(table != nullptr))
+                .c_str());
         return;
     }
-    Trace(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) +
-        " entries=" + std::to_string(table->NumEntries) +
-        " initialize_only=" + tracing::Trace::BoolText(initializeOnly)).c_str());
+    Trace(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) + " entries=" +
+           std::to_string(table->NumEntries) + " initialize_only=" + tracing::Trace::BoolText(initializeOnly))
+            .c_str());
 
     ULONG addressBufferSize = 0;
     const ULONG addressProbeStatus = GetAdaptersAddresses(
         AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, nullptr, &addressBufferSize);
     Trace(("telemetry:network_ip_probe " + tracing::Trace::FormatWin32Status("status", addressProbeStatus) +
-        " size=" + std::to_string(addressBufferSize)).c_str());
+           " size=" + std::to_string(addressBufferSize))
+            .c_str());
 
     std::vector<BYTE> addressBuffer;
     IP_ADAPTER_ADDRESSES* addresses = nullptr;
@@ -112,7 +112,8 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
             AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, addresses, &addressBufferSize);
     }
     Trace(("telemetry:network_ip_fetch " + tracing::Trace::FormatWin32Status("status", addressFetchStatus) +
-        " size=" + std::to_string(addressBufferSize)).c_str());
+           " size=" + std::to_string(addressBufferSize))
+            .c_str());
     if (addressFetchStatus != NO_ERROR) {
         addresses = nullptr;
     }
@@ -149,14 +150,11 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         }
 
         const bool configuredExactMatch =
-            configuredCandidateAvailable &&
-            (EqualsInsensitive(row.Alias, config_.network.adapterName) ||
-                EqualsInsensitive(row.Description, config_.network.adapterName));
-        const bool configuredPartialMatch =
-            configuredCandidateAvailable &&
-            !configuredExactMatch &&
-            (ContainsInsensitive(row.Alias, config_.network.adapterName) ||
-                ContainsInsensitive(row.Description, config_.network.adapterName));
+            configuredCandidateAvailable && (EqualsInsensitive(row.Alias, config_.network.adapterName) ||
+                                                EqualsInsensitive(row.Description, config_.network.adapterName));
+        const bool configuredPartialMatch = configuredCandidateAvailable && !configuredExactMatch &&
+                                            (ContainsInsensitive(row.Alias, config_.network.adapterName) ||
+                                                ContainsInsensitive(row.Description, config_.network.adapterName));
         if (configuredCandidateAvailable && !configuredExactMatch && !configuredPartialMatch) {
             continue;
         }
@@ -169,29 +167,26 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         const bool hardwareInterface = row.InterfaceAndOperStatusFlags.HardwareInterface != FALSE;
         const bool connectorPresent = row.InterfaceAndOperStatusFlags.ConnectorPresent != FALSE;
 
-        Trace(("telemetry:network_candidate interface=" + std::to_string(row.InterfaceIndex) +
-            " alias=\"" + Utf8FromWide(row.Alias) + "\" description=\"" + Utf8FromWide(row.Description) + "\"" +
-            " exact_match=" + tracing::Trace::BoolText(configuredExactMatch) +
-            " partial_match=" + tracing::Trace::BoolText(configuredPartialMatch) +
-            " matched=" + tracing::Trace::BoolText(info.matched) +
-            " has_ipv4=" + tracing::Trace::BoolText(info.hasIpv4) +
-            " has_gateway=" + tracing::Trace::BoolText(info.hasGateway) +
-            " hardware=" + tracing::Trace::BoolText(hardwareInterface) +
-            " connector=" + tracing::Trace::BoolText(connectorPresent) +
-            " traffic=" + std::to_string(traffic) +
-            " ip=" + info.ipAddress).c_str());
+        Trace(("telemetry:network_candidate interface=" + std::to_string(row.InterfaceIndex) + " alias=\"" +
+               Utf8FromWide(row.Alias) + "\" description=\"" + Utf8FromWide(row.Description) + "\"" +
+               " exact_match=" + tracing::Trace::BoolText(configuredExactMatch) + " partial_match=" +
+               tracing::Trace::BoolText(configuredPartialMatch) + " matched=" + tracing::Trace::BoolText(info.matched) +
+               " has_ipv4=" + tracing::Trace::BoolText(info.hasIpv4) + " has_gateway=" +
+               tracing::Trace::BoolText(info.hasGateway) + " hardware=" + tracing::Trace::BoolText(hardwareInterface) +
+               " connector=" + tracing::Trace::BoolText(connectorPresent) + " traffic=" + std::to_string(traffic) +
+               " ip=" + info.ipAddress)
+                .c_str());
 
         NetworkCandidateState candidateState;
         candidateState.interfaceIndex = row.InterfaceIndex;
-        candidateState.candidate.adapterName = Utf8FromWide(
-            row.Alias[0] != L'\0' ? std::wstring_view(row.Alias) : std::wstring_view(row.Description));
+        candidateState.candidate.adapterName =
+            Utf8FromWide(row.Alias[0] != L'\0' ? std::wstring_view(row.Alias) : std::wstring_view(row.Description));
         candidateState.candidate.ipAddress = info.ipAddress;
         candidates.push_back(std::move(candidateState));
 
         if (!configuredCandidateAvailable) {
             const bool candidatePreferred =
-                selected == nullptr ||
-                (info.hasGateway && !selectedInfo.hasGateway) ||
+                selected == nullptr || (info.hasGateway && !selectedInfo.hasGateway) ||
                 (info.hasGateway == selectedInfo.hasGateway && info.hasIpv4 && !selectedInfo.hasIpv4) ||
                 (info.hasGateway == selectedInfo.hasGateway && info.hasIpv4 == selectedInfo.hasIpv4 &&
                     hardwareInterface && !selected->InterfaceAndOperStatusFlags.HardwareInterface) ||
@@ -207,15 +202,14 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
                 selectedTraffic = traffic;
                 selectedInfo = info;
             }
-        } else if (
-            selected == nullptr ||
-            (configuredExactMatch && !(
-                EqualsInsensitive(selected->Alias, config_.network.adapterName) ||
-                EqualsInsensitive(selected->Description, config_.network.adapterName))) ||
-            (configuredExactMatch ==
-                (EqualsInsensitive(selected->Alias, config_.network.adapterName) ||
-                    EqualsInsensitive(selected->Description, config_.network.adapterName)) &&
-                (info.hasGateway || info.hasIpv4))) {
+        } else if (selected == nullptr ||
+                   (configuredExactMatch &&
+                       !(EqualsInsensitive(selected->Alias, config_.network.adapterName) ||
+                           EqualsInsensitive(selected->Description, config_.network.adapterName))) ||
+                   (configuredExactMatch ==
+                           (EqualsInsensitive(selected->Alias, config_.network.adapterName) ||
+                               EqualsInsensitive(selected->Description, config_.network.adapterName)) &&
+                       (info.hasGateway || info.hasIpv4))) {
             selected = &row;
             selectedTraffic = traffic;
             selectedInfo = info;
@@ -235,14 +229,15 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
     }
 
     if (selected != nullptr) {
-        Trace(("telemetry:network_selected interface=" + std::to_string(selected->InterfaceIndex) +
-            " alias=\"" + Utf8FromWide(selected->Alias) + "\" description=\"" + Utf8FromWide(selected->Description) +
-            "\" has_ipv4=" + tracing::Trace::BoolText(selectedInfo.hasIpv4) +
-            " has_gateway=" + tracing::Trace::BoolText(selectedInfo.hasGateway) +
-            " traffic=" + std::to_string(selectedTraffic) +
-            " ip=" + selectedInfo.ipAddress).c_str());
-        snapshot_.network.adapterName = Utf8FromWide(
-            selected->Alias[0] != L'\0' ? std::wstring_view(selected->Alias) : std::wstring_view(selected->Description));
+        Trace(("telemetry:network_selected interface=" + std::to_string(selected->InterfaceIndex) + " alias=\"" +
+               Utf8FromWide(selected->Alias) + "\" description=\"" + Utf8FromWide(selected->Description) +
+               "\" has_ipv4=" + tracing::Trace::BoolText(selectedInfo.hasIpv4) +
+               " has_gateway=" + tracing::Trace::BoolText(selectedInfo.hasGateway) +
+               " traffic=" + std::to_string(selectedTraffic) + " ip=" + selectedInfo.ipAddress)
+                .c_str());
+        snapshot_.network.adapterName =
+            Utf8FromWide(selected->Alias[0] != L'\0' ? std::wstring_view(selected->Alias)
+                                                     : std::wstring_view(selected->Description));
         if (network_.selectedIndex != selected->InterfaceIndex) {
             network_.selectedIndex = selected->InterfaceIndex;
             network_.previousInOctets = selected->InOctets;
@@ -258,9 +253,10 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
                 retainedHistoryStore_.PushSample(snapshot_, "network.upload", snapshot_.network.uploadMbps);
                 retainedHistoryStore_.PushSample(snapshot_, "network.download", snapshot_.network.downloadMbps);
                 Trace(("telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
-                    " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) +
-                    " upload_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.network.uploadMbps, 3) +
-                    " download_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.network.downloadMbps, 3)).c_str());
+                       " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) + " upload_mbps=" +
+                       tracing::Trace::FormatValueDouble("value", snapshot_.network.uploadMbps, 3) + " download_mbps=" +
+                       tracing::Trace::FormatValueDouble("value", snapshot_.network.downloadMbps, 3))
+                        .c_str());
             }
             network_.previousInOctets = selected->InOctets;
             network_.previousOutOctets = selected->OutOctets;
@@ -270,7 +266,8 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         snapshot_.network.ipAddress = selectedInfo.ipAddress;
         if (selectedInfo.hasIpv4) {
             Trace(("telemetry:network_ip_found interface=" + std::to_string(selected->InterfaceIndex) +
-                " ip=" + selectedInfo.ipAddress).c_str());
+                   " ip=" + selectedInfo.ipAddress)
+                    .c_str());
         } else {
             Trace(("telemetry:network_ip_missing interface=" + std::to_string(selected->InterfaceIndex)).c_str());
         }

@@ -15,8 +15,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         const auto configureDisplayTarget = GetSwitchValue(L"/configure-display-target");
         const auto configureDisplayDump = GetSwitchValue(L"/configure-display-dump");
         const auto configureDisplayImageTarget = GetSwitchValue(L"/configure-display-image-target");
-        return RunElevatedConfigureDisplayMode(
-            *configureDisplaySource,
+        return RunElevatedConfigureDisplayMode(*configureDisplaySource,
             configureDisplayDump.value_or(std::filesystem::path{}),
             configureDisplayTarget.value_or(std::filesystem::path{}),
             configureDisplayImageTarget.value_or(std::filesystem::path{}));

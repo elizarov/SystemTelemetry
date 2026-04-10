@@ -26,12 +26,13 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
 
     const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.display.monitorName);
     if (!targetMonitor.has_value()) {
-        trace.Write("wallpaper:monitor_unresolved monitor=\"" + config.display.monitorName +
-            "\" wallpaper=\"" + config.display.wallpaper + "\"");
+        trace.Write("wallpaper:monitor_unresolved monitor=\"" + config.display.monitorName + "\" wallpaper=\"" +
+                    config.display.wallpaper + "\"");
         return false;
     }
 
-    const std::filesystem::path wallpaperPath = ResolveExecutableRelativePath(std::filesystem::path(WideFromUtf8(config.display.wallpaper)));
+    const std::filesystem::path wallpaperPath =
+        ResolveExecutableRelativePath(std::filesystem::path(WideFromUtf8(config.display.wallpaper)));
     if (wallpaperPath.empty()) {
         trace.Write("wallpaper:path_empty monitor=\"" + config.display.monitorName + "\"");
         return false;
@@ -45,11 +46,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
     }
 
     IDesktopWallpaper* desktopWallpaper = nullptr;
-    const HRESULT createStatus = CoCreateInstance(
-        CLSID_DesktopWallpaper,
-        nullptr,
-        CLSCTX_ALL,
-        IID_PPV_ARGS(&desktopWallpaper));
+    const HRESULT createStatus =
+        CoCreateInstance(CLSID_DesktopWallpaper, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&desktopWallpaper));
     if (FAILED(createStatus) || desktopWallpaper == nullptr) {
         trace.Write("wallpaper:create_failed hr=" + FormatHresult(createStatus));
         if (shouldUninitialize) {
@@ -78,11 +76,9 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
                 targetFound = true;
                 const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wallpaperPath.c_str());
                 applied = SUCCEEDED(setStatus);
-                trace.Write(
-                    std::string("wallpaper:apply_") + (applied ? "done" : "failed") +
-                    " monitor=\"" + config.display.monitorName +
-                    "\" path=\"" + Utf8FromWide(wallpaperPath.wstring()) +
-                    "\" hr=" + FormatHresult(setStatus));
+                trace.Write(std::string("wallpaper:apply_") + (applied ? "done" : "failed") + " monitor=\"" +
+                            config.display.monitorName + "\" path=\"" + Utf8FromWide(wallpaperPath.wstring()) +
+                            "\" hr=" + FormatHresult(setStatus));
                 CoTaskMemFree(monitorId);
                 break;
             }
@@ -91,8 +87,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
     }
 
     if (!targetFound) {
-        trace.Write("wallpaper:target_not_found monitor=\"" + config.display.monitorName +
-            "\" path=\"" + Utf8FromWide(wallpaperPath.wstring()) + "\"");
+        trace.Write("wallpaper:target_not_found monitor=\"" + config.display.monitorName + "\" path=\"" +
+                    Utf8FromWide(wallpaperPath.wstring()) + "\"");
     }
 
     desktopWallpaper->Release();
@@ -102,15 +98,14 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
     return applied;
 }
 
-bool ConfigureDisplay(const AppConfig& config, const TelemetryDump& dump, UINT targetDpi,
-    std::ostream* traceStream, HWND owner) {
+bool ConfigureDisplay(
+    const AppConfig& config, const TelemetryDump& dump, UINT targetDpi, std::ostream* traceStream, HWND owner) {
     const std::filesystem::path configPath = GetRuntimeConfigPath();
     const std::filesystem::path imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
 
     if (CanWriteRuntimeConfig(configPath) && CanWriteRuntimeConfig(imagePath)) {
         std::string screenshotError;
-        const bool imageSaved = SaveDumpScreenshot(
-            imagePath,
+        const bool imageSaved = SaveDumpScreenshot(imagePath,
             dump.snapshot,
             config,
             ScaleFromDpi(targetDpi),
@@ -184,8 +179,10 @@ bool ConfigureDisplay(const AppConfig& config, const TelemetryDump& dump, UINT t
     return exitCode == 0;
 }
 
-int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPath, const std::filesystem::path& sourceDumpPath,
-    const std::filesystem::path& targetConfigPath, const std::filesystem::path& targetImagePath) {
+int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPath,
+    const std::filesystem::path& sourceDumpPath,
+    const std::filesystem::path& targetConfigPath,
+    const std::filesystem::path& targetImagePath) {
     if (sourceConfigPath.empty() || sourceDumpPath.empty() || targetConfigPath.empty() || targetImagePath.empty()) {
         return 2;
     }
@@ -206,8 +203,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
     }
 
     std::string screenshotError;
-    const bool imageSaved = SaveDumpScreenshot(
-        targetImagePath,
+    const bool imageSaved = SaveDumpScreenshot(targetImagePath,
         dump.snapshot,
         config,
         ScaleFromDpi(targetMonitor->dpi),

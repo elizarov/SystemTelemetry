@@ -15,7 +15,10 @@ struct SnapCandidate {
 
 using ExtentEvaluator = std::function<std::optional<int>(int firstWeight)>;
 
-std::optional<int> FindNearestSnapWeight(int currentWeight, int combinedWeight, int threshold,
-    const std::vector<SnapCandidate>& candidates, const ExtentEvaluator& evaluateExtent);
+std::optional<int> FindNearestSnapWeight(int currentWeight,
+    int combinedWeight,
+    int threshold,
+    const std::vector<SnapCandidate>& candidates,
+    const ExtentEvaluator& evaluateExtent);
 
 }  // namespace layout_snap_solver

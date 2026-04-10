@@ -7,9 +7,8 @@ namespace layout_edit {
 namespace {
 
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
-    const auto it = std::find_if(layout.cards.begin(), layout.cards.end(), [&](LayoutCardConfig& card) {
-        return card.id == cardId;
-    });
+    const auto it = std::find_if(
+        layout.cards.begin(), layout.cards.end(), [&](LayoutCardConfig& card) { return card.id == cardId; });
     return it != layout.cards.end() ? &(*it) : nullptr;
 }
 
@@ -113,8 +112,7 @@ bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& ta
     return updated;
 }
 
-std::optional<int> EvaluateWidgetExtentForGuideWeights(
-    DashboardRenderer& renderer,
+std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer,
     const AppConfig& baseConfig,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,

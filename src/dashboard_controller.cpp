@@ -121,7 +121,8 @@ bool DashboardController::WriteDiagnosticsOutputs() {
     return ok;
 }
 
-bool DashboardController::ReloadConfigFromDisk(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller) {
+bool DashboardController::ReloadConfigFromDisk(
+    DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller) {
     StopLayoutEditMode(shell, controller, diagnosticsOptions.editLayout);
     if (!ReloadTelemetryRuntimeFromDisk(
             GetRuntimeConfigPath(), state_.config, state_.telemetry, diagnosticsOptions, state_.diagnostics.get())) {
@@ -150,9 +151,7 @@ void DashboardController::SaveDumpAs(DashboardShellHost& shell) {
         return;
     }
     const auto path = shell.PromptDiagnosticsSavePath(
-        kDefaultDumpFileName,
-        L"Telemetry dump (*.txt)\0*.txt\0All files (*.*)\0*.*\0",
-        L"txt");
+        kDefaultDumpFileName, L"Telemetry dump (*.txt)\0*.txt\0All files (*.*)\0*.*\0", L"txt");
     if (!path.has_value()) {
         return;
     }
@@ -171,15 +170,12 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
         return;
     }
     const auto path = shell.PromptDiagnosticsSavePath(
-        kDefaultScreenshotFileName,
-        L"PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0",
-        L"png");
+        kDefaultScreenshotFileName, L"PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0", L"png");
     if (!path.has_value()) {
         return;
     }
     std::string errorText;
-    if (!SaveDumpScreenshot(
-            *path,
+    if (!SaveDumpScreenshot(*path,
             state_.telemetry->Dump().snapshot,
             state_.telemetry->EffectiveConfig(),
             1.0,
@@ -199,9 +195,7 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
 
 void DashboardController::SaveFullConfigAs(DashboardShellHost& shell) {
     const auto path = shell.PromptDiagnosticsSavePath(
-        kDefaultSavedFullConfigFileName,
-        L"INI config (*.ini)\0*.ini\0All files (*.*)\0*.*\0",
-        L"ini");
+        kDefaultSavedFullConfigFileName, L"INI config (*.ini)\0*.ini\0All files (*.*)\0*.*\0", L"ini");
     if (!path.has_value()) {
         return;
     }
@@ -233,8 +227,7 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
     updatedConfig.display.monitorName = option.configMonitorName;
     updatedConfig.display.position = {};
     updatedConfig.display.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
-    if (!::ConfigureDisplay(
-            updatedConfig,
+    if (!::ConfigureDisplay(updatedConfig,
             state_.telemetry->Dump(),
             option.dpi,
             state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr,
@@ -252,7 +245,10 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
     return true;
 }
 
-bool DashboardController::SwitchLayout(DashboardShellHost& shell, const std::string& layoutName, LayoutEditController& controller, bool diagnosticsEditLayout) {
+bool DashboardController::SwitchLayout(DashboardShellHost& shell,
+    const std::string& layoutName,
+    LayoutEditController& controller,
+    bool diagnosticsEditLayout) {
     StopLayoutEditMode(shell, controller, diagnosticsEditLayout);
     AppConfig updatedConfig = state_.config;
     if (!SelectLayout(updatedConfig, layoutName)) {
@@ -318,7 +314,8 @@ void DashboardController::StartLayoutEditMode(DashboardShellHost& shell, LayoutE
     shell.InvalidateShell();
 }
 
-void DashboardController::StopLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller, bool diagnosticsEditLayout) {
+void DashboardController::StopLayoutEditMode(
+    DashboardShellHost& shell, LayoutEditController& controller, bool diagnosticsEditLayout) {
     if (!state_.isEditingLayout) {
         return;
     }
@@ -327,8 +324,8 @@ void DashboardController::StopLayoutEditMode(DashboardShellHost& shell, LayoutEd
     shell.RendererEditOverlayState().showLayoutEditGuides = diagnosticsEditLayout;
 }
 
-bool DashboardController::ApplyLayoutGuideWeights(DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target,
-    const std::vector<int>& weights) {
+bool DashboardController::ApplyLayoutGuideWeights(
+    DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
     if (!layout_edit::ApplyGuideWeights(state_.config, target, weights)) {
         return false;
     }
@@ -337,7 +334,8 @@ bool DashboardController::ApplyLayoutGuideWeights(DashboardShellHost& shell, con
     return true;
 }
 
-bool DashboardController::ApplyLayoutEditValue(DashboardShellHost& shell, const LayoutEditHost::ValueTarget& target, double value) {
+bool DashboardController::ApplyLayoutEditValue(
+    DashboardShellHost& shell, const LayoutEditHost::ValueTarget& target, double value) {
     if (!layout_edit::ApplyValue(state_.config, target, value)) {
         return false;
     }
@@ -347,15 +345,19 @@ bool DashboardController::ApplyLayoutEditValue(DashboardShellHost& shell, const 
 }
 
 std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
-    const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights,
-    const DashboardRenderer::LayoutWidgetIdentity& widget, DashboardRenderer::LayoutGuideAxis axis) {
-    return layout_edit::EvaluateWidgetExtentForGuideWeights(shell.Renderer(), state_.config, target, weights, widget, axis);
+    const LayoutEditHost::LayoutTarget& target,
+    const std::vector<int>& weights,
+    const DashboardRenderer::LayoutWidgetIdentity& widget,
+    DashboardRenderer::LayoutGuideAxis axis) {
+    return layout_edit::EvaluateWidgetExtentForGuideWeights(
+        shell.Renderer(), state_.config, target, weights, widget, axis);
 }
 
 AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {
     AppConfig config = state_.telemetry != nullptr ? state_.telemetry->EffectiveConfig() : state_.config;
     const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
-    config.display.monitorName = !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
+    config.display.monitorName =
+        !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
     config.display.position.x = placement.relativePosition.x;
     config.display.position.y = placement.relativePosition.y;
     return config;

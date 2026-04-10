@@ -114,63 +114,87 @@ std::vector<double> ResolveRetainedHistorySamples(const SystemSnapshot& snapshot
 }
 
 std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<NamedScalarMetric>& metrics,
-    const SystemSnapshot& snapshot, const std::string& metricHistoryRef, const std::string& name,
-    const char* suffix, double scale) {
+    const SystemSnapshot& snapshot,
+    const std::string& metricHistoryRef,
+    const std::string& name,
+    const char* suffix,
+    double scale) {
     for (const auto& metric : metrics) {
         if (metric.name != name) {
             continue;
         }
         const double ratio = ResolveScaleRatio(metric.metric.value.value_or(0.0), scale);
-        return DashboardMetricRow{BuildBoardMetricLabel(metric.name, suffix), FormatScalarValue(metric.metric, 0),
-            ratio, ResolvePeakRatio(snapshot, metricHistoryRef, ratio)};
+        return DashboardMetricRow{BuildBoardMetricLabel(metric.name, suffix),
+            FormatScalarValue(metric.metric, 0),
+            ratio,
+            ResolvePeakRatio(snapshot, metricHistoryRef, ratio)};
     }
 
-    ScalarMetric unavailable{std::nullopt, std::string(suffix) == "Temp" ? "\xC2\xB0""C" : "RPM"};
-    return DashboardMetricRow{BuildBoardMetricLabel(name, suffix), FormatScalarValue(unavailable, 0), 0.0,
+    ScalarMetric unavailable{std::nullopt,
+        std::string(suffix) == "Temp" ? "\xC2\xB0"
+                                        "C"
+                                      : "RPM"};
+    return DashboardMetricRow{BuildBoardMetricLabel(name, suffix),
+        FormatScalarValue(unavailable, 0),
+        0.0,
         ResolvePeakRatio(snapshot, metricHistoryRef, 0.0)};
 }
 
-std::optional<DashboardMetricRow> ResolveMetricRow(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales,
-    const std::string& metricRef) {
+std::optional<DashboardMetricRow> ResolveMetricRow(
+    const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales, const std::string& metricRef) {
     if (metricRef == "cpu.clock") {
         const double ratio = ResolveScaleRatio(snapshot.cpu.clock.value.value_or(0.0), metricScales.cpuClockGHz);
-        return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.cpu.clock, 2),
-            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return DashboardMetricRow{
+            "Clock", FormatScalarValue(snapshot.cpu.clock, 2), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "cpu.ram") {
         const double total = snapshot.cpu.memory.totalGb;
         const double ratio = total > 0.0 ? snapshot.cpu.memory.usedGb / total : 0.0;
-        return DashboardMetricRow{"RAM", FormatMemory(snapshot.cpu.memory.usedGb, total),
-            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return DashboardMetricRow{"RAM",
+            FormatMemory(snapshot.cpu.memory.usedGb, total),
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.temp") {
-        const double ratio = ResolveScaleRatio(snapshot.gpu.temperature.value.value_or(0.0), metricScales.gpuTemperatureC);
-        return DashboardMetricRow{"Temp", FormatScalarValue(snapshot.gpu.temperature, 0),
-            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        const double ratio =
+            ResolveScaleRatio(snapshot.gpu.temperature.value.value_or(0.0), metricScales.gpuTemperatureC);
+        return DashboardMetricRow{"Temp",
+            FormatScalarValue(snapshot.gpu.temperature, 0),
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.clock") {
         const double ratio = ResolveScaleRatio(snapshot.gpu.clock.value.value_or(0.0), metricScales.gpuClockMHz);
-        return DashboardMetricRow{"Clock", FormatScalarValue(snapshot.gpu.clock, 0),
-            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return DashboardMetricRow{
+            "Clock", FormatScalarValue(snapshot.gpu.clock, 0), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.fan") {
         const double ratio = ResolveScaleRatio(snapshot.gpu.fan.value.value_or(0.0), metricScales.gpuFanRpm);
-        return DashboardMetricRow{"Fan", FormatScalarValue(snapshot.gpu.fan, 0),
-            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return DashboardMetricRow{
+            "Fan", FormatScalarValue(snapshot.gpu.fan, 0), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.vram") {
         const double total = std::max(1.0, snapshot.gpu.vram.totalGb);
-        const double ratio = snapshot.gpu.vram.totalGb > 0.0 ? snapshot.gpu.vram.usedGb / snapshot.gpu.vram.totalGb : 0.0;
-        return DashboardMetricRow{"VRAM", FormatMemory(snapshot.gpu.vram.usedGb, total),
-            ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        const double ratio =
+            snapshot.gpu.vram.totalGb > 0.0 ? snapshot.gpu.vram.usedGb / snapshot.gpu.vram.totalGb : 0.0;
+        return DashboardMetricRow{
+            "VRAM", FormatMemory(snapshot.gpu.vram.usedGb, total), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef.rfind("board.temp.", 0) == 0) {
-        return ResolveNamedBoardMetric(snapshot.boardTemperatures, snapshot, metricRef,
-            metricRef.substr(std::string("board.temp.").size()), "Temp", metricScales.boardTemperatureC);
+        return ResolveNamedBoardMetric(snapshot.boardTemperatures,
+            snapshot,
+            metricRef,
+            metricRef.substr(std::string("board.temp.").size()),
+            "Temp",
+            metricScales.boardTemperatureC);
     }
     if (metricRef.rfind("board.fan.", 0) == 0) {
-        return ResolveNamedBoardMetric(snapshot.boardFans, snapshot, metricRef,
-            metricRef.substr(std::string("board.fan.").size()), "Fan", metricScales.boardFanRpm);
+        return ResolveNamedBoardMetric(snapshot.boardFans,
+            snapshot,
+            metricRef,
+            metricRef.substr(std::string("board.fan.").size()),
+            "Fan",
+            metricScales.boardFanRpm);
     }
     return std::nullopt;
 }
@@ -208,7 +232,8 @@ DashboardGaugeMetric DashboardMetricSource::ResolveGauge(const std::string& metr
     return DashboardGaugeMetric{};
 }
 
-std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const {
+std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(
+    const std::vector<DashboardMetricListEntry>& metricRefs) const {
     std::vector<DashboardMetricRow> rows;
     for (const auto& metricRef : metricRefs) {
         if (auto row = ResolveMetricRow(snapshot_, metricScales_, metricRef.metricRef); row.has_value()) {
@@ -220,30 +245,50 @@ std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(const s
 }
 
 DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::string& metricRef) const {
-    const auto networkUploadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.upload"));
-    const auto networkDownloadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.download"));
+    const auto networkUploadHistory =
+        SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.upload"));
+    const auto networkDownloadHistory =
+        SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.download"));
     const auto storageReadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.read"));
     const auto storageWriteHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.write"));
     const double networkMaxGraph = GetThroughputGraphMax(networkUploadHistory, networkDownloadHistory);
     const double storageMaxGraph = GetThroughputGraphMax(storageReadHistory, storageWriteHistory);
     const double timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot_.now);
     if (metricRef == "network.upload") {
-        return DashboardThroughputMetric{
-            "Up", ResolveDisplayedThroughputValue(snapshot_.network.uploadMbps, networkUploadHistory),
-            networkUploadHistory, networkMaxGraph, 5.0, timeMarkerOffsetSamples, 20.0};
+        return DashboardThroughputMetric{"Up",
+            ResolveDisplayedThroughputValue(snapshot_.network.uploadMbps, networkUploadHistory),
+            networkUploadHistory,
+            networkMaxGraph,
+            5.0,
+            timeMarkerOffsetSamples,
+            20.0};
     }
     if (metricRef == "network.download") {
-        return DashboardThroughputMetric{
-            "Down", ResolveDisplayedThroughputValue(snapshot_.network.downloadMbps, networkDownloadHistory),
-            networkDownloadHistory, networkMaxGraph, 5.0, timeMarkerOffsetSamples, 20.0};
+        return DashboardThroughputMetric{"Down",
+            ResolveDisplayedThroughputValue(snapshot_.network.downloadMbps, networkDownloadHistory),
+            networkDownloadHistory,
+            networkMaxGraph,
+            5.0,
+            timeMarkerOffsetSamples,
+            20.0};
     }
     if (metricRef == "storage.read") {
-        return DashboardThroughputMetric{"Read", ResolveDisplayedThroughputValue(snapshot_.storage.readMbps, storageReadHistory),
-            storageReadHistory, storageMaxGraph, GetStorageGuideStep(storageMaxGraph), timeMarkerOffsetSamples, 20.0};
+        return DashboardThroughputMetric{"Read",
+            ResolveDisplayedThroughputValue(snapshot_.storage.readMbps, storageReadHistory),
+            storageReadHistory,
+            storageMaxGraph,
+            GetStorageGuideStep(storageMaxGraph),
+            timeMarkerOffsetSamples,
+            20.0};
     }
     if (metricRef == "storage.write") {
-        return DashboardThroughputMetric{"Write", ResolveDisplayedThroughputValue(snapshot_.storage.writeMbps, storageWriteHistory),
-            storageWriteHistory, storageMaxGraph, GetStorageGuideStep(storageMaxGraph), timeMarkerOffsetSamples, 20.0};
+        return DashboardThroughputMetric{"Write",
+            ResolveDisplayedThroughputValue(snapshot_.storage.writeMbps, storageWriteHistory),
+            storageWriteHistory,
+            storageMaxGraph,
+            GetStorageGuideStep(storageMaxGraph),
+            timeMarkerOffsetSamples,
+            20.0};
     }
     return DashboardThroughputMetric{};
 }
@@ -265,9 +310,10 @@ std::vector<DashboardDriveRow> DashboardMetricSource::ResolveDriveRows() const {
     }
     for (const auto& drive : snapshot_.drives) {
         const double readActivity = totalReadMbps > 0.0 ? std::clamp(drive.readMbps / totalReadMbps, 0.0, 1.0) : 0.0;
-        const double writeActivity = totalWriteMbps > 0.0 ? std::clamp(drive.writeMbps / totalWriteMbps, 0.0, 1.0) : 0.0;
-        rows.push_back(DashboardDriveRow{drive.label, readActivity, writeActivity, drive.usedPercent,
-            FormatDriveFree(drive.freeGb)});
+        const double writeActivity =
+            totalWriteMbps > 0.0 ? std::clamp(drive.writeMbps / totalWriteMbps, 0.0, 1.0) : 0.0;
+        rows.push_back(DashboardDriveRow{
+            drive.label, readActivity, writeActivity, drive.usedPercent, FormatDriveFree(drive.freeGb)});
     }
     return rows;
 }

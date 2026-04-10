@@ -52,7 +52,9 @@ struct ProcessorTelemetry {
 struct GpuTelemetry {
     std::string name = "GPU";
     double loadPercent = 0.0;
-    ScalarMetric temperature{std::nullopt, "\xC2\xB0""C"};
+    ScalarMetric temperature{std::nullopt,
+        "\xC2\xB0"
+        "C"};
     ScalarMetric clock{std::nullopt, "MHz"};
     ScalarMetric fan{std::nullopt, "RPM"};
     MemoryMetric vram;

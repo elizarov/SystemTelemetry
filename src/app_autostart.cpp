@@ -8,12 +8,7 @@
 
 std::optional<std::wstring> ReadAutoStartCommand() {
     HKEY key = nullptr;
-    const LSTATUS openStatus = RegOpenKeyExW(
-        HKEY_LOCAL_MACHINE,
-        kAutoStartRunSubKey,
-        0,
-        KEY_QUERY_VALUE,
-        &key);
+    const LSTATUS openStatus = RegOpenKeyExW(HKEY_LOCAL_MACHINE, kAutoStartRunSubKey, 0, KEY_QUERY_VALUE, &key);
     if (openStatus != ERROR_SUCCESS) {
         return std::nullopt;
     }
@@ -27,13 +22,8 @@ std::optional<std::wstring> ReadAutoStartCommand() {
     }
 
     std::wstring value(size / sizeof(wchar_t), L'\0');
-    const LSTATUS readStatus = RegQueryValueExW(
-        key,
-        kAutoStartValueName,
-        nullptr,
-        &type,
-        reinterpret_cast<LPBYTE>(value.data()),
-        &size);
+    const LSTATUS readStatus =
+        RegQueryValueExW(key, kAutoStartValueName, nullptr, &type, reinterpret_cast<LPBYTE>(value.data()), &size);
     RegCloseKey(key);
     if (readStatus != ERROR_SUCCESS || value.empty()) {
         return std::nullopt;
@@ -58,8 +48,7 @@ bool IsAutoStartEnabledForCurrentExecutable() {
 LSTATUS WriteAutoStartRegistryValue(bool enabled) {
     HKEY key = nullptr;
     DWORD disposition = 0;
-    const LSTATUS createStatus = RegCreateKeyExW(
-        HKEY_LOCAL_MACHINE,
+    const LSTATUS createStatus = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
         kAutoStartRunSubKey,
         0,
         nullptr,
@@ -80,8 +69,7 @@ LSTATUS WriteAutoStartRegistryValue(bool enabled) {
             return ERROR_FILE_NOT_FOUND;
         }
         const std::wstring command = QuoteCommandLineArgument(*executablePath);
-        result = RegSetValueExW(
-            key,
+        result = RegSetValueExW(key,
             kAutoStartValueName,
             0,
             REG_SZ,

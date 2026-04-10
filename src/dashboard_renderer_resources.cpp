@@ -36,8 +36,9 @@ std::string Trim(std::string value) {
 }
 
 std::string ToLowerAscii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(),
-        [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
     return value;
 }
 
@@ -63,21 +64,15 @@ std::string FormatWin32Error(DWORD error) {
 }
 
 bool FontConfigEquals(const UiFontConfig& left, const UiFontConfig& right) {
-    return left.face == right.face &&
-        left.size == right.size &&
-        left.weight == right.weight;
+    return left.face == right.face && left.size == right.size && left.weight == right.weight;
 }
 
 bool FontSetConfigEquals(const UiFontSetConfig& left, const UiFontSetConfig& right) {
-    return FontConfigEquals(left.title, right.title) &&
-        FontConfigEquals(left.big, right.big) &&
-        FontConfigEquals(left.value, right.value) &&
-        FontConfigEquals(left.label, right.label) &&
-        FontConfigEquals(left.text, right.text) &&
-        FontConfigEquals(left.smallText, right.smallText) &&
-        FontConfigEquals(left.footer, right.footer) &&
-        FontConfigEquals(left.clockTime, right.clockTime) &&
-        FontConfigEquals(left.clockDate, right.clockDate);
+    return FontConfigEquals(left.title, right.title) && FontConfigEquals(left.big, right.big) &&
+           FontConfigEquals(left.value, right.value) && FontConfigEquals(left.label, right.label) &&
+           FontConfigEquals(left.text, right.text) && FontConfigEquals(left.smallText, right.smallText) &&
+           FontConfigEquals(left.footer, right.footer) && FontConfigEquals(left.clockTime, right.clockTime) &&
+           FontConfigEquals(left.clockDate, right.clockDate);
 }
 
 std::vector<std::string> Split(const std::string& input, char delimiter) {
@@ -118,11 +113,16 @@ std::vector<DashboardMetricListEntry> ParseMetricListEntries(const std::string& 
 }
 
 UINT GetPanelIconResourceId(const std::string& iconName) {
-    if (iconName == "cpu") return IDR_PANEL_ICON_CPU;
-    if (iconName == "gpu") return IDR_PANEL_ICON_GPU;
-    if (iconName == "network") return IDR_PANEL_ICON_NETWORK;
-    if (iconName == "storage") return IDR_PANEL_ICON_STORAGE;
-    if (iconName == "time") return IDR_PANEL_ICON_TIME;
+    if (iconName == "cpu")
+        return IDR_PANEL_ICON_CPU;
+    if (iconName == "gpu")
+        return IDR_PANEL_ICON_GPU;
+    if (iconName == "network")
+        return IDR_PANEL_ICON_NETWORK;
+    if (iconName == "storage")
+        return IDR_PANEL_ICON_STORAGE;
+    if (iconName == "time")
+        return IDR_PANEL_ICON_TIME;
     return 0;
 }
 
@@ -132,9 +132,20 @@ bool ContainsCardReference(const std::vector<std::string>& stack, const std::str
 
 HFONT CreateUiFont(const UiFontConfig& font) {
     const std::wstring face = WideFromUtf8(font.face);
-    return CreateFontW(-font.size, 0, 0, 0, font.weight, FALSE, FALSE, FALSE,
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-        VARIABLE_PITCH, face.c_str());
+    return CreateFontW(-font.size,
+        0,
+        0,
+        0,
+        font.weight,
+        FALSE,
+        FALSE,
+        FALSE,
+        DEFAULT_CHARSET,
+        OUT_DEFAULT_PRECIS,
+        CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY,
+        VARIABLE_PITCH,
+        face.c_str());
 }
 
 std::unique_ptr<Gdiplus::Bitmap> LoadPngResourceBitmap(UINT resourceId) {
@@ -217,16 +228,13 @@ int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
 
 POINT PolarPoint(int cx, int cy, int radius, double angleDegrees) {
     const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
-    return POINT{
-        cx + static_cast<LONG>(std::round(std::cos(radians) * radius)),
-        cy - static_cast<LONG>(std::round(std::sin(radians) * radius))
-    };
+    return POINT{cx + static_cast<LONG>(std::round(std::cos(radians) * radius)),
+        cy - static_cast<LONG>(std::round(std::sin(radians) * radius))};
 }
 
 Gdiplus::PointF GaugePoint(float cx, float cy, float radius, double angleDegrees) {
     const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
-    return Gdiplus::PointF(
-        cx + static_cast<Gdiplus::REAL>(std::cos(radians) * radius),
+    return Gdiplus::PointF(cx + static_cast<Gdiplus::REAL>(std::cos(radians) * radius),
         cy + static_cast<Gdiplus::REAL>(std::sin(radians) * radius));
 }
 
@@ -249,8 +257,14 @@ void AddCapsulePath(Gdiplus::GraphicsPath& path, const Gdiplus::RectF& rect) {
     path.CloseFigure();
 }
 
-void FillGaugeSegment(Gdiplus::Graphics& graphics, float cx, float cy, float radius, float thickness,
-    double startAngleDegrees, double sweepAngleDegrees, const Gdiplus::Color& color) {
+void FillGaugeSegment(Gdiplus::Graphics& graphics,
+    float cx,
+    float cy,
+    float radius,
+    float thickness,
+    double startAngleDegrees,
+    double sweepAngleDegrees,
+    const Gdiplus::Color& color) {
     if (radius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
         return;
     }
@@ -272,10 +286,12 @@ void FillGaugeSegment(Gdiplus::Graphics& graphics, float cx, float cy, float rad
 
     Gdiplus::GraphicsPath path;
     path.StartFigure();
-    path.AddArc(outerRect, static_cast<Gdiplus::REAL>(startAngleDegrees), static_cast<Gdiplus::REAL>(sweepAngleDegrees));
+    path.AddArc(
+        outerRect, static_cast<Gdiplus::REAL>(startAngleDegrees), static_cast<Gdiplus::REAL>(sweepAngleDegrees));
     path.AddLine(outerEnd, innerEnd);
     if (innerRadius > 0.0f) {
-        path.AddArc(innerRect, static_cast<Gdiplus::REAL>(startAngleDegrees + sweepAngleDegrees),
+        path.AddArc(innerRect,
+            static_cast<Gdiplus::REAL>(startAngleDegrees + sweepAngleDegrees),
             static_cast<Gdiplus::REAL>(-sweepAngleDegrees));
     } else {
         path.AddLine(innerEnd, Gdiplus::PointF(cx, cy));
@@ -288,8 +304,8 @@ void FillGaugeSegment(Gdiplus::Graphics& graphics, float cx, float cy, float rad
 }
 
 std::string FormatRect(const RECT& rect) {
-    return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," +
-        std::to_string(rect.right) + "," + std::to_string(rect.bottom) + ")";
+    return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," + std::to_string(rect.right) +
+           "," + std::to_string(rect.bottom) + ")";
 }
 
 SIZE MeasureTextSize(HDC hdc, HFONT font, const std::string& text) {
@@ -353,8 +369,13 @@ void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color,
         static_cast<INT>(clampedDiameter));
 }
 
-void DrawSegmentIndicator(HDC hdc, const RECT& rect, int segmentCount, int segmentGap, double ratio,
-    COLORREF trackColor, COLORREF accentColor) {
+void DrawSegmentIndicator(HDC hdc,
+    const RECT& rect,
+    int segmentCount,
+    int segmentGap,
+    double ratio,
+    COLORREF trackColor,
+    COLORREF accentColor) {
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
     if (width <= 0 || height <= 0 || segmentCount <= 0) {
@@ -366,17 +387,18 @@ void DrawSegmentIndicator(HDC hdc, const RECT& rect, int segmentCount, int segme
     const int baseSegmentHeight = std::max(1, availableHeight / segmentCount);
     const int remainder = std::max(0, availableHeight - (baseSegmentHeight * segmentCount));
     const double clampedRatio = std::clamp(ratio, 0.0, 1.0);
-    const int filledSegments = clampedRatio > 0.0
-        ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
-        : 0;
+    const int filledSegments =
+        clampedRatio > 0.0
+            ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
+            : 0;
     int top = rect.top;
     for (int index = segmentCount - 1; index >= 0; --index) {
         const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
         const int segmentHeight = baseSegmentHeight + extra;
         const int visualHeight = std::min(segmentHeight, std::max(2, width / 2));
         const int segmentTop = top + std::max(0, (segmentHeight - visualHeight) / 2);
-        RECT segmentRect{rect.left, segmentTop, rect.right,
-            std::min(rect.bottom, static_cast<LONG>(segmentTop + visualHeight))};
+        RECT segmentRect{
+            rect.left, segmentTop, rect.right, std::min(rect.bottom, static_cast<LONG>(segmentTop + visualHeight))};
         HBRUSH trackBrush = CreateSolidBrush(trackColor);
         FillRect(hdc, &segmentRect, trackBrush);
         DeleteObject(trackBrush);
@@ -410,9 +432,9 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
             return;
         }
     }
-    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-        fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
-        fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
+    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr && fonts_.label != nullptr &&
+        fonts_.text != nullptr && fonts_.smallFont != nullptr && fonts_.footer != nullptr &&
+        fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
         if (!MeasureFonts() || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:reconfigure_failed" : lastError_;
         }
@@ -425,9 +447,9 @@ void DashboardRenderer::SetRenderScale(double scale) {
         return;
     }
     renderScale_ = nextScale;
-    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-        fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
-        fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
+    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr && fonts_.label != nullptr &&
+        fonts_.text != nullptr && fonts_.smallFont != nullptr && fonts_.footer != nullptr &&
+        fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
         DestroyFonts();
         if (!CreateFonts()) {
             lastError_ = "renderer:font_create_failed";
@@ -574,7 +596,8 @@ std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::Coll
     return candidates;
 }
 
-std::optional<int> DashboardRenderer::FindLayoutWidgetExtent(const LayoutWidgetIdentity& identity, LayoutGuideAxis axis) const {
+std::optional<int> DashboardRenderer::FindLayoutWidgetExtent(
+    const LayoutWidgetIdentity& identity, LayoutGuideAxis axis) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (MatchesWidgetIdentity(widget, identity)) {
@@ -585,12 +608,13 @@ std::optional<int> DashboardRenderer::FindLayoutWidgetExtent(const LayoutWidgetI
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableWidget(POINT clientPoint) const {
+std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableWidget(
+    POINT clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             const bool hoverableWidget = widget.kind != WidgetKind::Spacer &&
-                widget.kind != WidgetKind::VerticalSpring &&
-                widget.kind != WidgetKind::Unknown;
+                                         widget.kind != WidgetKind::VerticalSpring &&
+                                         widget.kind != WidgetKind::Unknown;
             if (!hoverableWidget || !PtInRect(&widget.rect, clientPoint)) {
                 continue;
             }
@@ -600,7 +624,8 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(POINT clientPoint) const {
+std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(
+    POINT clientPoint) const {
     for (auto it = editableAnchorRegions_.rbegin(); it != editableAnchorRegions_.rend(); ++it) {
         if (PtInRect(&it->targetRect, clientPoint)) {
             return it->key;
@@ -609,7 +634,8 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(POINT clientPoint) const {
+std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(
+    POINT clientPoint) const {
     for (auto it = editableAnchorRegions_.rbegin(); it != editableAnchorRegions_.rend(); ++it) {
         if (PtInRect(&it->anchorHitRect, clientPoint)) {
             return it->key;
@@ -620,7 +646,8 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
 
 std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
     const EditableAnchorKey& key) const {
-    const auto it = std::find_if(editableAnchorRegions_.begin(), editableAnchorRegions_.end(),
+    const auto it = std::find_if(editableAnchorRegions_.begin(),
+        editableAnchorRegions_.end(),
         [&](const EditableAnchorRegion& region) { return MatchesEditableAnchorKey(region.key, key); });
     if (it == editableAnchorRegions_.end()) {
         return std::nullopt;
@@ -633,32 +660,32 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFi
     const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
     auto matchesType = [&](WidgetKind kind) {
         switch (kind) {
-        case WidgetKind::Text:
-            return normalizedName == "text";
-        case WidgetKind::Gauge:
-            return normalizedName == "gauge";
-        case WidgetKind::MetricList:
-            return normalizedName == "metric_list";
-        case WidgetKind::Throughput:
-            return normalizedName == "throughput";
-        case WidgetKind::NetworkFooter:
-            return normalizedName == "network_footer";
-        case WidgetKind::DriveUsageList:
-            return normalizedName == "drive_usage_list";
-        case WidgetKind::ClockTime:
-            return normalizedName == "clock_time";
-        case WidgetKind::ClockDate:
-            return normalizedName == "clock_date";
-        default:
-            return false;
+            case WidgetKind::Text:
+                return normalizedName == "text";
+            case WidgetKind::Gauge:
+                return normalizedName == "gauge";
+            case WidgetKind::MetricList:
+                return normalizedName == "metric_list";
+            case WidgetKind::Throughput:
+                return normalizedName == "throughput";
+            case WidgetKind::NetworkFooter:
+                return normalizedName == "network_footer";
+            case WidgetKind::DriveUsageList:
+                return normalizedName == "drive_usage_list";
+            case WidgetKind::ClockTime:
+                return normalizedName == "clock_time";
+            case WidgetKind::ClockDate:
+                return normalizedName == "clock_date";
+            default:
+                return false;
         }
     };
 
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             const bool hoverableWidget = widget.kind != WidgetKind::Spacer &&
-                widget.kind != WidgetKind::VerticalSpring &&
-                widget.kind != WidgetKind::Unknown;
+                                         widget.kind != WidgetKind::VerticalSpring &&
+                                         widget.kind != WidgetKind::Unknown;
             if (!hoverableWidget || !matchesType(widget.kind)) {
                 continue;
             }
@@ -679,9 +706,9 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
         Shutdown();
         return false;
     }
-    if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr ||
-        fonts_.label == nullptr || fonts_.text == nullptr || fonts_.smallFont == nullptr ||
-        fonts_.footer == nullptr || fonts_.clockTime == nullptr || fonts_.clockDate == nullptr) {
+    if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr || fonts_.label == nullptr ||
+        fonts_.text == nullptr || fonts_.smallFont == nullptr || fonts_.footer == nullptr ||
+        fonts_.clockTime == nullptr || fonts_.clockDate == nullptr) {
         lastError_ = "renderer:font_create_failed";
         Shutdown();
         return false;
@@ -724,9 +751,9 @@ void DashboardRenderer::ShutdownGdiplus() {
 }
 
 bool DashboardRenderer::CreateFonts() {
-    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-        fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
-        fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
+    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr && fonts_.label != nullptr &&
+        fonts_.text != nullptr && fonts_.smallFont != nullptr && fonts_.footer != nullptr &&
+        fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
         return true;
     }
 
@@ -758,9 +785,9 @@ bool DashboardRenderer::CreateFonts() {
     fonts_.footer = CreateUiFont(footerFont);
     fonts_.clockTime = CreateUiFont(clockTimeFont);
     fonts_.clockDate = CreateUiFont(clockDateFont);
-    return fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-        fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
-        fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr;
+    return fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr && fonts_.label != nullptr &&
+           fonts_.text != nullptr && fonts_.smallFont != nullptr && fonts_.footer != nullptr &&
+           fonts_.clockTime != nullptr && fonts_.clockDate != nullptr;
 }
 
 void DashboardRenderer::DestroyFonts() {
@@ -836,28 +863,24 @@ bool DashboardRenderer::MeasureFonts() {
     fontHeights_.footer = measure(fonts_.footer);
     fontHeights_.clockTime = measure(fonts_.clockTime);
     fontHeights_.clockDate = measure(fonts_.clockDate);
-    measuredWidths_.throughputLabel = std::max(
-        MeasureTextSize(hdc, fonts_.smallFont, "Read").cx,
-        MeasureTextSize(hdc, fonts_.smallFont, "Write").cx) + std::max(0, ScaleLogical(config_.layout.throughput.labelPadding));
+    measuredWidths_.throughputLabel = std::max(MeasureTextSize(hdc, fonts_.smallFont, "Read").cx,
+                                          MeasureTextSize(hdc, fonts_.smallFont, "Write").cx) +
+                                      std::max(0, ScaleLogical(config_.layout.throughput.labelPadding));
     measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx +
-        std::max(0, ScaleLogical(config_.layout.throughput.axisPadding));
+                                     std::max(0, ScaleLogical(config_.layout.throughput.axisPadding));
     measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx;
     measuredWidths_.drivePercent = MeasureTextSize(hdc, fonts_.label, "100%").cx;
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
     WriteTrace("renderer:font_metrics title=" + std::to_string(fontHeights_.title) +
-        " big=" + std::to_string(fontHeights_.big) +
-        " value=" + std::to_string(fontHeights_.value) +
-        " label=" + std::to_string(fontHeights_.label) +
-        " text=" + std::to_string(fontHeights_.text) +
-        " small=" + std::to_string(fontHeights_.smallText) +
-        " footer=" + std::to_string(fontHeights_.footer) +
-        " clock_time=" + std::to_string(fontHeights_.clockTime) +
-        " clock_date=" + std::to_string(fontHeights_.clockDate) +
-        " render_scale=" + std::to_string(renderScale_) +
-        " throughput_label_width=" + std::to_string(measuredWidths_.throughputLabel) +
-        " throughput_axis_width=" + std::to_string(measuredWidths_.throughputAxis) +
-        " drive_label_width=" + std::to_string(measuredWidths_.driveLabel) +
-        " drive_percent_width=" + std::to_string(measuredWidths_.drivePercent));
+               " big=" + std::to_string(fontHeights_.big) + " value=" + std::to_string(fontHeights_.value) +
+               " label=" + std::to_string(fontHeights_.label) + " text=" + std::to_string(fontHeights_.text) +
+               " small=" + std::to_string(fontHeights_.smallText) + " footer=" + std::to_string(fontHeights_.footer) +
+               " clock_time=" + std::to_string(fontHeights_.clockTime) + " clock_date=" +
+               std::to_string(fontHeights_.clockDate) + " render_scale=" + std::to_string(renderScale_) +
+               " throughput_label_width=" + std::to_string(measuredWidths_.throughputLabel) +
+               " throughput_axis_width=" + std::to_string(measuredWidths_.throughputAxis) +
+               " drive_label_width=" + std::to_string(measuredWidths_.driveLabel) +
+               " drive_percent_width=" + std::to_string(measuredWidths_.drivePercent));
     return true;
 }
 
@@ -866,8 +889,7 @@ int DashboardRenderer::EffectiveHeaderHeight() const {
     const int configured = ScaleLogical(config_.layout.cardStyle.headerHeight);
     const int computed = std::max(configured, titleHeight);
     WriteTrace("renderer:layout_header_height configured=" + std::to_string(configured) +
-        " title_or_icon=" + std::to_string(titleHeight) +
-        " effective=" + std::to_string(computed));
+               " title_or_icon=" + std::to_string(titleHeight) + " effective=" + std::to_string(computed));
     return computed;
 }
 
@@ -877,9 +899,8 @@ int DashboardRenderer::EffectiveMetricRowHeight() const {
     const int verticalGap = std::max(0, ScaleLogical(config_.layout.metricList.verticalGap));
     const int computed = textHeight + verticalGap + barHeight;
     WriteTrace("renderer:layout_metric_row_height text=" + std::to_string(textHeight) +
-        " bar=" + std::to_string(barHeight) +
-        " gap=" + std::to_string(verticalGap) +
-        " effective=" + std::to_string(computed));
+               " bar=" + std::to_string(barHeight) + " gap=" + std::to_string(verticalGap) +
+               " effective=" + std::to_string(computed));
     return computed;
 }
 
@@ -887,8 +908,7 @@ int DashboardRenderer::EffectiveDriveHeaderHeight() const {
     const int headerGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.headerGap));
     const int computed = fontHeights_.smallText + headerGap;
     WriteTrace("renderer:layout_drive_header_height text=" + std::to_string(fontHeights_.smallText) +
-        " gap=" + std::to_string(headerGap) +
-        " effective=" + std::to_string(computed));
+               " gap=" + std::to_string(headerGap) + " effective=" + std::to_string(computed));
     return computed;
 }
 
@@ -897,10 +917,8 @@ int DashboardRenderer::EffectiveDriveRowHeight() const {
     const int barHeight = std::max(1, ScaleLogical(config_.layout.driveUsageList.barHeight));
     const int rowGap = std::max(0, ScaleLogical(config_.layout.driveUsageList.rowGap));
     const int computed = std::max(textHeight, barHeight) + rowGap;
-    WriteTrace("renderer:layout_drive_row_height text=" + std::to_string(textHeight) +
-        " bar=" + std::to_string(barHeight) +
-        " gap=" + std::to_string(rowGap) +
-        " effective=" + std::to_string(computed));
+    WriteTrace("renderer:layout_drive_row_height text=" + std::to_string(textHeight) + " bar=" +
+               std::to_string(barHeight) + " gap=" + std::to_string(rowGap) + " effective=" + std::to_string(computed));
     return computed;
 }
 
@@ -914,7 +932,8 @@ bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const ResolvedWidgetLa
     return widget.kind != WidgetKind::Unknown;
 }
 
-bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const {
+bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(
+    const ResolvedWidgetLayout& widget, LayoutGuideAxis axis) const {
     const int extent = WidgetExtentForAxis(widget, axis);
     if (extent <= 0) {
         return false;
@@ -985,12 +1004,14 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         return height;
     }
     if (node.name == "network_footer") {
-        const int height = fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        const int height =
+            fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
     if (node.name == "spacer") {
-        const int height = fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        const int height =
+            fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
@@ -1003,19 +1024,19 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         const int count = static_cast<int>(Split(param, ',').size());
         const int height = count * EffectiveMetricRowHeight();
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
-            " value=" + std::to_string(height));
+                   " value=" + std::to_string(height));
         return height;
     }
     if (node.name == "drive_usage_list") {
         const int count = static_cast<int>(config_.storage.drives.size());
         const int height = (count > 0 ? EffectiveDriveHeaderHeight() : 0) + (count * EffectiveDriveRowHeight());
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" rows=" + std::to_string(count) +
-            " value=" + std::to_string(height));
+                   " value=" + std::to_string(height));
         return height;
     }
     if (node.name == "throughput") {
         const int height = fontHeights_.smallText + ScaleLogical(config_.layout.throughput.headerGap) +
-            std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
+                           std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(height));
         return height;
     }
@@ -1050,7 +1071,8 @@ int DashboardRenderer::GaugeRadiusForRect(const RECT& rect) const {
     return fittedRadius;
 }
 
-DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const {
+DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(
+    const LayoutNodeConfig& node, const RECT& rect) const {
     ResolvedWidgetLayout widget;
     widget.rect = rect;
     if (node.name == "text") {
@@ -1070,14 +1092,16 @@ DashboardRenderer::ResolvedWidgetLayout DashboardRenderer::ResolveWidgetLayout(c
         widget.kind = WidgetKind::Throughput;
         widget.binding.metric = node.parameter;
         widget.preferredHeight = fontHeights_.smallText + ScaleLogical(config_.layout.throughput.headerGap) +
-            std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
+                                 std::max(1, ScaleLogical(config_.layout.throughput.graphHeight));
     } else if (node.name == "network_footer") {
         widget.kind = WidgetKind::NetworkFooter;
-        widget.preferredHeight = fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        widget.preferredHeight =
+            fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "spacer") {
         widget.kind = WidgetKind::Spacer;
-        widget.preferredHeight = fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
+        widget.preferredHeight =
+            fontHeights_.footer + std::max(0, ScaleLogical(config_.layout.networkFooter.preferredPadding));
         widget.fixedPreferredHeightInRows = true;
     } else if (node.name == "vertical_spring") {
         widget.kind = WidgetKind::VerticalSpring;
@@ -1102,9 +1126,7 @@ bool DashboardRenderer::UsesFixedPreferredHeightInRows(const ResolvedWidgetLayou
 }
 
 const LayoutCardConfig* DashboardRenderer::FindCardConfigById(const std::string& id) const {
-    const auto it = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
-        return card.id == id;
-    });
+    const auto it = std::find_if(
+        config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) { return card.id == id; });
     return it != config_.layout.cards.end() ? &(*it) : nullptr;
 }
-

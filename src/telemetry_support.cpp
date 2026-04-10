@@ -32,7 +32,8 @@ bool IsSelectableStorageDriveType(UINT driveType) {
 
 std::string ReadVolumeLabel(const std::wstring& root) {
     wchar_t volumeName[MAX_PATH] = {};
-    if (!GetVolumeInformationW(root.c_str(), volumeName, ARRAYSIZE(volumeName), nullptr, nullptr, nullptr, nullptr, 0)) {
+    if (!GetVolumeInformationW(
+            root.c_str(), volumeName, ARRAYSIZE(volumeName), nullptr, nullptr, nullptr, nullptr, 0)) {
         return {};
     }
     return Utf8FromWide(volumeName);
@@ -98,9 +99,7 @@ bool EqualsInsensitive(const std::wstring& value, const std::string& needle) {
 }
 
 std::string TrimAsciiWhitespace(std::string value) {
-    auto notSpace = [](unsigned char ch) {
-        return !std::isspace(ch);
-    };
+    auto notSpace = [](unsigned char ch) { return !std::isspace(ch); };
 
     const auto begin = std::find_if(value.begin(), value.end(), notSpace);
     if (begin == value.end()) {
@@ -193,9 +192,7 @@ std::string DetectCpuName() {
     }
 
     const auto registryName = ReadRegistryString(
-        HKEY_LOCAL_MACHINE,
-        L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
-        L"ProcessorNameString");
+        HKEY_LOCAL_MACHINE, L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", L"ProcessorNameString");
     if (registryName.has_value()) {
         return CollapseAsciiWhitespace(TrimAsciiWhitespace(*registryName));
     }

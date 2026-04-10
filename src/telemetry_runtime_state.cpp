@@ -53,12 +53,12 @@ void RuntimeCandidateView::SyncFromSnapshotAndConfig(const SystemSnapshot& snaps
         candidate.volumeLabel = drive.volumeLabel;
         candidate.totalGb = drive.totalGb;
         candidate.driveType = drive.driveType;
-        candidate.selected =
-            std::find(config.storage.drives.begin(), config.storage.drives.end(), candidate.letter) != config.storage.drives.end();
+        candidate.selected = std::find(config.storage.drives.begin(), config.storage.drives.end(), candidate.letter) !=
+                             config.storage.drives.end();
         storageDrives.push_back(std::move(candidate));
     }
 
-    std::sort(storageDrives.begin(), storageDrives.end(), [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) {
-        return lhs.letter < rhs.letter;
-    });
+    std::sort(storageDrives.begin(),
+        storageDrives.end(),
+        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
 }
