@@ -50,7 +50,7 @@ void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color,
 }
 
 RECT MakeAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
-    const int diameter = std::max(8, representedDiameter + extraDiameter);
+    const int diameter = std::max(4, representedDiameter + extraDiameter);
     const int radius = diameter / 2;
     return RECT{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
 }
@@ -270,7 +270,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
                 renderer.Config().layout.fonts.smallText.size));
     }
     const ThroughputGraphLayout layout = ComputeGraphLayout(renderer, graphRect);
-    const int anchorPadding = std::max(4, renderer.ScaleLogical(4));
+    const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
     const int leaderAnchorCenterX = layout.graphRight;
     const int leaderAnchorCenterY = layout.plotTop + (std::max)(0, (layout.graphBottom - layout.plotTop) / 2);
     const RECT leaderAnchorRect =

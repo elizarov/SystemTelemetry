@@ -292,9 +292,10 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
 
         if (highlighted->shape == AnchorShape::Circle) {
             const RECT& anchorRect = highlighted->anchorRect;
-            Gdiplus::SolidBrush fill(
-                Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)));
-            graphics.FillEllipse(&fill,
+            Gdiplus::Pen pen(
+                Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
+                static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
+            graphics.DrawEllipse(&pen,
                 static_cast<Gdiplus::REAL>(anchorRect.left),
                 static_cast<Gdiplus::REAL>(anchorRect.top),
                 static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
