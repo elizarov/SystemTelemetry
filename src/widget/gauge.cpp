@@ -11,7 +11,7 @@
 #include "../dashboard_renderer.h"
 
 struct GaugeSharedLayout {
-    int radius = 1;
+    int radius = 0;
 };
 
 namespace {
@@ -127,6 +127,24 @@ int GaugeRadiusForRect(const DashboardRenderer& renderer, const RECT& rect) {
     return std::max(1, std::min(width, height) / 2 - outerPadding);
 }
 
+int EffectiveGaugePreferredRadius(const DashboardRenderer& renderer) {
+    const int outerPadding = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.outerPadding));
+    const int ringThickness = std::max(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
+    const int halfWidth = std::max(1, renderer.ScaleLogical(renderer.Config().layout.gauge.textHalfWidth));
+    const int valueTop = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.valueTop));
+    const int valueBottom = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom));
+    const int labelTop = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.labelTop));
+    const int labelBottom = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom));
+    const int valueHalfHeight = (std::max)(1, (renderer.FontMetrics().big + 1) / 2);
+    const int labelHalfHeight = (std::max)(1, (renderer.FontMetrics().smallText + 1) / 2);
+    const int verticalInnerExtent = (std::max)(valueTop + valueHalfHeight,
+        (std::max)(
+            valueBottom + valueHalfHeight, (std::max)(labelTop + labelHalfHeight, labelBottom + labelHalfHeight)));
+    const int innerRadius = (std::max)(halfWidth, verticalInnerExtent);
+    const int outerRadius = innerRadius + ringThickness + outerPadding;
+    return (std::max)(1, outerRadius);
+}
+
 }  // namespace
 
 DashboardWidgetClass GaugeWidget::Class() const {
@@ -139,11 +157,11 @@ std::unique_ptr<DashboardWidget> GaugeWidget::Clone() const {
 
 void GaugeWidget::Initialize(const LayoutNodeConfig& node) {
     metric_ = node.parameter;
-    sharedLayout_ = std::make_shared<GaugeSharedLayout>();
+    sharedLayout_.reset();
 }
 
 int GaugeWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.preferredSize));
+    return EffectiveGaugePreferredRadius(renderer) * 2;
 }
 
 void GaugeWidget::Draw(DashboardRenderer& renderer,
@@ -153,7 +171,9 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     const DashboardGaugeMetric metric = metrics.ResolveGauge(metric_);
     const int width = widget.rect.right - widget.rect.left;
     const int height = widget.rect.bottom - widget.rect.top;
-    const int radius = sharedLayout_ != nullptr ? sharedLayout_->radius : GaugeRadiusForRect(renderer, widget.rect);
+    const int radius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
+                           ? sharedLayout_->radius
+                           : GaugeRadiusForRect(renderer, widget.rect);
     const int cx = widget.rect.left + width / 2;
     const int cy = widget.rect.top + height / 2;
     const float segmentThickness =
@@ -274,7 +294,9 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
 }
 
 void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
-    const int radius = sharedLayout_ != nullptr ? sharedLayout_->radius : GaugeRadiusForRect(renderer, widget.rect);
+    const int radius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
+                           ? sharedLayout_->radius
+                           : GaugeRadiusForRect(renderer, widget.rect);
     if (radius <= 0) {
         return;
     }
@@ -343,10 +365,6 @@ void GaugeWidget::FinalizeLayoutGroup(DashboardRenderer& renderer, const std::ve
         const int gaugeRadius = GaugeRadiusForRect(renderer, widget->rect);
         sharedLayout->radius = gaugeCount == 0 ? gaugeRadius : (std::min)(sharedLayout->radius, gaugeRadius);
         ++gaugeCount;
-    }
-
-    if (gaugeCount == 0) {
-        sharedLayout->radius = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.minRadius));
     }
 
     for (DashboardWidgetLayout* widget : widgets) {

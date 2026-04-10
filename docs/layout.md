@@ -77,7 +77,7 @@ Supported widget geometry keys:
 - `[metric_list]`: `label_width`, `bar_height`, `vertical_gap`
 - `[drive_usage_list]`: `label_gap`, `activity_width`, `rw_gap`, `bar_gap`, `percent_gap`, `free_width`, `bar_height`, `header_gap`, `row_gap`, `activity_segments`, `activity_segment_gap`
 - `[throughput]`: `header_gap`, `axis_padding`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
-- `[gauge]`: `preferred_size`, `outer_padding`, `min_radius`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`
+- `[gauge]`: `outer_padding`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `text_half_width`, `value_top`, `value_bottom`, `label_top`, `label_bottom`
 - `[text]`: `preferred_padding`
 - `[network_footer]`: `preferred_padding`
 

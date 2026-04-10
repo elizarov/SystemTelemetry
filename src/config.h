@@ -195,9 +195,7 @@ struct ThroughputWidgetConfig {
 
 struct GaugeWidgetConfig {
     CONFIG_REFLECTED_STRUCT(GaugeWidgetConfig)
-    CONFIG_VALUE(int, preferredSize, "preferred_size");
     CONFIG_VALUE(int, outerPadding, "outer_padding");
-    CONFIG_VALUE(int, minRadius, "min_radius");
     CONFIG_VALUE(int, ringThickness, "ring_thickness");
     CONFIG_VALUE(double, sweepDegrees, "sweep_degrees");
     CONFIG_VALUE(int, segmentCount, "segment_count");
