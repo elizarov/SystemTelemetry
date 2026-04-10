@@ -1133,7 +1133,7 @@ void DashboardRenderer::DrawGraph(HDC hdc,
             maxRect,
             maxLabel,
             fonts_.smallFont,
-            ForegroundColor(),
+            MutedTextColor(),
             DT_CENTER | DT_SINGLELINE | DT_VCENTER,
             maxLabelEditable);
     }
