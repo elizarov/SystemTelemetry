@@ -1059,7 +1059,7 @@ bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
 }
 
 int DashboardRenderer::EffectiveThroughputPreferredHeight() const {
-    const int headerHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.valuePadding));
+    const int headerHeight = fontHeights_.smallText;
     const int graphLabelHeight =
         fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.scaleLabelPadding));
     return headerHeight + std::max(0, ScaleLogical(config_.layout.throughput.headerGap)) + graphLabelHeight;

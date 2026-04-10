@@ -1176,7 +1176,7 @@ void DashboardRenderer::DrawGraph(HDC hdc,
 
 void DashboardRenderer::DrawThroughputWidget(
     HDC hdc, const ResolvedWidgetLayout& widget, const RECT& rect, const DashboardThroughputMetric& metric) {
-    const int lineHeight = fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.valuePadding));
+    const int lineHeight = fontHeights_.smallText;
     RECT valueRect{rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + lineHeight)};
     RECT graphRect{rect.left,
         std::min(rect.bottom, valueRect.bottom + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),

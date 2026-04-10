@@ -482,8 +482,7 @@ void DashboardRendererLayoutEngine::BuildWidgetEditGuides(DashboardRenderer& ren
     };
 
     const auto addThroughputWidgetEditGuide = [&](const DashboardRenderer::ResolvedWidgetLayout& widget) {
-        const int lineHeight = renderer.fontHeights_.smallText +
-                               (std::max)(0, renderer.ScaleLogical(renderer.config_.layout.throughput.valuePadding));
+        const int lineHeight = renderer.fontHeights_.smallText;
         RECT valueRect{widget.rect.left,
             widget.rect.top,
             widget.rect.right,
