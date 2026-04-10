@@ -209,7 +209,8 @@ Supported layout kinds:
 `clock_time` uses a preferred height of `clock_time_font_height`.
 `clock_date` uses a preferred height of `clock_date_font_height`.
 `throughput(...)` uses a preferred height of `small_font_height + [throughput].value_padding + [throughput].header_gap + max(small_font_height + [throughput].scale_label_padding, [throughput].scale_label_min_height)`.
-Throughput label width, drive label width, and drive percent width are measured from the configured fonts at layout load.
+Throughput header labels use their actual rendered text width at draw time.
+Drive label width and drive percent width are measured from the configured fonts at layout load.
 Throughput axis width is measured from the configured fonts at layout load, then widened by `[throughput].axis_padding`.
 
 Nested layout expressions are allowed.

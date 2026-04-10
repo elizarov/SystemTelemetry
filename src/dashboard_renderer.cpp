@@ -1183,27 +1183,24 @@ void DashboardRenderer::DrawThroughputWidget(
         std::min(rect.bottom, valueRect.bottom + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
         rect.right,
         rect.bottom};
-    const int labelWidth = std::max(1, measuredWidths_.throughputLabel);
-    RECT labelRect{
-        valueRect.left, valueRect.top, std::min(valueRect.right, valueRect.left + labelWidth), valueRect.bottom};
-    RECT numberRect{
-        std::min(valueRect.right, labelRect.right + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
-        valueRect.top,
-        valueRect.right,
-        valueRect.bottom};
     char buffer[64];
     if (metric.valueMbps >= 100.0) {
         sprintf_s(buffer, "%.0f MB/s", metric.valueMbps);
     } else {
         sprintf_s(buffer, "%.1f MB/s", metric.valueMbps);
     }
-    DrawTextBlock(hdc,
-        labelRect,
+    const TextLayoutResult labelLayout = DrawTextBlock(hdc,
+        valueRect,
         metric.label,
         fonts_.smallFont,
         MutedTextColor(),
         DT_LEFT | DT_SINGLELINE | DT_VCENTER,
         MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 0, config_.layout.fonts.smallText.size));
+    RECT numberRect{
+        std::min(valueRect.right, labelLayout.textRect.right + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
+        valueRect.top,
+        valueRect.right,
+        valueRect.bottom};
     if (renderMode_ != RenderMode::Blank) {
         DrawTextBlock(hdc,
             numberRect,

@@ -269,7 +269,6 @@ private:
     };
 
     struct MeasuredWidths {
-        int throughputLabel = 0;
         int throughputAxis = 0;
         int driveLabel = 0;
         int drivePercent = 0;

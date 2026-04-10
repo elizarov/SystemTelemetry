@@ -863,8 +863,6 @@ bool DashboardRenderer::MeasureFonts() {
     fontHeights_.footer = measure(fonts_.footer);
     fontHeights_.clockTime = measure(fonts_.clockTime);
     fontHeights_.clockDate = measure(fonts_.clockDate);
-    measuredWidths_.throughputLabel =
-        std::max(MeasureTextSize(hdc, fonts_.smallFont, "Read").cx, MeasureTextSize(hdc, fonts_.smallFont, "Write").cx);
     measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx +
                                      std::max(0, ScaleLogical(config_.layout.throughput.axisPadding));
     measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx;
@@ -876,7 +874,6 @@ bool DashboardRenderer::MeasureFonts() {
                " small=" + std::to_string(fontHeights_.smallText) + " footer=" + std::to_string(fontHeights_.footer) +
                " clock_time=" + std::to_string(fontHeights_.clockTime) + " clock_date=" +
                std::to_string(fontHeights_.clockDate) + " render_scale=" + std::to_string(renderScale_) +
-               " throughput_label_width=" + std::to_string(measuredWidths_.throughputLabel) +
                " throughput_axis_width=" + std::to_string(measuredWidths_.throughputAxis) +
                " drive_label_width=" + std::to_string(measuredWidths_.driveLabel) +
                " drive_percent_width=" + std::to_string(measuredWidths_.drivePercent));
