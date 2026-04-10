@@ -145,6 +145,12 @@ LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForWidgetGuide(
         case DashboardRenderer::WidgetEditParameter::GaugeRingThickness:
             target.field = Field::GaugeRingThickness;
             break;
+        case DashboardRenderer::WidgetEditParameter::GaugeValueBottom:
+            target.field = Field::GaugeValueBottom;
+            break;
+        case DashboardRenderer::WidgetEditParameter::GaugeLabelBottom:
+            target.field = Field::GaugeLabelBottom;
+            break;
         case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees:
             target.field = Field::GaugeSweepDegrees;
             break;

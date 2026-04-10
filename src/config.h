@@ -201,9 +201,7 @@ struct GaugeWidgetConfig {
     CONFIG_VALUE(int, segmentCount, "segment_count");
     CONFIG_VALUE(double, segmentGapDegrees, "segment_gap_degrees");
     CONFIG_VALUE(int, textHalfWidth, "text_half_width");
-    CONFIG_VALUE(int, valueTop, "value_top");
     CONFIG_VALUE(int, valueBottom, "value_bottom");
-    CONFIG_VALUE(int, labelTop, "label_top");
     CONFIG_VALUE(int, labelBottom, "label_bottom");
     CONFIG_SECTION("gauge");
 };

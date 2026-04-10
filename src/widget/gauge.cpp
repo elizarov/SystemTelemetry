@@ -136,16 +136,9 @@ int EffectiveGaugePreferredRadius(const DashboardRenderer& renderer) {
     const int outerPadding = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.outerPadding));
     const int ringThickness = std::max(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
     const int halfWidth = std::max(1, renderer.ScaleLogical(renderer.Config().layout.gauge.textHalfWidth));
-    const int valueTop = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.valueTop));
-    const int valueBottom = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom));
-    const int labelTop = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.labelTop));
-    const int labelBottom = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom));
-    const int valueHalfHeight = (std::max)(1, (renderer.FontMetrics().big + 1) / 2);
-    const int labelHalfHeight = (std::max)(1, (renderer.FontMetrics().smallText + 1) / 2);
-    const int verticalInnerExtent = (std::max)(valueTop + valueHalfHeight,
-        (std::max)(
-            valueBottom + valueHalfHeight, (std::max)(labelTop + labelHalfHeight, labelBottom + labelHalfHeight)));
-    const int innerRadius = (std::max)(halfWidth, verticalInnerExtent);
+    const int valueHalfHeight = std::max(1, (renderer.FontMetrics().big + 1) / 2);
+    const int labelHalfHeight = std::max(1, (renderer.FontMetrics().smallText + 1) / 2);
+    const int innerRadius = (std::max)(halfWidth, (std::max)(valueHalfHeight, labelHalfHeight));
     const int outerRadius = innerRadius + ringThickness + outerPadding;
     return (std::max)(1, outerRadius);
 }
@@ -205,7 +198,8 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
     const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
-    const int innerRadius = std::max(0, outerRadius - static_cast<int>(std::lround(static_cast<double>(segmentThickness))));
+    const int innerRadius =
+        std::max(0, outerRadius - static_cast<int>(std::lround(static_cast<double>(segmentThickness))));
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -225,8 +219,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         true,
         true,
         renderer.Config().layout.gauge.segmentCount);
-    const RECT outerPaddingAnchorRect =
-        MakeCircleAnchorRect(cx, cy, outerRadius * 2, anchorPadding);
+    const RECT outerPaddingAnchorRect = MakeCircleAnchorRect(cx, cy, outerRadius * 2, anchorPadding);
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -243,8 +236,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         true,
         false,
         renderer.Config().layout.gauge.outerPadding);
-    const RECT ringThicknessAnchorRect =
-        MakeCircleAnchorRect(cx, cy, innerRadius * 2, anchorPadding);
+    const RECT ringThicknessAnchorRect = MakeCircleAnchorRect(cx, cy, innerRadius * 2, anchorPadding);
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -310,11 +302,10 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         char number[16];
         sprintf_s(number, "%.0f%%", metric.percent);
+        const int valueBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom);
+        const int valueHeight = renderer.FontMetrics().big;
         renderer.DrawTextBlock(hdc,
-            RECT{cx - halfWidth,
-                cy - renderer.ScaleLogical(renderer.Config().layout.gauge.valueTop),
-                cx + halfWidth,
-                cy + renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom)},
+            RECT{cx - halfWidth, cy + valueBottom - valueHeight, cx + halfWidth, cy + valueBottom},
             number,
             renderer.WidgetFonts().big,
             renderer.ForegroundColor(),
@@ -322,11 +313,10 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             renderer.MakeEditableTextBinding(
                 widget, DashboardRenderer::AnchorEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
     }
+    const int labelBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom);
+    const int labelHeight = renderer.FontMetrics().smallText;
     renderer.DrawTextBlock(hdc,
-        RECT{cx - halfWidth,
-            cy + renderer.ScaleLogical(renderer.Config().layout.gauge.labelTop),
-            cx + halfWidth,
-            cy + renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom)},
+        RECT{cx - halfWidth, cy + labelBottom - labelHeight, cx + halfWidth, cy + labelBottom},
         "Load",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
@@ -353,6 +343,7 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
     const int ringThickness = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
     const int guideHalfExtension = (std::max)(1, ringThickness / 2);
     const int hitInset = (std::max)(4, renderer.ScaleLogical(5));
+    const int halfWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.textHalfWidth));
 
     const auto addRadialGuide = [&](DashboardRenderer::WidgetEditParameter parameter,
                                     int guideId,
@@ -393,6 +384,28 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
         gaugeLayout.segmentGap,
         gaugeLayout.gaugeStart,
         gaugeLayout.gaugeStart + gaugeLayout.maxSegmentSweep);
+
+    const auto addHorizontalGuide =
+        [&](DashboardRenderer::WidgetEditParameter parameter, int guideId, int bottomOffset) {
+            const int y = cy + renderer.ScaleLogical(bottomOffset);
+            DashboardRenderer::WidgetEditGuide guide;
+            guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
+            guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+            guide.parameter = parameter;
+            guide.guideId = guideId;
+            guide.widgetRect = widget.rect;
+            guide.drawStart = POINT{cx - halfWidth, y};
+            guide.drawEnd = POINT{cx + halfWidth, y};
+            guide.hitRect = RECT{cx - halfWidth, y - hitInset, cx + halfWidth, y + hitInset + 1};
+            guide.value = bottomOffset;
+            guide.dragDirection = 1;
+            renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
+        };
+
+    addHorizontalGuide(
+        DashboardRenderer::WidgetEditParameter::GaugeValueBottom, 100, renderer.Config().layout.gauge.valueBottom);
+    addHorizontalGuide(
+        DashboardRenderer::WidgetEditParameter::GaugeLabelBottom, 101, renderer.Config().layout.gauge.labelBottom);
 }
 
 void GaugeWidget::FinalizeLayoutGroup(DashboardRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) {

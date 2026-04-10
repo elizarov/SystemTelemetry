@@ -131,6 +131,8 @@ public:
         ThroughputLeaderDiameter,
         GaugeOuterPadding,
         GaugeRingThickness,
+        GaugeValueBottom,
+        GaugeLabelBottom,
         GaugeSweepDegrees,
         GaugeSegmentGapDegrees,
     };

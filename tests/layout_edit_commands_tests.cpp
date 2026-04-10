@@ -42,11 +42,17 @@ TEST(LayoutEditCommands, UpdatesMetricListAndGaugeFieldsThroughCommands) {
         layout_edit::ApplyValue(config, MakeTarget(LayoutEditHost::ValueTarget::Field::GaugeOuterPadding), 9.6));
     ASSERT_TRUE(
         layout_edit::ApplyValue(config, MakeTarget(LayoutEditHost::ValueTarget::Field::GaugeRingThickness), 11.2));
+    ASSERT_TRUE(
+        layout_edit::ApplyValue(config, MakeTarget(LayoutEditHost::ValueTarget::Field::GaugeValueBottom), 17.6));
+    ASSERT_TRUE(
+        layout_edit::ApplyValue(config, MakeTarget(LayoutEditHost::ValueTarget::Field::GaugeLabelBottom), 33.2));
 
     EXPECT_EQ(config.layout.metricList.barHeight, 17);
     EXPECT_EQ(config.layout.gauge.segmentCount, 6);
     EXPECT_EQ(config.layout.gauge.outerPadding, 10);
     EXPECT_EQ(config.layout.gauge.ringThickness, 11);
+    EXPECT_EQ(config.layout.gauge.valueBottom, 18);
+    EXPECT_EQ(config.layout.gauge.labelBottom, 33);
 }
 
 TEST(LayoutEditCommands, UpdatesDriveUsageActivitySegmentsThroughCommands) {

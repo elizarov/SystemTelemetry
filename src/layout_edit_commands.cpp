@@ -110,6 +110,12 @@ bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, do
         case Field::GaugeRingThickness:
             ApplyPositiveInt(&LayoutConfig::gauge, &GaugeWidgetConfig::ringThickness, config, value);
             return true;
+        case Field::GaugeValueBottom:
+            ApplyPositiveInt(&LayoutConfig::gauge, &GaugeWidgetConfig::valueBottom, config, value);
+            return true;
+        case Field::GaugeLabelBottom:
+            ApplyPositiveInt(&LayoutConfig::gauge, &GaugeWidgetConfig::labelBottom, config, value);
+            return true;
         case Field::GaugeSweepDegrees:
             config.layout.gauge.sweepDegrees = ClampGaugeSweepDegrees(value);
             return true;
