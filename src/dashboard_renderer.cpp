@@ -76,21 +76,6 @@ void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
     graphics.FillPath(&brush, &path);
 }
 
-void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color, BYTE alpha) {
-    const int clampedDiameter = std::max(1, diameter);
-    const int radius = clampedDiameter / 2;
-
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    Gdiplus::SolidBrush brush(Gdiplus::Color(alpha, GetRValue(color), GetGValue(color), GetBValue(color)));
-    graphics.FillEllipse(&brush,
-        static_cast<INT>(centerX - radius),
-        static_cast<INT>(centerY - radius),
-        static_cast<INT>(clampedDiameter),
-        static_cast<INT>(clampedDiameter));
-}
-
 void FillDiamond(HDC hdc, const RECT& rect, COLORREF color) {
     const int width = std::max(1, static_cast<int>(rect.right - rect.left));
     const int height = std::max(1, static_cast<int>(rect.bottom - rect.top));
@@ -712,114 +697,6 @@ void DashboardRenderer::DrawPillBar(
         const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
         RECT markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
         FillCapsule(hdc, markerRect, AccentColor(), 96);
-    }
-}
-
-void DashboardRenderer::DrawGraph(HDC hdc,
-    const RECT& rect,
-    const std::vector<double>& history,
-    double maxValue,
-    double guideStepMbps,
-    double timeMarkerOffsetSamples,
-    double timeMarkerIntervalSamples,
-    const std::optional<EditableAnchorBinding>& maxLabelEditable) {
-    HBRUSH bg = CreateSolidBrush(ToColorRef(config_.layout.colors.graphBackgroundColor));
-    FillRect(hdc, &rect, bg);
-    DeleteObject(bg);
-
-    const int axisWidth = std::max(1, measuredWidths_.throughputAxis);
-    const int labelBandHeight =
-        fontHeights_.smallText + std::max(0, ScaleLogical(config_.layout.throughput.scaleLabelPadding));
-    const int graphTop = std::min(rect.bottom - 1, rect.top + labelBandHeight);
-    const int graphLeft = rect.left + axisWidth;
-    const int leaderDiameter = std::max(0, ScaleLogical(config_.layout.throughput.leaderDiameter));
-    const int leaderRadius = leaderDiameter / 2;
-    const int width = std::max<int>(1, rect.right - graphLeft - 1 - leaderRadius);
-    const int graphRight = graphLeft + width;
-    const int graphBottom = rect.bottom - 1;
-    const int plotStrokeWidth = std::max(1, ScaleLogical(config_.layout.throughput.plotStrokeWidth));
-    const int plotTop = std::min(graphBottom, static_cast<int>(rect.top) + plotStrokeWidth);
-    const int plotHeight = std::max(1, graphBottom - plotTop);
-
-    const int strokeWidth = std::max(1, ScaleLogical(config_.layout.throughput.guideStrokeWidth));
-    const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
-    HBRUSH markerBrush = CreateSolidBrush(ToColorRef(config_.layout.colors.graphMarkerColor));
-    for (double tick = guideStep; tick < maxValue; tick += guideStep) {
-        const double ratio = tick / maxValue;
-        const int y = graphBottom - static_cast<int>(std::round(ratio * plotHeight));
-        RECT lineRect{graphLeft, std::max(plotTop, y), graphRight, std::min(graphBottom + 1, y + strokeWidth)};
-        FillRect(hdc, &lineRect, markerBrush);
-    }
-
-    if (!history.empty()) {
-        const double markerInterval = timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
-        for (double sampleOffset = timeMarkerOffsetSamples;
-            sampleOffset <= static_cast<double>(history.size() - 1) + markerInterval;
-            sampleOffset += markerInterval) {
-            const double clampedOffset = std::clamp(sampleOffset, 0.0, static_cast<double>(history.size() - 1));
-            const int x = graphRight -
-                          static_cast<int>(std::round(clampedOffset * width / std::max<size_t>(1, history.size() - 1)));
-            RECT lineRect{x, rect.top, std::min(graphRight + 1, x + strokeWidth), rect.bottom};
-            FillRect(hdc, &lineRect, markerBrush);
-        }
-    }
-
-    DeleteObject(markerBrush);
-
-    HBRUSH axisBrush = CreateSolidBrush(ToColorRef(config_.layout.colors.graphAxisColor));
-    RECT verticalAxisRect{rect.left + axisWidth, rect.top, rect.left + axisWidth + strokeWidth, rect.bottom};
-    RECT horizontalAxisRect{rect.left + axisWidth, rect.bottom - strokeWidth, rect.right, rect.bottom};
-    FillRect(hdc, &verticalAxisRect, axisBrush);
-    FillRect(hdc, &horizontalAxisRect, axisBrush);
-    DeleteObject(axisBrush);
-
-    char maxLabel[32];
-    sprintf_s(maxLabel, "%.0f", maxValue);
-    RECT maxRect{rect.left, rect.top, rect.left + axisWidth, graphTop};
-    if (renderMode_ != RenderMode::Blank) {
-        DrawTextBlock(hdc,
-            maxRect,
-            maxLabel,
-            fonts_.smallFont,
-            MutedTextColor(),
-            DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-            maxLabelEditable);
-    }
-
-    if (renderMode_ == RenderMode::Blank) {
-        return;
-    }
-
-    const COLORREF plotColor = AccentColor();
-    HPEN pen = CreatePen(PS_SOLID, plotStrokeWidth, plotColor);
-    HGDIOBJ oldPen = SelectObject(hdc, pen);
-    POINT lastPoint{graphLeft, graphBottom};
-    bool hasLastPoint = false;
-    if (!history.empty()) {
-        const size_t historyDenominator = std::max<size_t>(1, history.size() - 1);
-        for (size_t i = 0; i < history.size(); ++i) {
-            const double valueRatio = std::clamp(history[i] / maxValue, 0.0, 1.0);
-            const int x = graphLeft + static_cast<int>(i * width / historyDenominator);
-            const int y = graphBottom - static_cast<int>(std::round(valueRatio * plotHeight));
-            lastPoint = POINT{x, y};
-            hasLastPoint = true;
-        }
-    }
-    for (size_t i = 1; i < history.size(); ++i) {
-        const double v1 = std::clamp(history[i - 1] / maxValue, 0.0, 1.0);
-        const double v2 = std::clamp(history[i] / maxValue, 0.0, 1.0);
-        const int x1 = graphLeft + static_cast<int>((i - 1) * width / std::max<size_t>(1, history.size() - 1));
-        const int x2 = graphLeft + static_cast<int>(i * width / std::max<size_t>(1, history.size() - 1));
-        const int y1 = graphBottom - static_cast<int>(std::round(v1 * plotHeight));
-        const int y2 = graphBottom - static_cast<int>(std::round(v2 * plotHeight));
-        MoveToEx(hdc, x1, y1, nullptr);
-        LineTo(hdc, x2, y2);
-    }
-    SelectObject(hdc, oldPen);
-    DeleteObject(pen);
-
-    if (hasLastPoint && leaderDiameter > 0) {
-        FillCircle(hdc, lastPoint.x, lastPoint.y, leaderDiameter, plotColor, 255);
     }
 }
 

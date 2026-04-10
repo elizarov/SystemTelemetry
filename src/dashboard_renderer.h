@@ -257,14 +257,6 @@ public:
         UINT format,
         const std::optional<EditableAnchorBinding>& editable = std::nullopt);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
-    void DrawGraph(HDC hdc,
-        const RECT& rect,
-        const std::vector<double>& history,
-        double maxValue,
-        double guideStepMbps,
-        double timeMarkerOffsetSamples,
-        double timeMarkerIntervalSamples,
-        const std::optional<EditableAnchorBinding>& maxLabelEditable = std::nullopt);
     EditableAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const;
     void RegisterEditableAnchorRegion(const EditableAnchorKey& key,
