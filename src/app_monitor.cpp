@@ -100,7 +100,8 @@ double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LON
         return 0.0;
     }
 
-    const double widthScale = static_cast<double>(monitorWidth) / static_cast<double>(config.layout.structure.window.width);
+    const double widthScale =
+        static_cast<double>(monitorWidth) / static_cast<double>(config.layout.structure.window.width);
     const double heightScale =
         static_cast<double>(monitorHeight) / static_cast<double>(config.layout.structure.window.height);
     if (!std::isfinite(widthScale) || !std::isfinite(heightScale) || widthScale <= 0.0 || heightScale <= 0.0) {
@@ -274,10 +275,10 @@ MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd, double configuredSc
         info.dpi = GetMonitorDpi(monitor);
         info.physicalRelativePosition.x = windowRect.left - monitorInfo.rcMonitor.left;
         info.physicalRelativePosition.y = windowRect.top - monitorInfo.rcMonitor.top;
-        info.relativePosition.x = ScalePhysicalToLogical(windowRect.left - monitorInfo.rcMonitor.left,
-            ResolveDisplayScale(configuredScale, info.dpi));
-        info.relativePosition.y = ScalePhysicalToLogical(windowRect.top - monitorInfo.rcMonitor.top,
-            ResolveDisplayScale(configuredScale, info.dpi));
+        info.relativePosition.x = ScalePhysicalToLogical(
+            windowRect.left - monitorInfo.rcMonitor.left, ResolveDisplayScale(configuredScale, info.dpi));
+        info.relativePosition.y = ScalePhysicalToLogical(
+            windowRect.top - monitorInfo.rcMonitor.top, ResolveDisplayScale(configuredScale, info.dpi));
     }
     return info;
 }

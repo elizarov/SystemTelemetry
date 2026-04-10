@@ -555,8 +555,8 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
     }
     std::sort(scaleEntries.begin(), scaleEntries.end());
     scaleEntries.erase(std::unique(scaleEntries.begin(),
-                          scaleEntries.end(),
-                          [](double left, double right) { return AreScalesEqual(left, right); }),
+                           scaleEntries.end(),
+                           [](double left, double right) { return AreScalesEqual(left, right); }),
         scaleEntries.end());
     for (size_t i = 0; i < scaleEntries.size() && (kCommandScaleBase + 1 + i) <= kCommandScaleMax; ++i) {
         ScaleMenuOption option;
@@ -711,9 +711,11 @@ std::optional<double> DashboardApp::PromptCustomScale() const {
     state.initialScale = HasExplicitDisplayScale(controller_.State().config.display.scale)
                              ? controller_.State().config.display.scale
                              : ResolveCurrentDisplayScale(CurrentWindowDpi());
-    if (DialogBoxParamW(
-            instance_, MAKEINTRESOURCEW(IDD_CUSTOM_SCALE), hwnd_, CustomScaleDialogProc, reinterpret_cast<LPARAM>(&state)) ==
-        IDOK) {
+    if (DialogBoxParamW(instance_,
+            MAKEINTRESOURCEW(IDD_CUSTOM_SCALE),
+            hwnd_,
+            CustomScaleDialogProc,
+            reinterpret_cast<LPARAM>(&state)) == IDOK) {
         return state.result;
     }
     return std::nullopt;

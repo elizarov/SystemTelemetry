@@ -11,8 +11,7 @@ enum class ConfigSaveShape {
 };
 
 std::string FormatLayoutExpression(const LayoutNodeConfig& node);
-std::string BuildSavedConfigText(
-    const std::string& initialText,
+std::string BuildSavedConfigText(const std::string& initialText,
     const AppConfig& config,
     const AppConfig* compareConfig,
     ConfigSaveShape shape = ConfigSaveShape::UpdateOrAppend);

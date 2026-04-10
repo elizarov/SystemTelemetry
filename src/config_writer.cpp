@@ -488,8 +488,7 @@ std::string BuildSavedConfigText(
             lines[sectionStart] = sectionName;
         }
         const size_t sectionEnd = findSectionEnd(sectionStart);
-        ReplaceOrAppendKey(
-            lines, sectionStart, sectionEnd, key, value, shape == ConfigSaveShape::UpdateOrAppend);
+        ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value, shape == ConfigSaveShape::UpdateOrAppend);
     };
 
     if (compareConfig == nullptr) {
