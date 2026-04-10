@@ -187,7 +187,6 @@ struct ThroughputWidgetConfig {
     CONFIG_REFLECTED_STRUCT(ThroughputWidgetConfig)
     CONFIG_VALUE(int, headerGap, "header_gap");
     CONFIG_VALUE(int, axisPadding, "axis_padding");
-    CONFIG_VALUE(int, scaleLabelPadding, "scale_label_padding");
     CONFIG_VALUE(int, guideStrokeWidth, "guide_stroke_width");
     CONFIG_VALUE(int, plotStrokeWidth, "plot_stroke_width");
     CONFIG_VALUE(int, leaderDiameter, "leader_diameter");

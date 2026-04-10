@@ -59,8 +59,7 @@ ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, cons
     ThroughputGraphLayout layout;
     layout.graphRect = rect;
     layout.axisWidth = std::max(1, renderer.MeasuredTextWidths().throughputAxis);
-    layout.labelBandHeight = renderer.FontMetrics().smallText +
-                             std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.scaleLabelPadding));
+    layout.labelBandHeight = renderer.FontMetrics().smallText;
     layout.graphTop = std::min(rect.bottom - 1, rect.top + layout.labelBandHeight);
     layout.graphLeft = rect.left + layout.axisWidth;
     layout.leaderDiameter = std::max(1, renderer.ScaleLogical(renderer.Config().layout.throughput.leaderDiameter));
@@ -198,9 +197,7 @@ void DrawGraph(DashboardRenderer& renderer,
 
 int EffectiveThroughputPreferredHeight(const DashboardRenderer& renderer) {
     const int headerHeight = renderer.FontMetrics().smallText;
-    const int graphLabelHeight =
-        renderer.FontMetrics().smallText +
-        std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.scaleLabelPadding));
+    const int graphLabelHeight = renderer.FontMetrics().smallText;
     return headerHeight + std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap)) +
            graphLabelHeight;
 }
