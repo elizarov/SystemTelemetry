@@ -1195,8 +1195,8 @@ void DashboardRenderer::DrawThroughputWidget(
         MutedTextColor(),
         DT_LEFT | DT_SINGLELINE | DT_VCENTER,
         MakeEditableTextBinding(widget, AnchorEditParameter::FontSmall, 0, config_.layout.fonts.smallText.size));
-    RECT numberRect{
-        std::min(valueRect.right, labelLayout.textRect.right + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
+    RECT numberRect{std::min(valueRect.right,
+                        labelLayout.textRect.right + std::max(0, ScaleLogical(config_.layout.throughput.headerGap))),
         valueRect.top,
         valueRect.right,
         valueRect.bottom};
