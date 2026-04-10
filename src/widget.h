@@ -58,11 +58,6 @@ struct DashboardWidgetLayout {
     std::string editCardId;
     std::vector<size_t> nodePath;
     std::unique_ptr<DashboardWidget> widget;
-    DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
-    int preferredHeight = 0;
-    bool fixedPreferredHeightInRows = false;
-    bool hoverable = false;
-    bool verticalSpring = false;
 };
 
 std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view name);

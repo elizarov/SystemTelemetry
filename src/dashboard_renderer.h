@@ -298,11 +298,9 @@ private:
     };
 
     struct ParsedWidgetInfo {
-        DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
         std::unique_ptr<DashboardWidget> widgetPrototype;
         int preferredHeight = 0;
         bool fixedPreferredHeightInRows = false;
-        bool hoverable = false;
         bool verticalSpring = false;
     };
 

@@ -382,16 +382,17 @@ std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::Coll
     std::vector<LayoutGuideSnapCandidate> candidates;
     for (const DashboardWidgetLayout* affected : affectedWidgets) {
         const int startExtent = WidgetExtentForAxis(*affected, guide.axis);
-        if (startExtent <= 0) {
+        if (startExtent <= 0 || affected->widget == nullptr) {
             continue;
         }
         std::set<SimilarityTypeKey> seenTargets;
         for (size_t i = 0; i < allWidgets.size(); ++i) {
             const DashboardWidgetLayout* target = allWidgets[i];
-            if (target == affected || target->widgetClass != affected->widgetClass) {
+            if (target == affected || target->widget == nullptr ||
+                target->widget->Class() != affected->widget->Class()) {
                 continue;
             }
-            const SimilarityTypeKey typeKey{target->widgetClass, WidgetExtentForAxis(*target, guide.axis)};
+            const SimilarityTypeKey typeKey{target->widget->Class(), WidgetExtentForAxis(*target, guide.axis)};
             if (!seenTargets.insert(typeKey).second) {
                 continue;
             }
@@ -430,7 +431,7 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     POINT clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (!widget.hoverable || !PtInRect(&widget.rect, clientPoint)) {
+            if (widget.widget == nullptr || !widget.widget->IsHoverable() || !PtInRect(&widget.rect, clientPoint)) {
                 continue;
             }
             return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -480,7 +481,7 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFi
 
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (!widget.hoverable || widget.widgetClass != *widgetClass) {
+            if (widget.widget == nullptr || !widget.widget->IsHoverable() || widget.widget->Class() != *widgetClass) {
                 continue;
             }
             return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -685,7 +686,7 @@ int DashboardRenderer::EffectiveHeaderHeight() const {
 }
 
 bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const {
-    if (widget.widget == nullptr || widget.verticalSpring) {
+    if (widget.widget == nullptr || widget.widget->IsVerticalSpring()) {
         return false;
     }
     if (UsesFixedPreferredHeightInRows(widget)) {
@@ -703,8 +704,8 @@ bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(
 
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& candidate : card.widgets) {
-            if (&candidate == &widget || candidate.cardId != widget.cardId ||
-                candidate.widgetClass != widget.widgetClass) {
+            if (&candidate == &widget || candidate.cardId != widget.cardId || candidate.widget == nullptr ||
+                widget.widget == nullptr || candidate.widget->Class() != widget.widget->Class()) {
                 continue;
             }
             if (!SupportsLayoutSimilarityIndicator(candidate) || WidgetExtentForAxis(candidate, axis) != extent) {
@@ -789,22 +790,19 @@ const DashboardRenderer::ParsedWidgetInfo* DashboardRenderer::FindParsedWidgetIn
         return &it->second;
     }
 
-    const auto widgetClass = FindDashboardWidgetClass(node.name);
-    if (!widgetClass.has_value()) {
+    if (!FindDashboardWidgetClass(node.name).has_value()) {
         return nullptr;
     }
 
-    auto widget = CreateDashboardWidget(*widgetClass);
+    auto widget = CreateDashboardWidget(node.name);
     if (widget == nullptr) {
         return nullptr;
     }
 
     widget->Initialize(node);
     ParsedWidgetInfo info;
-    info.widgetClass = *widgetClass;
     info.preferredHeight = widget->PreferredHeight(*this);
     info.fixedPreferredHeightInRows = widget->UsesFixedPreferredHeightInRows();
-    info.hoverable = widget->IsHoverable();
     info.verticalSpring = widget->IsVerticalSpring();
     info.widgetPrototype = std::move(widget);
     return &parsedWidgetInfoCache_.emplace(&node, std::move(info)).first->second;
@@ -815,18 +813,13 @@ DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeCon
     widget.rect = rect;
     const ParsedWidgetInfo* info = FindParsedWidgetInfo(node);
     if (info != nullptr) {
-        widget.widgetClass = info->widgetClass;
-        widget.preferredHeight = info->preferredHeight;
-        widget.fixedPreferredHeightInRows = info->fixedPreferredHeightInRows;
-        widget.hoverable = info->hoverable;
-        widget.verticalSpring = info->verticalSpring;
         widget.widget = info->widgetPrototype->Clone();
     }
     return widget;
 }
 
 bool DashboardRenderer::UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const {
-    return widget.fixedPreferredHeightInRows;
+    return widget.widget != nullptr && widget.widget->UsesFixedPreferredHeightInRows();
 }
 
 const LayoutCardConfig* DashboardRenderer::FindCardConfigById(const std::string& id) const {

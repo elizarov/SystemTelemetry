@@ -153,7 +153,7 @@ bool DashboardRendererLayoutEngine::ResolveLayout(DashboardRenderer& renderer) {
     int globalGaugeRadius = 0;
     for (const auto& card : renderer.resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (widget.widgetClass != DashboardWidgetClass::Gauge) {
+            if (widget.widget == nullptr || widget.widget->Class() != DashboardWidgetClass::Gauge) {
                 continue;
             }
 

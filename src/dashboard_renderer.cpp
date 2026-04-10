@@ -488,13 +488,14 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
     std::map<const DashboardWidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
     for (const DashboardWidgetLayout* affected : affectedWidgets) {
         const int affectedExtent = WidgetExtentForAxis(*affected, axis);
-        if (affectedExtent <= 0) {
+        if (affectedExtent <= 0 || affected->widget == nullptr) {
             continue;
         }
-        const SimilarityTypeKey typeKey{affected->widgetClass, affectedExtent};
+        const SimilarityTypeKey typeKey{affected->widget->Class(), affectedExtent};
         bool hasExactMatch = false;
         for (const DashboardWidgetLayout* candidate : allWidgets) {
-            if (candidate == affected || candidate->widgetClass != affected->widgetClass) {
+            if (candidate == affected || candidate->widget == nullptr ||
+                candidate->widget->Class() != affected->widget->Class()) {
                 continue;
             }
             const int candidateExtent = WidgetExtentForAxis(*candidate, axis);
