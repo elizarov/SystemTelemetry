@@ -2,8 +2,16 @@
 
 #include "../dashboard_renderer.h"
 
+DashboardWidgetClass SpacerWidget::Class() const {
+    return DashboardWidgetClass::Spacer;
+}
+
 const char* SpacerWidget::TypeName() const {
     return "spacer";
+}
+
+std::unique_ptr<DashboardWidget> SpacerWidget::Clone() const {
+    return std::make_unique<SpacerWidget>(*this);
 }
 
 void SpacerWidget::Initialize(const LayoutNodeConfig&) {}

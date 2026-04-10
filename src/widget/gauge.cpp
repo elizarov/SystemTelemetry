@@ -118,8 +118,16 @@ RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
 
 }  // namespace
 
+DashboardWidgetClass GaugeWidget::Class() const {
+    return DashboardWidgetClass::Gauge;
+}
+
 const char* GaugeWidget::TypeName() const {
     return "gauge";
+}
+
+std::unique_ptr<DashboardWidget> GaugeWidget::Clone() const {
+    return std::make_unique<GaugeWidget>(*this);
 }
 
 void GaugeWidget::Initialize(const LayoutNodeConfig& node) {
@@ -130,8 +138,10 @@ int GaugeWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.preferredSize));
 }
 
-void GaugeWidget::Draw(
-    DashboardRenderer& renderer, HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+void GaugeWidget::Draw(DashboardRenderer& renderer,
+    HDC hdc,
+    const DashboardWidgetLayout& widget,
+    const DashboardMetricSource& metrics) const {
     const DashboardGaugeMetric metric = metrics.ResolveGauge(metric_);
     const int width = widget.rect.right - widget.rect.left;
     const int height = widget.rect.bottom - widget.rect.top;
@@ -145,21 +155,21 @@ void GaugeWidget::Draw(
         renderer.Config().layout.gauge.segmentCount,
         renderer.Config().layout.gauge.segmentGapDegrees);
     const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
-    const int filledSegments = clampedPercent <= 0.0
-                                   ? 0
-                                   : std::clamp(static_cast<int>(std::ceil(
-                                                     clampedPercent * static_cast<double>(gaugeLayout.segmentCount) /
-                                                     100.0)),
-                                         1,
-                                         gaugeLayout.segmentCount);
+    const int filledSegments =
+        clampedPercent <= 0.0
+            ? 0
+            : std::clamp(
+                  static_cast<int>(std::ceil(clampedPercent * static_cast<double>(gaugeLayout.segmentCount) / 100.0)),
+                  1,
+                  gaugeLayout.segmentCount);
     const double clampedPeakRatio = std::clamp(metric.peakRatio, 0.0, 1.0);
-    const int peakSegment = clampedPeakRatio <= 0.0
-                                ? -1
-                                : std::clamp(static_cast<int>(std::ceil(
-                                                   clampedPeakRatio * static_cast<double>(gaugeLayout.segmentCount))) -
-                                              1,
-                                      0,
-                                      gaugeLayout.segmentCount - 1);
+    const int peakSegment =
+        clampedPeakRatio <= 0.0
+            ? -1
+            : std::clamp(
+                  static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(gaugeLayout.segmentCount))) - 1,
+                  0,
+                  gaugeLayout.segmentCount - 1);
     const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     const int outerRadius = radius + static_cast<int>(std::ceil(static_cast<double>(segmentThickness) / 2.0f));
@@ -181,10 +191,8 @@ void GaugeWidget::Draw(
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    const Gdiplus::Color trackColor(255,
-        GetRValue(renderer.TrackColor()),
-        GetGValue(renderer.TrackColor()),
-        GetBValue(renderer.TrackColor()));
+    const Gdiplus::Color trackColor(
+        255, GetRValue(renderer.TrackColor()), GetGValue(renderer.TrackColor()), GetBValue(renderer.TrackColor()));
     const Gdiplus::Color usageColor(
         255, GetRValue(renderer.AccentColor()), GetGValue(renderer.AccentColor()), GetBValue(renderer.AccentColor()));
     const Gdiplus::Color ghostColor(
@@ -237,8 +245,8 @@ void GaugeWidget::Draw(
             renderer.WidgetFonts().big,
             renderer.ForegroundColor(),
             DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontBig, 0,
-                renderer.Config().layout.fonts.big.size));
+            renderer.MakeEditableTextBinding(
+                widget, DashboardRenderer::AnchorEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
     }
     renderer.DrawTextBlock(hdc,
         RECT{cx - halfWidth,
@@ -249,7 +257,9 @@ void GaugeWidget::Draw(
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, 1,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontSmall,
+            1,
             renderer.Config().layout.fonts.smallText.size));
 }
 

@@ -3,8 +3,16 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+DashboardWidgetClass ClockTimeWidget::Class() const {
+    return DashboardWidgetClass::ClockTime;
+}
+
 const char* ClockTimeWidget::TypeName() const {
     return "clock_time";
+}
+
+std::unique_ptr<DashboardWidget> ClockTimeWidget::Clone() const {
+    return std::make_unique<ClockTimeWidget>(*this);
 }
 
 void ClockTimeWidget::Initialize(const LayoutNodeConfig&) {}
@@ -17,8 +25,10 @@ bool ClockTimeWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void ClockTimeWidget::Draw(
-    DashboardRenderer& renderer, HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+void ClockTimeWidget::Draw(DashboardRenderer& renderer,
+    HDC hdc,
+    const DashboardWidgetLayout& widget,
+    const DashboardMetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
         return;
     }
@@ -29,6 +39,8 @@ void ClockTimeWidget::Draw(
         renderer.WidgetFonts().clockTime,
         renderer.ForegroundColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontClockTime, 0,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontClockTime,
+            0,
             renderer.Config().layout.fonts.clockTime.size));
 }

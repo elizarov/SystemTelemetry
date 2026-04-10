@@ -3,8 +3,16 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+DashboardWidgetClass ClockDateWidget::Class() const {
+    return DashboardWidgetClass::ClockDate;
+}
+
 const char* ClockDateWidget::TypeName() const {
     return "clock_date";
+}
+
+std::unique_ptr<DashboardWidget> ClockDateWidget::Clone() const {
+    return std::make_unique<ClockDateWidget>(*this);
 }
 
 void ClockDateWidget::Initialize(const LayoutNodeConfig&) {}
@@ -17,8 +25,10 @@ bool ClockDateWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void ClockDateWidget::Draw(
-    DashboardRenderer& renderer, HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+void ClockDateWidget::Draw(DashboardRenderer& renderer,
+    HDC hdc,
+    const DashboardWidgetLayout& widget,
+    const DashboardMetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
         return;
     }
@@ -29,6 +39,8 @@ void ClockDateWidget::Draw(
         renderer.WidgetFonts().clockDate,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontClockDate, 0,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontClockDate,
+            0,
             renderer.Config().layout.fonts.clockDate.size));
 }

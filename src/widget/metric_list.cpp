@@ -33,8 +33,16 @@ MetricListWidget::Entry ParseMetricListEntry(std::string item) {
 
 }  // namespace
 
+DashboardWidgetClass MetricListWidget::Class() const {
+    return DashboardWidgetClass::MetricList;
+}
+
 const char* MetricListWidget::TypeName() const {
     return "metric_list";
+}
+
+std::unique_ptr<DashboardWidget> MetricListWidget::Clone() const {
+    return std::make_unique<MetricListWidget>(*this);
 }
 
 void MetricListWidget::Initialize(const LayoutNodeConfig& node) {
@@ -53,8 +61,10 @@ int MetricListWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return static_cast<int>(entries_.size()) * renderer.EffectiveMetricRowHeight();
 }
 
-void MetricListWidget::Draw(
-    DashboardRenderer& renderer, HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+void MetricListWidget::Draw(DashboardRenderer& renderer,
+    HDC hdc,
+    const DashboardWidgetLayout& widget,
+    const DashboardMetricSource& metrics) const {
     const int rowHeight = renderer.EffectiveMetricRowHeight();
     const int savedDc = SaveDC(hdc);
     IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
@@ -75,7 +85,9 @@ void MetricListWidget::Draw(
             renderer.WidgetFonts().label,
             renderer.MutedTextColor(),
             DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontLabel, rowIndex * 2,
+            renderer.MakeEditableTextBinding(widget,
+                DashboardRenderer::AnchorEditParameter::FontLabel,
+                rowIndex * 2,
                 renderer.Config().layout.fonts.label.size));
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
             renderer.DrawTextBlock(hdc,
@@ -84,7 +96,8 @@ void MetricListWidget::Draw(
                 renderer.WidgetFonts().value,
                 renderer.ForegroundColor(),
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-                renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontValue,
+                renderer.MakeEditableTextBinding(widget,
+                    DashboardRenderer::AnchorEditParameter::FontValue,
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size));
         }
@@ -93,10 +106,14 @@ void MetricListWidget::Draw(
         const int barBottom = (std::min)(static_cast<int>(rowRect.bottom), static_cast<int>(rowRect.top) + rowHeight);
         const int barTop = (std::max)(static_cast<int>(rowRect.top), barBottom - metricBarHeight);
         RECT barRect{valueRect.left, barTop, rowRect.right, barBottom};
-        renderer.DrawPillBar(
-            hdc, barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
+        renderer.DrawPillBar(hdc,
+            barRect,
+            row.ratio,
+            row.peakRatio,
+            renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
         const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
-        const int anchorCenterX = static_cast<int>(barRect.left) + ((std::max)(0, static_cast<int>(barRect.right - barRect.left) / 2));
+        const int anchorCenterX =
+            static_cast<int>(barRect.left) + ((std::max)(0, static_cast<int>(barRect.right - barRect.left) / 2));
         const int anchorCenterY = static_cast<int>(barRect.bottom);
         renderer.RegisterEditableAnchorRegion(
             DashboardRenderer::EditableAnchorKey{
@@ -126,11 +143,13 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     const int labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
     const int rowHeight = renderer.EffectiveMetricRowHeight();
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
-    const int x = std::clamp(
-        static_cast<int>(widget.rect.left) + labelWidth, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
+    const int x = std::clamp(static_cast<int>(widget.rect.left) + labelWidth,
+        static_cast<int>(widget.rect.left),
+        static_cast<int>(widget.rect.right));
     const int visibleRows =
         rowHeight > 0
-            ? std::clamp(((std::max)(0, static_cast<int>(widget.rect.bottom - widget.rect.top)) + rowHeight - 1) / rowHeight,
+            ? std::clamp(
+                  ((std::max)(0, static_cast<int>(widget.rect.bottom - widget.rect.top)) + rowHeight - 1) / rowHeight,
                   0,
                   static_cast<int>(entries_.size()))
             : 0;

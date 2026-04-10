@@ -1,5 +1,7 @@
 #include "widget.h"
 
+#include <string_view>
+
 #include "widget/clock_date.h"
 #include "widget/clock_time.h"
 #include "widget/drive_usage_list.h"
@@ -23,10 +25,43 @@ bool DashboardWidget::IsVerticalSpring() const {
     return false;
 }
 
-void DashboardWidget::Draw(
-    DashboardRenderer&, HDC, const DashboardWidgetLayout&, const DashboardMetricSource&) const {}
+void DashboardWidget::Draw(DashboardRenderer&, HDC, const DashboardWidgetLayout&, const DashboardMetricSource&) const {}
 
 void DashboardWidget::BuildEditGuides(DashboardRenderer&, const DashboardWidgetLayout&) const {}
+
+std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view name) {
+    if (name == "text") {
+        return DashboardWidgetClass::Text;
+    }
+    if (name == "gauge") {
+        return DashboardWidgetClass::Gauge;
+    }
+    if (name == "metric_list") {
+        return DashboardWidgetClass::MetricList;
+    }
+    if (name == "throughput") {
+        return DashboardWidgetClass::Throughput;
+    }
+    if (name == "network_footer") {
+        return DashboardWidgetClass::NetworkFooter;
+    }
+    if (name == "spacer") {
+        return DashboardWidgetClass::Spacer;
+    }
+    if (name == "vertical_spring") {
+        return DashboardWidgetClass::VerticalSpring;
+    }
+    if (name == "drive_usage_list") {
+        return DashboardWidgetClass::DriveUsageList;
+    }
+    if (name == "clock_time") {
+        return DashboardWidgetClass::ClockTime;
+    }
+    if (name == "clock_date") {
+        return DashboardWidgetClass::ClockDate;
+    }
+    return std::nullopt;
+}
 
 std::unique_ptr<DashboardWidget> CreateDashboardWidget(const std::string& name) {
     if (name == "text") {

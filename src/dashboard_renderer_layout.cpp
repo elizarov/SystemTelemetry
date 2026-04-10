@@ -46,10 +46,9 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
     std::vector<bool> childFixedExtents;
     childFixedExtents.reserve(node.children.size());
     for (const auto& child : node.children) {
-        const DashboardWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-        childFixedExtents.push_back(
-            !horizontal && (UsesFixedPreferredHeightInRows(resolvedChild) ||
-                               (resolvedChild.widget != nullptr && resolvedChild.widget->IsVerticalSpring())));
+        const ParsedWidgetInfo* childWidget = FindParsedWidgetInfo(child);
+        childFixedExtents.push_back(!horizontal && childWidget != nullptr &&
+                                    (childWidget->fixedPreferredHeightInRows || childWidget->verticalSpring));
     }
     for (size_t i = 0; i + 1 < childRects.size(); ++i) {
         if (!horizontal && (childFixedExtents[i] || childFixedExtents[i + 1])) {
@@ -132,18 +131,18 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     int springWeight = 0;
     const bool rowsUseSprings =
         !horizontal && std::any_of(node.children.begin(), node.children.end(), [&](const auto& child) {
-            const DashboardWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-            return resolvedChild.widget != nullptr && resolvedChild.widget->IsVerticalSpring();
+            const ParsedWidgetInfo* childWidget = FindParsedWidgetInfo(child);
+            return childWidget != nullptr && childWidget->verticalSpring;
         });
     if (!horizontal) {
         for (const auto& child : node.children) {
-            const DashboardWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-            if (resolvedChild.widget != nullptr && resolvedChild.widget->IsVerticalSpring()) {
+            const ParsedWidgetInfo* childWidget = FindParsedWidgetInfo(child);
+            if (childWidget != nullptr && childWidget->verticalSpring) {
                 springWeight += std::max(1, child.weight);
                 continue;
             }
-            if (UsesFixedPreferredHeightInRows(resolvedChild)) {
-                reservedPreferred += std::max(0, resolvedChild.preferredHeight);
+            if (childWidget != nullptr && childWidget->fixedPreferredHeightInRows) {
+                reservedPreferred += std::max(0, childWidget->preferredHeight);
             } else if (rowsUseSprings) {
                 reservedPreferred += std::max(0, PreferredNodeHeight(child, static_cast<int>(rect.right - rect.left)));
             } else {
@@ -167,16 +166,15 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     childRects.reserve(node.children.size());
     for (size_t i = 0; i < node.children.size(); ++i) {
         const auto& child = node.children[i];
-        const DashboardWidgetLayout resolvedChild = ResolveWidgetLayout(child, RECT{});
-        const bool fixedPreferred = !horizontal && UsesFixedPreferredHeightInRows(resolvedChild);
-        const bool verticalSpring =
-            !horizontal && resolvedChild.widget != nullptr && resolvedChild.widget->IsVerticalSpring();
+        const ParsedWidgetInfo* childWidget = FindParsedWidgetInfo(child);
+        const bool fixedPreferred = !horizontal && childWidget != nullptr && childWidget->fixedPreferredHeightInRows;
+        const bool verticalSpring = !horizontal && childWidget != nullptr && childWidget->verticalSpring;
         const bool preferredPacked = !horizontal && rowsUseSprings && !verticalSpring;
         const int childWeight = (fixedPreferred || preferredPacked) ? 0 : std::max(1, child.weight);
         const int remainingWeight = std::max(1, totalWeight);
         int size = 0;
         if (fixedPreferred) {
-            size = std::max(0, resolvedChild.preferredHeight);
+            size = std::max(0, childWidget->preferredHeight);
         } else if (preferredPacked) {
             size = std::max(0, PreferredNodeHeight(child, static_cast<int>(rect.right - rect.left)));
         } else if (verticalSpring) {

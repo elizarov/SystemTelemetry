@@ -3,8 +3,16 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+DashboardWidgetClass ThroughputWidget::Class() const {
+    return DashboardWidgetClass::Throughput;
+}
+
 const char* ThroughputWidget::TypeName() const {
     return "throughput";
+}
+
+std::unique_ptr<DashboardWidget> ThroughputWidget::Clone() const {
+    return std::make_unique<ThroughputWidget>(*this);
 }
 
 void ThroughputWidget::Initialize(const LayoutNodeConfig& node) {
@@ -15,11 +23,16 @@ int ThroughputWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return renderer.EffectiveThroughputPreferredHeight();
 }
 
-void ThroughputWidget::Draw(
-    DashboardRenderer& renderer, HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+void ThroughputWidget::Draw(DashboardRenderer& renderer,
+    HDC hdc,
+    const DashboardWidgetLayout& widget,
+    const DashboardMetricSource& metrics) const {
     const DashboardThroughputMetric metric = metrics.ResolveThroughput(metric_);
     const int lineHeight = renderer.FontMetrics().smallText;
-    RECT valueRect{widget.rect.left, widget.rect.top, widget.rect.right, (std::min)(widget.rect.bottom, widget.rect.top + lineHeight)};
+    RECT valueRect{widget.rect.left,
+        widget.rect.top,
+        widget.rect.right,
+        (std::min)(widget.rect.bottom, widget.rect.top + lineHeight)};
     RECT graphRect{widget.rect.left,
         (std::min)(widget.rect.bottom,
             valueRect.bottom + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
@@ -37,11 +50,13 @@ void ThroughputWidget::Draw(
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, 0,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontSmall,
+            0,
             renderer.Config().layout.fonts.smallText.size));
-    RECT numberRect{
-        (std::min)(valueRect.right,
-            labelLayout.textRect.right + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
+    RECT numberRect{(std::min)(valueRect.right,
+                        labelLayout.textRect.right +
+                            (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
         valueRect.top,
         valueRect.right,
         valueRect.bottom};
@@ -52,7 +67,9 @@ void ThroughputWidget::Draw(
             renderer.WidgetFonts().smallFont,
             renderer.ForegroundColor(),
             DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, 1,
+            renderer.MakeEditableTextBinding(widget,
+                DashboardRenderer::AnchorEditParameter::FontSmall,
+                1,
                 renderer.Config().layout.fonts.smallText.size));
     }
     renderer.DrawGraph(hdc,
@@ -62,13 +79,18 @@ void ThroughputWidget::Draw(
         metric.guideStepMbps,
         metric.timeMarkerOffsetSamples,
         metric.timeMarkerIntervalSamples,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, 2,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontSmall,
+            2,
             renderer.Config().layout.fonts.smallText.size));
 }
 
 void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const int lineHeight = renderer.FontMetrics().smallText;
-    RECT valueRect{widget.rect.left, widget.rect.top, widget.rect.right, (std::min)(widget.rect.bottom, widget.rect.top + lineHeight)};
+    RECT valueRect{widget.rect.left,
+        widget.rect.top,
+        widget.rect.right,
+        (std::min)(widget.rect.bottom, widget.rect.top + lineHeight)};
     RECT graphRect{widget.rect.left,
         (std::min)(widget.rect.bottom,
             valueRect.bottom + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
@@ -94,7 +116,8 @@ void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     guide.dragDirection = 1;
     guides.push_back(guide);
 
-    const int y = std::clamp(static_cast<int>(graphRect.top), static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
+    const int y = std::clamp(
+        static_cast<int>(graphRect.top), static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
     guide = {};
     guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
     guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};

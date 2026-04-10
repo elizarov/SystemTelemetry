@@ -88,8 +88,16 @@ void DrawSegmentIndicator(HDC hdc,
 
 }  // namespace
 
+DashboardWidgetClass DriveUsageListWidget::Class() const {
+    return DashboardWidgetClass::DriveUsageList;
+}
+
 const char* DriveUsageListWidget::TypeName() const {
     return "drive_usage_list";
+}
+
+std::unique_ptr<DashboardWidget> DriveUsageListWidget::Clone() const {
+    return std::make_unique<DriveUsageListWidget>(*this);
 }
 
 void DriveUsageListWidget::Initialize(const LayoutNodeConfig&) {}
@@ -99,8 +107,10 @@ int DriveUsageListWidget::PreferredHeight(const DashboardRenderer& renderer) con
     return (count > 0 ? renderer.EffectiveDriveHeaderHeight() : 0) + (count * renderer.EffectiveDriveRowHeight());
 }
 
-void DriveUsageListWidget::Draw(
-    DashboardRenderer& renderer, HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
+    HDC hdc,
+    const DashboardWidgetLayout& widget,
+    const DashboardMetricSource& metrics) const {
     const auto& config = renderer.Config().layout.driveUsageList;
     const int headerHeight = renderer.EffectiveDriveHeaderHeight();
     const int rowHeight = renderer.EffectiveDriveRowHeight();
@@ -131,7 +141,8 @@ void DriveUsageListWidget::Draw(
                                     RECT& barRect,
                                     RECT& pctRect,
                                     RECT& freeRect) {
-        labelRect = {band.left, band.top, (std::min)(band.right, static_cast<LONG>(band.left + labelWidth)), band.bottom};
+        labelRect = {
+            band.left, band.top, (std::min)(band.right, static_cast<LONG>(band.left + labelWidth)), band.bottom};
         readRect = {(std::min)(band.right, static_cast<LONG>(labelRect.right + labelGap)),
             band.top,
             (std::min)(band.right, static_cast<LONG>(labelRect.right + labelGap + activityWidth)),
@@ -140,9 +151,12 @@ void DriveUsageListWidget::Draw(
             band.top,
             (std::min)(band.right, static_cast<LONG>(readRect.right + rwGap + activityWidth)),
             band.bottom};
-        freeRect = {(std::max)(band.left, static_cast<LONG>(band.right - freeWidth)), band.top, band.right, band.bottom};
-        pctRect = {
-            (std::max)(band.left, static_cast<LONG>(freeRect.left - percentWidth)), band.top, freeRect.left, band.bottom};
+        freeRect = {
+            (std::max)(band.left, static_cast<LONG>(band.right - freeWidth)), band.top, band.right, band.bottom};
+        pctRect = {(std::max)(band.left, static_cast<LONG>(freeRect.left - percentWidth)),
+            band.top,
+            freeRect.left,
+            band.bottom};
         barRect = {(std::min)(band.right, static_cast<LONG>(writeRect.right + barGap)),
             band.top,
             (std::max)((std::min)(band.right, static_cast<LONG>(writeRect.right + barGap)),
@@ -151,12 +165,14 @@ void DriveUsageListWidget::Draw(
     };
 
     RECT headerLabelRect{}, headerReadRect{}, headerWriteRect{}, headerBarRect{}, headerPctRect{}, headerFreeRect{};
-    resolveColumns(header, headerLabelRect, headerReadRect, headerWriteRect, headerBarRect, headerPctRect, headerFreeRect);
+    resolveColumns(
+        header, headerLabelRect, headerReadRect, headerWriteRect, headerBarRect, headerPctRect, headerFreeRect);
     const int activityAnchorSize = (std::max)(8, renderer.ScaleLogical(10));
     const int activityAnchorCenterX =
         headerReadRect.left + ((std::max)(0L, headerWriteRect.right - headerReadRect.left) / 2);
     const int firstRowTop = (std::min)(static_cast<int>(widget.rect.bottom), static_cast<int>(header.bottom));
-    const int firstRowBottom = (std::min)(static_cast<int>(widget.rect.bottom), static_cast<int>(header.bottom + rowHeight));
+    const int firstRowBottom =
+        (std::min)(static_cast<int>(widget.rect.bottom), static_cast<int>(header.bottom + rowHeight));
     const int firstRowContentTop = firstRowTop + (std::max)(0, ((firstRowBottom - firstRowTop) - rowContentHeight) / 2);
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
@@ -184,7 +200,9 @@ void DriveUsageListWidget::Draw(
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, 0,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontSmall,
+            0,
             renderer.Config().layout.fonts.smallText.size));
     renderer.DrawTextBlock(hdc,
         headerWriteLabelRect,
@@ -192,7 +210,9 @@ void DriveUsageListWidget::Draw(
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, 1,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontSmall,
+            1,
             renderer.Config().layout.fonts.smallText.size));
     renderer.DrawTextBlock(hdc,
         usageHeaderRect,
@@ -200,7 +220,9 @@ void DriveUsageListWidget::Draw(
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, 2,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontSmall,
+            2,
             renderer.Config().layout.fonts.smallText.size));
     renderer.DrawTextBlock(hdc,
         headerFreeRect,
@@ -208,7 +230,9 @@ void DriveUsageListWidget::Draw(
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, 3,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontSmall,
+            3,
             renderer.Config().layout.fonts.smallText.size));
 
     const auto rows = metrics.ResolveDriveRows();
@@ -230,7 +254,9 @@ void DriveUsageListWidget::Draw(
             renderer.WidgetFonts().label,
             renderer.ForegroundColor(),
             DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontLabel, textBaseId,
+            renderer.MakeEditableTextBinding(widget,
+                DashboardRenderer::AnchorEditParameter::FontLabel,
+                textBaseId,
                 renderer.Config().layout.fonts.label.size));
         DrawSegmentIndicator(hdc,
             readIndicatorRect,
@@ -246,8 +272,11 @@ void DriveUsageListWidget::Draw(
             renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank ? 0.0 : drive.writeActivity,
             renderer.TrackColor(),
             renderer.AccentColor());
-        renderer.DrawPillBar(
-            hdc, barRect, drive.usedPercent / 100.0, std::nullopt, renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
+        renderer.DrawPillBar(hdc,
+            barRect,
+            drive.usedPercent / 100.0,
+            std::nullopt,
+            renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
         const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
         const int anchorCenterX =
             static_cast<int>(barRect.left) + ((std::max)(0, static_cast<int>(barRect.right - barRect.left) / 2));
@@ -276,7 +305,9 @@ void DriveUsageListWidget::Draw(
                 renderer.WidgetFonts().label,
                 renderer.ForegroundColor(),
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-                renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontLabel, textBaseId + 1,
+                renderer.MakeEditableTextBinding(widget,
+                    DashboardRenderer::AnchorEditParameter::FontLabel,
+                    textBaseId + 1,
                     renderer.Config().layout.fonts.label.size));
             renderer.DrawTextBlock(hdc,
                 freeRect,
@@ -284,7 +315,9 @@ void DriveUsageListWidget::Draw(
                 renderer.WidgetFonts().smallFont,
                 renderer.MutedTextColor(),
                 DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-                renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontSmall, textBaseId + 2,
+                renderer.MakeEditableTextBinding(widget,
+                    DashboardRenderer::AnchorEditParameter::FontSmall,
+                    textBaseId + 2,
                     renderer.Config().layout.fonts.smallText.size));
         }
 
@@ -311,7 +344,8 @@ void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const Da
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     const int totalRows = static_cast<int>(renderer.Config().storage.drives.size());
     const int availableRowPixels = (std::max)(0, static_cast<int>(widget.rect.bottom - widget.rect.top) - headerHeight);
-    const int visibleRows = rowHeight > 0 ? std::clamp((availableRowPixels + rowHeight - 1) / rowHeight, 0, totalRows) : 0;
+    const int visibleRows =
+        rowHeight > 0 ? std::clamp((availableRowPixels + rowHeight - 1) / rowHeight, 0, totalRows) : 0;
 
     RECT labelRect{widget.rect.left,
         widget.rect.top,
@@ -343,21 +377,22 @@ void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const Da
     }
 
     auto& guides = renderer.WidgetEditGuidesMutable();
-    const auto addVerticalGuide = [&](int guideId, int x, DashboardRenderer::WidgetEditParameter parameter, int value, int dragDirection) {
-        const int clampedX = std::clamp(x, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
-        DashboardRenderer::WidgetEditGuide guide;
-        guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
-        guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-        guide.parameter = parameter;
-        guide.guideId = guideId;
-        guide.widgetRect = widget.rect;
-        guide.drawStart = POINT{clampedX, widget.rect.top};
-        guide.drawEnd = POINT{clampedX, widget.rect.bottom};
-        guide.hitRect = RECT{clampedX - hitInset, widget.rect.top, clampedX + hitInset + 1, widget.rect.bottom};
-        guide.value = value;
-        guide.dragDirection = dragDirection;
-        guides.push_back(std::move(guide));
-    };
+    const auto addVerticalGuide =
+        [&](int guideId, int x, DashboardRenderer::WidgetEditParameter parameter, int value, int dragDirection) {
+            const int clampedX = std::clamp(x, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
+            DashboardRenderer::WidgetEditGuide guide;
+            guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
+            guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+            guide.parameter = parameter;
+            guide.guideId = guideId;
+            guide.widgetRect = widget.rect;
+            guide.drawStart = POINT{clampedX, widget.rect.top};
+            guide.drawEnd = POINT{clampedX, widget.rect.bottom};
+            guide.hitRect = RECT{clampedX - hitInset, widget.rect.top, clampedX + hitInset + 1, widget.rect.bottom};
+            guide.value = value;
+            guide.dragDirection = dragDirection;
+            guides.push_back(std::move(guide));
+        };
     const auto addHorizontalGuide = [&](int guideId,
                                         int y,
                                         DashboardRenderer::WidgetEditParameter parameter,
@@ -385,20 +420,22 @@ void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const Da
     addVerticalGuide(0, readRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageLabelGap, config.labelGap, 1);
     addVerticalGuide(1, writeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageRwGap, config.rwGap, 1);
     addVerticalGuide(2, barRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageBarGap, config.barGap, 1);
-    addVerticalGuide(3, barRect.right, DashboardRenderer::WidgetEditParameter::DriveUsagePercentGap, config.percentGap, -1);
-    addVerticalGuide(4, writeRect.right, DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth, config.activityWidth, 1);
-    addVerticalGuide(5, freeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth, config.freeWidth, -1);
+    addVerticalGuide(
+        3, barRect.right, DashboardRenderer::WidgetEditParameter::DriveUsagePercentGap, config.percentGap, -1);
+    addVerticalGuide(
+        4, writeRect.right, DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth, config.activityWidth, 1);
+    addVerticalGuide(
+        5, freeRect.left, DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth, config.freeWidth, -1);
     addHorizontalGuide(6,
         widget.rect.top + headerHeight,
         DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap,
         config.headerGap,
         1);
     if (visibleRows > 0 && config.activitySegments > 1) {
-        const int rowContentHeight =
-            (std::max)(renderer.FontMetrics().label,
-                (std::max)(renderer.FontMetrics().smallText, renderer.ScaleLogical(config.barHeight)));
-        const int activitySegmentGap =
-            ClampStackedSegmentGap(rowContentHeight, config.activitySegments, renderer.ScaleLogical(config.activitySegmentGap));
+        const int rowContentHeight = (std::max)(renderer.FontMetrics().label,
+            (std::max)(renderer.FontMetrics().smallText, renderer.ScaleLogical(config.barHeight)));
+        const int activitySegmentGap = ClampStackedSegmentGap(
+            rowContentHeight, config.activitySegments, renderer.ScaleLogical(config.activitySegmentGap));
         const int contentTop = widget.rect.top + headerHeight + (std::max)(0, (rowHeight - rowContentHeight) / 2);
         const RECT activityBandRect{readRect.left, contentTop, writeRect.right, contentTop + rowContentHeight};
         const int lowestSegmentTop = ComputeLowestStackedSegmentTop(
@@ -413,10 +450,6 @@ void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const Da
     }
     for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {
         const int y = widget.rect.top + headerHeight + ((rowIndex + 1) * rowHeight);
-        addHorizontalGuide(8 + rowIndex,
-            y,
-            DashboardRenderer::WidgetEditParameter::DriveUsageRowGap,
-            config.rowGap,
-            1);
+        addHorizontalGuide(8 + rowIndex, y, DashboardRenderer::WidgetEditParameter::DriveUsageRowGap, config.rowGap, 1);
     }
 }

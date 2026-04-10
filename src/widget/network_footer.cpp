@@ -3,8 +3,16 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+DashboardWidgetClass NetworkFooterWidget::Class() const {
+    return DashboardWidgetClass::NetworkFooter;
+}
+
 const char* NetworkFooterWidget::TypeName() const {
     return "network_footer";
+}
+
+std::unique_ptr<DashboardWidget> NetworkFooterWidget::Clone() const {
+    return std::make_unique<NetworkFooterWidget>(*this);
 }
 
 void NetworkFooterWidget::Initialize(const LayoutNodeConfig&) {}
@@ -18,8 +26,10 @@ bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void NetworkFooterWidget::Draw(
-    DashboardRenderer& renderer, HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+void NetworkFooterWidget::Draw(DashboardRenderer& renderer,
+    HDC hdc,
+    const DashboardWidgetLayout& widget,
+    const DashboardMetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
         return;
     }
@@ -30,6 +40,6 @@ void NetworkFooterWidget::Draw(
         renderer.WidgetFonts().footer,
         renderer.MutedTextColor(),
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
-        renderer.MakeEditableTextBinding(widget, DashboardRenderer::AnchorEditParameter::FontFooter, 0,
-            renderer.Config().layout.fonts.footer.size));
+        renderer.MakeEditableTextBinding(
+            widget, DashboardRenderer::AnchorEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size));
 }

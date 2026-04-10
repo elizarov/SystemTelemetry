@@ -11,7 +11,6 @@
 #include <objidl.h>
 #include <optional>
 #include <set>
-#include <sstream>
 
 #include <gdiplus.h>
 
@@ -75,43 +74,6 @@ bool FontSetConfigEquals(const UiFontSetConfig& left, const UiFontSetConfig& rig
            FontConfigEquals(left.clockDate, right.clockDate);
 }
 
-std::vector<std::string> Split(const std::string& input, char delimiter) {
-    std::vector<std::string> parts;
-    std::stringstream stream(input);
-    std::string item;
-    while (std::getline(stream, item, delimiter)) {
-        const std::string trimmed = Trim(item);
-        if (!trimmed.empty()) {
-            parts.push_back(trimmed);
-        }
-    }
-    return parts;
-}
-
-DashboardMetricListEntry ParseMetricListEntry(std::string item) {
-    DashboardMetricListEntry entry;
-    const size_t equals = item.find('=');
-    if (equals == std::string::npos) {
-        entry.metricRef = Trim(item);
-        return entry;
-    }
-
-    entry.metricRef = Trim(item.substr(0, equals));
-    entry.labelOverride = Trim(item.substr(equals + 1));
-    return entry;
-}
-
-std::vector<DashboardMetricListEntry> ParseMetricListEntries(const std::string& parameter) {
-    std::vector<DashboardMetricListEntry> entries;
-    for (const auto& item : Split(parameter, ',')) {
-        DashboardMetricListEntry entry = ParseMetricListEntry(item);
-        if (!entry.metricRef.empty()) {
-            entries.push_back(std::move(entry));
-        }
-    }
-    return entries;
-}
-
 UINT GetPanelIconResourceId(const std::string& iconName) {
     if (iconName == "cpu")
         return IDR_PANEL_ICON_CPU;
@@ -124,10 +86,6 @@ UINT GetPanelIconResourceId(const std::string& iconName) {
     if (iconName == "time")
         return IDR_PANEL_ICON_TIME;
     return 0;
-}
-
-bool ContainsCardReference(const std::vector<std::string>& stack, const std::string& cardId) {
-    return std::find(stack.begin(), stack.end(), cardId) != stack.end();
 }
 
 HFONT CreateUiFont(const UiFontConfig& font) {
@@ -226,83 +184,6 @@ int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
     return -1;
 }
 
-POINT PolarPoint(int cx, int cy, int radius, double angleDegrees) {
-    const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
-    return POINT{cx + static_cast<LONG>(std::round(std::cos(radians) * radius)),
-        cy - static_cast<LONG>(std::round(std::sin(radians) * radius))};
-}
-
-Gdiplus::PointF GaugePoint(float cx, float cy, float radius, double angleDegrees) {
-    const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
-    return Gdiplus::PointF(cx + static_cast<Gdiplus::REAL>(std::cos(radians) * radius),
-        cy + static_cast<Gdiplus::REAL>(std::sin(radians) * radius));
-}
-
-void AddCapsulePath(Gdiplus::GraphicsPath& path, const Gdiplus::RectF& rect) {
-    const float width = std::max(0.0f, rect.Width);
-    const float height = std::max(0.0f, rect.Height);
-    if (width <= 0.0f || height <= 0.0f) {
-        return;
-    }
-
-    const float diameter = std::max(1.0f, std::min(width, height));
-    const float centerWidth = std::max(0.0f, width - diameter);
-    const float rightArcLeft = rect.X + centerWidth;
-
-    path.StartFigure();
-    path.AddArc(rect.X, rect.Y, diameter, diameter, 180.0f, 90.0f);
-    path.AddArc(rightArcLeft, rect.Y, diameter, diameter, 270.0f, 90.0f);
-    path.AddArc(rightArcLeft, rect.Y + height - diameter, diameter, diameter, 0.0f, 90.0f);
-    path.AddArc(rect.X, rect.Y + height - diameter, diameter, diameter, 90.0f, 90.0f);
-    path.CloseFigure();
-}
-
-void FillGaugeSegment(Gdiplus::Graphics& graphics,
-    float cx,
-    float cy,
-    float radius,
-    float thickness,
-    double startAngleDegrees,
-    double sweepAngleDegrees,
-    const Gdiplus::Color& color) {
-    if (radius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
-        return;
-    }
-
-    const float outerRadius = radius + (thickness / 2.0f);
-    const float innerRadius = std::max(0.0f, radius - (thickness / 2.0f));
-    if (outerRadius <= innerRadius) {
-        return;
-    }
-
-    const float outerDiameter = outerRadius * 2.0f;
-    const float innerDiameter = innerRadius * 2.0f;
-    const Gdiplus::RectF outerRect(cx - outerRadius, cy - outerRadius, outerDiameter, outerDiameter);
-    const Gdiplus::RectF innerRect(cx - innerRadius, cy - innerRadius, innerDiameter, innerDiameter);
-    const Gdiplus::PointF outerStart = GaugePoint(cx, cy, outerRadius, startAngleDegrees);
-    const Gdiplus::PointF outerEnd = GaugePoint(cx, cy, outerRadius, startAngleDegrees + sweepAngleDegrees);
-    const Gdiplus::PointF innerEnd = GaugePoint(cx, cy, innerRadius, startAngleDegrees + sweepAngleDegrees);
-    const Gdiplus::PointF innerStart = GaugePoint(cx, cy, innerRadius, startAngleDegrees);
-
-    Gdiplus::GraphicsPath path;
-    path.StartFigure();
-    path.AddArc(
-        outerRect, static_cast<Gdiplus::REAL>(startAngleDegrees), static_cast<Gdiplus::REAL>(sweepAngleDegrees));
-    path.AddLine(outerEnd, innerEnd);
-    if (innerRadius > 0.0f) {
-        path.AddArc(innerRect,
-            static_cast<Gdiplus::REAL>(startAngleDegrees + sweepAngleDegrees),
-            static_cast<Gdiplus::REAL>(-sweepAngleDegrees));
-    } else {
-        path.AddLine(innerEnd, Gdiplus::PointF(cx, cy));
-    }
-    path.AddLine(innerStart, outerStart);
-    path.CloseFigure();
-
-    Gdiplus::SolidBrush brush(color);
-    graphics.FillPath(&brush, &path);
-}
-
 std::string FormatRect(const RECT& rect) {
     return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," + std::to_string(rect.right) +
            "," + std::to_string(rect.bottom) + ")";
@@ -317,101 +198,6 @@ SIZE MeasureTextSize(HDC hdc, HFONT font, const std::string& text) {
     }
     SelectObject(hdc, oldFont);
     return size;
-}
-
-void AddCapsulePath(Gdiplus::GraphicsPath& path, const RECT& rect) {
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-
-    const int diameter = std::max(1, std::min(width, height));
-    const int centerWidth = std::max(0, width - diameter);
-    const int rightArcLeft = rect.left + centerWidth;
-
-    path.StartFigure();
-    path.AddArc(rect.left, rect.top, diameter, diameter, 180.0f, 90.0f);
-    path.AddArc(rightArcLeft, rect.top, diameter, diameter, 270.0f, 90.0f);
-    path.AddArc(rightArcLeft, rect.bottom - diameter, diameter, diameter, 0.0f, 90.0f);
-    path.AddArc(rect.left, rect.bottom - diameter, diameter, diameter, 90.0f, 90.0f);
-    path.CloseFigure();
-}
-
-void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    Gdiplus::GraphicsPath path;
-    AddCapsulePath(path, rect);
-    Gdiplus::SolidBrush brush(Gdiplus::Color(alpha, GetRValue(color), GetGValue(color), GetBValue(color)));
-    graphics.FillPath(&brush, &path);
-}
-
-void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color, BYTE alpha) {
-    const int clampedDiameter = std::max(1, diameter);
-    const int radius = clampedDiameter / 2;
-
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    Gdiplus::SolidBrush brush(Gdiplus::Color(alpha, GetRValue(color), GetGValue(color), GetBValue(color)));
-    graphics.FillEllipse(&brush,
-        static_cast<INT>(centerX - radius),
-        static_cast<INT>(centerY - radius),
-        static_cast<INT>(clampedDiameter),
-        static_cast<INT>(clampedDiameter));
-}
-
-void DrawSegmentIndicator(HDC hdc,
-    const RECT& rect,
-    int segmentCount,
-    int segmentGap,
-    double ratio,
-    COLORREF trackColor,
-    COLORREF accentColor) {
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-    if (width <= 0 || height <= 0 || segmentCount <= 0) {
-        return;
-    }
-
-    const int totalGap = std::max(0, segmentGap) * std::max(0, segmentCount - 1);
-    const int availableHeight = std::max(segmentCount, height - totalGap);
-    const int baseSegmentHeight = std::max(1, availableHeight / segmentCount);
-    const int remainder = std::max(0, availableHeight - (baseSegmentHeight * segmentCount));
-    const double clampedRatio = std::clamp(ratio, 0.0, 1.0);
-    const int filledSegments =
-        clampedRatio > 0.0
-            ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
-            : 0;
-    int top = rect.top;
-    for (int index = segmentCount - 1; index >= 0; --index) {
-        const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
-        const int segmentHeight = baseSegmentHeight + extra;
-        const int visualHeight = std::min(segmentHeight, std::max(2, width / 2));
-        const int segmentTop = top + std::max(0, (segmentHeight - visualHeight) / 2);
-        RECT segmentRect{
-            rect.left, segmentTop, rect.right, std::min(rect.bottom, static_cast<LONG>(segmentTop + visualHeight))};
-        HBRUSH trackBrush = CreateSolidBrush(trackColor);
-        FillRect(hdc, &segmentRect, trackBrush);
-        DeleteObject(trackBrush);
-
-        if (index < filledSegments) {
-            RECT fillRect = segmentRect;
-            HBRUSH fillBrush = CreateSolidBrush(accentColor);
-            FillRect(hdc, &fillRect, fillBrush);
-            DeleteObject(fillBrush);
-        }
-
-        top = segmentRect.bottom + std::max(0, segmentGap);
-    }
 }
 
 }  // namespace
@@ -574,12 +360,12 @@ int DashboardRenderer::LayoutSimilarityThreshold() const {
 std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
     const LayoutEditGuide& guide) const {
     struct SimilarityTypeKey {
-        std::string typeName;
+        DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
         int extent = 0;
 
         bool operator<(const SimilarityTypeKey& other) const {
-            if (typeName != other.typeName) {
-                return typeName < other.typeName;
+            if (widgetClass != other.widgetClass) {
+                return widgetClass < other.widgetClass;
             }
             return extent < other.extent;
         }
@@ -602,10 +388,10 @@ std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::Coll
         std::set<SimilarityTypeKey> seenTargets;
         for (size_t i = 0; i < allWidgets.size(); ++i) {
             const DashboardWidgetLayout* target = allWidgets[i];
-            if (target == affected || target->typeName != affected->typeName) {
+            if (target == affected || target->widgetClass != affected->widgetClass) {
                 continue;
             }
-            const SimilarityTypeKey typeKey{target->typeName, WidgetExtentForAxis(*target, guide.axis)};
+            const SimilarityTypeKey typeKey{target->widgetClass, WidgetExtentForAxis(*target, guide.axis)};
             if (!seenTargets.insert(typeKey).second) {
                 continue;
             }
@@ -644,8 +430,7 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     POINT clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            const bool hoverableWidget = widget.widget != nullptr && widget.widget->IsHoverable();
-            if (!hoverableWidget || !PtInRect(&widget.rect, clientPoint)) {
+            if (!widget.hoverable || !PtInRect(&widget.rect, clientPoint)) {
                 continue;
             }
             return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -688,11 +473,14 @@ std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEd
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
     const std::string& widgetTypeName) const {
     const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
+    const auto widgetClass = FindDashboardWidgetClass(normalizedName);
+    if (!widgetClass.has_value()) {
+        return std::nullopt;
+    }
 
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            const bool hoverableWidget = widget.widget != nullptr && widget.widget->IsHoverable();
-            if (!hoverableWidget || widget.typeName != normalizedName) {
+            if (!widget.hoverable || widget.widgetClass != *widgetClass) {
                 continue;
             }
             return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -731,6 +519,7 @@ void DashboardRenderer::Shutdown() {
     fontHeights_ = {};
     measuredWidths_ = {};
     resolvedLayout_ = {};
+    parsedWidgetInfoCache_.clear();
     editableAnchorRegions_.clear();
     ReleasePanelIcons();
     ShutdownGdiplus();
@@ -925,7 +714,7 @@ int DashboardRenderer::EffectiveDriveRowHeight() const {
 }
 
 bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const {
-    if (widget.widget == nullptr || widget.widget->IsVerticalSpring()) {
+    if (widget.widget == nullptr || widget.verticalSpring) {
         return false;
     }
     if (UsesFixedPreferredHeightInRows(widget)) {
@@ -943,7 +732,8 @@ bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(
 
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& candidate : card.widgets) {
-            if (&candidate == &widget || candidate.cardId != widget.cardId || candidate.typeName != widget.typeName) {
+            if (&candidate == &widget || candidate.cardId != widget.cardId ||
+                candidate.widgetClass != widget.widgetClass) {
                 continue;
             }
             if (!SupportsLayoutSimilarityIndicator(candidate) || WidgetExtentForAxis(candidate, axis) != extent) {
@@ -1000,10 +790,10 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(tallest));
         return tallest;
     }
-    const DashboardWidgetLayout widget = ResolveWidgetLayout(node, RECT{});
-    WriteTrace(
-        "renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(widget.preferredHeight));
-    return widget.preferredHeight;
+    const ParsedWidgetInfo* widget = FindParsedWidgetInfo(node);
+    const int preferredHeight = widget != nullptr ? widget->preferredHeight : 0;
+    WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(preferredHeight));
+    return preferredHeight;
 }
 
 bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
@@ -1025,15 +815,45 @@ int DashboardRenderer::GaugeRadiusForRect(const RECT& rect) const {
     return fittedRadius;
 }
 
+const DashboardRenderer::ParsedWidgetInfo* DashboardRenderer::FindParsedWidgetInfo(const LayoutNodeConfig& node) const {
+    if (IsContainerNode(node)) {
+        return nullptr;
+    }
+
+    const auto it = parsedWidgetInfoCache_.find(&node);
+    if (it != parsedWidgetInfoCache_.end()) {
+        return &it->second;
+    }
+
+    auto widget = CreateDashboardWidget(node.name);
+    if (widget == nullptr) {
+        return nullptr;
+    }
+
+    widget->Initialize(node);
+    ParsedWidgetInfo info;
+    info.widgetClass = widget->Class();
+    info.typeName = widget->TypeName();
+    info.preferredHeight = widget->PreferredHeight(*this);
+    info.fixedPreferredHeightInRows = widget->UsesFixedPreferredHeightInRows();
+    info.hoverable = widget->IsHoverable();
+    info.verticalSpring = widget->IsVerticalSpring();
+    info.widgetPrototype = std::move(widget);
+    return &parsedWidgetInfoCache_.emplace(&node, std::move(info)).first->second;
+}
+
 DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const {
     DashboardWidgetLayout widget;
     widget.rect = rect;
-    widget.widget = CreateDashboardWidget(node.name);
-    if (widget.widget != nullptr) {
-        widget.widget->Initialize(node);
-        widget.typeName = widget.widget->TypeName();
-        widget.preferredHeight = widget.widget->PreferredHeight(*this);
-        widget.fixedPreferredHeightInRows = widget.widget->UsesFixedPreferredHeightInRows();
+    const ParsedWidgetInfo* info = FindParsedWidgetInfo(node);
+    if (info != nullptr) {
+        widget.widgetClass = info->widgetClass;
+        widget.typeName = info->typeName;
+        widget.preferredHeight = info->preferredHeight;
+        widget.fixedPreferredHeightInRows = info->fixedPreferredHeightInRows;
+        widget.hoverable = info->hoverable;
+        widget.verticalSpring = info->verticalSpring;
+        widget.widget = info->widgetPrototype->Clone();
     }
     return widget;
 }

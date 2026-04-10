@@ -3,95 +3,13 @@
 #include "dashboard_renderer.h"
 
 #include <algorithm>
-#include <cmath>
 #include <functional>
-#include <limits>
 
 namespace {
-
-POINT PolarPoint(int cx, int cy, int radius, double angleDegrees) {
-    const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
-    return POINT{cx + static_cast<LONG>(std::lround(std::cos(radians) * static_cast<double>(radius))),
-        cy + static_cast<LONG>(std::lround(std::sin(radians) * static_cast<double>(radius)))};
-}
-
-RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
-    return RECT{(std::min)(start.x, end.x) - inset,
-        (std::min)(start.y, end.y) - inset,
-        (std::max)(start.x, end.x) + inset + 1,
-        (std::max)(start.y, end.y) + inset + 1};
-}
-
-int ClampStackedSegmentGap(int height, int segmentCount, int gap) {
-    if (segmentCount <= 1) {
-        return 0;
-    }
-    const int maxGap = (std::max)(0, (height - segmentCount) / (segmentCount - 1));
-    return std::clamp((std::max)(0, gap), 0, maxGap);
-}
-
-int ComputeLowestStackedSegmentTop(int top, int height, int width, int segmentCount, int segmentGap) {
-    if (segmentCount <= 0 || height <= 0 || width <= 0) {
-        return top;
-    }
-
-    const int clampedGap = ClampStackedSegmentGap(height, segmentCount, segmentGap);
-    const int totalGap = clampedGap * (segmentCount - 1);
-    const int availableHeight = (std::max)(segmentCount, height - totalGap);
-    const int baseSegmentHeight = (std::max)(1, availableHeight / segmentCount);
-    const int remainder = (std::max)(0, availableHeight - (baseSegmentHeight * segmentCount));
-    const int maxVisualHeight = (std::max)(2, width / 2);
-
-    int currentTop = top;
-    int lastSegmentTop = top;
-    for (int index = segmentCount - 1; index >= 0; --index) {
-        const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
-        const int segmentHeight = baseSegmentHeight + extra;
-        const int visualHeight = (std::min)(segmentHeight, maxVisualHeight);
-        lastSegmentTop = currentTop + (std::max)(0, (segmentHeight - visualHeight) / 2);
-        currentTop = lastSegmentTop + visualHeight + clampedGap;
-    }
-    return lastSegmentTop;
-}
 
 std::string FormatRect(const RECT& rect) {
     return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," + std::to_string(rect.right) +
            "," + std::to_string(rect.bottom) + ")";
-}
-
-struct GaugeSegmentLayout {
-    int segmentCount = 1;
-    double totalSweep = 0.0;
-    double segmentGap = 0.0;
-    double segmentSweep = 0.0;
-    double maxSegmentSweep = 0.0;
-    double gaugeStart = 90.0;
-    double gaugeEnd = 90.0;
-};
-
-GaugeSegmentLayout ComputeGaugeSegmentLayout(
-    double requestedSweep, int requestedSegmentCount, double requestedSegmentGap) {
-    GaugeSegmentLayout layout;
-    layout.segmentCount = (std::max)(1, requestedSegmentCount);
-    layout.totalSweep = std::clamp(requestedSweep, 0.0, 360.0);
-    const double gapSweep = (std::max)(0.0, 360.0 - layout.totalSweep);
-    layout.gaugeStart = 90.0 + (gapSweep / 2.0);
-    layout.gaugeEnd = layout.gaugeStart + layout.totalSweep;
-
-    if (layout.segmentCount <= 1) {
-        layout.segmentGap = 0.0;
-        layout.segmentSweep = layout.totalSweep;
-        layout.maxSegmentSweep = layout.totalSweep;
-        return layout;
-    }
-
-    layout.maxSegmentSweep = layout.totalSweep / static_cast<double>(layout.segmentCount);
-    const double maxSegmentGap = layout.totalSweep / static_cast<double>(layout.segmentCount - 1);
-    layout.segmentGap = std::clamp(requestedSegmentGap, 0.0, maxSegmentGap);
-    layout.segmentSweep = (std::max)(0.0,
-        (layout.totalSweep - (layout.segmentGap * static_cast<double>(layout.segmentCount - 1))) /
-            static_cast<double>(layout.segmentCount));
-    return layout;
 }
 
 }  // namespace
@@ -100,6 +18,7 @@ bool DashboardRendererLayoutEngine::ResolveLayout(DashboardRenderer& renderer) {
     renderer.resolvedLayout_ = {};
     renderer.layoutEditGuides_.clear();
     renderer.widgetEditGuides_.clear();
+    renderer.parsedWidgetInfoCache_.clear();
     renderer.resolvedLayout_.windowWidth = renderer.WindowWidth();
     renderer.resolvedLayout_.windowHeight = renderer.WindowHeight();
 
@@ -234,7 +153,7 @@ bool DashboardRendererLayoutEngine::ResolveLayout(DashboardRenderer& renderer) {
     int globalGaugeRadius = 0;
     for (const auto& card : renderer.resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (widget.typeName != "gauge") {
+            if (widget.widgetClass != DashboardWidgetClass::Gauge) {
                 continue;
             }
 

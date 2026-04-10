@@ -12,6 +12,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <windows.h>
@@ -307,6 +308,17 @@ private:
         int globalGaugeRadius = 0;
         std::vector<ResolvedCardLayout> cards;
     };
+
+    struct ParsedWidgetInfo {
+        DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
+        std::string typeName;
+        std::unique_ptr<DashboardWidget> widgetPrototype;
+        int preferredHeight = 0;
+        bool fixedPreferredHeightInRows = false;
+        bool hoverable = false;
+        bool verticalSpring = false;
+    };
+
     void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
@@ -315,6 +327,7 @@ private:
     void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
+    const ParsedWidgetInfo* FindParsedWidgetInfo(const LayoutNodeConfig& node) const;
     DashboardWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
     bool UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
@@ -371,6 +384,7 @@ private:
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<WidgetEditGuide> widgetEditGuides_;
     std::vector<EditableAnchorRegion> editableAnchorRegions_;
+    mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

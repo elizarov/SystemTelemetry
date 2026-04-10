@@ -1,14 +1,12 @@
 #include "dashboard_renderer.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <map>
 #include <memory>
 #include <objidl.h>
 #include <optional>
-#include <sstream>
 #include <set>
 #include <vector>
 
@@ -18,54 +16,8 @@
 
 namespace {
 
-struct GaugeSegmentLayout {
-    int segmentCount = 1;
-    double totalSweep = 0.0;
-    double gapSweep = 360.0;
-    double segmentGap = 0.0;
-    double segmentSweep = 0.0;
-    double pitchSweep = 0.0;
-    double gaugeStart = 90.0;
-    double gaugeEnd = 90.0;
-};
-
-GaugeSegmentLayout ComputeGaugeSegmentLayout(
-    double requestedSweep, int requestedSegmentCount, double requestedSegmentGap) {
-    GaugeSegmentLayout layout;
-    layout.segmentCount = std::max(1, requestedSegmentCount);
-    layout.totalSweep = std::clamp(requestedSweep, 0.0, 360.0);
-    layout.gapSweep = std::max(0.0, 360.0 - layout.totalSweep);
-    layout.gaugeStart = 90.0 + (layout.gapSweep / 2.0);
-    layout.gaugeEnd = layout.gaugeStart + layout.totalSweep;
-
-    if (layout.segmentCount <= 1) {
-        layout.segmentGap = 0.0;
-        layout.segmentSweep = layout.totalSweep;
-        layout.pitchSweep = layout.totalSweep;
-        return layout;
-    }
-
-    const double maxSegmentGap = layout.totalSweep / static_cast<double>(layout.segmentCount - 1);
-    layout.segmentGap = std::clamp(requestedSegmentGap, 0.0, maxSegmentGap);
-    layout.segmentSweep = std::max(0.0,
-        (layout.totalSweep - (layout.segmentGap * static_cast<double>(layout.segmentCount - 1))) /
-            static_cast<double>(layout.segmentCount));
-    layout.pitchSweep = layout.segmentSweep + layout.segmentGap;
-    return layout;
-}
-
 COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
-}
-
-std::string Trim(std::string value) {
-    const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
-    const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
-    if (first == value.end()) {
-        return {};
-    }
-    const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
-    return std::string(first, last);
 }
 
 std::string FormatWin32Error(DWORD error) {
@@ -87,49 +39,6 @@ std::string FormatWin32Error(DWORD error) {
         LocalFree(buffer);
     }
     return message;
-}
-
-std::vector<std::string> Split(const std::string& input, char delimiter) {
-    std::vector<std::string> parts;
-    std::stringstream stream(input);
-    std::string item;
-    while (std::getline(stream, item, delimiter)) {
-        const std::string trimmed = Trim(item);
-        if (!trimmed.empty()) {
-            parts.push_back(trimmed);
-        }
-    }
-    return parts;
-}
-
-DashboardMetricListEntry ParseMetricListEntry(std::string item) {
-    DashboardMetricListEntry entry;
-    const size_t equals = item.find('=');
-    if (equals == std::string::npos) {
-        entry.metricRef = Trim(item);
-        return entry;
-    }
-
-    entry.metricRef = Trim(item.substr(0, equals));
-    entry.labelOverride = Trim(item.substr(equals + 1));
-    return entry;
-}
-
-std::vector<DashboardMetricListEntry> ParseMetricListEntries(const std::string& parameter) {
-    std::vector<DashboardMetricListEntry> entries;
-    for (const auto& item : Split(parameter, ',')) {
-        DashboardMetricListEntry entry = ParseMetricListEntry(item);
-        if (!entry.metricRef.empty()) {
-            entries.push_back(std::move(entry));
-        }
-    }
-    return entries;
-}
-
-Gdiplus::PointF GaugePoint(float cx, float cy, float radius, double angleDegrees) {
-    const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
-    return Gdiplus::PointF(cx + static_cast<Gdiplus::REAL>(std::cos(radians) * radius),
-        cy + static_cast<Gdiplus::REAL>(std::sin(radians) * radius));
 }
 
 void AddCapsulePath(Gdiplus::GraphicsPath& path, const RECT& rect) {
@@ -199,98 +108,6 @@ void FillDiamond(HDC hdc, const RECT& rect, COLORREF color) {
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
     Gdiplus::SolidBrush brush(Gdiplus::Color(255, GetRValue(color), GetGValue(color), GetBValue(color)));
     graphics.FillPolygon(&brush, points, static_cast<INT>(std::size(points)));
-}
-
-void DrawSegmentIndicator(HDC hdc,
-    const RECT& rect,
-    int segmentCount,
-    int segmentGap,
-    double ratio,
-    COLORREF trackColor,
-    COLORREF accentColor) {
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-    if (width <= 0 || height <= 0 || segmentCount <= 0) {
-        return;
-    }
-
-    const int maxGap = segmentCount <= 1 ? 0 : std::max(0, (height - segmentCount) / (segmentCount - 1));
-    const int clampedGap = std::clamp(std::max(0, segmentGap), 0, maxGap);
-    const int totalGap = clampedGap * std::max(0, segmentCount - 1);
-    const int availableHeight = std::max(segmentCount, height - totalGap);
-    const int baseSegmentHeight = std::max(1, availableHeight / segmentCount);
-    const int remainder = std::max(0, availableHeight - (baseSegmentHeight * segmentCount));
-    const double clampedRatio = std::clamp(ratio, 0.0, 1.0);
-    const int filledSegments =
-        clampedRatio > 0.0
-            ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
-            : 0;
-    int top = rect.top;
-    for (int index = segmentCount - 1; index >= 0; --index) {
-        const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
-        const int segmentHeight = baseSegmentHeight + extra;
-        const int visualHeight = std::min(segmentHeight, std::max(2, width / 2));
-        const int segmentTop = top + std::max(0, (segmentHeight - visualHeight) / 2);
-        RECT segmentRect{
-            rect.left, segmentTop, rect.right, std::min(rect.bottom, static_cast<LONG>(segmentTop + visualHeight))};
-        HBRUSH trackBrush = CreateSolidBrush(trackColor);
-        FillRect(hdc, &segmentRect, trackBrush);
-        DeleteObject(trackBrush);
-
-        if (index < filledSegments) {
-            HBRUSH fillBrush = CreateSolidBrush(accentColor);
-            FillRect(hdc, &segmentRect, fillBrush);
-            DeleteObject(fillBrush);
-        }
-
-        top = segmentRect.bottom + clampedGap;
-    }
-}
-
-void FillGaugeSegment(Gdiplus::Graphics& graphics,
-    float cx,
-    float cy,
-    float radius,
-    float thickness,
-    double startAngleDegrees,
-    double sweepAngleDegrees,
-    const Gdiplus::Color& color) {
-    if (radius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
-        return;
-    }
-
-    const float outerRadius = radius + (thickness / 2.0f);
-    const float innerRadius = std::max(0.0f, radius - (thickness / 2.0f));
-    if (outerRadius <= innerRadius) {
-        return;
-    }
-
-    const float outerDiameter = outerRadius * 2.0f;
-    const float innerDiameter = innerRadius * 2.0f;
-    const Gdiplus::RectF outerRect(cx - outerRadius, cy - outerRadius, outerDiameter, outerDiameter);
-    const Gdiplus::RectF innerRect(cx - innerRadius, cy - innerRadius, innerDiameter, innerDiameter);
-    const Gdiplus::PointF outerStart = GaugePoint(cx, cy, outerRadius, startAngleDegrees);
-    const Gdiplus::PointF outerEnd = GaugePoint(cx, cy, outerRadius, startAngleDegrees + sweepAngleDegrees);
-    const Gdiplus::PointF innerEnd = GaugePoint(cx, cy, innerRadius, startAngleDegrees + sweepAngleDegrees);
-    const Gdiplus::PointF innerStart = GaugePoint(cx, cy, innerRadius, startAngleDegrees);
-
-    Gdiplus::GraphicsPath path;
-    path.StartFigure();
-    path.AddArc(
-        outerRect, static_cast<Gdiplus::REAL>(startAngleDegrees), static_cast<Gdiplus::REAL>(sweepAngleDegrees));
-    path.AddLine(outerEnd, innerEnd);
-    if (innerRadius > 0.0f) {
-        path.AddArc(innerRect,
-            static_cast<Gdiplus::REAL>(startAngleDegrees + sweepAngleDegrees),
-            static_cast<Gdiplus::REAL>(-sweepAngleDegrees));
-    } else {
-        path.AddLine(innerEnd, Gdiplus::PointF(cx, cy));
-    }
-    path.AddLine(innerStart, outerStart);
-    path.CloseFigure();
-
-    Gdiplus::SolidBrush brush(color);
-    graphics.FillPath(&brush, &path);
 }
 
 int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
@@ -639,12 +456,12 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
     }
 
     struct SimilarityTypeKey {
-        std::string typeName;
+        DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
         int extent = 0;
 
         bool operator<(const SimilarityTypeKey& other) const {
-            if (typeName != other.typeName) {
-                return typeName < other.typeName;
+            if (widgetClass != other.widgetClass) {
+                return widgetClass < other.widgetClass;
             }
             return extent < other.extent;
         }
@@ -689,10 +506,10 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
         if (affectedExtent <= 0) {
             continue;
         }
-        const SimilarityTypeKey typeKey{affected->typeName, affectedExtent};
+        const SimilarityTypeKey typeKey{affected->widgetClass, affectedExtent};
         bool hasExactMatch = false;
         for (const DashboardWidgetLayout* candidate : allWidgets) {
-            if (candidate == affected || candidate->typeName != affected->typeName) {
+            if (candidate == affected || candidate->widgetClass != affected->widgetClass) {
                 continue;
             }
             const int candidateExtent = WidgetExtentForAxis(*candidate, axis);
@@ -744,9 +561,9 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
 
     if (traceOutput_ != nullptr) {
         for (const auto& entry : exactTypeOrdinals) {
-            WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) + "\" type=\"" +
-                       entry.first.typeName + " extent=" + std::to_string(entry.first.extent) +
-                       " ordinal=" + std::to_string(entry.second));
+            WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
+                       "\" class=" + std::to_string(static_cast<int>(entry.first.widgetClass)) +
+                       " extent=" + std::to_string(entry.first.extent) + " ordinal=" + std::to_string(entry.second));
         }
     }
 
