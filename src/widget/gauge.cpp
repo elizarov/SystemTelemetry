@@ -64,17 +64,16 @@ Gdiplus::PointF GaugePoint(float cx, float cy, float radius, double angleDegrees
 void FillGaugeSegment(Gdiplus::Graphics& graphics,
     float cx,
     float cy,
-    float radius,
+    float outerRadius,
     float thickness,
     double startAngleDegrees,
     double sweepAngleDegrees,
     const Gdiplus::Color& color) {
-    if (radius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
+    if (outerRadius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
         return;
     }
 
-    const float outerRadius = radius + (thickness / 2.0f);
-    const float innerRadius = (std::max)(0.0f, radius - (thickness / 2.0f));
+    const float innerRadius = (std::max)(0.0f, outerRadius - thickness);
     if (outerRadius <= innerRadius) {
         return;
     }
@@ -126,7 +125,7 @@ RECT MakeCircleAnchorRect(int centerX, int centerY, int representedDiameter, int
     return RECT{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
 }
 
-int GaugeRadiusForRect(const DashboardRenderer& renderer, const RECT& rect) {
+int GaugeOuterRadiusForRect(const DashboardRenderer& renderer, const RECT& rect) {
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
     const int outerPadding = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.outerPadding));
@@ -177,9 +176,9 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     const DashboardGaugeMetric metric = metrics.ResolveGauge(metric_);
     const int width = widget.rect.right - widget.rect.left;
     const int height = widget.rect.bottom - widget.rect.top;
-    const int radius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
-                           ? sharedLayout_->radius
-                           : GaugeRadiusForRect(renderer, widget.rect);
+    const int outerRadius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
+                                ? sharedLayout_->radius
+                                : GaugeOuterRadiusForRect(renderer, widget.rect);
     const int cx = widget.rect.left + width / 2;
     const int cy = widget.rect.top + height / 2;
     const float segmentThickness =
@@ -206,9 +205,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
     const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
-    const int outerRadius = radius + static_cast<int>(std::ceil(static_cast<double>(segmentThickness) / 2.0f));
-    const int innerRadius =
-        std::max(0, radius - static_cast<int>(std::floor(static_cast<double>(segmentThickness) / 2.0f)));
+    const int innerRadius = std::max(0, outerRadius - static_cast<int>(std::lround(static_cast<double>(segmentThickness))));
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -260,7 +257,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         DashboardRenderer::AnchorDragAxis::Both,
         DashboardRenderer::AnchorDragMode::RadialDistance,
         POINT{cx, cy},
-        -2.0,
+        -1.0,
         true,
         false,
         renderer.Config().layout.gauge.ringThickness);
@@ -280,7 +277,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         FillGaugeSegment(graphics,
             static_cast<float>(cx),
             static_cast<float>(cy),
-            static_cast<float>(radius),
+            static_cast<float>(outerRadius),
             segmentThickness,
             slotStart,
             gaugeLayout.segmentSweep,
@@ -290,7 +287,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             FillGaugeSegment(graphics,
                 static_cast<float>(cx),
                 static_cast<float>(cy),
-                static_cast<float>(radius),
+                static_cast<float>(outerRadius),
                 segmentThickness,
                 slotStart,
                 gaugeLayout.segmentSweep,
@@ -301,7 +298,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             FillGaugeSegment(graphics,
                 static_cast<float>(cx),
                 static_cast<float>(cy),
-                static_cast<float>(radius),
+                static_cast<float>(outerRadius),
                 segmentThickness,
                 slotStart,
                 gaugeLayout.segmentSweep,
@@ -341,10 +338,10 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
 }
 
 void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
-    const int radius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
-                           ? sharedLayout_->radius
-                           : GaugeRadiusForRect(renderer, widget.rect);
-    if (radius <= 0) {
+    const int outerRadius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
+                                ? sharedLayout_->radius
+                                : GaugeOuterRadiusForRect(renderer, widget.rect);
+    if (outerRadius <= 0) {
         return;
     }
 
@@ -363,8 +360,8 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
                                     double value,
                                     double angularMin,
                                     double angularMax) {
-        const int innerGuideRadius = (std::max)(1, radius - (ringThickness / 2) - guideHalfExtension);
-        const int outerGuideRadius = radius + (ringThickness / 2) + guideHalfExtension;
+        const int innerGuideRadius = (std::max)(1, outerRadius - ringThickness - guideHalfExtension);
+        const int outerGuideRadius = outerRadius + guideHalfExtension;
         const POINT guideStart = PolarPoint(cx, cy, innerGuideRadius, angleDegrees);
         const POINT guideEnd = PolarPoint(cx, cy, outerGuideRadius, angleDegrees);
         DashboardRenderer::WidgetEditGuide guide;
@@ -409,7 +406,7 @@ void GaugeWidget::FinalizeLayoutGroup(DashboardRenderer& renderer, const std::ve
         if (gauge == nullptr) {
             continue;
         }
-        const int gaugeRadius = GaugeRadiusForRect(renderer, widget->rect);
+        const int gaugeRadius = GaugeOuterRadiusForRect(renderer, widget->rect);
         sharedLayout->radius = gaugeCount == 0 ? gaugeRadius : (std::min)(sharedLayout->radius, gaugeRadius);
         ++gaugeCount;
     }
