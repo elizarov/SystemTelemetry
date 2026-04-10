@@ -31,6 +31,8 @@ public:
             ThroughputGuideStrokeWidth,
             ThroughputPlotStrokeWidth,
             ThroughputLeaderDiameter,
+            GaugeOuterPadding,
+            GaugeRingThickness,
             GaugeSweepDegrees,
             GaugeSegmentGapDegrees,
             FontTitle,
@@ -103,10 +105,11 @@ private:
         DashboardRenderer::EditableAnchorKey key;
         DashboardRenderer::AnchorDragAxis dragAxis = DashboardRenderer::AnchorDragAxis::Vertical;
         DashboardRenderer::AnchorDragMode dragMode = DashboardRenderer::AnchorDragMode::AxisDelta;
+        POINT dragOrigin{};
+        double dragScale = 1.0;
         int initialValue = 0;
         POINT dragStartPoint{};
-        POINT anchorCenterPoint{};
-        double dragStartDiameterPixels = 0.0;
+        double dragStartDistancePixels = 0.0;
     };
 
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;

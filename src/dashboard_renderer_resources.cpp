@@ -449,7 +449,21 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
 std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(
     POINT clientPoint) const {
     for (auto it = editableAnchorRegions_.rbegin(); it != editableAnchorRegions_.rend(); ++it) {
-        if (PtInRect(&it->anchorHitRect, clientPoint)) {
+        bool hit = false;
+        if (it->shape == AnchorShape::Circle) {
+            const int width = std::max(1L, it->anchorRect.right - it->anchorRect.left);
+            const int height = std::max(1L, it->anchorRect.bottom - it->anchorRect.top);
+            const double radius = static_cast<double>(std::max(width, height)) / 2.0;
+            const double centerX = static_cast<double>(it->anchorRect.left) + static_cast<double>(width) / 2.0;
+            const double centerY = static_cast<double>(it->anchorRect.top) + static_cast<double>(height) / 2.0;
+            const double dx = static_cast<double>(clientPoint.x) - centerX;
+            const double dy = static_cast<double>(clientPoint.y) - centerY;
+            const double distance = std::sqrt((dx * dx) + (dy * dy));
+            hit = std::abs(distance - radius) <= static_cast<double>(it->anchorHitPadding);
+        } else {
+            hit = PtInRect(&it->anchorHitRect, clientPoint);
+        }
+        if (hit) {
             return it->key;
         }
     }

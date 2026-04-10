@@ -132,6 +132,8 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
             DashboardRenderer::AnchorShape::Circle,
             DashboardRenderer::AnchorDragAxis::Horizontal,
             DashboardRenderer::AnchorDragMode::AxisDelta,
+            POINT{anchorCenterX, anchorCenterY},
+            1.0,
             false,
             true,
             renderer.Config().layout.metricList.barHeight);

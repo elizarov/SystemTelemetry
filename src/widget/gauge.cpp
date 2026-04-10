@@ -120,6 +120,12 @@ RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
         ((std::max))(start.y, end.y) + inset + 1};
 }
 
+RECT MakeCircleAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
+    const int diameter = std::max(4, representedDiameter + extraDiameter);
+    const int radius = diameter / 2;
+    return RECT{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
+}
+
 int GaugeRadiusForRect(const DashboardRenderer& renderer, const RECT& rect) {
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
@@ -197,9 +203,12 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
                   static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(gaugeLayout.segmentCount))) - 1,
                   0,
                   gaugeLayout.segmentCount - 1);
+    const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
     const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     const int outerRadius = radius + static_cast<int>(std::ceil(static_cast<double>(segmentThickness) / 2.0f));
+    const int innerRadius =
+        std::max(0, radius - static_cast<int>(std::floor(static_cast<double>(segmentThickness) / 2.0f)));
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -214,9 +223,47 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         DashboardRenderer::AnchorShape::Diamond,
         DashboardRenderer::AnchorDragAxis::Both,
         DashboardRenderer::AnchorDragMode::AxisDelta,
+        POINT{cx, cy - outerRadius},
+        1.0,
         true,
         true,
         renderer.Config().layout.gauge.segmentCount);
+    const RECT outerPaddingAnchorRect =
+        MakeCircleAnchorRect(cx, cy, outerRadius * 2, anchorPadding);
+    renderer.RegisterEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::GaugeOuterPadding,
+            0,
+        },
+        outerPaddingAnchorRect,
+        outerPaddingAnchorRect,
+        DashboardRenderer::AnchorShape::Circle,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::RadialDistance,
+        POINT{cx, cy},
+        -1.0,
+        true,
+        false,
+        renderer.Config().layout.gauge.outerPadding);
+    const RECT ringThicknessAnchorRect =
+        MakeCircleAnchorRect(cx, cy, innerRadius * 2, anchorPadding);
+    renderer.RegisterEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::GaugeRingThickness,
+            0,
+        },
+        ringThicknessAnchorRect,
+        ringThicknessAnchorRect,
+        DashboardRenderer::AnchorShape::Circle,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::RadialDistance,
+        POINT{cx, cy},
+        -2.0,
+        true,
+        false,
+        renderer.Config().layout.gauge.ringThickness);
 
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);

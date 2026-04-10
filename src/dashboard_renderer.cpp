@@ -194,6 +194,8 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(HDC hdc,
             editable->shape,
             editable->dragAxis,
             editable->dragMode,
+            POINT{anchorCenterX, anchorCenterY},
+            1.0,
             false,
             true,
             editable->value);
@@ -426,6 +428,8 @@ void DashboardRenderer::RegisterEditableAnchorRegion(const EditableAnchorKey& ke
     AnchorShape shape,
     AnchorDragAxis dragAxis,
     AnchorDragMode dragMode,
+    POINT dragOrigin,
+    double dragScale,
     bool showWhenWidgetHovered,
     bool drawTargetOutline,
     int value) {
@@ -438,12 +442,15 @@ void DashboardRenderer::RegisterEditableAnchorRegion(const EditableAnchorKey& ke
     region.anchorRect = anchorRect;
     region.shape = shape;
     const int anchorHitInset = std::max(3, ScaleLogical(4));
+    region.anchorHitPadding = anchorHitInset;
     region.anchorHitRect = RECT{region.anchorRect.left - anchorHitInset,
         region.anchorRect.top - anchorHitInset,
         region.anchorRect.right + anchorHitInset,
         region.anchorRect.bottom + anchorHitInset};
     region.dragAxis = dragAxis;
     region.dragMode = dragMode;
+    region.dragOrigin = dragOrigin;
+    region.dragScale = dragScale;
     region.showWhenWidgetHovered = showWhenWidgetHovered;
     region.drawTargetOutline = drawTargetOutline;
     region.value = value;

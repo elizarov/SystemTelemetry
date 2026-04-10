@@ -70,6 +70,8 @@ public:
         ThroughputGuideStrokeWidth,
         ThroughputPlotStrokeWidth,
         ThroughputLeaderDiameter,
+        GaugeOuterPadding,
+        GaugeRingThickness,
     };
 
     enum class AnchorShape {
@@ -99,9 +101,12 @@ public:
         RECT targetRect{};
         RECT anchorRect{};
         RECT anchorHitRect{};
+        int anchorHitPadding = 0;
         AnchorShape shape = AnchorShape::Circle;
         AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
         AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
+        POINT dragOrigin{};
+        double dragScale = 1.0;
         bool showWhenWidgetHovered = false;
         bool drawTargetOutline = true;
         int value = 0;
@@ -124,6 +129,8 @@ public:
         ThroughputGuideStrokeWidth,
         ThroughputPlotStrokeWidth,
         ThroughputLeaderDiameter,
+        GaugeOuterPadding,
+        GaugeRingThickness,
         GaugeSweepDegrees,
         GaugeSegmentGapDegrees,
     };
@@ -279,6 +286,8 @@ public:
         AnchorShape shape,
         AnchorDragAxis dragAxis,
         AnchorDragMode dragMode,
+        POINT dragOrigin,
+        double dragScale,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
