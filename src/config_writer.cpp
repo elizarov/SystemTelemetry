@@ -338,7 +338,8 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines,
     size_t sectionStart,
     size_t sectionEnd,
     const std::string& key,
-    const std::string& value) {
+    const std::string& value,
+    bool appendWhenMissing) {
     for (size_t i = sectionStart + 1; i < sectionEnd; ++i) {
         const std::string trimmed = Trim(lines[i]);
         if (trimmed.empty() || trimmed[0] == ';' || trimmed[0] == '#') {
@@ -354,7 +355,9 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines,
         }
     }
 
-    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
+    if (appendWhenMissing) {
+        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
+    }
 }
 
 std::vector<std::string> SplitConfigLines(const std::string& text) {
@@ -392,7 +395,7 @@ void SaveKnownStructuredSectionDifferences(
 }  // namespace
 
 std::string BuildSavedConfigText(
-    const std::string& initialText, const AppConfig& config, const AppConfig* compareConfig) {
+    const std::string& initialText, const AppConfig& config, const AppConfig* compareConfig, ConfigSaveShape shape) {
     std::vector<std::string> lines = SplitConfigLines(initialText);
 
     const auto findSectionIndex = [&lines](const std::string& sectionName) -> size_t {
@@ -404,10 +407,13 @@ std::string BuildSavedConfigText(
         return lines.size();
     };
 
-    const auto ensureSection = [&lines, &findSectionIndex](const std::string& sectionName) -> size_t {
+    const auto ensureSection = [&lines, &findSectionIndex, shape](const std::string& sectionName) -> size_t {
         const size_t existingIndex = findSectionIndex(sectionName);
         if (existingIndex < lines.size()) {
             return existingIndex;
+        }
+        if (shape == ConfigSaveShape::ExistingTemplateOnly) {
+            return lines.size();
         }
         if (!lines.empty() && !lines.back().empty()) {
             lines.push_back("");
@@ -416,11 +422,14 @@ std::string BuildSavedConfigText(
         return lines.size() - 1;
     };
 
-    const auto ensureSectionAfter = [&lines, &findSectionIndex](
+    const auto ensureSectionAfter = [&lines, &findSectionIndex, shape](
                                         const std::string& sectionName, const std::string& afterSectionName) -> size_t {
         const size_t existingIndex = findSectionIndex(sectionName);
         if (existingIndex < lines.size()) {
             return existingIndex;
+        }
+        if (shape == ConfigSaveShape::ExistingTemplateOnly) {
+            return lines.size();
         }
 
         const size_t afterIndex = findSectionIndex(afterSectionName);
@@ -467,16 +476,20 @@ std::string BuildSavedConfigText(
         return sectionEnd;
     };
 
-    const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd](
+    const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape](
                                const std::string& sectionName, const std::string& key, const std::string& value) {
         size_t sectionStart = sectionName == "[storage]" ? ensureSectionAfter(sectionName, "[network]")
                               : sectionName == "[board]" ? ensureSectionAfter(sectionName, "[storage]")
                                                          : ensureSection(sectionName);
+        if (sectionStart >= lines.size()) {
+            return;
+        }
         if (Trim(lines[sectionStart]) != sectionName) {
             lines[sectionStart] = sectionName;
         }
         const size_t sectionEnd = findSectionEnd(sectionStart);
-        ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value);
+        ReplaceOrAppendKey(
+            lines, sectionStart, sectionEnd, key, value, shape == ConfigSaveShape::UpdateOrAppend);
     };
 
     if (compareConfig == nullptr) {
@@ -494,6 +507,7 @@ bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
 }
 
 bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) {
-    const std::string output = BuildSavedConfigText(LoadEmbeddedConfigTemplate(), config, nullptr);
+    const std::string output =
+        BuildSavedConfigText(LoadEmbeddedConfigTemplate(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
     return WriteFileUtf8(path, output);
 }

@@ -200,7 +200,9 @@ add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_commands_tests.cpp
     tests/config_resolution_tests.cpp
+    tests/config_writer_tests.cpp
     tests/telemetry_retained_history_tests.cpp
+    src/config_writer.cpp
     src/config_resolution.cpp
     src/layout_edit_commands.cpp
     src/layout_snap_solver.cpp
