@@ -67,6 +67,9 @@ public:
         DriveUsageBarHeight,
         SegmentCount,
         DriveUsageActivitySegments,
+        ThroughputGuideStrokeWidth,
+        ThroughputPlotStrokeWidth,
+        ThroughputLeaderDiameter,
     };
 
     enum class AnchorShape {
@@ -78,6 +81,11 @@ public:
         Horizontal,
         Vertical,
         Both,
+    };
+
+    enum class AnchorDragMode {
+        AxisDelta,
+        RadialDistance,
     };
 
     struct EditableAnchorKey {
@@ -93,6 +101,9 @@ public:
         RECT anchorHitRect{};
         AnchorShape shape = AnchorShape::Circle;
         AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
+        AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
+        bool showWhenWidgetHovered = false;
+        bool drawTargetOutline = true;
         int value = 0;
     };
 
@@ -110,6 +121,9 @@ public:
         DriveUsageRowGap,
         ThroughputAxisPadding,
         ThroughputHeaderGap,
+        ThroughputGuideStrokeWidth,
+        ThroughputPlotStrokeWidth,
+        ThroughputLeaderDiameter,
         GaugeSweepDegrees,
         GaugeSegmentGapDegrees,
     };
@@ -195,6 +209,7 @@ public:
         int value = 0;
         AnchorShape shape = AnchorShape::Circle;
         AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
+        AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
     };
 
     struct TextLayoutResult {
@@ -263,6 +278,9 @@ public:
         const RECT& anchorRect,
         AnchorShape shape,
         AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
+        bool showWhenWidgetHovered,
+        bool drawTargetOutline,
         int value);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
     int ScaleLogical(int value) const;

@@ -28,6 +28,9 @@ public:
             DriveUsageActivitySegments,
             ThroughputAxisPadding,
             ThroughputHeaderGap,
+            ThroughputGuideStrokeWidth,
+            ThroughputPlotStrokeWidth,
+            ThroughputLeaderDiameter,
             GaugeSweepDegrees,
             GaugeSegmentGapDegrees,
             FontTitle,
@@ -99,8 +102,11 @@ private:
     struct AnchorEditDragState {
         DashboardRenderer::EditableAnchorKey key;
         DashboardRenderer::AnchorDragAxis dragAxis = DashboardRenderer::AnchorDragAxis::Vertical;
+        DashboardRenderer::AnchorDragMode dragMode = DashboardRenderer::AnchorDragMode::AxisDelta;
         int initialValue = 0;
         POINT dragStartPoint{};
+        POINT anchorCenterPoint{};
+        double dragStartDiameterPixels = 0.0;
     };
 
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;

@@ -95,6 +95,15 @@ bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, do
         case Field::ThroughputHeaderGap:
             ApplyPositiveInt(&LayoutConfig::throughput, &ThroughputWidgetConfig::headerGap, config, value);
             return true;
+        case Field::ThroughputGuideStrokeWidth:
+            ApplyPositiveInt(&LayoutConfig::throughput, &ThroughputWidgetConfig::guideStrokeWidth, config, value);
+            return true;
+        case Field::ThroughputPlotStrokeWidth:
+            ApplyPositiveInt(&LayoutConfig::throughput, &ThroughputWidgetConfig::plotStrokeWidth, config, value);
+            return true;
+        case Field::ThroughputLeaderDiameter:
+            ApplyPositiveInt(&LayoutConfig::throughput, &ThroughputWidgetConfig::leaderDiameter, config, value);
+            return true;
         case Field::GaugeSweepDegrees:
             config.layout.gauge.sweepDegrees = ClampGaugeSweepDegrees(value);
             return true;

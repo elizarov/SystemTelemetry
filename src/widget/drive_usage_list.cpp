@@ -195,6 +195,9 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
             firstRowContentTop - (activityAnchorSize / 2) + activityAnchorSize},
         DashboardRenderer::AnchorShape::Diamond,
         DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::AxisDelta,
+        true,
+        true,
         config.activitySegments);
 
     RECT usageHeaderRect{headerBarRect.left, header.top, headerPctRect.right, header.bottom};
@@ -302,6 +305,9 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
                 anchorCenterY - (anchorSize / 2) + anchorSize},
             DashboardRenderer::AnchorShape::Circle,
             DashboardRenderer::AnchorDragAxis::Horizontal,
+            DashboardRenderer::AnchorDragMode::AxisDelta,
+            false,
+            true,
             config.barHeight);
 
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {

@@ -193,6 +193,9 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             cy - outerRadius - anchorHalf + anchorSize},
         DashboardRenderer::AnchorShape::Diamond,
         DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::AxisDelta,
+        true,
+        true,
         renderer.Config().layout.gauge.segmentCount);
 
     Gdiplus::Graphics graphics(hdc);

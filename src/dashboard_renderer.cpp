@@ -188,8 +188,15 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(HDC hdc,
             anchorCenterY - anchorHalf,
             anchorCenterX - anchorHalf + anchorSize,
             anchorCenterY - anchorHalf + anchorSize};
-        RegisterEditableAnchorRegion(
-            editable->key, result.textRect, anchorRect, editable->shape, editable->dragAxis, editable->value);
+        RegisterEditableAnchorRegion(editable->key,
+            result.textRect,
+            anchorRect,
+            editable->shape,
+            editable->dragAxis,
+            editable->dragMode,
+            false,
+            true,
+            editable->value);
     }
     return result;
 }
@@ -230,70 +237,71 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
         return;
     }
 
-    const EditableAnchorRegion* highlighted = nullptr;
-    bool active = false;
+    std::vector<std::pair<const EditableAnchorRegion*, bool>> highlights;
     if (overlayState.activeEditableAnchor.has_value()) {
         const auto it = std::find_if(
             editableAnchorRegions_.begin(), editableAnchorRegions_.end(), [&](const EditableAnchorRegion& region) {
                 return MatchesEditableAnchorKey(region.key, *overlayState.activeEditableAnchor);
             });
         if (it != editableAnchorRegions_.end()) {
-            highlighted = &(*it);
-            active = true;
+            highlights.push_back({&(*it), true});
         }
-    }
-    if (highlighted == nullptr && overlayState.hoveredEditableAnchor.has_value()) {
+    } else if (overlayState.hoveredEditableAnchor.has_value()) {
         const auto it = std::find_if(
             editableAnchorRegions_.begin(), editableAnchorRegions_.end(), [&](const EditableAnchorRegion& region) {
                 return MatchesEditableAnchorKey(region.key, *overlayState.hoveredEditableAnchor);
             });
         if (it != editableAnchorRegions_.end()) {
-            highlighted = &(*it);
+            highlights.push_back({&(*it), false});
+        }
+    } else if (overlayState.hoveredEditableWidget.has_value()) {
+        for (const auto& region : editableAnchorRegions_) {
+            if (!region.showWhenWidgetHovered) {
+                continue;
+            }
+            if (region.key.widget.renderCardId != overlayState.hoveredEditableWidget->renderCardId ||
+                region.key.widget.editCardId != overlayState.hoveredEditableWidget->editCardId ||
+                region.key.widget.nodePath != overlayState.hoveredEditableWidget->nodePath) {
+                continue;
+            }
+            highlights.push_back({&region, false});
         }
     }
-    if (highlighted == nullptr && overlayState.hoveredEditableWidget.has_value()) {
-        const auto it = std::find_if(
-            editableAnchorRegions_.begin(), editableAnchorRegions_.end(), [&](const EditableAnchorRegion& region) {
-                return region.key.widget.renderCardId == overlayState.hoveredEditableWidget->renderCardId &&
-                       region.key.widget.editCardId == overlayState.hoveredEditableWidget->editCardId &&
-                       region.key.widget.nodePath == overlayState.hoveredEditableWidget->nodePath;
-            });
-        if (it != editableAnchorRegions_.end()) {
-            highlighted = &(*it);
-        }
-    }
-    if (highlighted == nullptr) {
+    if (highlights.empty()) {
         return;
     }
 
-    const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    if (highlighted->targetRect.right > highlighted->targetRect.left &&
-        highlighted->targetRect.bottom > highlighted->targetRect.top) {
-        Gdiplus::Pen pen(Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
-            static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
-        pen.SetDashStyle(Gdiplus::DashStyleDot);
-        const RECT& targetRect = highlighted->targetRect;
-        graphics.DrawRectangle(&pen,
-            static_cast<Gdiplus::REAL>(targetRect.left),
-            static_cast<Gdiplus::REAL>(targetRect.top),
-            static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.right - targetRect.left)),
-            static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.bottom - targetRect.top)));
-    }
+    for (const auto& [highlighted, active] : highlights) {
+        const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
+        if (highlighted->drawTargetOutline && highlighted->targetRect.right > highlighted->targetRect.left &&
+            highlighted->targetRect.bottom > highlighted->targetRect.top) {
+            Gdiplus::Pen pen(
+                Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
+                static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
+            pen.SetDashStyle(Gdiplus::DashStyleDot);
+            const RECT& targetRect = highlighted->targetRect;
+            graphics.DrawRectangle(&pen,
+                static_cast<Gdiplus::REAL>(targetRect.left),
+                static_cast<Gdiplus::REAL>(targetRect.top),
+                static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.right - targetRect.left)),
+                static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.bottom - targetRect.top)));
+        }
 
-    if (highlighted->shape == AnchorShape::Circle) {
-        const RECT& anchorRect = highlighted->anchorRect;
-        Gdiplus::SolidBrush fill(
-            Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)));
-        graphics.FillEllipse(&fill,
-            static_cast<Gdiplus::REAL>(anchorRect.left),
-            static_cast<Gdiplus::REAL>(anchorRect.top),
-            static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
-            static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
-    } else {
-        FillDiamond(hdc, highlighted->anchorRect, outlineColor);
+        if (highlighted->shape == AnchorShape::Circle) {
+            const RECT& anchorRect = highlighted->anchorRect;
+            Gdiplus::SolidBrush fill(
+                Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)));
+            graphics.FillEllipse(&fill,
+                static_cast<Gdiplus::REAL>(anchorRect.left),
+                static_cast<Gdiplus::REAL>(anchorRect.top),
+                static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
+                static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
+        } else {
+            FillDiamond(hdc, highlighted->anchorRect, outlineColor);
+        }
     }
 }
 
@@ -407,6 +415,7 @@ DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBind
         value,
         AnchorShape::Circle,
         AnchorDragAxis::Vertical,
+        AnchorDragMode::AxisDelta,
     };
 }
 
@@ -415,6 +424,9 @@ void DashboardRenderer::RegisterEditableAnchorRegion(const EditableAnchorKey& ke
     const RECT& anchorRect,
     AnchorShape shape,
     AnchorDragAxis dragAxis,
+    AnchorDragMode dragMode,
+    bool showWhenWidgetHovered,
+    bool drawTargetOutline,
     int value) {
     if (anchorRect.right <= anchorRect.left || anchorRect.bottom <= anchorRect.top) {
         return;
@@ -430,6 +442,9 @@ void DashboardRenderer::RegisterEditableAnchorRegion(const EditableAnchorKey& ke
         region.anchorRect.right + anchorHitInset,
         region.anchorRect.bottom + anchorHitInset};
     region.dragAxis = dragAxis;
+    region.dragMode = dragMode;
+    region.showWhenWidgetHovered = showWhenWidgetHovered;
+    region.drawTargetOutline = drawTargetOutline;
     region.value = value;
     editableAnchorRegions_.push_back(std::move(region));
 }
@@ -664,6 +679,7 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
                 config_.layout.fonts.title.size,
                 AnchorShape::Circle,
                 AnchorDragAxis::Vertical,
+                AnchorDragMode::AxisDelta,
             });
     }
 }

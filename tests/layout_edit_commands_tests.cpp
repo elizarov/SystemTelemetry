@@ -52,6 +52,21 @@ TEST(LayoutEditCommands, UpdatesDriveUsageActivitySegmentsThroughCommands) {
     EXPECT_EQ(config.layout.driveUsageList.activitySegments, 6);
 }
 
+TEST(LayoutEditCommands, UpdatesThroughputAnchorFieldsThroughCommands) {
+    AppConfig config;
+
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config, MakeTarget(LayoutEditHost::ValueTarget::Field::ThroughputGuideStrokeWidth), 3.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(
+        config, MakeTarget(LayoutEditHost::ValueTarget::Field::ThroughputPlotStrokeWidth), 5.6));
+    ASSERT_TRUE(
+        layout_edit::ApplyValue(config, MakeTarget(LayoutEditHost::ValueTarget::Field::ThroughputLeaderDiameter), 8.6));
+
+    EXPECT_EQ(config.layout.throughput.guideStrokeWidth, 4);
+    EXPECT_EQ(config.layout.throughput.plotStrokeWidth, 6);
+    EXPECT_EQ(config.layout.throughput.leaderDiameter, 9);
+}
+
 TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
     AppConfig config;
     config.layout.fonts.label.size = 15;

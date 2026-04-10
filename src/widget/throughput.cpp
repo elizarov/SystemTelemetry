@@ -9,6 +9,25 @@
 
 namespace {
 
+struct ThroughputGraphLayout {
+    RECT graphRect{};
+    int axisWidth = 1;
+    int labelBandHeight = 0;
+    int graphTop = 0;
+    int graphLeft = 0;
+    int graphRight = 0;
+    int graphBottom = 0;
+    int plotTop = 0;
+    int plotHeight = 1;
+    int plotStrokeWidth = 1;
+    int guideStrokeWidth = 1;
+    int leaderDiameter = 0;
+    int leaderRadius = 0;
+    int plotWidth = 1;
+    int guideCenterX = 0;
+    int guideCenterY = 0;
+};
+
 COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
 }
@@ -30,6 +49,50 @@ void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color,
     DeleteObject(brush);
 }
 
+RECT MakeAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
+    const int diameter = std::max(8, representedDiameter + extraDiameter);
+    const int radius = diameter / 2;
+    return RECT{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
+}
+
+ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, const RECT& rect) {
+    ThroughputGraphLayout layout;
+    layout.graphRect = rect;
+    layout.axisWidth = std::max(1, renderer.MeasuredTextWidths().throughputAxis);
+    layout.labelBandHeight = renderer.FontMetrics().smallText +
+                             std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.scaleLabelPadding));
+    layout.graphTop = std::min(rect.bottom - 1, rect.top + layout.labelBandHeight);
+    layout.graphLeft = rect.left + layout.axisWidth;
+    layout.leaderDiameter = std::max(1, renderer.ScaleLogical(renderer.Config().layout.throughput.leaderDiameter));
+    layout.leaderRadius = layout.leaderDiameter / 2;
+    layout.plotWidth = std::max<int>(1, rect.right - layout.graphLeft - 1 - layout.leaderRadius);
+    layout.graphRight = layout.graphLeft + layout.plotWidth;
+    layout.graphBottom = rect.bottom - 1;
+    layout.plotStrokeWidth = std::max(1, renderer.ScaleLogical(renderer.Config().layout.throughput.plotStrokeWidth));
+    layout.plotTop = std::min(layout.graphBottom, static_cast<int>(rect.top) + layout.plotStrokeWidth);
+    layout.plotHeight = std::max(1, layout.graphBottom - layout.plotTop);
+    layout.guideStrokeWidth = std::max(1, renderer.ScaleLogical(renderer.Config().layout.throughput.guideStrokeWidth));
+    layout.guideCenterX = layout.graphLeft + (std::max)(0, (layout.graphRight - layout.graphLeft) / 2);
+    layout.guideCenterY = layout.plotTop + (std::max)(0, (layout.graphBottom - layout.plotTop) / 2);
+    return layout;
+}
+
+POINT ThroughputLastPoint(const ThroughputGraphLayout& layout, const std::vector<double>& history, double maxValue) {
+    POINT lastPoint{layout.graphLeft, layout.graphBottom};
+    if (history.empty()) {
+        return lastPoint;
+    }
+
+    const size_t historyDenominator = std::max<size_t>(1, history.size() - 1);
+    for (size_t i = 0; i < history.size(); ++i) {
+        const double valueRatio = std::clamp(history[i] / maxValue, 0.0, 1.0);
+        const int x = layout.graphLeft + static_cast<int>(i * layout.plotWidth / historyDenominator);
+        const int y = layout.graphBottom - static_cast<int>(std::round(valueRatio * layout.plotHeight));
+        lastPoint = POINT{x, y};
+    }
+    return lastPoint;
+}
+
 void DrawGraph(DashboardRenderer& renderer,
     HDC hdc,
     const RECT& rect,
@@ -43,28 +106,17 @@ void DrawGraph(DashboardRenderer& renderer,
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
 
-    const int axisWidth = std::max(1, renderer.MeasuredTextWidths().throughputAxis);
-    const int labelBandHeight =
-        renderer.FontMetrics().smallText +
-        std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.scaleLabelPadding));
-    const int graphTop = std::min(rect.bottom - 1, rect.top + labelBandHeight);
-    const int graphLeft = rect.left + axisWidth;
-    const int leaderDiameter = std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.leaderDiameter));
-    const int leaderRadius = leaderDiameter / 2;
-    const int width = std::max<int>(1, rect.right - graphLeft - 1 - leaderRadius);
-    const int graphRight = graphLeft + width;
-    const int graphBottom = rect.bottom - 1;
-    const int plotStrokeWidth = std::max(1, renderer.ScaleLogical(renderer.Config().layout.throughput.plotStrokeWidth));
-    const int plotTop = std::min(graphBottom, static_cast<int>(rect.top) + plotStrokeWidth);
-    const int plotHeight = std::max(1, graphBottom - plotTop);
-
-    const int strokeWidth = std::max(1, renderer.ScaleLogical(renderer.Config().layout.throughput.guideStrokeWidth));
+    const ThroughputGraphLayout layout = ComputeGraphLayout(renderer, rect);
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
     HBRUSH markerBrush = CreateSolidBrush(ToColorRef(renderer.Config().layout.colors.graphMarkerColor));
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
         const double ratio = tick / maxValue;
-        const int y = graphBottom - static_cast<int>(std::round(ratio * plotHeight));
-        RECT lineRect{graphLeft, std::max(plotTop, y), graphRight, std::min(graphBottom + 1, y + strokeWidth)};
+        const int centerY = layout.graphBottom - static_cast<int>(std::round(ratio * layout.plotHeight));
+        const int lineTop = centerY - (layout.guideStrokeWidth / 2);
+        RECT lineRect{layout.graphLeft,
+            std::max(layout.plotTop, lineTop),
+            layout.graphRight,
+            std::min(layout.graphBottom + 1, lineTop + layout.guideStrokeWidth)};
         FillRect(hdc, &lineRect, markerBrush);
     }
 
@@ -74,9 +126,12 @@ void DrawGraph(DashboardRenderer& renderer,
             sampleOffset <= static_cast<double>(history.size() - 1) + markerInterval;
             sampleOffset += markerInterval) {
             const double clampedOffset = std::clamp(sampleOffset, 0.0, static_cast<double>(history.size() - 1));
-            const int x = graphRight -
-                          static_cast<int>(std::round(clampedOffset * width / std::max<size_t>(1, history.size() - 1)));
-            RECT lineRect{x, rect.top, std::min(graphRight + 1, x + strokeWidth), rect.bottom};
+            const int centerX =
+                layout.graphRight - static_cast<int>(std::round(
+                                        clampedOffset * layout.plotWidth / std::max<size_t>(1, history.size() - 1)));
+            const int lineLeft = centerX - (layout.guideStrokeWidth / 2);
+            RECT lineRect{
+                lineLeft, rect.top, std::min(layout.graphRight + 1, lineLeft + layout.guideStrokeWidth), rect.bottom};
             FillRect(hdc, &lineRect, markerBrush);
         }
     }
@@ -84,15 +139,25 @@ void DrawGraph(DashboardRenderer& renderer,
     DeleteObject(markerBrush);
 
     HBRUSH axisBrush = CreateSolidBrush(ToColorRef(renderer.Config().layout.colors.graphAxisColor));
-    RECT verticalAxisRect{rect.left + axisWidth, rect.top, rect.left + axisWidth + strokeWidth, rect.bottom};
-    RECT horizontalAxisRect{rect.left + axisWidth, rect.bottom - strokeWidth, rect.right, rect.bottom};
+    const int verticalAxisCenterX = rect.left + layout.axisWidth;
+    const int verticalAxisLeft = verticalAxisCenterX - (layout.guideStrokeWidth / 2);
+    const int horizontalAxisCenterY = rect.bottom - 1;
+    const int horizontalAxisTop = horizontalAxisCenterY - (layout.guideStrokeWidth / 2);
+    RECT verticalAxisRect{verticalAxisLeft,
+        rect.top,
+        std::min<LONG>(rect.right, verticalAxisLeft + layout.guideStrokeWidth),
+        rect.bottom};
+    RECT horizontalAxisRect{rect.left + layout.axisWidth,
+        horizontalAxisTop,
+        rect.right,
+        std::min<LONG>(rect.bottom, horizontalAxisTop + layout.guideStrokeWidth)};
     FillRect(hdc, &verticalAxisRect, axisBrush);
     FillRect(hdc, &horizontalAxisRect, axisBrush);
     DeleteObject(axisBrush);
 
     char maxLabel[32];
     sprintf_s(maxLabel, "%.0f", maxValue);
-    RECT maxRect{rect.left, rect.top, rect.left + axisWidth, graphTop};
+    RECT maxRect{rect.left, rect.top, rect.left + layout.axisWidth, layout.graphTop};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         renderer.DrawTextBlock(hdc,
             maxRect,
@@ -108,35 +173,26 @@ void DrawGraph(DashboardRenderer& renderer,
     }
 
     const COLORREF plotColor = renderer.AccentColor();
-    HPEN pen = CreatePen(PS_SOLID, plotStrokeWidth, plotColor);
+    HPEN pen = CreatePen(PS_SOLID, layout.plotStrokeWidth, plotColor);
     HGDIOBJ oldPen = SelectObject(hdc, pen);
-    POINT lastPoint{graphLeft, graphBottom};
-    bool hasLastPoint = false;
-    if (!history.empty()) {
-        const size_t historyDenominator = std::max<size_t>(1, history.size() - 1);
-        for (size_t i = 0; i < history.size(); ++i) {
-            const double valueRatio = std::clamp(history[i] / maxValue, 0.0, 1.0);
-            const int x = graphLeft + static_cast<int>(i * width / historyDenominator);
-            const int y = graphBottom - static_cast<int>(std::round(valueRatio * plotHeight));
-            lastPoint = POINT{x, y};
-            hasLastPoint = true;
-        }
-    }
     for (size_t i = 1; i < history.size(); ++i) {
         const double v1 = std::clamp(history[i - 1] / maxValue, 0.0, 1.0);
         const double v2 = std::clamp(history[i] / maxValue, 0.0, 1.0);
-        const int x1 = graphLeft + static_cast<int>((i - 1) * width / std::max<size_t>(1, history.size() - 1));
-        const int x2 = graphLeft + static_cast<int>(i * width / std::max<size_t>(1, history.size() - 1));
-        const int y1 = graphBottom - static_cast<int>(std::round(v1 * plotHeight));
-        const int y2 = graphBottom - static_cast<int>(std::round(v2 * plotHeight));
+        const int x1 =
+            layout.graphLeft + static_cast<int>((i - 1) * layout.plotWidth / std::max<size_t>(1, history.size() - 1));
+        const int x2 =
+            layout.graphLeft + static_cast<int>(i * layout.plotWidth / std::max<size_t>(1, history.size() - 1));
+        const int y1 = layout.graphBottom - static_cast<int>(std::round(v1 * layout.plotHeight));
+        const int y2 = layout.graphBottom - static_cast<int>(std::round(v2 * layout.plotHeight));
         MoveToEx(hdc, x1, y1, nullptr);
         LineTo(hdc, x2, y2);
     }
     SelectObject(hdc, oldPen);
     DeleteObject(pen);
 
-    if (hasLastPoint && leaderDiameter > 0) {
-        FillCircle(hdc, lastPoint.x, lastPoint.y, leaderDiameter, plotColor, 255);
+    if (!history.empty() && layout.leaderDiameter > 0) {
+        const POINT lastPoint = ThroughputLastPoint(layout, history, maxValue);
+        FillCircle(hdc, lastPoint.x, lastPoint.y, layout.leaderDiameter, plotColor, 255);
     }
 }
 
@@ -216,6 +272,63 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
                 1,
                 renderer.Config().layout.fonts.smallText.size));
     }
+    const ThroughputGraphLayout layout = ComputeGraphLayout(renderer, graphRect);
+    const int anchorPadding = std::max(4, renderer.ScaleLogical(4));
+    const int leaderAnchorCenterX = layout.graphRight;
+    const int leaderAnchorCenterY = layout.plotTop + (std::max)(0, (layout.graphBottom - layout.plotTop) / 2);
+    const RECT leaderAnchorRect =
+        MakeAnchorRect(leaderAnchorCenterX, leaderAnchorCenterY, layout.leaderDiameter, anchorPadding);
+    renderer.RegisterEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::ThroughputLeaderDiameter,
+            0,
+        },
+        leaderAnchorRect,
+        leaderAnchorRect,
+        DashboardRenderer::AnchorShape::Circle,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::RadialDistance,
+        true,
+        false,
+        renderer.Config().layout.throughput.leaderDiameter);
+
+    const int plotAnchorCenterY = layout.plotTop + (std::max)(0, (layout.graphBottom - layout.plotTop) / 2);
+    const int plotAnchorCenterX = layout.graphLeft;
+    const RECT plotAnchorRect =
+        MakeAnchorRect(plotAnchorCenterX, plotAnchorCenterY, layout.plotStrokeWidth, anchorPadding);
+    renderer.RegisterEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::ThroughputPlotStrokeWidth,
+            0,
+        },
+        plotAnchorRect,
+        plotAnchorRect,
+        DashboardRenderer::AnchorShape::Circle,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::RadialDistance,
+        true,
+        false,
+        renderer.Config().layout.throughput.plotStrokeWidth);
+
+    const RECT guideAnchorRect =
+        MakeAnchorRect(layout.guideCenterX, layout.guideCenterY, layout.guideStrokeWidth, anchorPadding);
+    renderer.RegisterEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::ThroughputGuideStrokeWidth,
+            0,
+        },
+        guideAnchorRect,
+        guideAnchorRect,
+        DashboardRenderer::AnchorShape::Circle,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::RadialDistance,
+        true,
+        false,
+        renderer.Config().layout.throughput.guideStrokeWidth);
+
     DrawGraph(renderer,
         hdc,
         graphRect,
