@@ -268,10 +268,6 @@ public:
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
     int ScaleLogical(int value) const;
     int GaugeRadiusForRect(const RECT& rect) const;
-    int EffectiveMetricRowHeight() const;
-    int EffectiveDriveHeaderHeight() const;
-    int EffectiveDriveRowHeight() const;
-    int EffectiveThroughputPreferredHeight() const;
 
 private:
     friend struct DashboardRendererLayoutEngine;

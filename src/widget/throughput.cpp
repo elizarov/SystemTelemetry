@@ -140,6 +140,15 @@ void DrawGraph(DashboardRenderer& renderer,
     }
 }
 
+int EffectiveThroughputPreferredHeight(const DashboardRenderer& renderer) {
+    const int headerHeight = renderer.FontMetrics().smallText;
+    const int graphLabelHeight =
+        renderer.FontMetrics().smallText +
+        std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.scaleLabelPadding));
+    return headerHeight + std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap)) +
+           graphLabelHeight;
+}
+
 }  // namespace
 
 DashboardWidgetClass ThroughputWidget::Class() const {
@@ -155,7 +164,7 @@ void ThroughputWidget::Initialize(const LayoutNodeConfig& node) {
 }
 
 int ThroughputWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return renderer.EffectiveThroughputPreferredHeight();
+    return EffectiveThroughputPreferredHeight(renderer);
 }
 
 void ThroughputWidget::Draw(DashboardRenderer& renderer,

@@ -31,6 +31,13 @@ MetricListWidget::Entry ParseMetricListEntry(std::string item) {
     return entry;
 }
 
+int EffectiveMetricRowHeight(const DashboardRenderer& renderer) {
+    const int textHeight = std::max(renderer.FontMetrics().label, renderer.FontMetrics().value);
+    const int barHeight = std::max(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
+    const int verticalGap = std::max(0, renderer.ScaleLogical(renderer.Config().layout.metricList.verticalGap));
+    return textHeight + verticalGap + barHeight;
+}
+
 }  // namespace
 
 DashboardWidgetClass MetricListWidget::Class() const {
@@ -54,14 +61,14 @@ void MetricListWidget::Initialize(const LayoutNodeConfig& node) {
 }
 
 int MetricListWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return static_cast<int>(entries_.size()) * renderer.EffectiveMetricRowHeight();
+    return static_cast<int>(entries_.size()) * EffectiveMetricRowHeight(renderer);
 }
 
 void MetricListWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
-    const int rowHeight = renderer.EffectiveMetricRowHeight();
+    const int rowHeight = EffectiveMetricRowHeight(renderer);
     const int savedDc = SaveDC(hdc);
     IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
     RECT rowRect{widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.top + rowHeight};
@@ -137,7 +144,7 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
 
 void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const int labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
-    const int rowHeight = renderer.EffectiveMetricRowHeight();
+    const int rowHeight = EffectiveMetricRowHeight(renderer);
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     const int x = std::clamp(static_cast<int>(widget.rect.left) + labelWidth,
         static_cast<int>(widget.rect.left),

@@ -86,6 +86,18 @@ void DrawSegmentIndicator(HDC hdc,
     }
 }
 
+int EffectiveDriveHeaderHeight(const DashboardRenderer& renderer) {
+    const int headerGap = std::max(0, renderer.ScaleLogical(renderer.Config().layout.driveUsageList.headerGap));
+    return renderer.FontMetrics().smallText + headerGap;
+}
+
+int EffectiveDriveRowHeight(const DashboardRenderer& renderer) {
+    const int textHeight = std::max(renderer.FontMetrics().label, renderer.FontMetrics().smallText);
+    const int barHeight = std::max(1, renderer.ScaleLogical(renderer.Config().layout.driveUsageList.barHeight));
+    const int rowGap = std::max(0, renderer.ScaleLogical(renderer.Config().layout.driveUsageList.rowGap));
+    return std::max(textHeight, barHeight) + rowGap;
+}
+
 }  // namespace
 
 DashboardWidgetClass DriveUsageListWidget::Class() const {
@@ -100,7 +112,7 @@ void DriveUsageListWidget::Initialize(const LayoutNodeConfig&) {}
 
 int DriveUsageListWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     const int count = static_cast<int>(renderer.Config().storage.drives.size());
-    return (count > 0 ? renderer.EffectiveDriveHeaderHeight() : 0) + (count * renderer.EffectiveDriveRowHeight());
+    return (count > 0 ? EffectiveDriveHeaderHeight(renderer) : 0) + (count * EffectiveDriveRowHeight(renderer));
 }
 
 void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
@@ -108,8 +120,8 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
     const auto& config = renderer.Config().layout.driveUsageList;
-    const int headerHeight = renderer.EffectiveDriveHeaderHeight();
-    const int rowHeight = renderer.EffectiveDriveRowHeight();
+    const int headerHeight = EffectiveDriveHeaderHeight(renderer);
+    const int rowHeight = EffectiveDriveRowHeight(renderer);
     const int labelWidth = (std::max)(1, renderer.MeasuredTextWidths().driveLabel);
     const int percentWidth = (std::max)(1, renderer.MeasuredTextWidths().drivePercent);
     const int labelGap = (std::max)(0, renderer.ScaleLogical(config.labelGap));
@@ -328,8 +340,8 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
 
 void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.driveUsageList;
-    const int headerHeight = renderer.EffectiveDriveHeaderHeight();
-    const int rowHeight = renderer.EffectiveDriveRowHeight();
+    const int headerHeight = EffectiveDriveHeaderHeight(renderer);
+    const int rowHeight = EffectiveDriveRowHeight(renderer);
     const int labelWidth = (std::max)(1, renderer.MeasuredTextWidths().driveLabel);
     const int percentWidth = (std::max)(1, renderer.MeasuredTextWidths().drivePercent);
     const int labelGap = (std::max)(0, renderer.ScaleLogical(config.labelGap));
