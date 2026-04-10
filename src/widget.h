@@ -39,7 +39,6 @@ public:
     virtual ~DashboardWidget() = default;
 
     virtual DashboardWidgetClass Class() const = 0;
-    virtual const char* TypeName() const = 0;
     virtual std::unique_ptr<DashboardWidget> Clone() const = 0;
     virtual void Initialize(const LayoutNodeConfig& node) = 0;
     virtual int PreferredHeight(const DashboardRenderer& renderer) const = 0;
@@ -60,12 +59,13 @@ struct DashboardWidgetLayout {
     std::vector<size_t> nodePath;
     std::unique_ptr<DashboardWidget> widget;
     DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
-    std::string typeName;
     int preferredHeight = 0;
     bool fixedPreferredHeightInRows = false;
     bool hoverable = false;
     bool verticalSpring = false;
 };
 
-std::unique_ptr<DashboardWidget> CreateDashboardWidget(const std::string& name);
 std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view name);
+std::string_view DashboardWidgetClassName(DashboardWidgetClass widgetClass);
+std::unique_ptr<DashboardWidget> CreateDashboardWidget(DashboardWidgetClass widgetClass);
+std::unique_ptr<DashboardWidget> CreateDashboardWidget(std::string_view name);

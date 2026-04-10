@@ -7,10 +7,6 @@ DashboardWidgetClass NetworkFooterWidget::Class() const {
     return DashboardWidgetClass::NetworkFooter;
 }
 
-const char* NetworkFooterWidget::TypeName() const {
-    return "network_footer";
-}
-
 std::unique_ptr<DashboardWidget> NetworkFooterWidget::Clone() const {
     return std::make_unique<NetworkFooterWidget>(*this);
 }

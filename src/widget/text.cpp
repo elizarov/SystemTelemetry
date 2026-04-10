@@ -7,10 +7,6 @@ DashboardWidgetClass TextWidget::Class() const {
     return DashboardWidgetClass::Text;
 }
 
-const char* TextWidget::TypeName() const {
-    return "text";
-}
-
 std::unique_ptr<DashboardWidget> TextWidget::Clone() const {
     return std::make_unique<TextWidget>(*this);
 }

@@ -92,10 +92,6 @@ DashboardWidgetClass DriveUsageListWidget::Class() const {
     return DashboardWidgetClass::DriveUsageList;
 }
 
-const char* DriveUsageListWidget::TypeName() const {
-    return "drive_usage_list";
-}
-
 std::unique_ptr<DashboardWidget> DriveUsageListWidget::Clone() const {
     return std::make_unique<DriveUsageListWidget>(*this);
 }

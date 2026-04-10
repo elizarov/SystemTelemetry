@@ -122,10 +122,6 @@ DashboardWidgetClass GaugeWidget::Class() const {
     return DashboardWidgetClass::Gauge;
 }
 
-const char* GaugeWidget::TypeName() const {
-    return "gauge";
-}
-
 std::unique_ptr<DashboardWidget> GaugeWidget::Clone() const {
     return std::make_unique<GaugeWidget>(*this);
 }

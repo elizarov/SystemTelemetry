@@ -825,15 +825,19 @@ const DashboardRenderer::ParsedWidgetInfo* DashboardRenderer::FindParsedWidgetIn
         return &it->second;
     }
 
-    auto widget = CreateDashboardWidget(node.name);
+    const auto widgetClass = FindDashboardWidgetClass(node.name);
+    if (!widgetClass.has_value()) {
+        return nullptr;
+    }
+
+    auto widget = CreateDashboardWidget(*widgetClass);
     if (widget == nullptr) {
         return nullptr;
     }
 
     widget->Initialize(node);
     ParsedWidgetInfo info;
-    info.widgetClass = widget->Class();
-    info.typeName = widget->TypeName();
+    info.widgetClass = *widgetClass;
     info.preferredHeight = widget->PreferredHeight(*this);
     info.fixedPreferredHeightInRows = widget->UsesFixedPreferredHeightInRows();
     info.hoverable = widget->IsHoverable();
@@ -848,7 +852,6 @@ DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeCon
     const ParsedWidgetInfo* info = FindParsedWidgetInfo(node);
     if (info != nullptr) {
         widget.widgetClass = info->widgetClass;
-        widget.typeName = info->typeName;
         widget.preferredHeight = info->preferredHeight;
         widget.fixedPreferredHeightInRows = info->fixedPreferredHeightInRows;
         widget.hoverable = info->hoverable;

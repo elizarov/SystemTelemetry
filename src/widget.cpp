@@ -63,36 +63,66 @@ std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view na
     return std::nullopt;
 }
 
-std::unique_ptr<DashboardWidget> CreateDashboardWidget(const std::string& name) {
-    if (name == "text") {
-        return std::make_unique<TextWidget>();
+std::string_view DashboardWidgetClassName(DashboardWidgetClass widgetClass) {
+    switch (widgetClass) {
+        case DashboardWidgetClass::Text:
+            return "text";
+        case DashboardWidgetClass::Gauge:
+            return "gauge";
+        case DashboardWidgetClass::MetricList:
+            return "metric_list";
+        case DashboardWidgetClass::Throughput:
+            return "throughput";
+        case DashboardWidgetClass::NetworkFooter:
+            return "network_footer";
+        case DashboardWidgetClass::Spacer:
+            return "spacer";
+        case DashboardWidgetClass::VerticalSpring:
+            return "vertical_spring";
+        case DashboardWidgetClass::DriveUsageList:
+            return "drive_usage_list";
+        case DashboardWidgetClass::ClockTime:
+            return "clock_time";
+        case DashboardWidgetClass::ClockDate:
+            return "clock_date";
+        case DashboardWidgetClass::Unknown:
+        default:
+            return "";
     }
-    if (name == "gauge") {
-        return std::make_unique<GaugeWidget>();
+}
+
+std::unique_ptr<DashboardWidget> CreateDashboardWidget(DashboardWidgetClass widgetClass) {
+    switch (widgetClass) {
+        case DashboardWidgetClass::Text:
+            return std::make_unique<TextWidget>();
+        case DashboardWidgetClass::Gauge:
+            return std::make_unique<GaugeWidget>();
+        case DashboardWidgetClass::MetricList:
+            return std::make_unique<MetricListWidget>();
+        case DashboardWidgetClass::Throughput:
+            return std::make_unique<ThroughputWidget>();
+        case DashboardWidgetClass::NetworkFooter:
+            return std::make_unique<NetworkFooterWidget>();
+        case DashboardWidgetClass::Spacer:
+            return std::make_unique<SpacerWidget>();
+        case DashboardWidgetClass::VerticalSpring:
+            return std::make_unique<VerticalSpringWidget>();
+        case DashboardWidgetClass::DriveUsageList:
+            return std::make_unique<DriveUsageListWidget>();
+        case DashboardWidgetClass::ClockTime:
+            return std::make_unique<ClockTimeWidget>();
+        case DashboardWidgetClass::ClockDate:
+            return std::make_unique<ClockDateWidget>();
+        case DashboardWidgetClass::Unknown:
+        default:
+            return nullptr;
     }
-    if (name == "metric_list") {
-        return std::make_unique<MetricListWidget>();
+}
+
+std::unique_ptr<DashboardWidget> CreateDashboardWidget(std::string_view name) {
+    const auto widgetClass = FindDashboardWidgetClass(name);
+    if (!widgetClass.has_value()) {
+        return nullptr;
     }
-    if (name == "throughput") {
-        return std::make_unique<ThroughputWidget>();
-    }
-    if (name == "network_footer") {
-        return std::make_unique<NetworkFooterWidget>();
-    }
-    if (name == "spacer") {
-        return std::make_unique<SpacerWidget>();
-    }
-    if (name == "vertical_spring") {
-        return std::make_unique<VerticalSpringWidget>();
-    }
-    if (name == "drive_usage_list") {
-        return std::make_unique<DriveUsageListWidget>();
-    }
-    if (name == "clock_time") {
-        return std::make_unique<ClockTimeWidget>();
-    }
-    if (name == "clock_date") {
-        return std::make_unique<ClockDateWidget>();
-    }
-    return nullptr;
+    return CreateDashboardWidget(*widgetClass);
 }

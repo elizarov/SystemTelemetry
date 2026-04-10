@@ -7,10 +7,6 @@ DashboardWidgetClass ClockDateWidget::Class() const {
     return DashboardWidgetClass::ClockDate;
 }
 
-const char* ClockDateWidget::TypeName() const {
-    return "clock_date";
-}
-
 std::unique_ptr<DashboardWidget> ClockDateWidget::Clone() const {
     return std::make_unique<ClockDateWidget>(*this);
 }

@@ -6,10 +6,6 @@ DashboardWidgetClass SpacerWidget::Class() const {
     return DashboardWidgetClass::Spacer;
 }
 
-const char* SpacerWidget::TypeName() const {
-    return "spacer";
-}
-
 std::unique_ptr<DashboardWidget> SpacerWidget::Clone() const {
     return std::make_unique<SpacerWidget>(*this);
 }

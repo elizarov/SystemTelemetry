@@ -5,7 +5,6 @@
 class VerticalSpringWidget final : public DashboardWidget {
 public:
     DashboardWidgetClass Class() const override;
-    const char* TypeName() const override;
     std::unique_ptr<DashboardWidget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const DashboardRenderer& renderer) const override;

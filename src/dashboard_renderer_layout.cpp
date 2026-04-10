@@ -114,8 +114,9 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         widget.cardId = renderCardId;
         widget.editCardId = editCardId;
         widget.nodePath = nodePath;
+        const std::string widgetTypeName(DashboardWidgetClassName(widget.widgetClass));
         WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
-                   (widget.typeName.empty() ? "" : " type=\"" + widget.typeName + "\""));
+                   (widgetTypeName.empty() ? "" : " type=\"" + widgetTypeName + "\""));
         widgets.push_back(std::move(widget));
         return;
     }

@@ -4,10 +4,6 @@ DashboardWidgetClass VerticalSpringWidget::Class() const {
     return DashboardWidgetClass::VerticalSpring;
 }
 
-const char* VerticalSpringWidget::TypeName() const {
-    return "vertical_spring";
-}
-
 std::unique_ptr<DashboardWidget> VerticalSpringWidget::Clone() const {
     return std::make_unique<VerticalSpringWidget>(*this);
 }

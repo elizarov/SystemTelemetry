@@ -37,10 +37,6 @@ DashboardWidgetClass MetricListWidget::Class() const {
     return DashboardWidgetClass::MetricList;
 }
 
-const char* MetricListWidget::TypeName() const {
-    return "metric_list";
-}
-
 std::unique_ptr<DashboardWidget> MetricListWidget::Clone() const {
     return std::make_unique<MetricListWidget>(*this);
 }

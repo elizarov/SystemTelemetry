@@ -7,10 +7,6 @@ DashboardWidgetClass ThroughputWidget::Class() const {
     return DashboardWidgetClass::Throughput;
 }
 
-const char* ThroughputWidget::TypeName() const {
-    return "throughput";
-}
-
 std::unique_ptr<DashboardWidget> ThroughputWidget::Clone() const {
     return std::make_unique<ThroughputWidget>(*this);
 }
