@@ -1,5 +1,6 @@
 #include "config_parser.h"
 #include "config_resolution.h"
+#include "widget.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -424,9 +425,7 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
 namespace {
 
 bool IsWidgetOrContainerNodeName(const std::string& name) {
-    return name == "rows" || name == "columns" || name == "text" || name == "gauge" || name == "metric_list" ||
-           name == "throughput" || name == "network_footer" || name == "vertical_spacer" || name == "vertical_spring" ||
-           name == "drive_usage_list" || name == "clock_time" || name == "clock_date";
+    return name == "rows" || name == "columns" || FindDashboardWidgetClass(name).has_value();
 }
 
 void MarkCardReferencesRecursive(LayoutNodeConfig& node, const std::set<std::string>& cardIds) {
