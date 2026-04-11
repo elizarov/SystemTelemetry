@@ -61,7 +61,7 @@ The language has nine levels:
 
 `[storage]` owns runtime storage-drive selection:
 
-- `drives = C,D,E`
+- `drives =`
 
 `[board]` owns the mapping from logical layout metric names to board-specific sensor titles:
 
@@ -297,10 +297,11 @@ Runtime storage-drive selection lives in `[storage]`, while board-sensor selecti
 Example:
 
 - `[storage]`
-- `drives = C,D,E`
+- `drives =`
 - `metric_list(cpu.ram=RAM,board.temp.cpu=Temp,board.fan.cpu=Fan,board.fan.system=System Fan)`
 
 - `[storage] drives` defines the vertical drive-usage list contents and order.
+- An empty `[storage] drives` value means the runtime selection resolver auto-selects all currently available fixed drives.
 - Layout metric references define which logical board temperature and fan metrics are requested from the board provider.
 - The `[board]` section maps those logical metric names to the board-specific sensor titles that the provider looks up.
 

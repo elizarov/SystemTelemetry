@@ -37,3 +37,15 @@ TEST(ConfigWriter, FullExportDoesNotInventEmptyHeaderKeysForHeaderlessCards) {
     EXPECT_EQ(output.find("[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\nicon = "),
         std::string::npos);
 }
+
+TEST(ConfigWriter, MinimalSavePersistsResolvedStorageDrivesAgainstEmptySourceConfig) {
+    AppConfig compareConfig;
+    compareConfig.storage.drives.clear();
+
+    AppConfig currentConfig = compareConfig;
+    currentConfig.storage.drives = {"C", "E"};
+
+    const std::string output = BuildSavedConfigText(LoadEmbeddedConfigTemplate(), currentConfig, &compareConfig);
+
+    EXPECT_TRUE(output.find("[storage]\r\ndrives = C,E\r\n") != std::string::npos);
+}

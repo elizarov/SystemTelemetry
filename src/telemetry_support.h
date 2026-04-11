@@ -12,6 +12,7 @@
 
 std::string NormalizeDriveLetter(const std::string& drive);
 bool IsSelectableStorageDriveType(UINT driveType);
+std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates(const std::vector<std::string>& selectedDrives);
 std::string ReadVolumeLabel(const std::wstring& root);
 std::string ToLowerAscii(std::string value);
 std::string FormatScalarMetric(const ScalarMetric& metric, int precision);

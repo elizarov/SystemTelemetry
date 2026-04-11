@@ -43,57 +43,10 @@ void TelemetryCollector::Impl::EnumerateDrives() {
 }
 
 void TelemetryCollector::Impl::RefreshStorageDriveCandidates() {
-    storage_.driveCandidates.clear();
-
-    const DWORD bufferLength = GetLogicalDriveStringsW(0, nullptr);
-    if (bufferLength == 0) {
+    storage_.driveCandidates = EnumerateStorageDriveCandidates(config_.storage.drives);
+    if (storage_.driveCandidates.empty()) {
         Trace("telemetry:storage_candidates skipped=no_drives");
-        return;
     }
-
-    std::vector<wchar_t> buffer(bufferLength + 1, L'\0');
-    const DWORD copied = GetLogicalDriveStringsW(static_cast<DWORD>(buffer.size()), buffer.data());
-    if (copied == 0 || copied >= buffer.size()) {
-        Trace("telemetry:storage_candidates skipped=query_failed");
-        return;
-    }
-
-    for (const wchar_t* current = buffer.data(); *current != L'\0'; current += wcslen(current) + 1) {
-        const std::wstring root(current);
-        if (root.size() < 2 || !iswalpha(root[0])) {
-            continue;
-        }
-
-        const UINT driveType = GetDriveTypeW(root.c_str());
-        if (!IsSelectableStorageDriveType(driveType)) {
-            Trace(("telemetry:storage_candidate_skip root=\"" + Utf8FromWide(root) +
-                   "\" type=" + std::to_string(driveType))
-                    .c_str());
-            continue;
-        }
-
-        ULARGE_INTEGER totalBytes{};
-        if (!GetDiskFreeSpaceExW(root.c_str(), nullptr, &totalBytes, nullptr) || totalBytes.QuadPart == 0) {
-            Trace(("telemetry:storage_candidate_skip root=\"" + Utf8FromWide(root) +
-                   "\" type=" + std::to_string(driveType) + " total_bytes=" + std::to_string(totalBytes.QuadPart))
-                    .c_str());
-            continue;
-        }
-
-        StorageDriveCandidate candidate;
-        candidate.letter = std::string(1, static_cast<char>(towupper(root[0])));
-        candidate.volumeLabel = ReadVolumeLabel(root);
-        candidate.totalGb = totalBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
-        candidate.driveType = driveType;
-        candidate.selected =
-            std::find(config_.storage.drives.begin(), config_.storage.drives.end(), candidate.letter) !=
-            config_.storage.drives.end();
-        storage_.driveCandidates.push_back(std::move(candidate));
-    }
-
-    std::sort(storage_.driveCandidates.begin(),
-        storage_.driveCandidates.end(),
-        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
     Trace(("telemetry:storage_candidates count=" + std::to_string(storage_.driveCandidates.size())).c_str());
 }
 

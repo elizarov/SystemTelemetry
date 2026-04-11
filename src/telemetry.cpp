@@ -23,6 +23,7 @@
 #include "telemetry.h"
 #include "telemetry_internal.h"
 #include "telemetry_support.h"
+#include "config_resolution.h"
 #include "trace.h"
 #include "utf8.h"
 
@@ -51,7 +52,8 @@ TelemetryCollector::TelemetryCollector(TelemetryCollector&&) noexcept = default;
 TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept = default;
 
 bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* traceStream) {
-    impl_->config_ = config;
+    impl_->config_ = ResolveRuntimeSelections(
+        config, std::string{}, EnumerateStorageDriveCandidates(config.storage.drives), true);
     impl_->trace_.SetOutput(traceStream);
     impl_->snapshot_.boardTemperatures = CreateRequestedBoardMetrics(config.board.requestedTemperatureNames,
         "\xC2\xB0"
@@ -219,11 +221,7 @@ TelemetryDump TelemetryCollector::Dump() const {
 }
 
 AppConfig TelemetryCollector::EffectiveConfig() const {
-    AppConfig config = impl_->config_;
-    if (!impl_->snapshot_.network.adapterName.empty() && impl_->snapshot_.network.adapterName != "Auto") {
-        config.network.adapterName = impl_->snapshot_.network.adapterName;
-    }
-    return config;
+    return ResolveRuntimeSelections(impl_->config_, impl_->snapshot_.network.adapterName, impl_->storage_.driveCandidates, false);
 }
 
 const std::vector<NetworkAdapterCandidate>& TelemetryCollector::NetworkAdapterCandidates() const {

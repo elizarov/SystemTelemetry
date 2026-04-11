@@ -1,13 +1,15 @@
 #include "telemetry_runtime_state.h"
 
+#include "config_resolution.h"
 #include "telemetry_support.h"
 
-AppConfig RuntimeConfigView::ComposeEffectiveConfig(const AppConfig& telemetryConfig) const {
+AppConfig RuntimeConfigView::ComposeEffectiveConfig(
+    const AppConfig& telemetryConfig, const std::string& resolvedNetworkAdapterName, const std::vector<StorageDriveCandidate>& storageDrives) const {
     AppConfig config = telemetryConfig;
     config.display = effectiveConfig.display;
     config.layouts = effectiveConfig.layouts;
     config.layout = effectiveConfig.layout;
-    return config;
+    return ResolveRuntimeSelections(config, resolvedNetworkAdapterName, storageDrives, false);
 }
 
 void RuntimeConfigView::SetEffectiveConfig(const AppConfig& config) {
@@ -53,9 +55,14 @@ void RuntimeCandidateView::SyncFromSnapshotAndConfig(const SystemSnapshot& snaps
         candidate.volumeLabel = drive.volumeLabel;
         candidate.totalGb = drive.totalGb;
         candidate.driveType = drive.driveType;
-        candidate.selected = std::find(config.storage.drives.begin(), config.storage.drives.end(), candidate.letter) !=
-                             config.storage.drives.end();
         storageDrives.push_back(std::move(candidate));
+    }
+
+    const AppConfig effectiveConfig = ResolveRuntimeSelections(config, snapshot.network.adapterName, storageDrives, false);
+    for (auto& candidate : storageDrives) {
+        candidate.selected =
+            std::find(effectiveConfig.storage.drives.begin(), effectiveConfig.storage.drives.end(), candidate.letter) !=
+            effectiveConfig.storage.drives.end();
     }
 
     std::sort(storageDrives.begin(),

@@ -71,7 +71,8 @@ Examples include:
 - Card-local layout expressions may reference another card id as a reusable sub-layout, and the renderer must substitute that referenced card's layout during layout resolution instead of flattening it during config parse.
 - The list of rendered cards must come from layout config.
 - Card titles and icons must be optional, and when a card specifies neither one the renderer must not reserve any card-header height for that card.
-- The storage drive list must come from `[storage] drives`.
+- The storage drive list must come from the resolved `[storage] drives` selection.
+- When `[storage] drives` is empty, the runtime selection resolver must replace it with all currently available fixed drives before the renderer and telemetry consume the effective config.
 - The dedicated widget sections must derive metric-list and drive-usage row heights from measured UI font metrics plus dedicated bar-height and vertical-gap settings, so font-size experiments preserve or intentionally retune the visual rhythm.
 - When a `metric_list` or `drive_usage_list` widget has less vertical space than its full configured content needs, the renderer must keep each header, row, bar, and configured gap at its full configured height and crop any overflow at the bottom instead of compressing the final visible lines.
 - In a vertical `rows(...)` container, direct `text` children must behave as fixed-height widgets at their preferred configured height, with the remaining vertical space going to flexible siblings unless one or more `vertical_spring` children consume that leftover first.

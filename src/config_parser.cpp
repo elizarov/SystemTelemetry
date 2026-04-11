@@ -517,7 +517,6 @@ AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay) {
     SelectResolvedLayout(config, config.display.layout);
 
     const LayoutBindingSelection layoutBindings = CollectLayoutBindings(config.layout);
-    config.storage.drives = NormalizeConfiguredDrives(config.storage.drives);
     config.board.requestedTemperatureNames = layoutBindings.boardTemperatureNames;
     config.board.requestedFanNames = layoutBindings.boardFanNames;
     return config;

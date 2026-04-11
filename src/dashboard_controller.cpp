@@ -61,8 +61,6 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     if (!ApplyDiagnosticsLayoutOverride(state_.config, diagnosticsOptions)) {
         return false;
     }
-
-    SyncRenderer(shell, diagnosticsOptions.editLayout);
     shell.RendererEditOverlayState().similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions);
     shell.Renderer().SetTraceOutput(nullptr);
 
@@ -90,6 +88,8 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         state_.lastDiagnosticsOutput = std::chrono::steady_clock::now();
     }
 
+    state_.config = state_.telemetry->EffectiveConfig();
+    SyncRenderer(shell, diagnosticsOptions.editLayout);
     state_.isEditingLayout = diagnosticsOptions.editLayout;
     ApplyConfiguredWallpaper();
     return true;

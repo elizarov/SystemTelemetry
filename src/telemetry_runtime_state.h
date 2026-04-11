@@ -9,7 +9,8 @@
 struct RuntimeConfigView {
     AppConfig effectiveConfig{};
 
-    AppConfig ComposeEffectiveConfig(const AppConfig& telemetryConfig) const;
+    AppConfig ComposeEffectiveConfig(
+        const AppConfig& telemetryConfig, const std::string& resolvedNetworkAdapterName, const std::vector<StorageDriveCandidate>& storageDrives) const;
     void SetEffectiveConfig(const AppConfig& config);
     void SetPreferredNetworkAdapterName(const std::string& adapterName);
     void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters);

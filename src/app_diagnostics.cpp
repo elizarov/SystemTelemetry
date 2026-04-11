@@ -468,9 +468,9 @@ bool ReloadTelemetryRuntimeFromDisk(const std::filesystem::path& configPath,
         return false;
     }
 
-    activeConfig = effectiveReloadedConfig;
     telemetry = std::move(reloadedTelemetry);
     telemetry->UpdateSnapshot();
+    activeConfig = telemetry->EffectiveConfig();
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarker("diagnostics:reload_config_done");
     }
@@ -553,7 +553,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         }
     }
     diagnostics.WriteTraceMarker("diagnostics:write_outputs_begin");
-    if (!diagnostics.WriteOutputs(telemetry->Dump(), config)) {
+    if (!diagnostics.WriteOutputs(telemetry->Dump(), telemetry->EffectiveConfig())) {
         diagnostics.WriteTraceMarker("diagnostics:write_outputs_failed");
         return 1;
     }

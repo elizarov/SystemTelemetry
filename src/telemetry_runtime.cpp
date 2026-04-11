@@ -14,6 +14,7 @@ public:
             return false;
         }
         candidateView_.SyncFromTelemetry(telemetry_);
+        configView_.SetEffectiveConfig(telemetry_.EffectiveConfig());
         return true;
     }
 
@@ -26,7 +27,8 @@ public:
     }
 
     AppConfig EffectiveConfig() const override {
-        return configView_.ComposeEffectiveConfig(telemetry_.EffectiveConfig());
+        return configView_.ComposeEffectiveConfig(
+            telemetry_.EffectiveConfig(), telemetry_.Snapshot().network.adapterName, candidateView_.storageDrives);
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {

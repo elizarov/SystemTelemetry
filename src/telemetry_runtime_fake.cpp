@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+#include "config_resolution.h"
 #include "snapshot_dump.h"
 #include "telemetry_runtime_state.h"
 #include "trace.h"
@@ -33,6 +34,9 @@ public:
             trace_.Write("fake:initialize_failed");
             return false;
         }
+        configView_.SetEffectiveConfig(ResolveRuntimeSelections(
+            configView_.effectiveConfig, dump_.snapshot.network.adapterName, candidateView_.storageDrives, true));
+        candidateView_.SyncFromSnapshotAndConfig(dump_.snapshot, configView_.effectiveConfig);
         trace_.Write("fake:initialize_done");
         return true;
     }
@@ -46,7 +50,8 @@ public:
     }
 
     AppConfig EffectiveConfig() const override {
-        return configView_.effectiveConfig;
+        return ResolveRuntimeSelections(
+            configView_.effectiveConfig, dump_.snapshot.network.adapterName, candidateView_.storageDrives, false);
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {

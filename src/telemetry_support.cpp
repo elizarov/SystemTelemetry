@@ -30,6 +30,63 @@ bool IsSelectableStorageDriveType(UINT driveType) {
     return driveType == DRIVE_FIXED || driveType == DRIVE_REMOVABLE;
 }
 
+std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates(const std::vector<std::string>& selectedDrives) {
+    std::vector<std::string> normalizedSelected;
+    normalizedSelected.reserve(selectedDrives.size());
+    for (const auto& drive : selectedDrives) {
+        const std::string letter = NormalizeDriveLetter(drive);
+        if (letter.empty()) {
+            continue;
+        }
+        if (std::find(normalizedSelected.begin(), normalizedSelected.end(), letter) == normalizedSelected.end()) {
+            normalizedSelected.push_back(letter);
+        }
+    }
+
+    std::vector<StorageDriveCandidate> candidates;
+    const DWORD bufferLength = GetLogicalDriveStringsW(0, nullptr);
+    if (bufferLength == 0) {
+        return candidates;
+    }
+
+    std::vector<wchar_t> buffer(bufferLength + 1, L'\0');
+    const DWORD copied = GetLogicalDriveStringsW(static_cast<DWORD>(buffer.size()), buffer.data());
+    if (copied == 0 || copied >= buffer.size()) {
+        return {};
+    }
+
+    for (const wchar_t* current = buffer.data(); *current != L'\0'; current += wcslen(current) + 1) {
+        const std::wstring root(current);
+        if (root.size() < 2 || !iswalpha(root[0])) {
+            continue;
+        }
+
+        const UINT driveType = GetDriveTypeW(root.c_str());
+        if (!IsSelectableStorageDriveType(driveType)) {
+            continue;
+        }
+
+        ULARGE_INTEGER totalBytes{};
+        if (!GetDiskFreeSpaceExW(root.c_str(), nullptr, &totalBytes, nullptr) || totalBytes.QuadPart == 0) {
+            continue;
+        }
+
+        StorageDriveCandidate candidate;
+        candidate.letter = std::string(1, static_cast<char>(towupper(root[0])));
+        candidate.volumeLabel = ReadVolumeLabel(root);
+        candidate.totalGb = totalBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
+        candidate.driveType = driveType;
+        candidate.selected =
+            std::find(normalizedSelected.begin(), normalizedSelected.end(), candidate.letter) != normalizedSelected.end();
+        candidates.push_back(std::move(candidate));
+    }
+
+    std::sort(candidates.begin(),
+        candidates.end(),
+        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
+    return candidates;
+}
+
 std::string ReadVolumeLabel(const std::wstring& root) {
     wchar_t volumeName[MAX_PATH] = {};
     if (!GetVolumeInformationW(
