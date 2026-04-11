@@ -11,6 +11,7 @@
 std::string NormalizeStorageDriveLetter(const std::string& drive);
 bool IsSelectableStorageDriveType(UINT driveType);
 std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates();
+std::vector<StorageDriveCandidate> EnumerateSnapshotStorageDriveCandidates(const SystemSnapshot& snapshot);
 std::vector<std::string> ResolveConfiguredStorageDrives(
     const std::vector<std::string>& configuredDrives, const std::vector<StorageDriveCandidate>& availableDrives);
 void MarkSelectedStorageDriveCandidates(

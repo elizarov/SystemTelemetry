@@ -201,6 +201,7 @@ add_executable(SystemTelemetryTests
     tests/layout_edit_commands_tests.cpp
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
+    tests/telemetry_network_source_tests.cpp
     tests/telemetry_retained_history_tests.cpp
     src/config_writer.cpp
     src/config_resolution.cpp

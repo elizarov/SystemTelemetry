@@ -91,6 +91,31 @@ std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
     return candidates;
 }
 
+std::vector<StorageDriveCandidate> EnumerateSnapshotStorageDriveCandidates(const SystemSnapshot& snapshot) {
+    std::vector<StorageDriveCandidate> candidates;
+    candidates.reserve(snapshot.drives.size());
+    for (const auto& drive : snapshot.drives) {
+        if (!IsSelectableStorageDriveType(drive.driveType)) {
+            continue;
+        }
+
+        StorageDriveCandidate candidate;
+        candidate.letter = NormalizeStorageDriveLetter(drive.label);
+        if (candidate.letter.empty()) {
+            continue;
+        }
+        candidate.volumeLabel = drive.volumeLabel;
+        candidate.totalGb = drive.totalGb;
+        candidate.driveType = drive.driveType;
+        candidates.push_back(std::move(candidate));
+    }
+
+    std::sort(candidates.begin(),
+        candidates.end(),
+        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
+    return candidates;
+}
+
 std::vector<std::string> ResolveConfiguredStorageDrives(
     const std::vector<std::string>& configuredDrives, const std::vector<StorageDriveCandidate>& availableDrives) {
     std::vector<std::string> resolvedDrives;

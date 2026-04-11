@@ -329,7 +329,7 @@ void DashboardController::RefreshTelemetrySelections(DashboardShellHost& shell) 
     if (state_.telemetry == nullptr) {
         return;
     }
-    state_.telemetry->RefreshSelections();
+    state_.telemetry->RefreshSelectionsAndSnapshot();
     state_.config = state_.telemetry->EffectiveConfig();
     SyncRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();

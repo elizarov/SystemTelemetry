@@ -4,7 +4,7 @@
 
 namespace {
 
-AppConfig BuildRuntimeEffectiveConfig(const AppConfig& uiConfig, const TelemetryCollector& telemetry) {
+AppConfig BuildUiOverlayConfigFromResolvedTelemetry(const AppConfig& uiConfig, const TelemetryCollector& telemetry) {
     AppConfig config = telemetry.EffectiveConfig();
     config.display = uiConfig.display;
     config.layouts = uiConfig.layouts;
@@ -39,7 +39,7 @@ public:
     }
 
     AppConfig EffectiveConfig() const override {
-        return BuildRuntimeEffectiveConfig(effectiveConfig_, telemetry_);
+        return BuildUiOverlayConfigFromResolvedTelemetry(effectiveConfig_, telemetry_);
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
@@ -66,8 +66,9 @@ public:
         candidateView_.SyncStorageFromTelemetry(telemetry_);
     }
 
-    void RefreshSelections() override {
+    void RefreshSelectionsAndSnapshot() override {
         telemetry_.RefreshSelections();
+        telemetry_.UpdateSnapshot();
         candidateView_.SyncNetworkFromTelemetry(telemetry_);
         candidateView_.SyncStorageFromTelemetry(telemetry_);
     }
