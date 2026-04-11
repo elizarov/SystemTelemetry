@@ -1,4 +1,5 @@
 #include "telemetry_internal.h"
+#include "telemetry_storage_source.h"
 #include "telemetry_support.h"
 
 #include <algorithm>
@@ -6,15 +7,124 @@
 
 #include "utf8.h"
 
-void TelemetryCollector::Impl::EnumerateDrives() {
-    snapshot_.drives.clear();
-    storage_.driveCounters.clear();
-    for (const auto& drive : config_.storage.drives) {
-        const std::string letter = NormalizeDriveLetter(drive);
-        if (letter.empty()) {
+namespace {
+
+std::string ReadVolumeLabel(const std::wstring& root) {
+    wchar_t volumeName[MAX_PATH] = {};
+    if (!GetVolumeInformationW(
+            root.c_str(), volumeName, ARRAYSIZE(volumeName), nullptr, nullptr, nullptr, nullptr, 0)) {
+        return {};
+    }
+    return Utf8FromWide(volumeName);
+}
+
+std::vector<std::string> SelectFixedDriveLetters(const std::vector<StorageDriveCandidate>& availableDrives) {
+    std::vector<std::string> drives;
+    for (const auto& drive : availableDrives) {
+        if (drive.driveType != DRIVE_FIXED) {
+            continue;
+        }
+        if (std::find(drives.begin(), drives.end(), drive.letter) == drives.end()) {
+            drives.push_back(drive.letter);
+        }
+    }
+    return drives;
+}
+
+}  // namespace
+
+std::string NormalizeStorageDriveLetter(const std::string& drive) {
+    if (drive.empty()) {
+        return {};
+    }
+    const unsigned char ch = static_cast<unsigned char>(drive.front());
+    if (!std::isalpha(ch)) {
+        return {};
+    }
+    return std::string(1, static_cast<char>(std::toupper(ch)));
+}
+
+bool IsSelectableStorageDriveType(UINT driveType) {
+    return driveType == DRIVE_FIXED || driveType == DRIVE_REMOVABLE;
+}
+
+std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
+    std::vector<StorageDriveCandidate> candidates;
+    const DWORD bufferLength = GetLogicalDriveStringsW(0, nullptr);
+    if (bufferLength == 0) {
+        return candidates;
+    }
+
+    std::vector<wchar_t> buffer(bufferLength + 1, L'\0');
+    const DWORD copied = GetLogicalDriveStringsW(static_cast<DWORD>(buffer.size()), buffer.data());
+    if (copied == 0 || copied >= buffer.size()) {
+        return {};
+    }
+
+    for (const wchar_t* current = buffer.data(); *current != L'\0'; current += wcslen(current) + 1) {
+        const std::wstring root(current);
+        if (root.size() < 2 || !iswalpha(root[0])) {
             continue;
         }
 
+        const UINT driveType = GetDriveTypeW(root.c_str());
+        if (!IsSelectableStorageDriveType(driveType)) {
+            continue;
+        }
+
+        ULARGE_INTEGER totalBytes{};
+        if (!GetDiskFreeSpaceExW(root.c_str(), nullptr, &totalBytes, nullptr) || totalBytes.QuadPart == 0) {
+            continue;
+        }
+
+        StorageDriveCandidate candidate;
+        candidate.letter = std::string(1, static_cast<char>(towupper(root[0])));
+        candidate.volumeLabel = ReadVolumeLabel(root);
+        candidate.totalGb = totalBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
+        candidate.driveType = driveType;
+        candidates.push_back(std::move(candidate));
+    }
+
+    std::sort(candidates.begin(),
+        candidates.end(),
+        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
+    return candidates;
+}
+
+std::vector<std::string> ResolveConfiguredStorageDrives(
+    const std::vector<std::string>& configuredDrives, const std::vector<StorageDriveCandidate>& availableDrives) {
+    std::vector<std::string> resolvedDrives;
+    resolvedDrives.reserve(configuredDrives.size());
+    for (const auto& drive : configuredDrives) {
+        const std::string letter = NormalizeStorageDriveLetter(drive);
+        if (letter.empty()) {
+            continue;
+        }
+        if (std::find(resolvedDrives.begin(), resolvedDrives.end(), letter) == resolvedDrives.end()) {
+            resolvedDrives.push_back(letter);
+        }
+    }
+    if (!resolvedDrives.empty() || !configuredDrives.empty()) {
+        return resolvedDrives;
+    }
+    return SelectFixedDriveLetters(availableDrives);
+}
+
+void MarkSelectedStorageDriveCandidates(
+    std::vector<StorageDriveCandidate>& candidates, const std::vector<std::string>& selectedDrives) {
+    for (auto& candidate : candidates) {
+        candidate.selected = std::find(selectedDrives.begin(), selectedDrives.end(), candidate.letter) != selectedDrives.end();
+    }
+}
+
+void TelemetryCollector::Impl::ResolveStorageSelection() {
+    storage_.driveCandidates = EnumerateStorageDriveCandidates();
+    storage_.resolvedDriveLetters = ResolveConfiguredStorageDrives(config_.storage.drives, storage_.driveCandidates);
+    MarkSelectedStorageDriveCandidates(storage_.driveCandidates, storage_.resolvedDriveLetters);
+
+    snapshot_.drives.clear();
+    storage_.driveCounters.clear();
+    for (const auto& letter : storage_.resolvedDriveLetters) {
         const std::string label = letter + ":";
         DriveInfo info;
         info.label = label;
@@ -38,16 +148,12 @@ void TelemetryCollector::Impl::EnumerateDrives() {
             storage_.driveCounters.push_back(std::move(counters));
         }
     }
-    Trace(("telemetry:drive_enumerate count=" + std::to_string(snapshot_.drives.size())).c_str());
-    RefreshDriveUsage();
-}
-
-void TelemetryCollector::Impl::RefreshStorageDriveCandidates() {
-    storage_.driveCandidates = EnumerateStorageDriveCandidates(config_.storage.drives);
     if (storage_.driveCandidates.empty()) {
         Trace("telemetry:storage_candidates skipped=no_drives");
     }
     Trace(("telemetry:storage_candidates count=" + std::to_string(storage_.driveCandidates.size())).c_str());
+    Trace(("telemetry:drive_enumerate count=" + std::to_string(snapshot_.drives.size())).c_str());
+    RefreshDriveUsage();
 }
 
 void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
@@ -89,6 +195,11 @@ void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
            " read_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.storage.readMbps, 3) +
            " write_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.storage.writeMbps, 3))
             .c_str());
+}
+
+void TelemetryCollector::Impl::CollectStorageMetrics(bool initializeOnly) {
+    UpdateStorageThroughput(initializeOnly);
+    RefreshDriveUsage();
 }
 
 void TelemetryCollector::Impl::RefreshDriveUsage() {

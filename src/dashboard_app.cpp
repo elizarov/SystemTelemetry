@@ -948,6 +948,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_DISPLAYCHANGE:
             StartPlacementWatch();
             RetryConfigPlacementIfPending();
+            controller_.RefreshTelemetrySelections(*this);
             if (!ApplyWindowDpi(CurrentWindowDpi())) {
                 return -1;
             }
@@ -958,6 +959,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_SETTINGCHANGE:
             StartPlacementWatch();
             RetryConfigPlacementIfPending();
+            controller_.RefreshTelemetrySelections(*this);
             movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
             InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;

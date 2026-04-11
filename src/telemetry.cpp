@@ -22,8 +22,8 @@
 #include "snapshot_dump.h"
 #include "telemetry.h"
 #include "telemetry_internal.h"
+#include "telemetry_storage_source.h"
 #include "telemetry_support.h"
-#include "config_resolution.h"
 #include "trace.h"
 #include "utf8.h"
 
@@ -52,8 +52,7 @@ TelemetryCollector::TelemetryCollector(TelemetryCollector&&) noexcept = default;
 TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept = default;
 
 bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* traceStream) {
-    impl_->config_ = ResolveRuntimeSelections(
-        config, std::string{}, EnumerateStorageDriveCandidates(config.storage.drives), true);
+    impl_->config_ = config;
     impl_->trace_.SetOutput(traceStream);
     impl_->snapshot_.boardTemperatures = CreateRequestedBoardMetrics(config.board.requestedTemperatureNames,
         "\xC2\xB0"
@@ -182,11 +181,11 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
         ("telemetry:pdh_collect storage_query " + tracing::Trace::FormatPdhStatus("status", storageCollectStatus))
             .c_str());
 
-    impl_->RefreshStorageDriveCandidates();
-    impl_->EnumerateDrives();
+    impl_->ResolveStorageSelection();
     impl_->InitializeGpuAdapterInfo();
-    impl_->UpdateNetworkState(true);
-    impl_->UpdateStorageThroughput(true);
+    impl_->ResolveNetworkSelection();
+    impl_->CollectNetworkMetrics(true);
+    impl_->CollectStorageMetrics(true);
     impl_->UpdateMemory();
     impl_->UpdateCpu();
     impl_->UpdateGpu();
@@ -221,7 +220,20 @@ TelemetryDump TelemetryCollector::Dump() const {
 }
 
 AppConfig TelemetryCollector::EffectiveConfig() const {
-    return ResolveRuntimeSelections(impl_->config_, impl_->snapshot_.network.adapterName, impl_->storage_.driveCandidates, false);
+    AppConfig config = impl_->config_;
+    if (!impl_->network_.resolvedAdapterName.empty()) {
+        config.network.adapterName = impl_->network_.resolvedAdapterName;
+    }
+    config.storage.drives = impl_->storage_.resolvedDriveLetters;
+    return config;
+}
+
+const std::string& TelemetryCollector::ResolvedNetworkAdapterName() const {
+    return impl_->network_.resolvedAdapterName;
+}
+
+const std::vector<std::string>& TelemetryCollector::ResolvedStorageDrives() const {
+    return impl_->storage_.resolvedDriveLetters;
 }
 
 const std::vector<NetworkAdapterCandidate>& TelemetryCollector::NetworkAdapterCandidates() const {
@@ -234,13 +246,14 @@ const std::vector<StorageDriveCandidate>& TelemetryCollector::StorageDriveCandid
 
 void TelemetryCollector::SetPreferredNetworkAdapterName(std::string adapterName) {
     impl_->config_.network.adapterName = std::move(adapterName);
+    impl_->ResolveNetworkSelection();
 }
 
 void TelemetryCollector::SetSelectedStorageDrives(std::vector<std::string> driveLetters) {
     std::vector<std::string> normalized;
     normalized.reserve(driveLetters.size());
     for (const auto& drive : driveLetters) {
-        const std::string letter = NormalizeDriveLetter(drive);
+        const std::string letter = NormalizeStorageDriveLetter(drive);
         if (letter.empty()) {
             continue;
         }
@@ -250,19 +263,21 @@ void TelemetryCollector::SetSelectedStorageDrives(std::vector<std::string> drive
     }
     std::sort(normalized.begin(), normalized.end());
     impl_->config_.storage.drives = std::move(normalized);
-    impl_->RefreshStorageDriveCandidates();
-    impl_->EnumerateDrives();
+    impl_->ResolveStorageSelection();
+}
+
+void TelemetryCollector::RefreshSelections() {
+    impl_->ResolveNetworkSelection();
+    impl_->ResolveStorageSelection();
 }
 
 void TelemetryCollector::UpdateSnapshot() {
     impl_->trace_.Write("telemetry:update_snapshot_begin");
     impl_->UpdateCpu();
     impl_->UpdateGpu();
-    impl_->UpdateNetworkState(false);
-    impl_->UpdateStorageThroughput(false);
-    impl_->RefreshStorageDriveCandidates();
+    impl_->CollectNetworkMetrics(false);
+    impl_->CollectStorageMetrics(false);
     impl_->UpdateMemory();
-    impl_->RefreshDriveUsage();
     GetLocalTime(&impl_->snapshot_.now);
     impl_->trace_.Write("telemetry:update_snapshot_done");
 }

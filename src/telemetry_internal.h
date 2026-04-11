@@ -31,6 +31,7 @@ struct DriveCounterState {
 
 struct TelemetryCollector::Impl {
     struct StorageState {
+        std::vector<std::string> resolvedDriveLetters;
         std::vector<StorageDriveCandidate> driveCandidates;
         PDH_HQUERY query = nullptr;
         PDH_HCOUNTER readCounter = nullptr;
@@ -39,6 +40,8 @@ struct TelemetryCollector::Impl {
     };
 
     struct NetworkState {
+        std::string resolvedAdapterName;
+        std::string resolvedIpAddress = "N/A";
         std::vector<NetworkAdapterCandidate> adapterCandidates;
         ULONG selectedIndex = 0;
         uint64_t previousInOctets = 0;
@@ -54,11 +57,12 @@ struct TelemetryCollector::Impl {
     void UpdateMemory();
     void ApplyBoardVendorSample(const BoardVendorTelemetrySample& sample);
     void ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample);
-    void EnumerateDrives();
+    void ResolveStorageSelection();
+    void CollectStorageMetrics(bool initializeOnly);
     void UpdateStorageThroughput(bool initializeOnly);
-    void RefreshStorageDriveCandidates();
     void RefreshDriveUsage();
-    void UpdateNetworkState(bool initializeOnly);
+    void ResolveNetworkSelection();
+    void CollectNetworkMetrics(bool initializeOnly);
     double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
     void Trace(const char* text) const;
     void Trace(const std::string& text) const;

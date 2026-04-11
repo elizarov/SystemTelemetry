@@ -27,13 +27,6 @@ NamedLayoutSectionConfig MakeNamedLayout(const std::string& name, int width, int
     return layout;
 }
 
-StorageDriveCandidate MakeDriveCandidate(const std::string& letter, UINT driveType = DRIVE_FIXED) {
-    StorageDriveCandidate candidate;
-    candidate.letter = letter;
-    candidate.driveType = driveType;
-    return candidate;
-}
-
 }  // namespace
 
 TEST(ConfigResolution, CollectsUniqueBoardBindingsFromNestedCardLayouts) {
@@ -63,40 +56,6 @@ TEST(ConfigResolution, NormalizesConfiguredDrivesAndRemovesDuplicates) {
     ASSERT_EQ(drives.size(), 2u);
     EXPECT_EQ(drives[0], "C");
     EXPECT_EQ(drives[1], "D");
-}
-
-TEST(ConfigResolution, ResolveConfiguredDrivesKeepsExplicitDriveSelection) {
-    const std::vector<std::string> drives =
-        ResolveConfiguredDrives({" d", "C:", "d"}, {MakeDriveCandidate("C"), MakeDriveCandidate("D")});
-
-    ASSERT_EQ(drives.size(), 2u);
-    EXPECT_EQ(drives[0], "D");
-    EXPECT_EQ(drives[1], "C");
-}
-
-TEST(ConfigResolution, ResolveConfiguredDrivesAutoDiscoversFixedDrivesWhenEmpty) {
-    const std::vector<std::string> drives = ResolveConfiguredDrives(
-        {}, {MakeDriveCandidate("C", DRIVE_FIXED), MakeDriveCandidate("D", DRIVE_REMOVABLE), MakeDriveCandidate("E", DRIVE_FIXED)});
-
-    ASSERT_EQ(drives.size(), 2u);
-    EXPECT_EQ(drives[0], "C");
-    EXPECT_EQ(drives[1], "E");
-}
-
-TEST(ConfigResolution, ResolveRuntimeSelectionsAppliesResolvedNetworkAndDriveSelection) {
-    AppConfig config;
-    config.network.adapterName.clear();
-    config.storage.drives.clear();
-
-    const AppConfig resolved = ResolveRuntimeSelections(config,
-        "Ethernet",
-        {MakeDriveCandidate("C", DRIVE_FIXED), MakeDriveCandidate("D", DRIVE_REMOVABLE), MakeDriveCandidate("E", DRIVE_FIXED)},
-        true);
-
-    EXPECT_EQ(resolved.network.adapterName, "Ethernet");
-    ASSERT_EQ(resolved.storage.drives.size(), 2u);
-    EXPECT_EQ(resolved.storage.drives[0], "C");
-    EXPECT_EQ(resolved.storage.drives[1], "E");
 }
 
 TEST(ConfigResolution, SelectsRequestedLayoutAndFallsBackToFirstLayout) {

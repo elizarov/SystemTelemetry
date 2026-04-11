@@ -1,45 +1,33 @@
 #include "telemetry_runtime_state.h"
 
-#include "config_resolution.h"
-#include "telemetry_support.h"
+#include <algorithm>
 
-AppConfig RuntimeConfigView::ComposeEffectiveConfig(
-    const AppConfig& telemetryConfig, const std::string& resolvedNetworkAdapterName, const std::vector<StorageDriveCandidate>& storageDrives) const {
-    AppConfig config = telemetryConfig;
-    config.display = effectiveConfig.display;
-    config.layouts = effectiveConfig.layouts;
-    config.layout = effectiveConfig.layout;
-    return ResolveRuntimeSelections(config, resolvedNetworkAdapterName, storageDrives, false);
-}
+#include "telemetry_storage_source.h"
 
-void RuntimeConfigView::SetEffectiveConfig(const AppConfig& config) {
-    effectiveConfig = config;
-}
-
-void RuntimeConfigView::SetPreferredNetworkAdapterName(const std::string& adapterName) {
-    effectiveConfig.network.adapterName = adapterName;
-}
-
-void RuntimeConfigView::SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) {
-    effectiveConfig.storage.drives = driveLetters;
-}
-
-void RuntimeCandidateView::SyncFromTelemetry(const TelemetryCollector& telemetry) {
+void RuntimeCandidateView::SyncNetworkFromTelemetry(const TelemetryCollector& telemetry) {
     networkAdapters = telemetry.NetworkAdapterCandidates();
+}
+
+void RuntimeCandidateView::SyncStorageFromTelemetry(const TelemetryCollector& telemetry) {
     storageDrives = telemetry.StorageDriveCandidates();
 }
 
-void RuntimeCandidateView::SyncFromSnapshotAndConfig(const SystemSnapshot& snapshot, const AppConfig& config) {
+void RuntimeCandidateView::SyncNetworkFromSnapshot(const SystemSnapshot& snapshot) {
     networkAdapters.clear();
-    storageDrives.clear();
-
-    if (!snapshot.network.adapterName.empty()) {
-        NetworkAdapterCandidate candidate;
-        candidate.adapterName = snapshot.network.adapterName;
-        candidate.ipAddress = snapshot.network.ipAddress.empty() ? "N/A" : snapshot.network.ipAddress;
-        candidate.selected = true;
-        networkAdapters.push_back(std::move(candidate));
+    if (snapshot.network.adapterName.empty()) {
+        return;
     }
+
+    NetworkAdapterCandidate candidate;
+    candidate.adapterName = snapshot.network.adapterName;
+    candidate.ipAddress = snapshot.network.ipAddress.empty() ? "N/A" : snapshot.network.ipAddress;
+    candidate.selected = true;
+    networkAdapters.push_back(std::move(candidate));
+}
+
+void RuntimeCandidateView::SyncStorageFromSnapshot(
+    const SystemSnapshot& snapshot, const std::vector<std::string>& selectedDriveLetters) {
+    storageDrives.clear();
 
     storageDrives.reserve(snapshot.drives.size());
     for (const auto& drive : snapshot.drives) {
@@ -48,21 +36,17 @@ void RuntimeCandidateView::SyncFromSnapshotAndConfig(const SystemSnapshot& snaps
         }
 
         StorageDriveCandidate candidate;
-        candidate.letter = NormalizeDriveLetter(drive.label);
+        candidate.letter = NormalizeStorageDriveLetter(drive.label);
         if (candidate.letter.empty()) {
             continue;
         }
         candidate.volumeLabel = drive.volumeLabel;
         candidate.totalGb = drive.totalGb;
         candidate.driveType = drive.driveType;
-        storageDrives.push_back(std::move(candidate));
-    }
-
-    const AppConfig effectiveConfig = ResolveRuntimeSelections(config, snapshot.network.adapterName, storageDrives, false);
-    for (auto& candidate : storageDrives) {
         candidate.selected =
-            std::find(effectiveConfig.storage.drives.begin(), effectiveConfig.storage.drives.end(), candidate.letter) !=
-            effectiveConfig.storage.drives.end();
+            std::find(selectedDriveLetters.begin(), selectedDriveLetters.end(), candidate.letter) !=
+            selectedDriveLetters.end();
+        storageDrives.push_back(std::move(candidate));
     }
 
     std::sort(storageDrives.begin(),

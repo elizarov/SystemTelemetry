@@ -1,5 +1,4 @@
 #include "config_resolution.h"
-#include "telemetry_support.h"
 
 #include <algorithm>
 #include <cctype>
@@ -81,17 +80,6 @@ std::string NormalizeConfiguredDriveLetter(const std::string& drive) {
     return std::string(1, static_cast<char>(std::toupper(ch)));
 }
 
-std::vector<std::string> SelectFixedDriveLetters(const std::vector<StorageDriveCandidate>& availableDrives) {
-    std::vector<std::string> drives;
-    for (const auto& drive : availableDrives) {
-        if (drive.driveType != DRIVE_FIXED) {
-            continue;
-        }
-        AddUniqueValue(drives, drive.letter);
-    }
-    return drives;
-}
-
 }  // namespace
 
 LayoutBindingSelection CollectLayoutBindings(const LayoutConfig& layout) {
@@ -108,27 +96,6 @@ std::vector<std::string> NormalizeConfiguredDrives(const std::vector<std::string
         AddUniqueValue(normalizedDrives, NormalizeConfiguredDriveLetter(drive));
     }
     return normalizedDrives;
-}
-
-std::vector<std::string> ResolveConfiguredDrives(
-    const std::vector<std::string>& drives, const std::vector<StorageDriveCandidate>& availableDrives, bool resolveWhenEmpty) {
-    const std::vector<std::string> normalizedDrives = NormalizeConfiguredDrives(drives);
-    if (!normalizedDrives.empty() || !resolveWhenEmpty || !drives.empty()) {
-        return normalizedDrives;
-    }
-    return SelectFixedDriveLetters(availableDrives);
-}
-
-AppConfig ResolveRuntimeSelections(const AppConfig& config,
-    const std::string& resolvedNetworkAdapterName,
-    const std::vector<StorageDriveCandidate>& availableDrives,
-    bool resolveEmptyDrives) {
-    AppConfig resolved = config;
-    if (!resolvedNetworkAdapterName.empty() && resolvedNetworkAdapterName != "Auto") {
-        resolved.network.adapterName = resolvedNetworkAdapterName;
-    }
-    resolved.storage.drives = ResolveConfiguredDrives(resolved.storage.drives, availableDrives, resolveEmptyDrives);
-    return resolved;
 }
 
 bool SelectResolvedLayout(AppConfig& config, const std::string& requestedName) {

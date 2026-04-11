@@ -301,7 +301,7 @@ Example:
 - `metric_list(cpu.ram=RAM,board.temp.cpu=Temp,board.fan.cpu=Fan,board.fan.system=System Fan)`
 
 - `[storage] drives` defines the vertical drive-usage list contents and order.
-- An empty `[storage] drives` value means the runtime selection resolver auto-selects all currently available fixed drives.
+- An empty `[storage] drives` value means the storage telemetry selection flow auto-selects all currently available fixed drives.
 - Layout metric references define which logical board temperature and fan metrics are requested from the board provider.
 - The `[board]` section maps those logical metric names to the board-specific sensor titles that the provider looks up.
 

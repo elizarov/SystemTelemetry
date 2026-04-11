@@ -2,8 +2,8 @@
 
 #include <fstream>
 
-#include "config_resolution.h"
 #include "snapshot_dump.h"
+#include "telemetry_storage_source.h"
 #include "telemetry_runtime_state.h"
 #include "trace.h"
 #include "utf8.h"
@@ -27,16 +27,14 @@ public:
         : fakePath_(std::move(fakePath)), showDialogs_(showDialogs) {}
 
     bool Initialize(const AppConfig& config, std::ostream* traceStream) override {
-        configView_.SetEffectiveConfig(config);
+        effectiveConfig_ = config;
         trace_.SetOutput(traceStream);
         trace_.Write("fake:initialize_begin path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
         if (!ReloadFakeDump(true)) {
             trace_.Write("fake:initialize_failed");
             return false;
         }
-        configView_.SetEffectiveConfig(ResolveRuntimeSelections(
-            configView_.effectiveConfig, dump_.snapshot.network.adapterName, candidateView_.storageDrives, true));
-        candidateView_.SyncFromSnapshotAndConfig(dump_.snapshot, configView_.effectiveConfig);
+        RefreshSelections();
         trace_.Write("fake:initialize_done");
         return true;
     }
@@ -50,8 +48,12 @@ public:
     }
 
     AppConfig EffectiveConfig() const override {
-        return ResolveRuntimeSelections(
-            configView_.effectiveConfig, dump_.snapshot.network.adapterName, candidateView_.storageDrives, false);
+        AppConfig config = effectiveConfig_;
+        if (!dump_.snapshot.network.adapterName.empty() && dump_.snapshot.network.adapterName != "Auto") {
+            config.network.adapterName = dump_.snapshot.network.adapterName;
+        }
+        config.storage.drives = resolvedStorageDrives_;
+        return config;
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
@@ -63,18 +65,25 @@ public:
     }
 
     void SetEffectiveConfig(const AppConfig& config) override {
-        configView_.SetEffectiveConfig(config);
-        candidateView_.SyncFromSnapshotAndConfig(dump_.snapshot, configView_.effectiveConfig);
+        effectiveConfig_ = config;
     }
 
     void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
-        configView_.SetPreferredNetworkAdapterName(adapterName);
-        candidateView_.SyncFromSnapshotAndConfig(dump_.snapshot, configView_.effectiveConfig);
+        effectiveConfig_.network.adapterName = adapterName;
+        RefreshSelections();
     }
 
     void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) override {
-        configView_.SetSelectedStorageDrives(driveLetters);
-        candidateView_.SyncFromSnapshotAndConfig(dump_.snapshot, configView_.effectiveConfig);
+        effectiveConfig_.storage.drives = driveLetters;
+        RefreshSelections();
+    }
+
+    void RefreshSelections() override {
+        candidateView_.SyncNetworkFromSnapshot(dump_.snapshot);
+        RuntimeCandidateView storageView;
+        storageView.SyncStorageFromSnapshot(dump_.snapshot, {});
+        resolvedStorageDrives_ = ResolveConfiguredStorageDrives(effectiveConfig_.storage.drives, storageView.storageDrives);
+        candidateView_.SyncStorageFromSnapshot(dump_.snapshot, resolvedStorageDrives_);
     }
 
     void UpdateSnapshot() override {
@@ -109,7 +118,7 @@ private:
         }
 
         dump_ = std::move(loaded);
-        candidateView_.SyncFromSnapshotAndConfig(dump_.snapshot, configView_.effectiveConfig);
+        RefreshSelections();
         lastReload_ = std::chrono::steady_clock::now();
         trace_.Write("fake:load_done path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
         return true;
@@ -117,9 +126,10 @@ private:
 
     std::filesystem::path fakePath_;
     bool showDialogs_ = true;
-    RuntimeConfigView configView_{};
+    AppConfig effectiveConfig_{};
     TelemetryDump dump_{};
     RuntimeCandidateView candidateView_{};
+    std::vector<std::string> resolvedStorageDrives_{};
     tracing::Trace trace_;
     std::chrono::steady_clock::time_point lastReload_{};
 };

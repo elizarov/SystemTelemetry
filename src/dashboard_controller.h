@@ -71,6 +71,7 @@ public:
     bool SetDisplayScale(DashboardShellHost& shell, double scale);
     void SelectNetworkAdapter(DashboardShellHost& shell, const NetworkMenuOption& option);
     void ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option);
+    void RefreshTelemetrySelections(DashboardShellHost& shell);
     void StartLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller);
     void StopLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller, bool diagnosticsEditLayout);
     bool ApplyLayoutGuideWeights(

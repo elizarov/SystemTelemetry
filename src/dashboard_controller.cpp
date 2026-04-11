@@ -299,6 +299,8 @@ void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const 
     }
     state_.config.network.adapterName = option.adapterName;
     state_.telemetry->SetPreferredNetworkAdapterName(option.adapterName);
+    state_.config = state_.telemetry->EffectiveConfig();
+    SyncRenderer(shell, state_.isEditingLayout);
     state_.telemetry->UpdateSnapshot();
     shell.InvalidateShell();
 }
@@ -316,9 +318,20 @@ void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const St
     }
     std::sort(driveLetters.begin(), driveLetters.end());
     state_.config.storage.drives = driveLetters;
-    SyncRenderer(shell, state_.isEditingLayout);
     state_.telemetry->SetSelectedStorageDrives(driveLetters);
+    state_.config = state_.telemetry->EffectiveConfig();
+    SyncRenderer(shell, state_.isEditingLayout);
     state_.telemetry->UpdateSnapshot();
+    shell.InvalidateShell();
+}
+
+void DashboardController::RefreshTelemetrySelections(DashboardShellHost& shell) {
+    if (state_.telemetry == nullptr) {
+        return;
+    }
+    state_.telemetry->RefreshSelections();
+    state_.config = state_.telemetry->EffectiveConfig();
+    SyncRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
 }
 

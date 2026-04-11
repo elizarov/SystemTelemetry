@@ -49,3 +49,15 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedStorageDrivesAgainstEmptySourceCon
 
     EXPECT_TRUE(output.find("[storage]\r\ndrives = C,E\r\n") != std::string::npos);
 }
+
+TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceConfig) {
+    AppConfig compareConfig;
+    compareConfig.network.adapterName.clear();
+
+    AppConfig currentConfig = compareConfig;
+    currentConfig.network.adapterName = "Ethernet";
+
+    const std::string output = BuildSavedConfigText(LoadEmbeddedConfigTemplate(), currentConfig, &compareConfig);
+
+    EXPECT_TRUE(output.find("[network]\r\nadapter_name = Ethernet\r\n") != std::string::npos);
+}

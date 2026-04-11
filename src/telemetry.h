@@ -123,10 +123,13 @@ public:
     const SystemSnapshot& Snapshot() const;
     TelemetryDump Dump() const;
     AppConfig EffectiveConfig() const;
+    const std::string& ResolvedNetworkAdapterName() const;
+    const std::vector<std::string>& ResolvedStorageDrives() const;
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const;
     const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const;
     void SetPreferredNetworkAdapterName(std::string adapterName);
     void SetSelectedStorageDrives(std::vector<std::string> driveLetters);
+    void RefreshSelections();
     void UpdateSnapshot();
     void WriteDump(std::ostream& output) const;
 

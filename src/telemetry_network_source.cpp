@@ -82,7 +82,7 @@ AdapterSelectionInfo BuildAdapterSelectionInfo(const MIB_IF_ROW2& row, const IP_
 
 }  // namespace
 
-void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
+void TelemetryCollector::Impl::ResolveNetworkSelection() {
     PMIB_IF_TABLE2 table = nullptr;
     const DWORD tableStatus = GetIfTable2(&table);
     if (tableStatus != NO_ERROR || table == nullptr) {
@@ -92,7 +92,7 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         return;
     }
     Trace(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) + " entries=" +
-           std::to_string(table->NumEntries) + " initialize_only=" + tracing::Trace::BoolText(initializeOnly))
+           std::to_string(table->NumEntries))
             .c_str());
 
     ULONG addressBufferSize = 0;
@@ -118,7 +118,6 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         addresses = nullptr;
     }
 
-    const auto now = std::chrono::steady_clock::now();
     MIB_IF_ROW2* selected = nullptr;
     uint64_t selectedTraffic = 0;
     AdapterSelectionInfo selectedInfo;
@@ -221,6 +220,14 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
 
     network_.adapterCandidates.clear();
     network_.adapterCandidates.reserve(candidates.size());
+    network_.resolvedAdapterName.clear();
+    network_.resolvedIpAddress = "N/A";
+    network_.selectedIndex = 0;
+    network_.previousInOctets = 0;
+    network_.previousOutOctets = 0;
+    network_.previousTick = {};
+    snapshot_.network.uploadMbps = 0.0;
+    snapshot_.network.downloadMbps = 0.0;
     for (auto& candidate : candidates) {
         if (selected != nullptr && candidate.interfaceIndex == selected->InterfaceIndex) {
             candidate.candidate.selected = true;
@@ -238,32 +245,13 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
         snapshot_.network.adapterName =
             Utf8FromWide(selected->Alias[0] != L'\0' ? std::wstring_view(selected->Alias)
                                                      : std::wstring_view(selected->Description));
-        if (network_.selectedIndex != selected->InterfaceIndex) {
-            network_.selectedIndex = selected->InterfaceIndex;
-            network_.previousInOctets = selected->InOctets;
-            network_.previousOutOctets = selected->OutOctets;
-            network_.previousTick = now;
-        } else if (!initializeOnly) {
-            const double seconds = std::chrono::duration<double>(now - network_.previousTick).count();
-            if (seconds > 0.0) {
-                snapshot_.network.downloadMbps =
-                    ((selected->InOctets - network_.previousInOctets) / seconds) / (1024.0 * 1024.0);
-                snapshot_.network.uploadMbps =
-                    ((selected->OutOctets - network_.previousOutOctets) / seconds) / (1024.0 * 1024.0);
-                retainedHistoryStore_.PushSample(snapshot_, "network.upload", snapshot_.network.uploadMbps);
-                retainedHistoryStore_.PushSample(snapshot_, "network.download", snapshot_.network.downloadMbps);
-                Trace(("telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
-                       " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) + " upload_mbps=" +
-                       tracing::Trace::FormatValueDouble("value", snapshot_.network.uploadMbps, 3) + " download_mbps=" +
-                       tracing::Trace::FormatValueDouble("value", snapshot_.network.downloadMbps, 3))
-                        .c_str());
-            }
-            network_.previousInOctets = selected->InOctets;
-            network_.previousOutOctets = selected->OutOctets;
-            network_.previousTick = now;
-        }
-
+        network_.resolvedAdapterName = snapshot_.network.adapterName;
         snapshot_.network.ipAddress = selectedInfo.ipAddress;
+        network_.resolvedIpAddress = selectedInfo.ipAddress;
+        network_.selectedIndex = selected->InterfaceIndex;
+        network_.previousInOctets = selected->InOctets;
+        network_.previousOutOctets = selected->OutOctets;
+        network_.previousTick = std::chrono::steady_clock::now();
         if (selectedInfo.hasIpv4) {
             Trace(("telemetry:network_ip_found interface=" + std::to_string(selected->InterfaceIndex) +
                    " ip=" + selectedInfo.ipAddress)
@@ -272,9 +260,77 @@ void TelemetryCollector::Impl::UpdateNetworkState(bool initializeOnly) {
             Trace(("telemetry:network_ip_missing interface=" + std::to_string(selected->InterfaceIndex)).c_str());
         }
     } else {
+        snapshot_.network.adapterName = config_.network.adapterName.empty() ? "Auto" : config_.network.adapterName;
+        snapshot_.network.ipAddress = "N/A";
         Trace("telemetry:network_selected interface=none");
     }
 
+    FreeMibTable(table);
+    Trace("telemetry:network_table_free status=done");
+}
+
+void TelemetryCollector::Impl::CollectNetworkMetrics(bool initializeOnly) {
+    if (network_.selectedIndex == 0) {
+        if (!initializeOnly) {
+            snapshot_.network.uploadMbps = 0.0;
+            snapshot_.network.downloadMbps = 0.0;
+        }
+        Trace("telemetry:network_rates skipped=no_selection");
+        return;
+    }
+
+    PMIB_IF_TABLE2 table = nullptr;
+    const DWORD tableStatus = GetIfTable2(&table);
+    if (tableStatus != NO_ERROR || table == nullptr) {
+        Trace(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) +
+               " table=" + tracing::Trace::BoolText(table != nullptr))
+                .c_str());
+        return;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    MIB_IF_ROW2* selected = nullptr;
+    for (ULONG i = 0; i < table->NumEntries; ++i) {
+        auto& row = table->Table[i];
+        if (row.InterfaceIndex == network_.selectedIndex) {
+            selected = &row;
+            break;
+        }
+    }
+
+    if (selected == nullptr || selected->OperStatus != IfOperStatusUp) {
+        if (!initializeOnly) {
+            snapshot_.network.uploadMbps = 0.0;
+            snapshot_.network.downloadMbps = 0.0;
+        }
+        Trace(("telemetry:network_rates skipped=selection_missing interface=" + std::to_string(network_.selectedIndex)).c_str());
+        FreeMibTable(table);
+        Trace("telemetry:network_table_free status=done");
+        return;
+    }
+
+    snapshot_.network.adapterName = network_.resolvedAdapterName.empty() ? snapshot_.network.adapterName : network_.resolvedAdapterName;
+    snapshot_.network.ipAddress = network_.resolvedIpAddress;
+    if (!initializeOnly && network_.previousTick.time_since_epoch().count() != 0) {
+        const double seconds = std::chrono::duration<double>(now - network_.previousTick).count();
+        if (seconds > 0.0) {
+            snapshot_.network.downloadMbps =
+                ((selected->InOctets - network_.previousInOctets) / seconds) / (1024.0 * 1024.0);
+            snapshot_.network.uploadMbps =
+                ((selected->OutOctets - network_.previousOutOctets) / seconds) / (1024.0 * 1024.0);
+            retainedHistoryStore_.PushSample(snapshot_, "network.upload", snapshot_.network.uploadMbps);
+            retainedHistoryStore_.PushSample(snapshot_, "network.download", snapshot_.network.downloadMbps);
+            Trace(("telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
+                   " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) + " upload_mbps=" +
+                   tracing::Trace::FormatValueDouble("value", snapshot_.network.uploadMbps, 3) + " download_mbps=" +
+                   tracing::Trace::FormatValueDouble("value", snapshot_.network.downloadMbps, 3))
+                    .c_str());
+        }
+    }
+
+    network_.previousInOctets = selected->InOctets;
+    network_.previousOutOctets = selected->OutOctets;
+    network_.previousTick = now;
     FreeMibTable(table);
     Trace("telemetry:network_table_free status=done");
 }

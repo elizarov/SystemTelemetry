@@ -54,6 +54,7 @@ public:
     virtual void SetEffectiveConfig(const AppConfig& config) = 0;
     virtual void SetPreferredNetworkAdapterName(const std::string& adapterName) = 0;
     virtual void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) = 0;
+    virtual void RefreshSelections() = 0;
     virtual void UpdateSnapshot() = 0;
 };
 
