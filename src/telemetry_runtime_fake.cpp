@@ -80,10 +80,10 @@ public:
 
     void RefreshSelections() override {
         candidateView_.SyncNetworkFromSnapshot(dump_.snapshot);
-        RuntimeCandidateView storageView;
-        storageView.SyncStorageFromSnapshot(dump_.snapshot, {});
-        resolvedStorageDrives_ = ResolveConfiguredStorageDrives(effectiveConfig_.storage.drives, storageView.storageDrives);
-        candidateView_.SyncStorageFromSnapshot(dump_.snapshot, resolvedStorageDrives_);
+        candidateView_.SyncStorageFromSnapshot(dump_.snapshot, {});
+        resolvedStorageDrives_ =
+            ResolveConfiguredStorageDrives(effectiveConfig_.storage.drives, candidateView_.storageDrives);
+        MarkSelectedStorageDriveCandidates(candidateView_.storageDrives, resolvedStorageDrives_);
     }
 
     void UpdateSnapshot() override {
