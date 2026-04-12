@@ -28,12 +28,6 @@ struct ThroughputGraphLayout {
     int guideCenterY = 0;
 };
 
-int MeasureAxisWidth(const DashboardRenderer& renderer) {
-    return std::max(1,
-        renderer.MeasureTextWidth(renderer.WidgetFonts().smallFont, "1000") +
-            std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.axisPadding)));
-}
-
 COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
 }
@@ -61,10 +55,10 @@ RECT MakeAnchorRect(int centerX, int centerY, int representedDiameter, int extra
     return RECT{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
 }
 
-ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, const RECT& rect) {
+ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, const RECT& rect, int axisWidth) {
     ThroughputGraphLayout layout;
     layout.graphRect = rect;
-    layout.axisWidth = MeasureAxisWidth(renderer);
+    layout.axisWidth = std::max(1, axisWidth);
     layout.labelBandHeight = renderer.FontMetrics().smallText;
     layout.graphTop = std::min(rect.bottom - 1, rect.top + layout.labelBandHeight);
     layout.graphLeft = rect.left + layout.axisWidth;
@@ -101,6 +95,7 @@ POINT ThroughputLastPoint(const ThroughputGraphLayout& layout, const std::vector
 void DrawGraph(DashboardRenderer& renderer,
     HDC hdc,
     const RECT& rect,
+    const ThroughputGraphLayout& layout,
     const std::vector<double>& history,
     double maxValue,
     double guideStepMbps,
@@ -111,7 +106,6 @@ void DrawGraph(DashboardRenderer& renderer,
     FillRect(hdc, &rect, bg);
     DeleteObject(bg);
 
-    const ThroughputGraphLayout layout = ComputeGraphLayout(renderer, rect);
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
     HBRUSH markerBrush = CreateSolidBrush(ToColorRef(renderer.Config().layout.colors.graphMarkerColor));
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
@@ -226,6 +220,12 @@ int ThroughputWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return EffectiveThroughputPreferredHeight(renderer);
 }
 
+void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer) {
+    measuredAxisWidth_ = std::max(1,
+        renderer.MeasureTextWidth(renderer.WidgetFonts().smallFont, "1000") +
+            std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.axisPadding)));
+}
+
 void ThroughputWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
@@ -275,7 +275,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
                 1,
                 renderer.Config().layout.fonts.smallText.size));
     }
-    const ThroughputGraphLayout layout = ComputeGraphLayout(renderer, graphRect);
+    const ThroughputGraphLayout layout = ComputeGraphLayout(renderer, graphRect, measuredAxisWidth_);
     const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
     const int leaderAnchorCenterX = layout.graphRight;
     const int leaderAnchorCenterY = layout.plotTop + (std::max)(0, (layout.graphBottom - layout.plotTop) / 2);
@@ -341,6 +341,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
     DrawGraph(renderer,
         hdc,
         graphRect,
+        layout,
         metric.history,
         metric.maxGraph,
         metric.guideStepMbps,
@@ -363,7 +364,7 @@ void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
             valueRect.bottom + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
         widget.rect.right,
         widget.rect.bottom};
-    const int axisWidth = MeasureAxisWidth(renderer);
+    const int axisWidth = std::max(1, measuredAxisWidth_);
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
 
     auto& guides = renderer.WidgetEditGuidesMutable();

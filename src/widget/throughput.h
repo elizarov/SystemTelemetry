@@ -8,6 +8,7 @@ public:
     std::unique_ptr<DashboardWidget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const DashboardRenderer& renderer) const override;
+    void ResolveLayoutState(const DashboardRenderer& renderer) override;
     void Draw(DashboardRenderer& renderer,
         HDC hdc,
         const DashboardWidgetLayout& widget,
@@ -16,4 +17,5 @@ public:
 
 private:
     std::string metric_;
+    int measuredAxisWidth_ = 1;
 };

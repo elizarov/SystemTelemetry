@@ -8,13 +8,8 @@
 
 namespace {
 
-struct MeasuredColumnWidths {
-    int label = 1;
-    int percent = 1;
-};
-
-MeasuredColumnWidths MeasureColumnWidths(const DashboardRenderer& renderer) {
-    return MeasuredColumnWidths{
+DriveUsageListWidget::MeasuredColumnWidths MeasureColumnWidths(const DashboardRenderer& renderer) {
+    return DriveUsageListWidget::MeasuredColumnWidths{
         std::max(1, renderer.MeasureTextWidth(renderer.WidgetFonts().label, "W:")),
         std::max(1, renderer.MeasureTextWidth(renderer.WidgetFonts().label, "100%")),
     };
@@ -127,6 +122,10 @@ int DriveUsageListWidget::PreferredHeight(const DashboardRenderer& renderer) con
     return (count > 0 ? EffectiveDriveHeaderHeight(renderer) : 0) + (count * EffectiveDriveRowHeight(renderer));
 }
 
+void DriveUsageListWidget::ResolveLayoutState(const DashboardRenderer& renderer) {
+    measuredColumnWidths_ = MeasureColumnWidths(renderer);
+}
+
 void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
@@ -134,9 +133,8 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
     const auto& config = renderer.Config().layout.driveUsageList;
     const int headerHeight = EffectiveDriveHeaderHeight(renderer);
     const int rowHeight = EffectiveDriveRowHeight(renderer);
-    const MeasuredColumnWidths widths = MeasureColumnWidths(renderer);
-    const int labelWidth = widths.label;
-    const int percentWidth = widths.percent;
+    const int labelWidth = measuredColumnWidths_.label;
+    const int percentWidth = measuredColumnWidths_.percent;
     const int labelGap = (std::max)(0, renderer.ScaleLogical(config.labelGap));
     const int activityWidth = (std::max)(1, renderer.ScaleLogical(config.activityWidth));
     const int rwGap = (std::max)(0, renderer.ScaleLogical(config.rwGap));
@@ -365,9 +363,8 @@ void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const Da
     const auto& config = renderer.Config().layout.driveUsageList;
     const int headerHeight = EffectiveDriveHeaderHeight(renderer);
     const int rowHeight = EffectiveDriveRowHeight(renderer);
-    const MeasuredColumnWidths widths = MeasureColumnWidths(renderer);
-    const int labelWidth = widths.label;
-    const int percentWidth = widths.percent;
+    const int labelWidth = measuredColumnWidths_.label;
+    const int percentWidth = measuredColumnWidths_.percent;
     const int labelGap = (std::max)(0, renderer.ScaleLogical(config.labelGap));
     const int activityWidth = (std::max)(1, renderer.ScaleLogical(config.activityWidth));
     const int rwGap = (std::max)(0, renderer.ScaleLogical(config.rwGap));
