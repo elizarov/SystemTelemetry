@@ -65,8 +65,8 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
             continue;
         }
         DashboardRenderer::LayoutEditGuide guide;
-        guide.axis = horizontal ? DashboardRenderer::LayoutGuideAxis::Vertical
-                                : DashboardRenderer::LayoutGuideAxis::Horizontal;
+        guide.axis =
+            horizontal ? DashboardRenderer::LayoutGuideAxis::Vertical : DashboardRenderer::LayoutGuideAxis::Horizontal;
         guide.renderCardId = renderCardId;
         guide.editCardId = editCardId;
         guide.nodePath = nodePath;
@@ -102,9 +102,9 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
     const std::string& renderCardId,
     const std::string& editCardId,
     const std::vector<size_t>& nodePath) {
-    renderer.WriteTrace("renderer:layout_resolve_node name=\"" + node.name + "\" weight=" +
-                        std::to_string(node.weight) + " " + FormatRect(rect) + " children=" +
-                        std::to_string(node.children.size()));
+    renderer.WriteTrace("renderer:layout_resolve_node name=\"" + node.name +
+                        "\" weight=" + std::to_string(node.weight) + " " + FormatRect(rect) +
+                        " children=" + std::to_string(node.children.size()));
     if (node.cardReference) {
         if (ContainsCardReference(cardReferenceStack, node.name)) {
             renderer.WriteTrace("renderer:layout_card_ref_cycle id=\"" + node.name + "\"");
@@ -221,7 +221,8 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         childRects.push_back(childRect);
         std::vector<size_t> childPath = nodePath;
         childPath.push_back(i);
-        ResolveNodeWidgetsInternal(renderer, child, childRect, widgets, cardReferenceStack, renderCardId, editCardId, childPath);
+        ResolveNodeWidgetsInternal(
+            renderer, child, childRect, widgets, cardReferenceStack, renderCardId, editCardId, childPath);
         cursor += size + gap;
         if (verticalSpring) {
             remainingDistributable -= size;
@@ -299,7 +300,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer) {
                             " title=" + FormatRect(card.titleRect) + " icon=" + FormatRect(card.iconRect) +
                             " content=" + FormatRect(card.contentRect));
         std::vector<std::string> cardReferenceStack;
-        ResolveNodeWidgetsInternal(renderer, cardIt->layout, card.contentRect, card.widgets, cardReferenceStack, card.id, card.id, {});
+        ResolveNodeWidgetsInternal(
+            renderer, cardIt->layout, card.contentRect, card.widgets, cardReferenceStack, card.id, card.id, {});
         renderer.resolvedLayout_.cards.push_back(std::move(card));
     };
 

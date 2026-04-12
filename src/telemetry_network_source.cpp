@@ -105,9 +105,10 @@ ResolvedNetworkCandidate ResolveConfiguredNetworkCandidate(
     }
 
     const std::string configuredLower = ToLowerAscii(configuredAdapterName);
-    const auto exactIt = std::find_if(availableCandidates.begin(), availableCandidates.end(), [&](const auto& candidate) {
-        return !configuredLower.empty() && ToLowerAscii(candidate.adapterName) == configuredLower;
-    });
+    const auto exactIt =
+        std::find_if(availableCandidates.begin(), availableCandidates.end(), [&](const auto& candidate) {
+            return !configuredLower.empty() && ToLowerAscii(candidate.adapterName) == configuredLower;
+        });
     if (exactIt != availableCandidates.end()) {
         resolved.adapterName = exactIt->adapterName;
         resolved.ipAddress = exactIt->ipAddress;
@@ -151,8 +152,8 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
                 .c_str());
         return;
     }
-    Trace(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) + " entries=" +
-           std::to_string(table->NumEntries))
+    Trace(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) +
+           " entries=" + std::to_string(table->NumEntries))
             .c_str());
 
     ULONG addressBufferSize = 0;
@@ -363,13 +364,15 @@ void TelemetryCollector::Impl::CollectNetworkMetrics(bool initializeOnly) {
             snapshot_.network.uploadMbps = 0.0;
             snapshot_.network.downloadMbps = 0.0;
         }
-        Trace(("telemetry:network_rates skipped=selection_missing interface=" + std::to_string(network_.selectedIndex)).c_str());
+        Trace(("telemetry:network_rates skipped=selection_missing interface=" + std::to_string(network_.selectedIndex))
+                .c_str());
         FreeMibTable(table);
         Trace("telemetry:network_table_free status=done");
         return;
     }
 
-    snapshot_.network.adapterName = network_.resolvedAdapterName.empty() ? snapshot_.network.adapterName : network_.resolvedAdapterName;
+    snapshot_.network.adapterName =
+        network_.resolvedAdapterName.empty() ? snapshot_.network.adapterName : network_.resolvedAdapterName;
     snapshot_.network.ipAddress = network_.resolvedIpAddress;
     if (!initializeOnly && network_.previousTick.time_since_epoch().count() != 0) {
         const double seconds = std::chrono::duration<double>(now - network_.previousTick).count();
@@ -381,9 +384,9 @@ void TelemetryCollector::Impl::CollectNetworkMetrics(bool initializeOnly) {
             retainedHistoryStore_.PushSample(snapshot_, "network.upload", snapshot_.network.uploadMbps);
             retainedHistoryStore_.PushSample(snapshot_, "network.download", snapshot_.network.downloadMbps);
             Trace(("telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
-                   " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) + " upload_mbps=" +
-                   tracing::Trace::FormatValueDouble("value", snapshot_.network.uploadMbps, 3) + " download_mbps=" +
-                   tracing::Trace::FormatValueDouble("value", snapshot_.network.downloadMbps, 3))
+                   " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) +
+                   " upload_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.network.uploadMbps, 3) +
+                   " download_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.network.downloadMbps, 3))
                     .c_str());
         }
     }

@@ -138,7 +138,8 @@ std::vector<std::string> ResolveConfiguredStorageDrives(
 void MarkSelectedStorageDriveCandidates(
     std::vector<StorageDriveCandidate>& candidates, const std::vector<std::string>& selectedDrives) {
     for (auto& candidate : candidates) {
-        candidate.selected = std::find(selectedDrives.begin(), selectedDrives.end(), candidate.letter) != selectedDrives.end();
+        candidate.selected =
+            std::find(selectedDrives.begin(), selectedDrives.end(), candidate.letter) != selectedDrives.end();
     }
 }
 

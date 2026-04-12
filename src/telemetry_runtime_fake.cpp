@@ -95,8 +95,7 @@ public:
 private:
     void RefreshNetworkSelection() {
         networkAdapters_ = EnumerateSnapshotNetworkCandidates(sourceDump_.snapshot);
-        resolvedNetwork_ =
-            ResolveConfiguredNetworkCandidate(effectiveConfig_.network.adapterName, networkAdapters_);
+        resolvedNetwork_ = ResolveConfiguredNetworkCandidate(effectiveConfig_.network.adapterName, networkAdapters_);
         MarkSelectedNetworkAdapterCandidates(networkAdapters_, resolvedNetwork_);
 
         dump_.snapshot.network.adapterName =
