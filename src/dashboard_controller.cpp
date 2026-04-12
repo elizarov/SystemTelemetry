@@ -7,6 +7,7 @@
 #include "app_config_io.h"
 #include "app_display_config.h"
 #include "app_paths.h"
+#include "config_resolution.h"
 #include "config_writer.h"
 #include "layout_edit_service.h"
 

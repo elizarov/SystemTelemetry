@@ -261,5 +261,3 @@ struct AppConfig {
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
 };
-
-bool SelectLayout(AppConfig& config, const std::string& name);

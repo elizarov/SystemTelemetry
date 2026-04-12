@@ -3,6 +3,7 @@
 #include "app_paths.h"
 #include "app_strings.h"
 #include "config_parser.h"
+#include "config_resolution.h"
 #include "config_writer.h"
 #include "telemetry_runtime_factory.h"
 
