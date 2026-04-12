@@ -384,6 +384,13 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer) {
             group.front()->widget->FinalizeLayoutGroup(renderer, group);
         }
     }
+    for (auto& card : renderer.resolvedLayout_.cards) {
+        for (auto& widget : card.widgets) {
+            if (widget.widget != nullptr) {
+                widget.widget->ResolveLayoutState(renderer, widget.rect);
+            }
+        }
+    }
 
     BuildWidgetEditGuides(renderer);
 

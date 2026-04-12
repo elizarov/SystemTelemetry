@@ -45,7 +45,7 @@ public:
     virtual bool UsesFixedPreferredHeightInRows() const;
     virtual bool IsHoverable() const;
     virtual bool IsVerticalSpring() const;
-    virtual void ResolveLayoutState(const DashboardRenderer& renderer);
+    virtual void ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect);
     virtual void Draw(DashboardRenderer& renderer,
         HDC hdc,
         const struct DashboardWidgetLayout& widget,

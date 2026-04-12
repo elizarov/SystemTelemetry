@@ -1615,7 +1615,7 @@ DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeCon
     if (info != nullptr) {
         widget.widget = info->widgetPrototype->Clone();
         if (widget.widget != nullptr) {
-            widget.widget->ResolveLayoutState(*this);
+            widget.widget->ResolveLayoutState(*this, rect);
         }
     }
     return widget;

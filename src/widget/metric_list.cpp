@@ -64,14 +64,43 @@ int MetricListWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return static_cast<int>(entries_.size()) * EffectiveMetricRowHeight(renderer);
 }
 
+void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) {
+    layoutState_ = {};
+    layoutState_.rowHeight = EffectiveMetricRowHeight(renderer);
+    layoutState_.labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
+    layoutState_.metricBarHeight = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
+    layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
+    layoutState_.visibleRows =
+        layoutState_.rowHeight > 0
+            ? std::clamp(((std::max)(0, static_cast<int>(rect.bottom - rect.top)) + layoutState_.rowHeight - 1) /
+                             layoutState_.rowHeight,
+                  0,
+                  static_cast<int>(entries_.size()))
+            : 0;
+    RECT rowRect{rect.left, rect.top, rect.right, rect.top + layoutState_.rowHeight};
+    for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
+        layoutState_.rowRects.push_back(rowRect);
+        RECT labelRect{rowRect.left,
+            rowRect.top,
+            (std::min)(rowRect.right, rowRect.left + layoutState_.labelWidth),
+            rowRect.bottom};
+        RECT valueRect{labelRect.right, rowRect.top, rowRect.right, rowRect.bottom};
+        const int barBottom =
+            (std::min)(static_cast<int>(rowRect.bottom), static_cast<int>(rowRect.top) + layoutState_.rowHeight);
+        const int barTop = (std::max)(static_cast<int>(rowRect.top), barBottom - layoutState_.metricBarHeight);
+        layoutState_.labelRects.push_back(labelRect);
+        layoutState_.valueRects.push_back(valueRect);
+        layoutState_.barRects.push_back(RECT{valueRect.left, barTop, rowRect.right, barBottom});
+        OffsetRect(&rowRect, 0, layoutState_.rowHeight);
+    }
+}
+
 void MetricListWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
-    const int rowHeight = EffectiveMetricRowHeight(renderer);
     const int savedDc = SaveDC(hdc);
     IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
-    RECT rowRect{widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.top + rowHeight};
     int rowIndex = 0;
     std::vector<DashboardMetricListEntry> entries;
     entries.reserve(entries_.size());
@@ -79,9 +108,11 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
         entries.push_back(DashboardMetricListEntry{entry.metricRef, entry.labelOverride});
     }
     for (const auto& row : metrics.ResolveMetricList(entries)) {
-        const int labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
-        RECT labelRect{rowRect.left, rowRect.top, (std::min)(rowRect.right, rowRect.left + labelWidth), rowRect.bottom};
-        RECT valueRect{labelRect.right, rowRect.top, rowRect.right, rowRect.bottom};
+        if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
+            break;
+        }
+        const RECT& labelRect = layoutState_.labelRects[rowIndex];
+        const RECT& valueRect = layoutState_.valueRects[rowIndex];
         renderer.DrawTextBlock(hdc,
             labelRect,
             row.label,
@@ -104,17 +135,13 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size));
         }
-
-        const int metricBarHeight = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
-        const int barBottom = (std::min)(static_cast<int>(rowRect.bottom), static_cast<int>(rowRect.top) + rowHeight);
-        const int barTop = (std::max)(static_cast<int>(rowRect.top), barBottom - metricBarHeight);
-        RECT barRect{valueRect.left, barTop, rowRect.right, barBottom};
+        const RECT& barRect = layoutState_.barRects[rowIndex];
         renderer.DrawPillBar(hdc,
             barRect,
             row.ratio,
             row.peakRatio,
             renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
-        const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
+        const int anchorSize = layoutState_.anchorSize;
         const int anchorCenterX =
             static_cast<int>(barRect.left) + ((std::max)(0, static_cast<int>(barRect.right - barRect.left) / 2));
         const int anchorCenterY = static_cast<int>(barRect.bottom);
@@ -139,28 +166,15 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
             renderer.Config().layout.metricList.barHeight);
 
         ++rowIndex;
-        OffsetRect(&rowRect, 0, rowHeight);
-        if (rowRect.top >= widget.rect.bottom) {
-            break;
-        }
     }
     RestoreDC(hdc, savedDc);
 }
 
 void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
-    const int labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
-    const int rowHeight = EffectiveMetricRowHeight(renderer);
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
-    const int x = std::clamp(static_cast<int>(widget.rect.left) + labelWidth,
+    const int x = std::clamp(static_cast<int>(widget.rect.left) + layoutState_.labelWidth,
         static_cast<int>(widget.rect.left),
         static_cast<int>(widget.rect.right));
-    const int visibleRows =
-        rowHeight > 0
-            ? std::clamp(
-                  ((std::max)(0, static_cast<int>(widget.rect.bottom - widget.rect.top)) + rowHeight - 1) / rowHeight,
-                  0,
-                  static_cast<int>(entries_.size()))
-            : 0;
 
     auto& guides = renderer.WidgetEditGuidesMutable();
     DashboardRenderer::WidgetEditGuide guide;
@@ -176,8 +190,8 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     guide.dragDirection = 1;
     guides.push_back(guide);
 
-    for (int rowIndex = 0; rowIndex < visibleRows; ++rowIndex) {
-        const int y = widget.rect.top + ((rowIndex + 1) * rowHeight);
+    for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
+        const int y = layoutState_.rowRects[rowIndex].bottom;
         guide = {};
         guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
         guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};

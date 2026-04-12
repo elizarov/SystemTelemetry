@@ -9,24 +9,7 @@
 
 namespace {
 
-struct ThroughputGraphLayout {
-    RECT graphRect{};
-    int axisWidth = 1;
-    int labelBandHeight = 0;
-    int graphTop = 0;
-    int graphLeft = 0;
-    int graphRight = 0;
-    int graphBottom = 0;
-    int plotTop = 0;
-    int plotHeight = 1;
-    int plotStrokeWidth = 1;
-    int guideStrokeWidth = 1;
-    int leaderDiameter = 0;
-    int leaderRadius = 0;
-    int plotWidth = 1;
-    int guideCenterX = 0;
-    int guideCenterY = 0;
-};
+using ThroughputGraphLayout = ThroughputWidget::LayoutState;
 
 COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
@@ -55,10 +38,12 @@ RECT MakeAnchorRect(int centerX, int centerY, int representedDiameter, int extra
     return RECT{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
 }
 
-ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, const RECT& rect, int axisWidth) {
+ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, const RECT& rect) {
     ThroughputGraphLayout layout;
     layout.graphRect = rect;
-    layout.axisWidth = std::max(1, axisWidth);
+    layout.axisWidth = std::max(1,
+        renderer.MeasureTextWidth(renderer.WidgetFonts().smallFont, "1000") +
+            std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.axisPadding)));
     layout.labelBandHeight = renderer.FontMetrics().smallText;
     layout.graphTop = std::min(rect.bottom - 1, rect.top + layout.labelBandHeight);
     layout.graphLeft = rect.left + layout.axisWidth;
@@ -220,10 +205,30 @@ int ThroughputWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return EffectiveThroughputPreferredHeight(renderer);
 }
 
-void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer) {
-    measuredAxisWidth_ = std::max(1,
-        renderer.MeasureTextWidth(renderer.WidgetFonts().smallFont, "1000") +
-            std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.axisPadding)));
+void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) {
+    const int lineHeight = renderer.FontMetrics().smallText;
+    layoutState_.valueRect = RECT{
+        rect.left, rect.top, rect.right, (std::min)(rect.bottom, static_cast<LONG>(rect.top + lineHeight))};
+    layoutState_.graphRect = RECT{rect.left,
+        (std::min)(rect.bottom,
+            static_cast<LONG>(layoutState_.valueRect.bottom +
+                              (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap)))),
+        rect.right,
+        rect.bottom};
+    ThroughputGraphLayout graphLayout = ComputeGraphLayout(renderer, layoutState_.graphRect);
+    graphLayout.valueRect = layoutState_.valueRect;
+    const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
+    graphLayout.leaderAnchorCenterX = graphLayout.graphRight;
+    graphLayout.leaderAnchorCenterY = graphLayout.plotTop + (std::max)(0, (graphLayout.graphBottom - graphLayout.plotTop) / 2);
+    graphLayout.leaderAnchorRect = MakeAnchorRect(
+        graphLayout.leaderAnchorCenterX, graphLayout.leaderAnchorCenterY, graphLayout.leaderDiameter, anchorPadding);
+    graphLayout.plotAnchorCenterX = graphLayout.graphLeft;
+    graphLayout.plotAnchorCenterY = graphLayout.plotTop + (std::max)(0, (graphLayout.graphBottom - graphLayout.plotTop) / 2);
+    graphLayout.plotAnchorRect = MakeAnchorRect(
+        graphLayout.plotAnchorCenterX, graphLayout.plotAnchorCenterY, graphLayout.plotStrokeWidth, anchorPadding);
+    graphLayout.guideAnchorRect =
+        MakeAnchorRect(graphLayout.guideCenterX, graphLayout.guideCenterY, graphLayout.guideStrokeWidth, anchorPadding);
+    layoutState_ = graphLayout;
 }
 
 void ThroughputWidget::Draw(DashboardRenderer& renderer,
@@ -231,16 +236,6 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
     const DashboardThroughputMetric metric = metrics.ResolveThroughput(metric_);
-    const int lineHeight = renderer.FontMetrics().smallText;
-    RECT valueRect{widget.rect.left,
-        widget.rect.top,
-        widget.rect.right,
-        (std::min)(widget.rect.bottom, widget.rect.top + lineHeight)};
-    RECT graphRect{widget.rect.left,
-        (std::min)(widget.rect.bottom,
-            valueRect.bottom + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
-        widget.rect.right,
-        widget.rect.bottom};
     char buffer[64];
     if (metric.valueMbps >= 100.0) {
         sprintf_s(buffer, "%.0f MB/s", metric.valueMbps);
@@ -248,7 +243,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         sprintf_s(buffer, "%.1f MB/s", metric.valueMbps);
     }
     const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(hdc,
-        valueRect,
+        layoutState_.valueRect,
         metric.label,
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
@@ -257,12 +252,12 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
             DashboardRenderer::AnchorEditParameter::FontSmall,
             0,
             renderer.Config().layout.fonts.smallText.size));
-    RECT numberRect{(std::min)(valueRect.right,
+    RECT numberRect{(std::min)(layoutState_.valueRect.right,
                         labelLayout.textRect.right +
                             (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
-        valueRect.top,
-        valueRect.right,
-        valueRect.bottom};
+        layoutState_.valueRect.top,
+        layoutState_.valueRect.right,
+        layoutState_.valueRect.bottom};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         renderer.DrawTextBlock(hdc,
             numberRect,
@@ -275,60 +270,49 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
                 1,
                 renderer.Config().layout.fonts.smallText.size));
     }
-    const ThroughputGraphLayout layout = ComputeGraphLayout(renderer, graphRect, measuredAxisWidth_);
-    const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
-    const int leaderAnchorCenterX = layout.graphRight;
-    const int leaderAnchorCenterY = layout.plotTop + (std::max)(0, (layout.graphBottom - layout.plotTop) / 2);
-    const RECT leaderAnchorRect =
-        MakeAnchorRect(leaderAnchorCenterX, leaderAnchorCenterY, layout.leaderDiameter, anchorPadding);
+    const ThroughputGraphLayout& layout = layoutState_;
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::AnchorEditParameter::ThroughputLeaderDiameter,
             0,
         },
-        leaderAnchorRect,
-        leaderAnchorRect,
+        layout.leaderAnchorRect,
+        layout.leaderAnchorRect,
         DashboardRenderer::AnchorShape::Circle,
         DashboardRenderer::AnchorDragAxis::Both,
         DashboardRenderer::AnchorDragMode::RadialDistance,
-        POINT{leaderAnchorCenterX, leaderAnchorCenterY},
+        POINT{layout.leaderAnchorCenterX, layout.leaderAnchorCenterY},
         2.0,
         true,
         false,
         renderer.Config().layout.throughput.leaderDiameter);
 
-    const int plotAnchorCenterY = layout.plotTop + (std::max)(0, (layout.graphBottom - layout.plotTop) / 2);
-    const int plotAnchorCenterX = layout.graphLeft;
-    const RECT plotAnchorRect =
-        MakeAnchorRect(plotAnchorCenterX, plotAnchorCenterY, layout.plotStrokeWidth, anchorPadding);
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::AnchorEditParameter::ThroughputPlotStrokeWidth,
             0,
         },
-        plotAnchorRect,
-        plotAnchorRect,
+        layout.plotAnchorRect,
+        layout.plotAnchorRect,
         DashboardRenderer::AnchorShape::Circle,
         DashboardRenderer::AnchorDragAxis::Both,
         DashboardRenderer::AnchorDragMode::RadialDistance,
-        POINT{plotAnchorCenterX, plotAnchorCenterY},
+        POINT{layout.plotAnchorCenterX, layout.plotAnchorCenterY},
         2.0,
         true,
         false,
         renderer.Config().layout.throughput.plotStrokeWidth);
 
-    const RECT guideAnchorRect =
-        MakeAnchorRect(layout.guideCenterX, layout.guideCenterY, layout.guideStrokeWidth, anchorPadding);
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::AnchorEditParameter::ThroughputGuideStrokeWidth,
             0,
         },
-        guideAnchorRect,
-        guideAnchorRect,
+        layout.guideAnchorRect,
+        layout.guideAnchorRect,
         DashboardRenderer::AnchorShape::Circle,
         DashboardRenderer::AnchorDragAxis::Both,
         DashboardRenderer::AnchorDragMode::RadialDistance,
@@ -340,7 +324,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
 
     DrawGraph(renderer,
         hdc,
-        graphRect,
+        layout.graphRect,
         layout,
         metric.history,
         metric.maxGraph,
@@ -354,22 +338,11 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
 }
 
 void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
-    const int lineHeight = renderer.FontMetrics().smallText;
-    RECT valueRect{widget.rect.left,
-        widget.rect.top,
-        widget.rect.right,
-        (std::min)(widget.rect.bottom, widget.rect.top + lineHeight)};
-    RECT graphRect{widget.rect.left,
-        (std::min)(widget.rect.bottom,
-            valueRect.bottom + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
-        widget.rect.right,
-        widget.rect.bottom};
-    const int axisWidth = std::max(1, measuredAxisWidth_);
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
 
     auto& guides = renderer.WidgetEditGuidesMutable();
     DashboardRenderer::WidgetEditGuide guide;
-    const int x = std::clamp(static_cast<int>(graphRect.left) + axisWidth,
+    const int x = std::clamp(static_cast<int>(layoutState_.graphRect.left) + layoutState_.axisWidth,
         static_cast<int>(widget.rect.left),
         static_cast<int>(widget.rect.right));
     guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
@@ -377,15 +350,15 @@ void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     guide.parameter = DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
-    guide.drawStart = POINT{x, graphRect.top};
-    guide.drawEnd = POINT{x, graphRect.bottom};
-    guide.hitRect = RECT{x - hitInset, graphRect.top, x + hitInset + 1, graphRect.bottom};
+    guide.drawStart = POINT{x, layoutState_.graphRect.top};
+    guide.drawEnd = POINT{x, layoutState_.graphRect.bottom};
+    guide.hitRect = RECT{x - hitInset, layoutState_.graphRect.top, x + hitInset + 1, layoutState_.graphRect.bottom};
     guide.value = renderer.Config().layout.throughput.axisPadding;
     guide.dragDirection = 1;
     guides.push_back(guide);
 
     const int y = std::clamp(
-        static_cast<int>(graphRect.top), static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
+        static_cast<int>(layoutState_.graphRect.top), static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
     guide = {};
     guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
     guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};

@@ -16,17 +16,7 @@ struct GaugeSharedLayout {
 
 namespace {
 
-struct GaugeSegmentLayout {
-    int segmentCount = 1;
-    double totalSweep = 0.0;
-    double gapSweep = 360.0;
-    double segmentGap = 0.0;
-    double segmentSweep = 0.0;
-    double pitchSweep = 0.0;
-    double gaugeStart = 90.0;
-    double gaugeEnd = 90.0;
-    double maxSegmentSweep = 0.0;
-};
+using GaugeSegmentLayout = GaugeWidget::SegmentLayout;
 
 GaugeSegmentLayout ComputeGaugeSegmentLayout(
     double requestedSweep, int requestedSegmentCount, double requestedSegmentGap) {
@@ -162,23 +152,56 @@ int GaugeWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return EffectiveGaugePreferredRadius(renderer) * 2;
 }
 
+void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) {
+    layoutState_ = {};
+    layoutState_.outerRadius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
+                                   ? sharedLayout_->radius
+                                   : GaugeOuterRadiusForRect(renderer, rect);
+    layoutState_.cx = rect.left + ((std::max)(0L, rect.right - rect.left) / 2);
+    layoutState_.cy = rect.top + ((std::max)(0L, rect.bottom - rect.top) / 2);
+    layoutState_.ringThickness = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
+    layoutState_.segmentLayout = ComputeGaugeSegmentLayout(renderer.Config().layout.gauge.sweepDegrees,
+        renderer.Config().layout.gauge.segmentCount,
+        renderer.Config().layout.gauge.segmentGapDegrees);
+    layoutState_.innerRadius = std::max(0, layoutState_.outerRadius - layoutState_.ringThickness);
+    layoutState_.anchorPadding = std::max(1, renderer.ScaleLogical(1));
+    layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
+    layoutState_.anchorHalf = layoutState_.anchorSize / 2;
+    layoutState_.halfWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.textHalfWidth));
+    layoutState_.valueBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom);
+    layoutState_.valueHeight = renderer.FontMetrics().big;
+    layoutState_.labelBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom);
+    layoutState_.labelHeight = renderer.FontMetrics().smallText;
+    layoutState_.guideHalfExtension = (std::max)(1, layoutState_.ringThickness / 2);
+    layoutState_.hitInset = (std::max)(4, renderer.ScaleLogical(5));
+    layoutState_.segmentCountAnchorRect = RECT{layoutState_.cx - layoutState_.anchorHalf,
+        layoutState_.cy - layoutState_.outerRadius - layoutState_.anchorHalf,
+        layoutState_.cx - layoutState_.anchorHalf + layoutState_.anchorSize,
+        layoutState_.cy - layoutState_.outerRadius - layoutState_.anchorHalf + layoutState_.anchorSize};
+    layoutState_.outerPaddingAnchorRect = MakeCircleAnchorRect(
+        layoutState_.cx, layoutState_.cy, layoutState_.outerRadius * 2, layoutState_.anchorPadding);
+    layoutState_.ringThicknessAnchorRect = MakeCircleAnchorRect(
+        layoutState_.cx, layoutState_.cy, layoutState_.innerRadius * 2, layoutState_.anchorPadding);
+    layoutState_.valueRect = RECT{layoutState_.cx - layoutState_.halfWidth,
+        layoutState_.cy + layoutState_.valueBottom - layoutState_.valueHeight,
+        layoutState_.cx + layoutState_.halfWidth,
+        layoutState_.cy + layoutState_.valueBottom};
+    layoutState_.labelRect = RECT{layoutState_.cx - layoutState_.halfWidth,
+        layoutState_.cy + layoutState_.labelBottom - layoutState_.labelHeight,
+        layoutState_.cx + layoutState_.halfWidth,
+        layoutState_.cy + layoutState_.labelBottom};
+}
+
 void GaugeWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
     const DashboardGaugeMetric metric = metrics.ResolveGauge(metric_);
-    const int width = widget.rect.right - widget.rect.left;
-    const int height = widget.rect.bottom - widget.rect.top;
-    const int outerRadius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
-                                ? sharedLayout_->radius
-                                : GaugeOuterRadiusForRect(renderer, widget.rect);
-    const int cx = widget.rect.left + width / 2;
-    const int cy = widget.rect.top + height / 2;
-    const float segmentThickness =
-        static_cast<float>((std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness)));
-    const GaugeSegmentLayout gaugeLayout = ComputeGaugeSegmentLayout(renderer.Config().layout.gauge.sweepDegrees,
-        renderer.Config().layout.gauge.segmentCount,
-        renderer.Config().layout.gauge.segmentGapDegrees);
+    const int outerRadius = layoutState_.outerRadius;
+    const int cx = layoutState_.cx;
+    const int cy = layoutState_.cy;
+    const float segmentThickness = static_cast<float>(layoutState_.ringThickness);
+    const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
     const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
     const int filledSegments =
         clampedPercent <= 0.0
@@ -195,11 +218,6 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
                   static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(gaugeLayout.segmentCount))) - 1,
                   0,
                   gaugeLayout.segmentCount - 1);
-    const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
-    const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
-    const int anchorHalf = anchorSize / 2;
-    const int innerRadius =
-        std::max(0, outerRadius - static_cast<int>(std::lround(static_cast<double>(segmentThickness))));
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -207,10 +225,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             0,
         },
         widget.rect,
-        RECT{cx - anchorHalf,
-            cy - outerRadius - anchorHalf,
-            cx - anchorHalf + anchorSize,
-            cy - outerRadius - anchorHalf + anchorSize},
+        layoutState_.segmentCountAnchorRect,
         DashboardRenderer::AnchorShape::Diamond,
         DashboardRenderer::AnchorDragAxis::Both,
         DashboardRenderer::AnchorDragMode::AxisDelta,
@@ -219,15 +234,14 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         true,
         true,
         renderer.Config().layout.gauge.segmentCount);
-    const RECT outerPaddingAnchorRect = MakeCircleAnchorRect(cx, cy, outerRadius * 2, anchorPadding);
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::AnchorEditParameter::GaugeOuterPadding,
             0,
         },
-        outerPaddingAnchorRect,
-        outerPaddingAnchorRect,
+        layoutState_.outerPaddingAnchorRect,
+        layoutState_.outerPaddingAnchorRect,
         DashboardRenderer::AnchorShape::Circle,
         DashboardRenderer::AnchorDragAxis::Both,
         DashboardRenderer::AnchorDragMode::RadialDistance,
@@ -236,15 +250,14 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         true,
         false,
         renderer.Config().layout.gauge.outerPadding);
-    const RECT ringThicknessAnchorRect = MakeCircleAnchorRect(cx, cy, innerRadius * 2, anchorPadding);
     renderer.RegisterEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::AnchorEditParameter::GaugeRingThickness,
             0,
         },
-        ringThicknessAnchorRect,
-        ringThicknessAnchorRect,
+        layoutState_.ringThicknessAnchorRect,
+        layoutState_.ringThicknessAnchorRect,
         DashboardRenderer::AnchorShape::Circle,
         DashboardRenderer::AnchorDragAxis::Both,
         DashboardRenderer::AnchorDragMode::RadialDistance,
@@ -298,14 +311,11 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         }
     }
 
-    const int halfWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.textHalfWidth));
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         char number[16];
         sprintf_s(number, "%.0f%%", metric.percent);
-        const int valueBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom);
-        const int valueHeight = renderer.FontMetrics().big;
         renderer.DrawTextBlock(hdc,
-            RECT{cx - halfWidth, cy + valueBottom - valueHeight, cx + halfWidth, cy + valueBottom},
+            layoutState_.valueRect,
             number,
             renderer.WidgetFonts().big,
             renderer.ForegroundColor(),
@@ -313,10 +323,8 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             renderer.MakeEditableTextBinding(
                 widget, DashboardRenderer::AnchorEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
     }
-    const int labelBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom);
-    const int labelHeight = renderer.FontMetrics().smallText;
     renderer.DrawTextBlock(hdc,
-        RECT{cx - halfWidth, cy + labelBottom - labelHeight, cx + halfWidth, cy + labelBottom},
+        layoutState_.labelRect,
         "Load",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
@@ -328,22 +336,18 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
 }
 
 void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
-    const int outerRadius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
-                                ? sharedLayout_->radius
-                                : GaugeOuterRadiusForRect(renderer, widget.rect);
+    const int outerRadius = layoutState_.outerRadius;
     if (outerRadius <= 0) {
         return;
     }
 
-    const int cx = widget.rect.left + ((std::max)(0L, widget.rect.right - widget.rect.left) / 2);
-    const int cy = widget.rect.top + ((std::max)(0L, widget.rect.bottom - widget.rect.top) / 2);
-    const GaugeSegmentLayout gaugeLayout = ComputeGaugeSegmentLayout(renderer.Config().layout.gauge.sweepDegrees,
-        renderer.Config().layout.gauge.segmentCount,
-        renderer.Config().layout.gauge.segmentGapDegrees);
-    const int ringThickness = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
-    const int guideHalfExtension = (std::max)(1, ringThickness / 2);
-    const int hitInset = (std::max)(4, renderer.ScaleLogical(5));
-    const int halfWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.textHalfWidth));
+    const int cx = layoutState_.cx;
+    const int cy = layoutState_.cy;
+    const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
+    const int ringThickness = layoutState_.ringThickness;
+    const int guideHalfExtension = layoutState_.guideHalfExtension;
+    const int hitInset = layoutState_.hitInset;
+    const int halfWidth = layoutState_.halfWidth;
 
     const auto addRadialGuide = [&](DashboardRenderer::WidgetEditParameter parameter,
                                     int guideId,
