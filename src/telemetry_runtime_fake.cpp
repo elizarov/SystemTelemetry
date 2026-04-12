@@ -5,7 +5,6 @@
 
 #include "snapshot_dump.h"
 #include "telemetry_network_source.h"
-#include "telemetry_runtime_state.h"
 #include "telemetry_storage_source.h"
 #include "trace.h"
 #include "utf8.h"
@@ -58,11 +57,11 @@ public:
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
-        return candidateView_.networkAdapters;
+        return networkAdapters_;
     }
 
     const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const override {
-        return candidateView_.storageDrives;
+        return storageDrives_;
     }
 
     void SetEffectiveConfig(const AppConfig& config) override {
@@ -93,10 +92,10 @@ public:
 
 private:
     void RefreshNetworkSelection() {
-        candidateView_.networkAdapters = EnumerateSnapshotNetworkCandidates(sourceDump_.snapshot);
+        networkAdapters_ = EnumerateSnapshotNetworkCandidates(sourceDump_.snapshot);
         resolvedNetwork_ =
-            ResolveConfiguredNetworkCandidate(effectiveConfig_.network.adapterName, candidateView_.networkAdapters);
-        MarkSelectedNetworkAdapterCandidates(candidateView_.networkAdapters, resolvedNetwork_);
+            ResolveConfiguredNetworkCandidate(effectiveConfig_.network.adapterName, networkAdapters_);
+        MarkSelectedNetworkAdapterCandidates(networkAdapters_, resolvedNetwork_);
 
         dump_.snapshot.network.adapterName =
             resolvedNetwork_.adapterName.empty() ? "Auto" : resolvedNetwork_.adapterName;
@@ -104,10 +103,9 @@ private:
     }
 
     void RefreshStorageSelection() {
-        candidateView_.storageDrives = EnumerateSnapshotStorageDriveCandidates(sourceDump_.snapshot);
-        resolvedStorageDrives_ =
-            ResolveConfiguredStorageDrives(effectiveConfig_.storage.drives, candidateView_.storageDrives);
-        MarkSelectedStorageDriveCandidates(candidateView_.storageDrives, resolvedStorageDrives_);
+        storageDrives_ = EnumerateSnapshotStorageDriveCandidates(sourceDump_.snapshot);
+        resolvedStorageDrives_ = ResolveConfiguredStorageDrives(effectiveConfig_.storage.drives, storageDrives_);
+        MarkSelectedStorageDriveCandidates(storageDrives_, resolvedStorageDrives_);
 
         dump_.snapshot.drives.clear();
         for (const auto& drive : sourceDump_.snapshot.drives) {
@@ -156,7 +154,8 @@ private:
     AppConfig effectiveConfig_{};
     TelemetryDump sourceDump_{};
     TelemetryDump dump_{};
-    RuntimeCandidateView candidateView_{};
+    std::vector<NetworkAdapterCandidate> networkAdapters_{};
+    std::vector<StorageDriveCandidate> storageDrives_{};
     ResolvedNetworkCandidate resolvedNetwork_{};
     std::vector<std::string> resolvedStorageDrives_{};
     tracing::Trace trace_;

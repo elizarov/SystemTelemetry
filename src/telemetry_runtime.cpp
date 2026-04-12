@@ -1,7 +1,5 @@
 #include "telemetry_runtime.h"
 
-#include "telemetry_runtime_state.h"
-
 namespace {
 
 AppConfig BuildUiOverlayConfigFromResolvedTelemetry(const AppConfig& uiConfig, const TelemetryCollector& telemetry) {
@@ -25,8 +23,8 @@ public:
         if (!telemetry_.Initialize(config, traceStream)) {
             return false;
         }
-        candidateView_.SyncNetworkFromTelemetry(telemetry_);
-        candidateView_.SyncStorageFromTelemetry(telemetry_);
+        networkAdapters_ = telemetry_.NetworkAdapterCandidates();
+        storageDrives_ = telemetry_.StorageDriveCandidates();
         return true;
     }
 
@@ -43,11 +41,11 @@ public:
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
-        return candidateView_.networkAdapters;
+        return networkAdapters_;
     }
 
     const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const override {
-        return candidateView_.storageDrives;
+        return storageDrives_;
     }
 
     void SetEffectiveConfig(const AppConfig& config) override {
@@ -57,20 +55,20 @@ public:
     void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
         effectiveConfig_.network.adapterName = adapterName;
         telemetry_.SetPreferredNetworkAdapterName(adapterName);
-        candidateView_.SyncNetworkFromTelemetry(telemetry_);
+        networkAdapters_ = telemetry_.NetworkAdapterCandidates();
     }
 
     void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) override {
         effectiveConfig_.storage.drives = driveLetters;
         telemetry_.SetSelectedStorageDrives(driveLetters);
-        candidateView_.SyncStorageFromTelemetry(telemetry_);
+        storageDrives_ = telemetry_.StorageDriveCandidates();
     }
 
     void RefreshSelectionsAndSnapshot() override {
         telemetry_.RefreshSelections();
         telemetry_.UpdateSnapshot();
-        candidateView_.SyncNetworkFromTelemetry(telemetry_);
-        candidateView_.SyncStorageFromTelemetry(telemetry_);
+        networkAdapters_ = telemetry_.NetworkAdapterCandidates();
+        storageDrives_ = telemetry_.StorageDriveCandidates();
     }
 
     void UpdateSnapshot() override {
@@ -80,7 +78,8 @@ public:
 private:
     TelemetryCollector telemetry_;
     AppConfig effectiveConfig_{};
-    RuntimeCandidateView candidateView_{};
+    std::vector<NetworkAdapterCandidate> networkAdapters_{};
+    std::vector<StorageDriveCandidate> storageDrives_{};
 };
 
 std::unique_ptr<TelemetryRuntime> CreateRealTelemetryRuntime() {
