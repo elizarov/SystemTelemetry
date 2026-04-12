@@ -19,6 +19,7 @@
 
 ## Repository conventions
 
+- Keep the repository license text in the top-level `LICENSE` file so hosting platforms can detect the project license from the standard path.
 - `docs/specifications.md` should keep only the core user-visible dashboard behavior requirements that are not diagnostics-specific.
 - `docs/diagnostics.md` should capture command-line diagnostics behavior, trace/dump/screenshot output requirements, and diagnostics-specific verification expectations.
 - `docs/layout.md` should capture the configuration language syntax, section ownership, and maintained inline language examples.

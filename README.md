@@ -5,3 +5,5 @@ The app reads telemetry from Windows and vendor runtimes where available, includ
 For first-use setup, start the app, open the tray or window menu, use `Config To Display` to pick the target monitor, and then enable `Auto-start on user logon` if you want it to launch automatically after sign-in.
 
 Build and development setup instructions live in [docs/build.md](docs/build.md).
+
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
