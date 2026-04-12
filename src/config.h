@@ -13,6 +13,7 @@ struct UiFontConfig {
     int size = 0;
     int weight = 0;
 };
+
 CONFIG_CODEC(UiFontConfig, configschema::FontSpecCodec);
 CONFIG_CODEC(std::vector<std::string>, configschema::StringCodec);
 
@@ -34,12 +35,14 @@ struct LogicalPointConfig {
     int x = 0;
     int y = 0;
 };
+
 CONFIG_CODEC(LogicalPointConfig, configschema::LogicalPointCodec);
 
 struct LogicalSizeConfig {
     int width = 0;
     int height = 0;
 };
+
 CONFIG_CODEC(LogicalSizeConfig, configschema::LogicalSizeCodec);
 
 struct DisplayConfig {
@@ -73,6 +76,7 @@ struct BoardConfig {
     std::unordered_map<std::string, std::string> temperatureSensorNames;
     std::unordered_map<std::string, std::string> fanSensorNames;
 };
+
 CONFIG_SECTION_CODEC(BoardConfig, configschema::BoardSectionCodec);
 
 struct DashboardSectionConfig {
@@ -121,6 +125,7 @@ struct LayoutNodeConfig {
     bool cardReference = false;
     std::vector<LayoutNodeConfig> children;
 };
+
 CONFIG_CODEC(LayoutNodeConfig, configschema::LayoutExpressionCodec);
 
 struct LayoutSectionConfig {

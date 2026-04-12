@@ -29,5 +29,6 @@ AllowShortLoopsOnASingleLine: false
 
 IncludeBlocks: Preserve
 SortIncludes: false
+SeparateDefinitionBlocks: Always
 ReflowComments: false
 SpacesBeforeTrailingComments: 2

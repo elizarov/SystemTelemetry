@@ -29,6 +29,7 @@
 #include "dashboard_controller.h"
 #include "diagnostics_options.h"
 #include "layout_edit_controller.h"
+
 class DashboardApp : private LayoutEditHost, public DashboardShellHost {
 public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {});

@@ -227,6 +227,7 @@ std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedN
     if (requestedName.empty()) {
         return std::nullopt;
     }
+
     struct SearchContext {
         std::string requestedName;
         std::optional<TargetMonitorInfo> result;

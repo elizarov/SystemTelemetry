@@ -24,14 +24,23 @@ template <size_t N> struct FixedString {
 };
 
 struct IntCodec {};
+
 struct DoubleCodec {};
+
 struct StringCodec {};
+
 struct LogicalPointCodec {};
+
 struct LogicalSizeCodec {};
+
 struct HexColorCodec {};
+
 struct FontSpecCodec {};
+
 struct LayoutExpressionCodec {};
+
 struct StructuredSectionCodec {};
+
 struct BoardSectionCodec {};
 
 template <typename T> struct DefaultCodec;

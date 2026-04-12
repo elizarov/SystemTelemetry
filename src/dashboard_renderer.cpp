@@ -437,6 +437,7 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
 bool DashboardRenderer::ResolveLayout() {
     return DashboardLayoutResolver::ResolveLayout(*this);
 }
+
 DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
     HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const {
     TextLayoutResult result{rect};
