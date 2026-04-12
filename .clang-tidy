@@ -1,0 +1,9 @@
+Checks: >
+  -*,
+  clang-analyzer-core.*,
+  clang-analyzer-cplusplus.NewDelete,
+  bugprone-use-after-move
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(src|tests)/'
+FormatStyle: none
+UseColor: false

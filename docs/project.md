@@ -16,7 +16,7 @@
 - Keep the repo-level `.clang-format` as the single maintained source of truth for C++ formatting rules.
 - Keep the repo-level `.clangd` as the maintained source of truth for the project compilation-database path used by `clangd` clients.
 - Use the top-level `format.cmd` script as the maintained entry point for formatting non-vendored C++ sources; run `format` to check and `format fix` to apply the repo style.
-- Use the top-level `check_architecture.cmd` script as the maintained entry point for header-to-implementation ownership checks and header-body checks.
+- Use the top-level `lint.cmd` script as the maintained entry point for header-to-implementation ownership checks and header-body checks; `lint` runs the architectural policy checks and `lint tidy` runs the optional whole-repo `clang-tidy` sweep.
 - Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
 - Provide an `install.cmd` script at the repository root that requests elevation, stops running `SystemTelemetry.exe` instances before deployment, waits for those processes to exit, installs the already-built runtime into `C:\Program Files\SystemTelemetry`, copies `build\SystemTelemetry.exe` there, and leaves auto-start registration to the runtime popup-menu toggle.
 - Keep third-party source vendoring narrow; prefer package-managed dependencies where practical and keep only the minimal ADLX SDK subset needed for the AMD GPU provider in-tree.
