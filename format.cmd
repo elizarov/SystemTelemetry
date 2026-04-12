@@ -19,7 +19,7 @@ if not "%~2"=="" goto :usage
 set "file_count=0"
 set "failed=0"
 
-for /f "usebackq delims=" %%F in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$files = git -c core.quotepath=off ls-files -- '*.cpp' '*.h'; $files | Where-Object { $_ -notlike 'src/vendor/*' -and $_ -notlike 'tests/gtest/*' }"`) do (
+for /f "usebackq delims=" %%F in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$files = git -c core.quotepath=off ls-files -- '*.cpp' '*.h'; $files | Where-Object { $_ -notlike 'src/vendor/*' }"`) do (
     set /a file_count+=1
     if /I "%mode%"=="fix" (
         "%clang_format%" -i "%%F"

@@ -30,7 +30,36 @@ if exist "%CMAKE_BUILD_ROOT%\CMakeCache.txt" (
 )
 if not exist "%CMAKE_BUILD_ROOT%" mkdir "%CMAKE_BUILD_ROOT%"
 
-cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+set "VCPKG_TOOLCHAIN_FILE="
+set "VCPKG_EXE="
+if defined VCPKG_ROOT (
+    if exist "%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" (
+        set "VCPKG_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
+    ) else (
+        echo VCPKG_ROOT is set but "%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" was not found.
+        exit /b 1
+    )
+    if exist "%VCPKG_ROOT%\vcpkg.exe" (
+        set "VCPKG_EXE=%VCPKG_ROOT%\vcpkg.exe"
+    ) else (
+        echo VCPKG_ROOT is set but "%VCPKG_ROOT%\vcpkg.exe" was not found.
+        exit /b 1
+    )
+) else if exist "%REPO_ROOT%\vcpkg.json" if not defined CMAKE_TOOLCHAIN_FILE (
+    echo The repo uses a vcpkg manifest for test dependencies.
+    echo Set VCPKG_ROOT to your vcpkg install before running build.cmd.
+    exit /b 1
+)
+
+if defined VCPKG_TOOLCHAIN_FILE (
+    if exist "%REPO_ROOT%\vcpkg.json" (
+        "%VCPKG_EXE%" install --x-manifest-root="%REPO_ROOT%" --x-install-root="%BUILD_ROOT%\vcpkg_installed" --triplet x64-windows
+        if errorlevel 1 goto build_done
+    )
+    cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DVCPKG_TARGET_TRIPLET=x64-windows "-DCMAKE_TOOLCHAIN_FILE=%VCPKG_TOOLCHAIN_FILE%"
+) else (
+    cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+)
 if errorlevel 1 goto build_done
 
 if "%~1"=="" (

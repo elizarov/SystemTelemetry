@@ -8,6 +8,7 @@ This document is the single maintained source of truth for build prerequisites, 
 - Visual Studio 2022 Build Tools with CMake support
 - Visual Studio 2022 C++/CLI support
 - .NET Framework 4.8 SDK
+- vcpkg with `VCPKG_ROOT` set so the CMake configure step can resolve the repo manifest dependency on GoogleTest
 - AMD Software: Adrenalin Edition with ADLX runtime available for AMD GPU telemetry
 - Gigabyte SIV installed on supported Gigabyte motherboards when board temperature and fan telemetry are desired
 
@@ -20,7 +21,7 @@ build.cmd
 ```
 
 All build artifacts are kept under `build\`.
-`build.cmd` configures the CMake tree with `Ninja Multi-Config` and keeps `build\cmake\compile_commands.json` available for `clangd`-based editors such as Zed.
+`build.cmd` configures the CMake tree with `Ninja Multi-Config`, uses `%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake` when `VCPKG_ROOT` is set, installs the repo `vcpkg.json` manifest for the `x64-windows` triplet into `build\vcpkg_installed\` so `SystemTelemetryTests` links against the full GoogleTest package, and restores `build\cmake\compile_commands.json` for `clangd`-based editors such as Zed.
 
 ## Install
 

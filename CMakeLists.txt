@@ -198,22 +198,16 @@ set_target_properties(SystemTelemetry PROPERTIES
 
 enable_testing()
 
-add_library(gtest INTERFACE)
-target_include_directories(gtest INTERFACE
-    "${CMAKE_SOURCE_DIR}/tests/gtest/include"
-    "${CMAKE_SOURCE_DIR}/src"
-)
+set(systemtelemetry_vcpkg_triplet "x64-windows")
+if(DEFINED VCPKG_TARGET_TRIPLET AND NOT VCPKG_TARGET_TRIPLET STREQUAL "")
+    set(systemtelemetry_vcpkg_triplet "${VCPKG_TARGET_TRIPLET}")
+endif()
 
-add_library(gtest_main STATIC
-    tests/gtest/src/gtest_main.cpp
-)
-target_link_libraries(gtest_main PUBLIC gtest)
-target_compile_options(gtest_main PRIVATE
-    /EHsc
-    /W4
-    /permissive-
-    /Zi
-)
+if(EXISTS "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/${systemtelemetry_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
+    list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/${systemtelemetry_vcpkg_triplet}")
+endif()
+
+find_package(GTest CONFIG REQUIRED)
 
 add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
@@ -248,10 +242,16 @@ target_link_options(SystemTelemetryTests PRIVATE
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
 )
 target_link_libraries(SystemTelemetryTests PRIVATE
-    gtest_main
+    GTest::gtest_main
 )
 set_target_properties(SystemTelemetryTests PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
+)
+add_custom_command(TARGET SystemTelemetryTests POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        $<TARGET_RUNTIME_DLLS:SystemTelemetryTests>
+        $<TARGET_FILE_DIR:SystemTelemetryTests>
+    COMMAND_EXPAND_LISTS
 )
 
 add_test(NAME SystemTelemetryTests COMMAND SystemTelemetryTests)
