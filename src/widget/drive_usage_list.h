@@ -50,6 +50,7 @@ public:
         std::vector<RECT> rowReadIndicatorRects;
         std::vector<RECT> rowWriteIndicatorRects;
         std::vector<RECT> rowBarRects;
+        std::vector<RECT> rowBarAnchorRects;
     };
 
     DashboardWidgetClass Class() const override;
@@ -61,6 +62,7 @@ public:
         HDC hdc,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;
+    void BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
     void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
 
 private:

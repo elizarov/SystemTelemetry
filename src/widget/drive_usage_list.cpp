@@ -201,6 +201,7 @@ void DriveUsageListWidget::ResolveLayoutState(const DashboardRenderer& renderer,
     layoutState_.rowReadIndicatorRects.clear();
     layoutState_.rowWriteIndicatorRects.clear();
     layoutState_.rowBarRects.clear();
+    layoutState_.rowBarAnchorRects.clear();
     const int totalRows = static_cast<int>(renderer.Config().storage.drives.size());
     RECT rowRect{rect.left, layoutState_.headerRect.bottom, rect.right, layoutState_.headerRect.bottom + layoutState_.rowHeight};
     for (int rowIndex = 0; rowIndex < totalRows && rowRect.top < rect.bottom; ++rowIndex) {
@@ -225,6 +226,14 @@ void DriveUsageListWidget::ResolveLayoutState(const DashboardRenderer& renderer,
         const int barTop =
             static_cast<int>(rowRect.top) + (std::max)(0, (rowPixelHeight - layoutState_.driveBarHeight) / 2);
         layoutState_.rowBarRects.push_back(RECT{columns.bar.left, barTop, columns.bar.right, barTop + layoutState_.driveBarHeight});
+        const int anchorCenterX =
+            static_cast<int>(columns.bar.left) + ((std::max)(0, static_cast<int>(columns.bar.right - columns.bar.left) / 2));
+        const int anchorCenterY = barTop + layoutState_.driveBarHeight;
+        const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
+        layoutState_.rowBarAnchorRects.push_back(RECT{anchorCenterX - (anchorSize / 2),
+            anchorCenterY - (anchorSize / 2),
+            anchorCenterX - (anchorSize / 2) + anchorSize,
+            anchorCenterY - (anchorSize / 2) + anchorSize});
         OffsetRect(&rowRect, 0, layoutState_.rowHeight);
     }
     layoutState_.visibleRows = static_cast<int>(layoutState_.rowBands.size());
@@ -255,65 +264,32 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
-    const auto& config = renderer.Config().layout.driveUsageList;
     const int savedDc = SaveDC(hdc);
     IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
-    renderer.RegisterEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::DriveUsageActivitySegments,
-            0,
-        },
-        layoutState_.activityTargetRect,
-        layoutState_.activityAnchorRect,
-        DashboardRenderer::AnchorShape::Diamond,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::AxisDelta,
-        POINT{layoutState_.activityAnchorCenterX, layoutState_.firstRowContentTop},
-        1.0,
-        true,
-        true,
-        config.activitySegments);
     renderer.DrawTextBlock(hdc,
         layoutState_.headerReadLabelRect,
         "R",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
-        renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontSmall,
-            0,
-            renderer.Config().layout.fonts.smallText.size));
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
     renderer.DrawTextBlock(hdc,
         layoutState_.headerWriteLabelRect,
         "W",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
-        renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontSmall,
-            1,
-            renderer.Config().layout.fonts.smallText.size));
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
     renderer.DrawTextBlock(hdc,
         layoutState_.usageHeaderRect,
         "Usage",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontSmall,
-            2,
-            renderer.Config().layout.fonts.smallText.size));
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER);
     renderer.DrawTextBlock(hdc,
         layoutState_.headerColumns.free,
         "Free",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
-        DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontSmall,
-            3,
-            renderer.Config().layout.fonts.smallText.size));
+        DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
 
     const auto rows = metrics.ResolveDriveRows();
     for (size_t rowIndex = 0; rowIndex < rows.size() && rowIndex < layoutState_.rowBands.size(); ++rowIndex) {
@@ -329,11 +305,13 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
             drive.label,
             renderer.WidgetFonts().label,
             renderer.ForegroundColor(),
+            DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        renderer.RegisterDynamicTextAnchor(columns.label,
+            drive.label,
+            renderer.WidgetFonts().label,
             DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(widget,
-                DashboardRenderer::AnchorEditParameter::FontLabel,
-                textBaseId,
-                renderer.Config().layout.fonts.label.size));
+            renderer.MakeEditableTextBinding(
+                widget, DashboardRenderer::AnchorEditParameter::FontLabel, textBaseId, renderer.Config().layout.fonts.label.size));
         DrawSegmentIndicator(hdc,
             readIndicatorRect,
             layoutState_.activitySegments,
@@ -353,30 +331,6 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
             drive.usedPercent / 100.0,
             std::nullopt,
             renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
-        const int anchorSize = (std::max)(4, renderer.ScaleLogical(6));
-        const int anchorCenterX =
-            static_cast<int>(barRect.left) + ((std::max)(0, static_cast<int>(barRect.right - barRect.left) / 2));
-        const int anchorCenterY = static_cast<int>(barRect.bottom);
-        renderer.RegisterEditableAnchorRegion(
-            DashboardRenderer::EditableAnchorKey{
-                DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                DashboardRenderer::AnchorEditParameter::DriveUsageBarHeight,
-                static_cast<int>(rowIndex),
-            },
-            barRect,
-            RECT{anchorCenterX - (anchorSize / 2),
-                anchorCenterY - (anchorSize / 2),
-                anchorCenterX - (anchorSize / 2) + anchorSize,
-                anchorCenterY - (anchorSize / 2) + anchorSize},
-            DashboardRenderer::AnchorShape::Circle,
-            DashboardRenderer::AnchorDragAxis::Horizontal,
-            DashboardRenderer::AnchorDragMode::AxisDelta,
-            POINT{anchorCenterX, anchorCenterY},
-            1.0,
-            false,
-            true,
-            config.barHeight);
-
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
             char percent[16];
             sprintf_s(percent, "%.0f%%", drive.usedPercent);
@@ -385,6 +339,10 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
                 percent,
                 renderer.WidgetFonts().label,
                 renderer.ForegroundColor(),
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+            renderer.RegisterDynamicTextAnchor(columns.percent,
+                percent,
+                renderer.WidgetFonts().label,
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER,
                 renderer.MakeEditableTextBinding(widget,
                     DashboardRenderer::AnchorEditParameter::FontLabel,
@@ -395,6 +353,10 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
                 drive.freeText,
                 renderer.WidgetFonts().smallFont,
                 renderer.MutedTextColor(),
+                DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+            renderer.RegisterDynamicTextAnchor(columns.free,
+                drive.freeText,
+                renderer.WidgetFonts().smallFont,
                 DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
                 renderer.MakeEditableTextBinding(widget,
                     DashboardRenderer::AnchorEditParameter::FontSmall,
@@ -405,6 +367,74 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
     }
 
     RestoreDC(hdc, savedDc);
+}
+
+void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
+    const auto& config = renderer.Config().layout.driveUsageList;
+    renderer.RegisterStaticEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::DriveUsageActivitySegments,
+            0,
+        },
+        layoutState_.activityTargetRect,
+        layoutState_.activityAnchorRect,
+        DashboardRenderer::AnchorShape::Diamond,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::AxisDelta,
+        POINT{layoutState_.activityAnchorCenterX, layoutState_.firstRowContentTop},
+        1.0,
+        true,
+        true,
+        config.activitySegments);
+    renderer.RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
+        "R",
+        renderer.WidgetFonts().smallFont,
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
+        renderer.MakeEditableTextBinding(
+            widget, DashboardRenderer::AnchorEditParameter::FontSmall, 0, renderer.Config().layout.fonts.smallText.size));
+    renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
+        "W",
+        renderer.WidgetFonts().smallFont,
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP,
+        renderer.MakeEditableTextBinding(
+            widget, DashboardRenderer::AnchorEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size));
+    renderer.RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
+        "Usage",
+        renderer.WidgetFonts().smallFont,
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+        renderer.MakeEditableTextBinding(
+            widget, DashboardRenderer::AnchorEditParameter::FontSmall, 2, renderer.Config().layout.fonts.smallText.size));
+    renderer.RegisterStaticTextAnchor(layoutState_.headerColumns.free,
+        "Free",
+        renderer.WidgetFonts().smallFont,
+        DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
+        renderer.MakeEditableTextBinding(
+            widget, DashboardRenderer::AnchorEditParameter::FontSmall, 3, renderer.Config().layout.fonts.smallText.size));
+    for (int rowIndex = 0; rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.rowBarRects.size()) &&
+                           rowIndex < static_cast<int>(layoutState_.rowBarAnchorRects.size());
+         ++rowIndex) {
+        const RECT& barRect = layoutState_.rowBarRects[rowIndex];
+        const RECT& anchorRect = layoutState_.rowBarAnchorRects[rowIndex];
+        const int anchorCenterX = anchorRect.left + ((std::max)(0L, anchorRect.right - anchorRect.left) / 2);
+        const int anchorCenterY = anchorRect.top + ((std::max)(0L, anchorRect.bottom - anchorRect.top) / 2);
+        renderer.RegisterStaticEditableAnchorRegion(
+            DashboardRenderer::EditableAnchorKey{
+                DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+                DashboardRenderer::AnchorEditParameter::DriveUsageBarHeight,
+                rowIndex,
+            },
+            barRect,
+            anchorRect,
+            DashboardRenderer::AnchorShape::Circle,
+            DashboardRenderer::AnchorDragAxis::Horizontal,
+            DashboardRenderer::AnchorDragMode::AxisDelta,
+            POINT{anchorCenterX, anchorCenterY},
+            1.0,
+            false,
+            true,
+            config.barHeight);
+    }
 }
 
 void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

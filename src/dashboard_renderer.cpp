@@ -409,6 +409,10 @@ void DashboardRenderer::BuildWidgetEditGuides() {
     DashboardLayoutResolver::BuildWidgetEditGuides(*this);
 }
 
+void DashboardRenderer::BuildStaticEditableAnchors() {
+    DashboardLayoutResolver::BuildStaticEditableAnchors(*this);
+}
+
 void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
     const RECT& rect,
     const std::vector<RECT>& childRects,
@@ -479,43 +483,31 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
     return result;
 }
 
+DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
+    const RECT& rect, const std::string& text, HFONT font, UINT format) const {
+    HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
+    if (hdc == nullptr) {
+        return TextLayoutResult{rect};
+    }
+
+    const TextLayoutResult result = MeasureTextBlock(hdc, rect, text, font, format);
+    ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
+    return result;
+}
+
 DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(HDC hdc,
     const RECT& rect,
     const std::string& text,
     HFONT font,
     COLORREF color,
-    UINT format,
-    const std::optional<EditableAnchorBinding>& editable) {
-    TextLayoutResult result{rect};
+    UINT format) {
+    const TextLayoutResult result = MeasureTextBlock(hdc, rect, text, font, format);
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
     RECT copy = rect;
     const std::wstring wideText = WideFromUtf8(text);
     DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
     SelectObject(hdc, oldFont);
-    if (editable.has_value() && !wideText.empty()) {
-        result = MeasureTextBlock(hdc, rect, text, font, format);
-
-        const int anchorSize = std::max(4, ScaleLogical(6));
-        const int anchorHalf = anchorSize / 2;
-        const int anchorCenterX = result.textRect.right;
-        const int anchorCenterY = result.textRect.top;
-        const RECT anchorRect{anchorCenterX - anchorHalf,
-            anchorCenterY - anchorHalf,
-            anchorCenterX - anchorHalf + anchorSize,
-            anchorCenterY - anchorHalf + anchorSize};
-        RegisterEditableAnchorRegion(editable->key,
-            result.textRect,
-            anchorRect,
-            editable->shape,
-            editable->dragAxis,
-            editable->dragMode,
-            POINT{anchorCenterX, anchorCenterY},
-            1.0,
-            false,
-            true,
-            editable->value);
-    }
     return result;
 }
 
@@ -555,35 +547,33 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
         return;
     }
 
-    std::vector<std::pair<const EditableAnchorRegion*, bool>> highlights;
+    std::vector<std::pair<EditableAnchorRegion, bool>> highlights;
     if (overlayState.activeEditableAnchor.has_value()) {
-        const auto it = std::find_if(
-            editableAnchorRegions_.begin(), editableAnchorRegions_.end(), [&](const EditableAnchorRegion& region) {
-                return MatchesEditableAnchorKey(region.key, *overlayState.activeEditableAnchor);
-            });
-        if (it != editableAnchorRegions_.end()) {
-            highlights.push_back({&(*it), true});
+        const auto region = FindEditableAnchorRegion(*overlayState.activeEditableAnchor);
+        if (region.has_value()) {
+            highlights.push_back({*region, true});
         }
     } else if (overlayState.hoveredEditableAnchor.has_value()) {
-        const auto it = std::find_if(
-            editableAnchorRegions_.begin(), editableAnchorRegions_.end(), [&](const EditableAnchorRegion& region) {
-                return MatchesEditableAnchorKey(region.key, *overlayState.hoveredEditableAnchor);
-            });
-        if (it != editableAnchorRegions_.end()) {
-            highlights.push_back({&(*it), false});
+        const auto region = FindEditableAnchorRegion(*overlayState.hoveredEditableAnchor);
+        if (region.has_value()) {
+            highlights.push_back({*region, false});
         }
     } else if (overlayState.hoveredEditableWidget.has_value()) {
-        for (const auto& region : editableAnchorRegions_) {
-            if (!region.showWhenWidgetHovered) {
-                continue;
+        const auto collectHovered = [&](const std::vector<EditableAnchorRegion>& regions) {
+            for (const auto& region : regions) {
+                if (!region.showWhenWidgetHovered) {
+                    continue;
+                }
+                if (region.key.widget.renderCardId != overlayState.hoveredEditableWidget->renderCardId ||
+                    region.key.widget.editCardId != overlayState.hoveredEditableWidget->editCardId ||
+                    region.key.widget.nodePath != overlayState.hoveredEditableWidget->nodePath) {
+                    continue;
+                }
+                highlights.push_back({region, false});
             }
-            if (region.key.widget.renderCardId != overlayState.hoveredEditableWidget->renderCardId ||
-                region.key.widget.editCardId != overlayState.hoveredEditableWidget->editCardId ||
-                region.key.widget.nodePath != overlayState.hoveredEditableWidget->nodePath) {
-                continue;
-            }
-            highlights.push_back({&region, false});
-        }
+        };
+        collectHovered(staticEditableAnchorRegions_);
+        collectHovered(dynamicEditableAnchorRegions_);
     }
     if (highlights.empty()) {
         return;
@@ -594,13 +584,13 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
     for (const auto& [highlighted, active] : highlights) {
         const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
-        if (highlighted->drawTargetOutline && highlighted->targetRect.right > highlighted->targetRect.left &&
-            highlighted->targetRect.bottom > highlighted->targetRect.top) {
+        if (highlighted.drawTargetOutline && highlighted.targetRect.right > highlighted.targetRect.left &&
+            highlighted.targetRect.bottom > highlighted.targetRect.top) {
             Gdiplus::Pen pen(
                 Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
                 static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
             pen.SetDashStyle(Gdiplus::DashStyleDot);
-            const RECT& targetRect = highlighted->targetRect;
+            const RECT& targetRect = highlighted.targetRect;
             graphics.DrawRectangle(&pen,
                 static_cast<Gdiplus::REAL>(targetRect.left),
                 static_cast<Gdiplus::REAL>(targetRect.top),
@@ -608,8 +598,8 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
                 static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.bottom - targetRect.top)));
         }
 
-        if (highlighted->shape == AnchorShape::Circle) {
-            const RECT& anchorRect = highlighted->anchorRect;
+        if (highlighted.shape == AnchorShape::Circle) {
+            const RECT& anchorRect = highlighted.anchorRect;
             Gdiplus::Pen pen(
                 Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
                 static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
@@ -619,7 +609,7 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
                 static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
                 static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
         } else {
-            FillDiamond(hdc, highlighted->anchorRect, outlineColor);
+            FillDiamond(hdc, highlighted.anchorRect, outlineColor);
         }
     }
 }
@@ -738,7 +728,8 @@ DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBind
     };
 }
 
-void DashboardRenderer::RegisterEditableAnchorRegion(const EditableAnchorKey& key,
+void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<EditableAnchorRegion>& regions,
+    const EditableAnchorKey& key,
     const RECT& targetRect,
     const RECT& anchorRect,
     AnchorShape shape,
@@ -770,7 +761,100 @@ void DashboardRenderer::RegisterEditableAnchorRegion(const EditableAnchorKey& ke
     region.showWhenWidgetHovered = showWhenWidgetHovered;
     region.drawTargetOutline = drawTargetOutline;
     region.value = value;
-    editableAnchorRegions_.push_back(std::move(region));
+    regions.push_back(std::move(region));
+}
+
+void DashboardRenderer::RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
+    const RECT& targetRect,
+    const RECT& anchorRect,
+    AnchorShape shape,
+    AnchorDragAxis dragAxis,
+    AnchorDragMode dragMode,
+    POINT dragOrigin,
+    double dragScale,
+    bool showWhenWidgetHovered,
+    bool drawTargetOutline,
+    int value) {
+    RegisterEditableAnchorRegion(staticEditableAnchorRegions_,
+        key,
+        targetRect,
+        anchorRect,
+        shape,
+        dragAxis,
+        dragMode,
+        dragOrigin,
+        dragScale,
+        showWhenWidgetHovered,
+        drawTargetOutline,
+        value);
+}
+
+void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const EditableAnchorKey& key,
+    const RECT& targetRect,
+    const RECT& anchorRect,
+    AnchorShape shape,
+    AnchorDragAxis dragAxis,
+    AnchorDragMode dragMode,
+    POINT dragOrigin,
+    double dragScale,
+    bool showWhenWidgetHovered,
+    bool drawTargetOutline,
+    int value) {
+    RegisterEditableAnchorRegion(dynamicEditableAnchorRegions_,
+        key,
+        targetRect,
+        anchorRect,
+        shape,
+        dragAxis,
+        dragMode,
+        dragOrigin,
+        dragScale,
+        showWhenWidgetHovered,
+        drawTargetOutline,
+        value);
+}
+
+void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
+    const RECT& rect,
+    const std::string& text,
+    HFONT font,
+    UINT format,
+    const EditableAnchorBinding& editable) {
+    if (text.empty()) {
+        return;
+    }
+
+    const TextLayoutResult result = MeasureTextBlock(rect, text, font, format);
+    const int anchorSize = std::max(4, ScaleLogical(6));
+    const int anchorHalf = anchorSize / 2;
+    const int anchorCenterX = result.textRect.right;
+    const int anchorCenterY = result.textRect.top;
+    const RECT anchorRect{anchorCenterX - anchorHalf,
+        anchorCenterY - anchorHalf,
+        anchorCenterX - anchorHalf + anchorSize,
+        anchorCenterY - anchorHalf + anchorSize};
+    RegisterEditableAnchorRegion(regions,
+        editable.key,
+        result.textRect,
+        anchorRect,
+        editable.shape,
+        editable.dragAxis,
+        editable.dragMode,
+        POINT{anchorCenterX, anchorCenterY},
+        1.0,
+        false,
+        true,
+        editable.value);
+}
+
+void DashboardRenderer::RegisterStaticTextAnchor(
+    const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
+    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, font, format, editable);
+}
+
+void DashboardRenderer::RegisterDynamicTextAnchor(
+    const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, font, format, editable);
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const {
@@ -988,23 +1072,7 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
         DrawPanelIcon(hdc, card.iconName, card.iconRect);
     }
     if (!card.title.empty()) {
-        DrawTextBlock(hdc,
-            card.titleRect,
-            card.title,
-            fonts_.title,
-            ForegroundColor(),
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-            EditableAnchorBinding{
-                EditableAnchorKey{
-                    LayoutWidgetIdentity{card.id, card.id, {}},
-                    AnchorEditParameter::FontTitle,
-                    0,
-                },
-                config_.layout.fonts.title.size,
-                AnchorShape::Circle,
-                AnchorDragAxis::Vertical,
-                AnchorDragMode::AxisDelta,
-            });
+        DrawTextBlock(hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     }
 }
 
@@ -1054,7 +1122,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
 }
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
-    editableAnchorRegions_.clear();
+    dynamicEditableAnchorRegions_.clear();
     DashboardMetricSource metrics(snapshot, config_.metricScales);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
@@ -1244,9 +1312,17 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
 
 std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(
     POINT clientPoint) const {
-    for (auto it = editableAnchorRegions_.rbegin(); it != editableAnchorRegions_.rend(); ++it) {
-        if (PtInRect(&it->targetRect, clientPoint)) {
-            return it->key;
+    std::vector<const EditableAnchorRegion*> regions;
+    regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
+    for (const auto& region : staticEditableAnchorRegions_) {
+        regions.push_back(&region);
+    }
+    for (const auto& region : dynamicEditableAnchorRegions_) {
+        regions.push_back(&region);
+    }
+    for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
+        if (PtInRect(&(*it)->targetRect, clientPoint)) {
+            return (*it)->key;
         }
     }
     return std::nullopt;
@@ -1254,23 +1330,32 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
 
 std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(
     POINT clientPoint) const {
-    for (auto it = editableAnchorRegions_.rbegin(); it != editableAnchorRegions_.rend(); ++it) {
+    std::vector<const EditableAnchorRegion*> regions;
+    regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
+    for (const auto& region : staticEditableAnchorRegions_) {
+        regions.push_back(&region);
+    }
+    for (const auto& region : dynamicEditableAnchorRegions_) {
+        regions.push_back(&region);
+    }
+    for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
+        const EditableAnchorRegion& region = *(*it);
         bool hit = false;
-        if (it->shape == AnchorShape::Circle) {
-            const int width = std::max(1L, it->anchorRect.right - it->anchorRect.left);
-            const int height = std::max(1L, it->anchorRect.bottom - it->anchorRect.top);
+        if (region.shape == AnchorShape::Circle) {
+            const int width = std::max(1L, region.anchorRect.right - region.anchorRect.left);
+            const int height = std::max(1L, region.anchorRect.bottom - region.anchorRect.top);
             const double radius = static_cast<double>(std::max(width, height)) / 2.0;
-            const double centerX = static_cast<double>(it->anchorRect.left) + static_cast<double>(width) / 2.0;
-            const double centerY = static_cast<double>(it->anchorRect.top) + static_cast<double>(height) / 2.0;
+            const double centerX = static_cast<double>(region.anchorRect.left) + static_cast<double>(width) / 2.0;
+            const double centerY = static_cast<double>(region.anchorRect.top) + static_cast<double>(height) / 2.0;
             const double dx = static_cast<double>(clientPoint.x) - centerX;
             const double dy = static_cast<double>(clientPoint.y) - centerY;
             const double distance = std::sqrt((dx * dx) + (dy * dy));
-            hit = std::abs(distance - radius) <= static_cast<double>(it->anchorHitPadding);
+            hit = std::abs(distance - radius) <= static_cast<double>(region.anchorHitPadding);
         } else {
-            hit = PtInRect(&it->anchorHitRect, clientPoint);
+            hit = PtInRect(&region.anchorHitRect, clientPoint);
         }
         if (hit) {
-            return it->key;
+            return region.key;
         }
     }
     return std::nullopt;
@@ -1278,13 +1363,19 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
 
 std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
     const EditableAnchorKey& key) const {
-    const auto it = std::find_if(editableAnchorRegions_.begin(),
-        editableAnchorRegions_.end(),
-        [&](const EditableAnchorRegion& region) { return MatchesEditableAnchorKey(region.key, key); });
-    if (it == editableAnchorRegions_.end()) {
-        return std::nullopt;
+    const auto findIn = [&](const std::vector<EditableAnchorRegion>& regions) -> std::optional<EditableAnchorRegion> {
+        const auto it = std::find_if(regions.begin(),
+            regions.end(),
+            [&](const EditableAnchorRegion& region) { return MatchesEditableAnchorKey(region.key, key); });
+        if (it == regions.end()) {
+            return std::nullopt;
+        }
+        return *it;
+    };
+    if (const auto staticRegion = findIn(staticEditableAnchorRegions_); staticRegion.has_value()) {
+        return staticRegion;
     }
-    return *it;
+    return findIn(dynamicEditableAnchorRegions_);
 }
 
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
@@ -1336,7 +1427,8 @@ void DashboardRenderer::Shutdown() {
     fontHeights_ = {};
     resolvedLayout_ = {};
     parsedWidgetInfoCache_.clear();
-    editableAnchorRegions_.clear();
+    staticEditableAnchorRegions_.clear();
+    dynamicEditableAnchorRegions_.clear();
     ReleasePanelIcons();
     ShutdownGdiplus();
 }

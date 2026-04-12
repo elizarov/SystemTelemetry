@@ -13,6 +13,8 @@ std::unique_ptr<DashboardWidget> TextWidget::Clone() const {
 
 void TextWidget::Initialize(const LayoutNodeConfig& node) {
     metric_ = node.parameter;
+    staticAnchorRegistered_ = false;
+    cachedStaticText_.clear();
 }
 
 int TextWidget::PreferredHeight(const DashboardRenderer& renderer) const {
@@ -28,12 +30,24 @@ void TextWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
+    const std::string text = metrics.ResolveText(metric_);
     renderer.DrawTextBlock(hdc,
         widget.rect,
-        metrics.ResolveText(metric_),
+        text,
         renderer.WidgetFonts().text,
         renderer.ForegroundColor(),
-        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
-        renderer.MakeEditableTextBinding(
-            widget, DashboardRenderer::AnchorEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size));
+        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+    const auto binding = renderer.MakeEditableTextBinding(
+        widget, DashboardRenderer::AnchorEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
+    if (metric_ == "cpu.name" || metric_ == "gpu.name") {
+        if (!staticAnchorRegistered_) {
+            cachedStaticText_ = text;
+            renderer.RegisterStaticTextAnchor(
+                widget.rect, cachedStaticText_, renderer.WidgetFonts().text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS, binding);
+            staticAnchorRegistered_ = true;
+        }
+        return;
+    }
+    renderer.RegisterDynamicTextAnchor(
+        widget.rect, text, renderer.WidgetFonts().text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS, binding);
 }

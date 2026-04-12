@@ -30,11 +30,16 @@ void NetworkFooterWidget::Draw(DashboardRenderer& renderer,
         return;
     }
 
+    const std::string text = metrics.ResolveNetworkFooter();
     renderer.DrawTextBlock(hdc,
         widget.rect,
-        metrics.ResolveNetworkFooter(),
+        text,
         renderer.WidgetFonts().footer,
         renderer.MutedTextColor(),
+        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+    renderer.RegisterDynamicTextAnchor(widget.rect,
+        text,
+        renderer.WidgetFonts().footer,
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
         renderer.MakeEditableTextBinding(
             widget, DashboardRenderer::AnchorEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size));

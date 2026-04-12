@@ -218,54 +218,6 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
                   static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(gaugeLayout.segmentCount))) - 1,
                   0,
                   gaugeLayout.segmentCount - 1);
-    renderer.RegisterEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::SegmentCount,
-            0,
-        },
-        widget.rect,
-        layoutState_.segmentCountAnchorRect,
-        DashboardRenderer::AnchorShape::Diamond,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::AxisDelta,
-        POINT{cx, cy - outerRadius},
-        1.0,
-        true,
-        true,
-        renderer.Config().layout.gauge.segmentCount);
-    renderer.RegisterEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::GaugeOuterPadding,
-            0,
-        },
-        layoutState_.outerPaddingAnchorRect,
-        layoutState_.outerPaddingAnchorRect,
-        DashboardRenderer::AnchorShape::Circle,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::RadialDistance,
-        POINT{cx, cy},
-        -1.0,
-        true,
-        false,
-        renderer.Config().layout.gauge.outerPadding);
-    renderer.RegisterEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::GaugeRingThickness,
-            0,
-        },
-        layoutState_.ringThicknessAnchorRect,
-        layoutState_.ringThicknessAnchorRect,
-        DashboardRenderer::AnchorShape::Circle,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::RadialDistance,
-        POINT{cx, cy},
-        -1.0,
-        true,
-        false,
-        renderer.Config().layout.gauge.ringThickness);
 
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
@@ -319,6 +271,10 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             number,
             renderer.WidgetFonts().big,
             renderer.ForegroundColor(),
+            DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        renderer.RegisterDynamicTextAnchor(layoutState_.valueRect,
+            number,
+            renderer.WidgetFonts().big,
             DT_CENTER | DT_SINGLELINE | DT_VCENTER,
             renderer.MakeEditableTextBinding(
                 widget, DashboardRenderer::AnchorEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
@@ -328,11 +284,67 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
         "Load",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+}
+
+void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
+    const int cx = layoutState_.cx;
+    const int cy = layoutState_.cy;
+    const int outerRadius = layoutState_.outerRadius;
+    renderer.RegisterStaticEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::SegmentCount,
+            0,
+        },
+        widget.rect,
+        layoutState_.segmentCountAnchorRect,
+        DashboardRenderer::AnchorShape::Diamond,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::AxisDelta,
+        POINT{cx, cy - outerRadius},
+        1.0,
+        true,
+        true,
+        renderer.Config().layout.gauge.segmentCount);
+    renderer.RegisterStaticEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::GaugeOuterPadding,
+            0,
+        },
+        layoutState_.outerPaddingAnchorRect,
+        layoutState_.outerPaddingAnchorRect,
+        DashboardRenderer::AnchorShape::Circle,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::RadialDistance,
+        POINT{cx, cy},
+        -1.0,
+        true,
+        false,
+        renderer.Config().layout.gauge.outerPadding);
+    renderer.RegisterStaticEditableAnchorRegion(
+        DashboardRenderer::EditableAnchorKey{
+            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            DashboardRenderer::AnchorEditParameter::GaugeRingThickness,
+            0,
+        },
+        layoutState_.ringThicknessAnchorRect,
+        layoutState_.ringThicknessAnchorRect,
+        DashboardRenderer::AnchorShape::Circle,
+        DashboardRenderer::AnchorDragAxis::Both,
+        DashboardRenderer::AnchorDragMode::RadialDistance,
+        POINT{cx, cy},
+        -1.0,
+        true,
+        false,
+        renderer.Config().layout.gauge.ringThickness);
+    renderer.RegisterStaticTextAnchor(layoutState_.labelRect,
+        "Load",
+        renderer.WidgetFonts().smallFont,
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontSmall,
-            1,
-            renderer.Config().layout.fonts.smallText.size));
+        renderer.MakeEditableTextBinding(
+            widget, DashboardRenderer::AnchorEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size));
 }
 
 void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

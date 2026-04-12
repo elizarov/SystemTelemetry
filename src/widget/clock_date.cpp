@@ -29,11 +29,16 @@ void ClockDateWidget::Draw(DashboardRenderer& renderer,
         return;
     }
 
+    const std::string text = metrics.ResolveClockDate();
     renderer.DrawTextBlock(hdc,
         widget.rect,
-        metrics.ResolveClockDate(),
+        text,
         renderer.WidgetFonts().clockDate,
         renderer.MutedTextColor(),
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    renderer.RegisterDynamicTextAnchor(widget.rect,
+        text,
+        renderer.WidgetFonts().clockDate,
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::AnchorEditParameter::FontClockDate,

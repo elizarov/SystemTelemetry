@@ -38,6 +38,39 @@ int EffectiveMetricRowHeight(const DashboardRenderer& renderer) {
     return textHeight + verticalGap + barHeight;
 }
 
+std::string ResolveMetricListLabel(const MetricListWidget::Entry& entry) {
+    if (!entry.labelOverride.empty()) {
+        return entry.labelOverride;
+    }
+    if (entry.metricRef == "cpu.clock") {
+        return "Clock";
+    }
+    if (entry.metricRef == "cpu.ram") {
+        return "RAM";
+    }
+    if (entry.metricRef == "gpu.temp") {
+        return "Temp";
+    }
+    if (entry.metricRef == "gpu.clock") {
+        return "Clock";
+    }
+    if (entry.metricRef == "gpu.fan") {
+        return "Fan";
+    }
+    if (entry.metricRef == "gpu.vram") {
+        return "VRAM";
+    }
+    if (entry.metricRef.rfind("board.temp.", 0) == 0) {
+        const std::string name = entry.metricRef.substr(std::string("board.temp.").size());
+        return name.empty() ? "Temp" : name + " Temp";
+    }
+    if (entry.metricRef.rfind("board.fan.", 0) == 0) {
+        const std::string name = entry.metricRef.substr(std::string("board.fan.").size());
+        return name.empty() ? "Fan" : name + " Fan";
+    }
+    return {};
+}
+
 }  // namespace
 
 DashboardWidgetClass MetricListWidget::Class() const {
@@ -77,6 +110,11 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
                   0,
                   static_cast<int>(entries_.size()))
             : 0;
+    layoutState_.rowRects.clear();
+    layoutState_.labelRects.clear();
+    layoutState_.valueRects.clear();
+    layoutState_.barRects.clear();
+    layoutState_.barAnchorRects.clear();
     RECT rowRect{rect.left, rect.top, rect.right, rect.top + layoutState_.rowHeight};
     for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
         layoutState_.rowRects.push_back(rowRect);
@@ -91,6 +129,13 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
         layoutState_.labelRects.push_back(labelRect);
         layoutState_.valueRects.push_back(valueRect);
         layoutState_.barRects.push_back(RECT{valueRect.left, barTop, rowRect.right, barBottom});
+        const int anchorCenterX =
+            static_cast<int>(valueRect.left) + ((std::max)(0, static_cast<int>(rowRect.right - valueRect.left) / 2));
+        const int anchorCenterY = barBottom;
+        layoutState_.barAnchorRects.push_back(RECT{anchorCenterX - (layoutState_.anchorSize / 2),
+            anchorCenterY - (layoutState_.anchorSize / 2),
+            anchorCenterX - (layoutState_.anchorSize / 2) + layoutState_.anchorSize,
+            anchorCenterY - (layoutState_.anchorSize / 2) + layoutState_.anchorSize});
         OffsetRect(&rowRect, 0, layoutState_.rowHeight);
     }
 }
@@ -118,22 +163,20 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
             row.label,
             renderer.WidgetFonts().label,
             renderer.MutedTextColor(),
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(widget,
-                DashboardRenderer::AnchorEditParameter::FontLabel,
-                rowIndex * 2,
-                renderer.Config().layout.fonts.label.size));
+            DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
             renderer.DrawTextBlock(hdc,
                 valueRect,
                 row.valueText,
                 renderer.WidgetFonts().value,
                 renderer.ForegroundColor(),
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+            renderer.RegisterDynamicTextAnchor(valueRect,
+                row.valueText,
+                renderer.WidgetFonts().value,
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-                renderer.MakeEditableTextBinding(widget,
-                    DashboardRenderer::AnchorEditParameter::FontValue,
-                    rowIndex * 2 + 1,
-                    renderer.Config().layout.fonts.value.size));
+                renderer.MakeEditableTextBinding(
+                    widget, DashboardRenderer::AnchorEditParameter::FontValue, rowIndex * 2 + 1, renderer.Config().layout.fonts.value.size));
         }
         const RECT& barRect = layoutState_.barRects[rowIndex];
         renderer.DrawPillBar(hdc,
@@ -141,21 +184,30 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
             row.ratio,
             row.peakRatio,
             renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
-        const int anchorSize = layoutState_.anchorSize;
-        const int anchorCenterX =
-            static_cast<int>(barRect.left) + ((std::max)(0, static_cast<int>(barRect.right - barRect.left) / 2));
-        const int anchorCenterY = static_cast<int>(barRect.bottom);
-        renderer.RegisterEditableAnchorRegion(
+
+        ++rowIndex;
+    }
+    RestoreDC(hdc, savedDc);
+}
+
+void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
+    const auto& config = renderer.Config().layout.metricList;
+    for (int rowIndex = 0; rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.barRects.size()) &&
+                           rowIndex < static_cast<int>(layoutState_.barAnchorRects.size()) &&
+                           rowIndex < static_cast<int>(layoutState_.labelRects.size()) && rowIndex < static_cast<int>(entries_.size());
+         ++rowIndex) {
+        const RECT& barRect = layoutState_.barRects[rowIndex];
+        const RECT& anchorRect = layoutState_.barAnchorRects[rowIndex];
+        const int anchorCenterX = anchorRect.left + ((std::max)(0L, anchorRect.right - anchorRect.left) / 2);
+        const int anchorCenterY = anchorRect.top + ((std::max)(0L, anchorRect.bottom - anchorRect.top) / 2);
+        renderer.RegisterStaticEditableAnchorRegion(
             DashboardRenderer::EditableAnchorKey{
                 DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 DashboardRenderer::AnchorEditParameter::MetricListBarHeight,
                 rowIndex,
             },
             barRect,
-            RECT{anchorCenterX - (anchorSize / 2),
-                anchorCenterY - (anchorSize / 2),
-                anchorCenterX - (anchorSize / 2) + anchorSize,
-                anchorCenterY - (anchorSize / 2) + anchorSize},
+            anchorRect,
             DashboardRenderer::AnchorShape::Circle,
             DashboardRenderer::AnchorDragAxis::Horizontal,
             DashboardRenderer::AnchorDragMode::AxisDelta,
@@ -163,11 +215,17 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
             1.0,
             false,
             true,
-            renderer.Config().layout.metricList.barHeight);
-
-        ++rowIndex;
+            config.barHeight);
+        const std::string label = ResolveMetricListLabel(entries_[rowIndex]);
+        if (!label.empty()) {
+            renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
+                label,
+                renderer.WidgetFonts().label,
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+                renderer.MakeEditableTextBinding(
+                    widget, DashboardRenderer::AnchorEditParameter::FontLabel, rowIndex * 2, renderer.Config().layout.fonts.label.size));
+        }
     }
-    RestoreDC(hdc, savedDc);
 }
 
 void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

@@ -53,6 +53,7 @@ public:
     virtual void FinalizeLayoutGroup(
         DashboardRenderer& renderer, const std::vector<struct DashboardWidgetLayout*>& widgets);
     virtual void BuildEditGuides(DashboardRenderer& renderer, const struct DashboardWidgetLayout& widget) const;
+    virtual void BuildStaticAnchors(DashboardRenderer& renderer, const struct DashboardWidgetLayout& widget) const;
 };
 
 struct DashboardWidgetLayout {

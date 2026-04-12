@@ -16,6 +16,7 @@ public:
         int anchorSize = 4;
         int visibleRows = 0;
         std::vector<RECT> rowRects;
+        std::vector<RECT> barAnchorRects;
     };
 
     struct Entry {
@@ -32,6 +33,7 @@ public:
         HDC hdc,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;
+    void BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
     void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
 
 private:

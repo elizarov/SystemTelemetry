@@ -265,17 +265,17 @@ public:
     COLORREF TrackColor() const;
     TextLayoutResult MeasureTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
+    TextLayoutResult MeasureTextBlock(const RECT& rect, const std::string& text, HFONT font, UINT format) const;
     TextLayoutResult DrawTextBlock(HDC hdc,
         const RECT& rect,
         const std::string& text,
         HFONT font,
         COLORREF color,
-        UINT format,
-        const std::optional<EditableAnchorBinding>& editable = std::nullopt);
+        UINT format);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
     EditableAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const;
-    void RegisterEditableAnchorRegion(const EditableAnchorKey& key,
+    void RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
         const RECT& targetRect,
         const RECT& anchorRect,
         AnchorShape shape,
@@ -286,6 +286,21 @@ public:
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
+    void RegisterDynamicEditableAnchorRegion(const EditableAnchorKey& key,
+        const RECT& targetRect,
+        const RECT& anchorRect,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
+        POINT dragOrigin,
+        double dragScale,
+        bool showWhenWidgetHovered,
+        bool drawTargetOutline,
+        int value);
+    void RegisterStaticTextAnchor(
+        const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
+    void RegisterDynamicTextAnchor(
+        const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
     int ScaleLogical(int value) const;
     int MeasureTextWidth(HFONT font, std::string_view text) const;
@@ -351,6 +366,7 @@ private:
         const std::string& editCardId,
         const std::vector<size_t>& nodePath);
     void BuildWidgetEditGuides();
+    void BuildStaticEditableAnchors();
     std::optional<LayoutWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
 
     bool InitializeGdiplus();
@@ -375,6 +391,24 @@ private:
     bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const;
     bool MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const;
     static bool IsContainerNode(const LayoutNodeConfig& node);
+    void RegisterEditableAnchorRegion(std::vector<EditableAnchorRegion>& regions,
+        const EditableAnchorKey& key,
+        const RECT& targetRect,
+        const RECT& anchorRect,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
+        POINT dragOrigin,
+        double dragScale,
+        bool showWhenWidgetHovered,
+        bool drawTargetOutline,
+        int value);
+    void RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
+        const RECT& rect,
+        const std::string& text,
+        HFONT font,
+        UINT format,
+        const EditableAnchorBinding& editable);
     void WriteTrace(const std::string& text) const;
 
     AppConfig config_;
@@ -387,7 +421,8 @@ private:
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<WidgetEditGuide> widgetEditGuides_;
-    std::vector<EditableAnchorRegion> editableAnchorRegions_;
+    std::vector<EditableAnchorRegion> staticEditableAnchorRegions_;
+    std::vector<EditableAnchorRegion> dynamicEditableAnchorRegions_;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     std::string lastError_;
     double renderScale_ = 1.0;

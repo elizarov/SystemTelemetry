@@ -17,6 +17,7 @@ struct DashboardLayoutResolver {
         const RECT& rect,
         std::vector<struct DashboardWidgetLayout>& widgets);
     static void BuildWidgetEditGuides(DashboardRenderer& renderer);
+    static void BuildStaticEditableAnchors(DashboardRenderer& renderer);
     static void AddLayoutEditGuide(DashboardRenderer& renderer,
         const struct LayoutNodeConfig& node,
         const RECT& rect,

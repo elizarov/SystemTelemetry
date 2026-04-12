@@ -39,6 +39,34 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
     }
 }
 
+void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& renderer) {
+    renderer.staticEditableAnchorRegions_.clear();
+    for (const auto& card : renderer.resolvedLayout_.cards) {
+        if (!card.title.empty()) {
+            renderer.RegisterStaticTextAnchor(card.titleRect,
+                card.title,
+                renderer.WidgetFonts().title,
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+                DashboardRenderer::EditableAnchorBinding{
+                    DashboardRenderer::EditableAnchorKey{
+                        DashboardRenderer::LayoutWidgetIdentity{card.id, card.id, {}},
+                        DashboardRenderer::AnchorEditParameter::FontTitle,
+                        0,
+                    },
+                    renderer.Config().layout.fonts.title.size,
+                    DashboardRenderer::AnchorShape::Circle,
+                    DashboardRenderer::AnchorDragAxis::Vertical,
+                    DashboardRenderer::AnchorDragMode::AxisDelta,
+                });
+        }
+        for (const auto& widget : card.widgets) {
+            if (widget.widget != nullptr) {
+                widget.widget->BuildStaticAnchors(renderer, widget);
+            }
+        }
+    }
+}
+
 void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
     const RECT& rect,
@@ -393,6 +421,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer) {
     }
 
     BuildWidgetEditGuides(renderer);
+    BuildStaticEditableAnchors(renderer);
 
     renderer.WriteTrace("renderer:layout_done cards=" + std::to_string(renderer.resolvedLayout_.cards.size()));
     return true;

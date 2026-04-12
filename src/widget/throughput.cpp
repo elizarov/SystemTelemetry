@@ -143,13 +143,12 @@ void DrawGraph(DashboardRenderer& renderer,
     sprintf_s(maxLabel, "%.0f", maxValue);
     RECT maxRect{rect.left, rect.top, rect.left + layout.axisWidth, layout.graphTop};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        renderer.DrawTextBlock(hdc,
-            maxRect,
-            maxLabel,
-            renderer.WidgetFonts().smallFont,
-            renderer.MutedTextColor(),
-            DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-            maxLabelEditable);
+        renderer.DrawTextBlock(
+            hdc, maxRect, maxLabel, renderer.WidgetFonts().smallFont, renderer.MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        if (maxLabelEditable.has_value()) {
+            renderer.RegisterDynamicTextAnchor(
+                maxRect, maxLabel, renderer.WidgetFonts().smallFont, DT_CENTER | DT_SINGLELINE | DT_VCENTER, *maxLabelEditable);
+        }
     }
 
     if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
@@ -185,6 +184,22 @@ int EffectiveThroughputPreferredHeight(const DashboardRenderer& renderer) {
     const int graphLabelHeight = renderer.FontMetrics().smallText;
     return headerHeight + std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap)) +
            graphLabelHeight;
+}
+
+std::string ResolveThroughputLabel(const std::string& metricRef) {
+    if (metricRef == "network.upload") {
+        return "Up";
+    }
+    if (metricRef == "network.download") {
+        return "Down";
+    }
+    if (metricRef == "storage.read") {
+        return "Read";
+    }
+    if (metricRef == "storage.write") {
+        return "Write";
+    }
+    return {};
 }
 
 }  // namespace
@@ -247,11 +262,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         metric.label,
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
-        DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontSmall,
-            0,
-            renderer.Config().layout.fonts.smallText.size));
+        DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     RECT numberRect{(std::min)(layoutState_.valueRect.right,
                         labelLayout.textRect.right +
                             (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
@@ -264,14 +275,33 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
             buffer,
             renderer.WidgetFonts().smallFont,
             renderer.ForegroundColor(),
+            DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
+        renderer.RegisterDynamicTextAnchor(numberRect,
+            buffer,
+            renderer.WidgetFonts().smallFont,
             DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(widget,
-                DashboardRenderer::AnchorEditParameter::FontSmall,
-                1,
-                renderer.Config().layout.fonts.smallText.size));
+            renderer.MakeEditableTextBinding(
+                widget, DashboardRenderer::AnchorEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size));
     }
     const ThroughputGraphLayout& layout = layoutState_;
-    renderer.RegisterEditableAnchorRegion(
+    DrawGraph(renderer,
+        hdc,
+        layout.graphRect,
+        layout,
+        metric.history,
+        metric.maxGraph,
+        metric.guideStepMbps,
+        metric.timeMarkerOffsetSamples,
+        metric.timeMarkerIntervalSamples,
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::AnchorEditParameter::FontSmall,
+            2,
+            renderer.Config().layout.fonts.smallText.size));
+}
+
+void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
+    const ThroughputGraphLayout& layout = layoutState_;
+    renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::AnchorEditParameter::ThroughputLeaderDiameter,
@@ -288,7 +318,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         false,
         renderer.Config().layout.throughput.leaderDiameter);
 
-    renderer.RegisterEditableAnchorRegion(
+    renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::AnchorEditParameter::ThroughputPlotStrokeWidth,
@@ -305,7 +335,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         false,
         renderer.Config().layout.throughput.plotStrokeWidth);
 
-    renderer.RegisterEditableAnchorRegion(
+    renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::AnchorEditParameter::ThroughputGuideStrokeWidth,
@@ -322,19 +352,15 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         false,
         renderer.Config().layout.throughput.guideStrokeWidth);
 
-    DrawGraph(renderer,
-        hdc,
-        layout.graphRect,
-        layout,
-        metric.history,
-        metric.maxGraph,
-        metric.guideStepMbps,
-        metric.timeMarkerOffsetSamples,
-        metric.timeMarkerIntervalSamples,
-        renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontSmall,
-            2,
-            renderer.Config().layout.fonts.smallText.size));
+    const std::string label = ResolveThroughputLabel(metric_);
+    if (!label.empty()) {
+        renderer.RegisterStaticTextAnchor(layoutState_.valueRect,
+            label,
+            renderer.WidgetFonts().smallFont,
+            DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+            renderer.MakeEditableTextBinding(
+                widget, DashboardRenderer::AnchorEditParameter::FontSmall, 0, renderer.Config().layout.fonts.smallText.size));
+    }
 }
 
 void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

@@ -33,6 +33,8 @@ void DashboardWidget::FinalizeLayoutGroup(DashboardRenderer&, const std::vector<
 
 void DashboardWidget::BuildEditGuides(DashboardRenderer&, const DashboardWidgetLayout&) const {}
 
+void DashboardWidget::BuildStaticAnchors(DashboardRenderer&, const DashboardWidgetLayout&) const {}
+
 std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view name) {
     if (name == "text") {
         return DashboardWidgetClass::Text;

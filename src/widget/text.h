@@ -16,4 +16,6 @@ public:
 
 private:
     std::string metric_;
+    mutable bool staticAnchorRegistered_ = false;
+    mutable std::string cachedStaticText_;
 };

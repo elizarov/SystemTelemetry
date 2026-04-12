@@ -54,6 +54,7 @@ public:
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;
     void FinalizeLayoutGroup(DashboardRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) override;
+    void BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
     void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
 
 private:
