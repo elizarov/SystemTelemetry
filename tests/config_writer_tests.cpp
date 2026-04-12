@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include "config_writer.h"
 
@@ -33,11 +34,15 @@ TEST(ConfigWriter, FullExportDoesNotInventEmptyHeaderKeysForHeaderlessCards) {
 
     const std::string sectionText =
         "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\n[card.time]";
-    EXPECT_TRUE(output.find(sectionText) != std::string::npos);
-    EXPECT_EQ(output.find("[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\ntitle = "),
-        std::string::npos);
-    EXPECT_EQ(output.find("[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\nicon = "),
-        std::string::npos);
+    EXPECT_THAT(output, testing::HasSubstr(sectionText));
+    EXPECT_THAT(
+        output,
+        testing::Not(testing::HasSubstr(
+            "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\ntitle = ")));
+    EXPECT_THAT(
+        output,
+        testing::Not(testing::HasSubstr(
+            "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\nicon = ")));
 }
 
 TEST(ConfigWriter, MinimalSavePersistsResolvedStorageDrivesAgainstEmptySourceConfig) {
@@ -49,7 +54,7 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedStorageDrivesAgainstEmptySourceCon
 
     const std::string output = BuildSavedConfigText(LoadEmbeddedConfigTemplate(), currentConfig, &compareConfig);
 
-    EXPECT_TRUE(output.find("[storage]\r\ndrives = C,E\r\n") != std::string::npos);
+    EXPECT_THAT(output, testing::HasSubstr("[storage]\r\ndrives = C,E\r\n"));
 }
 
 TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceConfig) {
@@ -61,5 +66,5 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceCo
 
     const std::string output = BuildSavedConfigText(LoadEmbeddedConfigTemplate(), currentConfig, &compareConfig);
 
-    EXPECT_TRUE(output.find("[network]\r\nadapter_name = Ethernet\r\n") != std::string::npos);
+    EXPECT_THAT(output, testing::HasSubstr("[network]\r\nadapter_name = Ethernet\r\n"));
 }
