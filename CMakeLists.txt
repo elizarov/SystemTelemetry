@@ -169,8 +169,10 @@ target_compile_options(SystemTelemetry PRIVATE
 )
 
 target_link_options(SystemTelemetry PRIVATE
-    /DEBUG
-    /INCREMENTAL
+    $<$<CONFIG:Debug>:/DEBUG>
+    $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:RelWithDebInfo>:/DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
     /MANIFEST:NO
 )
 
@@ -240,8 +242,10 @@ target_compile_options(SystemTelemetryTests PRIVATE
     /Zi
 )
 target_link_options(SystemTelemetryTests PRIVATE
-    /DEBUG
-    /INCREMENTAL
+    $<$<CONFIG:Debug>:/DEBUG>
+    $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:RelWithDebInfo>:/DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
 )
 target_link_libraries(SystemTelemetryTests PRIVATE
     gtest_main
