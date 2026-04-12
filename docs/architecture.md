@@ -75,7 +75,7 @@
   - Maps layout-requested logical board fan and temperature metrics to SIV sensor titles through the parsed `[board]` config section without any helper process or text-protocol layer.
 - `resources/`: embedded UI assets, including the panel header icons extracted from the design sketch, the custom app icon, the self-documented embedded `config.ini` template, the custom-scale modal dialog resource, and the `.rc` plus resource-id definitions used to compile them into the executable.
 - `resources/SystemTelemetry.manifest`: embedded Win32 application manifest that keeps the app at `asInvoker`, disables file virtualization so config I/O targets the executable-side `config.ini`, and opts the process into per-monitor DPI-aware rendering.
-- `install.cmd`: elevated deployment script that builds via `build.cmd`, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and leaves automatic startup to the runtime popup-menu toggle.
+- `install.cmd`: elevated deployment script that installs the prebuilt `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, waits for the elevated copy to finish, and leaves automatic startup to the runtime popup-menu toggle.
 - `CMakeLists.txt`: single maintained build graph for the Win32 app plus the mixed-mode Gigabyte board-provider object library.
   - Defines the native source list once and keeps target outputs rooted in `build\`.
   - Lets MSBuild handle per-translation-unit incremental recompilation and header dependency tracking.

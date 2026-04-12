@@ -21,6 +21,16 @@ build.cmd
 
 All build artifacts are kept under `build\`.
 
+## Install
+
+Install the already-built runtime with `install.cmd` from the repository root:
+
+```bat
+install.cmd
+```
+
+`install.cmd` requests elevation, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and does not run `build.cmd` on its own.
+
 Run unit tests from the generated CMake tree after a successful build:
 
 ```bat

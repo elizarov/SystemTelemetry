@@ -15,7 +15,7 @@
 - Keep the repo-level `.clang-format` as the single maintained source of truth for C++ formatting rules.
 - Use the top-level `format.cmd` script as the maintained entry point for formatting non-vendored C++ sources; run `format` to check and `format fix` to apply the repo style.
 - Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
-- Provide an `install.cmd` script at the repository root that builds the project through `build.cmd`, installs the runtime into `C:\Program Files\SystemTelemetry`, copies `SystemTelemetry.exe` there, and leaves auto-start registration to the runtime popup-menu toggle.
+- Provide an `install.cmd` script at the repository root that requests elevation, installs the already-built runtime into `C:\Program Files\SystemTelemetry`, copies `build\SystemTelemetry.exe` there, and leaves auto-start registration to the runtime popup-menu toggle.
 
 ## Repository conventions
 

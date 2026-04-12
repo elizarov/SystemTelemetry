@@ -3,27 +3,21 @@ setlocal EnableExtensions
 
 cd /d "%~dp0"
 
-call :ensure_admin
-if errorlevel 2 exit /b 0
-if errorlevel 1 exit /b 1
-
 set "INSTALL_ROOT=%ProgramW6432%"
 if not defined INSTALL_ROOT set "INSTALL_ROOT=%ProgramFiles%"
 set "INSTALL_DIR=%INSTALL_ROOT%\SystemTelemetry"
 set "SOURCE_EXE=%~dp0build\SystemTelemetry.exe"
 set "TARGET_EXE=%INSTALL_DIR%\SystemTelemetry.exe"
 
-echo Building SystemTelemetry...
-call "%~dp0build.cmd"
-if errorlevel 1 (
-    echo Build failed. Installation aborted.
+if not exist "%SOURCE_EXE%" (
+    echo Missing build output: "%SOURCE_EXE%"
+    echo Build the project first with build.cmd, then run install.cmd.
     exit /b 1
 )
 
-if not exist "%SOURCE_EXE%" (
-    echo Missing build output: "%SOURCE_EXE%"
-    exit /b 1
-)
+call :ensure_admin
+if errorlevel 2 exit /b 0
+if errorlevel 1 exit /b 1
 
 
 echo Installing to "%INSTALL_DIR%"...
@@ -38,6 +32,10 @@ if errorlevel 1 (
     echo Failed to copy "%SOURCE_EXE%" to "%TARGET_EXE%".
     exit /b 1
 )
+if not exist "%TARGET_EXE%" (
+    echo Installation did not produce "%TARGET_EXE%".
+    exit /b 1
+)
 
 echo Installation complete.
 echo Installed executable: "%TARGET_EXE%"
@@ -49,7 +47,7 @@ net session >nul 2>nul
 if not errorlevel 1 exit /b 0
 
 echo Requesting administrator access...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -WorkingDirectory '%~dp0' -Verb RunAs"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$process = Start-Process -FilePath $env:ComSpec -ArgumentList '/c ""%~f0""' -WorkingDirectory '%~dp0' -Verb RunAs -Wait -PassThru; exit $process.ExitCode"
 if errorlevel 1 (
     echo Administrator approval is required to install into Program Files.
     exit /b 1
