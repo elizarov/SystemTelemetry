@@ -27,6 +27,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo Stopping running SystemTelemetry instances...
+taskkill /f /im "SystemTelemetry.exe" >nul 2>nul
+set "TASKKILL_RC=%errorlevel%"
+if not "%TASKKILL_RC%"=="0" (
+    if not "%TASKKILL_RC%"=="128" (
+        echo Failed to stop running SystemTelemetry.exe instances.
+        exit /b 1
+    )
+)
+
 copy /y "%SOURCE_EXE%" "%TARGET_EXE%" >nul
 if errorlevel 1 (
     echo Failed to copy "%SOURCE_EXE%" to "%TARGET_EXE%".
