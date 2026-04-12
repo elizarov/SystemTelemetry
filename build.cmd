@@ -21,9 +21,16 @@ set "TEMP=%BUILD_TMP%"
 set "BUILD_ROOT=%REPO_ROOT%\build"
 set "CMAKE_BUILD_ROOT=%BUILD_ROOT%\cmake"
 if not exist "%BUILD_ROOT%" mkdir "%BUILD_ROOT%"
+set "CMAKE_GENERATOR=Ninja Multi-Config"
+if exist "%CMAKE_BUILD_ROOT%\CMakeCache.txt" (
+    findstr /c:"CMAKE_GENERATOR:INTERNAL=%CMAKE_GENERATOR%" "%CMAKE_BUILD_ROOT%\CMakeCache.txt" >nul
+    if errorlevel 1 (
+        rmdir /s /q "%CMAKE_BUILD_ROOT%"
+    )
+)
 if not exist "%CMAKE_BUILD_ROOT%" mkdir "%CMAKE_BUILD_ROOT%"
 
-cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "Visual Studio 17 2022" -A x64
+cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 if errorlevel 1 goto build_done
 
 if "%~1"=="" (

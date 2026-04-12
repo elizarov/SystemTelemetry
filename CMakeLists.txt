@@ -6,9 +6,21 @@ if(NOT MSVC)
     message(FATAL_ERROR "SystemTelemetry currently supports MSVC builds only.")
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+foreach(cxx_flags_var IN ITEMS
+    CMAKE_CXX_FLAGS
+    CMAKE_CXX_FLAGS_DEBUG
+    CMAKE_CXX_FLAGS_RELEASE
+    CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    CMAKE_CXX_FLAGS_MINSIZEREL
+)
+    string(REPLACE "/EHsc" "" ${cxx_flags_var} "${${cxx_flags_var}}")
+endforeach()
 
 set(output_root "${CMAKE_SOURCE_DIR}/build")
 
@@ -128,7 +140,7 @@ target_compile_definitions(SystemTelemetryGigabyte PRIVATE
 )
 
 target_compile_options(SystemTelemetryGigabyte PRIVATE
-    /EHa
+    /clr
     /W4
     /permissive-
     /Zi
@@ -194,6 +206,12 @@ add_library(gtest_main STATIC
     tests/gtest/src/gtest_main.cpp
 )
 target_link_libraries(gtest_main PUBLIC gtest)
+target_compile_options(gtest_main PRIVATE
+    /EHsc
+    /W4
+    /permissive-
+    /Zi
+)
 
 add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp

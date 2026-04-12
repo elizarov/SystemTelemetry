@@ -78,10 +78,12 @@
 - `install.cmd`: elevated deployment script that stops running `SystemTelemetry.exe` instances across user sessions, installs the prebuilt `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, waits for the elevated copy to finish, and leaves automatic startup to the runtime popup-menu toggle.
 - `CMakeLists.txt`: single maintained build graph for the Win32 app plus the mixed-mode Gigabyte board-provider object library.
   - Defines the native source list once and keeps target outputs rooted in `build\`.
-  - Lets MSBuild handle per-translation-unit incremental recompilation and header dependency tracking.
+  - Exports `compile_commands.json` so `clangd` clients can resolve the project through the maintained CMake build tree.
+  - Lets the CMake-selected native build tool handle per-translation-unit incremental recompilation and header dependency tracking.
   - Compiles `src/board_gigabyte_siv.cpp` with Common Language Runtime support so it can call the vendor .NET assemblies in-process.
   - Links the required CLR host support library from the active Windows SDK.
   - Builds the `SystemTelemetryTests` unit-test binary and registers it with CTest using the repo-local GoogleTest-style test harness under `tests/gtest/`.
+- `.clangd`: repo-local `clangd` configuration that points editor integrations at `build\cmake\compile_commands.json`.
 - `src/vendor/adlx/...`: vendored AMD ADLX headers/helper/runtime glue used by the AMD GPU provider.
 - `devenv.cmd` + `devenv.md`: local build-environment bootstrap plus its machine-specific setup contract; `devenv.cmd` prepares the Visual Studio x64 toolchain that `build.cmd` and the mixed-mode Gigabyte board-provider build use, while `devenv.md` documents that requirement for future machines.
 
@@ -140,9 +142,9 @@
 
 ## Build and deployment
 
-- Build flow: `build.cmd` boots the VS environment via `devenv.cmd`, redirects `TMP` and `TEMP` into a fresh per-build subdirectory under the user's temp area (falling back to `build\tmp\` only when no user temp path is available), configures `build\cmake\` through `cmake -S -B -G "Visual Studio 17 2022" -A x64`, then builds that tree through `cmake --build`.
-  - Keeps generated solutions, dependency state, and object files under `build\cmake\` while placing the final executable and linked PDB under `build\`.
-  - Lets MSBuild perform incremental per-source recompilation.
+- Build flow: `build.cmd` boots the VS environment via `devenv.cmd`, redirects `TMP` and `TEMP` into a fresh per-build subdirectory under the user's temp area (falling back to `build\tmp\` only when no user temp path is available), re-creates `build\cmake\` when an older cache uses a different generator, configures `build\cmake\` through `cmake -S -B -G "Ninja Multi-Config" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, then builds that tree through `cmake --build`.
+  - Keeps generated Ninja files, dependency state, object files, and `compile_commands.json` under `build\cmake\` while placing the final executable and linked PDB under `build\`.
+  - Lets Ninja and the MSVC toolchain perform incremental per-source recompilation.
   - Compiles the Win32 app target from the split dashboard shell, controller, service, telemetry, renderer, diagnostics, vendored ADLX sources, and `resources/SystemTelemetry.rc`.
   - Builds `src/board_gigabyte_siv.cpp` separately as a Common Language Runtime-enabled object library so it can bridge into the Gigabyte .NET assemblies.
   - Resolves `mscoree.lib` from the Visual Studio developer environment through `NETFXSDKDir` and disables the linker manifest because the `.rc` file already embeds the maintained application manifest.

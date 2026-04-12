@@ -9,10 +9,12 @@
 - Keep production sources in `src` and unit tests plus vendored test support in `tests`.
 - Keep generated build outputs inside `build\` so the project root stays clean.
 - Keep the CMake build tree under `build\cmake\` so generated project files, dependency state, and object directories stay inside `build\` as well.
+- Keep the CMake build tree on the `Ninja Multi-Config` generator so `build\cmake\compile_commands.json` stays available for `clangd`-based editors such as Zed.
 - When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
 - Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
 - Always build through `build.cmd`.
 - Keep the repo-level `.clang-format` as the single maintained source of truth for C++ formatting rules.
+- Keep the repo-level `.clangd` as the maintained source of truth for the project compilation-database path used by `clangd` clients.
 - Use the top-level `format.cmd` script as the maintained entry point for formatting non-vendored C++ sources; run `format` to check and `format fix` to apply the repo style.
 - Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
 - Provide an `install.cmd` script at the repository root that requests elevation, stops running `SystemTelemetry.exe` instances before deployment, installs the already-built runtime into `C:\Program Files\SystemTelemetry`, copies `build\SystemTelemetry.exe` there, and leaves auto-start registration to the runtime popup-menu toggle.

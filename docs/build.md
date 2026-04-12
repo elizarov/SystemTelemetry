@@ -20,6 +20,7 @@ build.cmd
 ```
 
 All build artifacts are kept under `build\`.
+`build.cmd` configures the CMake tree with `Ninja Multi-Config` and keeps `build\cmake\compile_commands.json` available for `clangd`-based editors such as Zed.
 
 ## Install
 
