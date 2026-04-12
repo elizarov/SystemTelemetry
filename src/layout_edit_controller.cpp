@@ -20,6 +20,24 @@ bool EditableAnchorKeyEquals(
            left.anchorId == right.anchorId;
 }
 
+bool IsFontAnchorParameter(DashboardRenderer::AnchorEditParameter parameter) {
+    using Parameter = DashboardRenderer::AnchorEditParameter;
+    switch (parameter) {
+        case Parameter::FontTitle:
+        case Parameter::FontBig:
+        case Parameter::FontValue:
+        case Parameter::FontLabel:
+        case Parameter::FontText:
+        case Parameter::FontSmall:
+        case Parameter::FontFooter:
+        case Parameter::FontClockTime:
+        case Parameter::FontClockDate:
+            return true;
+        default:
+            return false;
+    }
+}
+
 double NormalizeDegrees(double degrees) {
     double normalized = std::fmod(degrees, 360.0);
     if (normalized < 0.0) {
@@ -293,6 +311,13 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
         return resolution;
     }
 
+    const std::optional<DashboardRenderer::EditableAnchorKey> anchorTarget = renderer.HitTestEditableAnchorTarget(clientPoint);
+    if (anchorTarget.has_value() && IsFontAnchorParameter(anchorTarget->parameter)) {
+        resolution.hoveredEditableAnchor = anchorTarget;
+        resolution.hoveredEditableWidget = anchorTarget->widget;
+        return resolution;
+    }
+
     size_t widgetGuideIndex = 0;
     const DashboardRenderer::WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
     if (widgetGuide != nullptr) {
@@ -305,8 +330,6 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
     if (hoveredWidget.has_value()) {
         resolution.hoveredEditableWidget = hoveredWidget;
 
-        const std::optional<DashboardRenderer::EditableAnchorKey> anchorTarget =
-            renderer.HitTestEditableAnchorTarget(clientPoint);
         if (anchorTarget.has_value() && WidgetIdentityEquals(anchorTarget->widget, *hoveredWidget)) {
             resolution.hoveredEditableAnchor = anchorTarget;
             return resolution;
@@ -562,6 +585,17 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
     const HoverResolution resolution = ResolveHover(lastClientPoint_);
     if (resolution.actionableAnchorHandle.has_value()) {
         const auto region = renderer.FindEditableAnchorRegion(*resolution.actionableAnchorHandle);
+        if (region.has_value()) {
+            TooltipTarget target;
+            target.kind = TooltipTarget::Kind::EditableAnchor;
+            target.clientPoint = lastClientPoint_;
+            target.editableAnchor = *region;
+            return target;
+        }
+    }
+
+    if (resolution.hoveredEditableAnchor.has_value() && IsFontAnchorParameter(resolution.hoveredEditableAnchor->parameter)) {
+        const auto region = renderer.FindEditableAnchorRegion(*resolution.hoveredEditableAnchor);
         if (region.has_value()) {
             TooltipTarget target;
             target.kind = TooltipTarget::Kind::EditableAnchor;
