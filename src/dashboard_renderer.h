@@ -195,12 +195,6 @@ public:
         int clockDate = 0;
     };
 
-    struct MeasuredWidths {
-        int throughputAxis = 0;
-        int driveLabel = 0;
-        int drivePercent = 0;
-    };
-
     struct Fonts {
         HFONT title = nullptr;
         HFONT big = nullptr;
@@ -266,7 +260,6 @@ public:
     const std::string& LastError() const;
     const AppConfig& Config() const;
     const FontHeights& FontMetrics() const;
-    const MeasuredWidths& MeasuredTextWidths() const;
     const Fonts& WidgetFonts() const;
     RenderMode CurrentRenderMode() const;
     COLORREF TrackColor() const;
@@ -295,6 +288,7 @@ public:
         int value);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
     int ScaleLogical(int value) const;
+    int MeasureTextWidth(HFONT font, std::string_view text) const;
 
 private:
     friend struct DashboardLayoutResolver;
@@ -390,7 +384,6 @@ private:
     std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
     Fonts fonts_{};
     FontHeights fontHeights_{};
-    MeasuredWidths measuredWidths_{};
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<WidgetEditGuide> widgetEditGuides_;

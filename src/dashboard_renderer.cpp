@@ -328,10 +328,6 @@ const DashboardRenderer::FontHeights& DashboardRenderer::FontMetrics() const {
     return fontHeights_;
 }
 
-const DashboardRenderer::MeasuredWidths& DashboardRenderer::MeasuredTextWidths() const {
-    return measuredWidths_;
-}
-
 const DashboardRenderer::Fonts& DashboardRenderer::WidgetFonts() const {
     return fonts_;
 }
@@ -1152,6 +1148,17 @@ int DashboardRenderer::ScaleLogical(int value) const {
     return std::max(1, static_cast<int>(std::lround(static_cast<double>(value) * renderScale_)));
 }
 
+int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const {
+    HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
+    if (hdc == nullptr) {
+        return 0;
+    }
+
+    const int width = MeasureTextSize(hdc, font, std::string(text)).cx;
+    ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
+    return width;
+}
+
 std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
     const LayoutEditGuide& guide) const {
     struct SimilarityTypeKey {
@@ -1327,7 +1334,6 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
 void DashboardRenderer::Shutdown() {
     DestroyFonts();
     fontHeights_ = {};
-    measuredWidths_ = {};
     resolvedLayout_ = {};
     parsedWidgetInfoCache_.clear();
     editableAnchorRegions_.clear();
@@ -1468,20 +1474,13 @@ bool DashboardRenderer::MeasureFonts() {
     fontHeights_.footer = measure(fonts_.footer);
     fontHeights_.clockTime = measure(fonts_.clockTime);
     fontHeights_.clockDate = measure(fonts_.clockDate);
-    measuredWidths_.throughputAxis = MeasureTextSize(hdc, fonts_.smallFont, "1000").cx +
-                                     std::max(0, ScaleLogical(config_.layout.throughput.axisPadding));
-    measuredWidths_.driveLabel = MeasureTextSize(hdc, fonts_.label, "W:").cx;
-    measuredWidths_.drivePercent = MeasureTextSize(hdc, fonts_.label, "100%").cx;
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
     WriteTrace("renderer:font_metrics title=" + std::to_string(fontHeights_.title) +
                " big=" + std::to_string(fontHeights_.big) + " value=" + std::to_string(fontHeights_.value) +
                " label=" + std::to_string(fontHeights_.label) + " text=" + std::to_string(fontHeights_.text) +
                " small=" + std::to_string(fontHeights_.smallText) + " footer=" + std::to_string(fontHeights_.footer) +
                " clock_time=" + std::to_string(fontHeights_.clockTime) + " clock_date=" +
-               std::to_string(fontHeights_.clockDate) + " render_scale=" + std::to_string(renderScale_) +
-               " throughput_axis_width=" + std::to_string(measuredWidths_.throughputAxis) +
-               " drive_label_width=" + std::to_string(measuredWidths_.driveLabel) +
-               " drive_percent_width=" + std::to_string(measuredWidths_.drivePercent));
+               std::to_string(fontHeights_.clockDate) + " render_scale=" + std::to_string(renderScale_));
     return true;
 }
 

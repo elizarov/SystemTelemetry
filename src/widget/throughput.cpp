@@ -28,6 +28,12 @@ struct ThroughputGraphLayout {
     int guideCenterY = 0;
 };
 
+int MeasureAxisWidth(const DashboardRenderer& renderer) {
+    return std::max(1,
+        renderer.MeasureTextWidth(renderer.WidgetFonts().smallFont, "1000") +
+            std::max(0, renderer.ScaleLogical(renderer.Config().layout.throughput.axisPadding)));
+}
+
 COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
 }
@@ -58,7 +64,7 @@ RECT MakeAnchorRect(int centerX, int centerY, int representedDiameter, int extra
 ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, const RECT& rect) {
     ThroughputGraphLayout layout;
     layout.graphRect = rect;
-    layout.axisWidth = std::max(1, renderer.MeasuredTextWidths().throughputAxis);
+    layout.axisWidth = MeasureAxisWidth(renderer);
     layout.labelBandHeight = renderer.FontMetrics().smallText;
     layout.graphTop = std::min(rect.bottom - 1, rect.top + layout.labelBandHeight);
     layout.graphLeft = rect.left + layout.axisWidth;
@@ -357,7 +363,7 @@ void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
             valueRect.bottom + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
         widget.rect.right,
         widget.rect.bottom};
-    const int axisWidth = (std::max)(1, renderer.MeasuredTextWidths().throughputAxis);
+    const int axisWidth = MeasureAxisWidth(renderer);
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
 
     auto& guides = renderer.WidgetEditGuidesMutable();

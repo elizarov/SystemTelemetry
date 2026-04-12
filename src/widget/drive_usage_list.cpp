@@ -8,6 +8,18 @@
 
 namespace {
 
+struct MeasuredColumnWidths {
+    int label = 1;
+    int percent = 1;
+};
+
+MeasuredColumnWidths MeasureColumnWidths(const DashboardRenderer& renderer) {
+    return MeasuredColumnWidths{
+        std::max(1, renderer.MeasureTextWidth(renderer.WidgetFonts().label, "W:")),
+        std::max(1, renderer.MeasureTextWidth(renderer.WidgetFonts().label, "100%")),
+    };
+}
+
 int ClampStackedSegmentGap(int height, int segmentCount, int gap) {
     if (segmentCount <= 1) {
         return 0;
@@ -122,8 +134,9 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
     const auto& config = renderer.Config().layout.driveUsageList;
     const int headerHeight = EffectiveDriveHeaderHeight(renderer);
     const int rowHeight = EffectiveDriveRowHeight(renderer);
-    const int labelWidth = (std::max)(1, renderer.MeasuredTextWidths().driveLabel);
-    const int percentWidth = (std::max)(1, renderer.MeasuredTextWidths().drivePercent);
+    const MeasuredColumnWidths widths = MeasureColumnWidths(renderer);
+    const int labelWidth = widths.label;
+    const int percentWidth = widths.percent;
     const int labelGap = (std::max)(0, renderer.ScaleLogical(config.labelGap));
     const int activityWidth = (std::max)(1, renderer.ScaleLogical(config.activityWidth));
     const int rwGap = (std::max)(0, renderer.ScaleLogical(config.rwGap));
@@ -352,8 +365,9 @@ void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const Da
     const auto& config = renderer.Config().layout.driveUsageList;
     const int headerHeight = EffectiveDriveHeaderHeight(renderer);
     const int rowHeight = EffectiveDriveRowHeight(renderer);
-    const int labelWidth = (std::max)(1, renderer.MeasuredTextWidths().driveLabel);
-    const int percentWidth = (std::max)(1, renderer.MeasuredTextWidths().drivePercent);
+    const MeasuredColumnWidths widths = MeasureColumnWidths(renderer);
+    const int labelWidth = widths.label;
+    const int percentWidth = widths.percent;
     const int labelGap = (std::max)(0, renderer.ScaleLogical(config.labelGap));
     const int activityWidth = (std::max)(1, renderer.ScaleLogical(config.activityWidth));
     const int rwGap = (std::max)(0, renderer.ScaleLogical(config.rwGap));
