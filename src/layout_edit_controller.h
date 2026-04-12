@@ -78,6 +78,18 @@ public:
 
 class LayoutEditController {
 public:
+    struct TooltipTarget {
+        enum class Kind {
+            WidgetGuide,
+            EditableAnchor,
+        };
+
+        Kind kind = Kind::WidgetGuide;
+        POINT clientPoint{};
+        DashboardRenderer::WidgetEditGuide widgetGuide{};
+        DashboardRenderer::EditableAnchorRegion editableAnchor{};
+    };
+
     explicit LayoutEditController(LayoutEditHost& host);
 
     void StartSession();
@@ -85,11 +97,21 @@ public:
 
     bool HandleLButtonDown(HWND hwnd, POINT clientPoint);
     bool HandleMouseMove(POINT clientPoint);
+    bool HandleMouseLeave();
     bool HandleLButtonUp(POINT clientPoint);
     bool HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner);
     bool HandleSetCursor(HWND hwnd);
+    std::optional<TooltipTarget> CurrentTooltipTarget();
 
 private:
+    struct HoverResolution {
+        std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget;
+        std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor;
+        std::optional<size_t> hoveredWidgetEditGuideIndex;
+        std::optional<size_t> hoveredLayoutGuideIndex;
+        std::optional<DashboardRenderer::EditableAnchorKey> actionableAnchorHandle;
+    };
+
     struct LayoutDragState {
         DashboardRenderer::LayoutEditGuide guide;
         std::vector<int> initialWeights;
@@ -116,6 +138,7 @@ private:
 
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
     const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(POINT clientPoint, size_t* index = nullptr) const;
+    HoverResolution ResolveHover(POINT clientPoint) const;
     void RefreshHover(POINT clientPoint);
     bool UpdateLayoutDrag(POINT clientPoint);
     bool UpdateWidgetEditDrag(POINT clientPoint);
@@ -134,4 +157,5 @@ private:
     std::optional<LayoutDragState> activeLayoutDrag_;
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
+    POINT lastClientPoint_{};
 };

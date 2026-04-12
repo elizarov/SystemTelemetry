@@ -83,10 +83,12 @@ add_executable(SystemTelemetry WIN32
     src/dashboard_app.cpp
     src/layout_edit_controller.cpp
     src/layout_edit_commands.cpp
+    src/layout_edit_tooltip.cpp
     src/layout_edit_service.cpp
     src/config_parser.cpp
     src/config_writer.cpp
     src/config_resolution.cpp
+    src/localization_catalog.cpp
     src/layout_snap_solver.cpp
     src/telemetry.cpp
     src/telemetry_support.cpp
@@ -212,12 +214,16 @@ find_package(GTest CONFIG REQUIRED)
 add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_commands_tests.cpp
+    tests/layout_edit_tooltip_tests.cpp
+    tests/localization_catalog_tests.cpp
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
     tests/telemetry_retained_history_tests.cpp
     src/config_writer.cpp
     src/config_resolution.cpp
     src/layout_edit_commands.cpp
+    src/layout_edit_tooltip.cpp
+    src/localization_catalog.cpp
     src/layout_snap_solver.cpp
     src/telemetry_retained_history.cpp
 )

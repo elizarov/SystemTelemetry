@@ -548,17 +548,26 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
     }
 
     std::vector<std::pair<EditableAnchorRegion, bool>> highlights;
-    if (overlayState.activeEditableAnchor.has_value()) {
-        const auto region = FindEditableAnchorRegion(*overlayState.activeEditableAnchor);
-        if (region.has_value()) {
-            highlights.push_back({*region, true});
+    const auto appendHighlight = [&](const EditableAnchorRegion& region, bool active) {
+        const auto existing = std::find_if(highlights.begin(), highlights.end(), [&](const auto& entry) {
+            return MatchesEditableAnchorKey(entry.first.key, region.key);
+        });
+        if (existing == highlights.end()) {
+            highlights.push_back({region, active});
+            return;
         }
-    } else if (overlayState.hoveredEditableAnchor.has_value()) {
-        const auto region = FindEditableAnchorRegion(*overlayState.hoveredEditableAnchor);
-        if (region.has_value()) {
-            highlights.push_back({*region, false});
+        existing->second = existing->second || active;
+    };
+    const auto appendByKey = [&](const std::optional<EditableAnchorKey>& key, bool active) {
+        if (!key.has_value()) {
+            return;
         }
-    } else if (overlayState.hoveredEditableWidget.has_value()) {
+        const auto region = FindEditableAnchorRegion(*key);
+        if (region.has_value()) {
+            appendHighlight(*region, active);
+        }
+    };
+    if (overlayState.hoveredEditableWidget.has_value()) {
         const auto collectHovered = [&](const std::vector<EditableAnchorRegion>& regions) {
             for (const auto& region : regions) {
                 if (!region.showWhenWidgetHovered) {
@@ -569,12 +578,14 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
                     region.key.widget.nodePath != overlayState.hoveredEditableWidget->nodePath) {
                     continue;
                 }
-                highlights.push_back({region, false});
+                appendHighlight(region, false);
             }
         };
         collectHovered(staticEditableAnchorRegions_);
         collectHovered(dynamicEditableAnchorRegions_);
     }
+    appendByKey(overlayState.hoveredEditableAnchor, false);
+    appendByKey(overlayState.activeEditableAnchor, true);
     if (highlights.empty()) {
         return;
     }

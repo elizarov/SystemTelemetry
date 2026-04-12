@@ -281,22 +281,57 @@ const DashboardRenderer::WidgetEditGuide* LayoutEditController::HitTestWidgetEdi
     return nullptr;
 }
 
+LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT clientPoint) const {
+    HoverResolution resolution;
+    DashboardRenderer& renderer = host_.LayoutEditRenderer();
+
+    const std::optional<DashboardRenderer::EditableAnchorKey> anchorHandle = renderer.HitTestEditableAnchorHandle(clientPoint);
+    if (anchorHandle.has_value()) {
+        resolution.hoveredEditableAnchor = anchorHandle;
+        resolution.actionableAnchorHandle = anchorHandle;
+        resolution.hoveredEditableWidget = anchorHandle->widget;
+        return resolution;
+    }
+
+    size_t widgetGuideIndex = 0;
+    const DashboardRenderer::WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
+    if (widgetGuide != nullptr) {
+        resolution.hoveredEditableWidget = widgetGuide->widget;
+        resolution.hoveredWidgetEditGuideIndex = widgetGuideIndex;
+        return resolution;
+    }
+
+    const std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredWidget = renderer.HitTestEditableWidget(clientPoint);
+    if (hoveredWidget.has_value()) {
+        resolution.hoveredEditableWidget = hoveredWidget;
+
+        const std::optional<DashboardRenderer::EditableAnchorKey> anchorTarget =
+            renderer.HitTestEditableAnchorTarget(clientPoint);
+        if (anchorTarget.has_value() && WidgetIdentityEquals(anchorTarget->widget, *hoveredWidget)) {
+            resolution.hoveredEditableAnchor = anchorTarget;
+            return resolution;
+        }
+
+        return resolution;
+    }
+
+    size_t layoutGuideIndex = 0;
+    if (HitTestLayoutGuide(clientPoint, &layoutGuideIndex) != nullptr) {
+        resolution.hoveredLayoutGuideIndex = layoutGuideIndex;
+        return resolution;
+    }
+
+    return resolution;
+}
+
 void LayoutEditController::RefreshHover(POINT clientPoint) {
     if (activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeAnchorEditDrag_.has_value()) {
         return;
     }
 
-    DashboardRenderer& renderer = host_.LayoutEditRenderer();
-    const std::optional<DashboardRenderer::EditableAnchorKey> nextHoveredAnchorHandle =
-        renderer.HitTestEditableAnchorHandle(clientPoint);
-    std::optional<DashboardRenderer::EditableAnchorKey> nextHoveredAnchor = nextHoveredAnchorHandle;
-    if (!nextHoveredAnchor.has_value()) {
-        nextHoveredAnchor = renderer.HitTestEditableAnchorTarget(clientPoint);
-    }
-    const std::optional<DashboardRenderer::LayoutWidgetIdentity> nextHoveredWidget =
-        nextHoveredAnchor.has_value()
-            ? std::optional<DashboardRenderer::LayoutWidgetIdentity>(nextHoveredAnchor->widget)
-            : renderer.HitTestEditableWidget(clientPoint);
+    const HoverResolution resolution = ResolveHover(clientPoint);
+    const std::optional<DashboardRenderer::LayoutWidgetIdentity>& nextHoveredWidget = resolution.hoveredEditableWidget;
+    const std::optional<DashboardRenderer::EditableAnchorKey>& nextHoveredAnchor = resolution.hoveredEditableAnchor;
 
     bool hoverChanged = (hoveredEditableWidget_.has_value() != nextHoveredWidget.has_value());
     if (!hoverChanged && hoveredEditableWidget_.has_value() && nextHoveredWidget.has_value()) {
@@ -314,25 +349,13 @@ void LayoutEditController::RefreshHover(POINT clientPoint) {
         hoverChanged = true;
     }
 
-    size_t widgetGuideIndex = 0;
-    const DashboardRenderer::WidgetEditGuide* widgetGuide = nullptr;
-    if (hoveredEditableWidget_.has_value()) {
-        widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
-        if (widgetGuide != nullptr && !WidgetIdentityEquals(widgetGuide->widget, *hoveredEditableWidget_)) {
-            widgetGuide = nullptr;
-        }
-    }
-    const std::optional<size_t> nextWidgetGuideIndex =
-        widgetGuide != nullptr ? std::optional<size_t>(widgetGuideIndex) : std::nullopt;
+    const std::optional<size_t>& nextWidgetGuideIndex = resolution.hoveredWidgetEditGuideIndex;
     if (hoveredWidgetEditGuideIndex_ != nextWidgetGuideIndex) {
         hoveredWidgetEditGuideIndex_ = nextWidgetGuideIndex;
         hoverChanged = true;
     }
 
-    size_t layoutGuideIndex = 0;
-    const DashboardRenderer::LayoutEditGuide* layoutGuide = HitTestLayoutGuide(clientPoint, &layoutGuideIndex);
-    const std::optional<size_t> nextLayoutGuideIndex =
-        layoutGuide != nullptr ? std::optional<size_t>(layoutGuideIndex) : std::nullopt;
+    const std::optional<size_t>& nextLayoutGuideIndex = resolution.hoveredLayoutGuideIndex;
     if (hoveredLayoutGuideIndex_ != nextLayoutGuideIndex) {
         hoveredLayoutGuideIndex_ = nextLayoutGuideIndex;
         hoverChanged = true;
@@ -346,11 +369,12 @@ void LayoutEditController::RefreshHover(POINT clientPoint) {
 }
 
 bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
+    lastClientPoint_ = clientPoint;
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
-    if (hoveredEditableAnchor_.has_value()) {
-        const auto region = renderer.FindEditableAnchorRegion(*hoveredEditableAnchor_);
-        const auto handle = renderer.HitTestEditableAnchorHandle(clientPoint);
-        if (region.has_value() && handle.has_value() && EditableAnchorKeyEquals(*handle, region->key)) {
+    const HoverResolution resolution = ResolveHover(clientPoint);
+    if (resolution.actionableAnchorHandle.has_value()) {
+        const auto region = renderer.FindEditableAnchorRegion(*resolution.actionableAnchorHandle);
+        if (region.has_value()) {
             const double startDx = static_cast<double>(clientPoint.x - region->dragOrigin.x);
             const double startDy = static_cast<double>(clientPoint.y - region->dragOrigin.y);
             activeAnchorEditDrag_ = AnchorEditDragState{region->key,
@@ -368,34 +392,34 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
         }
     }
 
-    size_t widgetGuideIndex = 0;
-    const DashboardRenderer::WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
-    if (widgetGuide != nullptr) {
+    if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
+        const auto& guides = renderer.WidgetEditGuides();
+        const DashboardRenderer::WidgetEditGuide& widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
         activeWidgetEditDrag_ = WidgetEditDragState{
-            *widgetGuide,
-            widgetGuide->value,
-            widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y,
+            widgetGuide,
+            widgetGuide.value,
+            widgetGuide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y,
         };
-        hoveredEditableWidget_ = widgetGuide->widget;
-        hoveredWidgetEditGuideIndex_ = widgetGuideIndex;
+        hoveredEditableWidget_ = widgetGuide.widget;
+        hoveredWidgetEditGuideIndex_ = resolution.hoveredWidgetEditGuideIndex;
         SyncRendererInteractionState();
         SetCapture(hwnd);
         return true;
     }
 
-    size_t guideIndex = 0;
-    const DashboardRenderer::LayoutEditGuide* guide = HitTestLayoutGuide(clientPoint, &guideIndex);
-    if (guide != nullptr) {
+    if (resolution.hoveredLayoutGuideIndex.has_value()) {
+        const auto& guides = renderer.LayoutEditGuides();
+        const DashboardRenderer::LayoutEditGuide& guide = guides[*resolution.hoveredLayoutGuideIndex];
         const LayoutNodeConfig* guideNode =
-            layout_edit::FindGuideNode(host_.LayoutEditConfig(), LayoutEditHost::LayoutTarget::ForGuide(*guide));
-        const std::vector<int> initialWeights = layout_edit::SeedGuideWeights(*guide, guideNode);
+            layout_edit::FindGuideNode(host_.LayoutEditConfig(), LayoutEditHost::LayoutTarget::ForGuide(guide));
+        const std::vector<int> initialWeights = layout_edit::SeedGuideWeights(guide, guideNode);
         activeLayoutDrag_ = LayoutDragState{
-            *guide,
+            guide,
             initialWeights,
-            renderer.CollectLayoutGuideSnapCandidates(*guide),
-            guide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y,
+            renderer.CollectLayoutGuideSnapCandidates(guide),
+            guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y,
         };
-        hoveredLayoutGuideIndex_ = guideIndex;
+        hoveredLayoutGuideIndex_ = resolution.hoveredLayoutGuideIndex;
         SyncRendererInteractionState();
         SetCapture(hwnd);
         return true;
@@ -405,6 +429,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
 }
 
 bool LayoutEditController::HandleMouseMove(POINT clientPoint) {
+    lastClientPoint_ = clientPoint;
     if (activeLayoutDrag_.has_value()) {
         return UpdateLayoutDrag(clientPoint);
     }
@@ -419,7 +444,28 @@ bool LayoutEditController::HandleMouseMove(POINT clientPoint) {
     return true;
 }
 
+bool LayoutEditController::HandleMouseLeave() {
+    if (activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeAnchorEditDrag_.has_value()) {
+        return false;
+    }
+
+    const bool hadHover = hoveredLayoutGuideIndex_.has_value() || hoveredEditableWidget_.has_value() ||
+                          hoveredWidgetEditGuideIndex_.has_value() || hoveredEditableAnchor_.has_value();
+    if (!hadHover) {
+        return false;
+    }
+
+    hoveredLayoutGuideIndex_.reset();
+    hoveredEditableWidget_.reset();
+    hoveredWidgetEditGuideIndex_.reset();
+    hoveredEditableAnchor_.reset();
+    SyncRendererInteractionState();
+    host_.InvalidateLayoutEdit();
+    return true;
+}
+
 bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
+    lastClientPoint_ = clientPoint;
     bool released = false;
     if (activeAnchorEditDrag_.has_value()) {
         activeAnchorEditDrag_.reset();
@@ -492,6 +538,53 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     return true;
 }
 
+std::optional<LayoutEditController::TooltipTarget> LayoutEditController::CurrentTooltipTarget() {
+    if (activeWidgetEditDrag_.has_value()) {
+        TooltipTarget target;
+        target.kind = TooltipTarget::Kind::WidgetGuide;
+        target.clientPoint = lastClientPoint_;
+        target.widgetGuide = activeWidgetEditDrag_->guide;
+        return target;
+    }
+
+    DashboardRenderer& renderer = host_.LayoutEditRenderer();
+    if (activeAnchorEditDrag_.has_value()) {
+        const auto region = renderer.FindEditableAnchorRegion(activeAnchorEditDrag_->key);
+        if (region.has_value()) {
+            TooltipTarget target;
+            target.kind = TooltipTarget::Kind::EditableAnchor;
+            target.clientPoint = lastClientPoint_;
+            target.editableAnchor = *region;
+            return target;
+        }
+    }
+
+    const HoverResolution resolution = ResolveHover(lastClientPoint_);
+    if (resolution.actionableAnchorHandle.has_value()) {
+        const auto region = renderer.FindEditableAnchorRegion(*resolution.actionableAnchorHandle);
+        if (region.has_value()) {
+            TooltipTarget target;
+            target.kind = TooltipTarget::Kind::EditableAnchor;
+            target.clientPoint = lastClientPoint_;
+            target.editableAnchor = *region;
+            return target;
+        }
+    }
+
+    if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
+        const auto& guides = renderer.WidgetEditGuides();
+        if (*resolution.hoveredWidgetEditGuideIndex < guides.size()) {
+            TooltipTarget target;
+            target.kind = TooltipTarget::Kind::WidgetGuide;
+            target.clientPoint = lastClientPoint_;
+            target.widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
+            return target;
+        }
+    }
+
+    return std::nullopt;
+}
+
 void LayoutEditController::SyncRendererInteractionState() {
     DashboardRenderer::EditOverlayState& overlayState = host_.LayoutEditOverlayState();
     overlayState.hoveredEditableWidget = hoveredEditableWidget_;
@@ -520,9 +613,9 @@ void LayoutEditController::ClearInteractionState() {
 }
 
 void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
-    if (const auto hoveredAnchorHandle = host_.LayoutEditRenderer().HitTestEditableAnchorHandle(clientPoint);
-        hoveredAnchorHandle.has_value()) {
-        const auto region = host_.LayoutEditRenderer().FindEditableAnchorRegion(*hoveredAnchorHandle);
+    const HoverResolution resolution = ResolveHover(clientPoint);
+    if (resolution.actionableAnchorHandle.has_value()) {
+        const auto region = host_.LayoutEditRenderer().FindEditableAnchorRegion(*resolution.actionableAnchorHandle);
         const auto dragAxis = region.has_value() ? region->dragAxis : DashboardRenderer::AnchorDragAxis::Vertical;
         const auto dragMode = region.has_value() ? region->dragMode : DashboardRenderer::AnchorDragMode::AxisDelta;
         SetCursor(LoadCursorW(nullptr,
@@ -533,25 +626,21 @@ void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
         return;
     }
 
-    const DashboardRenderer::WidgetEditGuide* widgetGuide = nullptr;
-    if (hoveredEditableWidget_.has_value()) {
-        widgetGuide = HitTestWidgetEditGuide(clientPoint);
-        if (widgetGuide != nullptr && !WidgetIdentityEquals(widgetGuide->widget, *hoveredEditableWidget_)) {
-            widgetGuide = nullptr;
-        }
-    }
-    if (widgetGuide != nullptr) {
+    if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
+        const auto& guides = host_.LayoutEditRenderer().WidgetEditGuides();
+        const DashboardRenderer::WidgetEditGuide& widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
         SetCursor(LoadCursorW(nullptr,
-            widgetGuide->angularDrag                                            ? IDC_CROSS
-            : widgetGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE
-                                                                                : IDC_SIZENS));
+            widgetGuide.angularDrag                                            ? IDC_CROSS
+            : widgetGuide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE
+                                                                               : IDC_SIZENS));
         return;
     }
 
-    const DashboardRenderer::LayoutEditGuide* layoutGuide = HitTestLayoutGuide(clientPoint);
-    if (layoutGuide != nullptr) {
+    if (resolution.hoveredLayoutGuideIndex.has_value()) {
+        const auto& guides = host_.LayoutEditRenderer().LayoutEditGuides();
+        const DashboardRenderer::LayoutEditGuide& layoutGuide = guides[*resolution.hoveredLayoutGuideIndex];
         SetCursor(LoadCursorW(
-            nullptr, layoutGuide->axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+            nullptr, layoutGuide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return;
     }
 

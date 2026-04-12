@@ -75,6 +75,12 @@ private:
     void StopMoveMode();
     void UpdateMoveTracking();
     void DrawMoveOverlay(HDC hdc);
+    bool CreateLayoutEditTooltip();
+    void DestroyLayoutEditTooltip();
+    void HideLayoutEditTooltip();
+    void UpdateLayoutEditTooltip();
+    void UpdateLayoutEditMouseTracking();
+    void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
     bool CreateTrayIcon();
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);
@@ -110,4 +116,10 @@ private:
     DiagnosticsOptions diagnosticsOptions_;
     UINT currentDpi_ = kDefaultDpi;
     LayoutEditController layoutEditController_;
+    HWND layoutEditTooltipHwnd_ = nullptr;
+    std::wstring layoutEditTooltipText_;
+    bool layoutEditTooltipVisible_ = false;
+    bool layoutEditMouseTracking_ = false;
+    RECT layoutEditTooltipRect_{};
+    bool layoutEditTooltipRectValid_ = false;
 };
