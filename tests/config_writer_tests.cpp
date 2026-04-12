@@ -6,7 +6,9 @@
 #include <sstream>
 
 std::string LoadEmbeddedConfigTemplate() {
-    std::ifstream input("resources/config.ini", std::ios::binary);
+    const std::filesystem::path configPath =
+        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    std::ifstream input(configPath, std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
     return buffer.str();

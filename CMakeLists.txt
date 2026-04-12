@@ -228,6 +228,7 @@ target_compile_definitions(SystemTelemetryTests PRIVATE
     UNICODE
     _UNICODE
     WIN32_LEAN_AND_MEAN
+    SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 target_compile_options(SystemTelemetryTests PRIVATE
     /EHsc
