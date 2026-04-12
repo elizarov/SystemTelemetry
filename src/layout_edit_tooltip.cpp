@@ -17,6 +17,10 @@ std::optional<LayoutEditTooltipDescriptor> MakeDescriptor(std::string sectionNam
     return descriptor;
 }
 
+std::optional<LayoutEditTooltipDescriptor> MakeFontDescriptor(std::string memberName) {
+    return MakeDescriptor("fonts", std::move(memberName), LayoutEditTooltipValueFormat::FontSpec);
+}
+
 }  // namespace
 
 std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(
@@ -94,20 +98,31 @@ std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(
         case Parameter::GaugeRingThickness:
             return MakeDescriptor("gauge", "ring_thickness");
         case Parameter::FontTitle:
+            return MakeFontDescriptor("title");
         case Parameter::FontBig:
+            return MakeFontDescriptor("big");
         case Parameter::FontValue:
+            return MakeFontDescriptor("value");
         case Parameter::FontLabel:
+            return MakeFontDescriptor("label");
         case Parameter::FontText:
+            return MakeFontDescriptor("text");
         case Parameter::FontSmall:
+            return MakeFontDescriptor("small");
         case Parameter::FontFooter:
+            return MakeFontDescriptor("footer");
         case Parameter::FontClockTime:
+            return MakeFontDescriptor("clock_time");
         case Parameter::FontClockDate:
-            return std::nullopt;
+            return MakeFontDescriptor("clock_date");
     }
     return std::nullopt;
 }
 
 std::string FormatLayoutEditTooltipValue(double value, LayoutEditTooltipValueFormat format) {
+    if (format == LayoutEditTooltipValueFormat::FontSpec) {
+        return {};
+    }
     if (format == LayoutEditTooltipValueFormat::Integer) {
         return std::to_string(static_cast<int>(std::lround(value)));
     }
@@ -127,7 +142,43 @@ std::string FormatLayoutEditTooltipValue(double value, LayoutEditTooltipValueFor
     return text;
 }
 
+std::string FormatLayoutEditTooltipValue(const UiFontConfig& value) {
+    return value.face + "," + std::to_string(value.size) + "," + std::to_string(value.weight);
+}
+
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, double value) {
     return "[" + descriptor.sectionName + "] " + descriptor.memberName + " = " +
            FormatLayoutEditTooltipValue(value, descriptor.valueFormat);
+}
+
+std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& value) {
+    return "[" + descriptor.sectionName + "] " + descriptor.memberName + " = " +
+           FormatLayoutEditTooltipValue(value);
+}
+
+std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(
+    const AppConfig& config, DashboardRenderer::AnchorEditParameter parameter) {
+    using Parameter = DashboardRenderer::AnchorEditParameter;
+    switch (parameter) {
+        case Parameter::FontTitle:
+            return &config.layout.fonts.title;
+        case Parameter::FontBig:
+            return &config.layout.fonts.big;
+        case Parameter::FontValue:
+            return &config.layout.fonts.value;
+        case Parameter::FontLabel:
+            return &config.layout.fonts.label;
+        case Parameter::FontText:
+            return &config.layout.fonts.text;
+        case Parameter::FontSmall:
+            return &config.layout.fonts.smallText;
+        case Parameter::FontFooter:
+            return &config.layout.fonts.footer;
+        case Parameter::FontClockTime:
+            return &config.layout.fonts.clockTime;
+        case Parameter::FontClockDate:
+            return &config.layout.fonts.clockDate;
+        default:
+            return std::nullopt;
+    }
 }

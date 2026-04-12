@@ -73,6 +73,16 @@ std::wstring BuildTooltipText(
     return text;
 }
 
+std::wstring BuildTooltipText(
+    const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& value, const std::wstring& descriptionText) {
+    std::wstring text = WideFromUtf8(BuildLayoutEditTooltipLine(descriptor, value));
+    if (!descriptionText.empty()) {
+        text += L"\r\n";
+        text += descriptionText;
+    }
+    return text;
+}
+
 struct CustomScaleDialogState {
     double initialScale = 1.0;
     std::optional<double> result;
@@ -815,6 +825,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
 
     std::optional<LayoutEditTooltipDescriptor> descriptor;
     double value = 0.0;
+    std::optional<UiFontConfig> fontValue;
     POINT clientPoint = target->clientPoint;
     if (target->kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide) {
         descriptor = FindLayoutEditTooltipDescriptor(target->widgetGuide.parameter);
@@ -825,6 +836,11 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     } else {
         descriptor = FindLayoutEditTooltipDescriptor(target->editableAnchor.key.parameter);
         value = static_cast<double>(target->editableAnchor.value);
+        if (const auto currentFont =
+                FindLayoutEditTooltipFontValue(controller_.State().config, target->editableAnchor.key.parameter);
+            currentFont.has_value() && *currentFont != nullptr) {
+            fontValue = **currentFont;
+        }
         if (clientPoint.x == 0 && clientPoint.y == 0) {
             clientPoint.x = target->editableAnchor.anchorRect.left +
                             (std::max<LONG>(0, target->editableAnchor.anchorRect.right - target->editableAnchor.anchorRect.left) /
@@ -841,7 +857,10 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     }
 
     const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
-    layoutEditTooltipText_ = BuildTooltipText(*descriptor, value, description);
+    layoutEditTooltipText_ =
+        descriptor->valueFormat == LayoutEditTooltipValueFormat::FontSpec && fontValue.has_value()
+            ? BuildTooltipText(*descriptor, *fontValue, description)
+            : BuildTooltipText(*descriptor, value, description);
 
     const int tooltipRadius = ScaleLogicalToPhysical(10, CurrentWindowDpi());
     layoutEditTooltipRect_ = RectFromPoint(clientPoint, tooltipRadius);

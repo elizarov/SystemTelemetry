@@ -12,8 +12,13 @@ TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {
     EXPECT_EQ(descriptor->valueFormat, LayoutEditTooltipValueFormat::Integer);
 }
 
-TEST(LayoutEditTooltip, OmitsFontAnchors) {
-    EXPECT_FALSE(FindLayoutEditTooltipDescriptor(DashboardRenderer::AnchorEditParameter::FontLabel).has_value());
+TEST(LayoutEditTooltip, IncludesFontAnchors) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(DashboardRenderer::AnchorEditParameter::FontLabel);
+    ASSERT_TRUE(descriptor.has_value());
+    EXPECT_EQ(descriptor->configKey, "config.fonts.label");
+    EXPECT_EQ(descriptor->sectionName, "fonts");
+    EXPECT_EQ(descriptor->memberName, "label");
+    EXPECT_EQ(descriptor->valueFormat, LayoutEditTooltipValueFormat::FontSpec);
 }
 
 TEST(LayoutEditTooltip, FormatsFloatingPointValuesWithoutTrailingZeros) {
@@ -26,4 +31,12 @@ TEST(LayoutEditTooltip, BuildsTooltipFirstLine) {
 
     ASSERT_TRUE(descriptor.has_value());
     EXPECT_EQ(BuildLayoutEditTooltipLine(*descriptor, 6.0), "[gauge] segment_count = 6");
+}
+
+TEST(LayoutEditTooltip, BuildsFontTooltipFirstLine) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(DashboardRenderer::AnchorEditParameter::FontClockTime);
+
+    ASSERT_TRUE(descriptor.has_value());
+    const UiFontConfig font{"Segoe UI Semibold", 40, 700};
+    EXPECT_EQ(BuildLayoutEditTooltipLine(*descriptor, font), "[fonts] clock_time = Segoe UI Semibold,40,700");
 }
