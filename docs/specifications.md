@@ -57,9 +57,9 @@ Examples include:
 - When `Save Config` creates `config.ini` beside the executable for the first time, it must write only the keys whose live in-memory values differ from the embedded defaults.
 - `Save Full Config To...` must export a complete config file by starting from the embedded `resources/config.ini` template text and updating every maintained config key with the live in-memory values so the exported file keeps the shipped line structure and comments.
 - The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
-- The `[display]` section must select the active dashboard layout by name through `display.layout`, and named dashboard size-and-card-placement definitions must live in `[layout.<name>]` sections.
+- The `[display]` section must select the active dashboard layout by name through `display.layout`, and named dashboard size-and-card-placement definitions must live in `[layout.<name>]` sections with aspect-ratio names plus an optional `description` popup label suffix.
 - The `[display]` section must store the dashboard render scale through `display.scale` as a fractional multiplier where `0` means the runtime uses the current monitor DPI scale.
-- The shipped config template must define `800x480` as the default active layout and also include an experimental `480x800` portrait layout for the same panel resolution.
+- The shipped config template must define `5x3` as the default active layout, also include an experimental `3x5` portrait layout for the same panel resolution, and expose human-readable layout descriptions such as `5" 800x480 screen` for the layout popup.
 - The config overlay path must replace parsed layout expressions during overlay, so `config.ini` overrides `[layout.<name>]` and `[card.*]` layout trees without duplicating cards or widgets.
 
 ### Layout and rendering behavior

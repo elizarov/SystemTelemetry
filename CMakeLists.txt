@@ -122,6 +122,10 @@ add_executable(SystemTelemetry WIN32
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
 )
 
+set_source_files_properties(resources/SystemTelemetry.rc PROPERTIES
+    OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/config.ini;${CMAKE_SOURCE_DIR}/resources/localization.ini"
+)
+
 add_library(SystemTelemetryGigabyte OBJECT
     src/board_gigabyte_siv.cpp
 )

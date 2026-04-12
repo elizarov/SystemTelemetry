@@ -91,6 +91,7 @@ Each `[layout.<name>]` section owns only one named dashboard size and card-place
 
 Supported `[layout.<name>]` keys:
 
+- `description = popup label suffix`
 - `window = width,height`
 - `cards = rows(columns:weight(card:weight,...), ...)`
 
@@ -117,8 +118,8 @@ Undocumented key spellings and metric aliases are invalid.
 
 Example:
 
-- `[layout.800x480]`
-- `[layout.480x800]`
+- `[layout.5x3]`
+- `description = 5" 800x480 screen`
 - `cards = rows(columns:3(cpu,gpu), columns:2(network:4,storage:9,time:3))`
 
 `[colors]` owns the shared dashboard palette and uses `#RRGGBB`:

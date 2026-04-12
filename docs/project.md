@@ -34,6 +34,7 @@
 ## Implementation constraints
 
 - Keep the checked-in config template at `resources/config.ini` so it can be embedded into the executable as the default configuration resource.
+- Keep `resources/SystemTelemetry.rc` explicitly dependent on embedded payload files such as `resources/config.ini` and `resources/localization.ini` so incremental builds refresh the executable resources when those UTF-8 source files change.
 - Treat `resources/config.ini` as the single maintained source of truth for config-file entry documentation instead of duplicating that format documentation elsewhere in the repo.
 - Do not add C++-side synthesized fallback layout/card/widget defaults that duplicate the embedded config template; shipped defaults must come only from `resources/config.ini`.
 - Do not keep code-side fallback fonts, colors, or layout-size defaults in the config structs; shipped UI styling defaults must come only from `resources/config.ini`.

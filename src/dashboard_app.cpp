@@ -63,6 +63,15 @@ std::wstring FormatScalePercentageValue(double scale) {
     return WideFromUtf8(value);
 }
 
+std::wstring FormatLayoutMenuLabel(const LayoutMenuOption& option) {
+    std::wstring label = WideFromUtf8(option.name);
+    if (!option.description.empty()) {
+        label += L" - ";
+        label += WideFromUtf8(option.description);
+    }
+    return label;
+}
+
 std::wstring BuildTooltipText(
     const LayoutEditTooltipDescriptor& descriptor, double value, const std::wstring& descriptionText) {
     std::wstring text = WideFromUtf8(BuildLayoutEditTooltipLine(descriptor, value));
@@ -523,13 +532,14 @@ void DashboardApp::ShowContextMenu(POINT screenPoint) {
         LayoutMenuOption option;
         option.commandId = kCommandLayoutBase + static_cast<UINT>(i);
         option.name = state.config.layouts[i].name;
+        option.description = state.config.layouts[i].description;
         state.layoutMenuOptions.push_back(option);
     }
     if (state.layoutMenuOptions.empty()) {
         AppendMenuW(layoutMenu, MF_STRING | MF_GRAYED, kCommandLayoutBase, L"No layouts found");
     } else {
         for (const auto& option : state.layoutMenuOptions) {
-            const std::wstring label = WideFromUtf8(option.name);
+            const std::wstring label = FormatLayoutMenuLabel(option);
             const UINT flags = MF_STRING | (state.config.display.layout == option.name ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(layoutMenu, flags, option.commandId, label.c_str());
             SetMenuItemRadioStyle(layoutMenu, option.commandId);

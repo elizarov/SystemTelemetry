@@ -139,6 +139,7 @@ struct NamedLayoutSectionConfig {
     std::string name;
 
     CONFIG_REFLECTED_STRUCT(NamedLayoutSectionConfig)
+    CONFIG_VALUE(std::string, description, "description");
     CONFIG_VALUE(LogicalSizeConfig, window, "window");
     CONFIG_VALUE(LayoutNodeConfig, cardsLayout, "cards");
     CONFIG_DYNAMIC_SECTION("layout.");
