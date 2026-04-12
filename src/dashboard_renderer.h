@@ -423,6 +423,7 @@ private:
     std::vector<WidgetEditGuide> widgetEditGuides_;
     std::vector<EditableAnchorRegion> staticEditableAnchorRegions_;
     std::vector<EditableAnchorRegion> dynamicEditableAnchorRegions_;
+    bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     std::string lastError_;
     double renderScale_ = 1.0;

@@ -800,6 +800,9 @@ void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const EditableAnchor
     bool showWhenWidgetHovered,
     bool drawTargetOutline,
     int value) {
+    if (!dynamicAnchorRegistrationEnabled_) {
+        return;
+    }
     RegisterEditableAnchorRegion(dynamicEditableAnchorRegions_,
         key,
         targetRect,
@@ -854,6 +857,9 @@ void DashboardRenderer::RegisterStaticTextAnchor(
 
 void DashboardRenderer::RegisterDynamicTextAnchor(
     const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
+    if (!dynamicAnchorRegistrationEnabled_) {
+        return;
+    }
     RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, font, format, editable);
 }
 
@@ -1123,6 +1129,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
     dynamicEditableAnchorRegions_.clear();
+    dynamicAnchorRegistrationEnabled_ = overlayState.showLayoutEditGuides;
     DashboardMetricSource metrics(snapshot, config_.metricScales);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
@@ -1135,6 +1142,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const Edit
     DrawLayoutEditGuides(hdc, overlayState);
     DrawWidgetEditGuides(hdc, overlayState);
     DrawLayoutSimilarityIndicators(hdc, overlayState);
+    dynamicAnchorRegistrationEnabled_ = false;
 }
 
 bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
@@ -1429,6 +1437,7 @@ void DashboardRenderer::Shutdown() {
     parsedWidgetInfoCache_.clear();
     staticEditableAnchorRegions_.clear();
     dynamicEditableAnchorRegions_.clear();
+    dynamicAnchorRegistrationEnabled_ = false;
     ReleasePanelIcons();
     ShutdownGdiplus();
 }
