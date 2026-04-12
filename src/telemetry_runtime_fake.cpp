@@ -1,6 +1,8 @@
 #include "telemetry_runtime.h"
 
 #include <algorithm>
+#include <chrono>
+#include <filesystem>
 #include <fstream>
 
 #include "snapshot_dump.h"
@@ -164,13 +166,7 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryRuntime> CreateRealTelemetryRuntime();
-
-std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(
-    const DiagnosticsOptions& options, const std::filesystem::path& workingDirectory) {
-    if (options.fake) {
-        return std::make_unique<FakeTelemetryRuntime>(
-            ResolveFakePath(workingDirectory, options.fakePath), ShouldShowRuntimeDialogs(options));
-    }
-    return CreateRealTelemetryRuntime();
+std::unique_ptr<TelemetryRuntime> CreateFakeTelemetryRuntime(
+    const std::filesystem::path& workingDirectory, const std::filesystem::path& configuredPath, bool showDialogs) {
+    return std::make_unique<FakeTelemetryRuntime>(ResolveFakePath(workingDirectory, configuredPath), showDialogs);
 }

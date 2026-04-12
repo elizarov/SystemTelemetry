@@ -12,10 +12,6 @@ AppConfig BuildUiOverlayConfigFromResolvedTelemetry(const AppConfig& uiConfig, c
 
 }  // namespace
 
-bool ShouldShowRuntimeDialogs(const DiagnosticsOptions& options) {
-    return !options.trace;
-}
-
 class RealTelemetryRuntime : public TelemetryRuntime {
 public:
     bool Initialize(const AppConfig& config, std::ostream* traceStream) override {

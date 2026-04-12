@@ -20,7 +20,6 @@
 #include "app_autostart.h"
 #include "app_command_line.h"
 #include "app_constants.h"
-#include "app_diagnostics.h"
 #include "app_config_io.h"
 #include "app_display_config.h"
 #include "app_monitor.h"
@@ -28,6 +27,7 @@
 #include "app_strings.h"
 #include "app_win32_ui.h"
 #include "dashboard_controller.h"
+#include "diagnostics_options.h"
 #include "layout_edit_controller.h"
 class DashboardApp : private LayoutEditHost, public DashboardShellHost {
 public:

@@ -89,14 +89,6 @@ struct SystemSnapshot {
     SYSTEMTIME now{};
 };
 
-inline void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
-    snapshot.retainedHistoryIndexByRef.clear();
-    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
-    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
-        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
-    }
-}
-
 struct GpuProviderTelemetryState {
     std::string providerName = "None";
     std::string diagnostics;

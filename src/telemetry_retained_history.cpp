@@ -28,6 +28,14 @@ void PushHistorySample(std::vector<double>& history, double value) {
 
 }  // namespace
 
+void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
+    snapshot.retainedHistoryIndexByRef.clear();
+    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
+    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
+        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
+    }
+}
+
 void RetainedHistoryStore::Reset(SystemSnapshot& snapshot) const {
     snapshot.retainedHistories.clear();
     snapshot.retainedHistoryIndexByRef.clear();

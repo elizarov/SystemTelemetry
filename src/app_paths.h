@@ -10,7 +10,7 @@
 #include <windows.h>
 
 #include "config.h"
-#include "telemetry_runtime.h"
+#include "diagnostics_options.h"
 
 std::filesystem::path GetExecutableDirectory();
 std::filesystem::path GetWorkingDirectory();

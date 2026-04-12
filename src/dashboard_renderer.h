@@ -297,7 +297,7 @@ public:
     int ScaleLogical(int value) const;
 
 private:
-    friend struct DashboardRendererLayoutEngine;
+    friend struct DashboardLayoutResolver;
 
     struct SimilarityIndicator {
         LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;

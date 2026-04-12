@@ -1,4 +1,5 @@
 #include "snapshot_dump.h"
+#include "telemetry_retained_history.h"
 
 #include <cerrno>
 #include <cstdio>

@@ -74,6 +74,7 @@ add_executable(SystemTelemetry WIN32
     src/app_command_line.cpp
     src/app_config_io.cpp
     src/app_display_config.cpp
+    src/diagnostics_options.cpp
     src/app_monitor.cpp
     src/app_paths.cpp
     src/app_strings.cpp
@@ -94,6 +95,7 @@ add_executable(SystemTelemetry WIN32
     src/telemetry_network_source.cpp
     src/telemetry_runtime.cpp
     src/telemetry_runtime_fake.cpp
+    src/telemetry_runtime_factory.cpp
     src/snapshot_dump.cpp
     src/gpu_vendor.cpp
     src/gpu_amd_adl.cpp
@@ -110,9 +112,7 @@ add_executable(SystemTelemetry WIN32
     src/widget/drive_usage_list.cpp
     src/widget/clock_time.cpp
     src/widget/clock_date.cpp
-    src/dashboard_renderer_resources.cpp
-    src/dashboard_renderer_layout_engine.cpp
-    src/dashboard_renderer_layout.cpp
+    src/dashboard_layout_resolver.cpp
     src/dashboard_renderer.cpp
     src/utf8.cpp
     src/trace.cpp

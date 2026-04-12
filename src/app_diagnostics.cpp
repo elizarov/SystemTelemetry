@@ -4,6 +4,7 @@
 #include "app_strings.h"
 #include "config_parser.h"
 #include "config_writer.h"
+#include "telemetry_runtime_factory.h"
 
 #include <cmath>
 #include <cstdio>
