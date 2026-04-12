@@ -36,6 +36,11 @@ if not "%TASKKILL_RC%"=="0" (
         exit /b 1
     )
 )
+call :wait_for_process_exit
+if errorlevel 1 (
+    echo Timed out waiting for running SystemTelemetry.exe instances to exit.
+    exit /b 1
+)
 
 copy /y "%SOURCE_EXE%" "%TARGET_EXE%" >nul
 if errorlevel 1 (
@@ -64,4 +69,18 @@ if errorlevel 1 (
 )
 exit /b 2
 
+:wait_for_process_exit
+setlocal EnableExtensions
+set /a WAIT_RETRIES=30
+:wait_for_process_exit_loop
+tasklist /fi "IMAGENAME eq SystemTelemetry.exe" 2>nul | find /i "SystemTelemetry.exe" >nul
+if errorlevel 1 (
+    exit /b 0
+)
+if "%WAIT_RETRIES%"=="0" (
+    exit /b 1
+)
+timeout /t 1 /nobreak >nul
+set /a WAIT_RETRIES-=1
+goto wait_for_process_exit_loop
 

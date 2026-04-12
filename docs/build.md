@@ -30,7 +30,7 @@ Install the already-built runtime with `install.cmd` from the repository root:
 install.cmd
 ```
 
-`install.cmd` requests elevation, stops any running `SystemTelemetry.exe` instances across user sessions, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and does not run `build.cmd` on its own.
+`install.cmd` requests elevation, stops any running `SystemTelemetry.exe` instances across user sessions, waits for those processes to exit, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and does not run `build.cmd` on its own.
 
 Run unit tests from the generated CMake tree after a successful build:
 
