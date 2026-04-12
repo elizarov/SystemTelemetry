@@ -35,12 +35,10 @@ TEST(ConfigWriter, FullExportDoesNotInventEmptyHeaderKeysForHeaderlessCards) {
     const std::string sectionText =
         "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\n[card.time]";
     EXPECT_THAT(output, testing::HasSubstr(sectionText));
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::Not(testing::HasSubstr(
             "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\ntitle = ")));
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::Not(testing::HasSubstr(
             "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\nicon = ")));
 }
