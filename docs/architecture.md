@@ -84,7 +84,7 @@
   - Links the required CLR host support library from the active Windows SDK.
   - Resolves the GoogleTest package through the repo `vcpkg.json` manifest and the active vcpkg CMake toolchain, builds the `SystemTelemetryTests` unit-test binary against `GTest::gtest_main`, and registers it with CTest.
 - `.clangd`: repo-local `clangd` configuration that points editor integrations at `build\cmake\compile_commands.json`.
-- `src/vendor/adlx/...`: vendored AMD ADLX headers/helper/runtime glue used by the AMD GPU provider.
+- `src/vendor/adlx/...`: minimal vendored AMD ADLX headers plus the helper/runtime glue subset required by the AMD GPU provider.
 - `devenv.cmd` + `devenv.md`: local build-environment bootstrap plus its machine-specific setup contract; `devenv.cmd` prepares the Visual Studio x64 toolchain that `build.cmd` and the mixed-mode Gigabyte board-provider build use, while `devenv.md` documents that requirement for future machines.
 
 ## Runtime flows
@@ -145,6 +145,6 @@
 - Build flow: `build.cmd` boots the VS environment via `devenv.cmd`, redirects `TMP` and `TEMP` into a fresh per-build subdirectory under the user's temp area (falling back to `build\tmp\` only when no user temp path is available), re-creates `build\cmake\` when an older cache uses a different generator, configures `build\cmake\` through `cmake -S -B -G "Ninja Multi-Config" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, then builds that tree through `cmake --build`.
   - Keeps generated Ninja files, dependency state, object files, and `compile_commands.json` under `build\cmake\` while placing the final executable under `build\` and leaving debug-symbol outputs there for debug-style configs.
   - Lets Ninja and the MSVC toolchain perform incremental per-source recompilation.
-  - Compiles the Win32 app target from the split dashboard shell, controller, service, telemetry, renderer, diagnostics, vendored ADLX sources, and `resources/SystemTelemetry.rc`.
+  - Compiles the Win32 app target from the split dashboard shell, controller, service, telemetry, renderer, diagnostics, the minimal vendored ADLX subset, and `resources/SystemTelemetry.rc`.
   - Builds `src/board_gigabyte_siv.cpp` separately as a Common Language Runtime-enabled object library so it can bridge into the Gigabyte .NET assemblies.
   - Resolves `mscoree.lib` from the Visual Studio developer environment through `NETFXSDKDir` and disables the linker manifest because the `.rc` file already embeds the maintained application manifest.
