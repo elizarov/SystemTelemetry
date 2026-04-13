@@ -20,6 +20,40 @@ TEST(LayoutEditCommands, ClampsFontSizesToPositiveValues) {
     EXPECT_EQ(config.layout.fonts.footer.size, 1);
 }
 
+TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
+    AppConfig config;
+    config.layout.fonts.label.size = 15;
+    config.layout.fonts.smallText.size = 13;
+    config.layout.driveUsageList.barHeight = 10;
+    config.layout.driveUsageList.activitySegments = 4;
+
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::TextBottomPadding, -3.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::MetricListVerticalGap, -2.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageLabelGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageRwGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageBarGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsagePercentGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageHeaderGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageRowGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegmentGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputAxisPadding, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputHeaderGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeOuterPadding, -1.0));
+
+    EXPECT_EQ(config.layout.text.bottomPadding, 0);
+    EXPECT_EQ(config.layout.metricList.verticalGap, 0);
+    EXPECT_EQ(config.layout.driveUsageList.labelGap, 0);
+    EXPECT_EQ(config.layout.driveUsageList.rwGap, 0);
+    EXPECT_EQ(config.layout.driveUsageList.barGap, 0);
+    EXPECT_EQ(config.layout.driveUsageList.percentGap, 0);
+    EXPECT_EQ(config.layout.driveUsageList.headerGap, 0);
+    EXPECT_EQ(config.layout.driveUsageList.rowGap, 0);
+    EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 0);
+    EXPECT_EQ(config.layout.throughput.axisPadding, 0);
+    EXPECT_EQ(config.layout.throughput.headerGap, 0);
+    EXPECT_EQ(config.layout.gauge.outerPadding, 0);
+}
+
 TEST(LayoutEditCommands, UpdatesMetricListAndGaugeFieldsThroughCommands) {
     AppConfig config;
 

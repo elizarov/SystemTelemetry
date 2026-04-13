@@ -170,21 +170,21 @@ struct MetricListWidgetConfig {
     CONFIG_REFLECTED_STRUCT(MetricListWidgetConfig)
     CONFIG_EDITABLE_VALUE(int, labelWidth, "label_width");
     CONFIG_EDITABLE_VALUE(int, barHeight, "bar_height");
-    CONFIG_EDITABLE_VALUE(int, verticalGap, "vertical_gap");
+    CONFIG_EDITABLE_VALUE_WITH(int, verticalGap, "vertical_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("metric_list");
 };
 
 struct DriveUsageListWidgetConfig {
     CONFIG_REFLECTED_STRUCT(DriveUsageListWidgetConfig)
-    CONFIG_EDITABLE_VALUE(int, labelGap, "label_gap");
+    CONFIG_EDITABLE_VALUE_WITH(int, labelGap, "label_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE(int, activityWidth, "activity_width");
-    CONFIG_EDITABLE_VALUE(int, rwGap, "rw_gap");
-    CONFIG_EDITABLE_VALUE(int, barGap, "bar_gap");
-    CONFIG_EDITABLE_VALUE(int, percentGap, "percent_gap");
+    CONFIG_EDITABLE_VALUE_WITH(int, rwGap, "rw_gap", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, barGap, "bar_gap", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, percentGap, "percent_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE(int, freeWidth, "free_width");
     CONFIG_EDITABLE_VALUE(int, barHeight, "bar_height");
-    CONFIG_EDITABLE_VALUE(int, headerGap, "header_gap");
-    CONFIG_EDITABLE_VALUE(int, rowGap, "row_gap");
+    CONFIG_EDITABLE_VALUE_WITH(int, headerGap, "header_gap", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE(int, activitySegments, "activity_segments");
     CONFIG_EDITABLE_VALUE_WITH(int, activitySegmentGap, "activity_segment_gap", configschema::DriveUsageActivitySegmentGapPolicy);
     CONFIG_SECTION("drive_usage_list");
@@ -192,8 +192,8 @@ struct DriveUsageListWidgetConfig {
 
 struct ThroughputWidgetConfig {
     CONFIG_REFLECTED_STRUCT(ThroughputWidgetConfig)
-    CONFIG_EDITABLE_VALUE(int, headerGap, "header_gap");
-    CONFIG_EDITABLE_VALUE(int, axisPadding, "axis_padding");
+    CONFIG_EDITABLE_VALUE_WITH(int, headerGap, "header_gap", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, axisPadding, "axis_padding", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE(int, guideStrokeWidth, "guide_stroke_width");
     CONFIG_EDITABLE_VALUE(int, plotStrokeWidth, "plot_stroke_width");
     CONFIG_EDITABLE_VALUE(int, leaderDiameter, "leader_diameter");
@@ -202,7 +202,7 @@ struct ThroughputWidgetConfig {
 
 struct GaugeWidgetConfig {
     CONFIG_REFLECTED_STRUCT(GaugeWidgetConfig)
-    CONFIG_EDITABLE_VALUE(int, outerPadding, "outer_padding");
+    CONFIG_EDITABLE_VALUE_WITH(int, outerPadding, "outer_padding", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE(int, ringThickness, "ring_thickness");
     CONFIG_EDITABLE_VALUE_WITH(double, sweepDegrees, "sweep_degrees", configschema::GaugeSweepDegreesPolicy);
     CONFIG_EDITABLE_VALUE(int, segmentCount, "segment_count");
