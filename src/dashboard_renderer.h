@@ -55,6 +55,7 @@ public:
 
     enum class LayoutEditParameter {
         // Hit-testing priority follows this declaration order for actionable widget-local handles and guides.
+        // Fonts
         FontTitle,
         FontBig,
         FontValue,
@@ -64,15 +65,15 @@ public:
         FontFooter,
         FontClockTime,
         FontClockDate,
+
+        // Metric list
         MetricListBarHeight,
-        GaugeSegmentCount,
-        DriveUsageActivitySegments,
-        ThroughputGuideStrokeWidth,
-        ThroughputPlotStrokeWidth,
-        ThroughputLeaderDiameter,
-        DriveUsageBarHeight,
         MetricListLabelWidth,
         MetricListVerticalGap,
+
+        // Drive usage list
+        DriveUsageActivitySegments,
+        DriveUsageBarHeight,
         DriveUsageLabelGap,
         DriveUsageBarGap,
         DriveUsageRwGap,
@@ -82,8 +83,16 @@ public:
         DriveUsageActivitySegmentGap,
         DriveUsageHeaderGap,
         DriveUsageRowGap,
+
+        // Throughput
+        ThroughputGuideStrokeWidth,
+        ThroughputPlotStrokeWidth,
+        ThroughputLeaderDiameter,
         ThroughputAxisPadding,
         ThroughputHeaderGap,
+
+        // Gauge
+        GaugeSegmentCount,
         GaugeValueBottom,
         GaugeLabelBottom,
         GaugeSweepDegrees,
