@@ -871,7 +871,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     }
 
     const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
-    layoutEditTooltipText_ = descriptor->valueFormat == LayoutEditTooltipValueFormat::FontSpec && fontValue.has_value()
+    layoutEditTooltipText_ = descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()
                                  ? BuildTooltipText(*descriptor, *fontValue, description)
                                  : BuildTooltipText(*descriptor, value, description);
 

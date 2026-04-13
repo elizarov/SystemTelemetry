@@ -10,7 +10,7 @@ TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {
     EXPECT_EQ(descriptor->configKey, "config.metric_list.label_width");
     EXPECT_EQ(descriptor->sectionName, "metric_list");
     EXPECT_EQ(descriptor->memberName, "label_width");
-    EXPECT_EQ(descriptor->valueFormat, LayoutEditTooltipValueFormat::Integer);
+    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
 }
 
 TEST(LayoutEditTooltip, IncludesFontAnchors) {
@@ -19,12 +19,12 @@ TEST(LayoutEditTooltip, IncludesFontAnchors) {
     EXPECT_EQ(descriptor->configKey, "config.fonts.label");
     EXPECT_EQ(descriptor->sectionName, "fonts");
     EXPECT_EQ(descriptor->memberName, "label");
-    EXPECT_EQ(descriptor->valueFormat, LayoutEditTooltipValueFormat::FontSpec);
+    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::FontSpec);
 }
 
 TEST(LayoutEditTooltip, FormatsFloatingPointValuesWithoutTrailingZeros) {
-    EXPECT_EQ(FormatLayoutEditTooltipValue(2.2, LayoutEditTooltipValueFormat::FloatingPoint), "2.2");
-    EXPECT_EQ(FormatLayoutEditTooltipValue(262.0, LayoutEditTooltipValueFormat::FloatingPoint), "262");
+    EXPECT_EQ(FormatLayoutEditTooltipValue(2.2, configschema::ValueFormat::FloatingPoint), "2.2");
+    EXPECT_EQ(FormatLayoutEditTooltipValue(262.0, configschema::ValueFormat::FloatingPoint), "262");
 }
 
 TEST(LayoutEditTooltip, BuildsTooltipFirstLine) {
@@ -59,12 +59,12 @@ TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {
     const auto& gaugeField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::GaugeSegmentCount);
     EXPECT_EQ(gaugeField.sectionName, "gauge");
     EXPECT_EQ(gaugeField.parameterName, "segment_count");
-    EXPECT_EQ(gaugeField.valueFormat, LayoutEditTooltipValueFormat::Integer);
+    EXPECT_EQ(gaugeField.valueFormat, configschema::ValueFormat::Integer);
 
     const auto& fontField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::FontLabel);
     EXPECT_EQ(fontField.sectionName, "fonts");
     EXPECT_EQ(fontField.parameterName, "label");
-    EXPECT_EQ(fontField.valueFormat, LayoutEditTooltipValueFormat::FontSpec);
+    EXPECT_EQ(fontField.valueFormat, configschema::ValueFormat::FontSpec);
 }
 
 TEST(LayoutEditParameter, RootLensAppliesIntoNestedConfig) {

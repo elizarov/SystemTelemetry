@@ -44,7 +44,7 @@ struct StructuredSectionCodec {};
 
 struct BoardSectionCodec {};
 
-enum class LayoutEditValueFormat {
+enum class ValueFormat {
     Integer,
     FloatingPoint,
     FontSpec,
@@ -61,14 +61,14 @@ struct DriveUsageActivitySegmentGapPolicy {};
 struct NoLayoutEditFieldTraits {
     using policy_tag = NoLayoutEditPolicy;
     static constexpr bool enabled = false;
-    static constexpr LayoutEditValueFormat value_format = LayoutEditValueFormat::Integer;
+    static constexpr ValueFormat value_format = ValueFormat::Integer;
 };
 
-template <typename PolicyTag, LayoutEditValueFormat ValueFormat = LayoutEditValueFormat::Integer>
+template <typename PolicyTag, ValueFormat Format = ValueFormat::Integer>
 struct LayoutEditFieldTraits {
     using policy_tag = PolicyTag;
     static constexpr bool enabled = true;
-    static constexpr LayoutEditValueFormat value_format = ValueFormat;
+    static constexpr configschema::ValueFormat value_format = Format;
 };
 
 template <typename PolicyTag> struct LayoutEditTraitsForPolicy {
@@ -76,15 +76,15 @@ template <typename PolicyTag> struct LayoutEditTraitsForPolicy {
 };
 
 template <> struct LayoutEditTraitsForPolicy<FontSizePolicy> {
-    using type = LayoutEditFieldTraits<FontSizePolicy, LayoutEditValueFormat::FontSpec>;
+    using type = LayoutEditFieldTraits<FontSizePolicy, ValueFormat::FontSpec>;
 };
 
 template <> struct LayoutEditTraitsForPolicy<GaugeSweepDegreesPolicy> {
-    using type = LayoutEditFieldTraits<GaugeSweepDegreesPolicy, LayoutEditValueFormat::FloatingPoint>;
+    using type = LayoutEditFieldTraits<GaugeSweepDegreesPolicy, ValueFormat::FloatingPoint>;
 };
 
 template <> struct LayoutEditTraitsForPolicy<GaugeSegmentGapDegreesPolicy> {
-    using type = LayoutEditFieldTraits<GaugeSegmentGapDegreesPolicy, LayoutEditValueFormat::FloatingPoint>;
+    using type = LayoutEditFieldTraits<GaugeSegmentGapDegreesPolicy, ValueFormat::FloatingPoint>;
 };
 
 template <typename T> struct DefaultLayoutEditTraits {

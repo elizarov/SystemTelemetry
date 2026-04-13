@@ -7,13 +7,11 @@
 #include "config.h"
 #include "layout_edit_parameter_id.h"
 
-using LayoutEditTooltipValueFormat = configschema::LayoutEditValueFormat;
-
 struct LayoutEditTooltipDescriptor {
     std::string configKey;
     std::string sectionName;
     std::string memberName;
-    LayoutEditTooltipValueFormat valueFormat = LayoutEditTooltipValueFormat::Integer;
+    configschema::ValueFormat valueFormat = configschema::ValueFormat::Integer;
 };
 
 enum class LayoutEditWidgetDragMode {
@@ -25,7 +23,7 @@ enum class LayoutEditWidgetDragMode {
 struct LayoutEditConfigFieldMetadata {
     std::string_view sectionName;
     std::string_view parameterName;
-    LayoutEditTooltipValueFormat valueFormat = LayoutEditTooltipValueFormat::Integer;
+    configschema::ValueFormat valueFormat = configschema::ValueFormat::Integer;
     bool isFont = false;
     bool (*applyValue)(AppConfig& config, double value) = nullptr;
     std::optional<const UiFontConfig*> (*fontValue)(const AppConfig& config) = nullptr;

@@ -4,11 +4,11 @@
 #include <iomanip>
 #include <sstream>
 
-std::string FormatLayoutEditTooltipValue(double value, LayoutEditTooltipValueFormat format) {
-    if (format == LayoutEditTooltipValueFormat::FontSpec) {
+std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format) {
+    if (format == configschema::ValueFormat::FontSpec) {
         return {};
     }
-    if (format == LayoutEditTooltipValueFormat::Integer) {
+    if (format == configschema::ValueFormat::Integer) {
         return std::to_string(static_cast<int>(std::lround(value)));
     }
 
