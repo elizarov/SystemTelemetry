@@ -164,7 +164,9 @@ bool ApplyStructuredSectionFields(
             (..., [&] {
                 using Field = std::remove_cvref_t<decltype(field)>;
                 if (!handled && key == Field::key.view()) {
-                    DecodeConfigValue<typename Field::codec_type>(owner.*(Field::member), value);
+                    typename Field::field_type decoded = Field::RawGet(owner);
+                    DecodeConfigValue<typename Field::codec_type>(decoded, value);
+                    Field::Set(owner, std::move(decoded));
                     handled = true;
                 }
             }());

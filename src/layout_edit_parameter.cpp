@@ -1,6 +1,5 @@
 #include "layout_edit_parameter.h"
 
-#include <algorithm>
 #include <cmath>
 #include <type_traits>
 
@@ -12,38 +11,28 @@ int ClampPositiveInt(double value) {
     return (std::max)(1, static_cast<int>(std::lround(value)));
 }
 
-int ClampNonNegativeInt(double value) {
-    return (std::max)(0, static_cast<int>(std::lround(value)));
-}
-
-double ClampDegrees(double value) {
-    return std::clamp(value, 0.0, 360.0);
-}
-
 template <typename Meta>
 bool ApplyFieldEdit(AppConfig& config, double value) {
     using PolicyTag = typename Meta::traits_type::policy_tag;
-    if constexpr (std::is_same_v<PolicyTag, configschema::PositiveIntPolicy>) {
-        Meta::Get(config) = ClampPositiveInt(value);
-        return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::NonNegativeIntPolicy>) {
-        Meta::Get(config) = ClampNonNegativeInt(value);
-        return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::FontSizePolicy>) {
-        Meta::Get(config).size = ClampPositiveInt(value);
-        return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::DegreesPolicy>) {
-        Meta::Get(config) = ClampDegrees(value);
+    if constexpr (std::is_same_v<PolicyTag, configschema::FontSizePolicy>) {
+        UiFontConfig font = Meta::RawGet(config);
+        font.size = ClampPositiveInt(value);
+        Meta::Get(config) = std::move(font);
         return true;
     } else {
-        return false;
+        if constexpr (std::is_same_v<typename Meta::value_type, int>) {
+            Meta::Get(config) = static_cast<int>(std::lround(value));
+        } else {
+            Meta::Get(config) = static_cast<typename Meta::value_type>(value);
+        }
+        return true;
     }
 }
 
 template <typename Meta>
 std::optional<const UiFontConfig*> FindFontFieldValue(const AppConfig& config) {
     if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
-        return &Meta::Get(config);
+        return &Meta::RawGet(config);
     } else {
         return std::nullopt;
     }

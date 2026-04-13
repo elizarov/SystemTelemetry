@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -60,6 +62,30 @@ struct NoLayoutEditFieldTraits {
     using policy_tag = NoLayoutEditPolicy;
     static constexpr bool enabled = false;
     static constexpr ValueFormat value_format = ValueFormat::Integer;
+};
+
+template <typename PolicyTag, typename Value> struct PolicyClamp {
+    static Value Apply(Value value) {
+        return value;
+    }
+};
+
+template <> struct PolicyClamp<PositiveIntPolicy, int> {
+    static int Apply(int value) {
+        return (std::max)(1, value);
+    }
+};
+
+template <> struct PolicyClamp<NonNegativeIntPolicy, int> {
+    static int Apply(int value) {
+        return (std::max)(0, value);
+    }
+};
+
+template <> struct PolicyClamp<DegreesPolicy, double> {
+    static double Apply(double value) {
+        return std::clamp(value, 0.0, 360.0);
+    }
 };
 
 template <typename PolicyTag, ValueFormat Format = ValueFormat::Integer>
@@ -126,6 +152,22 @@ struct FieldDescriptor {
     static constexpr auto key = Key;
     static constexpr auto member = Member;
     static constexpr bool has_layout_edit_traits = LayoutEditTraits::enabled;
+
+    static field_type& RawGet(owner_type& owner) {
+        return owner.*member;
+    }
+
+    static const field_type& RawGet(const owner_type& owner) {
+        return owner.*member;
+    }
+
+    static field_type Clamp(field_type value) {
+        return PolicyClamp<typename layout_edit_traits_type::policy_tag, field_type>::Apply(std::move(value));
+    }
+
+    static void Set(owner_type& owner, field_type value) {
+        RawGet(owner) = Clamp(std::move(value));
+    }
 };
 
 template <typename Owner, typename Section, typename Section::owner_type Owner::* Member>
@@ -326,6 +368,24 @@ template <typename Owner> struct AutoStructuredBindingListDescriptor {
         MakeReflectedBindingTuple<Owner>(std::make_index_sequence<CountReflectedBindings<Owner>()>{});
 };
 
+template <typename Lens> struct LensValueProxy {
+    using value_type = typename Lens::value_type;
+
+    explicit LensValueProxy(typename Lens::root_type& root) : root_(&root) {}
+
+    LensValueProxy& operator=(value_type value) {
+        Lens::Set(*root_, std::move(value));
+        return *this;
+    }
+
+    value_type* operator->() const {
+        return &Lens::RawGet(*root_);
+    }
+
+private:
+    typename Lens::root_type* root_ = nullptr;
+};
+
 template <typename Owner, typename... Bindings> struct BindingPathLens;
 
 template <typename Owner> struct BindingPathLens<Owner> {
@@ -366,14 +426,27 @@ template <typename Root, typename Field, typename... Bindings> struct RootFieldL
 
     static_assert(std::is_same_v<owner_type, typename Field::owner_type>);
 
-    static value_type& Get(Root& root) {
+    static value_type& RawGet(Root& root) {
         owner_type& owner = BindingPathLens<Root, Bindings...>::Get(root);
-        return owner.*(Field::member);
+        return Field::RawGet(owner);
+    }
+
+    static LensValueProxy<RootFieldLens> Get(Root& root) {
+        return LensValueProxy<RootFieldLens>(root);
+    }
+
+    static const value_type& RawGet(const Root& root) {
+        const owner_type& owner = BindingPathLens<Root, Bindings...>::Get(root);
+        return Field::RawGet(owner);
     }
 
     static const value_type& Get(const Root& root) {
-        const owner_type& owner = BindingPathLens<Root, Bindings...>::Get(root);
-        return owner.*(Field::member);
+        return RawGet(root);
+    }
+
+    static void Set(Root& root, value_type value) {
+        owner_type& owner = BindingPathLens<Root, Bindings...>::Get(root);
+        Field::Set(owner, std::move(value));
     }
 };
 
@@ -403,14 +476,27 @@ struct DeferredRootFieldLens {
     static constexpr std::string_view section_name = resolved_type::section_name;
     static constexpr std::string_view parameter_name = resolved_type::parameter_name;
 
-    static value_type& Get(Root& root) {
-        return resolved_type::Get(root);
+    static value_type& RawGet(Root& root) {
+        return resolved_type::RawGet(root);
+    }
+
+    static LensValueProxy<DeferredRootFieldLens> Get(Root& root) {
+        return LensValueProxy<DeferredRootFieldLens>(root);
+    }
+
+    static const value_type& RawGet(const Root& root) {
+        return resolved_type::RawGet(root);
     }
 
     static const value_type& Get(const Root& root) {
-        return resolved_type::Get(root);
+        return RawGet(root);
+    }
+
+    static void Set(Root& root, value_type value) {
+        resolved_type::Set(root, std::move(value));
     }
 };
+
 
 template <typename Root, typename... BindingTags>
 struct RootBindingPath {
