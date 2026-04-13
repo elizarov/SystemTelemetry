@@ -1234,6 +1234,11 @@ int DashboardRenderer::ScaleLogical(int value) const {
 }
 
 int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const {
+    TextWidthCacheKey cacheKey{font, std::string(text)};
+    if (const auto it = textWidthCache_.find(cacheKey); it != textWidthCache_.end()) {
+        return it->second;
+    }
+
     HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
     if (hdc == nullptr) {
         return 0;
@@ -1241,6 +1246,7 @@ int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const
 
     const int width = MeasureTextSize(hdc, font, std::string(text)).cx;
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
+    textWidthCache_.emplace(std::move(cacheKey), width);
     return width;
 }
 
@@ -1452,6 +1458,7 @@ void DashboardRenderer::Shutdown() {
     fontHeights_ = {};
     resolvedLayout_ = {};
     parsedWidgetInfoCache_.clear();
+    textWidthCache_.clear();
     staticEditableAnchorRegions_.clear();
     dynamicEditableAnchorRegions_.clear();
     dynamicAnchorRegistrationEnabled_ = false;
@@ -1530,6 +1537,7 @@ void DashboardRenderer::DestroyFonts() {
     DeleteObject(fonts_.clockTime);
     DeleteObject(fonts_.clockDate);
     fonts_ = {};
+    textWidthCache_.clear();
 }
 
 bool DashboardRenderer::LoadPanelIcons() {
@@ -1732,9 +1740,6 @@ DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeCon
     const ParsedWidgetInfo* info = FindParsedWidgetInfo(node);
     if (info != nullptr) {
         widget.widget = info->widgetPrototype->Clone();
-        if (widget.widget != nullptr) {
-            widget.widget->ResolveLayoutState(*this, rect);
-        }
     }
     return widget;
 }

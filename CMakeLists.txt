@@ -271,3 +271,61 @@ add_custom_command(TARGET SystemTelemetryTests POST_BUILD
 
 add_test(NAME SystemTelemetryTests COMMAND SystemTelemetryTests)
 
+add_executable(SystemTelemetryBenchmarks
+    resources/SystemTelemetry.rc
+    tests/layout_edit_benchmark.cpp
+    src/config_parser.cpp
+    src/config_resolution.cpp
+    src/layout_edit_parameter.cpp
+    src/layout_edit_commands.cpp
+    src/layout_edit_controller.cpp
+    src/layout_edit_service.cpp
+    src/layout_snap_solver.cpp
+    src/dashboard_metrics.cpp
+    src/widget.cpp
+    src/widget/text.cpp
+    src/widget/gauge.cpp
+    src/widget/metric_list.cpp
+    src/widget/throughput.cpp
+    src/widget/network_footer.cpp
+    src/widget/vertical_spacer.cpp
+    src/widget/vertical_spring.cpp
+    src/widget/drive_usage_list.cpp
+    src/widget/clock_time.cpp
+    src/widget/clock_date.cpp
+    src/dashboard_layout_resolver.cpp
+    src/dashboard_renderer.cpp
+    src/utf8.cpp
+    src/trace.cpp
+)
+target_include_directories(SystemTelemetryBenchmarks PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_compile_definitions(SystemTelemetryBenchmarks PRIVATE
+    UNICODE
+    _UNICODE
+    WIN32_LEAN_AND_MEAN
+    SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
+target_compile_options(SystemTelemetryBenchmarks PRIVATE
+    /EHsc
+    /W4
+    /permissive-
+    /Zi
+)
+target_link_options(SystemTelemetryBenchmarks PRIVATE
+    $<$<CONFIG:Debug>:/DEBUG>
+    $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:RelWithDebInfo>:/DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
+    /MANIFEST:NO
+)
+target_link_libraries(SystemTelemetryBenchmarks PRIVATE
+    user32
+    gdi32
+    gdiplus
+)
+set_target_properties(SystemTelemetryBenchmarks PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
+)
+

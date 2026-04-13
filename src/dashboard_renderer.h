@@ -292,6 +292,21 @@ private:
         bool verticalSpring = false;
     };
 
+    struct TextWidthCacheKey {
+        HFONT font = nullptr;
+        std::string text;
+
+        bool operator==(const TextWidthCacheKey& other) const {
+            return font == other.font && text == other.text;
+        }
+    };
+
+    struct TextWidthCacheKeyHash {
+        size_t operator()(const TextWidthCacheKey& key) const {
+            return (std::hash<HFONT>{}(key.font) * 1315423911u) ^ std::hash<std::string>{}(key.text);
+        }
+    };
+
     void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
@@ -378,6 +393,7 @@ private:
     std::vector<EditableAnchorRegion> dynamicEditableAnchorRegions_;
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
+    mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash> textWidthCache_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;
