@@ -17,17 +17,6 @@ struct UiFontConfig {
 CONFIG_CODEC(UiFontConfig, configschema::FontSpecCodec);
 CONFIG_CODEC(std::vector<std::string>, configschema::StringCodec);
 
-template <> struct configschema::DefaultLayoutEditTraits<UiFontConfig> {
-    using type = typename configschema::LayoutEditTraitsForPolicy<configschema::FontSizePolicy>::type;
-};
-
-template <> struct configschema::PolicyClamp<configschema::FontSizePolicy, UiFontConfig> {
-    static UiFontConfig Apply(UiFontConfig value) {
-        value.size = (std::max)(1, value.size);
-        return value;
-    }
-};
-
 struct LayoutConfig;
 struct AppConfig;
 

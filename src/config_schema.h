@@ -82,6 +82,18 @@ template <> struct PolicyClamp<NonNegativeIntPolicy, int> {
     }
 };
 
+template <typename Value>
+concept FontSizeEditableValue = requires(Value value) {
+    value.size;
+};
+
+template <FontSizeEditableValue Value> struct PolicyClamp<FontSizePolicy, Value> {
+    static Value Apply(Value value) {
+        value.size = (std::max)(1, value.size);
+        return value;
+    }
+};
+
 template <> struct PolicyClamp<DegreesPolicy, double> {
     static double Apply(double value) {
         return std::clamp(value, 0.0, 360.0);
@@ -135,6 +147,12 @@ template <> struct DefaultCodec<unsigned int> {
 
 template <> struct DefaultLayoutEditTraits<int> {
     using type = typename LayoutEditTraitsForPolicy<PositiveIntPolicy>::type;
+};
+
+template <typename T>
+    requires std::is_same_v<typename DefaultCodec<T>::codec_type, FontSpecCodec>
+struct DefaultLayoutEditTraits<T> {
+    using type = typename LayoutEditTraitsForPolicy<FontSizePolicy>::type;
 };
 
 template <typename Owner,
