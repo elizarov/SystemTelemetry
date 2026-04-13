@@ -303,6 +303,15 @@ void DashboardRenderer::SetRenderMode(RenderMode mode) {
     renderMode_ = mode;
 }
 
+void DashboardRenderer::SetLayoutGuideDragActive(bool active) {
+    layoutGuideDragActive_ = active;
+}
+
+void DashboardRenderer::RebuildEditArtifacts() {
+    BuildWidgetEditGuides();
+    BuildStaticEditableAnchors();
+}
+
 bool DashboardRenderer::SetLayoutEditPreviewWidgetType(
     EditOverlayState& overlayState, const std::string& widgetTypeName) const {
     const auto widget = FindFirstLayoutEditPreviewWidget(widgetTypeName);
@@ -447,18 +456,30 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
         return result;
     }
 
-    HGDIOBJ oldFont = SelectObject(hdc, font);
-    RECT measureRect{0, 0, std::max<LONG>(0, rect.right - rect.left), std::max<LONG>(0, rect.bottom - rect.top)};
     UINT measureFormat = format | DT_CALCRECT;
     measureFormat &= ~DT_VCENTER;
     measureFormat &= ~DT_BOTTOM;
     measureFormat &= ~DT_NOCLIP;
-    DrawTextW(hdc, wideText.c_str(), -1, &measureRect, measureFormat);
-
-    const int measuredWidth = std::max(0, static_cast<int>(measureRect.right - measureRect.left));
-    const int measuredHeight = std::max(0, static_cast<int>(measureRect.bottom - measureRect.top));
     const int availableWidth = std::max(0, static_cast<int>(rect.right - rect.left));
     const int availableHeight = std::max(0, static_cast<int>(rect.bottom - rect.top));
+
+    const TextMeasureCacheKey cacheKey{font, text, measureFormat, availableWidth, availableHeight};
+    SIZE measuredSize{};
+    const auto cached = textMeasureCache_.find(cacheKey);
+    if (cached != textMeasureCache_.end()) {
+        measuredSize = cached->second;
+    } else {
+        HGDIOBJ oldFont = SelectObject(hdc, font);
+        RECT measureRect{0, 0, availableWidth, availableHeight};
+        DrawTextW(hdc, wideText.c_str(), -1, &measureRect, measureFormat);
+        SelectObject(hdc, oldFont);
+        measuredSize.cx = std::max(0, static_cast<int>(measureRect.right - measureRect.left));
+        measuredSize.cy = std::max(0, static_cast<int>(measureRect.bottom - measureRect.top));
+        textMeasureCache_.emplace(cacheKey, measuredSize);
+    }
+
+    const int measuredWidth = measuredSize.cx;
+    const int measuredHeight = measuredSize.cy;
     const int textWidth = std::min(availableWidth, measuredWidth);
     const int textHeight = std::min(availableHeight, measuredHeight);
 
@@ -480,7 +501,6 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
         top,
         std::min(rect.right, static_cast<LONG>(left + textWidth)),
         std::min(rect.bottom, static_cast<LONG>(top + textHeight))};
-    SelectObject(hdc, oldFont);
     return result;
 }
 
@@ -1138,7 +1158,8 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
 
 void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
     dynamicEditableAnchorRegions_.clear();
-    dynamicAnchorRegistrationEnabled_ = overlayState.showLayoutEditGuides;
+    dynamicAnchorRegistrationEnabled_ =
+        overlayState.showLayoutEditGuides && !overlayState.activeLayoutEditGuide.has_value();
     DashboardMetricSource metrics(snapshot, config_.metricScales);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
@@ -1459,6 +1480,7 @@ void DashboardRenderer::Shutdown() {
     resolvedLayout_ = {};
     parsedWidgetInfoCache_.clear();
     textWidthCache_.clear();
+    textMeasureCache_.clear();
     staticEditableAnchorRegions_.clear();
     dynamicEditableAnchorRegions_.clear();
     dynamicAnchorRegistrationEnabled_ = false;
@@ -1538,6 +1560,7 @@ void DashboardRenderer::DestroyFonts() {
     DeleteObject(fonts_.clockDate);
     fonts_ = {};
     textWidthCache_.clear();
+    textMeasureCache_.clear();
 }
 
 bool DashboardRenderer::LoadPanelIcons() {

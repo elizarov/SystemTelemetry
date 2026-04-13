@@ -338,6 +338,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
             renderer.CollectLayoutGuideSnapCandidates(guide),
             guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y,
         };
+        renderer.SetLayoutGuideDragActive(true);
         hoveredLayoutGuideIndex_ = resolution.hoveredLayoutGuideIndex;
         SyncRendererInteractionState();
         SetCapture(hwnd);
@@ -386,6 +387,7 @@ bool LayoutEditController::HandleMouseLeave() {
 bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
     lastClientPoint_ = clientPoint;
     bool released = false;
+    bool releasedLayoutDrag = false;
     if (activeAnchorEditDrag_.has_value()) {
         activeAnchorEditDrag_.reset();
         released = true;
@@ -395,12 +397,17 @@ bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
     } else if (activeLayoutDrag_.has_value()) {
         activeLayoutDrag_.reset();
         released = true;
+        releasedLayoutDrag = true;
     }
 
     if (!released) {
         return false;
     }
 
+    if (releasedLayoutDrag) {
+        host_.LayoutEditRenderer().SetLayoutGuideDragActive(false);
+        host_.LayoutEditRenderer().RebuildEditArtifacts();
+    }
     SyncRendererInteractionState();
     ReleaseCapture();
     RefreshHover(clientPoint);
@@ -420,7 +427,12 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
 
     activeAnchorEditDrag_.reset();
     activeWidgetEditDrag_.reset();
+    const bool hadLayoutDrag = activeLayoutDrag_.has_value();
     activeLayoutDrag_.reset();
+    if (hadLayoutDrag) {
+        host_.LayoutEditRenderer().SetLayoutGuideDragActive(false);
+        host_.LayoutEditRenderer().RebuildEditArtifacts();
+    }
     SyncRendererInteractionState();
     host_.InvalidateLayoutEdit();
     return true;
@@ -545,6 +557,7 @@ void LayoutEditController::ClearInteractionState() {
     hoveredEditableWidget_.reset();
     hoveredWidgetEditGuideIndex_.reset();
     hoveredEditableAnchor_.reset();
+    host_.LayoutEditRenderer().SetLayoutGuideDragActive(false);
     activeLayoutDrag_.reset();
     activeWidgetEditDrag_.reset();
     activeAnchorEditDrag_.reset();

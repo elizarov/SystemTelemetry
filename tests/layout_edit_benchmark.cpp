@@ -143,12 +143,15 @@ BenchResult TimeRelayout(DashboardRenderer& renderer,
     AppConfig config,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<std::vector<int>>& weightSequence) {
+    renderer.SetLayoutGuideDragActive(true);
     const auto start = Clock::now();
     for (const auto& weights : weightSequence) {
         layout_edit::ApplyGuideWeights(config, target, weights);
         renderer.SetConfig(config);
     }
     const Duration total = Clock::now() - start;
+    renderer.SetLayoutGuideDragActive(false);
+    renderer.RebuildEditArtifacts();
     return {"relayout", total, total / static_cast<double>(weightSequence.size())};
 }
 
@@ -196,6 +199,7 @@ BenchResult TimeRelayoutAndDraw(DashboardRenderer& renderer,
                                       : nullptr;
     HGDIOBJ oldBitmap = bitmap != nullptr ? SelectObject(memDc, bitmap) : nullptr;
 
+    renderer.SetLayoutGuideDragActive(true);
     const auto start = Clock::now();
     for (const auto& weights : weightSequence) {
         layout_edit::ApplyGuideWeights(config, target, weights);
@@ -207,6 +211,8 @@ BenchResult TimeRelayoutAndDraw(DashboardRenderer& renderer,
         renderer.Draw(memDc, snapshot, overlayState);
     }
     const Duration total = Clock::now() - start;
+    renderer.SetLayoutGuideDragActive(false);
+    renderer.RebuildEditArtifacts();
 
     if (oldBitmap != nullptr) {
         SelectObject(memDc, oldBitmap);
@@ -228,6 +234,7 @@ std::optional<BenchResult> TimeSnapEvaluation(DashboardRenderer& renderer,
         return std::nullopt;
     }
 
+    renderer.SetLayoutGuideDragActive(true);
     const auto start = Clock::now();
     size_t completed = 0;
     for (const auto& weights : weightSequence) {
@@ -239,10 +246,14 @@ std::optional<BenchResult> TimeSnapEvaluation(DashboardRenderer& renderer,
         ++completed;
     }
     if (completed == 0) {
+        renderer.SetLayoutGuideDragActive(false);
+        renderer.RebuildEditArtifacts();
         return std::nullopt;
     }
 
     const Duration total = Clock::now() - start;
+    renderer.SetLayoutGuideDragActive(false);
+    renderer.RebuildEditArtifacts();
     return BenchResult{"snap_eval", total, total / static_cast<double>(completed)};
 }
 

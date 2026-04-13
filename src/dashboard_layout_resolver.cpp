@@ -420,8 +420,13 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer) {
         }
     }
 
-    BuildWidgetEditGuides(renderer);
-    BuildStaticEditableAnchors(renderer);
+    if (renderer.layoutGuideDragActive_) {
+        renderer.widgetEditGuides_.clear();
+        renderer.staticEditableAnchorRegions_.clear();
+    } else {
+        BuildWidgetEditGuides(renderer);
+        BuildStaticEditableAnchors(renderer);
+    }
 
     renderer.WriteTrace("renderer:layout_done cards=" + std::to_string(renderer.resolvedLayout_.cards.size()));
     return true;

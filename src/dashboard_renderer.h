@@ -182,6 +182,8 @@ public:
     void SetConfig(const AppConfig& config);
     void SetRenderScale(double scale);
     void SetRenderMode(RenderMode mode);
+    void SetLayoutGuideDragActive(bool active);
+    void RebuildEditArtifacts();
     bool SetLayoutEditPreviewWidgetType(EditOverlayState& overlayState, const std::string& widgetTypeName) const;
     double RenderScale() const;
     int WindowWidth() const;
@@ -307,6 +309,30 @@ private:
         }
     };
 
+    struct TextMeasureCacheKey {
+        HFONT font = nullptr;
+        std::string text;
+        UINT format = 0;
+        int width = 0;
+        int height = 0;
+
+        bool operator==(const TextMeasureCacheKey& other) const {
+            return font == other.font && text == other.text && format == other.format && width == other.width &&
+                   height == other.height;
+        }
+    };
+
+    struct TextMeasureCacheKeyHash {
+        size_t operator()(const TextMeasureCacheKey& key) const {
+            size_t hash = std::hash<HFONT>{}(key.font);
+            hash = (hash * 1315423911u) ^ std::hash<std::string>{}(key.text);
+            hash = (hash * 1315423911u) ^ std::hash<UINT>{}(key.format);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
+            return hash;
+        }
+    };
+
     void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
@@ -394,7 +420,9 @@ private:
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash> textWidthCache_;
+    mutable std::unordered_map<TextMeasureCacheKey, SIZE, TextMeasureCacheKeyHash> textMeasureCache_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;
+    bool layoutGuideDragActive_ = false;
 };
