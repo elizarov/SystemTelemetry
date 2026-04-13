@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <sstream>
 
+#include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
 
@@ -89,6 +90,53 @@ std::wstring BuildTooltipText(
     if (!descriptionText.empty()) {
         text += L"\r\n";
         text += descriptionText;
+    }
+    return text;
+}
+
+std::string LayoutGuideTooltipSectionName(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+    if (!guide.editCardId.empty()) {
+        return "card." + guide.editCardId;
+    }
+    if (!config.display.layout.empty()) {
+        return "layout." + config.display.layout;
+    }
+    return "layout";
+}
+
+std::string LayoutGuideTooltipConfigMember(const DashboardRenderer::LayoutEditGuide& guide) {
+    return guide.editCardId.empty() ? "cards" : "layout";
+}
+
+const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+    return layout_edit::FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
+}
+
+std::string LayoutGuideChildName(const LayoutNodeConfig& node) {
+    return node.name.empty() ? "unknown" : node.name;
+}
+
+std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+    const std::string sectionName = LayoutGuideTooltipSectionName(config, guide);
+    const std::string configMember = LayoutGuideTooltipConfigMember(guide);
+    const LayoutNodeConfig* node = FindLayoutGuideNode(config, guide);
+    if (node == nullptr || node->children.size() < 2 || guide.separatorIndex + 1 >= node->children.size()) {
+        return "[" + sectionName + "] " + configMember;
+    }
+
+    const LayoutNodeConfig& leftChild = node->children[guide.separatorIndex];
+    const LayoutNodeConfig& rightChild = node->children[guide.separatorIndex + 1];
+    return "[" + sectionName + "] " + configMember + " = ... " + node->name + "(" + LayoutGuideChildName(leftChild) +
+           ":" + std::to_string(std::max(1, leftChild.weight)) + ", " + LayoutGuideChildName(rightChild) + ":" +
+           std::to_string(std::max(1, rightChild.weight)) + ")";
+}
+
+std::wstring BuildLayoutGuideTooltipText(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+    std::wstring text = WideFromUtf8(BuildLayoutGuideTooltipLine(config, guide));
+    const std::wstring description = WideFromUtf8(FindLocalizedText("layout_edit.layout_guide"));
+    if (!description.empty()) {
+        text += L"\r\n";
+        text += description;
     }
     return text;
 }
@@ -839,7 +887,17 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
     POINT clientPoint = target->clientPoint;
-    if (target->kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide) {
+    if (target->kind == LayoutEditController::TooltipTarget::Kind::LayoutGuide) {
+        layoutEditTooltipText_ = BuildLayoutGuideTooltipText(controller_.State().config, target->layoutGuide);
+        if (clientPoint.x == 0 && clientPoint.y == 0) {
+            clientPoint.x =
+                target->layoutGuide.lineRect.left +
+                (std::max<LONG>(0, target->layoutGuide.lineRect.right - target->layoutGuide.lineRect.left) / 2);
+            clientPoint.y =
+                target->layoutGuide.lineRect.top +
+                (std::max<LONG>(0, target->layoutGuide.lineRect.bottom - target->layoutGuide.lineRect.top) / 2);
+        }
+    } else if (target->kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide) {
         descriptor = FindLayoutEditTooltipDescriptor(target->widgetGuide.parameter);
         value = target->widgetGuide.value;
         if (clientPoint.x == 0 && clientPoint.y == 0) {
@@ -865,15 +923,17 @@ void DashboardApp::UpdateLayoutEditTooltip() {
         }
     }
 
-    if (!descriptor.has_value()) {
+    if (target->kind != LayoutEditController::TooltipTarget::Kind::LayoutGuide && !descriptor.has_value()) {
         HideLayoutEditTooltip();
         return;
     }
 
-    const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
-    layoutEditTooltipText_ = descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()
-                                 ? BuildTooltipText(*descriptor, *fontValue, description)
-                                 : BuildTooltipText(*descriptor, value, description);
+    if (target->kind != LayoutEditController::TooltipTarget::Kind::LayoutGuide) {
+        const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
+        layoutEditTooltipText_ = descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()
+                                     ? BuildTooltipText(*descriptor, *fontValue, description)
+                                     : BuildTooltipText(*descriptor, value, description);
+    }
 
     const int tooltipRadius = ScaleLogicalToPhysical(10, CurrentWindowDpi());
     layoutEditTooltipRect_ = RectFromPoint(clientPoint, tooltipRadius);

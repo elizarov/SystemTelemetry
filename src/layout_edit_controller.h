@@ -35,12 +35,14 @@ class LayoutEditController {
 public:
     struct TooltipTarget {
         enum class Kind {
+            LayoutGuide,
             WidgetGuide,
             EditableAnchor,
         };
 
-        Kind kind = Kind::WidgetGuide;
+        Kind kind = Kind::LayoutGuide;
         POINT clientPoint{};
+        DashboardRenderer::LayoutEditGuide layoutGuide{};
         DashboardRenderer::WidgetEditGuide widgetGuide{};
         DashboardRenderer::EditableAnchorRegion editableAnchor{};
     };

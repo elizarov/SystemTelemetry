@@ -458,6 +458,14 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
 }
 
 std::optional<LayoutEditController::TooltipTarget> LayoutEditController::CurrentTooltipTarget() {
+    if (activeLayoutDrag_.has_value()) {
+        TooltipTarget target;
+        target.kind = TooltipTarget::Kind::LayoutGuide;
+        target.clientPoint = lastClientPoint_;
+        target.layoutGuide = activeLayoutDrag_->guide;
+        return target;
+    }
+
     if (activeWidgetEditDrag_.has_value()) {
         TooltipTarget target;
         target.kind = TooltipTarget::Kind::WidgetGuide;
@@ -497,6 +505,17 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
             target.kind = TooltipTarget::Kind::WidgetGuide;
             target.clientPoint = lastClientPoint_;
             target.widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
+            return target;
+        }
+    }
+
+    if (resolution.hoveredLayoutGuideIndex.has_value()) {
+        const auto& guides = renderer.LayoutEditGuides();
+        if (*resolution.hoveredLayoutGuideIndex < guides.size()) {
+            TooltipTarget target;
+            target.kind = TooltipTarget::Kind::LayoutGuide;
+            target.clientPoint = lastClientPoint_;
+            target.layoutGuide = guides[*resolution.hoveredLayoutGuideIndex];
             return target;
         }
     }
