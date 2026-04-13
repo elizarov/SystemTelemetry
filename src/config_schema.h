@@ -454,7 +454,7 @@ public:                                                                         
         &Self::member,                                                                                                 \
         typename configschema::DefaultCodec<field_type>::codec_type,                                                   \
         __VA_ARGS__>;                                                                                                  \
-    using member##Lens = configschema::EditableFieldLens<Self, member##Field>;                                         \
+    using member##Meta = configschema::EditableFieldLens<Self, member##Field>;                                         \
     friend consteval auto reflect_field(                                                                               \
         configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) {                              \
         return member##Field{};                                                                                        \

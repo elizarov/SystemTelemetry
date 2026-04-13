@@ -39,91 +39,91 @@ int ClampDriveUsageActivitySegmentGap(const AppConfig& config, double value) {
     return std::clamp(ClampNonNegativeInt(value), 0, maxGap);
 }
 
-template <typename Lens>
+template <typename Meta>
 bool ApplyFieldEdit(AppConfig& config, double value) {
-    using PolicyTag = typename Lens::traits_type::policy_tag;
+    using PolicyTag = typename Meta::traits_type::policy_tag;
     if constexpr (std::is_same_v<PolicyTag, configschema::PositiveIntLayoutEditPolicyTag>) {
-        Lens::Get(config) = ClampPositiveInt(value);
+        Meta::Get(config) = ClampPositiveInt(value);
         return true;
     } else if constexpr (std::is_same_v<PolicyTag, configschema::FontSizeLayoutEditPolicyTag>) {
-        Lens::Get(config).size = ClampPositiveInt(value);
+        Meta::Get(config).size = ClampPositiveInt(value);
         return true;
     } else if constexpr (std::is_same_v<PolicyTag, configschema::GaugeSweepDegreesLayoutEditPolicyTag>) {
-        Lens::Get(config) = ClampGaugeSweepDegrees(value);
+        Meta::Get(config) = ClampGaugeSweepDegrees(value);
         return true;
     } else if constexpr (std::is_same_v<PolicyTag, configschema::GaugeSegmentGapDegreesLayoutEditPolicyTag>) {
-        Lens::Get(config) = ClampGaugeSegmentGapDegrees(config, value);
+        Meta::Get(config) = ClampGaugeSegmentGapDegrees(config, value);
         return true;
     } else if constexpr (std::is_same_v<PolicyTag, configschema::DriveUsageActivitySegmentGapLayoutEditPolicyTag>) {
-        Lens::Get(config) = ClampDriveUsageActivitySegmentGap(config, value);
+        Meta::Get(config) = ClampDriveUsageActivitySegmentGap(config, value);
         return true;
     } else {
         return false;
     }
 }
 
-template <typename Lens>
+template <typename Meta>
 std::optional<const UiFontConfig*> FindFontFieldValue(const AppConfig& config) {
-    if constexpr (std::is_same_v<typename Lens::value_type, UiFontConfig>) {
-        return &Lens::Get(config);
+    if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
+        return &Meta::Get(config);
     } else {
         return std::nullopt;
     }
 }
 
-template <typename Lens>
+template <typename Meta>
 const LayoutEditConfigFieldMetadata& GetFieldMetadata() {
     static const LayoutEditConfigFieldMetadata metadata{
-        Lens::section_name,
-        Lens::parameter_name,
-        Lens::traits_type::value_format,
-        std::is_same_v<typename Lens::value_type, UiFontConfig>,
-        &ApplyFieldEdit<Lens>,
-        &FindFontFieldValue<Lens>,
+        Meta::section_name,
+        Meta::parameter_name,
+        Meta::traits_type::value_format,
+        std::is_same_v<typename Meta::value_type, UiFontConfig>,
+        &ApplyFieldEdit<Meta>,
+        &FindFontFieldValue<Meta>,
     };
     return metadata;
 }
 
 const LayoutEditParameterInfo kParameterInfo[] = {
-    {Parameter::FontTitle, &GetFieldMetadata<UiFontSetConfig::titleLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::FontBig, &GetFieldMetadata<UiFontSetConfig::bigLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::FontValue, &GetFieldMetadata<UiFontSetConfig::valueLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::FontLabel, &GetFieldMetadata<UiFontSetConfig::labelLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::FontText, &GetFieldMetadata<UiFontSetConfig::textLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::FontSmall, &GetFieldMetadata<UiFontSetConfig::smallTextLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::FontFooter, &GetFieldMetadata<UiFontSetConfig::footerLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::FontClockTime, &GetFieldMetadata<UiFontSetConfig::clockTimeLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::FontClockDate, &GetFieldMetadata<UiFontSetConfig::clockDateLens>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontTitle, &GetFieldMetadata<UiFontSetConfig::titleMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontBig, &GetFieldMetadata<UiFontSetConfig::bigMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontValue, &GetFieldMetadata<UiFontSetConfig::valueMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontLabel, &GetFieldMetadata<UiFontSetConfig::labelMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontText, &GetFieldMetadata<UiFontSetConfig::textMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontSmall, &GetFieldMetadata<UiFontSetConfig::smallTextMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontFooter, &GetFieldMetadata<UiFontSetConfig::footerMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontClockTime, &GetFieldMetadata<UiFontSetConfig::clockTimeMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::FontClockDate, &GetFieldMetadata<UiFontSetConfig::clockDateMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
 
-    {Parameter::MetricListBarHeight, &GetFieldMetadata<MetricListWidgetConfig::barHeightLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::MetricListLabelWidth, &GetFieldMetadata<MetricListWidgetConfig::labelWidthLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::MetricListVerticalGap, &GetFieldMetadata<MetricListWidgetConfig::verticalGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::MetricListBarHeight, &GetFieldMetadata<MetricListWidgetConfig::barHeightMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::MetricListLabelWidth, &GetFieldMetadata<MetricListWidgetConfig::labelWidthMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::MetricListVerticalGap, &GetFieldMetadata<MetricListWidgetConfig::verticalGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
 
-    {Parameter::DriveUsageActivitySegments, &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentsLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageBarHeight, &GetFieldMetadata<DriveUsageListWidgetConfig::barHeightLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageLabelGap, &GetFieldMetadata<DriveUsageListWidgetConfig::labelGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageBarGap, &GetFieldMetadata<DriveUsageListWidgetConfig::barGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageRwGap, &GetFieldMetadata<DriveUsageListWidgetConfig::rwGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsagePercentGap, &GetFieldMetadata<DriveUsageListWidgetConfig::percentGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageActivityWidth, &GetFieldMetadata<DriveUsageListWidgetConfig::activityWidthLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageFreeWidth, &GetFieldMetadata<DriveUsageListWidgetConfig::freeWidthLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageActivitySegmentGap, &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageHeaderGap, &GetFieldMetadata<DriveUsageListWidgetConfig::headerGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::DriveUsageRowGap, &GetFieldMetadata<DriveUsageListWidgetConfig::rowGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageActivitySegments, &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentsMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageBarHeight, &GetFieldMetadata<DriveUsageListWidgetConfig::barHeightMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageLabelGap, &GetFieldMetadata<DriveUsageListWidgetConfig::labelGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageBarGap, &GetFieldMetadata<DriveUsageListWidgetConfig::barGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageRwGap, &GetFieldMetadata<DriveUsageListWidgetConfig::rwGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsagePercentGap, &GetFieldMetadata<DriveUsageListWidgetConfig::percentGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageActivityWidth, &GetFieldMetadata<DriveUsageListWidgetConfig::activityWidthMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageFreeWidth, &GetFieldMetadata<DriveUsageListWidgetConfig::freeWidthMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageActivitySegmentGap, &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageHeaderGap, &GetFieldMetadata<DriveUsageListWidgetConfig::headerGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::DriveUsageRowGap, &GetFieldMetadata<DriveUsageListWidgetConfig::rowGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
 
-    {Parameter::ThroughputGuideStrokeWidth, &GetFieldMetadata<ThroughputWidgetConfig::guideStrokeWidthLens>(), true, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::ThroughputPlotStrokeWidth, &GetFieldMetadata<ThroughputWidgetConfig::plotStrokeWidthLens>(), true, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::ThroughputLeaderDiameter, &GetFieldMetadata<ThroughputWidgetConfig::leaderDiameterLens>(), true, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::ThroughputAxisPadding, &GetFieldMetadata<ThroughputWidgetConfig::axisPaddingLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::ThroughputHeaderGap, &GetFieldMetadata<ThroughputWidgetConfig::headerGapLens>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::ThroughputGuideStrokeWidth, &GetFieldMetadata<ThroughputWidgetConfig::guideStrokeWidthMeta>(), true, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::ThroughputPlotStrokeWidth, &GetFieldMetadata<ThroughputWidgetConfig::plotStrokeWidthMeta>(), true, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::ThroughputLeaderDiameter, &GetFieldMetadata<ThroughputWidgetConfig::leaderDiameterMeta>(), true, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::ThroughputAxisPadding, &GetFieldMetadata<ThroughputWidgetConfig::axisPaddingMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::ThroughputHeaderGap, &GetFieldMetadata<ThroughputWidgetConfig::headerGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
 
-    {Parameter::GaugeSegmentCount, &GetFieldMetadata<GaugeWidgetConfig::segmentCountLens>(), false, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::GaugeValueBottom, &GetFieldMetadata<GaugeWidgetConfig::valueBottomLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::GaugeLabelBottom, &GetFieldMetadata<GaugeWidgetConfig::labelBottomLens>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::GaugeSweepDegrees, &GetFieldMetadata<GaugeWidgetConfig::sweepDegreesLens>(), true, false, LayoutEditWidgetDragMode::GaugeSweepDegrees},
-    {Parameter::GaugeSegmentGapDegrees, &GetFieldMetadata<GaugeWidgetConfig::segmentGapDegreesLens>(), true, false, LayoutEditWidgetDragMode::GaugeSegmentGapDegrees},
-    {Parameter::GaugeOuterPadding, &GetFieldMetadata<GaugeWidgetConfig::outerPaddingLens>(), true, true, LayoutEditWidgetDragMode::Linear},
-    {Parameter::GaugeRingThickness, &GetFieldMetadata<GaugeWidgetConfig::ringThicknessLens>(), true, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::GaugeSegmentCount, &GetFieldMetadata<GaugeWidgetConfig::segmentCountMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::GaugeValueBottom, &GetFieldMetadata<GaugeWidgetConfig::valueBottomMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::GaugeLabelBottom, &GetFieldMetadata<GaugeWidgetConfig::labelBottomMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::GaugeSweepDegrees, &GetFieldMetadata<GaugeWidgetConfig::sweepDegreesMeta>(), true, false, LayoutEditWidgetDragMode::GaugeSweepDegrees},
+    {Parameter::GaugeSegmentGapDegrees, &GetFieldMetadata<GaugeWidgetConfig::segmentGapDegreesMeta>(), true, false, LayoutEditWidgetDragMode::GaugeSegmentGapDegrees},
+    {Parameter::GaugeOuterPadding, &GetFieldMetadata<GaugeWidgetConfig::outerPaddingMeta>(), true, true, LayoutEditWidgetDragMode::Linear},
+    {Parameter::GaugeRingThickness, &GetFieldMetadata<GaugeWidgetConfig::ringThicknessMeta>(), true, true, LayoutEditWidgetDragMode::Linear},
 };
 
 constexpr size_t kParameterInfoCount = sizeof(kParameterInfo) / sizeof(kParameterInfo[0]);
