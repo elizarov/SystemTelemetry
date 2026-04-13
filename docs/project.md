@@ -13,7 +13,7 @@
 - When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
 - Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
 - Always build through `build.cmd`.
-- Use the top-level `profile_benchmark.cmd` script as the maintained entry point for benchmark CPU profiling; it writes the benchmark ETL and exported CPU summary into `build\` and requires a real elevated Administrator shell with `SeSystemProfilePrivilege`.
+- Use the top-level `profile_benchmark.cmd` script as the maintained entry point for benchmark CPU profiling; it writes the benchmark ETL, flat CPU summary, and benchmark-only butterfly call tree HTML export into `build\` and requires a real elevated Administrator shell with `SeSystemProfilePrivilege`.
 - Keep the repo-level `.clang-format` as the single maintained source of truth for C++ formatting rules.
 - Keep the repo-level `.clangd` as the maintained source of truth for the project compilation-database path used by `clangd` clients.
 - Use the top-level `format.cmd` script as the maintained entry point for formatting non-vendored C++ sources; run `format` to check and `format fix` to apply the repo style.

@@ -23,6 +23,7 @@ set "BENCHMARK_EXE=%REPO_ROOT%\build\SystemTelemetryBenchmarks.exe"
 set "BENCHMARK_PDB_DIR=%REPO_ROOT%\build\cmake\CMakeFiles\SystemTelemetryBenchmarks.dir\Release"
 set "TRACE_ETL=%REPO_ROOT%\build\layout_edit_benchmark_wpr.etl"
 set "TRACE_TXT=%REPO_ROOT%\build\layout_edit_benchmark_wpr.txt"
+set "TRACE_CALLTREE_HTML=%REPO_ROOT%\build\layout_edit_benchmark_wpr_calltree.html"
 
 if not exist "%WPR_EXE%" (
     echo Windows Performance Recorder was not found at "%WPR_EXE%".
@@ -51,6 +52,7 @@ set "_NT_SYMBOL_PATH=%REPO_ROOT%\build;%BENCHMARK_PDB_DIR%"
 
 del /q "%TRACE_ETL%" >nul 2>nul
 del /q "%TRACE_TXT%" >nul 2>nul
+del /q "%TRACE_CALLTREE_HTML%" >nul 2>nul
 
 echo Starting CPU profile capture...
 "%WPR_EXE%" -cancel >nul 2>nul
@@ -78,7 +80,15 @@ if errorlevel 1 (
     exit /b %errorlevel%
 )
 
+echo Exporting benchmark call tree to "%TRACE_CALLTREE_HTML%"...
+"%XPERF_EXE%" -i "%TRACE_ETL%" -symbols -a stack -process "SystemTelemetryBenchmarks.exe" -butterfly 1 > "%TRACE_CALLTREE_HTML%"
+if errorlevel 1 (
+    echo Failed to export the benchmark call tree.
+    exit /b %errorlevel%
+)
+
 echo Done.
 echo ETL: %TRACE_ETL%
 echo CPU summary: %TRACE_TXT%
+echo Call tree: %TRACE_CALLTREE_HTML%
 exit /b %BENCHMARK_RC%
