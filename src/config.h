@@ -136,16 +136,9 @@ struct LayoutNodeConfig {
 CONFIG_CODEC(LayoutNodeConfig, configschema::LayoutExpressionCodec);
 
 struct LayoutSectionConfig {
-    CONFIG_REFLECTED_STRUCT(LayoutSectionConfig)
-    CONFIG_VALUE(LogicalSizeConfig, window, "window");
-    CONFIG_VALUE(LayoutNodeConfig, cardsLayout, "cards");
-    CONFIG_DYNAMIC_SECTION("layout.");
-};
-
-struct NamedLayoutSectionConfig {
     std::string name;
 
-    CONFIG_REFLECTED_STRUCT(NamedLayoutSectionConfig)
+    CONFIG_REFLECTED_STRUCT(LayoutSectionConfig)
     CONFIG_VALUE(std::string, description, "description");
     CONFIG_VALUE(LogicalSizeConfig, window, "window");
     CONFIG_VALUE(LayoutNodeConfig, cardsLayout, "cards");
@@ -266,7 +259,7 @@ struct AppConfig {
     CONFIG_SECTION_VALUE(StorageConfig, storage);
     CONFIG_SECTION_VALUE(BoardConfig, board);
     CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
-    CONFIG_DYNAMIC_SECTION_VALUE(NamedLayoutSectionConfig, layouts, name);
+    CONFIG_DYNAMIC_SECTION_VALUE(LayoutSectionConfig, layouts, name);
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
 };

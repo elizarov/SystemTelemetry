@@ -99,7 +99,7 @@ std::vector<std::string> NormalizeConfiguredDrives(const std::vector<std::string
 }
 
 bool SelectResolvedLayout(AppConfig& config, const std::string& requestedName) {
-    const NamedLayoutSectionConfig* selected = nullptr;
+    const LayoutSectionConfig* selected = nullptr;
     if (!requestedName.empty()) {
         for (const auto& layout : config.layouts) {
             if (layout.name == requestedName) {

@@ -12,8 +12,8 @@ LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& ca
     return it != layout.cards.end() ? &(*it) : nullptr;
 }
 
-NamedLayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name) {
-    const auto it = std::find_if(config.layouts.begin(), config.layouts.end(), [&](NamedLayoutSectionConfig& layout) {
+LayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name) {
+    const auto it = std::find_if(config.layouts.begin(), config.layouts.end(), [&](LayoutSectionConfig& layout) {
         return layout.name == name;
     });
     return it != config.layouts.end() ? &(*it) : nullptr;
@@ -102,7 +102,7 @@ bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& ta
         if (!updated) {
             return false;
         }
-        if (NamedLayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
+        if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
             applyWeights(FindLayoutNodeByPath(namedLayout->cardsLayout, target.nodePath));
         }
     } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, target.editCardId)) {

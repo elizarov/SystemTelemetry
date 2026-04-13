@@ -18,8 +18,8 @@ LayoutNodeConfig MakeContainerNode(const std::string& name, std::initializer_lis
     return node;
 }
 
-NamedLayoutSectionConfig MakeNamedLayout(const std::string& name, int width, int height, const std::string& rootName) {
-    NamedLayoutSectionConfig layout;
+LayoutSectionConfig MakeNamedLayout(const std::string& name, int width, int height, const std::string& rootName) {
+    LayoutSectionConfig layout;
     layout.name = name;
     layout.window.width = width;
     layout.window.height = height;
