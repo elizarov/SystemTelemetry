@@ -14,7 +14,8 @@ enum class LayoutEditParameter {
     FontClockDate,
 
     // Text
-    TextBottomPadding,
+    TextBottomGap,
+    NetworkFooterBottomGap,
 
     // Metric list
     MetricListBarHeight,

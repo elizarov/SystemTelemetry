@@ -30,8 +30,8 @@ TEST(ConfigWriter, FullExportDoesNotInventEmptyHeaderKeysForHeaderlessCards) {
     card.layout.children.push_back(LayoutNodeConfig{.name = "vertical_spring"});
     config.layout.cards.push_back(card);
 
-    const std::string output =
-        BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
+    const std::string output = BuildSavedConfigText(
+        ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
 
     const std::string sectionText =
         "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\n[card.time]";

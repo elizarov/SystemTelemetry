@@ -78,8 +78,8 @@ Supported widget geometry keys:
 - `[drive_usage_list]`: `label_gap`, `activity_width`, `rw_gap`, `bar_gap`, `percent_gap`, `free_width`, `bar_height`, `header_gap`, `row_gap`, `activity_segments`, `activity_segment_gap`
 - `[throughput]`: `header_gap`, `axis_padding`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
 - `[gauge]`: `outer_padding`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `value_bottom`, `label_bottom`
-- `[text]`: `bottom_padding`
-- `[network_footer]`: `preferred_padding`
+- `[text]`: `bottom_gap`
+- `[network_footer]`: `bottom_gap`
 
 `[layout_editor]` owns interactive layout-edit affordance tuning:
 
@@ -205,8 +205,8 @@ Supported layout kinds:
 
 `metric_list(...)` rows use a computed row height of `value_font_height + [metric_list].row_gap + [metric_list].bar_height`, then center the stacked value text and bar inside that row band with no internal gap.
 `drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].header_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].row_gap`.
-`text(...)` uses a preferred height of `text_font_height + [text].bottom_padding`.
-`network_footer` uses a preferred height of `footer_font_height + [network_footer].preferred_padding`.
+`text(...)` uses a preferred height of `text_font_height + [text].bottom_gap`.
+`network_footer` uses a preferred height of `footer_font_height + [network_footer].bottom_gap`.
 `vertical_spacer(widget_name)` uses the preferred height of the referenced widget type.
 `clock_time` uses a preferred height of `clock_time_font_height`.
 `clock_date` uses a preferred height of `clock_date_font_height`.

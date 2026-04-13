@@ -84,8 +84,8 @@ double ClampGaugeSegmentGapForCurrentConfig(const AppConfig& config, double valu
     }
 
     const double minSegmentSweep = MinimumGaugeSegmentSweep(totalSweep, segmentCount);
-    const double maxSegmentGap = (std::max)(
-        0.0, (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1));
+    const double maxSegmentGap = (std::max)(0.0,
+        (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1));
     return std::clamp(value, 0.0, maxSegmentGap);
 }
 
@@ -95,8 +95,8 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
         return 0.0;
     }
 
-    const int rowContentHeight = (std::max)(
-        config.layout.fonts.label.size, (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
+    const int rowContentHeight = (std::max)(config.layout.fonts.label.size,
+        (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
     const int maxGap = (std::max)(0, (rowContentHeight - segmentCount) / (segmentCount - 1));
     return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
 }

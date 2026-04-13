@@ -210,13 +210,13 @@ struct GaugeWidgetConfig {
 
 struct TextWidgetConfig {
     CONFIG_REFLECTED_STRUCT(TextWidgetConfig)
-    CONFIG_EDITABLE_VALUE_WITH(int, bottomPadding, "bottom_padding", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, bottomGap, "bottom_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("text");
 };
 
 struct NetworkFooterWidgetConfig {
     CONFIG_REFLECTED_STRUCT(NetworkFooterWidgetConfig)
-    CONFIG_VALUE(int, preferredPadding, "preferred_padding");
+    CONFIG_EDITABLE_VALUE_WITH(int, bottomGap, "bottom_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("network_footer");
 };
 
@@ -267,3 +267,5 @@ CONFIG_EDITABLE_ROOT_BINDING_PATH(
     ThroughputWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::throughputBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(GaugeWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::gaugeBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(TextWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::textBinding);
+CONFIG_EDITABLE_ROOT_BINDING_PATH(
+    NetworkFooterWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::networkFooterBinding);

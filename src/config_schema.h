@@ -53,9 +53,13 @@ enum class ValueFormat {
 };
 
 struct NoLayoutEditPolicy {};
+
 struct PositiveIntPolicy {};
+
 struct NonNegativeIntPolicy {};
+
 struct FontSizePolicy {};
+
 struct DegreesPolicy {};
 
 struct NoLayoutEditFieldTraits {
@@ -83,9 +87,7 @@ template <> struct PolicyClamp<NonNegativeIntPolicy, int> {
 };
 
 template <typename Value>
-concept FontSizeEditableValue = requires(Value value) {
-    value.size;
-};
+concept FontSizeEditableValue = requires(Value value) { value.size; };
 
 template <FontSizeEditableValue Value> struct PolicyClamp<FontSizePolicy, Value> {
     static Value Apply(Value value) {
@@ -100,8 +102,7 @@ template <> struct PolicyClamp<DegreesPolicy, double> {
     }
 };
 
-template <typename PolicyTag, ValueFormat Format = ValueFormat::Integer>
-struct LayoutEditFieldTraits {
+template <typename PolicyTag, ValueFormat Format = ValueFormat::Integer> struct LayoutEditFieldTraits {
     using policy_tag = PolicyTag;
     static constexpr bool enabled = true;
     static constexpr configschema::ValueFormat value_format = Format;
@@ -313,11 +314,9 @@ template <typename Owner, size_t Index> struct BindingTag {
     static constexpr size_t index = Index;
 };
 
-template <typename Owner, size_t Index>
-using ReflectedField = decltype(reflect_field(FieldTag<Owner, Index>{}));
+template <typename Owner, size_t Index> using ReflectedField = decltype(reflect_field(FieldTag<Owner, Index>{}));
 
-template <typename Owner, size_t Index>
-using ReflectedBinding = decltype(reflect_binding(BindingTag<Owner, Index>{}));
+template <typename Owner, size_t Index> using ReflectedBinding = decltype(reflect_binding(BindingTag<Owner, Index>{}));
 
 template <typename Owner, size_t Index>
 concept HasReflectedField = requires { reflect_field(FieldTag<Owner, Index>{}); };
@@ -418,8 +417,7 @@ template <typename Owner> struct BindingPathLens<Owner> {
     }
 };
 
-template <typename Owner, typename Binding, typename... Rest>
-struct BindingPathLens<Owner, Binding, Rest...> {
+template <typename Owner, typename Binding, typename... Rest> struct BindingPathLens<Owner, Binding, Rest...> {
     using next_owner_type = std::remove_reference_t<decltype(Binding::Get(std::declval<Owner&>()))>;
     using owner_type = typename BindingPathLens<next_owner_type, Rest...>::owner_type;
 
@@ -471,19 +469,16 @@ template <typename Root, typename Field, typename... Bindings> struct RootFieldL
 struct NoRootFieldPath {
     static constexpr bool enabled = false;
 
-    template <typename Field>
-    using Lens = void;
+    template <typename Field> using Lens = void;
 };
 
 template <typename Tag> struct ResolveBindingTag;
 
-template <typename Owner, size_t Index>
-struct ResolveBindingTag<BindingTag<Owner, Index>> {
+template <typename Owner, size_t Index> struct ResolveBindingTag<BindingTag<Owner, Index>> {
     using type = ReflectedBinding<Owner, Index>;
 };
 
-template <typename Root, typename Field, typename... BindingTags>
-struct DeferredRootFieldLens {
+template <typename Root, typename Field, typename... BindingTags> struct DeferredRootFieldLens {
     using resolved_type = RootFieldLens<Root, Field, typename ResolveBindingTag<BindingTags>::type...>;
     using root_type = typename resolved_type::root_type;
     using field_descriptor = typename resolved_type::field_descriptor;
@@ -515,11 +510,8 @@ struct DeferredRootFieldLens {
     }
 };
 
-
-template <typename Root, typename... BindingTags>
-struct RootBindingPath {
-    template <typename Field>
-    using Lens = DeferredRootFieldLens<Root, Field, BindingTags...>;
+template <typename Root, typename... BindingTags> struct RootBindingPath {
+    template <typename Field> using Lens = DeferredRootFieldLens<Root, Field, BindingTags...>;
 };
 
 template <typename Owner, typename Field> struct EditableFieldLens;
@@ -570,10 +562,12 @@ public:                                                                         
     }
 
 #define CONFIG_EDITABLE_VALUE(field_type, member, key)                                                                 \
-    CONFIG_EDITABLE_VALUE_WITH_TRAITS(field_type, member, key, typename configschema::DefaultLayoutEditTraits<field_type>::type)
+    CONFIG_EDITABLE_VALUE_WITH_TRAITS(                                                                                 \
+        field_type, member, key, typename configschema::DefaultLayoutEditTraits<field_type>::type)
 
 #define CONFIG_EDITABLE_VALUE_WITH(field_type, member, key, policy_tag)                                                \
-    CONFIG_EDITABLE_VALUE_WITH_TRAITS(field_type, member, key, typename configschema::LayoutEditTraitsForPolicy<policy_tag>::type)
+    CONFIG_EDITABLE_VALUE_WITH_TRAITS(                                                                                 \
+        field_type, member, key, typename configschema::LayoutEditTraitsForPolicy<policy_tag>::type)
 
 #define CONFIG_EDITABLE_VALUE_WITH_TRAITS(field_type, member, key, layout_edit_traits)                                 \
     field_type member{};                                                                                               \
@@ -595,10 +589,10 @@ public:                                                                         
 
 #define CONFIG_ROOT_BINDING_PATH(root_type, ...) configschema::RootBindingPath<root_type, __VA_ARGS__>
 
-#define CONFIG_EDITABLE_ROOT_BINDING_PATH(owner, root_type, ...)                                                      \
-    using owner##RootPath = CONFIG_ROOT_BINDING_PATH(root_type, __VA_ARGS__);                                         \
-    template <typename Field> struct configschema::EditableFieldLens<owner, Field>                                    \
-        : owner##RootPath::template Lens<Field> {}
+#define CONFIG_EDITABLE_ROOT_BINDING_PATH(owner, root_type, ...)                                                       \
+    using owner##RootPath = CONFIG_ROOT_BINDING_PATH(root_type, __VA_ARGS__);                                          \
+    template <typename Field>                                                                                          \
+    struct configschema::EditableFieldLens<owner, Field> : owner##RootPath::template Lens<Field> {}
 
 #define CONFIG_REFLECTED_BINDINGS(owner)                                                                               \
 private:                                                                                                               \
@@ -609,11 +603,10 @@ public:
 
 #define CONFIG_SECTION_VALUE(field_type, member)                                                                       \
     field_type member{};                                                                                               \
-    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;       \
+    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;        \
     using member##BindingDescriptor =                                                                                  \
         configschema::StructuredBindingDescriptor<Self, typename field_type::Section, &Self::member>;                  \
-    friend consteval auto reflect_binding(                                                                             \
-        member##Binding) {                                                                                             \
+    friend consteval auto reflect_binding(member##Binding) {                                                           \
         return member##BindingDescriptor{};                                                                            \
     }
 
@@ -621,20 +614,18 @@ public:
 
 #define CONFIG_DYNAMIC_SECTION_VALUE(item_type, member, key_member)                                                    \
     std::vector<item_type> member{};                                                                                   \
-    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;       \
+    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;        \
     using member##BindingDescriptor =                                                                                  \
         configschema::DynamicStructuredBindingDescriptor<Self, item_type, &Self::member, &item_type::key_member>;      \
-    friend consteval auto reflect_binding(                                                                             \
-        member##Binding) {                                                                                             \
+    friend consteval auto reflect_binding(member##Binding) {                                                           \
         return member##BindingDescriptor{};                                                                            \
     }
 
 #define CONFIG_RECURSIVE_BINDING_VALUE(field_type, member)                                                             \
     field_type member{};                                                                                               \
-    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;       \
+    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;        \
     using member##BindingDescriptor =                                                                                  \
         configschema::RecursiveStructuredBindingDescriptor<Self, field_type, &Self::member>;                           \
-    friend consteval auto reflect_binding(                                                                             \
-        member##Binding) {                                                                                             \
+    friend consteval auto reflect_binding(member##Binding) {                                                           \
         return member##BindingDescriptor{};                                                                            \
     }

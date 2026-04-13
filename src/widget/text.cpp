@@ -20,8 +20,7 @@ void TextWidget::Initialize(const LayoutNodeConfig& node) {
 }
 
 int TextWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return renderer.FontMetrics().text +
-           (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.text.bottomPadding));
+    return renderer.FontMetrics().text + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.text.bottomGap));
 }
 
 bool TextWidget::UsesFixedPreferredHeightInRows() const {
@@ -35,13 +34,13 @@ void TextWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWid
     DashboardRenderer::WidgetEditGuide guide;
     guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
     guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = DashboardRenderer::LayoutEditParameter::TextBottomPadding;
+    guide.parameter = DashboardRenderer::LayoutEditParameter::TextBottomGap;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
     guide.drawStart = POINT{widget.rect.left, y};
     guide.drawEnd = POINT{widget.rect.right, y};
     guide.hitRect = RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
-    guide.value = renderer.Config().layout.text.bottomPadding;
+    guide.value = renderer.Config().layout.text.bottomGap;
     guide.dragDirection = 1;
     renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
 }

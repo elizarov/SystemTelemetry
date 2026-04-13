@@ -7,8 +7,7 @@ namespace {
 
 using Parameter = LayoutEditParameter;
 
-template <typename Meta>
-bool ApplyFieldEdit(AppConfig& config, double value) {
+template <typename Meta> bool ApplyFieldEdit(AppConfig& config, double value) {
     using PolicyTag = typename Meta::traits_type::policy_tag;
     if constexpr (std::is_same_v<PolicyTag, configschema::FontSizePolicy>) {
         UiFontConfig font = Meta::RawGet(config);
@@ -25,8 +24,7 @@ bool ApplyFieldEdit(AppConfig& config, double value) {
     }
 }
 
-template <typename Meta>
-std::optional<const UiFontConfig*> FindFontFieldValue(const AppConfig& config) {
+template <typename Meta> std::optional<const UiFontConfig*> FindFontFieldValue(const AppConfig& config) {
     if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
         return &Meta::RawGet(config);
     } else {
@@ -34,8 +32,7 @@ std::optional<const UiFontConfig*> FindFontFieldValue(const AppConfig& config) {
     }
 }
 
-template <typename Meta>
-const LayoutEditConfigFieldMetadata& GetFieldMetadata() {
+template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata() {
     static const LayoutEditConfigFieldMetadata metadata{
         Meta::section_name,
         Meta::parameter_name,
@@ -58,26 +55,42 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::FontClockTime, &GetFieldMetadata<UiFontSetConfig::clockTimeMeta>(), false, true},
     {Parameter::FontClockDate, &GetFieldMetadata<UiFontSetConfig::clockDateMeta>(), false, true},
 
-    {Parameter::TextBottomPadding, &GetFieldMetadata<TextWidgetConfig::bottomPaddingMeta>(), true, false},
+    {Parameter::TextBottomGap, &GetFieldMetadata<TextWidgetConfig::bottomGapMeta>(), true, false},
+    {Parameter::NetworkFooterBottomGap, &GetFieldMetadata<NetworkFooterWidgetConfig::bottomGapMeta>(), true, false},
 
     {Parameter::MetricListBarHeight, &GetFieldMetadata<MetricListWidgetConfig::barHeightMeta>(), false, true},
     {Parameter::MetricListLabelWidth, &GetFieldMetadata<MetricListWidgetConfig::labelWidthMeta>(), true, false},
     {Parameter::MetricListRowGap, &GetFieldMetadata<MetricListWidgetConfig::rowGapMeta>(), true, false},
 
-    {Parameter::DriveUsageActivitySegments, &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentsMeta>(), false, true},
+    {Parameter::DriveUsageActivitySegments,
+        &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentsMeta>(),
+        false,
+        true},
     {Parameter::DriveUsageBarHeight, &GetFieldMetadata<DriveUsageListWidgetConfig::barHeightMeta>(), false, true},
     {Parameter::DriveUsageLabelGap, &GetFieldMetadata<DriveUsageListWidgetConfig::labelGapMeta>(), true, false},
     {Parameter::DriveUsageBarGap, &GetFieldMetadata<DriveUsageListWidgetConfig::barGapMeta>(), true, false},
     {Parameter::DriveUsageRwGap, &GetFieldMetadata<DriveUsageListWidgetConfig::rwGapMeta>(), true, false},
     {Parameter::DriveUsagePercentGap, &GetFieldMetadata<DriveUsageListWidgetConfig::percentGapMeta>(), true, false},
-    {Parameter::DriveUsageActivityWidth, &GetFieldMetadata<DriveUsageListWidgetConfig::activityWidthMeta>(), true, false},
+    {Parameter::DriveUsageActivityWidth,
+        &GetFieldMetadata<DriveUsageListWidgetConfig::activityWidthMeta>(),
+        true,
+        false},
     {Parameter::DriveUsageFreeWidth, &GetFieldMetadata<DriveUsageListWidgetConfig::freeWidthMeta>(), true, false},
-    {Parameter::DriveUsageActivitySegmentGap, &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentGapMeta>(), true, false},
+    {Parameter::DriveUsageActivitySegmentGap,
+        &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentGapMeta>(),
+        true,
+        false},
     {Parameter::DriveUsageHeaderGap, &GetFieldMetadata<DriveUsageListWidgetConfig::headerGapMeta>(), true, false},
     {Parameter::DriveUsageRowGap, &GetFieldMetadata<DriveUsageListWidgetConfig::rowGapMeta>(), true, false},
 
-    {Parameter::ThroughputGuideStrokeWidth, &GetFieldMetadata<ThroughputWidgetConfig::guideStrokeWidthMeta>(), true, true},
-    {Parameter::ThroughputPlotStrokeWidth, &GetFieldMetadata<ThroughputWidgetConfig::plotStrokeWidthMeta>(), true, true},
+    {Parameter::ThroughputGuideStrokeWidth,
+        &GetFieldMetadata<ThroughputWidgetConfig::guideStrokeWidthMeta>(),
+        true,
+        true},
+    {Parameter::ThroughputPlotStrokeWidth,
+        &GetFieldMetadata<ThroughputWidgetConfig::plotStrokeWidthMeta>(),
+        true,
+        true},
     {Parameter::ThroughputLeaderDiameter, &GetFieldMetadata<ThroughputWidgetConfig::leaderDiameterMeta>(), true, true},
     {Parameter::ThroughputAxisPadding, &GetFieldMetadata<ThroughputWidgetConfig::axisPaddingMeta>(), true, false},
     {Parameter::ThroughputHeaderGap, &GetFieldMetadata<ThroughputWidgetConfig::headerGapMeta>(), true, false},

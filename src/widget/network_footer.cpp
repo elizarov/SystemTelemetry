@@ -15,11 +15,29 @@ void NetworkFooterWidget::Initialize(const LayoutNodeConfig&) {}
 
 int NetworkFooterWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return renderer.FontMetrics().footer +
-           (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.networkFooter.preferredPadding));
+           (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
 }
 
 bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
     return true;
+}
+
+void NetworkFooterWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
+    const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
+    const int y = widget.rect.top + renderer.FontMetrics().footer;
+
+    DashboardRenderer::WidgetEditGuide guide;
+    guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
+    guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    guide.parameter = DashboardRenderer::LayoutEditParameter::NetworkFooterBottomGap;
+    guide.guideId = 0;
+    guide.widgetRect = widget.rect;
+    guide.drawStart = POINT{widget.rect.left, y};
+    guide.drawEnd = POINT{widget.rect.right, y};
+    guide.hitRect = RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
+    guide.value = renderer.Config().layout.networkFooter.bottomGap;
+    guide.dragDirection = -1;
+    renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
 }
 
 void NetworkFooterWidget::Draw(DashboardRenderer& renderer,

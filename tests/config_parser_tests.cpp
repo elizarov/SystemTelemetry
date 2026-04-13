@@ -8,7 +8,8 @@
 namespace {
 
 std::filesystem::path WriteTestConfig(const std::string& text) {
-    const std::filesystem::path path = std::filesystem::temp_directory_path() / "systemtelemetry_config_parser_test.ini";
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / "systemtelemetry_config_parser_test.ini";
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     output << text;
     return path;
@@ -21,16 +22,15 @@ std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view) {
 }
 
 TEST(ConfigParser, ClampsParsedEditableValuesThroughSchemaPolicies) {
-    const std::filesystem::path path = WriteTestConfig(
-        "[fonts]\n"
-        "label = Segoe UI,-5,600\n"
-        "\n"
-        "[drive_usage_list]\n"
-        "activity_segment_gap = -9\n"
-        "\n"
-        "[gauge]\n"
-        "sweep_degrees = 500\n"
-        "segment_gap_degrees = -12\n");
+    const std::filesystem::path path = WriteTestConfig("[fonts]\n"
+                                                       "label = Segoe UI,-5,600\n"
+                                                       "\n"
+                                                       "[drive_usage_list]\n"
+                                                       "activity_segment_gap = -9\n"
+                                                       "\n"
+                                                       "[gauge]\n"
+                                                       "sweep_degrees = 500\n"
+                                                       "segment_gap_degrees = -12\n");
 
     const AppConfig config = LoadConfig(path, true);
 

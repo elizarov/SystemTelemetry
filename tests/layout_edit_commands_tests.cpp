@@ -28,7 +28,8 @@ TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
     config.layout.driveUsageList.barHeight = 10;
     config.layout.driveUsageList.activitySegments = 4;
 
-    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::TextBottomPadding, -3.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::TextBottomGap, -3.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::NetworkFooterBottomGap, -3.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::MetricListRowGap, -2.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageLabelGap, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageRwGap, -1.0));
@@ -41,7 +42,8 @@ TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputHeaderGap, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeOuterPadding, -1.0));
 
-    EXPECT_EQ(config.layout.text.bottomPadding, 0);
+    EXPECT_EQ(config.layout.text.bottomGap, 0);
+    EXPECT_EQ(config.layout.networkFooter.bottomGap, 0);
     EXPECT_EQ(config.layout.metricList.rowGap, 0);
     EXPECT_EQ(config.layout.driveUsageList.labelGap, 0);
     EXPECT_EQ(config.layout.driveUsageList.rwGap, 0);
@@ -76,8 +78,7 @@ TEST(LayoutEditCommands, UpdatesMetricListAndGaugeFieldsThroughCommands) {
 TEST(LayoutEditCommands, UpdatesDriveUsageActivitySegmentsThroughCommands) {
     AppConfig config;
 
-    ASSERT_TRUE(
-        layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegments, 5.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegments, 5.6));
 
     EXPECT_EQ(config.layout.driveUsageList.activitySegments, 6);
 }
@@ -85,10 +86,8 @@ TEST(LayoutEditCommands, UpdatesDriveUsageActivitySegmentsThroughCommands) {
 TEST(LayoutEditCommands, UpdatesThroughputAnchorFieldsThroughCommands) {
     AppConfig config;
 
-    ASSERT_TRUE(
-        layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputGuideStrokeWidth, 3.6));
-    ASSERT_TRUE(
-        layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputPlotStrokeWidth, 5.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputGuideStrokeWidth, 3.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputPlotStrokeWidth, 5.6));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputLeaderDiameter, 8.6));
 
     EXPECT_EQ(config.layout.throughput.guideStrokeWidth, 4);
@@ -107,8 +106,7 @@ TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageBarGap, 11.4));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageRwGap, 7.6));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsagePercentGap, 9.4));
-    ASSERT_TRUE(
-        layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegmentGap, 3.2));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegmentGap, 3.2));
 
     EXPECT_EQ(config.layout.driveUsageList.labelGap, 13);
     EXPECT_EQ(config.layout.driveUsageList.barGap, 11);
@@ -120,8 +118,7 @@ TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
 TEST(LayoutEditCommands, LeavesDriveUsageActivitySegmentGapAsNonNegativeConfigValue) {
     AppConfig config;
 
-    ASSERT_TRUE(
-        layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegmentGap, 99.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegmentGap, 99.0));
 
     EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 99);
 }

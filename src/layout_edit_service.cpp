@@ -13,9 +13,8 @@ LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& ca
 }
 
 LayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name) {
-    const auto it = std::find_if(config.layouts.begin(), config.layouts.end(), [&](LayoutSectionConfig& layout) {
-        return layout.name == name;
-    });
+    const auto it = std::find_if(
+        config.layouts.begin(), config.layouts.end(), [&](LayoutSectionConfig& layout) { return layout.name == name; });
     return it != config.layouts.end() ? &(*it) : nullptr;
 }
 
