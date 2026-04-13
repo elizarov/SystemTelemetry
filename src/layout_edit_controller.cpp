@@ -438,18 +438,6 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
         }
     }
 
-    if (resolution.hoveredEditableAnchor.has_value() &&
-        IsFontLayoutEditParameter(resolution.hoveredEditableAnchor->parameter)) {
-        const auto region = renderer.FindEditableAnchorRegion(*resolution.hoveredEditableAnchor);
-        if (region.has_value()) {
-            TooltipTarget target;
-            target.kind = TooltipTarget::Kind::EditableAnchor;
-            target.clientPoint = lastClientPoint_;
-            target.editableAnchor = *region;
-            return target;
-        }
-    }
-
     if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
         const auto& guides = renderer.WidgetEditGuides();
         if (*resolution.hoveredWidgetEditGuideIndex < guides.size()) {
