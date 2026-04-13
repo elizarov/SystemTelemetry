@@ -17,6 +17,9 @@ struct UiFontConfig {
 CONFIG_CODEC(UiFontConfig, configschema::FontSpecCodec);
 CONFIG_CODEC(std::vector<std::string>, configschema::StringCodec);
 
+struct LayoutConfig;
+struct AppConfig;
+
 struct UiFontSetConfig {
     CONFIG_REFLECTED_STRUCT(UiFontSetConfig)
     CONFIG_EDITABLE_VALUE(UiFontConfig,
@@ -350,3 +353,29 @@ struct AppConfig {
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
 };
+
+using UiFontSetConfigRootPath =
+    CONFIG_ROOT_BINDING_PATH(AppConfig, AppConfig::layoutBindingTag, LayoutConfig::fontsBindingTag);
+using MetricListWidgetConfigRootPath =
+    CONFIG_ROOT_BINDING_PATH(AppConfig, AppConfig::layoutBindingTag, LayoutConfig::metricListBindingTag);
+using DriveUsageListWidgetConfigRootPath =
+    CONFIG_ROOT_BINDING_PATH(AppConfig, AppConfig::layoutBindingTag, LayoutConfig::driveUsageListBindingTag);
+using ThroughputWidgetConfigRootPath =
+    CONFIG_ROOT_BINDING_PATH(AppConfig, AppConfig::layoutBindingTag, LayoutConfig::throughputBindingTag);
+using GaugeWidgetConfigRootPath =
+    CONFIG_ROOT_BINDING_PATH(AppConfig, AppConfig::layoutBindingTag, LayoutConfig::gaugeBindingTag);
+
+template <typename Field> struct configschema::EditableFieldLens<UiFontSetConfig, Field>
+    : UiFontSetConfigRootPath::template Lens<Field> {};
+
+template <typename Field> struct configschema::EditableFieldLens<MetricListWidgetConfig, Field>
+    : MetricListWidgetConfigRootPath::template Lens<Field> {};
+
+template <typename Field> struct configschema::EditableFieldLens<DriveUsageListWidgetConfig, Field>
+    : DriveUsageListWidgetConfigRootPath::template Lens<Field> {};
+
+template <typename Field> struct configschema::EditableFieldLens<ThroughputWidgetConfig, Field>
+    : ThroughputWidgetConfigRootPath::template Lens<Field> {};
+
+template <typename Field> struct configschema::EditableFieldLens<GaugeWidgetConfig, Field>
+    : GaugeWidgetConfigRootPath::template Lens<Field> {};

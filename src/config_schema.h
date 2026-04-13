@@ -229,7 +229,10 @@ namespace configschema {
 
 template <typename Owner, size_t Index> struct FieldTag {};
 
-template <typename Owner, size_t Index> struct BindingTag {};
+template <typename Owner, size_t Index> struct BindingTag {
+    using owner_type = Owner;
+    static constexpr size_t index = Index;
+};
 
 template <typename Owner, size_t Index>
 using ReflectedField = decltype(reflect_field(FieldTag<Owner, Index>{}));
@@ -355,14 +358,71 @@ template <typename Root, typename Field, typename... Bindings> struct RootFieldL
     }
 };
 
+struct NoRootFieldPath {
+    static constexpr bool enabled = false;
+
+    template <typename Field>
+    using Lens = void;
+};
+
+template <typename Tag> struct ResolveBindingTag;
+
+template <typename Owner, size_t Index>
+struct ResolveBindingTag<BindingTag<Owner, Index>> {
+    using type = ReflectedBinding<Owner, Index>;
+};
+
+template <typename Root, typename Field, typename... BindingTags>
+struct DeferredRootFieldLens {
+    using resolved_type = RootFieldLens<Root, Field, typename ResolveBindingTag<BindingTags>::type...>;
+    using root_type = typename resolved_type::root_type;
+    using field_descriptor = typename resolved_type::field_descriptor;
+    using value_type = typename resolved_type::value_type;
+    using traits_type = typename resolved_type::traits_type;
+    using owner_type = typename resolved_type::owner_type;
+
+    static constexpr std::string_view section_name = resolved_type::section_name;
+    static constexpr std::string_view parameter_name = resolved_type::parameter_name;
+
+    static value_type& Get(Root& root) {
+        return resolved_type::Get(root);
+    }
+
+    static const value_type& Get(const Root& root) {
+        return resolved_type::Get(root);
+    }
+};
+
+template <typename Root, typename... BindingTags>
+struct RootBindingPath {
+    template <typename Field>
+    using Lens = DeferredRootFieldLens<Root, Field, BindingTags...>;
+};
+
+template <typename Owner, typename Field> struct EditableFieldLens;
+
 }  // namespace configschema
 
-#define CONFIG_REFLECTED_STRUCT(owner)                                                                                 \
+#define CONFIG_REFLECTED_STRUCT_GET_MACRO(_1, _2, NAME, ...) NAME
+
+#define CONFIG_REFLECTED_STRUCT(...)                                                                                   \
+    CONFIG_REFLECTED_STRUCT_GET_MACRO(__VA_ARGS__, CONFIG_REFLECTED_STRUCT_WITH_PATH, CONFIG_REFLECTED_STRUCT_NO_PATH) \
+    (__VA_ARGS__)
+
+#define CONFIG_REFLECTED_STRUCT_NO_PATH(owner)                                                                         \
 private:                                                                                                               \
     static constexpr std::size_t _configschema_field_base = __COUNTER__;                                               \
     using Self = owner;                                                                                                \
                                                                                                                        \
 public:
+
+#define CONFIG_REFLECTED_STRUCT_WITH_PATH(owner, root_path)                                                            \
+private:                                                                                                               \
+    static constexpr std::size_t _configschema_field_base = __COUNTER__;                                               \
+    using Self = owner;                                                                                                \
+                                                                                                                       \
+public:                                                                                                                \
+    using layout_edit_root_path = root_path;
 
 #define CONFIG_CODEC(value_type, codec)                                                                                \
     template <> struct configschema::DefaultCodec<value_type> {                                                        \
@@ -394,6 +454,7 @@ public:
         &Self::member,                                                                                                 \
         typename configschema::DefaultCodec<field_type>::codec_type,                                                   \
         __VA_ARGS__>;                                                                                                  \
+    using member##Lens = configschema::EditableFieldLens<Self, member##Field>;                                         \
     friend consteval auto reflect_field(                                                                               \
         configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) {                              \
         return member##Field{};                                                                                        \
@@ -402,6 +463,8 @@ public:
 #define CONFIG_SECTION(name) using Section = configschema::AutoSectionDescriptor<name, Self>
 
 #define CONFIG_DYNAMIC_SECTION(prefix) using Section = configschema::AutoDynamicSectionDescriptor<prefix, Self>
+
+#define CONFIG_ROOT_BINDING_PATH(root_type, ...) configschema::RootBindingPath<root_type, __VA_ARGS__>
 
 #define CONFIG_REFLECTED_BINDINGS(owner)                                                                               \
 private:                                                                                                               \
@@ -412,10 +475,11 @@ public:
 
 #define CONFIG_SECTION_VALUE(field_type, member)                                                                       \
     field_type member{};                                                                                               \
+    using member##BindingTag = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;    \
     using member##Binding =                                                                                            \
         configschema::StructuredBindingDescriptor<Self, typename field_type::Section, &Self::member>;                  \
     friend consteval auto reflect_binding(                                                                             \
-        configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) {                          \
+        member##BindingTag) {                                                                                          \
         return member##Binding{};                                                                                      \
     }
 
@@ -423,18 +487,20 @@ public:
 
 #define CONFIG_DYNAMIC_SECTION_VALUE(item_type, member, key_member)                                                    \
     std::vector<item_type> member{};                                                                                   \
+    using member##BindingTag = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;    \
     using member##Binding =                                                                                            \
         configschema::DynamicStructuredBindingDescriptor<Self, item_type, &Self::member, &item_type::key_member>;      \
     friend consteval auto reflect_binding(                                                                             \
-        configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) {                          \
+        member##BindingTag) {                                                                                          \
         return member##Binding{};                                                                                      \
     }
 
 #define CONFIG_RECURSIVE_BINDING_VALUE(field_type, member)                                                             \
     field_type member{};                                                                                               \
+    using member##BindingTag = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;    \
     using member##Binding =                                                                                            \
         configschema::RecursiveStructuredBindingDescriptor<Self, field_type, &Self::member>;                           \
     friend consteval auto reflect_binding(                                                                             \
-        configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) {                          \
+        member##BindingTag) {                                                                                          \
         return member##Binding{};                                                                                      \
     }
