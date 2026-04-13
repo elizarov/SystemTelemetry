@@ -15,13 +15,11 @@ COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
 }
 
-void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color, BYTE alpha) {
+void FillCircle(DashboardRenderer& renderer, HDC hdc, int centerX, int centerY, int diameter, COLORREF color) {
     const int clampedDiameter = std::max(1, diameter);
     const int radius = clampedDiameter / 2;
-    HBRUSH brush = CreateSolidBrush(
-        RGB((GetRValue(color) * alpha) / 255, (GetGValue(color) * alpha) / 255, (GetBValue(color) * alpha) / 255));
-    HGDIOBJ oldBrush = SelectObject(hdc, brush);
-    HGDIOBJ oldPen = SelectObject(hdc, GetStockObject(NULL_PEN));
+    HGDIOBJ oldBrush = SelectObject(hdc, renderer.SolidBrush(color));
+    HGDIOBJ oldPen = SelectObject(hdc, renderer.SolidPen(color));
     Ellipse(hdc,
         centerX - radius,
         centerY - radius,
@@ -29,7 +27,6 @@ void FillCircle(HDC hdc, int centerX, int centerY, int diameter, COLORREF color,
         centerY - radius + clampedDiameter);
     SelectObject(hdc, oldPen);
     SelectObject(hdc, oldBrush);
-    DeleteObject(brush);
 }
 
 RECT MakeAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
@@ -87,12 +84,11 @@ void DrawGraph(DashboardRenderer& renderer,
     double timeMarkerOffsetSamples,
     double timeMarkerIntervalSamples,
     const std::optional<DashboardRenderer::EditableAnchorBinding>& maxLabelEditable) {
-    HBRUSH bg = CreateSolidBrush(ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
+    HBRUSH bg = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
     FillRect(hdc, &rect, bg);
-    DeleteObject(bg);
 
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
-    HBRUSH markerBrush = CreateSolidBrush(ToColorRef(renderer.Config().layout.colors.graphMarkerColor));
+    HBRUSH markerBrush = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphMarkerColor));
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
         const double ratio = tick / maxValue;
         const int centerY = layout.graphBottom - static_cast<int>(std::round(ratio * layout.plotHeight));
@@ -119,10 +115,7 @@ void DrawGraph(DashboardRenderer& renderer,
             FillRect(hdc, &lineRect, markerBrush);
         }
     }
-
-    DeleteObject(markerBrush);
-
-    HBRUSH axisBrush = CreateSolidBrush(ToColorRef(renderer.Config().layout.colors.graphAxisColor));
+    HBRUSH axisBrush = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphAxisColor));
     const int verticalAxisCenterX = rect.left + layout.axisWidth;
     const int verticalAxisLeft = verticalAxisCenterX - (layout.guideStrokeWidth / 2);
     const int horizontalAxisCenterY = rect.bottom - 1;
@@ -137,7 +130,6 @@ void DrawGraph(DashboardRenderer& renderer,
         std::min<LONG>(rect.bottom, horizontalAxisTop + layout.guideStrokeWidth)};
     FillRect(hdc, &verticalAxisRect, axisBrush);
     FillRect(hdc, &horizontalAxisRect, axisBrush);
-    DeleteObject(axisBrush);
 
     char maxLabel[32];
     sprintf_s(maxLabel, "%.0f", maxValue);
@@ -163,26 +155,24 @@ void DrawGraph(DashboardRenderer& renderer,
     }
 
     const COLORREF plotColor = renderer.AccentColor();
-    HPEN pen = CreatePen(PS_SOLID, layout.plotStrokeWidth, plotColor);
-    HGDIOBJ oldPen = SelectObject(hdc, pen);
-    for (size_t i = 1; i < history.size(); ++i) {
-        const double v1 = std::clamp(history[i - 1] / maxValue, 0.0, 1.0);
-        const double v2 = std::clamp(history[i] / maxValue, 0.0, 1.0);
-        const int x1 =
-            layout.graphLeft + static_cast<int>((i - 1) * layout.plotWidth / std::max<size_t>(1, history.size() - 1));
-        const int x2 =
-            layout.graphLeft + static_cast<int>(i * layout.plotWidth / std::max<size_t>(1, history.size() - 1));
-        const int y1 = layout.graphBottom - static_cast<int>(std::round(v1 * layout.plotHeight));
-        const int y2 = layout.graphBottom - static_cast<int>(std::round(v2 * layout.plotHeight));
-        MoveToEx(hdc, x1, y1, nullptr);
-        LineTo(hdc, x2, y2);
+    const size_t historyDenominator = std::max<size_t>(1, history.size() - 1);
+    std::vector<POINT> plotPoints;
+    plotPoints.reserve(history.size());
+    for (size_t i = 0; i < history.size(); ++i) {
+        const double valueRatio = std::clamp(history[i] / maxValue, 0.0, 1.0);
+        const int x = layout.graphLeft + static_cast<int>(i * layout.plotWidth / historyDenominator);
+        const int y = layout.graphBottom - static_cast<int>(std::round(valueRatio * layout.plotHeight));
+        plotPoints.push_back(POINT{x, y});
     }
-    SelectObject(hdc, oldPen);
-    DeleteObject(pen);
+    if (plotPoints.size() >= 2) {
+        HGDIOBJ oldPen = SelectObject(hdc, renderer.SolidPen(plotColor, layout.plotStrokeWidth));
+        Polyline(hdc, plotPoints.data(), static_cast<int>(plotPoints.size()));
+        SelectObject(hdc, oldPen);
+    }
 
     if (!history.empty() && layout.leaderDiameter > 0) {
-        const POINT lastPoint = ThroughputLastPoint(layout, history, maxValue);
-        FillCircle(hdc, lastPoint.x, lastPoint.y, layout.leaderDiameter, plotColor, 255);
+        const POINT lastPoint = plotPoints.empty() ? ThroughputLastPoint(layout, history, maxValue) : plotPoints.back();
+        FillCircle(renderer, hdc, lastPoint.x, lastPoint.y, layout.leaderDiameter, plotColor);
     }
 }
 

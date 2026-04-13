@@ -1111,17 +1111,15 @@ void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, cons
 }
 
 void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
-    HPEN border = CreatePen(PS_SOLID,
-        std::max(1, ScaleLogical(config_.layout.cardStyle.cardBorderWidth)),
-        ToColorRef(config_.layout.colors.panelBorderColor));
-    HBRUSH fill = GetSolidBrush(ToColorRef(config_.layout.colors.panelFillColor));
+    HPEN border = SolidPen(ToColorRef(config_.layout.colors.panelBorderColor),
+        std::max(1, ScaleLogical(config_.layout.cardStyle.cardBorderWidth)));
+    HBRUSH fill = SolidBrush(ToColorRef(config_.layout.colors.panelFillColor));
     HGDIOBJ oldPen = SelectObject(hdc, border);
     HGDIOBJ oldBrush = SelectObject(hdc, fill);
     const int radius = std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius));
     RoundRect(hdc, card.rect.left, card.rect.top, card.rect.right, card.rect.bottom, radius, radius);
     SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);
-    DeleteObject(border);
     if (!card.iconName.empty()) {
         DrawPanelIcon(hdc, card.iconName, card.iconRect);
     }
@@ -1140,8 +1138,8 @@ void DashboardRenderer::DrawPillBar(
             return;
         }
 
-        HGDIOBJ oldBrush = SelectObject(hdc, GetSolidBrush(color));
-        HGDIOBJ oldPen = SelectObject(hdc, GetSolidPen(color));
+        HGDIOBJ oldBrush = SelectObject(hdc, SolidBrush(color));
+        HGDIOBJ oldPen = SelectObject(hdc, SolidPen(color));
         if (width <= height) {
             Ellipse(hdc, capsuleRect.left, capsuleRect.top, capsuleRect.right, capsuleRect.bottom);
         } else {
@@ -1256,9 +1254,8 @@ bool DashboardRenderer::SaveSnapshotPng(
 
     HGDIOBJ oldBitmap = SelectObject(memDc, bitmap);
     RECT client{0, 0, WindowWidth(), WindowHeight()};
-    HBRUSH background = CreateSolidBrush(BackgroundColor());
+    HBRUSH background = SolidBrush(BackgroundColor());
     FillRect(memDc, &client, background);
-    DeleteObject(background);
     SetBkMode(memDc, TRANSPARENT);
     Draw(memDc, snapshot, overlayState);
 
@@ -1612,7 +1609,7 @@ void DashboardRenderer::DestroyFonts() {
     textMeasureCache_.clear();
 }
 
-HBRUSH DashboardRenderer::GetSolidBrush(COLORREF color) {
+HBRUSH DashboardRenderer::SolidBrush(COLORREF color) {
     if (const auto it = solidBrushCache_.find(color); it != solidBrushCache_.end()) {
         return it->second;
     }
@@ -1622,13 +1619,14 @@ HBRUSH DashboardRenderer::GetSolidBrush(COLORREF color) {
     return brush;
 }
 
-HPEN DashboardRenderer::GetSolidPen(COLORREF color) {
-    if (const auto it = solidPenCache_.find(color); it != solidPenCache_.end()) {
+HPEN DashboardRenderer::SolidPen(COLORREF color, int width) {
+    const PenCacheKey key{color, std::max(1, width)};
+    if (const auto it = solidPenCache_.find(key); it != solidPenCache_.end()) {
         return it->second;
     }
 
-    HPEN pen = CreatePen(PS_SOLID, 1, color);
-    solidPenCache_.emplace(color, pen);
+    HPEN pen = CreatePen(PS_SOLID, key.width, color);
+    solidPenCache_.emplace(key, pen);
     return pen;
 }
 

@@ -229,6 +229,8 @@ public:
     TextLayoutResult DrawTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
+    HBRUSH SolidBrush(COLORREF color);
+    HPEN SolidPen(COLORREF color, int width = 1);
     EditableAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
     void RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
@@ -334,8 +336,21 @@ private:
         }
     };
 
-    HBRUSH GetSolidBrush(COLORREF color);
-    HPEN GetSolidPen(COLORREF color);
+    struct PenCacheKey {
+        COLORREF color = 0;
+        int width = 1;
+
+        bool operator==(const PenCacheKey& other) const {
+            return color == other.color && width == other.width;
+        }
+    };
+
+    struct PenCacheKeyHash {
+        size_t operator()(const PenCacheKey& key) const {
+            return (std::hash<COLORREF>{}(key.color) * 1315423911u) ^ std::hash<int>{}(key.width);
+        }
+    };
+
     const std::wstring& GetWideText(std::string_view text) const;
     void ClearGdiCaches();
     void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
@@ -428,7 +443,7 @@ private:
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash> textWidthCache_;
     mutable std::unordered_map<TextMeasureCacheKey, SIZE, TextMeasureCacheKeyHash> textMeasureCache_;
     std::unordered_map<COLORREF, HBRUSH> solidBrushCache_;
-    std::unordered_map<COLORREF, HPEN> solidPenCache_;
+    std::unordered_map<PenCacheKey, HPEN, PenCacheKeyHash> solidPenCache_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;
