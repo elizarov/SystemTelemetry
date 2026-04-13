@@ -64,3 +64,10 @@ TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
     EXPECT_LT(GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::ThroughputLeaderDiameter),
         GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::ThroughputAxisPadding));
 }
+
+TEST(LayoutEditParameter, MetadataTableMatchesEnumOrder) {
+    for (int index = 0; index < static_cast<int>(DashboardRenderer::LayoutEditParameter::Count); ++index) {
+        const auto parameter = static_cast<DashboardRenderer::LayoutEditParameter>(index);
+        EXPECT_EQ(GetLayoutEditParameterInfo(parameter).parameter, parameter);
+    }
+}

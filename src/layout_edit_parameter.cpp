@@ -288,15 +288,13 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::GaugeRingThickness, *MakeDescriptor("gauge", "ring_thickness"), true, true, false, LayoutEditWidgetDragMode::Linear, &ApplyGaugeRingThickness, nullptr},
 };
 
+constexpr size_t kParameterInfoCount = sizeof(kParameterInfo) / sizeof(kParameterInfo[0]);
+static_assert(kParameterInfoCount == static_cast<size_t>(Parameter::Count));
+
 }  // namespace
 
 const LayoutEditParameterInfo& GetLayoutEditParameterInfo(DashboardRenderer::LayoutEditParameter parameter) {
-    for (const auto& info : kParameterInfo) {
-        if (info.parameter == parameter) {
-            return info;
-        }
-    }
-    return kParameterInfo[0];
+    return kParameterInfo[static_cast<size_t>(parameter)];
 }
 
 int GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter parameter) {

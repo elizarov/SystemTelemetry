@@ -99,6 +99,7 @@ public:
         GaugeSegmentGapDegrees,
         GaugeOuterPadding,
         GaugeRingThickness,
+        Count,
     };
 
     enum class AnchorShape {
