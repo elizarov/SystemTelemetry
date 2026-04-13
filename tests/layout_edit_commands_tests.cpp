@@ -2,14 +2,15 @@
 
 #include "layout_edit_commands.h"
 
-TEST(LayoutEditCommands, ClampsGaugeSegmentGapAgainstSweepAndSegmentCount) {
+TEST(LayoutEditCommands, ClampsGaugeDegreeFieldsToZeroTo360) {
     AppConfig config;
-    config.layout.gauge.sweepDegrees = 180.0;
-    config.layout.gauge.segmentCount = 4;
 
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeSegmentGapDegrees, 100.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeSweepDegrees, 500.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeSegmentGapDegrees, -1.0));
 
-    EXPECT_EQ(config.layout.gauge.segmentGapDegrees, 60.0);
+    EXPECT_EQ(config.layout.gauge.sweepDegrees, 360.0);
+    EXPECT_EQ(config.layout.gauge.segmentGapDegrees, 0.0);
 }
 
 TEST(LayoutEditCommands, ClampsFontSizesToPositiveValues) {
@@ -116,15 +117,11 @@ TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
     EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 3);
 }
 
-TEST(LayoutEditCommands, ClampsDriveUsageActivitySegmentGapToAvailableRowHeight) {
+TEST(LayoutEditCommands, LeavesDriveUsageActivitySegmentGapAsNonNegativeConfigValue) {
     AppConfig config;
-    config.layout.fonts.label.size = 15;
-    config.layout.fonts.smallText.size = 13;
-    config.layout.driveUsageList.barHeight = 10;
-    config.layout.driveUsageList.activitySegments = 4;
 
     ASSERT_TRUE(
         layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegmentGap, 99.0));
 
-    EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 3);
+    EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 99);
 }

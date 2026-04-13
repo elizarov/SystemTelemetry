@@ -54,9 +54,7 @@ struct NoLayoutEditPolicy {};
 struct PositiveIntPolicy {};
 struct NonNegativeIntPolicy {};
 struct FontSizePolicy {};
-struct GaugeSweepDegreesPolicy {};
-struct GaugeSegmentGapDegreesPolicy {};
-struct DriveUsageActivitySegmentGapPolicy {};
+struct DegreesPolicy {};
 
 struct NoLayoutEditFieldTraits {
     using policy_tag = NoLayoutEditPolicy;
@@ -79,12 +77,8 @@ template <> struct LayoutEditTraitsForPolicy<FontSizePolicy> {
     using type = LayoutEditFieldTraits<FontSizePolicy, ValueFormat::FontSpec>;
 };
 
-template <> struct LayoutEditTraitsForPolicy<GaugeSweepDegreesPolicy> {
-    using type = LayoutEditFieldTraits<GaugeSweepDegreesPolicy, ValueFormat::FloatingPoint>;
-};
-
-template <> struct LayoutEditTraitsForPolicy<GaugeSegmentGapDegreesPolicy> {
-    using type = LayoutEditFieldTraits<GaugeSegmentGapDegreesPolicy, ValueFormat::FloatingPoint>;
+template <> struct LayoutEditTraitsForPolicy<DegreesPolicy> {
+    using type = LayoutEditFieldTraits<DegreesPolicy, ValueFormat::FloatingPoint>;
 };
 
 template <typename T> struct DefaultLayoutEditTraits {

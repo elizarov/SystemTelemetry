@@ -69,6 +69,38 @@ double ClampAngleToRange(double angleDegrees, double angularMin, double angularM
     return best;
 }
 
+double MinimumGaugeSegmentSweep(double totalSweep, int segmentCount) {
+    if (totalSweep <= 0.0 || segmentCount <= 0) {
+        return 0.0;
+    }
+    return (std::min)(0.25, totalSweep / static_cast<double>(segmentCount));
+}
+
+double ClampGaugeSegmentGapForCurrentConfig(const AppConfig& config, double value) {
+    const double totalSweep = std::clamp(config.layout.gauge.sweepDegrees, 0.0, 360.0);
+    const int segmentCount = (std::max)(1, config.layout.gauge.segmentCount);
+    if (segmentCount <= 1) {
+        return 0.0;
+    }
+
+    const double minSegmentSweep = MinimumGaugeSegmentSweep(totalSweep, segmentCount);
+    const double maxSegmentGap = (std::max)(
+        0.0, (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1));
+    return std::clamp(value, 0.0, maxSegmentGap);
+}
+
+double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config, double value) {
+    const int segmentCount = (std::max)(1, config.layout.driveUsageList.activitySegments);
+    if (segmentCount <= 1) {
+        return 0.0;
+    }
+
+    const int rowContentHeight = (std::max)(
+        config.layout.fonts.label.size, (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
+    const int maxGap = (std::max)(0, (rowContentHeight - segmentCount) / (segmentCount - 1));
+    return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
+}
+
 std::optional<double> ComputeGaugeSegmentGapDegrees(
     const DashboardRenderer::WidgetEditGuide& guide, POINT clientPoint) {
     const auto pointerAngle = ComputeGaugePointerAngle(guide.dragOrigin, clientPoint);
@@ -639,7 +671,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
             if (!segmentGapDegrees.has_value()) {
                 return true;
             }
-            nextValue = *segmentGapDegrees;
+            nextValue = ClampGaugeSegmentGapForCurrentConfig(host_.LayoutEditConfig(), *segmentGapDegrees);
         } else {
             return false;
         }
@@ -651,6 +683,9 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
             static_cast<int>(std::lround(static_cast<double>(pixelDelta * drag.guide.dragDirection) /
                                          (std::max)(0.1, host_.LayoutEditRenderer().RenderScale())));
         nextValue = (std::max)(0.0, drag.initialValue + static_cast<double>(logicalDelta));
+        if (drag.guide.parameter == DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegmentGap) {
+            nextValue = ClampDriveUsageActivitySegmentGapForCurrentConfig(host_.LayoutEditConfig(), nextValue);
+        }
     }
     if (!host_.ApplyLayoutEditValue(drag.guide.parameter, nextValue)) {
         return false;

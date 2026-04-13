@@ -16,27 +16,8 @@ int ClampNonNegativeInt(double value) {
     return (std::max)(0, static_cast<int>(std::lround(value)));
 }
 
-double ClampGaugeSweepDegrees(double value) {
+double ClampDegrees(double value) {
     return std::clamp(value, 0.0, 360.0);
-}
-
-double ClampGaugeSegmentGapDegrees(const AppConfig& config, double value) {
-    const double totalSweep = ClampGaugeSweepDegrees(config.layout.gauge.sweepDegrees);
-    const int segmentCount = (std::max)(1, config.layout.gauge.segmentCount);
-    const double maxSegmentGap = segmentCount <= 1 ? 0.0 : totalSweep / static_cast<double>(segmentCount - 1);
-    return std::clamp(value, 0.0, maxSegmentGap);
-}
-
-int ClampDriveUsageActivitySegmentGap(const AppConfig& config, double value) {
-    const int segmentCount = (std::max)(1, config.layout.driveUsageList.activitySegments);
-    if (segmentCount <= 1) {
-        return 0;
-    }
-
-    const int rowContentHeight = (std::max)(config.layout.fonts.label.size,
-        (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
-    const int maxGap = (std::max)(0, (rowContentHeight - segmentCount) / (segmentCount - 1));
-    return std::clamp(ClampNonNegativeInt(value), 0, maxGap);
 }
 
 template <typename Meta>
@@ -51,14 +32,8 @@ bool ApplyFieldEdit(AppConfig& config, double value) {
     } else if constexpr (std::is_same_v<PolicyTag, configschema::FontSizePolicy>) {
         Meta::Get(config).size = ClampPositiveInt(value);
         return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::GaugeSweepDegreesPolicy>) {
-        Meta::Get(config) = ClampGaugeSweepDegrees(value);
-        return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::GaugeSegmentGapDegreesPolicy>) {
-        Meta::Get(config) = ClampGaugeSegmentGapDegrees(config, value);
-        return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::DriveUsageActivitySegmentGapPolicy>) {
-        Meta::Get(config) = ClampDriveUsageActivitySegmentGap(config, value);
+    } else if constexpr (std::is_same_v<PolicyTag, configschema::DegreesPolicy>) {
+        Meta::Get(config) = ClampDegrees(value);
         return true;
     } else {
         return false;

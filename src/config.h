@@ -186,7 +186,7 @@ struct DriveUsageListWidgetConfig {
     CONFIG_EDITABLE_VALUE_WITH(int, headerGap, "header_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE(int, activitySegments, "activity_segments");
-    CONFIG_EDITABLE_VALUE_WITH(int, activitySegmentGap, "activity_segment_gap", configschema::DriveUsageActivitySegmentGapPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, activitySegmentGap, "activity_segment_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("drive_usage_list");
 };
 
@@ -204,10 +204,9 @@ struct GaugeWidgetConfig {
     CONFIG_REFLECTED_STRUCT(GaugeWidgetConfig)
     CONFIG_EDITABLE_VALUE_WITH(int, outerPadding, "outer_padding", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE(int, ringThickness, "ring_thickness");
-    CONFIG_EDITABLE_VALUE_WITH(double, sweepDegrees, "sweep_degrees", configschema::GaugeSweepDegreesPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(double, sweepDegrees, "sweep_degrees", configschema::DegreesPolicy);
     CONFIG_EDITABLE_VALUE(int, segmentCount, "segment_count");
-    CONFIG_EDITABLE_VALUE_WITH(
-        double, segmentGapDegrees, "segment_gap_degrees", configschema::GaugeSegmentGapDegreesPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(double, segmentGapDegrees, "segment_gap_degrees", configschema::DegreesPolicy);
     CONFIG_EDITABLE_VALUE(int, valueBottom, "value_bottom");
     CONFIG_EDITABLE_VALUE(int, labelBottom, "label_bottom");
     CONFIG_SECTION("gauge");

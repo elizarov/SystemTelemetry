@@ -18,6 +18,13 @@ namespace {
 
 using GaugeSegmentLayout = GaugeWidget::SegmentLayout;
 
+double MinimumGaugeSegmentSweep(double totalSweep, int segmentCount) {
+    if (totalSweep <= 0.0 || segmentCount <= 0) {
+        return 0.0;
+    }
+    return (std::min)(0.25, totalSweep / static_cast<double>(segmentCount));
+}
+
 GaugeSegmentLayout ComputeGaugeSegmentLayout(
     double requestedSweep, int requestedSegmentCount, double requestedSegmentGap) {
     GaugeSegmentLayout layout;
@@ -36,9 +43,12 @@ GaugeSegmentLayout ComputeGaugeSegmentLayout(
     }
 
     layout.maxSegmentSweep = layout.totalSweep / static_cast<double>(layout.segmentCount);
-    const double maxSegmentGap = layout.totalSweep / static_cast<double>(layout.segmentCount - 1);
+    const double minSegmentSweep = MinimumGaugeSegmentSweep(layout.totalSweep, layout.segmentCount);
+    const double maxSegmentGap = (std::max)(0.0,
+        (layout.totalSweep - (minSegmentSweep * static_cast<double>(layout.segmentCount))) /
+            static_cast<double>(layout.segmentCount - 1));
     layout.segmentGap = std::clamp(requestedSegmentGap, 0.0, maxSegmentGap);
-    layout.segmentSweep = (std::max)(0.0,
+    layout.segmentSweep = (std::max)(minSegmentSweep,
         (layout.totalSweep - (layout.segmentGap * static_cast<double>(layout.segmentCount - 1))) /
             static_cast<double>(layout.segmentCount));
     layout.pitchSweep = layout.segmentSweep + layout.segmentGap;
