@@ -277,7 +277,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             renderer.WidgetFonts().big,
             DT_CENTER | DT_SINGLELINE | DT_VCENTER,
             renderer.MakeEditableTextBinding(
-                widget, DashboardRenderer::AnchorEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
+                widget, DashboardRenderer::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
     }
     renderer.DrawTextBlock(hdc,
         layoutState_.labelRect,
@@ -294,7 +294,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
     renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::SegmentCount,
+            DashboardRenderer::LayoutEditParameter::GaugeSegmentCount,
             0,
         },
         widget.rect,
@@ -310,7 +310,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
     renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::GaugeOuterPadding,
+            DashboardRenderer::LayoutEditParameter::GaugeOuterPadding,
             0,
         },
         layoutState_.outerPaddingAnchorRect,
@@ -326,7 +326,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
     renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::GaugeRingThickness,
+            DashboardRenderer::LayoutEditParameter::GaugeRingThickness,
             0,
         },
         layoutState_.ringThicknessAnchorRect,
@@ -343,8 +343,10 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         "Load",
         renderer.WidgetFonts().smallFont,
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-        renderer.MakeEditableTextBinding(
-            widget, DashboardRenderer::AnchorEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size));
+        renderer.MakeEditableTextBinding(widget,
+            DashboardRenderer::LayoutEditParameter::FontSmall,
+            1,
+            renderer.Config().layout.fonts.smallText.size));
 }
 
 void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
@@ -361,7 +363,7 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
     const int hitInset = layoutState_.hitInset;
     const int halfWidth = layoutState_.halfWidth;
 
-    const auto addRadialGuide = [&](DashboardRenderer::WidgetEditParameter parameter,
+    const auto addRadialGuide = [&](DashboardRenderer::LayoutEditParameter parameter,
                                     int guideId,
                                     double angleDegrees,
                                     double value,
@@ -388,13 +390,13 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
         renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
     };
 
-    addRadialGuide(DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees,
+    addRadialGuide(DashboardRenderer::LayoutEditParameter::GaugeSweepDegrees,
         0,
         gaugeLayout.gaugeEnd,
         gaugeLayout.totalSweep,
         0.0,
         360.0);
-    addRadialGuide(DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees,
+    addRadialGuide(DashboardRenderer::LayoutEditParameter::GaugeSegmentGapDegrees,
         gaugeLayout.segmentCount,
         gaugeLayout.gaugeStart + gaugeLayout.segmentSweep,
         gaugeLayout.segmentGap,
@@ -402,7 +404,7 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
         gaugeLayout.gaugeStart + gaugeLayout.maxSegmentSweep);
 
     const auto addHorizontalGuide =
-        [&](DashboardRenderer::WidgetEditParameter parameter, int guideId, int bottomOffset) {
+        [&](DashboardRenderer::LayoutEditParameter parameter, int guideId, int bottomOffset) {
             const int y = cy + renderer.ScaleLogical(bottomOffset);
             DashboardRenderer::WidgetEditGuide guide;
             guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
@@ -419,9 +421,9 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
         };
 
     addHorizontalGuide(
-        DashboardRenderer::WidgetEditParameter::GaugeValueBottom, 100, renderer.Config().layout.gauge.valueBottom);
+        DashboardRenderer::LayoutEditParameter::GaugeValueBottom, 100, renderer.Config().layout.gauge.valueBottom);
     addHorizontalGuide(
-        DashboardRenderer::WidgetEditParameter::GaugeLabelBottom, 101, renderer.Config().layout.gauge.labelBottom);
+        DashboardRenderer::LayoutEditParameter::GaugeLabelBottom, 101, renderer.Config().layout.gauge.labelBottom);
 }
 
 void GaugeWidget::FinalizeLayoutGroup(DashboardRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) {

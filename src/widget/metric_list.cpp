@@ -175,8 +175,10 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
                 row.valueText,
                 renderer.WidgetFonts().value,
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-                renderer.MakeEditableTextBinding(
-                    widget, DashboardRenderer::AnchorEditParameter::FontValue, rowIndex * 2 + 1, renderer.Config().layout.fonts.value.size));
+                renderer.MakeEditableTextBinding(widget,
+                    DashboardRenderer::LayoutEditParameter::FontValue,
+                    rowIndex * 2 + 1,
+                    renderer.Config().layout.fonts.value.size));
         }
         const RECT& barRect = layoutState_.barRects[rowIndex];
         renderer.DrawPillBar(hdc,
@@ -192,10 +194,11 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
 
 void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.metricList;
-    for (int rowIndex = 0; rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.barRects.size()) &&
-                           rowIndex < static_cast<int>(layoutState_.barAnchorRects.size()) &&
-                           rowIndex < static_cast<int>(layoutState_.labelRects.size()) && rowIndex < static_cast<int>(entries_.size());
-         ++rowIndex) {
+    for (int rowIndex = 0;
+        rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.barRects.size()) &&
+        rowIndex < static_cast<int>(layoutState_.barAnchorRects.size()) &&
+        rowIndex < static_cast<int>(layoutState_.labelRects.size()) && rowIndex < static_cast<int>(entries_.size());
+        ++rowIndex) {
         const RECT& barRect = layoutState_.barRects[rowIndex];
         const RECT& anchorRect = layoutState_.barAnchorRects[rowIndex];
         const int anchorCenterX = anchorRect.left + ((std::max)(0L, anchorRect.right - anchorRect.left) / 2);
@@ -203,7 +206,7 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         renderer.RegisterStaticEditableAnchorRegion(
             DashboardRenderer::EditableAnchorKey{
                 DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                DashboardRenderer::AnchorEditParameter::MetricListBarHeight,
+                DashboardRenderer::LayoutEditParameter::MetricListBarHeight,
                 rowIndex,
             },
             barRect,
@@ -222,8 +225,10 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
                 label,
                 renderer.WidgetFonts().label,
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-                renderer.MakeEditableTextBinding(
-                    widget, DashboardRenderer::AnchorEditParameter::FontLabel, rowIndex * 2, renderer.Config().layout.fonts.label.size));
+                renderer.MakeEditableTextBinding(widget,
+                    DashboardRenderer::LayoutEditParameter::FontLabel,
+                    rowIndex * 2,
+                    renderer.Config().layout.fonts.label.size));
         }
     }
 }
@@ -238,7 +243,7 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     DashboardRenderer::WidgetEditGuide guide;
     guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
     guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = DashboardRenderer::WidgetEditParameter::MetricListLabelWidth;
+    guide.parameter = DashboardRenderer::LayoutEditParameter::MetricListLabelWidth;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
     guide.drawStart = POINT{x, widget.rect.top};
@@ -253,7 +258,7 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
         guide = {};
         guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
         guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-        guide.parameter = DashboardRenderer::WidgetEditParameter::MetricListVerticalGap;
+        guide.parameter = DashboardRenderer::LayoutEditParameter::MetricListVerticalGap;
         guide.guideId = 1 + rowIndex;
         guide.widgetRect = widget.rect;
         guide.drawStart = POINT{widget.rect.left, y};

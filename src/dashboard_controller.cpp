@@ -367,8 +367,8 @@ bool DashboardController::ApplyLayoutGuideWeights(
 }
 
 bool DashboardController::ApplyLayoutEditValue(
-    DashboardShellHost& shell, const LayoutEditHost::ValueTarget& target, double value) {
-    if (!layout_edit::ApplyValue(state_.config, target, value)) {
+    DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, double value) {
+    if (!layout_edit::ApplyValue(state_.config, parameter, value)) {
         return false;
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);

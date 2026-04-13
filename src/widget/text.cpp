@@ -38,12 +38,15 @@ void TextWidget::Draw(DashboardRenderer& renderer,
         renderer.ForegroundColor(),
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
     const auto binding = renderer.MakeEditableTextBinding(
-        widget, DashboardRenderer::AnchorEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
+        widget, DashboardRenderer::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
     if (metric_ == "cpu.name" || metric_ == "gpu.name") {
         if (!staticAnchorRegistered_) {
             cachedStaticText_ = text;
-            renderer.RegisterStaticTextAnchor(
-                widget.rect, cachedStaticText_, renderer.WidgetFonts().text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS, binding);
+            renderer.RegisterStaticTextAnchor(widget.rect,
+                cachedStaticText_,
+                renderer.WidgetFonts().text,
+                DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
+                binding);
             staticAnchorRegistered_ = true;
         }
         return;

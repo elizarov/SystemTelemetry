@@ -6,6 +6,7 @@
 
 #include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
+
 namespace {
 
 constexpr UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
@@ -412,8 +413,8 @@ bool DashboardApp::ApplyLayoutGuideWeights(
     return controller_.ApplyLayoutGuideWeights(*this, target, weights);
 }
 
-bool DashboardApp::ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& target, double value) {
-    return controller_.ApplyLayoutEditValue(*this, target, value);
+bool DashboardApp::ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) {
+    return controller_.ApplyLayoutEditValue(*this, parameter, value);
 }
 
 std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
@@ -785,7 +786,8 @@ bool DashboardApp::CreateLayoutEditTooltip() {
     toolInfo.uId = 1;
     toolInfo.rect = clientRect;
     toolInfo.lpszText = const_cast<LPWSTR>(L"");
-    const LRESULT addToolResult = SendMessageW(layoutEditTooltipHwnd_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&toolInfo));
+    const LRESULT addToolResult =
+        SendMessageW(layoutEditTooltipHwnd_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     const LRESULT activateResult = SendMessageW(layoutEditTooltipHwnd_, TTM_ACTIVATE, TRUE, 0);
     SendMessageW(layoutEditTooltipHwnd_, TTM_SETDELAYTIME, TTDT_INITIAL, 0);
     SendMessageW(layoutEditTooltipHwnd_, TTM_SETDELAYTIME, TTDT_RESHOW, 0);
@@ -852,12 +854,14 @@ void DashboardApp::UpdateLayoutEditTooltip() {
             fontValue = **currentFont;
         }
         if (clientPoint.x == 0 && clientPoint.y == 0) {
-            clientPoint.x = target->editableAnchor.anchorRect.left +
-                            (std::max<LONG>(0, target->editableAnchor.anchorRect.right - target->editableAnchor.anchorRect.left) /
-                                2);
-            clientPoint.y = target->editableAnchor.anchorRect.top +
-                            (std::max<LONG>(0, target->editableAnchor.anchorRect.bottom - target->editableAnchor.anchorRect.top) /
-                                2);
+            clientPoint.x =
+                target->editableAnchor.anchorRect.left +
+                (std::max<LONG>(0, target->editableAnchor.anchorRect.right - target->editableAnchor.anchorRect.left) /
+                    2);
+            clientPoint.y =
+                target->editableAnchor.anchorRect.top +
+                (std::max<LONG>(0, target->editableAnchor.anchorRect.bottom - target->editableAnchor.anchorRect.top) /
+                    2);
         }
     }
 
@@ -867,10 +871,9 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     }
 
     const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
-    layoutEditTooltipText_ =
-        descriptor->valueFormat == LayoutEditTooltipValueFormat::FontSpec && fontValue.has_value()
-            ? BuildTooltipText(*descriptor, *fontValue, description)
-            : BuildTooltipText(*descriptor, value, description);
+    layoutEditTooltipText_ = descriptor->valueFormat == LayoutEditTooltipValueFormat::FontSpec && fontValue.has_value()
+                                 ? BuildTooltipText(*descriptor, *fontValue, description)
+                                 : BuildTooltipText(*descriptor, value, description);
 
     const int tooltipRadius = ScaleLogicalToPhysical(10, CurrentWindowDpi());
     layoutEditTooltipRect_ = RectFromPoint(clientPoint, tooltipRadius);
@@ -882,8 +885,8 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     toolInfo.uFlags = kLayoutEditTooltipFlags;
     toolInfo.uId = 1;
     toolInfo.rect = layoutEditTooltipRect_;
-    toolInfo.lpszText = layoutEditTooltipText_.empty() ? const_cast<LPWSTR>(L"")
-                                                       : const_cast<LPWSTR>(layoutEditTooltipText_.c_str());
+    toolInfo.lpszText =
+        layoutEditTooltipText_.empty() ? const_cast<LPWSTR>(L"") : const_cast<LPWSTR>(layoutEditTooltipText_.c_str());
     SendMessageW(layoutEditTooltipHwnd_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     SendMessageW(layoutEditTooltipHwnd_, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     SendMessageW(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
@@ -1197,7 +1200,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 return -1;
             }
             if (layoutEditTooltipHwnd_ != nullptr) {
-                SendMessageW(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
+                SendMessageW(
+                    layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
             }
             UpdateLayoutEditTooltip();
             movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);

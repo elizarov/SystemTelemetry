@@ -50,7 +50,7 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 DashboardRenderer::EditableAnchorBinding{
                     DashboardRenderer::EditableAnchorKey{
                         DashboardRenderer::LayoutWidgetIdentity{card.id, card.id, {}},
-                        DashboardRenderer::AnchorEditParameter::FontTitle,
+                        DashboardRenderer::LayoutEditParameter::FontTitle,
                         0,
                     },
                     renderer.Config().layout.fonts.title.size,

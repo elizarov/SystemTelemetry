@@ -495,12 +495,8 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
     return result;
 }
 
-DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(HDC hdc,
-    const RECT& rect,
-    const std::string& text,
-    HFONT font,
-    COLORREF color,
-    UINT format) {
+DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
+    HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
     const TextLayoutResult result = MeasureTextBlock(hdc, rect, text, font, format);
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
@@ -725,7 +721,7 @@ bool DashboardRenderer::MatchesWidgetEditGuide(const WidgetEditGuide& left, cons
 }
 
 DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBinding(
-    const DashboardWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const {
+    const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const {
     return EditableAnchorBinding{
         EditableAnchorKey{
             LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -1089,7 +1085,8 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
         DrawPanelIcon(hdc, card.iconName, card.iconRect);
     }
     if (!card.title.empty()) {
-        DrawTextBlock(hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        DrawTextBlock(
+            hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     }
 }
 
@@ -1383,9 +1380,9 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
 std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
     const EditableAnchorKey& key) const {
     const auto findIn = [&](const std::vector<EditableAnchorRegion>& regions) -> std::optional<EditableAnchorRegion> {
-        const auto it = std::find_if(regions.begin(),
-            regions.end(),
-            [&](const EditableAnchorRegion& region) { return MatchesEditableAnchorKey(region.key, key); });
+        const auto it = std::find_if(regions.begin(), regions.end(), [&](const EditableAnchorRegion& region) {
+            return MatchesEditableAnchorKey(region.key, key);
+        });
         if (it == regions.end()) {
             return std::nullopt;
         }

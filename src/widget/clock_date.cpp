@@ -41,7 +41,7 @@ void ClockDateWidget::Draw(DashboardRenderer& renderer,
         renderer.WidgetFonts().clockDate,
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
         renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontClockDate,
+            DashboardRenderer::LayoutEditParameter::FontClockDate,
             0,
             renderer.Config().layout.fonts.clockDate.size));
 }

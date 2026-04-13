@@ -12,51 +12,6 @@ class LayoutEditHost {
 public:
     virtual ~LayoutEditHost() = default;
 
-    struct ValueTarget {
-        enum class Field {
-            MetricListLabelWidth,
-            MetricListVerticalGap,
-            DriveUsageLabelGap,
-            DriveUsageBarGap,
-            DriveUsageRwGap,
-            DriveUsagePercentGap,
-            DriveUsageActivityWidth,
-            DriveUsageFreeWidth,
-            DriveUsageActivitySegmentGap,
-            DriveUsageHeaderGap,
-            DriveUsageRowGap,
-            DriveUsageActivitySegments,
-            ThroughputAxisPadding,
-            ThroughputHeaderGap,
-            ThroughputGuideStrokeWidth,
-            ThroughputPlotStrokeWidth,
-            ThroughputLeaderDiameter,
-            GaugeOuterPadding,
-            GaugeRingThickness,
-            GaugeValueBottom,
-            GaugeLabelBottom,
-            GaugeSweepDegrees,
-            GaugeSegmentGapDegrees,
-            FontTitle,
-            FontBig,
-            FontValue,
-            FontLabel,
-            FontText,
-            FontSmall,
-            FontFooter,
-            FontClockTime,
-            FontClockDate,
-            MetricListBarHeight,
-            DriveUsageBarHeight,
-            GaugeSegmentCount,
-        };
-
-        Field field = Field::MetricListLabelWidth;
-
-        static ValueTarget ForWidgetGuide(const DashboardRenderer::WidgetEditGuide& guide);
-        static ValueTarget ForEditableAnchor(const DashboardRenderer::EditableAnchorKey& key);
-    };
-
     struct LayoutTarget {
         std::string editCardId;
         std::vector<size_t> nodePath;
@@ -72,7 +27,7 @@ public:
         const std::vector<int>& weights,
         const DashboardRenderer::LayoutWidgetIdentity& widget,
         DashboardRenderer::LayoutGuideAxis axis) = 0;
-    virtual bool ApplyLayoutEditValue(const ValueTarget& target, double value) = 0;
+    virtual bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) = 0;
     virtual void InvalidateLayoutEdit() = 0;
 };
 

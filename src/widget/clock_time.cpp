@@ -41,7 +41,7 @@ void ClockTimeWidget::Draw(DashboardRenderer& renderer,
         renderer.WidgetFonts().clockTime,
         DT_CENTER | DT_SINGLELINE | DT_VCENTER,
         renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontClockTime,
+            DashboardRenderer::LayoutEditParameter::FontClockTime,
             0,
             renderer.Config().layout.fonts.clockTime.size));
 }

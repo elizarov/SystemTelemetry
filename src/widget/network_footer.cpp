@@ -42,5 +42,5 @@ void NetworkFooterWidget::Draw(DashboardRenderer& renderer,
         renderer.WidgetFonts().footer,
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
         renderer.MakeEditableTextBinding(
-            widget, DashboardRenderer::AnchorEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size));
+            widget, DashboardRenderer::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size));
 }

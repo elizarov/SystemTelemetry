@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "layout_edit_parameter.h"
 #include "layout_edit_service.h"
 #include "layout_snap_solver.h"
 
@@ -18,24 +19,6 @@ bool EditableAnchorKeyEquals(
     const DashboardRenderer::EditableAnchorKey& left, const DashboardRenderer::EditableAnchorKey& right) {
     return WidgetIdentityEquals(left.widget, right.widget) && left.parameter == right.parameter &&
            left.anchorId == right.anchorId;
-}
-
-bool IsFontAnchorParameter(DashboardRenderer::AnchorEditParameter parameter) {
-    using Parameter = DashboardRenderer::AnchorEditParameter;
-    switch (parameter) {
-        case Parameter::FontTitle:
-        case Parameter::FontBig:
-        case Parameter::FontValue:
-        case Parameter::FontLabel:
-        case Parameter::FontText:
-        case Parameter::FontSmall:
-        case Parameter::FontFooter:
-        case Parameter::FontClockTime:
-        case Parameter::FontClockDate:
-            return true;
-        default:
-            return false;
-    }
 }
 
 double NormalizeDegrees(double degrees) {
@@ -105,148 +88,6 @@ std::optional<double> ComputeGaugeSegmentGapDegrees(
 
 }  // namespace
 
-LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForWidgetGuide(
-    const DashboardRenderer::WidgetEditGuide& guide) {
-    ValueTarget target;
-    switch (guide.parameter) {
-        case DashboardRenderer::WidgetEditParameter::MetricListLabelWidth:
-            target.field = Field::MetricListLabelWidth;
-            break;
-        case DashboardRenderer::WidgetEditParameter::MetricListVerticalGap:
-            target.field = Field::MetricListVerticalGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageLabelGap:
-            target.field = Field::DriveUsageLabelGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageBarGap:
-            target.field = Field::DriveUsageBarGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageRwGap:
-            target.field = Field::DriveUsageRwGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsagePercentGap:
-            target.field = Field::DriveUsagePercentGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageActivityWidth:
-            target.field = Field::DriveUsageActivityWidth;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageFreeWidth:
-            target.field = Field::DriveUsageFreeWidth;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageActivitySegmentGap:
-            target.field = Field::DriveUsageActivitySegmentGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageHeaderGap:
-            target.field = Field::DriveUsageHeaderGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::DriveUsageRowGap:
-            target.field = Field::DriveUsageRowGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding:
-            target.field = Field::ThroughputAxisPadding;
-            break;
-        case DashboardRenderer::WidgetEditParameter::ThroughputHeaderGap:
-            target.field = Field::ThroughputHeaderGap;
-            break;
-        case DashboardRenderer::WidgetEditParameter::ThroughputGuideStrokeWidth:
-            target.field = Field::ThroughputGuideStrokeWidth;
-            break;
-        case DashboardRenderer::WidgetEditParameter::ThroughputPlotStrokeWidth:
-            target.field = Field::ThroughputPlotStrokeWidth;
-            break;
-        case DashboardRenderer::WidgetEditParameter::ThroughputLeaderDiameter:
-            target.field = Field::ThroughputLeaderDiameter;
-            break;
-        case DashboardRenderer::WidgetEditParameter::GaugeOuterPadding:
-            target.field = Field::GaugeOuterPadding;
-            break;
-        case DashboardRenderer::WidgetEditParameter::GaugeRingThickness:
-            target.field = Field::GaugeRingThickness;
-            break;
-        case DashboardRenderer::WidgetEditParameter::GaugeValueBottom:
-            target.field = Field::GaugeValueBottom;
-            break;
-        case DashboardRenderer::WidgetEditParameter::GaugeLabelBottom:
-            target.field = Field::GaugeLabelBottom;
-            break;
-        case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees:
-            target.field = Field::GaugeSweepDegrees;
-            break;
-        case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees:
-            target.field = Field::GaugeSegmentGapDegrees;
-            break;
-        default:
-            target.field = Field::MetricListLabelWidth;
-            break;
-    }
-    return target;
-}
-
-LayoutEditHost::ValueTarget LayoutEditHost::ValueTarget::ForEditableAnchor(
-    const DashboardRenderer::EditableAnchorKey& key) {
-    ValueTarget target;
-    switch (key.parameter) {
-        case DashboardRenderer::AnchorEditParameter::FontTitle:
-            target.field = Field::FontTitle;
-            break;
-        case DashboardRenderer::AnchorEditParameter::FontBig:
-            target.field = Field::FontBig;
-            break;
-        case DashboardRenderer::AnchorEditParameter::FontValue:
-            target.field = Field::FontValue;
-            break;
-        case DashboardRenderer::AnchorEditParameter::FontLabel:
-            target.field = Field::FontLabel;
-            break;
-        case DashboardRenderer::AnchorEditParameter::FontText:
-            target.field = Field::FontText;
-            break;
-        case DashboardRenderer::AnchorEditParameter::FontSmall:
-            target.field = Field::FontSmall;
-            break;
-        case DashboardRenderer::AnchorEditParameter::FontFooter:
-            target.field = Field::FontFooter;
-            break;
-        case DashboardRenderer::AnchorEditParameter::FontClockTime:
-            target.field = Field::FontClockTime;
-            break;
-        case DashboardRenderer::AnchorEditParameter::FontClockDate:
-            target.field = Field::FontClockDate;
-            break;
-        case DashboardRenderer::AnchorEditParameter::MetricListBarHeight:
-            target.field = Field::MetricListBarHeight;
-            break;
-        case DashboardRenderer::AnchorEditParameter::DriveUsageBarHeight:
-            target.field = Field::DriveUsageBarHeight;
-            break;
-        case DashboardRenderer::AnchorEditParameter::SegmentCount:
-            target.field = Field::GaugeSegmentCount;
-            break;
-        case DashboardRenderer::AnchorEditParameter::DriveUsageActivitySegments:
-            target.field = Field::DriveUsageActivitySegments;
-            break;
-        case DashboardRenderer::AnchorEditParameter::ThroughputGuideStrokeWidth:
-            target.field = Field::ThroughputGuideStrokeWidth;
-            break;
-        case DashboardRenderer::AnchorEditParameter::ThroughputPlotStrokeWidth:
-            target.field = Field::ThroughputPlotStrokeWidth;
-            break;
-        case DashboardRenderer::AnchorEditParameter::ThroughputLeaderDiameter:
-            target.field = Field::ThroughputLeaderDiameter;
-            break;
-        case DashboardRenderer::AnchorEditParameter::GaugeOuterPadding:
-            target.field = Field::GaugeOuterPadding;
-            break;
-        case DashboardRenderer::AnchorEditParameter::GaugeRingThickness:
-            target.field = Field::GaugeRingThickness;
-            break;
-        default:
-            target.field = Field::GaugeSegmentCount;
-            break;
-    }
-    return target;
-}
-
 LayoutEditHost::LayoutTarget LayoutEditHost::LayoutTarget::ForGuide(const DashboardRenderer::LayoutEditGuide& guide) {
     LayoutTarget target;
     target.editCardId = guide.editCardId;
@@ -303,7 +144,8 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
     HoverResolution resolution;
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
 
-    const std::optional<DashboardRenderer::EditableAnchorKey> anchorHandle = renderer.HitTestEditableAnchorHandle(clientPoint);
+    const std::optional<DashboardRenderer::EditableAnchorKey> anchorHandle =
+        renderer.HitTestEditableAnchorHandle(clientPoint);
     if (anchorHandle.has_value()) {
         resolution.hoveredEditableAnchor = anchorHandle;
         resolution.actionableAnchorHandle = anchorHandle;
@@ -311,8 +153,9 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
         return resolution;
     }
 
-    const std::optional<DashboardRenderer::EditableAnchorKey> anchorTarget = renderer.HitTestEditableAnchorTarget(clientPoint);
-    if (anchorTarget.has_value() && IsFontAnchorParameter(anchorTarget->parameter)) {
+    const std::optional<DashboardRenderer::EditableAnchorKey> anchorTarget =
+        renderer.HitTestEditableAnchorTarget(clientPoint);
+    if (anchorTarget.has_value() && IsFontLayoutEditParameter(anchorTarget->parameter)) {
         resolution.hoveredEditableAnchor = anchorTarget;
         resolution.hoveredEditableWidget = anchorTarget->widget;
         return resolution;
@@ -326,7 +169,8 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
         return resolution;
     }
 
-    const std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredWidget = renderer.HitTestEditableWidget(clientPoint);
+    const std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredWidget =
+        renderer.HitTestEditableWidget(clientPoint);
     if (hoveredWidget.has_value()) {
         resolution.hoveredEditableWidget = hoveredWidget;
 
@@ -594,7 +438,8 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
         }
     }
 
-    if (resolution.hoveredEditableAnchor.has_value() && IsFontAnchorParameter(resolution.hoveredEditableAnchor->parameter)) {
+    if (resolution.hoveredEditableAnchor.has_value() &&
+        IsFontLayoutEditParameter(resolution.hoveredEditableAnchor->parameter)) {
         const auto region = renderer.FindEditableAnchorRegion(*resolution.hoveredEditableAnchor);
         if (region.has_value()) {
             TooltipTarget target;
@@ -775,8 +620,8 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
     WidgetEditDragState& drag = *activeWidgetEditDrag_;
     double nextValue = drag.initialValue;
     if (drag.guide.angularDrag) {
-        switch (drag.guide.parameter) {
-            case DashboardRenderer::WidgetEditParameter::GaugeSweepDegrees: {
+        switch (GetLayoutEditParameterInfo(drag.guide.parameter).widgetGuideDragMode) {
+            case LayoutEditWidgetDragMode::GaugeSweepDegrees: {
                 const auto sweepDegrees = ComputeGaugeSweepDegrees(drag.guide.dragOrigin, clientPoint);
                 if (!sweepDegrees.has_value()) {
                     return true;
@@ -784,7 +629,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
                 nextValue = *sweepDegrees;
                 break;
             }
-            case DashboardRenderer::WidgetEditParameter::GaugeSegmentGapDegrees: {
+            case LayoutEditWidgetDragMode::GaugeSegmentGapDegrees: {
                 const auto segmentGapDegrees = ComputeGaugeSegmentGapDegrees(drag.guide, clientPoint);
                 if (!segmentGapDegrees.has_value()) {
                     return true;
@@ -792,7 +637,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
                 nextValue = *segmentGapDegrees;
                 break;
             }
-            default:
+            case LayoutEditWidgetDragMode::Linear:
                 return false;
         }
     } else {
@@ -804,7 +649,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
                                          (std::max)(0.1, host_.LayoutEditRenderer().RenderScale())));
         nextValue = (std::max)(1.0, drag.initialValue + static_cast<double>(logicalDelta));
     }
-    if (!host_.ApplyLayoutEditValue(LayoutEditHost::ValueTarget::ForWidgetGuide(drag.guide), nextValue)) {
+    if (!host_.ApplyLayoutEditValue(drag.guide.parameter, nextValue)) {
         return false;
     }
 
@@ -852,8 +697,7 @@ bool LayoutEditController::UpdateAnchorEditDrag(POINT clientPoint) {
                                          (std::max)(0.1, host_.LayoutEditRenderer().RenderScale() * scaleDivisor)));
     }
     const int nextValue = (std::max)(1, drag.initialValue + logicalDelta);
-    const bool updated = host_.ApplyLayoutEditValue(
-        LayoutEditHost::ValueTarget::ForEditableAnchor(drag.key), static_cast<double>(nextValue));
+    const bool updated = host_.ApplyLayoutEditValue(drag.key.parameter, static_cast<double>(nextValue));
     if (updated) {
         SyncRendererInteractionState();
     }

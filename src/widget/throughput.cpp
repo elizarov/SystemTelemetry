@@ -143,11 +143,18 @@ void DrawGraph(DashboardRenderer& renderer,
     sprintf_s(maxLabel, "%.0f", maxValue);
     RECT maxRect{rect.left, rect.top, rect.left + layout.axisWidth, layout.graphTop};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        renderer.DrawTextBlock(
-            hdc, maxRect, maxLabel, renderer.WidgetFonts().smallFont, renderer.MutedTextColor(), DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        renderer.DrawTextBlock(hdc,
+            maxRect,
+            maxLabel,
+            renderer.WidgetFonts().smallFont,
+            renderer.MutedTextColor(),
+            DT_CENTER | DT_SINGLELINE | DT_VCENTER);
         if (maxLabelEditable.has_value()) {
-            renderer.RegisterDynamicTextAnchor(
-                maxRect, maxLabel, renderer.WidgetFonts().smallFont, DT_CENTER | DT_SINGLELINE | DT_VCENTER, *maxLabelEditable);
+            renderer.RegisterDynamicTextAnchor(maxRect,
+                maxLabel,
+                renderer.WidgetFonts().smallFont,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+                *maxLabelEditable);
         }
     }
 
@@ -222,8 +229,8 @@ int ThroughputWidget::PreferredHeight(const DashboardRenderer& renderer) const {
 
 void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) {
     const int lineHeight = renderer.FontMetrics().smallText;
-    layoutState_.valueRect = RECT{
-        rect.left, rect.top, rect.right, (std::min)(rect.bottom, static_cast<LONG>(rect.top + lineHeight))};
+    layoutState_.valueRect =
+        RECT{rect.left, rect.top, rect.right, (std::min)(rect.bottom, static_cast<LONG>(rect.top + lineHeight))};
     layoutState_.graphRect = RECT{rect.left,
         (std::min)(rect.bottom,
             static_cast<LONG>(layoutState_.valueRect.bottom +
@@ -234,11 +241,13 @@ void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     graphLayout.valueRect = layoutState_.valueRect;
     const int anchorPadding = std::max(1, renderer.ScaleLogical(1));
     graphLayout.leaderAnchorCenterX = graphLayout.graphRight;
-    graphLayout.leaderAnchorCenterY = graphLayout.plotTop + (std::max)(0, (graphLayout.graphBottom - graphLayout.plotTop) / 2);
+    graphLayout.leaderAnchorCenterY =
+        graphLayout.plotTop + (std::max)(0, (graphLayout.graphBottom - graphLayout.plotTop) / 2);
     graphLayout.leaderAnchorRect = MakeAnchorRect(
         graphLayout.leaderAnchorCenterX, graphLayout.leaderAnchorCenterY, graphLayout.leaderDiameter, anchorPadding);
     graphLayout.plotAnchorCenterX = graphLayout.graphLeft;
-    graphLayout.plotAnchorCenterY = graphLayout.plotTop + (std::max)(0, (graphLayout.graphBottom - graphLayout.plotTop) / 2);
+    graphLayout.plotAnchorCenterY =
+        graphLayout.plotTop + (std::max)(0, (graphLayout.graphBottom - graphLayout.plotTop) / 2);
     graphLayout.plotAnchorRect = MakeAnchorRect(
         graphLayout.plotAnchorCenterX, graphLayout.plotAnchorCenterY, graphLayout.plotStrokeWidth, anchorPadding);
     graphLayout.guideAnchorRect =
@@ -280,8 +289,10 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
             buffer,
             renderer.WidgetFonts().smallFont,
             DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(
-                widget, DashboardRenderer::AnchorEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size));
+            renderer.MakeEditableTextBinding(widget,
+                DashboardRenderer::LayoutEditParameter::FontSmall,
+                1,
+                renderer.Config().layout.fonts.smallText.size));
     }
     const ThroughputGraphLayout& layout = layoutState_;
     DrawGraph(renderer,
@@ -294,7 +305,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         metric.timeMarkerOffsetSamples,
         metric.timeMarkerIntervalSamples,
         renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::AnchorEditParameter::FontSmall,
+            DashboardRenderer::LayoutEditParameter::FontSmall,
             2,
             renderer.Config().layout.fonts.smallText.size));
 }
@@ -304,7 +315,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
     renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::ThroughputLeaderDiameter,
+            DashboardRenderer::LayoutEditParameter::ThroughputLeaderDiameter,
             0,
         },
         layout.leaderAnchorRect,
@@ -321,7 +332,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
     renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::ThroughputPlotStrokeWidth,
+            DashboardRenderer::LayoutEditParameter::ThroughputPlotStrokeWidth,
             0,
         },
         layout.plotAnchorRect,
@@ -338,7 +349,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
     renderer.RegisterStaticEditableAnchorRegion(
         DashboardRenderer::EditableAnchorKey{
             DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            DashboardRenderer::AnchorEditParameter::ThroughputGuideStrokeWidth,
+            DashboardRenderer::LayoutEditParameter::ThroughputGuideStrokeWidth,
             0,
         },
         layout.guideAnchorRect,
@@ -358,8 +369,10 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
             label,
             renderer.WidgetFonts().smallFont,
             DT_LEFT | DT_SINGLELINE | DT_VCENTER,
-            renderer.MakeEditableTextBinding(
-                widget, DashboardRenderer::AnchorEditParameter::FontSmall, 0, renderer.Config().layout.fonts.smallText.size));
+            renderer.MakeEditableTextBinding(widget,
+                DashboardRenderer::LayoutEditParameter::FontSmall,
+                0,
+                renderer.Config().layout.fonts.smallText.size));
     }
 }
 
@@ -373,7 +386,7 @@ void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
         static_cast<int>(widget.rect.right));
     guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
     guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = DashboardRenderer::WidgetEditParameter::ThroughputAxisPadding;
+    guide.parameter = DashboardRenderer::LayoutEditParameter::ThroughputAxisPadding;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
     guide.drawStart = POINT{x, layoutState_.graphRect.top};
@@ -383,12 +396,13 @@ void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     guide.dragDirection = 1;
     guides.push_back(guide);
 
-    const int y = std::clamp(
-        static_cast<int>(layoutState_.graphRect.top), static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
+    const int y = std::clamp(static_cast<int>(layoutState_.graphRect.top),
+        static_cast<int>(widget.rect.top),
+        static_cast<int>(widget.rect.bottom));
     guide = {};
     guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
     guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = DashboardRenderer::WidgetEditParameter::ThroughputHeaderGap;
+    guide.parameter = DashboardRenderer::LayoutEditParameter::ThroughputHeaderGap;
     guide.guideId = 1;
     guide.widgetRect = widget.rect;
     guide.drawStart = POINT{widget.rect.left, y};

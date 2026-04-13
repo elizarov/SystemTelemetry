@@ -1,10 +1,9 @@
 #pragma once
 
-#include "config.h"
-#include "layout_edit_controller.h"
+#include "dashboard_renderer.h"
 
 namespace layout_edit {
 
-bool ApplyValue(AppConfig& config, const LayoutEditHost::ValueTarget& target, double value);
+bool ApplyValue(AppConfig& config, DashboardRenderer::LayoutEditParameter parameter, double value);
 
 }  // namespace layout_edit

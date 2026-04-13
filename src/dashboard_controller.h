@@ -76,7 +76,8 @@ public:
     void StopLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller, bool diagnosticsEditLayout);
     bool ApplyLayoutGuideWeights(
         DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
-    bool ApplyLayoutEditValue(DashboardShellHost& shell, const LayoutEditHost::ValueTarget& target, double value);
+    bool ApplyLayoutEditValue(
+        DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, double value);
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
         const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights,

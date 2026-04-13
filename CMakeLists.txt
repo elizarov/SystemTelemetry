@@ -82,6 +82,7 @@ add_executable(SystemTelemetry WIN32
     src/dashboard_controller.cpp
     src/dashboard_app.cpp
     src/layout_edit_controller.cpp
+    src/layout_edit_parameter.cpp
     src/layout_edit_commands.cpp
     src/layout_edit_tooltip.cpp
     src/layout_edit_service.cpp
@@ -225,6 +226,7 @@ add_executable(SystemTelemetryTests
     tests/telemetry_retained_history_tests.cpp
     src/config_writer.cpp
     src/config_resolution.cpp
+    src/layout_edit_parameter.cpp
     src/layout_edit_commands.cpp
     src/layout_edit_tooltip.cpp
     src/localization_catalog.cpp

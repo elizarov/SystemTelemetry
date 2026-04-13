@@ -101,7 +101,7 @@ private:
     DashboardRenderer& LayoutEditRenderer() override;
     DashboardRenderer::EditOverlayState& LayoutEditOverlayState() override;
     bool ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) override;
-    bool ApplyLayoutEditValue(const LayoutEditHost::ValueTarget& target, double value) override;
+    bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override;
     void InvalidateLayoutEdit() override;
 
     HINSTANCE instance_ = nullptr;

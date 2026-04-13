@@ -53,7 +53,7 @@ public:
         std::vector<size_t> nodePath;
     };
 
-    enum class AnchorEditParameter {
+    enum class LayoutEditParameter {
         FontTitle,
         FontBig,
         FontValue,
@@ -65,13 +65,30 @@ public:
         FontClockDate,
         MetricListBarHeight,
         DriveUsageBarHeight,
-        SegmentCount,
+        GaugeSegmentCount,
         DriveUsageActivitySegments,
         ThroughputGuideStrokeWidth,
         ThroughputPlotStrokeWidth,
         ThroughputLeaderDiameter,
         GaugeOuterPadding,
         GaugeRingThickness,
+        MetricListLabelWidth,
+        MetricListVerticalGap,
+        DriveUsageLabelGap,
+        DriveUsageBarGap,
+        DriveUsageRwGap,
+        DriveUsagePercentGap,
+        DriveUsageActivityWidth,
+        DriveUsageFreeWidth,
+        DriveUsageActivitySegmentGap,
+        DriveUsageHeaderGap,
+        DriveUsageRowGap,
+        ThroughputAxisPadding,
+        ThroughputHeaderGap,
+        GaugeValueBottom,
+        GaugeLabelBottom,
+        GaugeSweepDegrees,
+        GaugeSegmentGapDegrees,
     };
 
     enum class AnchorShape {
@@ -92,7 +109,7 @@ public:
 
     struct EditableAnchorKey {
         LayoutWidgetIdentity widget;
-        AnchorEditParameter parameter = AnchorEditParameter::MetricListBarHeight;
+        LayoutEditParameter parameter = LayoutEditParameter::MetricListBarHeight;
         int anchorId = 0;
     };
 
@@ -112,35 +129,10 @@ public:
         int value = 0;
     };
 
-    enum class WidgetEditParameter {
-        MetricListLabelWidth,
-        MetricListVerticalGap,
-        DriveUsageLabelGap,
-        DriveUsageBarGap,
-        DriveUsageRwGap,
-        DriveUsagePercentGap,
-        DriveUsageActivityWidth,
-        DriveUsageFreeWidth,
-        DriveUsageActivitySegmentGap,
-        DriveUsageHeaderGap,
-        DriveUsageRowGap,
-        ThroughputAxisPadding,
-        ThroughputHeaderGap,
-        ThroughputGuideStrokeWidth,
-        ThroughputPlotStrokeWidth,
-        ThroughputLeaderDiameter,
-        GaugeOuterPadding,
-        GaugeRingThickness,
-        GaugeValueBottom,
-        GaugeLabelBottom,
-        GaugeSweepDegrees,
-        GaugeSegmentGapDegrees,
-    };
-
     struct WidgetEditGuide {
         LayoutGuideAxis axis = LayoutGuideAxis::Vertical;
         LayoutWidgetIdentity widget;
-        WidgetEditParameter parameter = WidgetEditParameter::DriveUsageActivityWidth;
+        LayoutEditParameter parameter = LayoutEditParameter::DriveUsageActivityWidth;
         int guideId = 0;
         RECT widgetRect{};
         POINT drawStart{};
@@ -266,15 +258,11 @@ public:
     TextLayoutResult MeasureTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
     TextLayoutResult MeasureTextBlock(const RECT& rect, const std::string& text, HFONT font, UINT format) const;
-    TextLayoutResult DrawTextBlock(HDC hdc,
-        const RECT& rect,
-        const std::string& text,
-        HFONT font,
-        COLORREF color,
-        UINT format);
+    TextLayoutResult DrawTextBlock(
+        HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
     EditableAnchorBinding MakeEditableTextBinding(
-        const DashboardWidgetLayout& widget, AnchorEditParameter parameter, int anchorId, int value) const;
+        const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
     void RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
         const RECT& targetRect,
         const RECT& anchorRect,
