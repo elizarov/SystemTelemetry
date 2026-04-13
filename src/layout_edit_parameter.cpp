@@ -42,19 +42,19 @@ int ClampDriveUsageActivitySegmentGap(const AppConfig& config, double value) {
 template <typename Meta>
 bool ApplyFieldEdit(AppConfig& config, double value) {
     using PolicyTag = typename Meta::traits_type::policy_tag;
-    if constexpr (std::is_same_v<PolicyTag, configschema::PositiveIntLayoutEditPolicyTag>) {
+    if constexpr (std::is_same_v<PolicyTag, configschema::PositiveIntPolicy>) {
         Meta::Get(config) = ClampPositiveInt(value);
         return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::FontSizeLayoutEditPolicyTag>) {
+    } else if constexpr (std::is_same_v<PolicyTag, configschema::FontSizePolicy>) {
         Meta::Get(config).size = ClampPositiveInt(value);
         return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::GaugeSweepDegreesLayoutEditPolicyTag>) {
+    } else if constexpr (std::is_same_v<PolicyTag, configschema::GaugeSweepDegreesPolicy>) {
         Meta::Get(config) = ClampGaugeSweepDegrees(value);
         return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::GaugeSegmentGapDegreesLayoutEditPolicyTag>) {
+    } else if constexpr (std::is_same_v<PolicyTag, configschema::GaugeSegmentGapDegreesPolicy>) {
         Meta::Get(config) = ClampGaugeSegmentGapDegrees(config, value);
         return true;
-    } else if constexpr (std::is_same_v<PolicyTag, configschema::DriveUsageActivitySegmentGapLayoutEditPolicyTag>) {
+    } else if constexpr (std::is_same_v<PolicyTag, configschema::DriveUsageActivitySegmentGapPolicy>) {
         Meta::Get(config) = ClampDriveUsageActivitySegmentGap(config, value);
         return true;
     } else {

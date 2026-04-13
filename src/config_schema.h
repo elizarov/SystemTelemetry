@@ -50,15 +50,15 @@ enum class LayoutEditValueFormat {
     FontSpec,
 };
 
-struct NoLayoutEditPolicyTag {};
-struct PositiveIntLayoutEditPolicyTag {};
-struct FontSizeLayoutEditPolicyTag {};
-struct GaugeSweepDegreesLayoutEditPolicyTag {};
-struct GaugeSegmentGapDegreesLayoutEditPolicyTag {};
-struct DriveUsageActivitySegmentGapLayoutEditPolicyTag {};
+struct NoLayoutEditPolicy {};
+struct PositiveIntPolicy {};
+struct FontSizePolicy {};
+struct GaugeSweepDegreesPolicy {};
+struct GaugeSegmentGapDegreesPolicy {};
+struct DriveUsageActivitySegmentGapPolicy {};
 
 struct NoLayoutEditFieldTraits {
-    using policy_tag = NoLayoutEditPolicyTag;
+    using policy_tag = NoLayoutEditPolicy;
     static constexpr bool enabled = false;
     static constexpr LayoutEditValueFormat value_format = LayoutEditValueFormat::Integer;
 };
@@ -68,6 +68,17 @@ struct LayoutEditFieldTraits {
     using policy_tag = PolicyTag;
     static constexpr bool enabled = true;
     static constexpr LayoutEditValueFormat value_format = ValueFormat;
+};
+
+using PositiveIntEdit = LayoutEditFieldTraits<PositiveIntPolicy>;
+using FontEdit = LayoutEditFieldTraits<FontSizePolicy, LayoutEditValueFormat::FontSpec>;
+using GaugeSweepDegreesEdit = LayoutEditFieldTraits<GaugeSweepDegreesPolicy, LayoutEditValueFormat::FloatingPoint>;
+using GaugeSegmentGapDegreesEdit =
+    LayoutEditFieldTraits<GaugeSegmentGapDegreesPolicy, LayoutEditValueFormat::FloatingPoint>;
+using DriveUsageActivitySegmentGapEdit = LayoutEditFieldTraits<DriveUsageActivitySegmentGapPolicy>;
+
+template <typename T> struct DefaultLayoutEditTraits {
+    using type = NoLayoutEditFieldTraits;
 };
 
 template <typename T> struct DefaultCodec;
@@ -90,6 +101,10 @@ template <> struct DefaultCodec<std::string> {
 
 template <> struct DefaultCodec<unsigned int> {
     using codec_type = HexColorCodec;
+};
+
+template <> struct DefaultLayoutEditTraits<int> {
+    using type = PositiveIntEdit;
 };
 
 template <typename Owner,
@@ -446,14 +461,17 @@ public:                                                                         
         return member##Field{};                                                                                        \
     }
 
-#define CONFIG_EDITABLE_VALUE(field_type, member, key, ...)                                                            \
+#define CONFIG_EDITABLE_VALUE(field_type, member, key)                                                                 \
+    CONFIG_EDITABLE_VALUE_WITH(field_type, member, key, typename configschema::DefaultLayoutEditTraits<field_type>::type)
+
+#define CONFIG_EDITABLE_VALUE_WITH(field_type, member, key, layout_edit_traits)                                        \
     field_type member{};                                                                                               \
     using member##Field = configschema::FieldDescriptor<Self,                                                          \
         field_type,                                                                                                    \
         key,                                                                                                           \
         &Self::member,                                                                                                 \
         typename configschema::DefaultCodec<field_type>::codec_type,                                                   \
-        __VA_ARGS__>;                                                                                                  \
+        layout_edit_traits>;                                                                                           \
     using member##Meta = configschema::EditableFieldLens<Self, member##Field>;                                         \
     friend consteval auto reflect_field(                                                                               \
         configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) {                              \
