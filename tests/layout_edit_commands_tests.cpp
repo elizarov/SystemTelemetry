@@ -7,7 +7,7 @@ TEST(LayoutEditCommands, ClampsGaugeSegmentGapAgainstSweepAndSegmentCount) {
     config.layout.gauge.sweepDegrees = 180.0;
     config.layout.gauge.segmentCount = 4;
 
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::GaugeSegmentGapDegrees, 100.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeSegmentGapDegrees, 100.0));
 
     EXPECT_EQ(config.layout.gauge.segmentGapDegrees, 60.0);
 }
@@ -15,7 +15,7 @@ TEST(LayoutEditCommands, ClampsGaugeSegmentGapAgainstSweepAndSegmentCount) {
 TEST(LayoutEditCommands, ClampsFontSizesToPositiveValues) {
     AppConfig config;
 
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::FontFooter, 0.2));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::FontFooter, 0.2));
 
     EXPECT_EQ(config.layout.fonts.footer.size, 1);
 }
@@ -23,12 +23,12 @@ TEST(LayoutEditCommands, ClampsFontSizesToPositiveValues) {
 TEST(LayoutEditCommands, UpdatesMetricListAndGaugeFieldsThroughCommands) {
     AppConfig config;
 
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::MetricListBarHeight, 17.2));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::GaugeSegmentCount, 6.4));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::GaugeOuterPadding, 9.6));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::GaugeRingThickness, 11.2));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::GaugeValueBottom, 17.6));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::GaugeLabelBottom, 33.2));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::MetricListBarHeight, 17.2));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeSegmentCount, 6.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeOuterPadding, 9.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeRingThickness, 11.2));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeValueBottom, 17.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeLabelBottom, 33.2));
 
     EXPECT_EQ(config.layout.metricList.barHeight, 17);
     EXPECT_EQ(config.layout.gauge.segmentCount, 6);
@@ -42,7 +42,7 @@ TEST(LayoutEditCommands, UpdatesDriveUsageActivitySegmentsThroughCommands) {
     AppConfig config;
 
     ASSERT_TRUE(
-        layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegments, 5.6));
+        layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegments, 5.6));
 
     EXPECT_EQ(config.layout.driveUsageList.activitySegments, 6);
 }
@@ -51,10 +51,10 @@ TEST(LayoutEditCommands, UpdatesThroughputAnchorFieldsThroughCommands) {
     AppConfig config;
 
     ASSERT_TRUE(
-        layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::ThroughputGuideStrokeWidth, 3.6));
+        layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputGuideStrokeWidth, 3.6));
     ASSERT_TRUE(
-        layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::ThroughputPlotStrokeWidth, 5.6));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::ThroughputLeaderDiameter, 8.6));
+        layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputPlotStrokeWidth, 5.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputLeaderDiameter, 8.6));
 
     EXPECT_EQ(config.layout.throughput.guideStrokeWidth, 4);
     EXPECT_EQ(config.layout.throughput.plotStrokeWidth, 6);
@@ -68,12 +68,12 @@ TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {
     config.layout.driveUsageList.barHeight = 10;
     config.layout.driveUsageList.activitySegments = 4;
 
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::DriveUsageLabelGap, 13.4));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::DriveUsageBarGap, 11.4));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::DriveUsageRwGap, 7.6));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::DriveUsagePercentGap, 9.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageLabelGap, 13.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageBarGap, 11.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageRwGap, 7.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsagePercentGap, 9.4));
     ASSERT_TRUE(
-        layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegmentGap, 3.2));
+        layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegmentGap, 3.2));
 
     EXPECT_EQ(config.layout.driveUsageList.labelGap, 13);
     EXPECT_EQ(config.layout.driveUsageList.barGap, 11);
@@ -90,7 +90,7 @@ TEST(LayoutEditCommands, ClampsDriveUsageActivitySegmentGapToAvailableRowHeight)
     config.layout.driveUsageList.activitySegments = 4;
 
     ASSERT_TRUE(
-        layout_edit::ApplyValue(config, DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegmentGap, 99.0));
+        layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageActivitySegmentGap, 99.0));
 
     EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 3);
 }

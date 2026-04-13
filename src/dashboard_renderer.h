@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "dashboard_metrics.h"
+#include "layout_edit_parameter_id.h"
 #include "widget.h"
 
 namespace Gdiplus {
@@ -53,54 +54,7 @@ public:
         std::vector<size_t> nodePath;
     };
 
-    enum class LayoutEditParameter {
-        // Hit-testing priority follows this declaration order for actionable widget-local handles and guides.
-        // Fonts
-        FontTitle,
-        FontBig,
-        FontValue,
-        FontLabel,
-        FontText,
-        FontSmall,
-        FontFooter,
-        FontClockTime,
-        FontClockDate,
-
-        // Metric list
-        MetricListBarHeight,
-        MetricListLabelWidth,
-        MetricListVerticalGap,
-
-        // Drive usage list
-        DriveUsageActivitySegments,
-        DriveUsageBarHeight,
-        DriveUsageLabelGap,
-        DriveUsageBarGap,
-        DriveUsageRwGap,
-        DriveUsagePercentGap,
-        DriveUsageActivityWidth,
-        DriveUsageFreeWidth,
-        DriveUsageActivitySegmentGap,
-        DriveUsageHeaderGap,
-        DriveUsageRowGap,
-
-        // Throughput
-        ThroughputGuideStrokeWidth,
-        ThroughputPlotStrokeWidth,
-        ThroughputLeaderDiameter,
-        ThroughputAxisPadding,
-        ThroughputHeaderGap,
-
-        // Gauge
-        GaugeSegmentCount,
-        GaugeValueBottom,
-        GaugeLabelBottom,
-        GaugeSweepDegrees,
-        GaugeSegmentGapDegrees,
-        GaugeOuterPadding,
-        GaugeRingThickness,
-        Count,
-    };
+    using LayoutEditParameter = ::LayoutEditParameter;
 
     enum class AnchorShape {
         Circle,

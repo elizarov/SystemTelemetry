@@ -4,7 +4,7 @@
 #include <string>
 
 #include "config.h"
-#include "dashboard_renderer.h"
+#include "layout_edit_parameter_id.h"
 
 enum class LayoutEditTooltipValueFormat {
     Integer,
@@ -26,7 +26,7 @@ enum class LayoutEditWidgetDragMode {
 };
 
 struct LayoutEditParameterInfo {
-    DashboardRenderer::LayoutEditParameter parameter = DashboardRenderer::LayoutEditParameter::MetricListLabelWidth;
+    LayoutEditParameter parameter = LayoutEditParameter::MetricListLabelWidth;
     LayoutEditTooltipDescriptor tooltip;
     bool supportsWidgetGuide = false;
     bool supportsAnchor = false;
@@ -36,10 +36,10 @@ struct LayoutEditParameterInfo {
     const UiFontConfig* (*fontValue)(const AppConfig& config) = nullptr;
 };
 
-const LayoutEditParameterInfo& GetLayoutEditParameterInfo(DashboardRenderer::LayoutEditParameter parameter);
-int GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter parameter);
-bool IsFontLayoutEditParameter(DashboardRenderer::LayoutEditParameter parameter);
-std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(DashboardRenderer::LayoutEditParameter parameter);
+const LayoutEditParameterInfo& GetLayoutEditParameterInfo(LayoutEditParameter parameter);
+int GetLayoutEditParameterHitPriority(LayoutEditParameter parameter);
+bool IsFontLayoutEditParameter(LayoutEditParameter parameter);
+std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(LayoutEditParameter parameter);
 std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(
-    const AppConfig& config, DashboardRenderer::LayoutEditParameter parameter);
-bool ApplyLayoutEditParameterValue(AppConfig& config, DashboardRenderer::LayoutEditParameter parameter, double value);
+    const AppConfig& config, LayoutEditParameter parameter);
+bool ApplyLayoutEditParameterValue(AppConfig& config, LayoutEditParameter parameter, double value);

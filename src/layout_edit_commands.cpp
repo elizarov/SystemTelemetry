@@ -4,7 +4,7 @@
 
 namespace layout_edit {
 
-bool ApplyValue(AppConfig& config, DashboardRenderer::LayoutEditParameter parameter, double value) {
+bool ApplyValue(AppConfig& config, LayoutEditParameter parameter, double value) {
     return ApplyLayoutEditParameterValue(config, parameter, value);
 }
 

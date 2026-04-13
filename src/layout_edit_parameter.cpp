@@ -6,7 +6,7 @@
 
 namespace {
 
-using Parameter = DashboardRenderer::LayoutEditParameter;
+using Parameter = LayoutEditParameter;
 
 int ClampPositiveInt(double value) {
     return (std::max)(1, static_cast<int>(std::lround(value)));
@@ -293,24 +293,24 @@ static_assert(kParameterInfoCount == static_cast<size_t>(Parameter::Count));
 
 }  // namespace
 
-const LayoutEditParameterInfo& GetLayoutEditParameterInfo(DashboardRenderer::LayoutEditParameter parameter) {
+const LayoutEditParameterInfo& GetLayoutEditParameterInfo(LayoutEditParameter parameter) {
     return kParameterInfo[static_cast<size_t>(parameter)];
 }
 
-int GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter parameter) {
+int GetLayoutEditParameterHitPriority(LayoutEditParameter parameter) {
     return static_cast<int>(parameter);
 }
 
-bool IsFontLayoutEditParameter(DashboardRenderer::LayoutEditParameter parameter) {
+bool IsFontLayoutEditParameter(LayoutEditParameter parameter) {
     return GetLayoutEditParameterInfo(parameter).isFont;
 }
 
-std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(DashboardRenderer::LayoutEditParameter parameter) {
+std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(LayoutEditParameter parameter) {
     return GetLayoutEditParameterInfo(parameter).tooltip;
 }
 
 std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(
-    const AppConfig& config, DashboardRenderer::LayoutEditParameter parameter) {
+    const AppConfig& config, LayoutEditParameter parameter) {
     const auto& info = GetLayoutEditParameterInfo(parameter);
     if (info.fontValue == nullptr) {
         return std::nullopt;
@@ -318,7 +318,7 @@ std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(
     return info.fontValue(config);
 }
 
-bool ApplyLayoutEditParameterValue(AppConfig& config, DashboardRenderer::LayoutEditParameter parameter, double value) {
+bool ApplyLayoutEditParameterValue(AppConfig& config, LayoutEditParameter parameter, double value) {
     const auto& info = GetLayoutEditParameterInfo(parameter);
     return info.applyValue != nullptr ? info.applyValue(config, value) : false;
 }

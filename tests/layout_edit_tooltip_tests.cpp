@@ -4,8 +4,7 @@
 #include "layout_edit_tooltip.h"
 
 TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {
-    const auto descriptor =
-        FindLayoutEditTooltipDescriptor(DashboardRenderer::LayoutEditParameter::MetricListLabelWidth);
+    const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::MetricListLabelWidth);
 
     ASSERT_TRUE(descriptor.has_value());
     EXPECT_EQ(descriptor->configKey, "config.metric_list.label_width");
@@ -15,7 +14,7 @@ TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {
 }
 
 TEST(LayoutEditTooltip, IncludesFontAnchors) {
-    const auto descriptor = FindLayoutEditTooltipDescriptor(DashboardRenderer::LayoutEditParameter::FontLabel);
+    const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::FontLabel);
     ASSERT_TRUE(descriptor.has_value());
     EXPECT_EQ(descriptor->configKey, "config.fonts.label");
     EXPECT_EQ(descriptor->sectionName, "fonts");
@@ -29,14 +28,14 @@ TEST(LayoutEditTooltip, FormatsFloatingPointValuesWithoutTrailingZeros) {
 }
 
 TEST(LayoutEditTooltip, BuildsTooltipFirstLine) {
-    const auto descriptor = FindLayoutEditTooltipDescriptor(DashboardRenderer::LayoutEditParameter::GaugeSegmentCount);
+    const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::GaugeSegmentCount);
 
     ASSERT_TRUE(descriptor.has_value());
     EXPECT_EQ(BuildLayoutEditTooltipLine(*descriptor, 6.0), "[gauge] segment_count = 6");
 }
 
 TEST(LayoutEditTooltip, BuildsFontTooltipFirstLine) {
-    const auto descriptor = FindLayoutEditTooltipDescriptor(DashboardRenderer::LayoutEditParameter::FontClockTime);
+    const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::FontClockTime);
 
     ASSERT_TRUE(descriptor.has_value());
     const UiFontConfig font{"Segoe UI Semibold", 40, 700};
@@ -47,7 +46,7 @@ TEST(LayoutEditTooltip, ResolvesFontValueThroughParameterMetadata) {
     AppConfig config;
     config.layout.fonts.label = UiFontConfig{"Segoe UI", 17, 600};
 
-    const auto font = FindLayoutEditTooltipFontValue(config, DashboardRenderer::LayoutEditParameter::FontLabel);
+    const auto font = FindLayoutEditTooltipFontValue(config, LayoutEditParameter::FontLabel);
 
     ASSERT_TRUE(font.has_value());
     ASSERT_NE(*font, nullptr);
@@ -57,17 +56,17 @@ TEST(LayoutEditTooltip, ResolvesFontValueThroughParameterMetadata) {
 }
 
 TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
-    EXPECT_LT(GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::GaugeSegmentCount),
-        GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::GaugeOuterPadding));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::FontLabel),
-        GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::MetricListLabelWidth));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::ThroughputLeaderDiameter),
-        GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::ThroughputAxisPadding));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeSegmentCount),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeOuterPadding));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::FontLabel),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::MetricListLabelWidth));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputLeaderDiameter),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputAxisPadding));
 }
 
 TEST(LayoutEditParameter, MetadataTableMatchesEnumOrder) {
-    for (int index = 0; index < static_cast<int>(DashboardRenderer::LayoutEditParameter::Count); ++index) {
-        const auto parameter = static_cast<DashboardRenderer::LayoutEditParameter>(index);
+    for (int index = 0; index < static_cast<int>(LayoutEditParameter::Count); ++index) {
+        const auto parameter = static_cast<LayoutEditParameter>(index);
         EXPECT_EQ(GetLayoutEditParameterInfo(parameter).parameter, parameter);
     }
 }
