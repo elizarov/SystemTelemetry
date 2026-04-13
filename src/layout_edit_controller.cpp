@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "layout_edit_parameter.h"
 #include "layout_edit_service.h"
@@ -129,15 +130,25 @@ const DashboardRenderer::LayoutEditGuide* LayoutEditController::HitTestLayoutGui
 const DashboardRenderer::WidgetEditGuide* LayoutEditController::HitTestWidgetEditGuide(
     POINT clientPoint, size_t* index) const {
     const auto& guides = host_.LayoutEditRenderer().WidgetEditGuides();
+    const DashboardRenderer::WidgetEditGuide* bestGuide = nullptr;
+    size_t bestIndex = 0;
+    int bestPriority = (std::numeric_limits<int>::max)();
     for (size_t i = 0; i < guides.size(); ++i) {
-        if (PtInRect(&guides[i].hitRect, clientPoint)) {
-            if (index != nullptr) {
-                *index = i;
-            }
-            return &guides[i];
+        if (!PtInRect(&guides[i].hitRect, clientPoint)) {
+            continue;
+        }
+
+        const int priority = GetLayoutEditParameterHitPriority(guides[i].parameter);
+        if (bestGuide == nullptr || priority < bestPriority) {
+            bestGuide = &guides[i];
+            bestIndex = i;
+            bestPriority = priority;
         }
     }
-    return nullptr;
+    if (bestGuide != nullptr && index != nullptr) {
+        *index = bestIndex;
+    }
+    return bestGuide;
 }
 
 LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT clientPoint) const {
@@ -146,6 +157,23 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
 
     const std::optional<DashboardRenderer::EditableAnchorKey> anchorHandle =
         renderer.HitTestEditableAnchorHandle(clientPoint);
+    size_t widgetGuideIndex = 0;
+    const DashboardRenderer::WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
+    if (anchorHandle.has_value() && widgetGuide != nullptr) {
+        const int anchorPriority = GetLayoutEditParameterHitPriority(anchorHandle->parameter);
+        const int guidePriority = GetLayoutEditParameterHitPriority(widgetGuide->parameter);
+        if (anchorPriority <= guidePriority) {
+            resolution.hoveredEditableAnchor = anchorHandle;
+            resolution.actionableAnchorHandle = anchorHandle;
+            resolution.hoveredEditableWidget = anchorHandle->widget;
+            return resolution;
+        }
+
+        resolution.hoveredEditableWidget = widgetGuide->widget;
+        resolution.hoveredWidgetEditGuideIndex = widgetGuideIndex;
+        return resolution;
+    }
+
     if (anchorHandle.has_value()) {
         resolution.hoveredEditableAnchor = anchorHandle;
         resolution.actionableAnchorHandle = anchorHandle;
@@ -153,22 +181,14 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
         return resolution;
     }
 
-    const std::optional<DashboardRenderer::EditableAnchorKey> anchorTarget =
-        renderer.HitTestEditableAnchorTarget(clientPoint);
-    if (anchorTarget.has_value() && IsFontLayoutEditParameter(anchorTarget->parameter)) {
-        resolution.hoveredEditableAnchor = anchorTarget;
-        resolution.hoveredEditableWidget = anchorTarget->widget;
-        return resolution;
-    }
-
-    size_t widgetGuideIndex = 0;
-    const DashboardRenderer::WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
     if (widgetGuide != nullptr) {
         resolution.hoveredEditableWidget = widgetGuide->widget;
         resolution.hoveredWidgetEditGuideIndex = widgetGuideIndex;
         return resolution;
     }
 
+    const std::optional<DashboardRenderer::EditableAnchorKey> anchorTarget =
+        renderer.HitTestEditableAnchorTarget(clientPoint);
     const std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredWidget =
         renderer.HitTestEditableWidget(clientPoint);
     if (hoveredWidget.has_value()) {

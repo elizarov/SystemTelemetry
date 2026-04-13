@@ -37,6 +37,7 @@ struct LayoutEditParameterInfo {
 };
 
 const LayoutEditParameterInfo& GetLayoutEditParameterInfo(DashboardRenderer::LayoutEditParameter parameter);
+int GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter parameter);
 bool IsFontLayoutEditParameter(DashboardRenderer::LayoutEditParameter parameter);
 std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(DashboardRenderer::LayoutEditParameter parameter);
 std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(

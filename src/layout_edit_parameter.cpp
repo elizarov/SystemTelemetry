@@ -257,14 +257,12 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::FontClockTime, *MakeFontDescriptor("clock_time"), false, true, true, LayoutEditWidgetDragMode::Linear, &ApplyFontClockTime, &FontClockTime},
     {Parameter::FontClockDate, *MakeFontDescriptor("clock_date"), false, true, true, LayoutEditWidgetDragMode::Linear, &ApplyFontClockDate, &FontClockDate},
     {Parameter::MetricListBarHeight, *MakeDescriptor("metric_list", "bar_height"), false, true, false, LayoutEditWidgetDragMode::Linear, &ApplyMetricListBarHeight, nullptr},
-    {Parameter::DriveUsageBarHeight, *MakeDescriptor("drive_usage_list", "bar_height"), false, true, false, LayoutEditWidgetDragMode::Linear, &ApplyDriveUsageBarHeight, nullptr},
     {Parameter::GaugeSegmentCount, *MakeDescriptor("gauge", "segment_count"), false, true, false, LayoutEditWidgetDragMode::Linear, &ApplyGaugeSegmentCount, nullptr},
     {Parameter::DriveUsageActivitySegments, *MakeDescriptor("drive_usage_list", "activity_segments"), false, true, false, LayoutEditWidgetDragMode::Linear, &ApplyDriveUsageActivitySegments, nullptr},
     {Parameter::ThroughputGuideStrokeWidth, *MakeDescriptor("throughput", "guide_stroke_width"), true, true, false, LayoutEditWidgetDragMode::Linear, &ApplyThroughputGuideStrokeWidth, nullptr},
     {Parameter::ThroughputPlotStrokeWidth, *MakeDescriptor("throughput", "plot_stroke_width"), true, true, false, LayoutEditWidgetDragMode::Linear, &ApplyThroughputPlotStrokeWidth, nullptr},
     {Parameter::ThroughputLeaderDiameter, *MakeDescriptor("throughput", "leader_diameter"), true, true, false, LayoutEditWidgetDragMode::Linear, &ApplyThroughputLeaderDiameter, nullptr},
-    {Parameter::GaugeOuterPadding, *MakeDescriptor("gauge", "outer_padding"), true, true, false, LayoutEditWidgetDragMode::Linear, &ApplyGaugeOuterPadding, nullptr},
-    {Parameter::GaugeRingThickness, *MakeDescriptor("gauge", "ring_thickness"), true, true, false, LayoutEditWidgetDragMode::Linear, &ApplyGaugeRingThickness, nullptr},
+    {Parameter::DriveUsageBarHeight, *MakeDescriptor("drive_usage_list", "bar_height"), false, true, false, LayoutEditWidgetDragMode::Linear, &ApplyDriveUsageBarHeight, nullptr},
     {Parameter::MetricListLabelWidth, *MakeDescriptor("metric_list", "label_width"), true, false, false, LayoutEditWidgetDragMode::Linear, &ApplyMetricListLabelWidth, nullptr},
     {Parameter::MetricListVerticalGap, *MakeDescriptor("metric_list", "vertical_gap"), true, false, false, LayoutEditWidgetDragMode::Linear, &ApplyMetricListVerticalGap, nullptr},
     {Parameter::DriveUsageLabelGap, *MakeDescriptor("drive_usage_list", "label_gap"), true, false, false, LayoutEditWidgetDragMode::Linear, &ApplyDriveUsageLabelGap, nullptr},
@@ -282,6 +280,8 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::GaugeLabelBottom, *MakeDescriptor("gauge", "label_bottom"), true, false, false, LayoutEditWidgetDragMode::Linear, &ApplyGaugeLabelBottom, nullptr},
     {Parameter::GaugeSweepDegrees, *MakeDescriptor("gauge", "sweep_degrees", LayoutEditTooltipValueFormat::FloatingPoint), true, false, false, LayoutEditWidgetDragMode::GaugeSweepDegrees, &ApplyGaugeSweep, nullptr},
     {Parameter::GaugeSegmentGapDegrees, *MakeDescriptor("gauge", "segment_gap_degrees", LayoutEditTooltipValueFormat::FloatingPoint), true, false, false, LayoutEditWidgetDragMode::GaugeSegmentGapDegrees, &ApplyGaugeSegmentGap, nullptr},
+    {Parameter::GaugeOuterPadding, *MakeDescriptor("gauge", "outer_padding"), true, true, false, LayoutEditWidgetDragMode::Linear, &ApplyGaugeOuterPadding, nullptr},
+    {Parameter::GaugeRingThickness, *MakeDescriptor("gauge", "ring_thickness"), true, true, false, LayoutEditWidgetDragMode::Linear, &ApplyGaugeRingThickness, nullptr},
 };
 
 }  // namespace
@@ -293,6 +293,16 @@ const LayoutEditParameterInfo& GetLayoutEditParameterInfo(DashboardRenderer::Lay
         }
     }
     return kParameterInfo[0];
+}
+
+int GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter parameter) {
+    constexpr int parameterCount = static_cast<int>(sizeof(kParameterInfo) / sizeof(kParameterInfo[0]));
+    for (int index = 0; index < parameterCount; ++index) {
+        if (kParameterInfo[index].parameter == parameter) {
+            return index;
+        }
+    }
+    return parameterCount;
 }
 
 bool IsFontLayoutEditParameter(DashboardRenderer::LayoutEditParameter parameter) {

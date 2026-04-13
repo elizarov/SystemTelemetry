@@ -1,5 +1,6 @@
 #include "dashboard_renderer.h"
 #include "dashboard_layout_resolver.h"
+#include "layout_edit_parameter.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1354,6 +1355,8 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
     for (const auto& region : dynamicEditableAnchorRegions_) {
         regions.push_back(&region);
     }
+    const EditableAnchorRegion* bestRegion = nullptr;
+    int bestPriority = 0;
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
         const EditableAnchorRegion& region = *(*it);
         bool hit = false;
@@ -1370,11 +1373,17 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
         } else {
             hit = PtInRect(&region.anchorHitRect, clientPoint);
         }
-        if (hit) {
-            return region.key;
+        if (!hit) {
+            continue;
+        }
+
+        const int priority = GetLayoutEditParameterHitPriority(region.key.parameter);
+        if (bestRegion == nullptr || priority < bestPriority) {
+            bestRegion = &region;
+            bestPriority = priority;
         }
     }
-    return std::nullopt;
+    return bestRegion != nullptr ? std::optional<EditableAnchorKey>(bestRegion->key) : std::nullopt;
 }
 
 std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(

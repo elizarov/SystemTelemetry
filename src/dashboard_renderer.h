@@ -54,6 +54,7 @@ public:
     };
 
     enum class LayoutEditParameter {
+        // Hit-testing priority follows this declaration order for actionable widget-local handles and guides.
         FontTitle,
         FontBig,
         FontValue,
@@ -64,14 +65,12 @@ public:
         FontClockTime,
         FontClockDate,
         MetricListBarHeight,
-        DriveUsageBarHeight,
         GaugeSegmentCount,
         DriveUsageActivitySegments,
         ThroughputGuideStrokeWidth,
         ThroughputPlotStrokeWidth,
         ThroughputLeaderDiameter,
-        GaugeOuterPadding,
-        GaugeRingThickness,
+        DriveUsageBarHeight,
         MetricListLabelWidth,
         MetricListVerticalGap,
         DriveUsageLabelGap,
@@ -89,6 +88,8 @@ public:
         GaugeLabelBottom,
         GaugeSweepDegrees,
         GaugeSegmentGapDegrees,
+        GaugeOuterPadding,
+        GaugeRingThickness,
     };
 
     enum class AnchorShape {

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "layout_edit_parameter.h"
 #include "layout_edit_tooltip.h"
 
 TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {
@@ -53,4 +54,13 @@ TEST(LayoutEditTooltip, ResolvesFontValueThroughParameterMetadata) {
     EXPECT_EQ((*font)->face, "Segoe UI");
     EXPECT_EQ((*font)->size, 17);
     EXPECT_EQ((*font)->weight, 600);
+}
+
+TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
+    EXPECT_LT(GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::GaugeSegmentCount),
+        GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::GaugeOuterPadding));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::FontLabel),
+        GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::MetricListLabelWidth));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::ThroughputLeaderDiameter),
+        GetLayoutEditParameterHitPriority(DashboardRenderer::LayoutEditParameter::ThroughputAxisPadding));
 }
