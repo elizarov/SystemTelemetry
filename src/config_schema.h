@@ -52,6 +52,7 @@ enum class LayoutEditValueFormat {
 
 struct NoLayoutEditPolicy {};
 struct PositiveIntPolicy {};
+struct NonNegativeIntPolicy {};
 struct FontSizePolicy {};
 struct GaugeSweepDegreesPolicy {};
 struct GaugeSegmentGapDegreesPolicy {};

@@ -45,6 +45,9 @@ bool ApplyFieldEdit(AppConfig& config, double value) {
     if constexpr (std::is_same_v<PolicyTag, configschema::PositiveIntPolicy>) {
         Meta::Get(config) = ClampPositiveInt(value);
         return true;
+    } else if constexpr (std::is_same_v<PolicyTag, configschema::NonNegativeIntPolicy>) {
+        Meta::Get(config) = ClampNonNegativeInt(value);
+        return true;
     } else if constexpr (std::is_same_v<PolicyTag, configschema::FontSizePolicy>) {
         Meta::Get(config).size = ClampPositiveInt(value);
         return true;
@@ -94,6 +97,8 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::FontFooter, &GetFieldMetadata<UiFontSetConfig::footerMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
     {Parameter::FontClockTime, &GetFieldMetadata<UiFontSetConfig::clockTimeMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
     {Parameter::FontClockDate, &GetFieldMetadata<UiFontSetConfig::clockDateMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
+
+    {Parameter::TextBottomPadding, &GetFieldMetadata<TextWidgetConfig::bottomPaddingMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
 
     {Parameter::MetricListBarHeight, &GetFieldMetadata<MetricListWidgetConfig::barHeightMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
     {Parameter::MetricListLabelWidth, &GetFieldMetadata<MetricListWidgetConfig::labelWidthMeta>(), true, false, LayoutEditWidgetDragMode::Linear},

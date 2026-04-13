@@ -13,6 +13,9 @@ enum class LayoutEditParameter {
     FontClockTime,
     FontClockDate,
 
+    // Text
+    TextBottomPadding,
+
     // Metric list
     MetricListBarHeight,
     MetricListLabelWidth,

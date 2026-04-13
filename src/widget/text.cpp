@@ -1,5 +1,7 @@
 #include "text.h"
 
+#include <algorithm>
+
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
@@ -19,11 +21,29 @@ void TextWidget::Initialize(const LayoutNodeConfig& node) {
 
 int TextWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return renderer.FontMetrics().text +
-           (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.text.preferredPadding));
+           (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.text.bottomPadding));
 }
 
 bool TextWidget::UsesFixedPreferredHeightInRows() const {
     return true;
+}
+
+void TextWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
+    const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
+    const int y = widget.rect.bottom;
+
+    DashboardRenderer::WidgetEditGuide guide;
+    guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
+    guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    guide.parameter = DashboardRenderer::LayoutEditParameter::TextBottomPadding;
+    guide.guideId = 0;
+    guide.widgetRect = widget.rect;
+    guide.drawStart = POINT{widget.rect.left, y};
+    guide.drawEnd = POINT{widget.rect.right, y};
+    guide.hitRect = RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
+    guide.value = renderer.Config().layout.text.bottomPadding;
+    guide.dragDirection = 1;
+    renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
 }
 
 void TextWidget::Draw(DashboardRenderer& renderer,

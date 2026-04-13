@@ -655,7 +655,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
         const int logicalDelta =
             static_cast<int>(std::lround(static_cast<double>(pixelDelta * drag.guide.dragDirection) /
                                          (std::max)(0.1, host_.LayoutEditRenderer().RenderScale())));
-        nextValue = (std::max)(1.0, drag.initialValue + static_cast<double>(logicalDelta));
+        nextValue = (std::max)(0.0, drag.initialValue + static_cast<double>(logicalDelta));
     }
     if (!host_.ApplyLayoutEditValue(drag.guide.parameter, nextValue)) {
         return false;
