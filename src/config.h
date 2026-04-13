@@ -18,7 +18,7 @@ CONFIG_CODEC(UiFontConfig, configschema::FontSpecCodec);
 CONFIG_CODEC(std::vector<std::string>, configschema::StringCodec);
 
 template <> struct configschema::DefaultLayoutEditTraits<UiFontConfig> {
-    using type = configschema::FontEdit;
+    using type = typename configschema::LayoutEditTraitsForPolicy<configschema::FontSizePolicy>::type;
 };
 
 struct LayoutConfig;
@@ -193,7 +193,7 @@ struct DriveUsageListWidgetConfig {
     CONFIG_EDITABLE_VALUE(int, headerGap, "header_gap");
     CONFIG_EDITABLE_VALUE(int, rowGap, "row_gap");
     CONFIG_EDITABLE_VALUE(int, activitySegments, "activity_segments");
-    CONFIG_EDITABLE_VALUE_WITH(int, activitySegmentGap, "activity_segment_gap", configschema::DriveUsageActivitySegmentGapEdit);
+    CONFIG_EDITABLE_VALUE_WITH(int, activitySegmentGap, "activity_segment_gap", configschema::DriveUsageActivitySegmentGapPolicy);
     CONFIG_SECTION("drive_usage_list");
 };
 
@@ -211,10 +211,10 @@ struct GaugeWidgetConfig {
     CONFIG_REFLECTED_STRUCT(GaugeWidgetConfig)
     CONFIG_EDITABLE_VALUE(int, outerPadding, "outer_padding");
     CONFIG_EDITABLE_VALUE(int, ringThickness, "ring_thickness");
-    CONFIG_EDITABLE_VALUE_WITH(double, sweepDegrees, "sweep_degrees", configschema::GaugeSweepDegreesEdit);
+    CONFIG_EDITABLE_VALUE_WITH(double, sweepDegrees, "sweep_degrees", configschema::GaugeSweepDegreesPolicy);
     CONFIG_EDITABLE_VALUE(int, segmentCount, "segment_count");
     CONFIG_EDITABLE_VALUE_WITH(
-        double, segmentGapDegrees, "segment_gap_degrees", configschema::GaugeSegmentGapDegreesEdit);
+        double, segmentGapDegrees, "segment_gap_degrees", configschema::GaugeSegmentGapDegreesPolicy);
     CONFIG_VALUE(int, textHalfWidth, "text_half_width");
     CONFIG_EDITABLE_VALUE(int, valueBottom, "value_bottom");
     CONFIG_EDITABLE_VALUE(int, labelBottom, "label_bottom");

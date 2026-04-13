@@ -70,12 +70,21 @@ struct LayoutEditFieldTraits {
     static constexpr LayoutEditValueFormat value_format = ValueFormat;
 };
 
-using PositiveIntEdit = LayoutEditFieldTraits<PositiveIntPolicy>;
-using FontEdit = LayoutEditFieldTraits<FontSizePolicy, LayoutEditValueFormat::FontSpec>;
-using GaugeSweepDegreesEdit = LayoutEditFieldTraits<GaugeSweepDegreesPolicy, LayoutEditValueFormat::FloatingPoint>;
-using GaugeSegmentGapDegreesEdit =
-    LayoutEditFieldTraits<GaugeSegmentGapDegreesPolicy, LayoutEditValueFormat::FloatingPoint>;
-using DriveUsageActivitySegmentGapEdit = LayoutEditFieldTraits<DriveUsageActivitySegmentGapPolicy>;
+template <typename PolicyTag> struct LayoutEditTraitsForPolicy {
+    using type = LayoutEditFieldTraits<PolicyTag>;
+};
+
+template <> struct LayoutEditTraitsForPolicy<FontSizePolicy> {
+    using type = LayoutEditFieldTraits<FontSizePolicy, LayoutEditValueFormat::FontSpec>;
+};
+
+template <> struct LayoutEditTraitsForPolicy<GaugeSweepDegreesPolicy> {
+    using type = LayoutEditFieldTraits<GaugeSweepDegreesPolicy, LayoutEditValueFormat::FloatingPoint>;
+};
+
+template <> struct LayoutEditTraitsForPolicy<GaugeSegmentGapDegreesPolicy> {
+    using type = LayoutEditFieldTraits<GaugeSegmentGapDegreesPolicy, LayoutEditValueFormat::FloatingPoint>;
+};
 
 template <typename T> struct DefaultLayoutEditTraits {
     using type = NoLayoutEditFieldTraits;
@@ -104,7 +113,7 @@ template <> struct DefaultCodec<unsigned int> {
 };
 
 template <> struct DefaultLayoutEditTraits<int> {
-    using type = PositiveIntEdit;
+    using type = typename LayoutEditTraitsForPolicy<PositiveIntPolicy>::type;
 };
 
 template <typename Owner,
@@ -462,9 +471,12 @@ public:                                                                         
     }
 
 #define CONFIG_EDITABLE_VALUE(field_type, member, key)                                                                 \
-    CONFIG_EDITABLE_VALUE_WITH(field_type, member, key, typename configschema::DefaultLayoutEditTraits<field_type>::type)
+    CONFIG_EDITABLE_VALUE_WITH_TRAITS(field_type, member, key, typename configschema::DefaultLayoutEditTraits<field_type>::type)
 
-#define CONFIG_EDITABLE_VALUE_WITH(field_type, member, key, layout_edit_traits)                                        \
+#define CONFIG_EDITABLE_VALUE_WITH(field_type, member, key, policy_tag)                                                \
+    CONFIG_EDITABLE_VALUE_WITH_TRAITS(field_type, member, key, typename configschema::LayoutEditTraitsForPolicy<policy_tag>::type)
+
+#define CONFIG_EDITABLE_VALUE_WITH_TRAITS(field_type, member, key, layout_edit_traits)                                 \
     field_type member{};                                                                                               \
     using member##Field = configschema::FieldDescriptor<Self,                                                          \
         field_type,                                                                                                    \
