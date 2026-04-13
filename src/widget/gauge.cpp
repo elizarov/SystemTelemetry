@@ -122,10 +122,16 @@ int GaugeOuterRadiusForRect(const DashboardRenderer& renderer, const RECT& rect)
     return std::max(1, std::min(width, height) / 2 - outerPadding);
 }
 
+int GaugeTextHalfWidth(const DashboardRenderer& renderer) {
+    const int valueWidth = renderer.MeasureTextWidth(renderer.WidgetFonts().big, "100%");
+    const int labelWidth = renderer.MeasureTextWidth(renderer.WidgetFonts().smallFont, "Load");
+    return std::max(1, ((std::max)(valueWidth, labelWidth) + 1) / 2);
+}
+
 int EffectiveGaugePreferredRadius(const DashboardRenderer& renderer) {
     const int outerPadding = std::max(0, renderer.ScaleLogical(renderer.Config().layout.gauge.outerPadding));
     const int ringThickness = std::max(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
-    const int halfWidth = std::max(1, renderer.ScaleLogical(renderer.Config().layout.gauge.textHalfWidth));
+    const int halfWidth = GaugeTextHalfWidth(renderer);
     const int valueHalfHeight = std::max(1, (renderer.FontMetrics().big + 1) / 2);
     const int labelHalfHeight = std::max(1, (renderer.FontMetrics().smallText + 1) / 2);
     const int innerRadius = (std::max)(halfWidth, (std::max)(valueHalfHeight, labelHalfHeight));
@@ -167,7 +173,7 @@ void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RE
     layoutState_.anchorPadding = std::max(1, renderer.ScaleLogical(1));
     layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
     layoutState_.anchorHalf = layoutState_.anchorSize / 2;
-    layoutState_.halfWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.textHalfWidth));
+    layoutState_.halfWidth = GaugeTextHalfWidth(renderer);
     layoutState_.valueBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom);
     layoutState_.valueHeight = renderer.FontMetrics().big;
     layoutState_.labelBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom);

@@ -208,7 +208,6 @@ struct GaugeWidgetConfig {
     CONFIG_EDITABLE_VALUE(int, segmentCount, "segment_count");
     CONFIG_EDITABLE_VALUE_WITH(
         double, segmentGapDegrees, "segment_gap_degrees", configschema::GaugeSegmentGapDegreesPolicy);
-    CONFIG_VALUE(int, textHalfWidth, "text_half_width");
     CONFIG_EDITABLE_VALUE(int, valueBottom, "value_bottom");
     CONFIG_EDITABLE_VALUE(int, labelBottom, "label_bottom");
     CONFIG_SECTION("gauge");
