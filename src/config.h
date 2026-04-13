@@ -354,11 +354,11 @@ struct AppConfig {
     CONFIG_BINDING_LIST();
 };
 
-CONFIG_EDITABLE_ROOT_BINDING_PATH(UiFontSetConfig, AppConfig, AppConfig::layoutBindingTag, LayoutConfig::fontsBindingTag);
+CONFIG_EDITABLE_ROOT_BINDING_PATH(UiFontSetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::fontsBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(
-    MetricListWidgetConfig, AppConfig, AppConfig::layoutBindingTag, LayoutConfig::metricListBindingTag);
+    MetricListWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::metricListBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(
-    DriveUsageListWidgetConfig, AppConfig, AppConfig::layoutBindingTag, LayoutConfig::driveUsageListBindingTag);
+    DriveUsageListWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::driveUsageListBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(
-    ThroughputWidgetConfig, AppConfig, AppConfig::layoutBindingTag, LayoutConfig::throughputBindingTag);
-CONFIG_EDITABLE_ROOT_BINDING_PATH(GaugeWidgetConfig, AppConfig, AppConfig::layoutBindingTag, LayoutConfig::gaugeBindingTag);
+    ThroughputWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::throughputBinding);
+CONFIG_EDITABLE_ROOT_BINDING_PATH(GaugeWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::gaugeBinding);

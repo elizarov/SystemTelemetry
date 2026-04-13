@@ -480,32 +480,32 @@ public:
 
 #define CONFIG_SECTION_VALUE(field_type, member)                                                                       \
     field_type member{};                                                                                               \
-    using member##BindingTag = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;    \
-    using member##Binding =                                                                                            \
+    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;       \
+    using member##BindingDescriptor =                                                                                  \
         configschema::StructuredBindingDescriptor<Self, typename field_type::Section, &Self::member>;                  \
     friend consteval auto reflect_binding(                                                                             \
-        member##BindingTag) {                                                                                          \
-        return member##Binding{};                                                                                      \
+        member##Binding) {                                                                                             \
+        return member##BindingDescriptor{};                                                                            \
     }
 
 #define CONFIG_BINDING_LIST() using BindingList = configschema::AutoStructuredBindingListDescriptor<Self>
 
 #define CONFIG_DYNAMIC_SECTION_VALUE(item_type, member, key_member)                                                    \
     std::vector<item_type> member{};                                                                                   \
-    using member##BindingTag = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;    \
-    using member##Binding =                                                                                            \
+    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;       \
+    using member##BindingDescriptor =                                                                                  \
         configschema::DynamicStructuredBindingDescriptor<Self, item_type, &Self::member, &item_type::key_member>;      \
     friend consteval auto reflect_binding(                                                                             \
-        member##BindingTag) {                                                                                          \
-        return member##Binding{};                                                                                      \
+        member##Binding) {                                                                                             \
+        return member##BindingDescriptor{};                                                                            \
     }
 
 #define CONFIG_RECURSIVE_BINDING_VALUE(field_type, member)                                                             \
     field_type member{};                                                                                               \
-    using member##BindingTag = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;    \
-    using member##Binding =                                                                                            \
+    using member##Binding = configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>;       \
+    using member##BindingDescriptor =                                                                                  \
         configschema::RecursiveStructuredBindingDescriptor<Self, field_type, &Self::member>;                           \
     friend consteval auto reflect_binding(                                                                             \
-        member##BindingTag) {                                                                                          \
-        return member##Binding{};                                                                                      \
+        member##Binding) {                                                                                             \
+        return member##BindingDescriptor{};                                                                            \
     }
