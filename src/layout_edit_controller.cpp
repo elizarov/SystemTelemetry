@@ -628,25 +628,20 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
     WidgetEditDragState& drag = *activeWidgetEditDrag_;
     double nextValue = drag.initialValue;
     if (drag.guide.angularDrag) {
-        switch (GetLayoutEditParameterInfo(drag.guide.parameter).widgetGuideDragMode) {
-            case LayoutEditWidgetDragMode::GaugeSweepDegrees: {
-                const auto sweepDegrees = ComputeGaugeSweepDegrees(drag.guide.dragOrigin, clientPoint);
-                if (!sweepDegrees.has_value()) {
-                    return true;
-                }
-                nextValue = *sweepDegrees;
-                break;
+        if (drag.guide.parameter == DashboardRenderer::LayoutEditParameter::GaugeSweepDegrees) {
+            const auto sweepDegrees = ComputeGaugeSweepDegrees(drag.guide.dragOrigin, clientPoint);
+            if (!sweepDegrees.has_value()) {
+                return true;
             }
-            case LayoutEditWidgetDragMode::GaugeSegmentGapDegrees: {
-                const auto segmentGapDegrees = ComputeGaugeSegmentGapDegrees(drag.guide, clientPoint);
-                if (!segmentGapDegrees.has_value()) {
-                    return true;
-                }
-                nextValue = *segmentGapDegrees;
-                break;
+            nextValue = *sweepDegrees;
+        } else if (drag.guide.parameter == DashboardRenderer::LayoutEditParameter::GaugeSegmentGapDegrees) {
+            const auto segmentGapDegrees = ComputeGaugeSegmentGapDegrees(drag.guide, clientPoint);
+            if (!segmentGapDegrees.has_value()) {
+                return true;
             }
-            case LayoutEditWidgetDragMode::Linear:
-                return false;
+            nextValue = *segmentGapDegrees;
+        } else {
+            return false;
         }
     } else {
         const int currentCoordinate =

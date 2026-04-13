@@ -14,12 +14,6 @@ struct LayoutEditTooltipDescriptor {
     configschema::ValueFormat valueFormat = configschema::ValueFormat::Integer;
 };
 
-enum class LayoutEditWidgetDragMode {
-    Linear,
-    GaugeSweepDegrees,
-    GaugeSegmentGapDegrees,
-};
-
 struct LayoutEditConfigFieldMetadata {
     std::string_view sectionName;
     std::string_view parameterName;
@@ -34,7 +28,6 @@ struct LayoutEditParameterInfo {
     const LayoutEditConfigFieldMetadata* field = nullptr;
     bool supportsWidgetGuide = false;
     bool supportsAnchor = false;
-    LayoutEditWidgetDragMode widgetGuideDragMode = LayoutEditWidgetDragMode::Linear;
 };
 
 const LayoutEditParameterInfo& GetLayoutEditParameterInfo(LayoutEditParameter parameter);
