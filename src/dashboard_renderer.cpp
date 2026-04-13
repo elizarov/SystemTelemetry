@@ -74,6 +74,23 @@ void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
         return;
     }
 
+    if (alpha == 255) {
+        HBRUSH brush = CreateSolidBrush(color);
+        HPEN pen = CreatePen(PS_SOLID, 1, color);
+        HGDIOBJ oldBrush = SelectObject(hdc, brush);
+        HGDIOBJ oldPen = SelectObject(hdc, pen);
+        if (width <= height) {
+            Ellipse(hdc, rect.left, rect.top, rect.right, rect.bottom);
+        } else {
+            RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, height, height);
+        }
+        SelectObject(hdc, oldPen);
+        SelectObject(hdc, oldBrush);
+        DeleteObject(pen);
+        DeleteObject(brush);
+        return;
+    }
+
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
@@ -455,7 +472,7 @@ bool DashboardRenderer::ResolveLayout() {
 DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
     HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const {
     TextLayoutResult result{rect};
-    const std::wstring wideText = WideFromUtf8(text);
+    const std::wstring& wideText = GetWideText(text);
     if (wideText.empty()) {
         return result;
     }
@@ -526,7 +543,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
     RECT copy = rect;
-    const std::wstring wideText = WideFromUtf8(text);
+    const std::wstring& wideText = GetWideText(text);
     DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
     SelectObject(hdc, oldFont);
     return result;
@@ -1097,14 +1114,13 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
     HPEN border = CreatePen(PS_SOLID,
         std::max(1, ScaleLogical(config_.layout.cardStyle.cardBorderWidth)),
         ToColorRef(config_.layout.colors.panelBorderColor));
-    HBRUSH fill = CreateSolidBrush(ToColorRef(config_.layout.colors.panelFillColor));
+    HBRUSH fill = GetSolidBrush(ToColorRef(config_.layout.colors.panelFillColor));
     HGDIOBJ oldPen = SelectObject(hdc, border);
     HGDIOBJ oldBrush = SelectObject(hdc, fill);
     const int radius = std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius));
     RoundRect(hdc, card.rect.left, card.rect.top, card.rect.right, card.rect.bottom, radius, radius);
     SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);
-    DeleteObject(fill);
     DeleteObject(border);
     if (!card.iconName.empty()) {
         DrawPanelIcon(hdc, card.iconName, card.iconRect);
@@ -1117,7 +1133,27 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
 
 void DashboardRenderer::DrawPillBar(
     HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
-    FillCapsule(hdc, rect, ToColorRef(config_.layout.colors.trackColor), 255);
+    const auto fillOpaqueCapsule = [&](const RECT& capsuleRect, COLORREF color) {
+        const int width = std::max(0, static_cast<int>(capsuleRect.right - capsuleRect.left));
+        const int height = std::max(0, static_cast<int>(capsuleRect.bottom - capsuleRect.top));
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        HGDIOBJ oldBrush = SelectObject(hdc, GetSolidBrush(color));
+        HGDIOBJ oldPen = SelectObject(hdc, GetSolidPen(color));
+        if (width <= height) {
+            Ellipse(hdc, capsuleRect.left, capsuleRect.top, capsuleRect.right, capsuleRect.bottom);
+        } else {
+            RoundRect(
+                hdc, capsuleRect.left, capsuleRect.top, capsuleRect.right, capsuleRect.bottom, height, height);
+        }
+        SelectObject(hdc, oldPen);
+        SelectObject(hdc, oldBrush);
+    };
+
+    const COLORREF accentColor = AccentColor();
+    fillOpaqueCapsule(rect, ToColorRef(config_.layout.colors.trackColor));
 
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
@@ -1134,7 +1170,7 @@ void DashboardRenderer::DrawPillBar(
     const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
     RECT fillRect = rect;
     fillRect.right = fillRect.left + fillWidth;
-    FillCapsule(hdc, fillRect, AccentColor(), 255);
+    fillOpaqueCapsule(fillRect, accentColor);
 
     if (peakRatio.has_value()) {
         const double peak = std::clamp(*peakRatio, 0.0, 1.0);
@@ -1144,7 +1180,7 @@ void DashboardRenderer::DrawPillBar(
         const int maxLeft = static_cast<int>(rect.right) - markerWidth;
         const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
         RECT markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-        FillCapsule(hdc, markerRect, AccentColor(), 96);
+        FillCapsule(hdc, markerRect, accentColor, 96);
     }
 }
 
@@ -1269,10 +1305,16 @@ int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const
         return 0;
     }
 
-    const int width = MeasureTextSize(hdc, font, std::string(text)).cx;
+    const std::wstring& wideText = GetWideText(text);
+    SIZE size{};
+    HGDIOBJ oldFont = SelectObject(hdc, font);
+    if (!wideText.empty()) {
+        GetTextExtentPoint32W(hdc, wideText.c_str(), static_cast<int>(wideText.size()), &size);
+    }
+    SelectObject(hdc, oldFont);
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
-    textWidthCache_.emplace(std::move(cacheKey), width);
-    return width;
+    textWidthCache_.emplace(std::move(cacheKey), size.cx);
+    return size.cx;
 }
 
 std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
@@ -1483,11 +1525,13 @@ void DashboardRenderer::Shutdown() {
     fontHeights_ = {};
     resolvedLayout_ = {};
     parsedWidgetInfoCache_.clear();
+    wideTextCache_.clear();
     textWidthCache_.clear();
     textMeasureCache_.clear();
     staticEditableAnchorRegions_.clear();
     dynamicEditableAnchorRegions_.clear();
     dynamicAnchorRegistrationEnabled_ = false;
+    ClearGdiCaches();
     ReleasePanelIcons();
     ShutdownGdiplus();
 }
@@ -1563,8 +1607,49 @@ void DashboardRenderer::DestroyFonts() {
     DeleteObject(fonts_.clockTime);
     DeleteObject(fonts_.clockDate);
     fonts_ = {};
+    wideTextCache_.clear();
     textWidthCache_.clear();
     textMeasureCache_.clear();
+}
+
+HBRUSH DashboardRenderer::GetSolidBrush(COLORREF color) {
+    if (const auto it = solidBrushCache_.find(color); it != solidBrushCache_.end()) {
+        return it->second;
+    }
+
+    HBRUSH brush = CreateSolidBrush(color);
+    solidBrushCache_.emplace(color, brush);
+    return brush;
+}
+
+HPEN DashboardRenderer::GetSolidPen(COLORREF color) {
+    if (const auto it = solidPenCache_.find(color); it != solidPenCache_.end()) {
+        return it->second;
+    }
+
+    HPEN pen = CreatePen(PS_SOLID, 1, color);
+    solidPenCache_.emplace(color, pen);
+    return pen;
+}
+
+const std::wstring& DashboardRenderer::GetWideText(std::string_view text) const {
+    const std::string key(text);
+    if (const auto it = wideTextCache_.find(key); it != wideTextCache_.end()) {
+        return it->second;
+    }
+
+    return wideTextCache_.emplace(key, WideFromUtf8(key)).first->second;
+}
+
+void DashboardRenderer::ClearGdiCaches() {
+    for (const auto& entry : solidBrushCache_) {
+        DeleteObject(entry.second);
+    }
+    solidBrushCache_.clear();
+    for (const auto& entry : solidPenCache_) {
+        DeleteObject(entry.second);
+    }
+    solidPenCache_.clear();
 }
 
 bool DashboardRenderer::LoadPanelIcons() {

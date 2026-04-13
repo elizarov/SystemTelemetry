@@ -268,10 +268,17 @@ void PrintBenchResult(const BenchResult& result) {
 
 int main(int argc, char** argv) {
     size_t iterations = 240;
+    double renderScale = 2.0;
     if (argc >= 2) {
         const long long parsed = std::atoll(argv[1]);
         if (parsed > 0) {
             iterations = static_cast<size_t>(parsed);
+        }
+    }
+    if (argc >= 3) {
+        const double parsed = std::atof(argv[2]);
+        if (std::isfinite(parsed) && parsed > 0.0) {
+            renderScale = parsed;
         }
     }
 
@@ -280,7 +287,7 @@ int main(int argc, char** argv) {
 
     DashboardRenderer renderer;
     renderer.SetConfig(config);
-    renderer.SetRenderScale(1.0);
+    renderer.SetRenderScale(renderScale);
     if (!renderer.Initialize()) {
         std::cerr << "renderer init failed: " << renderer.LastError() << "\n";
         return 1;
@@ -306,7 +313,8 @@ int main(int argc, char** argv) {
     overlayState.activeLayoutEditGuide = *guide;
 
     std::cout << "layout_edit_benchmark guide_children=" << seedWeights.size()
-              << " separator_index=" << guide->separatorIndex << " iterations=" << weightSequence.size() << "\n";
+              << " separator_index=" << guide->separatorIndex << " iterations=" << weightSequence.size()
+              << " render_scale=" << renderScale << "\n";
 
     const BenchResult relayout = TimeRelayout(renderer, config, target, weightSequence);
     PrintBenchResult(relayout);

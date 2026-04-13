@@ -334,6 +334,10 @@ private:
         }
     };
 
+    HBRUSH GetSolidBrush(COLORREF color);
+    HPEN GetSolidPen(COLORREF color);
+    const std::wstring& GetWideText(std::string_view text) const;
+    void ClearGdiCaches();
     void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
@@ -420,8 +424,11 @@ private:
     std::vector<EditableAnchorRegion> dynamicEditableAnchorRegions_;
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
+    mutable std::unordered_map<std::string, std::wstring> wideTextCache_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash> textWidthCache_;
     mutable std::unordered_map<TextMeasureCacheKey, SIZE, TextMeasureCacheKeyHash> textMeasureCache_;
+    std::unordered_map<COLORREF, HBRUSH> solidBrushCache_;
+    std::unordered_map<COLORREF, HPEN> solidPenCache_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

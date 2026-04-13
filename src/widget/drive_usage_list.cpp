@@ -105,6 +105,8 @@ void DrawSegmentIndicator(HDC hdc,
         clampedRatio > 0.0
             ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
             : 0;
+    HBRUSH trackBrush = CreateSolidBrush(trackColor);
+    HBRUSH fillBrush = filledSegments > 0 ? CreateSolidBrush(accentColor) : nullptr;
     int top = rect.top;
     for (int index = segmentCount - 1; index >= 0; --index) {
         const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
@@ -113,18 +115,18 @@ void DrawSegmentIndicator(HDC hdc,
         const int segmentTop = top + (std::max)(0, (segmentHeight - visualHeight) / 2);
         RECT segmentRect{
             rect.left, segmentTop, rect.right, (std::min)(rect.bottom, static_cast<LONG>(segmentTop + visualHeight))};
-        HBRUSH trackBrush = CreateSolidBrush(trackColor);
         FillRect(hdc, &segmentRect, trackBrush);
-        DeleteObject(trackBrush);
 
-        if (index < filledSegments) {
-            HBRUSH fillBrush = CreateSolidBrush(accentColor);
+        if (fillBrush != nullptr && index < filledSegments) {
             FillRect(hdc, &segmentRect, fillBrush);
-            DeleteObject(fillBrush);
         }
 
         top = segmentRect.bottom + clampedGap;
     }
+    if (fillBrush != nullptr) {
+        DeleteObject(fillBrush);
+    }
+    DeleteObject(trackBrush);
 }
 
 int EffectiveDriveHeaderHeight(const DashboardRenderer& renderer) {
