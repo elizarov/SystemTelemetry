@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <tuple>
 #include <vector>
 #include <utility>
@@ -43,6 +44,32 @@ struct StructuredSectionCodec {};
 
 struct BoardSectionCodec {};
 
+enum class LayoutEditValueFormat {
+    Integer,
+    FloatingPoint,
+    FontSpec,
+};
+
+struct NoLayoutEditPolicyTag {};
+struct PositiveIntLayoutEditPolicyTag {};
+struct FontSizeLayoutEditPolicyTag {};
+struct GaugeSweepDegreesLayoutEditPolicyTag {};
+struct GaugeSegmentGapDegreesLayoutEditPolicyTag {};
+struct DriveUsageActivitySegmentGapLayoutEditPolicyTag {};
+
+struct NoLayoutEditFieldTraits {
+    using policy_tag = NoLayoutEditPolicyTag;
+    static constexpr bool enabled = false;
+    static constexpr LayoutEditValueFormat value_format = LayoutEditValueFormat::Integer;
+};
+
+template <typename PolicyTag, LayoutEditValueFormat ValueFormat = LayoutEditValueFormat::Integer>
+struct LayoutEditFieldTraits {
+    using policy_tag = PolicyTag;
+    static constexpr bool enabled = true;
+    static constexpr LayoutEditValueFormat value_format = ValueFormat;
+};
+
 template <typename T> struct DefaultCodec;
 
 template <typename T> struct DefaultSectionCodec {
@@ -65,14 +92,21 @@ template <> struct DefaultCodec<unsigned int> {
     using codec_type = HexColorCodec;
 };
 
-template <typename Owner, typename Field, FixedString Key, Field Owner::* Member, typename Codec>
+template <typename Owner,
+    typename Field,
+    FixedString Key,
+    Field Owner::* Member,
+    typename Codec,
+    typename LayoutEditTraits = NoLayoutEditFieldTraits>
 struct FieldDescriptor {
     using owner_type = Owner;
     using field_type = Field;
     using codec_type = Codec;
+    using layout_edit_traits_type = LayoutEditTraits;
 
     static constexpr auto key = Key;
     static constexpr auto member = Member;
+    static constexpr bool has_layout_edit_traits = LayoutEditTraits::enabled;
 };
 
 template <typename Owner, typename Section, typename Section::owner_type Owner::* Member>
@@ -198,6 +232,12 @@ template <typename Owner, size_t Index> struct FieldTag {};
 template <typename Owner, size_t Index> struct BindingTag {};
 
 template <typename Owner, size_t Index>
+using ReflectedField = decltype(reflect_field(FieldTag<Owner, Index>{}));
+
+template <typename Owner, size_t Index>
+using ReflectedBinding = decltype(reflect_binding(BindingTag<Owner, Index>{}));
+
+template <typename Owner, size_t Index>
 concept HasReflectedField = requires { reflect_field(FieldTag<Owner, Index>{}); };
 
 template <typename Owner, size_t Index>
@@ -264,6 +304,57 @@ template <typename Owner> struct AutoStructuredBindingListDescriptor {
         MakeReflectedBindingTuple<Owner>(std::make_index_sequence<CountReflectedBindings<Owner>()>{});
 };
 
+template <typename Owner, typename... Bindings> struct BindingPathLens;
+
+template <typename Owner> struct BindingPathLens<Owner> {
+    using owner_type = Owner;
+
+    static Owner& Get(Owner& owner) {
+        return owner;
+    }
+
+    static const Owner& Get(const Owner& owner) {
+        return owner;
+    }
+};
+
+template <typename Owner, typename Binding, typename... Rest>
+struct BindingPathLens<Owner, Binding, Rest...> {
+    using next_owner_type = std::remove_reference_t<decltype(Binding::Get(std::declval<Owner&>()))>;
+    using owner_type = typename BindingPathLens<next_owner_type, Rest...>::owner_type;
+
+    static owner_type& Get(Owner& owner) {
+        return BindingPathLens<next_owner_type, Rest...>::Get(Binding::Get(owner));
+    }
+
+    static const owner_type& Get(const Owner& owner) {
+        return BindingPathLens<next_owner_type, Rest...>::Get(Binding::Get(owner));
+    }
+};
+
+template <typename Root, typename Field, typename... Bindings> struct RootFieldLens {
+    using root_type = Root;
+    using field_descriptor = Field;
+    using value_type = typename Field::field_type;
+    using traits_type = typename Field::layout_edit_traits_type;
+    using owner_type = typename BindingPathLens<Root, Bindings...>::owner_type;
+
+    static constexpr std::string_view section_name = Field::owner_type::Section::name.view();
+    static constexpr std::string_view parameter_name = Field::key.view();
+
+    static_assert(std::is_same_v<owner_type, typename Field::owner_type>);
+
+    static value_type& Get(Root& root) {
+        owner_type& owner = BindingPathLens<Root, Bindings...>::Get(root);
+        return owner.*(Field::member);
+    }
+
+    static const value_type& Get(const Root& root) {
+        const owner_type& owner = BindingPathLens<Root, Bindings...>::Get(root);
+        return owner.*(Field::member);
+    }
+};
+
 }  // namespace configschema
 
 #define CONFIG_REFLECTED_STRUCT(owner)                                                                                 \
@@ -285,13 +376,27 @@ public:
 
 #define CONFIG_VALUE(field_type, member, key)                                                                          \
     field_type member{};                                                                                               \
+    using member##Field = configschema::FieldDescriptor<Self,                                                          \
+        field_type,                                                                                                    \
+        key,                                                                                                           \
+        &Self::member,                                                                                                 \
+        typename configschema::DefaultCodec<field_type>::codec_type>;                                                  \
     friend consteval auto reflect_field(                                                                               \
         configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) {                              \
-        return configschema::FieldDescriptor<Self,                                                                     \
-            field_type,                                                                                                \
-            key,                                                                                                       \
-            &Self::member,                                                                                             \
-            typename configschema::DefaultCodec<field_type>::codec_type>{};                                            \
+        return member##Field{};                                                                                        \
+    }
+
+#define CONFIG_EDITABLE_VALUE(field_type, member, key, ...)                                                            \
+    field_type member{};                                                                                               \
+    using member##Field = configschema::FieldDescriptor<Self,                                                          \
+        field_type,                                                                                                    \
+        key,                                                                                                           \
+        &Self::member,                                                                                                 \
+        typename configschema::DefaultCodec<field_type>::codec_type,                                                   \
+        __VA_ARGS__>;                                                                                                  \
+    friend consteval auto reflect_field(                                                                               \
+        configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) {                              \
+        return member##Field{};                                                                                        \
     }
 
 #define CONFIG_SECTION(name) using Section = configschema::AutoSectionDescriptor<name, Self>
@@ -307,24 +412,29 @@ public:
 
 #define CONFIG_SECTION_VALUE(field_type, member)                                                                       \
     field_type member{};                                                                                               \
+    using member##Binding =                                                                                            \
+        configschema::StructuredBindingDescriptor<Self, typename field_type::Section, &Self::member>;                  \
     friend consteval auto reflect_binding(                                                                             \
         configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) {                          \
-        return configschema::StructuredBindingDescriptor<Self, typename field_type::Section, &Self::member>{};         \
+        return member##Binding{};                                                                                      \
     }
 
 #define CONFIG_BINDING_LIST() using BindingList = configschema::AutoStructuredBindingListDescriptor<Self>
 
 #define CONFIG_DYNAMIC_SECTION_VALUE(item_type, member, key_member)                                                    \
     std::vector<item_type> member{};                                                                                   \
+    using member##Binding =                                                                                            \
+        configschema::DynamicStructuredBindingDescriptor<Self, item_type, &Self::member, &item_type::key_member>;      \
     friend consteval auto reflect_binding(                                                                             \
         configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) {                          \
-        return configschema::                                                                                          \
-            DynamicStructuredBindingDescriptor<Self, item_type, &Self::member, &item_type::key_member>{};              \
+        return member##Binding{};                                                                                      \
     }
 
 #define CONFIG_RECURSIVE_BINDING_VALUE(field_type, member)                                                             \
     field_type member{};                                                                                               \
+    using member##Binding =                                                                                            \
+        configschema::RecursiveStructuredBindingDescriptor<Self, field_type, &Self::member>;                           \
     friend consteval auto reflect_binding(                                                                             \
         configschema::BindingTag<Self, __COUNTER__ - Self::_configschema_binding_base - 1>) {                          \
-        return configschema::RecursiveStructuredBindingDescriptor<Self, field_type, &Self::member>{};                  \
+        return member##Binding{};                                                                                      \
     }

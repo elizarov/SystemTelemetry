@@ -55,6 +55,37 @@ TEST(LayoutEditTooltip, ResolvesFontValueThroughParameterMetadata) {
     EXPECT_EQ((*font)->weight, 600);
 }
 
+TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {
+    const auto& gaugeField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::GaugeSegmentCount);
+    EXPECT_EQ(gaugeField.sectionName, "gauge");
+    EXPECT_EQ(gaugeField.parameterName, "segment_count");
+    EXPECT_EQ(gaugeField.valueFormat, LayoutEditTooltipValueFormat::Integer);
+
+    const auto& fontField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::FontLabel);
+    EXPECT_EQ(fontField.sectionName, "fonts");
+    EXPECT_EQ(fontField.parameterName, "label");
+    EXPECT_EQ(fontField.valueFormat, LayoutEditTooltipValueFormat::FontSpec);
+}
+
+TEST(LayoutEditParameter, RootLensAppliesIntoNestedConfig) {
+    AppConfig config;
+    ASSERT_TRUE(ApplyLayoutEditParameterValue(config, LayoutEditParameter::GaugeSegmentCount, 6.4));
+    ASSERT_TRUE(ApplyLayoutEditParameterValue(config, LayoutEditParameter::MetricListBarHeight, 17.2));
+
+    EXPECT_EQ(config.layout.gauge.segmentCount, 6);
+    EXPECT_EQ(config.layout.metricList.barHeight, 17);
+}
+
+TEST(LayoutEditParameter, RootLensReturnsUnderlyingFontField) {
+    AppConfig config;
+    config.layout.fonts.label = UiFontConfig{"Segoe UI", 17, 600};
+
+    const auto font = FindLayoutEditTooltipFontValue(config, LayoutEditParameter::FontLabel);
+
+    ASSERT_TRUE(font.has_value());
+    EXPECT_EQ(*font, &config.layout.fonts.label);
+}
+
 TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeSegmentCount),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeOuterPadding));

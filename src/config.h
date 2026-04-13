@@ -19,15 +19,51 @@ CONFIG_CODEC(std::vector<std::string>, configschema::StringCodec);
 
 struct UiFontSetConfig {
     CONFIG_REFLECTED_STRUCT(UiFontSetConfig)
-    CONFIG_VALUE(UiFontConfig, title, "title");
-    CONFIG_VALUE(UiFontConfig, big, "big");
-    CONFIG_VALUE(UiFontConfig, value, "value");
-    CONFIG_VALUE(UiFontConfig, label, "label");
-    CONFIG_VALUE(UiFontConfig, text, "text");
-    CONFIG_VALUE(UiFontConfig, smallText, "small");
-    CONFIG_VALUE(UiFontConfig, footer, "footer");
-    CONFIG_VALUE(UiFontConfig, clockTime, "clock_time");
-    CONFIG_VALUE(UiFontConfig, clockDate, "clock_date");
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        title,
+        "title",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        big,
+        "big",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        value,
+        "value",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        label,
+        "label",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        text,
+        "text",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        smallText,
+        "small",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        footer,
+        "footer",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        clockTime,
+        "clock_time",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
+    CONFIG_EDITABLE_VALUE(UiFontConfig,
+        clockDate,
+        "clock_date",
+        configschema::LayoutEditFieldTraits<configschema::FontSizeLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FontSpec>);
     CONFIG_SECTION("fonts");
 };
 
@@ -168,48 +204,100 @@ struct MetricScaleConfig {
 
 struct MetricListWidgetConfig {
     CONFIG_REFLECTED_STRUCT(MetricListWidgetConfig)
-    CONFIG_VALUE(int, labelWidth, "label_width");
-    CONFIG_VALUE(int, barHeight, "bar_height");
-    CONFIG_VALUE(int, verticalGap, "vertical_gap");
+    CONFIG_EDITABLE_VALUE(
+        int, labelWidth, "label_width", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, barHeight, "bar_height", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        verticalGap,
+        "vertical_gap",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
     CONFIG_SECTION("metric_list");
 };
 
 struct DriveUsageListWidgetConfig {
     CONFIG_REFLECTED_STRUCT(DriveUsageListWidgetConfig)
-    CONFIG_VALUE(int, labelGap, "label_gap");
-    CONFIG_VALUE(int, activityWidth, "activity_width");
-    CONFIG_VALUE(int, rwGap, "rw_gap");
-    CONFIG_VALUE(int, barGap, "bar_gap");
-    CONFIG_VALUE(int, percentGap, "percent_gap");
-    CONFIG_VALUE(int, freeWidth, "free_width");
-    CONFIG_VALUE(int, barHeight, "bar_height");
-    CONFIG_VALUE(int, headerGap, "header_gap");
-    CONFIG_VALUE(int, rowGap, "row_gap");
-    CONFIG_VALUE(int, activitySegments, "activity_segments");
-    CONFIG_VALUE(int, activitySegmentGap, "activity_segment_gap");
+    CONFIG_EDITABLE_VALUE(
+        int, labelGap, "label_gap", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        activityWidth,
+        "activity_width",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, rwGap, "rw_gap", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, barGap, "bar_gap", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        percentGap,
+        "percent_gap",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, freeWidth, "free_width", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, barHeight, "bar_height", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, headerGap, "header_gap", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, rowGap, "row_gap", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        activitySegments,
+        "activity_segments",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        activitySegmentGap,
+        "activity_segment_gap",
+        configschema::LayoutEditFieldTraits<configschema::DriveUsageActivitySegmentGapLayoutEditPolicyTag>);
     CONFIG_SECTION("drive_usage_list");
 };
 
 struct ThroughputWidgetConfig {
     CONFIG_REFLECTED_STRUCT(ThroughputWidgetConfig)
-    CONFIG_VALUE(int, headerGap, "header_gap");
-    CONFIG_VALUE(int, axisPadding, "axis_padding");
-    CONFIG_VALUE(int, guideStrokeWidth, "guide_stroke_width");
-    CONFIG_VALUE(int, plotStrokeWidth, "plot_stroke_width");
-    CONFIG_VALUE(int, leaderDiameter, "leader_diameter");
+    CONFIG_EDITABLE_VALUE(
+        int, headerGap, "header_gap", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, axisPadding, "axis_padding", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        guideStrokeWidth,
+        "guide_stroke_width",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        plotStrokeWidth,
+        "plot_stroke_width",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        leaderDiameter,
+        "leader_diameter",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
     CONFIG_SECTION("throughput");
 };
 
 struct GaugeWidgetConfig {
     CONFIG_REFLECTED_STRUCT(GaugeWidgetConfig)
-    CONFIG_VALUE(int, outerPadding, "outer_padding");
-    CONFIG_VALUE(int, ringThickness, "ring_thickness");
-    CONFIG_VALUE(double, sweepDegrees, "sweep_degrees");
-    CONFIG_VALUE(int, segmentCount, "segment_count");
-    CONFIG_VALUE(double, segmentGapDegrees, "segment_gap_degrees");
+    CONFIG_EDITABLE_VALUE(
+        int, outerPadding, "outer_padding", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(int,
+        ringThickness,
+        "ring_thickness",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(double,
+        sweepDegrees,
+        "sweep_degrees",
+        configschema::LayoutEditFieldTraits<configschema::GaugeSweepDegreesLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FloatingPoint>);
+    CONFIG_EDITABLE_VALUE(int,
+        segmentCount,
+        "segment_count",
+        configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(double,
+        segmentGapDegrees,
+        "segment_gap_degrees",
+        configschema::LayoutEditFieldTraits<configschema::GaugeSegmentGapDegreesLayoutEditPolicyTag,
+            configschema::LayoutEditValueFormat::FloatingPoint>);
     CONFIG_VALUE(int, textHalfWidth, "text_half_width");
-    CONFIG_VALUE(int, valueBottom, "value_bottom");
-    CONFIG_VALUE(int, labelBottom, "label_bottom");
+    CONFIG_EDITABLE_VALUE(
+        int, valueBottom, "value_bottom", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
+    CONFIG_EDITABLE_VALUE(
+        int, labelBottom, "label_bottom", configschema::LayoutEditFieldTraits<configschema::PositiveIntLayoutEditPolicyTag>);
     CONFIG_SECTION("gauge");
 };
 
