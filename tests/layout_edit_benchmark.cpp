@@ -162,8 +162,9 @@ BenchResult TimeDraw(DashboardRenderer& renderer,
     HDC screenDc = GetDC(nullptr);
     HDC memDc = screenDc != nullptr ? CreateCompatibleDC(screenDc) : nullptr;
     void* pixels = nullptr;
-    HBITMAP bitmap = memDc != nullptr ? CreateBenchmarkBitmap(screenDc, renderer.WindowWidth(), renderer.WindowHeight(), &pixels)
-                                      : nullptr;
+    HBITMAP bitmap = memDc != nullptr
+                         ? CreateBenchmarkBitmap(screenDc, renderer.WindowWidth(), renderer.WindowHeight(), &pixels)
+                         : nullptr;
     HGDIOBJ oldBitmap = bitmap != nullptr ? SelectObject(memDc, bitmap) : nullptr;
 
     const auto start = Clock::now();
@@ -195,8 +196,9 @@ BenchResult TimeRelayoutAndDraw(DashboardRenderer& renderer,
     HDC screenDc = GetDC(nullptr);
     HDC memDc = screenDc != nullptr ? CreateCompatibleDC(screenDc) : nullptr;
     void* pixels = nullptr;
-    HBITMAP bitmap = memDc != nullptr ? CreateBenchmarkBitmap(screenDc, renderer.WindowWidth(), renderer.WindowHeight(), &pixels)
-                                      : nullptr;
+    HBITMAP bitmap = memDc != nullptr
+                         ? CreateBenchmarkBitmap(screenDc, renderer.WindowWidth(), renderer.WindowHeight(), &pixels)
+                         : nullptr;
     HGDIOBJ oldBitmap = bitmap != nullptr ? SelectObject(memDc, bitmap) : nullptr;
 
     renderer.SetLayoutGuideDragActive(true);
@@ -318,7 +320,8 @@ int main(int argc, char** argv) {
     PrintBenchResult(combined);
 
     renderer.SetConfig(config);
-    if (const auto snapEval = TimeSnapEvaluation(renderer, config, *guide, target, weightSequence); snapEval.has_value()) {
+    if (const auto snapEval = TimeSnapEvaluation(renderer, config, *guide, target, weightSequence);
+        snapEval.has_value()) {
         PrintBenchResult(*snapEval);
     }
 

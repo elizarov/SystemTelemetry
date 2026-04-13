@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include <windows.h>
@@ -11,6 +13,13 @@
 class LayoutEditHost {
 public:
     virtual ~LayoutEditHost() = default;
+
+    enum class TracePhase {
+        Snap,
+        Apply,
+        PaintTotal,
+        PaintDraw,
+    };
 
     struct LayoutTarget {
         std::string editCardId;
@@ -29,6 +38,9 @@ public:
         DashboardRenderer::LayoutGuideAxis axis) = 0;
     virtual bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) = 0;
     virtual void InvalidateLayoutEdit() = 0;
+    virtual void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) = 0;
+    virtual void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) = 0;
+    virtual void EndLayoutEditTraceSession(const std::string& reason) = 0;
 };
 
 class LayoutEditController {

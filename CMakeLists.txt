@@ -82,6 +82,7 @@ add_executable(SystemTelemetry WIN32
     src/dashboard_controller.cpp
     src/dashboard_app.cpp
     src/layout_edit_controller.cpp
+    src/layout_edit_trace_session.cpp
     src/layout_edit_parameter.cpp
     src/layout_edit_commands.cpp
     src/layout_edit_tooltip.cpp
@@ -279,6 +280,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_edit_parameter.cpp
     src/layout_edit_commands.cpp
     src/layout_edit_controller.cpp
+    src/layout_edit_trace_session.cpp
     src/layout_edit_service.cpp
     src/layout_snap_solver.cpp
     src/dashboard_metrics.cpp

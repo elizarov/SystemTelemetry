@@ -458,11 +458,17 @@ bool DashboardApp::ApplyConfiguredWallpaper() {
 
 bool DashboardApp::ApplyLayoutGuideWeights(
     const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
-    return controller_.ApplyLayoutGuideWeights(*this, target, weights);
+    const auto start = std::chrono::steady_clock::now();
+    const bool applied = controller_.ApplyLayoutGuideWeights(*this, target, weights);
+    RecordLayoutEditTracePhase(TracePhase::Apply, std::chrono::steady_clock::now() - start);
+    return applied;
 }
 
 bool DashboardApp::ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) {
-    return controller_.ApplyLayoutEditValue(*this, parameter, value);
+    const auto start = std::chrono::steady_clock::now();
+    const bool applied = controller_.ApplyLayoutEditValue(*this, parameter, value);
+    RecordLayoutEditTracePhase(TracePhase::Apply, std::chrono::steady_clock::now() - start);
+    return applied;
 }
 
 std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
@@ -1319,6 +1325,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
 }
 
 void DashboardApp::Paint() {
+    const auto paintStart = std::chrono::steady_clock::now();
     PAINTSTRUCT ps{};
     HDC hdc = BeginPaint(hwnd_, &ps);
     RECT client{};
@@ -1333,16 +1340,21 @@ void DashboardApp::Paint() {
     DeleteObject(background);
     SetBkMode(memDc, TRANSPARENT);
 
+    const auto drawStart = std::chrono::steady_clock::now();
     DrawLayout(memDc, controller_.State().telemetry->Snapshot());
     if (controller_.State().isMoving) {
         DrawMoveOverlay(memDc);
     }
+    const auto drawEnd = std::chrono::steady_clock::now();
 
     BitBlt(hdc, 0, 0, client.right, client.bottom, memDc, 0, 0, SRCCOPY);
     SelectObject(memDc, oldBitmap);
     DeleteObject(bitmap);
     DeleteDC(memDc);
     EndPaint(hwnd_, &ps);
+    const auto paintEnd = std::chrono::steady_clock::now();
+    RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);
+    RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);
 }
 
 void DashboardApp::DrawTextBlock(
@@ -1357,4 +1369,20 @@ void DashboardApp::DrawTextBlock(
 
 void DashboardApp::DrawLayout(HDC hdc, const SystemSnapshot& snapshot) {
     renderer_.Draw(hdc, snapshot, rendererEditOverlayState_);
+}
+
+void DashboardApp::BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) {
+    layoutEditTraceSession_.Begin(
+        controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr,
+        kind,
+        detail);
+}
+
+void DashboardApp::RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) {
+    layoutEditTraceSession_.Record(phase, elapsed);
+}
+
+void DashboardApp::EndLayoutEditTraceSession(const std::string& reason) {
+    layoutEditTraceSession_.End(
+        controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr, reason);
 }

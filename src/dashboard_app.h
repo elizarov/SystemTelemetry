@@ -29,6 +29,7 @@
 #include "dashboard_controller.h"
 #include "diagnostics_options.h"
 #include "layout_edit_controller.h"
+#include "layout_edit_trace_session.h"
 
 class DashboardApp : private LayoutEditHost, public DashboardShellHost {
 public:
@@ -96,6 +97,9 @@ private:
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawLayout(HDC hdc, const SystemSnapshot& snapshot);
+    void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override;
+    void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
+    void EndLayoutEditTraceSession(const std::string& reason) override;
 
     const AppConfig& LayoutEditConfig() const override;
     DashboardRenderer& LayoutEditRenderer() override;
@@ -122,4 +126,5 @@ private:
     bool layoutEditMouseTracking_ = false;
     RECT layoutEditTooltipRect_{};
     bool layoutEditTooltipRectValid_ = false;
+    LayoutEditTraceSession layoutEditTraceSession_{};
 };

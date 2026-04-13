@@ -22,6 +22,46 @@ bool EditableAnchorKeyEquals(
            left.anchorId == right.anchorId;
 }
 
+std::string FormatNodePath(const std::vector<size_t>& path) {
+    std::string formatted;
+    for (size_t i = 0; i < path.size(); ++i) {
+        if (!formatted.empty()) {
+            formatted += ".";
+        }
+        formatted += std::to_string(path[i]);
+    }
+    return formatted.empty() ? "root" : formatted;
+}
+
+const char* AxisName(DashboardRenderer::LayoutGuideAxis axis) {
+    return axis == DashboardRenderer::LayoutGuideAxis::Vertical ? "vertical" : "horizontal";
+}
+
+std::string DescribeLayoutGuide(const DashboardRenderer::LayoutEditGuide& guide) {
+    std::string detail = "axis=" + std::string(AxisName(guide.axis)) +
+                         " separator=" + std::to_string(guide.separatorIndex) +
+                         " path=" + FormatNodePath(guide.nodePath);
+    if (!guide.editCardId.empty()) {
+        detail += " card=" + guide.editCardId;
+    }
+    return detail;
+}
+
+std::string DescribeWidgetParameter(LayoutEditParameter parameter) {
+    const auto metadata = GetLayoutEditConfigFieldMetadata(parameter);
+    return std::string(metadata.sectionName) + "." + std::string(metadata.parameterName);
+}
+
+std::string DescribeWidgetGuide(const DashboardRenderer::WidgetEditGuide& guide) {
+    return "axis=" + std::string(AxisName(guide.axis)) + " parameter=" + DescribeWidgetParameter(guide.parameter) +
+           " guide_id=" + std::to_string(guide.guideId) + " path=" + FormatNodePath(guide.widget.nodePath);
+}
+
+std::string DescribeEditableAnchor(const DashboardRenderer::EditableAnchorKey& key) {
+    return "parameter=" + DescribeWidgetParameter(key.parameter) + " anchor_id=" + std::to_string(key.anchorId) +
+           " path=" + FormatNodePath(key.widget.nodePath);
+}
+
 double NormalizeDegrees(double degrees) {
     double normalized = std::fmod(degrees, 360.0);
     if (normalized < 0.0) {
@@ -142,6 +182,7 @@ void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
     SyncRendererInteractionState();
     ReleaseCapture();
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    host_.EndLayoutEditTraceSession("session_stop");
     host_.InvalidateLayoutEdit();
 }
 
@@ -305,6 +346,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
                 clientPoint,
                 std::sqrt((startDx * startDx) + (startDy * startDy))};
             hoveredEditableWidget_ = region->key.widget;
+            host_.BeginLayoutEditTraceSession("anchor", DescribeEditableAnchor(region->key));
             SyncRendererInteractionState();
             SetCapture(hwnd);
             return true;
@@ -321,6 +363,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
         };
         hoveredEditableWidget_ = widgetGuide.widget;
         hoveredWidgetEditGuideIndex_ = resolution.hoveredWidgetEditGuideIndex;
+        host_.BeginLayoutEditTraceSession("widget_guide", DescribeWidgetGuide(widgetGuide));
         SyncRendererInteractionState();
         SetCapture(hwnd);
         return true;
@@ -340,6 +383,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
         };
         renderer.SetLayoutGuideDragActive(true);
         hoveredLayoutGuideIndex_ = resolution.hoveredLayoutGuideIndex;
+        host_.BeginLayoutEditTraceSession("layout_guide", DescribeLayoutGuide(guide));
         SyncRendererInteractionState();
         SetCapture(hwnd);
         return true;
@@ -411,6 +455,7 @@ bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
     SyncRendererInteractionState();
     ReleaseCapture();
     RefreshHover(clientPoint);
+    host_.EndLayoutEditTraceSession("mouse_up");
     return true;
 }
 
@@ -435,6 +480,7 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
     }
     SyncRendererInteractionState();
     host_.InvalidateLayoutEdit();
+    host_.EndLayoutEditTraceSession("capture_changed");
     return true;
 }
 
@@ -665,9 +711,12 @@ bool LayoutEditController::UpdateLayoutDrag(POINT clientPoint) {
     weights[index] = std::clamp(drag.initialWeights[index] + delta, 1, combined - 1);
     weights[index + 1] = combined - weights[index];
     if ((GetKeyState(VK_MENU) & 0x8000) == 0) {
+        const auto snapStart = std::chrono::steady_clock::now();
         if (const auto snappedWeights = FindSnappedLayoutGuideWeights(drag, weights); snappedWeights.has_value()) {
             weights = *snappedWeights;
         }
+        host_.RecordLayoutEditTracePhase(
+            LayoutEditHost::TracePhase::Snap, std::chrono::steady_clock::now() - snapStart);
     }
     if (!host_.ApplyLayoutGuideWeights(LayoutEditHost::LayoutTarget::ForGuide(drag.guide), weights)) {
         return false;
