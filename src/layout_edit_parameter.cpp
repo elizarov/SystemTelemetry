@@ -7,16 +7,12 @@ namespace {
 
 using Parameter = LayoutEditParameter;
 
-int ClampPositiveInt(double value) {
-    return (std::max)(1, static_cast<int>(std::lround(value)));
-}
-
 template <typename Meta>
 bool ApplyFieldEdit(AppConfig& config, double value) {
     using PolicyTag = typename Meta::traits_type::policy_tag;
     if constexpr (std::is_same_v<PolicyTag, configschema::FontSizePolicy>) {
         UiFontConfig font = Meta::RawGet(config);
-        font.size = ClampPositiveInt(value);
+        font.size = static_cast<int>(std::lround(value));
         Meta::Get(config) = std::move(font);
         return true;
     } else {

@@ -221,9 +221,11 @@ add_executable(SystemTelemetryTests
     tests/layout_edit_commands_tests.cpp
     tests/layout_edit_tooltip_tests.cpp
     tests/localization_catalog_tests.cpp
+    tests/config_parser_tests.cpp
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
     tests/telemetry_retained_history_tests.cpp
+    src/config_parser.cpp
     src/config_writer.cpp
     src/config_resolution.cpp
     src/layout_edit_parameter.cpp
@@ -260,38 +262,6 @@ target_link_libraries(SystemTelemetryTests PRIVATE
 set_target_properties(SystemTelemetryTests PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
-
-add_executable(SystemTelemetryConfigParserTests
-    tests/config_parser_tests.cpp
-    src/config_parser.cpp
-    src/config_resolution.cpp
-)
-target_include_directories(SystemTelemetryConfigParserTests PRIVATE
-    "${CMAKE_SOURCE_DIR}/src"
-)
-target_compile_definitions(SystemTelemetryConfigParserTests PRIVATE
-    UNICODE
-    _UNICODE
-    WIN32_LEAN_AND_MEAN
-)
-target_compile_options(SystemTelemetryConfigParserTests PRIVATE
-    /EHsc
-    /W4
-    /permissive-
-    /Zi
-)
-target_link_options(SystemTelemetryConfigParserTests PRIVATE
-    $<$<CONFIG:Debug>:/DEBUG>
-    $<$<CONFIG:Debug>:/INCREMENTAL>
-    $<$<CONFIG:RelWithDebInfo>:/DEBUG>
-    $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
-)
-target_link_libraries(SystemTelemetryConfigParserTests PRIVATE
-    GTest::gtest_main
-)
-set_target_properties(SystemTelemetryConfigParserTests PROPERTIES
-    VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
-)
 add_custom_command(TARGET SystemTelemetryTests POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
         $<TARGET_RUNTIME_DLLS:SystemTelemetryTests>
@@ -299,13 +269,5 @@ add_custom_command(TARGET SystemTelemetryTests POST_BUILD
     COMMAND_EXPAND_LISTS
 )
 
-add_custom_command(TARGET SystemTelemetryConfigParserTests POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        $<TARGET_RUNTIME_DLLS:SystemTelemetryConfigParserTests>
-        $<TARGET_FILE_DIR:SystemTelemetryConfigParserTests>
-    COMMAND_EXPAND_LISTS
-)
-
 add_test(NAME SystemTelemetryTests COMMAND SystemTelemetryTests)
-add_test(NAME SystemTelemetryConfigParserTests COMMAND SystemTelemetryConfigParserTests)
 
