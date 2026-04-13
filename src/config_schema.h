@@ -466,6 +466,11 @@ public:                                                                         
 
 #define CONFIG_ROOT_BINDING_PATH(root_type, ...) configschema::RootBindingPath<root_type, __VA_ARGS__>
 
+#define CONFIG_EDITABLE_ROOT_BINDING_PATH(owner, root_type, ...)                                                      \
+    using owner##RootPath = CONFIG_ROOT_BINDING_PATH(root_type, __VA_ARGS__);                                         \
+    template <typename Field> struct configschema::EditableFieldLens<owner, Field>                                    \
+        : owner##RootPath::template Lens<Field> {}
+
 #define CONFIG_REFLECTED_BINDINGS(owner)                                                                               \
 private:                                                                                                               \
     static constexpr std::size_t _configschema_binding_base = __COUNTER__;                                             \
