@@ -32,7 +32,7 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
 
     const std::vector<LayoutEditParameter> parameters = {
         LayoutEditParameter::MetricListLabelWidth,
-        LayoutEditParameter::MetricListVerticalGap,
+        LayoutEditParameter::MetricListRowGap,
         LayoutEditParameter::DriveUsageLabelGap,
         LayoutEditParameter::DriveUsageBarGap,
         LayoutEditParameter::DriveUsageRwGap,

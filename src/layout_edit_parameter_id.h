@@ -19,7 +19,7 @@ enum class LayoutEditParameter {
     // Metric list
     MetricListBarHeight,
     MetricListLabelWidth,
-    MetricListVerticalGap,
+    MetricListRowGap,
 
     // Drive usage list
     DriveUsageActivitySegments,

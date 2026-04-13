@@ -74,7 +74,7 @@ Widget-specific sizing lives in dedicated sections named exactly after the widge
 
 Supported widget geometry keys:
 
-- `[metric_list]`: `label_width`, `bar_height`, `vertical_gap`
+- `[metric_list]`: `label_width`, `bar_height`, `row_gap`
 - `[drive_usage_list]`: `label_gap`, `activity_width`, `rw_gap`, `bar_gap`, `percent_gap`, `free_width`, `bar_height`, `header_gap`, `row_gap`, `activity_segments`, `activity_segment_gap`
 - `[throughput]`: `header_gap`, `axis_padding`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
 - `[gauge]`: `outer_padding`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `value_bottom`, `label_bottom`
@@ -203,7 +203,7 @@ Supported layout kinds:
 - `rows(...)` splits content vertically into weighted children, with child weights written as `child:weight`
 - `columns(...)` splits content horizontally into weighted children, with child weights written as `child:weight`
 
-`metric_list(...)` rows use a computed row height of `max(label_font_height,value_font_height) + [metric_list].vertical_gap + [metric_list].bar_height`.
+`metric_list(...)` rows use a computed row height of `value_font_height + [metric_list].row_gap + [metric_list].bar_height`, then center the stacked value text and bar inside that row band with no internal gap.
 `drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].header_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].row_gap`.
 `text(...)` uses a preferred height of `text_font_height + [text].bottom_padding`.
 `network_footer` uses a preferred height of `footer_font_height + [network_footer].preferred_padding`.
@@ -222,7 +222,7 @@ When one or more direct `vertical_spring` children are present in `rows(...)`, e
 Interactive layout editing always exposes the container guides for `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, snaps to the nearest same-type exact-size group as soon as the similarity ruler threshold is reached by iteratively re-evaluating nested weighted layouts, lets `Alt` temporarily bypass that snap and continue free dragging, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
 When the pointer hovers a non-empty widget in layout-edit mode, the renderer outlines that widget's resolved box and shows any widget-local size guides that widget supports.
 `metric_list(...)` exposes a vertical guide for `[metric_list].label_width` at the label/value split.
-`metric_list(...)` also exposes horizontal guides after each visible non-empty row for `[metric_list].vertical_gap`.
+`metric_list(...)` also exposes horizontal guides after each visible non-empty row for `[metric_list].row_gap`.
 `throughput(...)` exposes a vertical guide for `[throughput].axis_padding` at the graph's left plot edge so the scale gutter can be widened or narrowed live.
 `throughput(...)` also exposes a horizontal guide for `[throughput].header_gap` at the boundary between the value header row and the graph body.
 `throughput(...)` also exposes circular radial size anchors for `[throughput].leader_diameter` at the middle of the plot's right edge, `[throughput].plot_stroke_width` at the middle of the plot's left edge, and `[throughput].guide_stroke_width` on a centered horizontal guide line whose center stays fixed while the stroke width changes; each anchor circle renders slightly larger than the edited size and dragging it in any direction resizes that throughput chrome from the pointer distance to the anchor center.

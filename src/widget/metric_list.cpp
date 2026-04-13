@@ -32,10 +32,10 @@ MetricListWidget::Entry ParseMetricListEntry(std::string item) {
 }
 
 int EffectiveMetricRowHeight(const DashboardRenderer& renderer) {
-    const int textHeight = std::max(renderer.FontMetrics().label, renderer.FontMetrics().value);
+    const int valueHeight = renderer.FontMetrics().value;
     const int barHeight = std::max(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
-    const int verticalGap = std::max(0, renderer.ScaleLogical(renderer.Config().layout.metricList.verticalGap));
-    return textHeight + verticalGap + barHeight;
+    const int rowGap = std::max(0, renderer.ScaleLogical(renderer.Config().layout.metricList.rowGap));
+    return valueHeight + rowGap + barHeight;
 }
 
 std::string ResolveMetricListLabel(const MetricListWidget::Entry& entry) {
@@ -103,6 +103,8 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     layoutState_.labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
     layoutState_.metricBarHeight = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
     layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
+    const int valueHeight = renderer.FontMetrics().value;
+    const int rowContentHeight = valueHeight + layoutState_.metricBarHeight;
     layoutState_.visibleRows =
         layoutState_.rowHeight > 0
             ? std::clamp(((std::max)(0, static_cast<int>(rect.bottom - rect.top)) + layoutState_.rowHeight - 1) /
@@ -122,10 +124,11 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
             rowRect.top,
             (std::min)(rowRect.right, rowRect.left + layoutState_.labelWidth),
             rowRect.bottom};
-        RECT valueRect{labelRect.right, rowRect.top, rowRect.right, rowRect.bottom};
-        const int barBottom =
-            (std::min)(static_cast<int>(rowRect.bottom), static_cast<int>(rowRect.top) + layoutState_.rowHeight);
-        const int barTop = (std::max)(static_cast<int>(rowRect.top), barBottom - layoutState_.metricBarHeight);
+        const int contentTop =
+            static_cast<int>(rowRect.top) + (std::max)(0, (layoutState_.rowHeight - rowContentHeight) / 2);
+        RECT valueRect{labelRect.right, contentTop, rowRect.right, contentTop + valueHeight};
+        const int barTop = valueRect.bottom;
+        const int barBottom = barTop + layoutState_.metricBarHeight;
         layoutState_.labelRects.push_back(labelRect);
         layoutState_.valueRects.push_back(valueRect);
         layoutState_.barRects.push_back(RECT{valueRect.left, barTop, rowRect.right, barBottom});
@@ -258,13 +261,13 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
         guide = {};
         guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
         guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-        guide.parameter = DashboardRenderer::LayoutEditParameter::MetricListVerticalGap;
+        guide.parameter = DashboardRenderer::LayoutEditParameter::MetricListRowGap;
         guide.guideId = 1 + rowIndex;
         guide.widgetRect = widget.rect;
         guide.drawStart = POINT{widget.rect.left, y};
         guide.drawEnd = POINT{widget.rect.right, y};
         guide.hitRect = RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
-        guide.value = renderer.Config().layout.metricList.verticalGap;
+        guide.value = renderer.Config().layout.metricList.rowGap;
         guide.dragDirection = 1;
         guides.push_back(std::move(guide));
     }

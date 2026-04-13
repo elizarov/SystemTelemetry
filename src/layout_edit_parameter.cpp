@@ -102,7 +102,7 @@ const LayoutEditParameterInfo kParameterInfo[] = {
 
     {Parameter::MetricListBarHeight, &GetFieldMetadata<MetricListWidgetConfig::barHeightMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
     {Parameter::MetricListLabelWidth, &GetFieldMetadata<MetricListWidgetConfig::labelWidthMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
-    {Parameter::MetricListVerticalGap, &GetFieldMetadata<MetricListWidgetConfig::verticalGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
+    {Parameter::MetricListRowGap, &GetFieldMetadata<MetricListWidgetConfig::rowGapMeta>(), true, false, LayoutEditWidgetDragMode::Linear},
 
     {Parameter::DriveUsageActivitySegments, &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentsMeta>(), false, true, LayoutEditWidgetDragMode::Linear},
     {Parameter::DriveUsageBarHeight, &GetFieldMetadata<DriveUsageListWidgetConfig::barHeightMeta>(), false, true, LayoutEditWidgetDragMode::Linear},

@@ -170,7 +170,7 @@ struct MetricListWidgetConfig {
     CONFIG_REFLECTED_STRUCT(MetricListWidgetConfig)
     CONFIG_EDITABLE_VALUE(int, labelWidth, "label_width");
     CONFIG_EDITABLE_VALUE(int, barHeight, "bar_height");
-    CONFIG_EDITABLE_VALUE_WITH(int, verticalGap, "vertical_gap", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("metric_list");
 };
 

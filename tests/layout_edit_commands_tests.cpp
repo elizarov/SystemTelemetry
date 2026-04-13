@@ -28,7 +28,7 @@ TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
     config.layout.driveUsageList.activitySegments = 4;
 
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::TextBottomPadding, -3.0));
-    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::MetricListVerticalGap, -2.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::MetricListRowGap, -2.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageLabelGap, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageRwGap, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DriveUsageBarGap, -1.0));
@@ -41,7 +41,7 @@ TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeOuterPadding, -1.0));
 
     EXPECT_EQ(config.layout.text.bottomPadding, 0);
-    EXPECT_EQ(config.layout.metricList.verticalGap, 0);
+    EXPECT_EQ(config.layout.metricList.rowGap, 0);
     EXPECT_EQ(config.layout.driveUsageList.labelGap, 0);
     EXPECT_EQ(config.layout.driveUsageList.rwGap, 0);
     EXPECT_EQ(config.layout.driveUsageList.barGap, 0);
