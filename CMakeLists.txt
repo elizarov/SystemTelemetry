@@ -318,6 +318,8 @@ target_compile_options(SystemTelemetryBenchmarks PRIVATE
 target_link_options(SystemTelemetryBenchmarks PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:Release>:/DEBUG:FULL>
+    $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
     /MANIFEST:NO
@@ -328,6 +330,8 @@ target_link_libraries(SystemTelemetryBenchmarks PRIVATE
     gdiplus
 )
 set_target_properties(SystemTelemetryBenchmarks PROPERTIES
+    PDB_NAME_RELEASE "SystemTelemetryBenchmarks"
+    PDB_OUTPUT_DIRECTORY_RELEASE "${output_root}"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
 

@@ -13,12 +13,14 @@
 - When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
 - Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
 - Always build through `build.cmd`.
+- Use the top-level `profile_benchmark.cmd` script as the maintained entry point for benchmark CPU profiling; it writes the benchmark ETL and exported CPU summary into `build\` and requires a real elevated Administrator shell with `SeSystemProfilePrivilege`.
 - Keep the repo-level `.clang-format` as the single maintained source of truth for C++ formatting rules.
 - Keep the repo-level `.clangd` as the maintained source of truth for the project compilation-database path used by `clangd` clients.
 - Use the top-level `format.cmd` script as the maintained entry point for formatting non-vendored C++ sources; run `format` to check and `format fix` to apply the repo style.
 - Use the top-level `lint.cmd` script as the maintained entry point for header-to-implementation ownership checks and header-body checks; `lint` runs the architectural policy checks and `lint tidy` runs the optional whole-repo `clang-tidy` sweep.
 - Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
 - Keep the focused layout-edit performance benchmark in the native build as `SystemTelemetryBenchmarks` so relayout and repaint regressions can be measured against the real renderer and config.
+- Keep the `Release` benchmark link configured to emit `build\SystemTelemetryBenchmarks.pdb` so Windows Performance Toolkit exports can resolve benchmark CPU samples to project function names.
 - Provide an `install.cmd` script at the repository root that requests elevation, stops running `SystemTelemetry.exe` instances before deployment, waits for those processes to exit, installs the already-built runtime into `C:\Program Files\SystemTelemetry`, copies `build\SystemTelemetry.exe` there, and leaves auto-start registration to the runtime popup-menu toggle.
 - Keep third-party source vendoring narrow; prefer package-managed dependencies where practical and keep only the minimal ADLX SDK subset needed for the AMD GPU provider in-tree.
 
