@@ -58,7 +58,7 @@ This document is the single maintained source of truth for diagnostics command b
 - When `/trace` is enabled, diagnostics failures prefer trace logging over modal UI and complete with a failure exit code.
 - Required `/fake` load failures follow that same rule so `/fake /exit` returns promptly with trace output.
 - When the renderer initializes under `/trace`, the trace also includes measured font heights, computed layout heights, and resolved widget and card rectangles.
-- While interactive layout editing runs under `/trace`, each started drag writes one `layout_edit_drag:start` marker that identifies the drag kind and edit target, and the matching drag end writes one `layout_edit_drag:end` marker with total drag time plus averaged `snap`, `apply`, `paint_total`, and `paint_draw` timings for the phases that ran during that drag.
+- While interactive layout editing runs under `/trace`, each started drag writes one `layout_edit_drag:start` marker that identifies the drag kind and edit target, the matching drag end writes one `layout_edit_drag:end` marker with total drag time plus averaged `snap`, `apply`, `paint_total`, and `paint_draw` timings for the phases that ran during that drag, and high-volume per-frame `renderer:*` trace lines stay suppressed for the drag duration so the summary stays readable and the trace itself does not dominate drag timing.
 
 ## Dump content
 

@@ -183,6 +183,7 @@ public:
     void SetRenderScale(double scale);
     void SetRenderMode(RenderMode mode);
     void SetLayoutGuideDragActive(bool active);
+    void SetInteractiveDragTraceActive(bool active);
     void RebuildEditArtifacts();
     bool SetLayoutEditPreviewWidgetType(EditOverlayState& overlayState, const std::string& widgetTypeName) const;
     double RenderScale() const;
@@ -425,4 +426,5 @@ private:
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;
     bool layoutGuideDragActive_ = false;
+    bool interactiveDragTraceActive_ = false;
 };

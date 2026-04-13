@@ -337,20 +337,21 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
         if (region.has_value()) {
             const double startDx = static_cast<double>(clientPoint.x - region->dragOrigin.x);
             const double startDy = static_cast<double>(clientPoint.y - region->dragOrigin.y);
-            activeAnchorEditDrag_ = AnchorEditDragState{region->key,
-                region->dragAxis,
-                region->dragMode,
-                region->dragOrigin,
-                region->dragScale,
+        activeAnchorEditDrag_ = AnchorEditDragState{region->key,
+            region->dragAxis,
+            region->dragMode,
+            region->dragOrigin,
+            region->dragScale,
                 region->value,
                 clientPoint,
                 std::sqrt((startDx * startDx) + (startDy * startDy))};
-            hoveredEditableWidget_ = region->key.widget;
-            host_.BeginLayoutEditTraceSession("anchor", DescribeEditableAnchor(region->key));
-            SyncRendererInteractionState();
-            SetCapture(hwnd);
-            return true;
-        }
+        hoveredEditableWidget_ = region->key.widget;
+        renderer.SetInteractiveDragTraceActive(true);
+        host_.BeginLayoutEditTraceSession("anchor", DescribeEditableAnchor(region->key));
+        SyncRendererInteractionState();
+        SetCapture(hwnd);
+        return true;
+    }
     }
 
     if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
@@ -363,6 +364,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
         };
         hoveredEditableWidget_ = widgetGuide.widget;
         hoveredWidgetEditGuideIndex_ = resolution.hoveredWidgetEditGuideIndex;
+        renderer.SetInteractiveDragTraceActive(true);
         host_.BeginLayoutEditTraceSession("widget_guide", DescribeWidgetGuide(widgetGuide));
         SyncRendererInteractionState();
         SetCapture(hwnd);
@@ -382,6 +384,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
             guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y,
         };
         renderer.SetLayoutGuideDragActive(true);
+        renderer.SetInteractiveDragTraceActive(true);
         hoveredLayoutGuideIndex_ = resolution.hoveredLayoutGuideIndex;
         host_.BeginLayoutEditTraceSession("layout_guide", DescribeLayoutGuide(guide));
         SyncRendererInteractionState();
@@ -452,6 +455,7 @@ bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
         host_.LayoutEditRenderer().SetLayoutGuideDragActive(false);
         host_.LayoutEditRenderer().RebuildEditArtifacts();
     }
+    host_.LayoutEditRenderer().SetInteractiveDragTraceActive(false);
     SyncRendererInteractionState();
     ReleaseCapture();
     RefreshHover(clientPoint);
@@ -478,6 +482,7 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
         host_.LayoutEditRenderer().SetLayoutGuideDragActive(false);
         host_.LayoutEditRenderer().RebuildEditArtifacts();
     }
+    host_.LayoutEditRenderer().SetInteractiveDragTraceActive(false);
     SyncRendererInteractionState();
     host_.InvalidateLayoutEdit();
     host_.EndLayoutEditTraceSession("capture_changed");
@@ -604,6 +609,7 @@ void LayoutEditController::ClearInteractionState() {
     hoveredWidgetEditGuideIndex_.reset();
     hoveredEditableAnchor_.reset();
     host_.LayoutEditRenderer().SetLayoutGuideDragActive(false);
+    host_.LayoutEditRenderer().SetInteractiveDragTraceActive(false);
     activeLayoutDrag_.reset();
     activeWidgetEditDrag_.reset();
     activeAnchorEditDrag_.reset();

@@ -307,6 +307,10 @@ void DashboardRenderer::SetLayoutGuideDragActive(bool active) {
     layoutGuideDragActive_ = active;
 }
 
+void DashboardRenderer::SetInteractiveDragTraceActive(bool active) {
+    interactiveDragTraceActive_ = active;
+}
+
 void DashboardRenderer::RebuildEditArtifacts() {
     BuildWidgetEditGuides();
     BuildStaticEditableAnchors();
@@ -1595,6 +1599,9 @@ void DashboardRenderer::ReleasePanelIcons() {
 
 void DashboardRenderer::WriteTrace(const std::string& text) const {
     if (traceOutput_ == nullptr) {
+        return;
+    }
+    if (interactiveDragTraceActive_ && text.rfind("renderer:", 0) == 0) {
         return;
     }
     tracing::Trace trace(traceOutput_);
