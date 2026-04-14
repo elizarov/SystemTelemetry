@@ -183,6 +183,7 @@ public:
         : config_(config), snapshot_(snapshot), renderScale_(renderScale), layoutEditController_(*this) {
         renderer_.SetConfig(config_);
         renderer_.SetRenderScale(renderScale_);
+        renderer_.SetImmediatePresent(true);
         overlayState_.showLayoutEditGuides = true;
     }
 

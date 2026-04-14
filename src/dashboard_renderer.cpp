@@ -270,6 +270,16 @@ void DashboardRenderer::SetRenderScale(double scale) {
     }
 }
 
+void DashboardRenderer::SetImmediatePresent(bool enabled) {
+    if (d2dImmediatePresent_ == enabled) {
+        return;
+    }
+    d2dImmediatePresent_ = enabled;
+    d2dWindowRenderTarget_.Reset();
+    d2dCacheOwnerTarget_ = nullptr;
+    ClearD2DCaches();
+}
+
 void DashboardRenderer::SetRenderMode(RenderMode mode) {
     renderMode_ = mode;
 }
@@ -1949,8 +1959,10 @@ bool DashboardRenderer::EnsureWindowRenderTarget() {
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE),
             96.0f,
             96.0f);
+        const D2D1_PRESENT_OPTIONS presentOptions =
+            d2dImmediatePresent_ ? D2D1_PRESENT_OPTIONS_IMMEDIATELY : D2D1_PRESENT_OPTIONS_NONE;
         const HRESULT hr = d2dFactory_->CreateHwndRenderTarget(properties,
-            D2D1::HwndRenderTargetProperties(hwnd_, D2D1::SizeU(width, height)),
+            D2D1::HwndRenderTargetProperties(hwnd_, D2D1::SizeU(width, height), presentOptions),
             d2dWindowRenderTarget_.ReleaseAndGetAddressOf());
         if (FAILED(hr) || d2dWindowRenderTarget_ == nullptr) {
             lastError_ = "renderer:d2d_hwnd_target_failed hr=0x" + FormatHresult(hr);

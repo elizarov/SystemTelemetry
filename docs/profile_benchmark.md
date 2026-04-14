@@ -9,6 +9,8 @@ This file records the current layout-edit drag benchmark baseline, the latest co
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
 - Measure the repeatable benchmark with `build\SystemTelemetryBenchmarks.exe 240 2`.
 - Capture a full profile with `profile_benchmark.cmd 240 2` when a change materially moves the benchmark or when hotspot confirmation is needed.
+- The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
+- Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
 - `profile_benchmark.cmd` rebuilds automatically through the daemon path, so profiling runs do not need a separate preceding `build.cmd` step.
 - Treat `build\SystemTelemetryBenchmarks.exe 240 2` as the fast comparison loop and the WPR profile as hotspot validation.
 
@@ -24,16 +26,16 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `apply avg_ms=0.22`
   - `paint_draw avg_ms=1.98`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=2.51` to `2.54`
+  - `drag_loop per_iter_ms=2.49` to `2.60`
   - `snap avg_ms=0.19` to `0.20`
-  - `apply avg_ms=0.28`
-  - `paint_draw avg_ms=2.03` to `2.06`
+  - `apply avg_ms=0.28` to `0.30`
+  - `paint_draw avg_ms=2.02` to `2.10`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The exported WPA text still does not surface stable named renderer functions for the benchmark process, but the latest daemon-backed capture under `build\profile_benchmark_daemon\requests\7135_11885_27010\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `amdxx64.dll`, `d3d11.dll`, `DWrite.dll`, `win32kfull.sys`, `WindowsCodecs.dll`, and `TextShaping.dll`.
+- The exported WPA text still does not surface stable named renderer functions for the benchmark process, but the latest elevated capture under `build\profile_benchmark_daemon\adhoc\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `amdxx64.dll`, `d3d11.dll`, `DWrite.dll`, `win32kfull.sys`, `WindowsCodecs.dll`, and `TextShaping.dll`.
 - The latest fixed-text capture keeps the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape that the earlier full-D2D validation captures showed, so replacing the last GDI+ icon decode and scale path did not move the hot work away from the current frame stack.
 - `GdiPlus.dll` no longer appears in the benchmark-process module list after the panel-icon path moved fully onto WIC plus Direct2D upload.
 - No new benchmark-process hotspot stands out in app-owned code; the named app-side leaves that the call tree resolves remain scattered low-single-digit helpers under the same renderer-driven frame.

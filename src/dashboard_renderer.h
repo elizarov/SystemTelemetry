@@ -90,6 +90,7 @@ public:
 
     void SetConfig(const AppConfig& config);
     void SetRenderScale(double scale);
+    void SetImmediatePresent(bool enabled);
     void SetRenderMode(RenderMode mode);
     void SetLayoutGuideDragActive(bool active);
     void SetInteractiveDragTraceActive(bool active);
@@ -493,6 +494,7 @@ private:
     Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dDashedStrokeStyle_;
     ID2D1RenderTarget* d2dActiveRenderTarget_ = nullptr;
     ID2D1RenderTarget* d2dCacheOwnerTarget_ = nullptr;
+    bool d2dImmediatePresent_ = false;
     bool wicComInitialized_ = false;
     bool d2dFirstDrawWarmupPending_ = false;
     int d2dClipDepth_ = 0;
