@@ -75,7 +75,7 @@ private:
         const std::vector<int>& weights,
         const DashboardRenderer::LayoutWidgetIdentity& widget,
         DashboardRenderer::LayoutGuideAxis axis);
-    void StartMoveMode();
+    void StartMoveMode(std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
     void StopMoveMode();
     void UpdateMoveTracking();
     void SyncMoveOverlayState();
@@ -125,6 +125,7 @@ private:
     RECT layoutEditTooltipRect_{};
     bool layoutEditTooltipRectValid_ = false;
     int layoutEditModalUiDepth_ = 0;
+    std::optional<POINT> moveCursorAnchorClientPoint_;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
     LayoutEditTraceSession layoutEditTraceSession_{};
 };

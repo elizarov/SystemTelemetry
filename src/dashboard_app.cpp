@@ -395,11 +395,12 @@ void DashboardApp::RemoveTrayIcon() {
     }
 }
 
-void DashboardApp::StartMoveMode() {
+void DashboardApp::StartMoveMode(std::optional<POINT> cursorAnchorClientPoint) {
     if (controller_.State().isEditingLayout) {
         controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
     }
     HideLayoutEditTooltip();
+    moveCursorAnchorClientPoint_ = cursorAnchorClientPoint;
     suppressMoveStopOnNextLeftButtonUp_ = false;
     controller_.State().isMoving = true;
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
@@ -412,6 +413,7 @@ void DashboardApp::StopMoveMode() {
     if (!controller_.State().isMoving) {
         return;
     }
+    moveCursorAnchorClientPoint_.reset();
     suppressMoveStopOnNextLeftButtonUp_ = false;
     controller_.State().isMoving = false;
     KillTimer(hwnd_, kMoveTimerId);
@@ -426,12 +428,19 @@ void DashboardApp::UpdateMoveTracking() {
         return;
     }
 
-    int cursorOffset = ScaleLogicalToPhysical(24, CurrentWindowDpi());
-    cursorOffset =
-        std::max(cursorOffset, renderer_.TextMetrics().smallText + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
+    int x = 0;
+    int y = 0;
+    if (moveCursorAnchorClientPoint_.has_value()) {
+        x = cursor.x - moveCursorAnchorClientPoint_->x;
+        y = cursor.y - moveCursorAnchorClientPoint_->y;
+    } else {
+        int cursorOffset = ScaleLogicalToPhysical(24, CurrentWindowDpi());
+        cursorOffset =
+            std::max(cursorOffset, renderer_.TextMetrics().smallText + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
 
-    const int x = cursor.x - (WindowWidth() / 2);
-    const int y = cursor.y - cursorOffset;
+        x = cursor.x - (WindowWidth() / 2);
+        y = cursor.y - cursorOffset;
+    }
     SetWindowPos(hwnd_, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
     SyncMoveOverlayState();
@@ -779,7 +788,9 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 layoutEditController_.HandleMouseMove(clientPoint);
                 layoutEditTarget = layoutEditController_.CurrentTooltipTarget();
             }
-            shellUi_->InvokeDefaultAction(DashboardShellUi::MenuSource::AppWindow, layoutEditTarget);
+            shellUi_->InvokeDefaultAction(DashboardShellUi::MenuSource::AppWindow,
+                layoutEditTarget,
+                POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
             if (controller_.State().isMoving) {
                 suppressMoveStopOnNextLeftButtonUp_ = true;
             }
