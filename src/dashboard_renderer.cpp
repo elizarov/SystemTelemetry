@@ -420,7 +420,7 @@ bool DashboardRenderer::ResolveLayout(bool includeWidgetState) {
 
 DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
     const RECT& rect, const std::string& text, HFONT font, UINT format) const {
-    const std::wstring& wideText = GetWideText(text);
+    const std::wstring wideText = WideFromUtf8(text);
     if (wideText.empty()) {
         return TextLayoutResult{rect};
     }
@@ -430,7 +430,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
 DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
     const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
     TextLayoutResult result{rect};
-    const std::wstring& wideText = GetWideText(text);
+    const std::wstring wideText = WideFromUtf8(text);
     if (wideText.empty()) {
         return result;
     }
@@ -460,7 +460,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
 
 void DashboardRenderer::DrawText(
     const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const {
-    const std::wstring& wideText = GetWideText(text);
+    const std::wstring wideText = WideFromUtf8(text);
     if (wideText.empty()) {
         return;
     }
@@ -1385,7 +1385,7 @@ int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const
         return 0;
     }
 
-    const std::wstring& wideText = GetWideText(text);
+    const std::wstring wideText = WideFromUtf8(text);
     if (wideText.empty()) {
         return 0;
     }
@@ -1621,7 +1621,6 @@ void DashboardRenderer::Shutdown() {
     fontHeights_ = {};
     resolvedLayout_ = {};
     parsedWidgetInfoCache_.clear();
-    wideTextCache_.clear();
     textWidthCache_.clear();
     staticEditableAnchorRegions_.clear();
     dynamicEditableAnchorRegions_.clear();
@@ -2244,17 +2243,7 @@ void DashboardRenderer::DestroyFonts() {
     DeleteObject(fonts_.clockDate);
     fonts_ = {};
     d2dTextFormats_ = {};
-    wideTextCache_.clear();
     textWidthCache_.clear();
-}
-
-const std::wstring& DashboardRenderer::GetWideText(std::string_view text) const {
-    if (const auto it = wideTextCache_.find(text); it != wideTextCache_.end()) {
-        return it->second;
-    }
-
-    std::string key(text);
-    return wideTextCache_.emplace(key, WideFromUtf8(key)).first->second;
 }
 
 void DashboardRenderer::ClearD2DCaches() {

@@ -436,7 +436,6 @@ private:
         Microsoft::WRL::ComPtr<IDWriteTextFormat> clockDate;
     };
 
-    const std::wstring& GetWideText(std::string_view text) const;
     void ClearD2DCaches();
     void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const;
@@ -553,7 +552,6 @@ private:
     std::vector<EditableAnchorRegion> dynamicEditableAnchorRegions_;
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
-    mutable std::unordered_map<std::string, std::wstring, TransparentStringHash, TransparentStringEqual> wideTextCache_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textWidthCache_;
     std::unordered_map<D2DBrushCacheKey, Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>, D2DBrushCacheKeyHash>
         d2dSolidBrushCache_;

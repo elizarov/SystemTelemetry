@@ -19,15 +19,15 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured result reached during this workstream:
-  - `drag_loop per_iter_ms=2.59`
+  - `drag_loop per_iter_ms=2.52`
   - `snap avg_ms=0.20`
-  - `apply avg_ms=0.23`
-  - `paint_draw avg_ms=2.15`
+  - `apply avg_ms=0.22`
+  - `paint_draw avg_ms=2.09`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=2.59` to `2.61`
+  - `drag_loop per_iter_ms=2.52` to `2.53`
   - `snap avg_ms=0.20` to `0.21`
-  - `apply avg_ms=0.23` to `0.24`
-  - `paint_draw avg_ms=2.15` to `2.17`
+  - `apply avg_ms=0.22` to `0.23`
+  - `paint_draw avg_ms=2.09` to `2.11`
 
 ## Current Confirmed Hotspots
 
@@ -364,6 +364,20 @@ These changes produced real wins and remain in the codebase:
   - The cleanup did not materially change the already-fast Direct2D frame cost, but it removed a second renderer path that could drift out of sync with the live scene and hide correctness problems in diagnostics or benchmarks.
 - Conclusion:
   - Keep the renderer D2D-only. Future draw-path work should optimize the live Direct2D scene directly instead of preserving a dormant GDI fallback.
+
+### Hypothesis: Remove the renderer-wide UTF-8 to UTF-16 cache from the draw path
+
+- Change:
+  - Stop routing `DrawText`, `DrawTextBlock`, `MeasureTextBlock`, and `MeasureTextWidth` through the renderer-wide `GetWideText` cache, and convert draw strings to UTF-16 on demand so changing telemetry values do not accumulate in a long-lived cache.
+- Result:
+  - Neutral to slightly positive and worth keeping for correctness.
+- Observed effect:
+  - `240`-iteration reruns landed at `drag_loop per_iter_ms=2.53`, `snap avg_ms=0.20`, `apply avg_ms=0.23`, and `paint_draw avg_ms=2.11`.
+  - `480`-iteration reruns landed at `drag_loop per_iter_ms=2.52`, `snap avg_ms=0.21`, `apply avg_ms=0.22`, and `paint_draw avg_ms=2.09`.
+- Why it helped:
+  - The cache was not buying measurable benchmark throughput, and removing it prevents unbounded retention of ever-changing telemetry strings such as clock and live numeric readouts.
+- Conclusion:
+  - Keep uncached UTF-16 conversion in the draw path unless a future bounded cache shows a clear benchmark win without reintroducing unbounded growth.
 
 ### Hypothesis: Reuse one GDI+ `Graphics` object across the whole frame
 
