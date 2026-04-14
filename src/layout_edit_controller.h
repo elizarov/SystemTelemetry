@@ -71,6 +71,7 @@ public:
     bool HandleLButtonUp(RenderPoint clientPoint);
     bool HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner);
     bool HandleSetCursor(HWND hwnd);
+    void CancelInteraction();
     std::optional<TooltipTarget> CurrentTooltipTarget();
 
 private:

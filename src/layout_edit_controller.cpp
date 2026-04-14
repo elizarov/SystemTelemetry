@@ -525,6 +525,27 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     return true;
 }
 
+void LayoutEditController::CancelInteraction() {
+    const bool hadInteraction = hoveredLayoutGuideIndex_.has_value() || hoveredEditableWidget_.has_value() ||
+                                hoveredWidgetEditGuideIndex_.has_value() || hoveredEditableAnchor_.has_value() ||
+                                activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
+                                activeAnchorEditDrag_.has_value();
+    const bool hadLayoutDrag = activeLayoutDrag_.has_value();
+    if (!hadInteraction) {
+        return;
+    }
+
+    ClearInteractionState();
+    if (hadLayoutDrag) {
+        host_.LayoutEditRenderer().RebuildEditArtifacts();
+    }
+    SyncRendererInteractionState();
+    ReleaseCapture();
+    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    host_.EndLayoutEditTraceSession("modal_ui");
+    host_.InvalidateLayoutEdit();
+}
+
 std::optional<LayoutEditController::TooltipTarget> LayoutEditController::CurrentTooltipTarget() {
     if (activeLayoutDrag_.has_value()) {
         TooltipTarget target;

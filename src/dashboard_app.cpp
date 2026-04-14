@@ -678,6 +678,9 @@ std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
 
 void DashboardApp::BeginLayoutEditModalUi() {
     ++layoutEditModalUiDepth_;
+    if (layoutEditModalUiDepth_ == 1 && controller_.State().isEditingLayout) {
+        layoutEditController_.CancelInteraction();
+    }
     HideLayoutEditTooltip();
     layoutEditMouseTracking_ = false;
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
