@@ -125,5 +125,6 @@ private:
     RECT layoutEditTooltipRect_{};
     bool layoutEditTooltipRectValid_ = false;
     int layoutEditModalUiDepth_ = 0;
+    bool suppressMoveStopOnNextLeftButtonUp_ = false;
     LayoutEditTraceSession layoutEditTraceSession_{};
 };

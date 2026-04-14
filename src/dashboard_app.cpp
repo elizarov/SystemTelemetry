@@ -168,6 +168,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
+    wc.style = CS_DBLCLKS;
     wc.lpfnWndProc = &DashboardApp::WndProcSetup;
     wc.hInstance = instance;
     wc.lpszClassName = kWindowClassName;
@@ -399,6 +400,7 @@ void DashboardApp::StartMoveMode() {
         controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
     }
     HideLayoutEditTooltip();
+    suppressMoveStopOnNextLeftButtonUp_ = false;
     controller_.State().isMoving = true;
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
     UpdateMoveTracking();
@@ -410,6 +412,7 @@ void DashboardApp::StopMoveMode() {
     if (!controller_.State().isMoving) {
         return;
     }
+    suppressMoveStopOnNextLeftButtonUp_ = false;
     controller_.State().isMoving = false;
     KillTimer(hwnd_, kMoveTimerId);
     HideLayoutEditTooltip();
@@ -754,7 +757,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (state.isMoving) {
                 StopMoveMode();
             }
-            shellUi_->ShowContextMenu(point, layoutEditTarget);
+            shellUi_->ShowContextMenu(DashboardShellUi::MenuSource::AppWindow, point, layoutEditTarget);
             return 0;
         }
         case WM_LBUTTONDOWN:
@@ -766,6 +769,22 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 }
             }
             break;
+        case WM_LBUTTONDBLCLK: {
+            if (shellUi_->IsLayoutEditModalUiActive()) {
+                return 0;
+            }
+            std::optional<LayoutEditController::TooltipTarget> layoutEditTarget;
+            if (state.isEditingLayout && !state.isMoving) {
+                const RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                layoutEditController_.HandleMouseMove(clientPoint);
+                layoutEditTarget = layoutEditController_.CurrentTooltipTarget();
+            }
+            shellUi_->InvokeDefaultAction(DashboardShellUi::MenuSource::AppWindow, layoutEditTarget);
+            if (controller_.State().isMoving) {
+                suppressMoveStopOnNextLeftButtonUp_ = true;
+            }
+            return 0;
+        }
         case WM_MOUSEMOVE:
             if (state.isEditingLayout && !shellUi_->IsLayoutEditModalUiActive()) {
                 UpdateLayoutEditMouseTracking();
@@ -806,6 +825,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 }
             }
             if (state.isMoving) {
+                if (suppressMoveStopOnNextLeftButtonUp_) {
+                    suppressMoveStopOnNextLeftButtonUp_ = false;
+                    return 0;
+                }
                 StopMoveMode();
                 return 0;
             }
@@ -840,11 +863,11 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (lParam == WM_RBUTTONUP || lParam == WM_CONTEXTMENU) {
                 POINT point{};
                 GetCursorPos(&point);
-                shellUi_->ShowContextMenu(point, std::nullopt);
+                shellUi_->ShowContextMenu(DashboardShellUi::MenuSource::TrayIcon, point, std::nullopt);
                 return 0;
             }
             if (lParam == WM_LBUTTONDBLCLK) {
-                BringOnTop();
+                shellUi_->InvokeDefaultAction(DashboardShellUi::MenuSource::TrayIcon, std::nullopt);
                 return 0;
             }
             break;

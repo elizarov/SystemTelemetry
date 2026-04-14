@@ -99,6 +99,7 @@ Examples include:
 
 - The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
 - The popup menu must provide an `Edit layout` toggle that switches the dashboard into interactive layout-edit mode, shows that item checked while the mode is active, and lets the same menu item turn the mode back off.
+- Double-clicking the dashboard window must invoke the popup menu's default action, using `Edit ...` when layout-edit mode is active and the pointer is over an actionable guide or anchor and otherwise using `Move`, and the dashboard-window popup menu must show that same default item in bold.
 - The command line must accept `/edit-layout` to start the dashboard with layout-edit guides already enabled, and that same switch must make diagnostics screenshots render the guides.
 - The command line must accept `/edit-layout:<widget-name>` for diagnostics screenshots, force the first visible widget of that type into the same outlined and widget-guide-rendering state as a live hover, and fail the export when the requested widget type is not present in the active layout.
 - The command line must also accept `/edit-layout:horizonatal-sizes` and `/edit-layout:vertical-sizes` for diagnostics validation, rendering and numbering every visible horizontal size ruler or every visible vertical size ruler without requiring an active drag.
@@ -268,6 +269,7 @@ While moving, show an overlay in the top-left corner with:
 
 - The dashboard should use normal window Z-order behavior so other windows may cover it. `Bring On Top` should raise the dashboard when it needs to be found.
 - Double-clicking the tray icon should perform the same `Bring On Top` action.
+- The tray popup menu must show `Bring On Top` in bold as its default action, even though the tray menu still exposes the same action list as the dashboard window.
 
 ## Single-instance behavior
 
