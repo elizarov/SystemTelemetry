@@ -33,6 +33,16 @@ TEST(LayoutEditTooltip, BuildsDashboardDescriptor) {
     EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
 }
 
+TEST(LayoutEditTooltip, BuildsDashboardOuterMarginDescriptor) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::DashboardOuterMargin);
+
+    ASSERT_TRUE(descriptor.has_value());
+    EXPECT_EQ(descriptor->configKey, "config.dashboard.outer_margin");
+    EXPECT_EQ(descriptor->sectionName, "dashboard");
+    EXPECT_EQ(descriptor->memberName, "outer_margin");
+    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
+}
+
 TEST(LayoutEditTooltip, IncludesFontAnchors) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::FontLabel);
     ASSERT_TRUE(descriptor.has_value());
@@ -148,6 +158,8 @@ TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
         GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputAxisPadding));
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardBorder),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::CardPadding));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::DashboardOuterMargin),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardRowGap),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::DashboardColumnGap),

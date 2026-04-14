@@ -74,6 +74,7 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
         LayoutEditParameter::CardHeaderContentGap,
         LayoutEditParameter::CardRowGap,
         LayoutEditParameter::CardColumnGap,
+        LayoutEditParameter::DashboardOuterMargin,
         LayoutEditParameter::DashboardRowGap,
         LayoutEditParameter::DashboardColumnGap,
     };

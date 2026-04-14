@@ -46,6 +46,7 @@ TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardHeaderContentGap, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardRowGap, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardColumnGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DashboardOuterMargin, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DashboardRowGap, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DashboardColumnGap, -1.0));
 
@@ -67,6 +68,7 @@ TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
     EXPECT_EQ(config.layout.cardStyle.headerContentGap, 0);
     EXPECT_EQ(config.layout.cardStyle.rowGap, 0);
     EXPECT_EQ(config.layout.cardStyle.columnGap, 0);
+    EXPECT_EQ(config.layout.dashboard.outerMargin, 0);
     EXPECT_EQ(config.layout.dashboard.rowGap, 0);
     EXPECT_EQ(config.layout.dashboard.columnGap, 0);
 }
@@ -132,11 +134,13 @@ TEST(LayoutEditCommands, UpdatesSharedContainerGapFieldsThroughCommands) {
 
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardRowGap, 3.6));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardColumnGap, 8.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DashboardOuterMargin, 5.6));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DashboardRowGap, 9.6));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::DashboardColumnGap, 11.6));
 
     EXPECT_EQ(config.layout.cardStyle.rowGap, 4);
     EXPECT_EQ(config.layout.cardStyle.columnGap, 9);
+    EXPECT_EQ(config.layout.dashboard.outerMargin, 6);
     EXPECT_EQ(config.layout.dashboard.rowGap, 10);
     EXPECT_EQ(config.layout.dashboard.columnGap, 12);
 }

@@ -26,6 +26,7 @@ enum class LayoutEditParameter {
     CardColumnGap,
 
     // Dashboard guides
+    DashboardOuterMargin,
     DashboardRowGap,
     DashboardColumnGap,
 

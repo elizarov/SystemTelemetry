@@ -92,6 +92,7 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::CardRowGap, &GetFieldMetadata<CardStyleConfig::rowGapMeta>(), true, false},
     {Parameter::CardColumnGap, &GetFieldMetadata<CardStyleConfig::columnGapMeta>(), true, false},
 
+    {Parameter::DashboardOuterMargin, &GetFieldMetadata<DashboardSectionConfig::outerMarginMeta>(), true, false},
     {Parameter::DashboardRowGap, &GetFieldMetadata<DashboardSectionConfig::rowGapMeta>(), true, false},
     {Parameter::DashboardColumnGap, &GetFieldMetadata<DashboardSectionConfig::columnGapMeta>(), true, false},
 

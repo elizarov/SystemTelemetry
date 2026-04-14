@@ -84,7 +84,7 @@ CONFIG_SECTION_CODEC(BoardConfig, configschema::BoardSectionCodec);
 
 struct DashboardSectionConfig {
     CONFIG_REFLECTED_STRUCT(DashboardSectionConfig)
-    CONFIG_VALUE(int, outerMargin, "outer_margin");
+    CONFIG_EDITABLE_VALUE_WITH(int, outerMargin, "outer_margin", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE_WITH(int, columnGap, "column_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("dashboard");

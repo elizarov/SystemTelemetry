@@ -489,6 +489,23 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
                         std::to_string(renderer.resolvedLayout_.windowHeight) + " " + FormatRect(dashboardRect) +
                         " cards_root=\"" + renderer.config_.layout.structure.cardsLayout.name + "\"");
 
+    if (includeWidgetState && !renderer.layoutGuideDragActive_) {
+        DashboardRenderer::GapEditAnchor anchor;
+        anchor.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
+        anchor.key.widget =
+            DashboardRenderer::LayoutWidgetIdentity{"", "", {}, DashboardRenderer::LayoutWidgetIdentity::Kind::DashboardChrome};
+        anchor.key.parameter = DashboardRenderer::LayoutEditParameter::DashboardOuterMargin;
+        const int handleSize = (std::max)(4, renderer.ScaleLogical(6));
+        const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
+        anchor.drawStart = RenderPoint{0, dashboardRect.top};
+        anchor.drawEnd = RenderPoint{dashboardRect.left, dashboardRect.top};
+        anchor.handleRect = MakeSquareAnchorRect(anchor.drawEnd.x, anchor.drawEnd.y, handleSize);
+        anchor.hitRect = anchor.handleRect.Inflate(hitInset, hitInset);
+        anchor.dragAxis = DashboardRenderer::AnchorDragAxis::Horizontal;
+        anchor.value = renderer.Config().layout.dashboard.outerMargin;
+        renderer.gapEditAnchors_.push_back(std::move(anchor));
+    }
+
     const auto resolveCard = [&](const LayoutNodeConfig& node, const RenderRect& rect) {
         const auto cardIt = std::find_if(renderer.config_.layout.cards.begin(),
             renderer.config_.layout.cards.end(),
