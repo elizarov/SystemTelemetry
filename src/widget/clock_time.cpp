@@ -30,17 +30,13 @@ void ClockTimeWidget::Draw(DashboardRenderer& renderer,
     }
 
     const std::string text = metrics.ResolveClockTime();
-    renderer.DrawText(hdc,
+    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(hdc,
         widget.rect,
         text,
         renderer.WidgetFonts().clockTime,
         renderer.ForegroundColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    renderer.RegisterDynamicTextAnchor(hdc,
-        widget.rect,
-        text,
-        renderer.WidgetFonts().clockTime,
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+    renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontClockTime,
             0,

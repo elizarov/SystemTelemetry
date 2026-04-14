@@ -283,17 +283,13 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         char number[16];
         sprintf_s(number, "%.0f%%", metric.percent);
-        renderer.DrawText(hdc,
+        const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(hdc,
             layoutState_.valueRect,
             number,
             renderer.WidgetFonts().big,
             renderer.ForegroundColor(),
             DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-        renderer.RegisterDynamicTextAnchor(hdc,
-            layoutState_.valueRect,
-            number,
-            renderer.WidgetFonts().big,
-            DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+        renderer.RegisterDynamicTextAnchor(valueLayout,
             renderer.MakeEditableTextBinding(
                 widget, DashboardRenderer::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
     }

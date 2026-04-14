@@ -119,19 +119,14 @@ void DrawGraph(DashboardRenderer& renderer,
     sprintf_s(maxLabel, "%.0f", maxValue);
     RECT maxRect{rect.left, rect.top, rect.left + layout.axisWidth, layout.graphTop};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        renderer.DrawText(hdc,
+        const DashboardRenderer::TextLayoutResult maxLabelLayout = renderer.DrawTextBlock(hdc,
             maxRect,
             maxLabel,
             renderer.WidgetFonts().smallFont,
             renderer.MutedTextColor(),
             DT_CENTER | DT_SINGLELINE | DT_VCENTER);
         if (maxLabelEditable.has_value()) {
-            renderer.RegisterDynamicTextAnchor(hdc,
-                maxRect,
-                maxLabel,
-                renderer.WidgetFonts().smallFont,
-                DT_CENTER | DT_SINGLELINE | DT_VCENTER,
-                *maxLabelEditable);
+            renderer.RegisterDynamicTextAnchor(maxLabelLayout, *maxLabelEditable);
         }
     }
 
@@ -254,17 +249,13 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         layoutState_.valueRect.right,
         layoutState_.valueRect.bottom};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        renderer.DrawText(hdc,
+        const DashboardRenderer::TextLayoutResult numberLayout = renderer.DrawTextBlock(hdc,
             numberRect,
             buffer,
             renderer.WidgetFonts().smallFont,
             renderer.ForegroundColor(),
             DT_RIGHT | DT_SINGLELINE | DT_VCENTER);
-        renderer.RegisterDynamicTextAnchor(hdc,
-            numberRect,
-            buffer,
-            renderer.WidgetFonts().smallFont,
-            DT_RIGHT | DT_SINGLELINE | DT_VCENTER,
+        renderer.RegisterDynamicTextAnchor(numberLayout,
             renderer.MakeEditableTextBinding(widget,
                 DashboardRenderer::LayoutEditParameter::FontSmall,
                 1,

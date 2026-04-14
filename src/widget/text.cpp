@@ -50,7 +50,7 @@ void TextWidget::Draw(DashboardRenderer& renderer,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
     const std::string text = metrics.ResolveText(metric_);
-    renderer.DrawText(hdc,
+    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(hdc,
         widget.rect,
         text,
         renderer.WidgetFonts().text,
@@ -70,6 +70,5 @@ void TextWidget::Draw(DashboardRenderer& renderer,
         }
         return;
     }
-    renderer.RegisterDynamicTextAnchor(
-        hdc, widget.rect, text, renderer.WidgetFonts().text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS, binding);
+    renderer.RegisterDynamicTextAnchor(textLayout, binding);
 }

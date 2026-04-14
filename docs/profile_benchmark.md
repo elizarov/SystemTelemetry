@@ -23,10 +23,10 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=0.19`
   - `paint_draw avg_ms=3.78`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=5.05` to `5.55`
-  - `snap avg_ms=0.21` to `0.22`
-  - `apply avg_ms=0.42` to `0.47`
-  - `paint_draw avg_ms=4.17` to `4.57`
+  - `drag_loop per_iter_ms=4.54` to `4.81`
+  - `snap avg_ms=0.20`
+  - `apply avg_ms=0.38` to `0.40`
+  - `paint_draw avg_ms=3.82` to `4.05`
 
 ## Current Confirmed Hotspots
 
@@ -36,13 +36,12 @@ Confirmed inclusive hotspots from the latest useful WPR capture in this workstre
 - `ThroughputWidget::Draw` about `18%`
 - ``anonymous namespace'::DrawGraph`` about `18%`
 - `GaugeWidget::Draw` about `13%`
-- `DashboardRenderer::RegisterTextAnchor` about `12.5%`
-- `DashboardRenderer::RegisterStaticTextAnchor` about `12.5%`
+- Before the latest text-anchor optimization, `DashboardRenderer::RegisterTextAnchor` and `DashboardRenderer::RegisterStaticTextAnchor` were both about `12.5%`; a follow-up coarse WPR text summary after the change still surfaced `DashboardRenderer::Draw`, `ThroughputWidget::Draw`, and `DrawGraph`, but it no longer surfaced those anchor functions near the top benchmark-side rows.
 
 Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
-- The remaining wall time is now dominated by real paint work, especially throughput graph drawing, gauge fills, and edit-mode text-anchor registration.
+- The remaining wall time is now dominated by real paint work, especially throughput graph drawing and gauge fills, while text-anchor bookkeeping still benefits from staying on the cheapest available path.
 - `DashboardLayoutResolver::ResolveLayout` no longer appears among the top benchmark user-mode functions in the latest useful capture, which matches the large drop in `snap avg_ms`.
 
 ## Kept Optimizations
@@ -54,6 +53,7 @@ These changes produced real wins and remain in the codebase:
 - Refactor layout similarity indicator collection to avoid repeated representative scans and reduce per-frame container churn.
 - Build only the one live gauge usage-fill path that the current metric needs instead of prebuilding every cumulative gauge fill path during each relayout.
 - Resolve snap-preview guide probes through an extent-only layout pass that skips widget instantiation, widget layout-state caching, and edit-artifact rebuilds.
+- Reuse draw-time text layout results for dynamic text anchors and measure static text anchors through one shared HDC during static-anchor rebuilds.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 
 ## Tested Hypotheses
@@ -118,6 +118,20 @@ These changes produced real wins and remain in the codebase:
   - `paint_draw avg_ms` stayed about flat or slightly better at `3.78` to `3.87`.
 - Conclusion:
   - Snap probing only needs resolved extents, so reusing the full widget-state resolve path for those tentative weights was avoidable overhead and is worth skipping.
+
+### Hypothesis: Reuse draw-time text layout and batch static text-anchor measurement
+
+- Change:
+  - Let anchor-bearing text draws reuse the text rectangle already computed during `DrawTextBlock` instead of measuring the same text again for dynamic anchor registration, and measure static text anchors through one shared HDC during static-anchor rebuilds instead of calling `GetDC` and `ReleaseDC` per anchor.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - `drag_loop per_iter_ms` improved from about `5.05-5.55` down to about `4.54-4.81`.
+  - `snap avg_ms` tightened from about `0.21-0.22` down to about `0.20`.
+  - `apply avg_ms` improved from about `0.42-0.47` down to about `0.38-0.40`.
+  - `paint_draw avg_ms` improved from about `4.17-4.57` down to about `3.82-4.05`.
+- Conclusion:
+  - Text-anchor bookkeeping still contained measurable repeated text-layout and DC-management overhead, and removing that duplicate work is worth keeping.
 
 ### Hypothesis: Replace throughput `Polyline` with incremental `MoveToEx` and `LineTo`
 
@@ -210,6 +224,22 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - The combined-path gauge rendering is better than per-segment filling and should remain the baseline.
 
+### Hypothesis: Replace gauge GDI+ path fills with software rasterization
+
+- Change:
+  - Rasterize the segmented gauge into a temporary supersampled ARGB image in software and blit that image into the frame instead of using the existing GDI+ path fills.
+- Result:
+  - Regressed catastrophically and was reverted.
+- Observed effect:
+  - `drag_loop per_iter_ms` rose to about `8.31`.
+  - `snap avg_ms` stayed about `0.22`.
+  - `apply avg_ms` stayed about `0.43`.
+  - `paint_draw avg_ms` rose to about `7.38`.
+- Why it failed:
+  - The per-pixel rasterization and extra image-blit path cost much more than the saved GDI+ fill calls.
+- Conclusion:
+  - A software gauge path is not promising unless it can draw directly into the renderer-owned frame buffer without the extra per-widget raster-and-blit cost.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.
@@ -217,10 +247,9 @@ These changes produced real wins and remain in the codebase:
 - Be skeptical of caches tied to graph or gauge size during drag; size changes every frame and cache maintenance can outweigh the saved draw work.
 - Prioritize experiments that reduce primitive count or switch to a cheaper primitive family while preserving the same pixels.
 - The most promising remaining directions are:
-  - replacing expensive gauge fill operations with a visually equivalent but cheaper drawing method
   - reducing throughput graph draw cost without replacing `Polyline` with per-segment line commands
   - reducing the amount of GDI+ work inside `GaugeWidget::Draw`
-  - trimming text-anchor registration cost when layout-edit behavior can stay identical
+  - exploring a renderer-owned direct-to-backbuffer raster path if a software widget experiment can avoid the extra bitmap copy that made the standalone gauge rasterizer fail
   - favoring draw-path work over additional snap-path work unless a new experiment also moves `apply`
 
 ## Validation Notes

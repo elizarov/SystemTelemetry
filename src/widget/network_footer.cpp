@@ -49,17 +49,13 @@ void NetworkFooterWidget::Draw(DashboardRenderer& renderer,
     }
 
     const std::string text = metrics.ResolveNetworkFooter();
-    renderer.DrawText(hdc,
+    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(hdc,
         widget.rect,
         text,
         renderer.WidgetFonts().footer,
         renderer.MutedTextColor(),
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    renderer.RegisterDynamicTextAnchor(hdc,
-        widget.rect,
-        text,
-        renderer.WidgetFonts().footer,
-        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
+    renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(
             widget, DashboardRenderer::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size));
 }

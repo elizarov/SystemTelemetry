@@ -266,6 +266,7 @@ public:
         HFONT font,
         UINT format,
         const EditableAnchorBinding& editable);
+    void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult, const EditableAnchorBinding& editable);
     void RegisterDynamicTextAnchor(
         const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
@@ -481,6 +482,9 @@ private:
         HFONT font,
         UINT format,
         const EditableAnchorBinding& editable);
+    void RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
+        const TextLayoutResult& layoutResult,
+        const EditableAnchorBinding& editable);
     void DrawAlphaCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha);
     void WriteTrace(const std::string& text) const;
 
@@ -496,6 +500,7 @@ private:
     std::vector<WidgetEditGuide> widgetEditGuides_;
     std::vector<EditableAnchorRegion> staticEditableAnchorRegions_;
     std::vector<EditableAnchorRegion> dynamicEditableAnchorRegions_;
+    HDC staticAnchorMeasureHdc_ = nullptr;
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     mutable std::unordered_map<std::string, std::wstring> wideTextCache_;

@@ -30,17 +30,13 @@ void ClockDateWidget::Draw(DashboardRenderer& renderer,
     }
 
     const std::string text = metrics.ResolveClockDate();
-    renderer.DrawText(hdc,
+    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(hdc,
         widget.rect,
         text,
         renderer.WidgetFonts().clockDate,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    renderer.RegisterDynamicTextAnchor(hdc,
-        widget.rect,
-        text,
-        renderer.WidgetFonts().clockDate,
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER,
+    renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontClockDate,
             0,

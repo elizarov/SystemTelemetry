@@ -272,6 +272,12 @@ SIZE MeasureTextSize(HDC hdc, HFONT font, const std::string& text) {
     return size;
 }
 
+bool IsFastSingleLineTextFormat(const std::wstring& wideText, UINT format) {
+    return !wideText.empty() && (format & DT_SINGLELINE) != 0 && (format & DT_END_ELLIPSIS) == 0 &&
+           (format & DT_PATH_ELLIPSIS) == 0 && (format & DT_WORD_ELLIPSIS) == 0 && (format & DT_WORDBREAK) == 0 &&
+           (format & DT_EDITCONTROL) == 0 && (format & DT_EXPANDTABS) == 0;
+}
+
 }  // namespace
 
 DashboardRenderer::DashboardRenderer() = default;
@@ -545,8 +551,52 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
 
 DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
     HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
-    const TextLayoutResult result = MeasureTextBlock(hdc, rect, text, font, format);
-    DrawText(hdc, rect, text, font, color, format);
+    TextLayoutResult result{rect};
+    const std::wstring& wideText = GetWideText(text);
+    if (wideText.empty()) {
+        return result;
+    }
+
+    HGDIOBJ oldFont = SelectObject(hdc, font);
+    SetTextColor(hdc, color);
+    if (IsFastSingleLineTextFormat(wideText, format)) {
+        const TextWidthCacheKey cacheKey{font, text};
+        SIZE size{};
+        if (const auto it = textExtentCache_.find(cacheKey); it != textExtentCache_.end()) {
+            size = it->second;
+        } else {
+            GetTextExtentPoint32W(hdc, wideText.c_str(), static_cast<int>(wideText.size()), &size);
+            textExtentCache_.emplace(cacheKey, size);
+        }
+
+        int x = rect.left;
+        if ((format & DT_CENTER) != 0) {
+            x = rect.left + std::max(0L, (rect.right - rect.left - size.cx) / 2);
+        } else if ((format & DT_RIGHT) != 0) {
+            x = rect.right - size.cx;
+        }
+
+        int y = rect.top;
+        if ((format & DT_VCENTER) != 0) {
+            y = rect.top + std::max(0L, (rect.bottom - rect.top - size.cy) / 2);
+        } else if ((format & DT_BOTTOM) != 0) {
+            y = rect.bottom - size.cy;
+        }
+
+        result.textRect = RECT{x,
+            y,
+            std::min(rect.right, static_cast<LONG>(x + size.cx)),
+            std::min(rect.bottom, static_cast<LONG>(y + size.cy))};
+
+        const UINT options = (format & DT_NOCLIP) != 0 ? 0u : ETO_CLIPPED;
+        const RECT* clipRect = (format & DT_NOCLIP) != 0 ? nullptr : &rect;
+        ExtTextOutW(hdc, x, y, options, clipRect, wideText.c_str(), static_cast<UINT>(wideText.size()), nullptr);
+    } else {
+        result = MeasureTextBlock(hdc, rect, text, font, format);
+        RECT copy = rect;
+        ::DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
+    }
+    SelectObject(hdc, oldFont);
     return result;
 }
 
@@ -555,10 +605,7 @@ void DashboardRenderer::DrawText(
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
     const std::wstring& wideText = GetWideText(text);
-    const bool fastSingleLine = !wideText.empty() && (format & DT_SINGLELINE) != 0 && (format & DT_END_ELLIPSIS) == 0 &&
-                                (format & DT_PATH_ELLIPSIS) == 0 && (format & DT_WORD_ELLIPSIS) == 0 &&
-                                (format & DT_WORDBREAK) == 0 && (format & DT_EDITCONTROL) == 0 &&
-                                (format & DT_EXPANDTABS) == 0;
+    const bool fastSingleLine = IsFastSingleLineTextFormat(wideText, format);
     if (fastSingleLine) {
         const TextWidthCacheKey cacheKey{font, text};
         SIZE size{};
@@ -945,9 +992,39 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
         editable.value);
 }
 
+void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
+    const TextLayoutResult& layoutResult,
+    const EditableAnchorBinding& editable) {
+    const RECT& textRect = layoutResult.textRect;
+    if (textRect.right <= textRect.left || textRect.bottom <= textRect.top) {
+        return;
+    }
+
+    const int anchorSize = std::max(4, ScaleLogical(6));
+    const int anchorHalf = anchorSize / 2;
+    const int anchorCenterX = textRect.right;
+    const int anchorCenterY = textRect.top;
+    const RECT anchorRect{anchorCenterX - anchorHalf,
+        anchorCenterY - anchorHalf,
+        anchorCenterX - anchorHalf + anchorSize,
+        anchorCenterY - anchorHalf + anchorSize};
+    RegisterEditableAnchorRegion(regions,
+        editable.key,
+        textRect,
+        anchorRect,
+        editable.shape,
+        editable.dragAxis,
+        editable.dragMode,
+        POINT{anchorCenterX, anchorCenterY},
+        1.0,
+        false,
+        true,
+        editable.value);
+}
+
 void DashboardRenderer::RegisterStaticTextAnchor(
     const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
-    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, nullptr, font, format, editable);
+    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, staticAnchorMeasureHdc_, font, format, editable);
 }
 
 void DashboardRenderer::RegisterDynamicTextAnchor(HDC hdc,
@@ -960,6 +1037,14 @@ void DashboardRenderer::RegisterDynamicTextAnchor(HDC hdc,
         return;
     }
     RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, hdc, font, format, editable);
+}
+
+void DashboardRenderer::RegisterDynamicTextAnchor(
+    const TextLayoutResult& layoutResult, const EditableAnchorBinding& editable) {
+    if (!dynamicAnchorRegistrationEnabled_) {
+        return;
+    }
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, layoutResult, editable);
 }
 
 void DashboardRenderer::RegisterDynamicTextAnchor(
