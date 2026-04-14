@@ -217,23 +217,29 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     }
 
     const bool horizontal = node.name == "columns";
-    {
+    const DashboardRenderer::LayoutWidgetIdentity gapWidgetIdentity =
+        renderCardId.empty()
+            ? DashboardRenderer::LayoutWidgetIdentity{
+                  "", "", {}, DashboardRenderer::LayoutWidgetIdentity::Kind::DashboardChrome}
+            : DashboardRenderer::LayoutWidgetIdentity{
+                  renderCardId, renderCardId, {}, DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome};
+    const DashboardRenderer::LayoutEditParameter gapParameter =
+        renderCardId.empty() ? (horizontal ? DashboardRenderer::LayoutEditParameter::DashboardColumnGap
+                                           : DashboardRenderer::LayoutEditParameter::DashboardRowGap)
+                             : (horizontal ? DashboardRenderer::LayoutEditParameter::CardColumnGap
+                                           : DashboardRenderer::LayoutEditParameter::CardRowGap);
+    const bool gapAnchorAlreadyRegistered =
+        std::any_of(renderer.gapEditAnchors_.begin(), renderer.gapEditAnchors_.end(), [&](const auto& anchor) {
+            return anchor.key.parameter == gapParameter && anchor.key.widget.kind == gapWidgetIdentity.kind &&
+                   anchor.key.widget.renderCardId == gapWidgetIdentity.renderCardId &&
+                   anchor.key.widget.editCardId == gapWidgetIdentity.editCardId;
+        });
+    if (!gapAnchorAlreadyRegistered) {
         DashboardRenderer::GapEditAnchor anchor;
         anchor.axis =
             horizontal ? DashboardRenderer::LayoutGuideAxis::Horizontal : DashboardRenderer::LayoutGuideAxis::Vertical;
-        anchor.key.widget =
-            renderCardId.empty()
-                ? DashboardRenderer::LayoutWidgetIdentity{"",
-                      "",
-                      {},
-                      DashboardRenderer::LayoutWidgetIdentity::Kind::DashboardChrome}
-                : DashboardRenderer::LayoutWidgetIdentity{
-                      renderCardId, renderCardId, {}, DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome};
-        anchor.key.parameter = renderCardId.empty()
-                                   ? (horizontal ? DashboardRenderer::LayoutEditParameter::DashboardColumnGap
-                                                 : DashboardRenderer::LayoutEditParameter::DashboardRowGap)
-                                   : (horizontal ? DashboardRenderer::LayoutEditParameter::CardColumnGap
-                                                 : DashboardRenderer::LayoutEditParameter::CardRowGap);
+        anchor.key.widget = gapWidgetIdentity;
+        anchor.key.parameter = gapParameter;
         anchor.key.nodePath = nodePath;
         const RenderRect& firstGapLead = childRects.front();
         const RenderRect& firstGapTrail = childRects[1];
