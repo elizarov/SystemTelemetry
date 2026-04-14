@@ -97,6 +97,7 @@ private:
 
     void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawLayout(HDC hdc, const SystemSnapshot& snapshot);
+    void ReleasePaintBuffer();
     void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
     void EndLayoutEditTraceSession(const std::string& reason) override;
@@ -127,4 +128,8 @@ private:
     RECT layoutEditTooltipRect_{};
     bool layoutEditTooltipRectValid_ = false;
     LayoutEditTraceSession layoutEditTraceSession_{};
+    HDC paintBufferDc_ = nullptr;
+    HBITMAP paintBufferBitmap_ = nullptr;
+    HBITMAP paintBufferOldBitmap_ = nullptr;
+    SIZE paintBufferSize_{};
 };

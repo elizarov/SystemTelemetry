@@ -35,6 +35,56 @@ struct BenchResult {
     Duration perIteration{};
 };
 
+struct PaintBuffer {
+    HDC dc = nullptr;
+    HBITMAP bitmap = nullptr;
+    HBITMAP previousBitmap = nullptr;
+    int width = 0;
+    int height = 0;
+
+    void Reset() {
+        if (dc != nullptr && previousBitmap != nullptr) {
+            SelectObject(dc, previousBitmap);
+        }
+        if (bitmap != nullptr) {
+            DeleteObject(bitmap);
+        }
+        if (dc != nullptr) {
+            DeleteDC(dc);
+        }
+        dc = nullptr;
+        bitmap = nullptr;
+        previousBitmap = nullptr;
+        width = 0;
+        height = 0;
+    }
+
+    ~PaintBuffer() {
+        Reset();
+    }
+
+    bool Ensure(HDC compatibleWith, int targetWidth, int targetHeight) {
+        if (dc != nullptr && width == targetWidth && height == targetHeight) {
+            return true;
+        }
+
+        Reset();
+        dc = CreateCompatibleDC(compatibleWith);
+        if (dc == nullptr) {
+            return false;
+        }
+        bitmap = CreateCompatibleBitmap(compatibleWith, targetWidth, targetHeight);
+        if (bitmap == nullptr) {
+            Reset();
+            return false;
+        }
+        previousBitmap = static_cast<HBITMAP>(SelectObject(dc, bitmap));
+        width = targetWidth;
+        height = targetHeight;
+        return true;
+    }
+};
+
 std::filesystem::path SourceConfigPath() {
     return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
 }
@@ -187,6 +237,7 @@ public:
     }
 
     ~BenchmarkDragHost() {
+        paintBuffer_.Reset();
         if (hwnd_ != nullptr) {
             DestroyWindow(hwnd_);
         }
@@ -232,23 +283,23 @@ public:
         dirty_ = false;
         const auto paintStart = Clock::now();
         HDC hdc = GetDC(hwnd_);
-        HDC memDc = CreateCompatibleDC(hdc);
-        HBITMAP bitmap = CreateCompatibleBitmap(hdc, renderer_.WindowWidth(), renderer_.WindowHeight());
-        HGDIOBJ oldBitmap = SelectObject(memDc, bitmap);
         RECT client{0, 0, renderer_.WindowWidth(), renderer_.WindowHeight()};
+        if (hdc == nullptr || !paintBuffer_.Ensure(hdc, client.right, client.bottom)) {
+            if (hdc != nullptr) {
+                ReleaseDC(hwnd_, hdc);
+            }
+            return;
+        }
         HBRUSH background = CreateSolidBrush(renderer_.BackgroundColor());
-        FillRect(memDc, &client, background);
+        FillRect(paintBuffer_.dc, &client, background);
         DeleteObject(background);
-        SetBkMode(memDc, TRANSPARENT);
+        SetBkMode(paintBuffer_.dc, TRANSPARENT);
 
         const auto drawStart = Clock::now();
-        renderer_.Draw(memDc, snapshot_, overlayState_);
+        renderer_.Draw(paintBuffer_.dc, snapshot_, overlayState_);
         const auto drawEnd = Clock::now();
 
-        BitBlt(hdc, 0, 0, client.right, client.bottom, memDc, 0, 0, SRCCOPY);
-        SelectObject(memDc, oldBitmap);
-        DeleteObject(bitmap);
-        DeleteDC(memDc);
+        BitBlt(hdc, 0, 0, client.right, client.bottom, paintBuffer_.dc, 0, 0, SRCCOPY);
         ReleaseDC(hwnd_, hdc);
 
         const auto paintEnd = Clock::now();
@@ -331,6 +382,7 @@ private:
     const SystemSnapshot& snapshot_;
     double renderScale_ = 1.0;
     bool dirty_ = false;
+    PaintBuffer paintBuffer_{};
     LayoutEditController layoutEditController_;
     LayoutEditTraceSession traceSession_{};
     std::ostringstream traceStream_{};

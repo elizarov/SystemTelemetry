@@ -259,6 +259,8 @@ public:
     void RegisterStaticTextAnchor(
         const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
     void RegisterDynamicTextAnchor(
+        HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
+    void RegisterDynamicTextAnchor(
         const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
     int ScaleLogical(int value) const;
@@ -346,6 +348,51 @@ private:
         }
     };
 
+    struct AlphaCapsuleCacheKey {
+        COLORREF color = 0;
+        BYTE alpha = 255;
+        int width = 0;
+        int height = 0;
+
+        bool operator==(const AlphaCapsuleCacheKey& other) const {
+            return color == other.color && alpha == other.alpha && width == other.width && height == other.height;
+        }
+    };
+
+    struct AlphaCapsuleCacheKeyHash {
+        size_t operator()(const AlphaCapsuleCacheKey& key) const {
+            size_t hash = std::hash<COLORREF>{}(key.color);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.alpha);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
+            return hash;
+        }
+    };
+
+    struct AlphaCapsuleBitmap {
+        HDC hdc = nullptr;
+        HBITMAP bitmap = nullptr;
+    };
+
+    struct PanelIconCacheKey {
+        std::string name;
+        int width = 0;
+        int height = 0;
+
+        bool operator==(const PanelIconCacheKey& other) const {
+            return name == other.name && width == other.width && height == other.height;
+        }
+    };
+
+    struct PanelIconCacheKeyHash {
+        size_t operator()(const PanelIconCacheKey& key) const {
+            size_t hash = std::hash<std::string>{}(key.name);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
+            return hash;
+        }
+    };
+
     struct PenCacheKeyHash {
         size_t operator()(const PenCacheKey& key) const {
             return (std::hash<COLORREF>{}(key.color) * 1315423911u) ^ std::hash<int>{}(key.width);
@@ -421,9 +468,11 @@ private:
     void RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
         const RECT& rect,
         const std::string& text,
+        HDC measureHdc,
         HFONT font,
         UINT format,
         const EditableAnchorBinding& editable);
+    void DrawAlphaCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha);
     void WriteTrace(const std::string& text) const;
 
     AppConfig config_;
@@ -442,9 +491,12 @@ private:
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     mutable std::unordered_map<std::string, std::wstring> wideTextCache_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash> textWidthCache_;
+    mutable std::unordered_map<TextWidthCacheKey, SIZE, TextWidthCacheKeyHash> textExtentCache_;
     mutable std::unordered_map<TextMeasureCacheKey, SIZE, TextMeasureCacheKeyHash> textMeasureCache_;
     std::unordered_map<COLORREF, HBRUSH> solidBrushCache_;
     std::unordered_map<PenCacheKey, HPEN, PenCacheKeyHash> solidPenCache_;
+    std::unordered_map<AlphaCapsuleCacheKey, AlphaCapsuleBitmap, AlphaCapsuleCacheKeyHash> alphaCapsuleCache_;
+    std::unordered_map<PanelIconCacheKey, AlphaCapsuleBitmap, PanelIconCacheKeyHash> scaledPanelIconCache_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

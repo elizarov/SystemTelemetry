@@ -651,7 +651,7 @@ void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
 }
 
 std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeights(
-    const LayoutDragState& drag, const std::vector<int>& freeWeights) {
+    LayoutDragState& drag, const std::vector<int>& freeWeights) {
     const int threshold = host_.LayoutEditRenderer().LayoutSimilarityThreshold();
     if (threshold <= 0 || drag.snapCandidates.empty()) {
         return std::nullopt;
@@ -680,10 +680,15 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
                 std::vector<int> attemptWeights = freeWeights;
                 attemptWeights[index] = firstWeight;
                 attemptWeights[index + 1] = combined - firstWeight;
-                return host_.EvaluateLayoutWidgetExtentForWeights(LayoutEditHost::LayoutTarget::ForGuide(drag.guide),
-                    attemptWeights,
-                    candidate.widget,
-                    drag.guide.axis);
+                const ExtentCacheKey cacheKey{attemptWeights, candidate.widget};
+                if (const auto cached = drag.extentCache.find(cacheKey); cached != drag.extentCache.end()) {
+                    return cached->second;
+                }
+
+                std::optional<int> extent = host_.EvaluateLayoutWidgetExtentForWeights(
+                    LayoutEditHost::LayoutTarget::ForGuide(drag.guide), attemptWeights, candidate.widget, drag.guide.axis);
+                drag.extentCache.emplace(std::move(cacheKey), extent);
+                return extent;
             });
         if (!snappedWeight.has_value()) {
             continue;

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <windows.h>
@@ -81,11 +82,44 @@ private:
         std::optional<DashboardRenderer::EditableAnchorKey> actionableAnchorHandle;
     };
 
+    struct WeightVectorHash {
+        size_t operator()(const std::vector<int>& weights) const {
+            size_t hash = 0;
+            for (int weight : weights) {
+                hash = (hash * 1315423911u) ^ std::hash<int>{}(weight);
+            }
+            return hash;
+        }
+    };
+
+    struct ExtentCacheKey {
+        std::vector<int> weights;
+        DashboardRenderer::LayoutWidgetIdentity widget;
+
+        bool operator==(const ExtentCacheKey& other) const {
+            return weights == other.weights && widget.renderCardId == other.widget.renderCardId &&
+                   widget.editCardId == other.widget.editCardId && widget.nodePath == other.widget.nodePath;
+        }
+    };
+
+    struct ExtentCacheKeyHash {
+        size_t operator()(const ExtentCacheKey& key) const {
+            size_t hash = WeightVectorHash{}(key.weights);
+            hash = (hash * 1315423911u) ^ std::hash<std::string>{}(key.widget.renderCardId);
+            hash = (hash * 1315423911u) ^ std::hash<std::string>{}(key.widget.editCardId);
+            for (size_t index : key.widget.nodePath) {
+                hash = (hash * 1315423911u) ^ std::hash<size_t>{}(index);
+            }
+            return hash;
+        }
+    };
+
     struct LayoutDragState {
         DashboardRenderer::LayoutEditGuide guide;
         std::vector<int> initialWeights;
         std::vector<DashboardRenderer::LayoutGuideSnapCandidate> snapCandidates;
         int dragStartCoordinate = 0;
+        std::unordered_map<ExtentCacheKey, std::optional<int>, ExtentCacheKeyHash> extentCache;
     };
 
     struct WidgetEditDragState {
@@ -115,8 +149,7 @@ private:
     void SyncRendererInteractionState();
     void ClearInteractionState();
     void SetCursorForPoint(POINT clientPoint);
-    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(
-        const LayoutDragState& drag, const std::vector<int>& freeWeights);
+    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(LayoutDragState& drag, const std::vector<int>& freeWeights);
 
     LayoutEditHost& host_;
     std::optional<size_t> hoveredLayoutGuideIndex_;

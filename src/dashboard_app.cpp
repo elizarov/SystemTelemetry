@@ -376,6 +376,22 @@ void DashboardApp::ReleaseFonts() {
     renderer_.Shutdown();
 }
 
+void DashboardApp::ReleasePaintBuffer() {
+    if (paintBufferDc_ != nullptr && paintBufferOldBitmap_ != nullptr) {
+        SelectObject(paintBufferDc_, paintBufferOldBitmap_);
+    }
+    if (paintBufferBitmap_ != nullptr) {
+        DeleteObject(paintBufferBitmap_);
+    }
+    if (paintBufferDc_ != nullptr) {
+        DeleteDC(paintBufferDc_);
+    }
+    paintBufferDc_ = nullptr;
+    paintBufferBitmap_ = nullptr;
+    paintBufferOldBitmap_ = nullptr;
+    paintBufferSize_ = {};
+}
+
 COLORREF DashboardApp::BackgroundColor() const {
     return ToColorRef(controller_.State().config.layout.colors.backgroundColor);
 }
@@ -1302,6 +1318,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 state.diagnostics->WriteTraceMarker("diagnostics:ui_done");
             }
             RemoveTrayIcon();
+            ReleasePaintBuffer();
             ReleaseFonts();
             {
                 HICON largeIcon = appIconLarge_;
@@ -1330,27 +1347,35 @@ void DashboardApp::Paint() {
     HDC hdc = BeginPaint(hwnd_, &ps);
     RECT client{};
     GetClientRect(hwnd_, &client);
-
-    HDC memDc = CreateCompatibleDC(hdc);
-    HBITMAP bitmap = CreateCompatibleBitmap(hdc, client.right, client.bottom);
-    HGDIOBJ oldBitmap = SelectObject(memDc, bitmap);
+    if (paintBufferDc_ == nullptr || paintBufferSize_.cx != client.right || paintBufferSize_.cy != client.bottom) {
+        ReleasePaintBuffer();
+        paintBufferDc_ = CreateCompatibleDC(hdc);
+        if (paintBufferDc_ != nullptr) {
+            paintBufferBitmap_ = CreateCompatibleBitmap(hdc, client.right, client.bottom);
+        }
+        if (paintBufferDc_ == nullptr || paintBufferBitmap_ == nullptr) {
+            ReleasePaintBuffer();
+            EndPaint(hwnd_, &ps);
+            return;
+        }
+        paintBufferOldBitmap_ = static_cast<HBITMAP>(SelectObject(paintBufferDc_, paintBufferBitmap_));
+        paintBufferSize_.cx = client.right;
+        paintBufferSize_.cy = client.bottom;
+    }
 
     HBRUSH background = CreateSolidBrush(BackgroundColor());
-    FillRect(memDc, &client, background);
+    FillRect(paintBufferDc_, &client, background);
     DeleteObject(background);
-    SetBkMode(memDc, TRANSPARENT);
+    SetBkMode(paintBufferDc_, TRANSPARENT);
 
     const auto drawStart = std::chrono::steady_clock::now();
-    DrawLayout(memDc, controller_.State().telemetry->Snapshot());
+    DrawLayout(paintBufferDc_, controller_.State().telemetry->Snapshot());
     if (controller_.State().isMoving) {
-        DrawMoveOverlay(memDc);
+        DrawMoveOverlay(paintBufferDc_);
     }
     const auto drawEnd = std::chrono::steady_clock::now();
 
-    BitBlt(hdc, 0, 0, client.right, client.bottom, memDc, 0, 0, SRCCOPY);
-    SelectObject(memDc, oldBitmap);
-    DeleteObject(bitmap);
-    DeleteDC(memDc);
+    BitBlt(hdc, 0, 0, client.right, client.bottom, paintBufferDc_, 0, 0, SRCCOPY);
     EndPaint(hwnd_, &ps);
     const auto paintEnd = std::chrono::steady_clock::now();
     RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);

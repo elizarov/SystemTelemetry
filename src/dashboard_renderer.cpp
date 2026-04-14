@@ -3,6 +3,7 @@
 #include "layout_edit_parameter.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -48,63 +49,56 @@ std::string FormatWin32Error(DWORD error) {
     return message;
 }
 
-void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
+void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE /*alpha*/) {
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
     if (width <= 0 || height <= 0) {
         return;
     }
 
-    if (alpha == 255) {
-        HBRUSH brush = CreateSolidBrush(color);
-        HPEN pen = CreatePen(PS_SOLID, 1, color);
-        HGDIOBJ oldBrush = SelectObject(hdc, brush);
-        HGDIOBJ oldPen = SelectObject(hdc, pen);
-        if (width <= height) {
-            Ellipse(hdc, rect.left, rect.top, rect.right, rect.bottom);
-        } else {
-            RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, height, height);
-        }
-        SelectObject(hdc, oldPen);
-        SelectObject(hdc, oldBrush);
-        DeleteObject(pen);
-        DeleteObject(brush);
-        return;
-    }
-
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    Gdiplus::SolidBrush brush(Gdiplus::Color(alpha, GetRValue(color), GetGValue(color), GetBValue(color)));
+    HBRUSH brush = CreateSolidBrush(color);
+    HPEN pen = CreatePen(PS_SOLID, 1, color);
+    HGDIOBJ oldBrush = SelectObject(hdc, brush);
+    HGDIOBJ oldPen = SelectObject(hdc, pen);
     if (width <= height) {
-        graphics.FillEllipse(&brush,
-            static_cast<Gdiplus::REAL>(rect.left),
-            static_cast<Gdiplus::REAL>(rect.top),
-            static_cast<Gdiplus::REAL>(width),
-            static_cast<Gdiplus::REAL>(height));
-        return;
+        Ellipse(hdc, rect.left, rect.top, rect.right, rect.bottom);
+    } else {
+        RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, height, height);
+    }
+    SelectObject(hdc, oldPen);
+    SelectObject(hdc, oldBrush);
+    DeleteObject(pen);
+    DeleteObject(brush);
+}
+
+bool CapsuleContainsSample(double sampleX, double sampleY, double width, double height) {
+    if (width <= 0.0 || height <= 0.0) {
+        return false;
     }
 
-    const int diameter = std::max(1, std::min(width, height));
-    const int centerWidth = std::max(0, width - diameter);
-    const int rightArcLeft = rect.left + centerWidth;
-    graphics.FillEllipse(&brush,
-        static_cast<Gdiplus::REAL>(rect.left),
-        static_cast<Gdiplus::REAL>(rect.top),
-        static_cast<Gdiplus::REAL>(diameter),
-        static_cast<Gdiplus::REAL>(height));
-    graphics.FillEllipse(&brush,
-        static_cast<Gdiplus::REAL>(rightArcLeft),
-        static_cast<Gdiplus::REAL>(rect.top),
-        static_cast<Gdiplus::REAL>(diameter),
-        static_cast<Gdiplus::REAL>(height));
-    if (centerWidth > 0) {
-        graphics.FillRectangle(&brush,
-            static_cast<Gdiplus::REAL>(rect.left + diameter / 2),
-            static_cast<Gdiplus::REAL>(rect.top),
-            static_cast<Gdiplus::REAL>(centerWidth),
-            static_cast<Gdiplus::REAL>(height));
+    if (width <= height) {
+        const double centerX = width / 2.0;
+        const double centerY = height / 2.0;
+        const double radiusX = width / 2.0;
+        const double radiusY = height / 2.0;
+        const double dx = sampleX - centerX;
+        const double dy = sampleY - centerY;
+        return ((dx * dx) / (radiusX * radiusX)) + ((dy * dy) / (radiusY * radiusY)) <= 1.0;
     }
+
+    const double radius = height / 2.0;
+    const double leftCenterX = radius;
+    const double rightCenterX = width - radius;
+    const double centerY = radius;
+    if (sampleX >= leftCenterX && sampleX <= rightCenterX && sampleY >= 0.0 && sampleY <= height) {
+        return true;
+    }
+
+    const double dxLeft = sampleX - leftCenterX;
+    const double dxRight = sampleX - rightCenterX;
+    const double dy = sampleY - centerY;
+    return (dxLeft * dxLeft) + (dy * dy) <= radius * radius ||
+           (dxRight * dxRight) + (dy * dy) <= radius * radius;
 }
 
 void FillDiamond(HDC hdc, const RECT& rect, COLORREF color) {
@@ -555,9 +549,42 @@ void DashboardRenderer::DrawText(
     HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const {
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
-    RECT copy = rect;
     const std::wstring& wideText = GetWideText(text);
-    ::DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
+    const bool fastSingleLine =
+        !wideText.empty() && (format & DT_SINGLELINE) != 0 && (format & DT_END_ELLIPSIS) == 0 &&
+        (format & DT_PATH_ELLIPSIS) == 0 && (format & DT_WORD_ELLIPSIS) == 0 && (format & DT_WORDBREAK) == 0 &&
+        (format & DT_EDITCONTROL) == 0 && (format & DT_EXPANDTABS) == 0;
+    if (fastSingleLine) {
+        const TextWidthCacheKey cacheKey{font, text};
+        SIZE size{};
+        if (const auto it = textExtentCache_.find(cacheKey); it != textExtentCache_.end()) {
+            size = it->second;
+        } else {
+            GetTextExtentPoint32W(hdc, wideText.c_str(), static_cast<int>(wideText.size()), &size);
+            textExtentCache_.emplace(cacheKey, size);
+        }
+
+        int x = rect.left;
+        if ((format & DT_CENTER) != 0) {
+            x = rect.left + std::max(0L, (rect.right - rect.left - size.cx) / 2);
+        } else if ((format & DT_RIGHT) != 0) {
+            x = rect.right - size.cx;
+        }
+
+        int y = rect.top;
+        if ((format & DT_VCENTER) != 0) {
+            y = rect.top + std::max(0L, (rect.bottom - rect.top - size.cy) / 2);
+        } else if ((format & DT_BOTTOM) != 0) {
+            y = rect.bottom - size.cy;
+        }
+
+        const UINT options = (format & DT_NOCLIP) != 0 ? 0u : ETO_CLIPPED;
+        const RECT* clipRect = (format & DT_NOCLIP) != 0 ? nullptr : &rect;
+        ExtTextOutW(hdc, x, y, options, clipRect, wideText.c_str(), static_cast<UINT>(wideText.size()), nullptr);
+    } else {
+        RECT copy = rect;
+        ::DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
+    }
     SelectObject(hdc, oldFont);
 }
 
@@ -881,6 +908,7 @@ void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const EditableAnchor
 void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
     const RECT& rect,
     const std::string& text,
+    HDC measureHdc,
     HFONT font,
     UINT format,
     const EditableAnchorBinding& editable) {
@@ -888,7 +916,8 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
         return;
     }
 
-    const TextLayoutResult result = MeasureTextBlock(rect, text, font, format);
+    const TextLayoutResult result =
+        measureHdc != nullptr ? MeasureTextBlock(measureHdc, rect, text, font, format) : MeasureTextBlock(rect, text, font, format);
     const int anchorSize = std::max(4, ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     const int anchorCenterX = result.textRect.right;
@@ -913,7 +942,15 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
 
 void DashboardRenderer::RegisterStaticTextAnchor(
     const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
-    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, font, format, editable);
+    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, nullptr, font, format, editable);
+}
+
+void DashboardRenderer::RegisterDynamicTextAnchor(
+    HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
+    if (!dynamicAnchorRegistrationEnabled_) {
+        return;
+    }
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, hdc, font, format, editable);
 }
 
 void DashboardRenderer::RegisterDynamicTextAnchor(
@@ -921,7 +958,82 @@ void DashboardRenderer::RegisterDynamicTextAnchor(
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
-    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, font, format, editable);
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, nullptr, font, format, editable);
+}
+
+void DashboardRenderer::DrawAlphaCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
+    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
+    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    if (alpha == 255) {
+        FillCapsule(hdc, rect, color, alpha);
+        return;
+    }
+
+    const AlphaCapsuleCacheKey key{color, alpha, width, height};
+    auto it = alphaCapsuleCache_.find(key);
+    if (it == alphaCapsuleCache_.end()) {
+        BITMAPINFO bitmapInfo{};
+        bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
+        bitmapInfo.bmiHeader.biWidth = width;
+        bitmapInfo.bmiHeader.biHeight = -height;
+        bitmapInfo.bmiHeader.biPlanes = 1;
+        bitmapInfo.bmiHeader.biBitCount = 32;
+        bitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+        void* pixels = nullptr;
+        HDC sourceDc = CreateCompatibleDC(nullptr);
+        HBITMAP bitmap = CreateDIBSection(sourceDc, &bitmapInfo, DIB_RGB_COLORS, &pixels, nullptr, 0);
+        if (sourceDc == nullptr || bitmap == nullptr || pixels == nullptr) {
+            if (bitmap != nullptr) {
+                DeleteObject(bitmap);
+            }
+            if (sourceDc != nullptr) {
+                DeleteDC(sourceDc);
+            }
+            return;
+        }
+
+        SelectObject(sourceDc, bitmap);
+        auto* dst = static_cast<BYTE*>(pixels);
+        const int stride = width * 4;
+        constexpr int kSamplesPerAxis = 4;
+        constexpr int kSampleCount = kSamplesPerAxis * kSamplesPerAxis;
+        const std::array<double, kSamplesPerAxis> offsets{0.125, 0.375, 0.625, 0.875};
+        const BYTE red = GetRValue(color);
+        const BYTE green = GetGValue(color);
+        const BYTE blue = GetBValue(color);
+        const double alphaScale = static_cast<double>(alpha) / 255.0;
+        for (int y = 0; y < height; ++y) {
+            BYTE* row = dst + (y * stride);
+            for (int x = 0; x < width; ++x) {
+                int coveredSamples = 0;
+                for (double offsetY : offsets) {
+                    for (double offsetX : offsets) {
+                        if (CapsuleContainsSample(
+                                static_cast<double>(x) + offsetX, static_cast<double>(y) + offsetY, width, height)) {
+                            ++coveredSamples;
+                        }
+                    }
+                }
+
+                const double coverage = static_cast<double>(coveredSamples) / kSampleCount;
+                const BYTE sampleAlpha = static_cast<BYTE>(std::lround(255.0 * coverage * alphaScale));
+                row[x * 4 + 0] = static_cast<BYTE>(std::lround(static_cast<double>(blue) * sampleAlpha / 255.0));
+                row[x * 4 + 1] = static_cast<BYTE>(std::lround(static_cast<double>(green) * sampleAlpha / 255.0));
+                row[x * 4 + 2] = static_cast<BYTE>(std::lround(static_cast<double>(red) * sampleAlpha / 255.0));
+                row[x * 4 + 3] = sampleAlpha;
+            }
+        }
+
+        it = alphaCapsuleCache_.emplace(key, AlphaCapsuleBitmap{sourceDc, bitmap}).first;
+    }
+
+    BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+    AlphaBlend(hdc, rect.left, rect.top, width, height, it->second.hdc, 0, 0, width, height, blend);
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const {
@@ -1112,14 +1224,61 @@ void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, cons
     if (it == panelIcons_.end() || it->second == nullptr) {
         return;
     }
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    graphics.DrawImage(it->second.get(),
-        static_cast<INT>(iconRect.left),
-        static_cast<INT>(iconRect.top),
-        static_cast<INT>(iconRect.right - iconRect.left),
-        static_cast<INT>(iconRect.bottom - iconRect.top));
+    const int width = std::max(0, static_cast<int>(iconRect.right - iconRect.left));
+    const int height = std::max(0, static_cast<int>(iconRect.bottom - iconRect.top));
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    const PanelIconCacheKey cacheKey{iconName, width, height};
+    auto scaled = scaledPanelIconCache_.find(cacheKey);
+    if (scaled == scaledPanelIconCache_.end()) {
+        Gdiplus::Bitmap surface(width, height, PixelFormat32bppPARGB);
+        Gdiplus::Graphics graphics(&surface);
+        graphics.Clear(Gdiplus::Color(0, 0, 0, 0));
+        graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+        graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+        graphics.DrawImage(it->second.get(), 0, 0, width, height);
+
+        Gdiplus::BitmapData bitmapData{};
+        const Gdiplus::Rect lockRect(0, 0, width, height);
+        if (surface.LockBits(&lockRect, Gdiplus::ImageLockModeRead, PixelFormat32bppPARGB, &bitmapData) !=
+            Gdiplus::Ok) {
+            return;
+        }
+
+        BITMAPINFO bitmapInfo{};
+        bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
+        bitmapInfo.bmiHeader.biWidth = width;
+        bitmapInfo.bmiHeader.biHeight = -height;
+        bitmapInfo.bmiHeader.biPlanes = 1;
+        bitmapInfo.bmiHeader.biBitCount = 32;
+        bitmapInfo.bmiHeader.biCompression = BI_RGB;
+        void* pixels = nullptr;
+        HDC sourceDc = CreateCompatibleDC(nullptr);
+        HBITMAP bitmap = CreateDIBSection(sourceDc, &bitmapInfo, DIB_RGB_COLORS, &pixels, nullptr, 0);
+        if (sourceDc == nullptr || bitmap == nullptr || pixels == nullptr) {
+            surface.UnlockBits(&bitmapData);
+            if (bitmap != nullptr) {
+                DeleteObject(bitmap);
+            }
+            if (sourceDc != nullptr) {
+                DeleteDC(sourceDc);
+            }
+            return;
+        }
+        SelectObject(sourceDc, bitmap);
+        for (int y = 0; y < height; ++y) {
+            memcpy(static_cast<BYTE*>(pixels) + (y * width * 4),
+                static_cast<const BYTE*>(bitmapData.Scan0) + (y * bitmapData.Stride),
+                static_cast<size_t>(width) * 4);
+        }
+        surface.UnlockBits(&bitmapData);
+        scaled = scaledPanelIconCache_.emplace(cacheKey, AlphaCapsuleBitmap{sourceDc, bitmap}).first;
+    }
+
+    BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+    AlphaBlend(hdc, iconRect.left, iconRect.top, width, height, scaled->second.hdc, 0, 0, width, height, blend);
 }
 
 void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
@@ -1189,7 +1348,7 @@ void DashboardRenderer::DrawPillBar(
         const int maxLeft = static_cast<int>(rect.right) - markerWidth;
         const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
         RECT markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-        FillCapsule(hdc, markerRect, accentColor, 96);
+        DrawAlphaCapsule(hdc, markerRect, accentColor, 96);
     }
 }
 
@@ -1535,6 +1694,7 @@ void DashboardRenderer::Shutdown() {
     parsedWidgetInfoCache_.clear();
     wideTextCache_.clear();
     textWidthCache_.clear();
+    textExtentCache_.clear();
     textMeasureCache_.clear();
     staticEditableAnchorRegions_.clear();
     dynamicEditableAnchorRegions_.clear();
@@ -1617,6 +1777,7 @@ void DashboardRenderer::DestroyFonts() {
     fonts_ = {};
     wideTextCache_.clear();
     textWidthCache_.clear();
+    textExtentCache_.clear();
     textMeasureCache_.clear();
 }
 
@@ -1659,6 +1820,16 @@ void DashboardRenderer::ClearGdiCaches() {
         DeleteObject(entry.second);
     }
     solidPenCache_.clear();
+    for (const auto& entry : alphaCapsuleCache_) {
+        DeleteObject(entry.second.bitmap);
+        DeleteDC(entry.second.hdc);
+    }
+    alphaCapsuleCache_.clear();
+    for (const auto& entry : scaledPanelIconCache_) {
+        DeleteObject(entry.second.bitmap);
+        DeleteDC(entry.second.hdc);
+    }
+    scaledPanelIconCache_.clear();
 }
 
 bool DashboardRenderer::LoadPanelIcons() {
@@ -1688,6 +1859,11 @@ bool DashboardRenderer::LoadPanelIcons() {
 }
 
 void DashboardRenderer::ReleasePanelIcons() {
+    for (const auto& entry : scaledPanelIconCache_) {
+        DeleteObject(entry.second.bitmap);
+        DeleteDC(entry.second.hdc);
+    }
+    scaledPanelIconCache_.clear();
     panelIcons_.clear();
 }
 

@@ -71,5 +71,5 @@ void TextWidget::Draw(DashboardRenderer& renderer,
         return;
     }
     renderer.RegisterDynamicTextAnchor(
-        widget.rect, text, renderer.WidgetFonts().text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS, binding);
+        hdc, widget.rect, text, renderer.WidgetFonts().text, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS, binding);
 }

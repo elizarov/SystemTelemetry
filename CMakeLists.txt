@@ -187,6 +187,7 @@ target_link_options(SystemTelemetry PRIVATE
 target_link_libraries(SystemTelemetry PRIVATE
     user32
     gdi32
+    msimg32
     gdiplus
     pdh
     iphlpapi
@@ -327,6 +328,7 @@ target_link_options(SystemTelemetryBenchmarks PRIVATE
 target_link_libraries(SystemTelemetryBenchmarks PRIVATE
     user32
     gdi32
+    msimg32
     gdiplus
 )
 set_target_properties(SystemTelemetryBenchmarks PROPERTIES
