@@ -104,6 +104,18 @@ TEST(LayoutEditParameter, AppliesFullFontValueThroughMetadata) {
     EXPECT_EQ(config.layout.fonts.label.weight, 450);
 }
 
+TEST(LayoutEditParameter, ClampsFullFontWeightThroughMetadata) {
+    AppConfig config;
+    config.layout.fonts.label = UiFontConfig{"Segoe UI", 17, 600};
+
+    ASSERT_TRUE(
+        ApplyLayoutEditParameterFontValue(config, LayoutEditParameter::FontLabel, UiFontConfig{"Bahnschrift", 12, 0}));
+
+    EXPECT_EQ(config.layout.fonts.label.face, "Bahnschrift");
+    EXPECT_EQ(config.layout.fonts.label.size, 12);
+    EXPECT_EQ(config.layout.fonts.label.weight, 1);
+}
+
 TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeSegmentCount),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeOuterPadding));

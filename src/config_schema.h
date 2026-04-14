@@ -89,9 +89,15 @@ template <> struct PolicyClamp<NonNegativeIntPolicy, int> {
 template <typename Value>
 concept FontSizeEditableValue = requires(Value value) { value.size; };
 
+template <typename Value>
+concept FontWeightEditableValue = requires(Value value) { value.weight; };
+
 template <FontSizeEditableValue Value> struct PolicyClamp<FontSizePolicy, Value> {
     static Value Apply(Value value) {
         value.size = (std::max)(1, value.size);
+        if constexpr (FontWeightEditableValue<Value>) {
+            value.weight = (std::max)(1, value.weight);
+        }
         return value;
     }
 };
