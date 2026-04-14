@@ -65,7 +65,6 @@ public:
     int PreferredHeight(const DashboardRenderer& renderer) const override;
     void ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) override;
     void Draw(DashboardRenderer& renderer,
-        HDC hdc,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;
     void FinalizeLayoutGroup(DashboardRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) override;

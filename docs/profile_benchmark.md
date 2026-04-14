@@ -35,7 +35,7 @@ Current useful hotspot signals from the latest daemon-backed WPR capture on the 
 
 - The exported WPA text no longer surfaces stable named renderer functions for the benchmark process, but it does show the heaviest benchmark-process module weights in `d2d1.dll`, `amdxx64.dll`, `win32kfull.sys`, and `d3d11.dll`.
 - The latest fixed-text capture also surfaces `DWrite.dll` and `TextShaping.dll` as meaningful benchmark-process module weights, which matches the restored full text path in the Direct2D renderer.
-- `GdiPlus.dll` still loads because the renderer keeps legacy assets and fallback helpers available, but its weight in the benchmark process stays below the Direct2D, DirectWrite, and driver stack modules.
+- `GdiPlus.dll` still loads because panel icons are still decoded and scaled through GDI+ before upload into Direct2D bitmaps, but its weight in the benchmark process stays below the Direct2D, DirectWrite, and driver stack modules.
 - The fast benchmark reruns stay consistent enough that the draw-path win is real even though the coarse text export no longer pinpoints the remaining app-side leaves by symbol.
 
 Interpretation:
@@ -54,9 +54,10 @@ These changes produced real wins and remain in the codebase:
 - Refactor layout similarity indicator collection to avoid repeated representative scans and reduce per-frame container churn.
 - Build only the one live gauge usage-fill path that the current metric needs instead of prebuilding every cumulative gauge fill path during each relayout.
 - Resolve snap-preview guide probes through an extent-only layout pass that skips widget instantiation, widget layout-state caching, and edit-artifact rebuilds.
-- Reuse draw-time text layout results for dynamic text anchors and measure static text anchors through one shared HDC during static-anchor rebuilds.
+- Reuse draw-time text layout results for dynamic text anchors and keep all text-anchor measurement on the renderer's shared DirectWrite layout path.
 - Reuse one cached `DashboardMetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse smoothed throughput history and formatted metric payloads until telemetry publishes a newer snapshot.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
+- Remove the legacy renderer GDI fallback path and keep both live repaint and screenshot export on the same Direct2D and DirectWrite scene.
 
 ## Tested Hypotheses
 
@@ -350,6 +351,20 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - A full renderer rewrite onto a real window-backed Direct2D target is the first Direct2D path that clearly beats the old renderer on this workload, and future draw-path work should treat this all-D2D live path as the current baseline.
 
+### Hypothesis: Remove the old GDI fallback path after the full Direct2D rewrite
+
+- Change:
+  - Delete the renderer's legacy GDI fallback draw path, remove the `HDC`-threaded widget and renderer draw entry points, route the app paint loop and the drag benchmark harness through `DashboardRenderer::DrawWindow` only, and keep screenshots on the same WIC-backed Direct2D scene.
+- Result:
+  - Neutral for throughput and worth keeping for simplicity.
+- Observed effect:
+  - `240`-iteration reruns landed at `drag_loop per_iter_ms=2.53`, `snap avg_ms=0.20`, `apply avg_ms=0.22`, and `paint_draw avg_ms=2.11`.
+  - `480`-iteration reruns landed at `drag_loop per_iter_ms=2.58`, `snap avg_ms=0.21`, `apply avg_ms=0.23`, and `paint_draw avg_ms=2.13`.
+- Why it helped:
+  - The cleanup did not materially change the already-fast Direct2D frame cost, but it removed a second renderer path that could drift out of sync with the live scene and hide correctness problems in diagnostics or benchmarks.
+- Conclusion:
+  - Keep the renderer D2D-only. Future draw-path work should optimize the live Direct2D scene directly instead of preserving a dormant GDI fallback.
+
 ### Hypothesis: Reuse one GDI+ `Graphics` object across the whole frame
 
 - Change:
@@ -370,6 +385,7 @@ These changes produced real wins and remain in the codebase:
 - Do not retry throughput `MoveToEx` and `LineTo` in place of `Polyline` for the current graph shape.
 - Do not retry Direct2D through `ID2D1DCRenderTarget` on the current compatible-bitmap paint buffer; that interop path is much slower than the existing GDI/GDI+ renderer here.
 - Do not retry partial GDI and Direct2D hybrid window passes; the full window-owned Direct2D and DirectWrite path is the only Direct2D experiment in this workstream that materially helps.
+- Do not reintroduce a renderer-side GDI fallback path for live repaint, diagnostics export, or benchmarks; it adds maintenance and can mask problems in the real Direct2D scene without improving the current benchmark.
 - Be skeptical of caches tied to graph or gauge size during drag; size changes every frame and cache maintenance can outweigh the saved draw work.
 - Prioritize experiments that reduce primitive count or switch to a cheaper primitive family while preserving the same pixels.
 - The most promising remaining directions are:

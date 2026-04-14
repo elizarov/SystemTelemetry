@@ -42,8 +42,6 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
 
 void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& renderer) {
     renderer.staticEditableAnchorRegions_.clear();
-    HDC measureHdc = GetDC(renderer.hwnd_ != nullptr ? renderer.hwnd_ : nullptr);
-    renderer.staticAnchorMeasureHdc_ = measureHdc;
     for (const auto& card : renderer.resolvedLayout_.cards) {
         if (!card.title.empty()) {
             renderer.RegisterStaticTextAnchor(card.titleRect,
@@ -67,10 +65,6 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 widget.widget->BuildStaticAnchors(renderer, widget);
             }
         }
-    }
-    renderer.staticAnchorMeasureHdc_ = nullptr;
-    if (measureHdc != nullptr) {
-        ReleaseDC(renderer.hwnd_ != nullptr ? renderer.hwnd_ : nullptr, measureHdc);
     }
 }
 

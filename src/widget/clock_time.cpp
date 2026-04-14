@@ -21,17 +21,14 @@ bool ClockTimeWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void ClockTimeWidget::Draw(DashboardRenderer& renderer,
-    HDC hdc,
-    const DashboardWidgetLayout& widget,
-    const DashboardMetricSource& metrics) const {
+void ClockTimeWidget::Draw(
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
         return;
     }
 
     const std::string text = metrics.ResolveClockTime();
-    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(hdc,
-        widget.rect,
+    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         renderer.WidgetFonts().clockTime,
         renderer.ForegroundColor(),

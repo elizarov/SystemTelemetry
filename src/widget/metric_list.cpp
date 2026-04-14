@@ -145,16 +145,9 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     }
 }
 
-void MetricListWidget::Draw(DashboardRenderer& renderer,
-    HDC hdc,
-    const DashboardWidgetLayout& widget,
-    const DashboardMetricSource& metrics) const {
-    const int savedDc = renderer.IsDirect2DActive() ? 0 : SaveDC(hdc);
-    if (renderer.IsDirect2DActive()) {
-        renderer.PushClipRect(widget.rect);
-    } else {
-        IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
-    }
+void MetricListWidget::Draw(
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    renderer.PushClipRect(widget.rect);
     int rowIndex = 0;
     for (const auto& row : metrics.ResolveMetricList(metricRefs_)) {
         if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
@@ -162,15 +155,13 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
         }
         const RECT& labelRect = layoutState_.labelRects[rowIndex];
         const RECT& valueRect = layoutState_.valueRects[rowIndex];
-        renderer.DrawText(hdc,
-            labelRect,
+        renderer.DrawText(labelRect,
             row.label,
             renderer.WidgetFonts().label,
             renderer.MutedTextColor(),
             DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-            const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(hdc,
-                valueRect,
+            const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(valueRect,
                 row.valueText,
                 renderer.WidgetFonts().value,
                 renderer.ForegroundColor(),
@@ -182,19 +173,12 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
                     renderer.Config().layout.fonts.value.size));
         }
         const RECT& barRect = layoutState_.barRects[rowIndex];
-        renderer.DrawPillBar(hdc,
-            barRect,
-            row.ratio,
-            row.peakRatio,
-            renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
+        renderer.DrawPillBar(
+            barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
 
         ++rowIndex;
     }
-    if (renderer.IsDirect2DActive()) {
-        renderer.PopClipRect();
-    } else {
-        RestoreDC(hdc, savedDc);
-    }
+    renderer.PopClipRect();
 }
 
 void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

@@ -10,7 +10,6 @@ public:
     int PreferredHeight(const DashboardRenderer& renderer) const override;
     bool UsesFixedPreferredHeightInRows() const override;
     void Draw(DashboardRenderer& renderer,
-        HDC hdc,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;
     void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;

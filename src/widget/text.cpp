@@ -45,13 +45,10 @@ void TextWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWid
     renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
 }
 
-void TextWidget::Draw(DashboardRenderer& renderer,
-    HDC hdc,
-    const DashboardWidgetLayout& widget,
-    const DashboardMetricSource& metrics) const {
+void TextWidget::Draw(
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
     const std::string text = metrics.ResolveText(metric_);
-    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(hdc,
-        widget.rect,
+    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         renderer.WidgetFonts().text,
         renderer.ForegroundColor(),

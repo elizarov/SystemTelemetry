@@ -82,7 +82,6 @@ int ComputeLowestStackedSegmentTop(int top, int height, int width, int segmentCo
 }
 
 void DrawSegmentIndicator(DashboardRenderer& renderer,
-    HDC hdc,
     const RECT& rect,
     int segmentCount,
     int segmentGap,
@@ -106,8 +105,6 @@ void DrawSegmentIndicator(DashboardRenderer& renderer,
         clampedRatio > 0.0
             ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
             : 0;
-    HBRUSH trackBrush = renderer.IsDirect2DActive() ? nullptr : renderer.SolidBrush(trackColor);
-    HBRUSH fillBrush = renderer.IsDirect2DActive() || filledSegments <= 0 ? nullptr : renderer.SolidBrush(accentColor);
     int top = rect.top;
     for (int index = segmentCount - 1; index >= 0; --index) {
         const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
@@ -116,18 +113,10 @@ void DrawSegmentIndicator(DashboardRenderer& renderer,
         const int segmentTop = top + (std::max)(0, (segmentHeight - visualHeight) / 2);
         RECT segmentRect{
             rect.left, segmentTop, rect.right, (std::min)(rect.bottom, static_cast<LONG>(segmentTop + visualHeight))};
-        if (renderer.IsDirect2DActive()) {
-            renderer.FillSolidRect(segmentRect, trackColor);
-        } else {
-            FillRect(hdc, &segmentRect, trackBrush);
-        }
+        renderer.FillSolidRect(segmentRect, trackColor);
 
         if (index < filledSegments) {
-            if (renderer.IsDirect2DActive()) {
-                renderer.FillSolidRect(segmentRect, accentColor);
-            } else if (fillBrush != nullptr) {
-                FillRect(hdc, &segmentRect, fillBrush);
-            }
+            renderer.FillSolidRect(segmentRect, accentColor);
         }
 
         top = segmentRect.bottom + clampedGap;
@@ -272,36 +261,25 @@ void DriveUsageListWidget::ResolveLayoutState(const DashboardRenderer& renderer,
     }
 }
 
-void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
-    HDC hdc,
-    const DashboardWidgetLayout& widget,
-    const DashboardMetricSource& metrics) const {
-    const int savedDc = renderer.IsDirect2DActive() ? 0 : SaveDC(hdc);
-    if (renderer.IsDirect2DActive()) {
-        renderer.PushClipRect(widget.rect);
-    } else {
-        IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
-    }
-    renderer.DrawText(hdc,
-        layoutState_.headerReadLabelRect,
+void DriveUsageListWidget::Draw(
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    renderer.PushClipRect(widget.rect);
+    renderer.DrawText(layoutState_.headerReadLabelRect,
         "R",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
-    renderer.DrawText(hdc,
-        layoutState_.headerWriteLabelRect,
+    renderer.DrawText(layoutState_.headerWriteLabelRect,
         "W",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
-    renderer.DrawText(hdc,
-        layoutState_.usageHeaderRect,
+    renderer.DrawText(layoutState_.usageHeaderRect,
         "Usage",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    renderer.DrawText(hdc,
-        layoutState_.headerColumns.free,
+    renderer.DrawText(layoutState_.headerColumns.free,
         "Free",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
@@ -316,8 +294,7 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
         const RECT& writeIndicatorRect = layoutState_.rowWriteIndicatorRects[rowIndex];
         const RECT& barRect = layoutState_.rowBarRects[rowIndex];
 
-        const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(hdc,
-            columns.label,
+        const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(columns.label,
             drive.label,
             renderer.WidgetFonts().label,
             renderer.ForegroundColor(),
@@ -328,7 +305,6 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
                 textBaseId,
                 renderer.Config().layout.fonts.label.size));
         DrawSegmentIndicator(renderer,
-            hdc,
             readIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
@@ -336,23 +312,20 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
             renderer.TrackColor(),
             renderer.AccentColor());
         DrawSegmentIndicator(renderer,
-            hdc,
             writeIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
             renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank ? 0.0 : drive.writeActivity,
             renderer.TrackColor(),
             renderer.AccentColor());
-        renderer.DrawPillBar(hdc,
-            barRect,
+        renderer.DrawPillBar(barRect,
             drive.usedPercent / 100.0,
             std::nullopt,
             renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
             char percent[16];
             sprintf_s(percent, "%.0f%%", drive.usedPercent);
-            const DashboardRenderer::TextLayoutResult percentLayout = renderer.DrawTextBlock(hdc,
-                columns.percent,
+            const DashboardRenderer::TextLayoutResult percentLayout = renderer.DrawTextBlock(columns.percent,
                 percent,
                 renderer.WidgetFonts().label,
                 renderer.ForegroundColor(),
@@ -362,8 +335,7 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
                     DashboardRenderer::LayoutEditParameter::FontLabel,
                     textBaseId + 1,
                     renderer.Config().layout.fonts.label.size));
-            const DashboardRenderer::TextLayoutResult freeLayout = renderer.DrawTextBlock(hdc,
-                columns.free,
+            const DashboardRenderer::TextLayoutResult freeLayout = renderer.DrawTextBlock(columns.free,
                 drive.freeText,
                 renderer.WidgetFonts().smallFont,
                 renderer.MutedTextColor(),
@@ -376,11 +348,7 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
         }
     }
 
-    if (renderer.IsDirect2DActive()) {
-        renderer.PopClipRect();
-    } else {
-        RestoreDC(hdc, savedDc);
-    }
+    renderer.PopClipRect();
 }
 
 void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

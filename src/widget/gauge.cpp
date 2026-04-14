@@ -137,17 +137,13 @@ Microsoft::WRL::ComPtr<ID2D1PathGeometry> BuildD2DGaugeSegmentPath(const Dashboa
 
     const double startRadians = startAngleDegrees * 3.14159265358979323846 / 180.0;
     const double endRadians = (startAngleDegrees + sweepAngleDegrees) * 3.14159265358979323846 / 180.0;
-    const D2D1_POINT_2F outerStart = D2D1::Point2F(
-        cx + static_cast<float>(std::cos(startRadians) * outerRadius),
+    const D2D1_POINT_2F outerStart = D2D1::Point2F(cx + static_cast<float>(std::cos(startRadians) * outerRadius),
         cy + static_cast<float>(std::sin(startRadians) * outerRadius));
-    const D2D1_POINT_2F outerEnd = D2D1::Point2F(
-        cx + static_cast<float>(std::cos(endRadians) * outerRadius),
+    const D2D1_POINT_2F outerEnd = D2D1::Point2F(cx + static_cast<float>(std::cos(endRadians) * outerRadius),
         cy + static_cast<float>(std::sin(endRadians) * outerRadius));
-    const D2D1_POINT_2F innerEnd = D2D1::Point2F(
-        cx + static_cast<float>(std::cos(endRadians) * innerRadius),
+    const D2D1_POINT_2F innerEnd = D2D1::Point2F(cx + static_cast<float>(std::cos(endRadians) * innerRadius),
         cy + static_cast<float>(std::sin(endRadians) * innerRadius));
-    const D2D1_POINT_2F innerStart = D2D1::Point2F(
-        cx + static_cast<float>(std::cos(startRadians) * innerRadius),
+    const D2D1_POINT_2F innerStart = D2D1::Point2F(cx + static_cast<float>(std::cos(startRadians) * innerRadius),
         cy + static_cast<float>(std::sin(startRadians) * innerRadius));
 
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> path = renderer.CreateD2DPathGeometry();
@@ -161,8 +157,11 @@ Microsoft::WRL::ComPtr<ID2D1PathGeometry> BuildD2DGaugeSegmentPath(const Dashboa
     }
     sink->SetFillMode(D2D1_FILL_MODE_WINDING);
     sink->BeginFigure(outerStart, D2D1_FIGURE_BEGIN_FILLED);
-    sink->AddArc(D2D1::ArcSegment(
-        outerEnd, D2D1::SizeF(outerRadius, outerRadius), 0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, GaugeArcSize(sweepAngleDegrees)));
+    sink->AddArc(D2D1::ArcSegment(outerEnd,
+        D2D1::SizeF(outerRadius, outerRadius),
+        0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE,
+        GaugeArcSize(sweepAngleDegrees)));
     sink->AddLine(innerEnd);
     if (innerRadius > 0.0f) {
         sink->AddArc(D2D1::ArcSegment(innerStart,
@@ -310,10 +309,8 @@ void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RE
     layoutState_.d2dCachedUsagePath.Reset();
 }
 
-void GaugeWidget::Draw(DashboardRenderer& renderer,
-    HDC hdc,
-    const DashboardWidgetLayout& widget,
-    const DashboardMetricSource& metrics) const {
+void GaugeWidget::Draw(
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
     const DashboardGaugeMetric& metric = metrics.ResolveGauge(metric_);
     const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
     const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
@@ -333,64 +330,30 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
                   0,
                   gaugeLayout.segmentCount - 1);
 
-    if (renderer.IsDirect2DActive()) {
-        if (layoutState_.d2dTrackPath != nullptr) {
-            renderer.FillD2DGeometry(layoutState_.d2dTrackPath.Get(), renderer.TrackColor());
+    if (layoutState_.d2dTrackPath != nullptr) {
+        renderer.FillD2DGeometry(layoutState_.d2dTrackPath.Get(), renderer.TrackColor());
+    }
+    if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && filledSegments > 0) {
+        if (layoutState_.cachedUsageSegmentCount != filledSegments || layoutState_.d2dCachedUsagePath == nullptr) {
+            layoutState_.d2dCachedUsagePath =
+                BuildCombinedD2DGaugePath(renderer, layoutState_.d2dSegmentPaths, static_cast<size_t>(filledSegments));
+            layoutState_.cachedUsageSegmentCount = filledSegments;
         }
-        if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && filledSegments > 0) {
-            if (layoutState_.cachedUsageSegmentCount != filledSegments || layoutState_.d2dCachedUsagePath == nullptr) {
-                layoutState_.d2dCachedUsagePath =
-                    BuildCombinedD2DGaugePath(renderer, layoutState_.d2dSegmentPaths, static_cast<size_t>(filledSegments));
-                layoutState_.cachedUsageSegmentCount = filledSegments;
-            }
-            if (layoutState_.d2dCachedUsagePath != nullptr) {
-                renderer.FillD2DGeometry(layoutState_.d2dCachedUsagePath.Get(), renderer.AccentColor());
-            }
+        if (layoutState_.d2dCachedUsagePath != nullptr) {
+            renderer.FillD2DGeometry(layoutState_.d2dCachedUsagePath.Get(), renderer.AccentColor());
         }
-        if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && peakSegment >= 0 &&
-            static_cast<size_t>(peakSegment) < layoutState_.d2dSegmentPaths.size() &&
-            layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)] != nullptr) {
-            renderer.FillD2DGeometry(
-                layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)].Get(), renderer.AccentColor(), 96);
-        }
-    } else {
-        Gdiplus::Graphics graphics(hdc);
-        graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-        graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-        const Gdiplus::Color trackColor(
-            255, GetRValue(renderer.TrackColor()), GetGValue(renderer.TrackColor()), GetBValue(renderer.TrackColor()));
-        const Gdiplus::Color usageColor(
-            255, GetRValue(renderer.AccentColor()), GetGValue(renderer.AccentColor()), GetBValue(renderer.AccentColor()));
-        const Gdiplus::Color ghostColor(
-            96, GetRValue(renderer.AccentColor()), GetGValue(renderer.AccentColor()), GetBValue(renderer.AccentColor()));
-        Gdiplus::SolidBrush trackBrush(trackColor);
-        Gdiplus::SolidBrush usageBrush(usageColor);
-        Gdiplus::SolidBrush ghostBrush(ghostColor);
-        if (layoutState_.trackPath != nullptr) {
-            graphics.FillPath(&trackBrush, layoutState_.trackPath.get());
-        }
-        if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && filledSegments > 0) {
-            if (layoutState_.cachedUsageSegmentCount != filledSegments || layoutState_.cachedUsagePath == nullptr) {
-                layoutState_.cachedUsagePath =
-                    BuildCombinedGaugePath(layoutState_.segmentPaths, static_cast<size_t>(filledSegments));
-                layoutState_.cachedUsageSegmentCount = filledSegments;
-            }
-            if (layoutState_.cachedUsagePath != nullptr) {
-                graphics.FillPath(&usageBrush, layoutState_.cachedUsagePath.get());
-            }
-        }
-        if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && peakSegment >= 0 &&
-            static_cast<size_t>(peakSegment) < layoutState_.segmentPaths.size() &&
-            layoutState_.segmentPaths[static_cast<size_t>(peakSegment)] != nullptr) {
-            graphics.FillPath(&ghostBrush, layoutState_.segmentPaths[static_cast<size_t>(peakSegment)].get());
-        }
+    }
+    if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && peakSegment >= 0 &&
+        static_cast<size_t>(peakSegment) < layoutState_.d2dSegmentPaths.size() &&
+        layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)] != nullptr) {
+        renderer.FillD2DGeometry(
+            layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)].Get(), renderer.AccentColor(), 96);
     }
 
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         char number[16];
         sprintf_s(number, "%.0f%%", metric.percent);
-        const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(hdc,
-            layoutState_.valueRect,
+        const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(layoutState_.valueRect,
             number,
             renderer.WidgetFonts().big,
             renderer.ForegroundColor(),
@@ -399,8 +362,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             renderer.MakeEditableTextBinding(
                 widget, DashboardRenderer::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
     }
-    renderer.DrawText(hdc,
-        layoutState_.labelRect,
+    renderer.DrawText(layoutState_.labelRect,
         "Load",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),

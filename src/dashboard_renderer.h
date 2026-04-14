@@ -221,8 +221,6 @@ public:
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
 
-    void Draw(HDC hdc, const SystemSnapshot& snapshot);
-    void Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     bool DrawWindow(const SystemSnapshot& snapshot);
     bool DrawWindow(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
@@ -233,15 +231,11 @@ public:
     const FontHeights& FontMetrics() const;
     const Fonts& WidgetFonts() const;
     RenderMode CurrentRenderMode() const;
-    bool IsDirect2DActive() const;
     COLORREF TrackColor() const;
-    TextLayoutResult MeasureTextBlock(
-        HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
     TextLayoutResult MeasureTextBlock(const RECT& rect, const std::string& text, HFONT font, UINT format) const;
-    void DrawText(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const;
-    TextLayoutResult DrawTextBlock(
-        HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
-    void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
+    void DrawText(const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const;
+    TextLayoutResult DrawTextBlock(const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
+    void DrawPillBar(const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
     void PushClipRect(const RECT& rect);
     void PopClipRect();
     bool FillSolidRect(const RECT& rect, COLORREF color, BYTE alpha = 255);
@@ -255,8 +249,6 @@ public:
         std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
     bool FillD2DGeometry(ID2D1Geometry* geometry, COLORREF color, BYTE alpha = 255);
     bool DrawD2DPolyline(std::span<const POINT> points, COLORREF color, int strokeWidth);
-    HBRUSH SolidBrush(COLORREF color) const;
-    HPEN SolidPen(COLORREF color, int width = 1) const;
     EditableAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
     void RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
@@ -283,12 +275,6 @@ public:
         int value);
     void RegisterStaticTextAnchor(
         const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
-    void RegisterDynamicTextAnchor(HDC hdc,
-        const RECT& rect,
-        const std::string& text,
-        HFONT font,
-        UINT format,
-        const EditableAnchorBinding& editable);
     void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult, const EditableAnchorBinding& editable);
     void RegisterDynamicTextAnchor(
         const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
@@ -404,103 +390,6 @@ private:
         }
     };
 
-    struct TextMeasureCacheKey {
-        HFONT font = nullptr;
-        std::string text;
-        UINT format = 0;
-        int width = 0;
-        int height = 0;
-
-        bool operator==(const TextMeasureCacheKey& other) const {
-            return font == other.font && text == other.text && format == other.format && width == other.width &&
-                   height == other.height;
-        }
-    };
-
-    struct TextMeasureCacheLookupKey {
-        HFONT font = nullptr;
-        std::string_view text;
-        UINT format = 0;
-        int width = 0;
-        int height = 0;
-    };
-
-    struct TextMeasureCacheKeyHash {
-        using is_transparent = void;
-
-        size_t operator()(const TextMeasureCacheKey& key) const {
-            size_t hash = std::hash<HFONT>{}(key.font);
-            hash = (hash * 1315423911u) ^ TransparentStringHash {}(key.text);
-            hash = (hash * 1315423911u) ^ std::hash<UINT>{}(key.format);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
-            return hash;
-        }
-
-        size_t operator()(const TextMeasureCacheLookupKey& key) const {
-            size_t hash = std::hash<HFONT>{}(key.font);
-            hash = (hash * 1315423911u) ^ TransparentStringHash {}(key.text);
-            hash = (hash * 1315423911u) ^ std::hash<UINT>{}(key.format);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
-            return hash;
-        }
-    };
-
-    struct TextMeasureCacheKeyEqual {
-        using is_transparent = void;
-
-        bool operator()(const TextMeasureCacheKey& left, const TextMeasureCacheKey& right) const {
-            return left.font == right.font && left.text == right.text && left.format == right.format &&
-                   left.width == right.width && left.height == right.height;
-        }
-
-        bool operator()(const TextMeasureCacheKey& left, const TextMeasureCacheLookupKey& right) const {
-            return left.font == right.font && std::string_view(left.text) == right.text &&
-                   left.format == right.format && left.width == right.width && left.height == right.height;
-        }
-
-        bool operator()(const TextMeasureCacheLookupKey& left, const TextMeasureCacheKey& right) const {
-            return left.font == right.font && left.text == std::string_view(right.text) &&
-                   left.format == right.format && left.width == right.width && left.height == right.height;
-        }
-    };
-
-    struct PenCacheKey {
-        COLORREF color = 0;
-        int width = 1;
-
-        bool operator==(const PenCacheKey& other) const {
-            return color == other.color && width == other.width;
-        }
-    };
-
-    struct AlphaCapsuleCacheKey {
-        COLORREF color = 0;
-        BYTE alpha = 255;
-        int width = 0;
-        int height = 0;
-
-        bool operator==(const AlphaCapsuleCacheKey& other) const {
-            return color == other.color && alpha == other.alpha && width == other.width && height == other.height;
-        }
-    };
-
-    struct AlphaCapsuleCacheKeyHash {
-        size_t operator()(const AlphaCapsuleCacheKey& key) const {
-            size_t hash = std::hash<COLORREF>{}(key.color);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.alpha);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
-            return hash;
-        }
-    };
-
-    struct AlphaCapsuleBitmap {
-        HDC hdc = nullptr;
-        HBITMAP bitmap = nullptr;
-    };
-
     struct PanelIconCacheKey {
         std::string name;
         int width = 0;
@@ -517,12 +406,6 @@ private:
             hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
             hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
             return hash;
-        }
-    };
-
-    struct PenCacheKeyHash {
-        size_t operator()(const PenCacheKey& key) const {
-            return (std::hash<COLORREF>{}(key.color) * 1315423911u) ^ std::hash<int>{}(key.width);
         }
     };
 
@@ -554,16 +437,15 @@ private:
     };
 
     const std::wstring& GetWideText(std::string_view text) const;
-    void ClearGdiCaches();
     void ClearD2DCaches();
-    void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawWidgetEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const;
-    void DrawPanel(HDC hdc, const ResolvedCardLayout& card);
-    void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
-    void DrawResolvedWidget(HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
+    void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
+    void DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const;
+    void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
+    void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
+    void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
+    void DrawPanel(const ResolvedCardLayout& card);
+    void DrawPanelIcon(const std::string& iconName, const RECT& iconRect);
+    void DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
     const ParsedWidgetInfo* FindParsedWidgetInfo(const LayoutNodeConfig& node) const;
     DashboardWidgetLayout ResolveWidgetLayout(
         const LayoutNodeConfig& node, const RECT& rect, bool instantiateWidget) const;
@@ -645,14 +527,13 @@ private:
     void RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
         const RECT& rect,
         const std::string& text,
-        HDC measureHdc,
         HFONT font,
         UINT format,
         const EditableAnchorBinding& editable);
     void RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
         const TextLayoutResult& layoutResult,
         const EditableAnchorBinding& editable);
-    void DrawAlphaCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha);
+    bool IsDirect2DActive() const;
     const DashboardMetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();
     void WriteTrace(const std::string& text) const;
@@ -670,21 +551,11 @@ private:
     std::vector<WidgetEditGuide> widgetEditGuides_;
     std::vector<EditableAnchorRegion> staticEditableAnchorRegions_;
     std::vector<EditableAnchorRegion> dynamicEditableAnchorRegions_;
-    HDC staticAnchorMeasureHdc_ = nullptr;
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     mutable std::unordered_map<std::string, std::wstring, TransparentStringHash, TransparentStringEqual> wideTextCache_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textWidthCache_;
-    mutable std::unordered_map<TextWidthCacheKey, SIZE, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textExtentCache_;
-    mutable std::unordered_map<TextMeasureCacheKey, SIZE, TextMeasureCacheKeyHash, TextMeasureCacheKeyEqual>
-        textMeasureCache_;
-    mutable std::unordered_map<COLORREF, HBRUSH> solidBrushCache_;
-    mutable std::unordered_map<PenCacheKey, HPEN, PenCacheKeyHash> solidPenCache_;
-    std::unordered_map<AlphaCapsuleCacheKey, AlphaCapsuleBitmap, AlphaCapsuleCacheKeyHash> alphaCapsuleCache_;
-    std::unordered_map<PanelIconCacheKey, AlphaCapsuleBitmap, PanelIconCacheKeyHash> scaledPanelIconCache_;
-    std::unordered_map<D2DBrushCacheKey,
-        Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>,
-        D2DBrushCacheKeyHash>
+    std::unordered_map<D2DBrushCacheKey, Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>, D2DBrushCacheKeyHash>
         d2dSolidBrushCache_;
     std::unordered_map<PanelIconCacheKey, Microsoft::WRL::ComPtr<ID2D1Bitmap>, PanelIconCacheKeyHash>
         d2dPanelIconCache_;

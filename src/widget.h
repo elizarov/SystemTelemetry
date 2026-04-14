@@ -47,7 +47,6 @@ public:
     virtual bool IsVerticalSpring() const;
     virtual void ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect);
     virtual void Draw(DashboardRenderer& renderer,
-        HDC hdc,
         const struct DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const;
     virtual void FinalizeLayoutGroup(

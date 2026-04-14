@@ -27,7 +27,7 @@ bool DashboardWidget::IsVerticalSpring() const {
 
 void DashboardWidget::ResolveLayoutState(const DashboardRenderer&, const RECT&) {}
 
-void DashboardWidget::Draw(DashboardRenderer&, HDC, const DashboardWidgetLayout&, const DashboardMetricSource&) const {}
+void DashboardWidget::Draw(DashboardRenderer&, const DashboardWidgetLayout&, const DashboardMetricSource&) const {}
 
 void DashboardWidget::FinalizeLayoutGroup(DashboardRenderer&, const std::vector<DashboardWidgetLayout*>&) {}
 

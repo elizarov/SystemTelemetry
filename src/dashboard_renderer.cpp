@@ -89,98 +89,6 @@ std::string FormatWin32Error(DWORD error) {
     return message;
 }
 
-void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE /*alpha*/) {
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-
-    HBRUSH brush = CreateSolidBrush(color);
-    HPEN pen = CreatePen(PS_SOLID, 1, color);
-    HGDIOBJ oldBrush = SelectObject(hdc, brush);
-    HGDIOBJ oldPen = SelectObject(hdc, pen);
-    if (width <= height) {
-        Ellipse(hdc, rect.left, rect.top, rect.right, rect.bottom);
-    } else {
-        RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, height, height);
-    }
-    SelectObject(hdc, oldPen);
-    SelectObject(hdc, oldBrush);
-    DeleteObject(pen);
-    DeleteObject(brush);
-}
-
-bool CapsuleContainsSample(double sampleX, double sampleY, double width, double height) {
-    if (width <= 0.0 || height <= 0.0) {
-        return false;
-    }
-
-    if (width <= height) {
-        const double centerX = width / 2.0;
-        const double centerY = height / 2.0;
-        const double radiusX = width / 2.0;
-        const double radiusY = height / 2.0;
-        const double dx = sampleX - centerX;
-        const double dy = sampleY - centerY;
-        return ((dx * dx) / (radiusX * radiusX)) + ((dy * dy) / (radiusY * radiusY)) <= 1.0;
-    }
-
-    const double radius = height / 2.0;
-    const double leftCenterX = radius;
-    const double rightCenterX = width - radius;
-    const double centerY = radius;
-    if (sampleX >= leftCenterX && sampleX <= rightCenterX && sampleY >= 0.0 && sampleY <= height) {
-        return true;
-    }
-
-    const double dxLeft = sampleX - leftCenterX;
-    const double dxRight = sampleX - rightCenterX;
-    const double dy = sampleY - centerY;
-    return (dxLeft * dxLeft) + (dy * dy) <= radius * radius || (dxRight * dxRight) + (dy * dy) <= radius * radius;
-}
-
-void FillDiamond(HDC hdc, const RECT& rect, COLORREF color) {
-    const int width = std::max(1, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(1, static_cast<int>(rect.bottom - rect.top));
-    const int centerX = rect.left + (width / 2);
-    const int centerY = rect.top + (height / 2);
-    Gdiplus::Point points[] = {
-        Gdiplus::Point(centerX, rect.top),
-        Gdiplus::Point(rect.right - 1, centerY),
-        Gdiplus::Point(centerX, rect.bottom - 1),
-        Gdiplus::Point(rect.left, centerY),
-    };
-
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    Gdiplus::SolidBrush brush(Gdiplus::Color(255, GetRValue(color), GetGValue(color), GetBValue(color)));
-    graphics.FillPolygon(&brush, points, static_cast<INT>(std::size(points)));
-}
-
-int GetImageEncoderClsid(const WCHAR* mimeType, CLSID* clsid) {
-    UINT encoderCount = 0;
-    UINT encoderBytes = 0;
-    if (Gdiplus::GetImageEncodersSize(&encoderCount, &encoderBytes) != Gdiplus::Ok || encoderBytes == 0) {
-        return -1;
-    }
-
-    std::vector<BYTE> encoderBuffer(encoderBytes);
-    auto* encoders = reinterpret_cast<Gdiplus::ImageCodecInfo*>(encoderBuffer.data());
-    if (Gdiplus::GetImageEncoders(encoderCount, encoderBytes, encoders) != Gdiplus::Ok) {
-        return -1;
-    }
-
-    for (UINT i = 0; i < encoderCount; ++i) {
-        if (wcscmp(encoders[i].MimeType, mimeType) == 0) {
-            *clsid = encoders[i].Clsid;
-            return static_cast<int>(i);
-        }
-    }
-    return -1;
-}
-
 std::string Trim(std::string value) {
     const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
     const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
@@ -296,23 +204,6 @@ std::unique_ptr<Gdiplus::Bitmap> LoadPngResourceBitmap(UINT resourceId) {
 
     stream->Release();
     return bitmap;
-}
-
-SIZE MeasureTextSize(HDC hdc, HFONT font, const std::string& text) {
-    SIZE size{};
-    const std::wstring wide = WideFromUtf8(text);
-    HGDIOBJ oldFont = SelectObject(hdc, font);
-    if (!wide.empty()) {
-        GetTextExtentPoint32W(hdc, wide.c_str(), static_cast<int>(wide.size()), &size);
-    }
-    SelectObject(hdc, oldFont);
-    return size;
-}
-
-bool IsFastSingleLineTextFormat(const std::wstring& wideText, UINT format) {
-    return !wideText.empty() && (format & DT_SINGLELINE) != 0 && (format & DT_END_ELLIPSIS) == 0 &&
-           (format & DT_PATH_ELLIPSIS) == 0 && (format & DT_WORD_ELLIPSIS) == 0 && (format & DT_WORDBREAK) == 0 &&
-           (format & DT_EDITCONTROL) == 0 && (format & DT_EXPANDTABS) == 0;
 }
 
 }  // namespace
@@ -528,229 +419,74 @@ bool DashboardRenderer::ResolveLayout(bool includeWidgetState) {
 }
 
 DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
-    HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const {
-    TextLayoutResult result{rect};
+    const RECT& rect, const std::string& text, HFONT font, UINT format) const {
     const std::wstring& wideText = GetWideText(text);
     if (wideText.empty()) {
-        return result;
-    }
-    if (IsDirect2DActive()) {
-        return MeasureTextBlockD2D(rect, wideText, font, format, nullptr);
-    }
-
-    UINT measureFormat = format | DT_CALCRECT;
-    measureFormat &= ~DT_VCENTER;
-    measureFormat &= ~DT_BOTTOM;
-    measureFormat &= ~DT_NOCLIP;
-    const int availableWidth = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int availableHeight = std::max(0, static_cast<int>(rect.bottom - rect.top));
-
-    const TextMeasureCacheLookupKey cacheKey{font, text, measureFormat, availableWidth, availableHeight};
-    SIZE measuredSize{};
-    const auto cached = textMeasureCache_.find(cacheKey);
-    if (cached != textMeasureCache_.end()) {
-        measuredSize = cached->second;
-    } else {
-        HGDIOBJ oldFont = SelectObject(hdc, font);
-        RECT measureRect{0, 0, availableWidth, availableHeight};
-        ::DrawTextW(hdc, wideText.c_str(), -1, &measureRect, measureFormat);
-        SelectObject(hdc, oldFont);
-        measuredSize.cx = std::max(0, static_cast<int>(measureRect.right - measureRect.left));
-        measuredSize.cy = std::max(0, static_cast<int>(measureRect.bottom - measureRect.top));
-        textMeasureCache_.emplace(
-            TextMeasureCacheKey{font, std::string(text), measureFormat, availableWidth, availableHeight}, measuredSize);
-    }
-
-    const int measuredWidth = measuredSize.cx;
-    const int measuredHeight = measuredSize.cy;
-    const int textWidth = std::min(availableWidth, measuredWidth);
-    const int textHeight = std::min(availableHeight, measuredHeight);
-
-    int left = rect.left;
-    if ((format & DT_CENTER) != 0) {
-        left = rect.left + std::max(0, (availableWidth - textWidth) / 2);
-    } else if ((format & DT_RIGHT) != 0) {
-        left = rect.right - textWidth;
-    }
-
-    int top = rect.top;
-    if ((format & DT_VCENTER) != 0) {
-        top = rect.top + std::max(0, (availableHeight - textHeight) / 2);
-    } else if ((format & DT_BOTTOM) != 0) {
-        top = rect.bottom - textHeight;
-    }
-
-    result.textRect = RECT{left,
-        top,
-        std::min(rect.right, static_cast<LONG>(left + textWidth)),
-        std::min(rect.bottom, static_cast<LONG>(top + textHeight))};
-    return result;
-}
-
-DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
-    const RECT& rect, const std::string& text, HFONT font, UINT format) const {
-    if (hwnd_ != nullptr && dwriteFactory_ != nullptr) {
-        const std::wstring& wideText = GetWideText(text);
-        if (wideText.empty()) {
-            return TextLayoutResult{rect};
-        }
-        return MeasureTextBlockD2D(rect, wideText, font, format, nullptr);
-    }
-
-    HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
-    if (hdc == nullptr) {
         return TextLayoutResult{rect};
     }
-
-    const TextLayoutResult result = MeasureTextBlock(hdc, rect, text, font, format);
-    ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
-    return result;
+    return MeasureTextBlockD2D(rect, wideText, font, format, nullptr);
 }
 
 DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
-    HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
+    const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
     TextLayoutResult result{rect};
     const std::wstring& wideText = GetWideText(text);
     if (wideText.empty()) {
         return result;
     }
-    if (IsDirect2DActive()) {
-        result = MeasureTextBlockD2D(rect, wideText, font, format, nullptr);
-        IDWriteTextFormat* textFormat = DWriteTextFormatForFont(font);
-        if (textFormat == nullptr) {
-            return result;
-        }
-        ConfigureDWriteTextFormat(textFormat, format);
-        ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
-        if (brush == nullptr) {
-            return result;
-        }
-        const D2D1_DRAW_TEXT_OPTIONS options = (format & DT_NOCLIP) != 0 ? D2D1_DRAW_TEXT_OPTIONS_NONE
-                                                                          : D2D1_DRAW_TEXT_OPTIONS_CLIP;
-        d2dActiveRenderTarget_->DrawText(wideText.c_str(),
-            static_cast<UINT32>(wideText.size()),
-            textFormat,
-            D2D1::RectF(static_cast<float>(rect.left),
-                static_cast<float>(rect.top),
-                static_cast<float>(rect.right),
-                static_cast<float>(rect.bottom)),
-            brush,
-            options);
+    result = MeasureTextBlockD2D(rect, wideText, font, format, nullptr);
+    IDWriteTextFormat* textFormat = DWriteTextFormatForFont(font);
+    if (textFormat == nullptr) {
         return result;
     }
-
-    HGDIOBJ oldFont = SelectObject(hdc, font);
-    SetTextColor(hdc, color);
-    if (IsFastSingleLineTextFormat(wideText, format)) {
-        const TextWidthCacheLookupKey cacheKey{font, text};
-        SIZE size{};
-        if (const auto it = textExtentCache_.find(cacheKey); it != textExtentCache_.end()) {
-            size = it->second;
-        } else {
-            GetTextExtentPoint32W(hdc, wideText.c_str(), static_cast<int>(wideText.size()), &size);
-            textExtentCache_.emplace(TextWidthCacheKey{font, text}, size);
-        }
-
-        int x = rect.left;
-        if ((format & DT_CENTER) != 0) {
-            x = rect.left + std::max(0L, (rect.right - rect.left - size.cx) / 2);
-        } else if ((format & DT_RIGHT) != 0) {
-            x = rect.right - size.cx;
-        }
-
-        int y = rect.top;
-        if ((format & DT_VCENTER) != 0) {
-            y = rect.top + std::max(0L, (rect.bottom - rect.top - size.cy) / 2);
-        } else if ((format & DT_BOTTOM) != 0) {
-            y = rect.bottom - size.cy;
-        }
-
-        result.textRect = RECT{x,
-            y,
-            std::min(rect.right, static_cast<LONG>(x + size.cx)),
-            std::min(rect.bottom, static_cast<LONG>(y + size.cy))};
-
-        const UINT options = (format & DT_NOCLIP) != 0 ? 0u : ETO_CLIPPED;
-        const RECT* clipRect = (format & DT_NOCLIP) != 0 ? nullptr : &rect;
-        ExtTextOutW(hdc, x, y, options, clipRect, wideText.c_str(), static_cast<UINT>(wideText.size()), nullptr);
-    } else {
-        result = MeasureTextBlock(hdc, rect, text, font, format);
-        RECT copy = rect;
-        ::DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
+    ConfigureDWriteTextFormat(textFormat, format);
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
+    if (brush == nullptr) {
+        return result;
     }
-    SelectObject(hdc, oldFont);
+    const D2D1_DRAW_TEXT_OPTIONS options =
+        (format & DT_NOCLIP) != 0 ? D2D1_DRAW_TEXT_OPTIONS_NONE : D2D1_DRAW_TEXT_OPTIONS_CLIP;
+    d2dActiveRenderTarget_->DrawText(wideText.c_str(),
+        static_cast<UINT32>(wideText.size()),
+        textFormat,
+        D2D1::RectF(static_cast<float>(rect.left),
+            static_cast<float>(rect.top),
+            static_cast<float>(rect.right),
+            static_cast<float>(rect.bottom)),
+        brush,
+        options);
     return result;
 }
 
 void DashboardRenderer::DrawText(
-    HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const {
-    if (IsDirect2DActive()) {
-        const std::wstring& wideText = GetWideText(text);
-        if (wideText.empty()) {
-            return;
-        }
-        IDWriteTextFormat* textFormat = DWriteTextFormatForFont(font);
-        if (textFormat == nullptr) {
-            return;
-        }
-        ConfigureDWriteTextFormat(textFormat, format);
-        ID2D1SolidColorBrush* brush = const_cast<DashboardRenderer*>(this)->D2DSolidBrush(color);
-        if (brush == nullptr) {
-            return;
-        }
-        const D2D1_DRAW_TEXT_OPTIONS options = (format & DT_NOCLIP) != 0 ? D2D1_DRAW_TEXT_OPTIONS_NONE
-                                                                          : D2D1_DRAW_TEXT_OPTIONS_CLIP;
-        d2dActiveRenderTarget_->DrawText(wideText.c_str(),
-            static_cast<UINT32>(wideText.size()),
-            textFormat,
-            D2D1::RectF(static_cast<float>(rect.left),
-                static_cast<float>(rect.top),
-                static_cast<float>(rect.right),
-                static_cast<float>(rect.bottom)),
-            brush,
-            options);
+    const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const {
+    const std::wstring& wideText = GetWideText(text);
+    if (wideText.empty()) {
         return;
     }
-
-    HGDIOBJ oldFont = SelectObject(hdc, font);
-    SetTextColor(hdc, color);
-    const std::wstring& wideText = GetWideText(text);
-    const bool fastSingleLine = IsFastSingleLineTextFormat(wideText, format);
-    if (fastSingleLine) {
-        const TextWidthCacheLookupKey cacheKey{font, text};
-        SIZE size{};
-        if (const auto it = textExtentCache_.find(cacheKey); it != textExtentCache_.end()) {
-            size = it->second;
-        } else {
-            GetTextExtentPoint32W(hdc, wideText.c_str(), static_cast<int>(wideText.size()), &size);
-            textExtentCache_.emplace(TextWidthCacheKey{font, text}, size);
-        }
-
-        int x = rect.left;
-        if ((format & DT_CENTER) != 0) {
-            x = rect.left + std::max(0L, (rect.right - rect.left - size.cx) / 2);
-        } else if ((format & DT_RIGHT) != 0) {
-            x = rect.right - size.cx;
-        }
-
-        int y = rect.top;
-        if ((format & DT_VCENTER) != 0) {
-            y = rect.top + std::max(0L, (rect.bottom - rect.top - size.cy) / 2);
-        } else if ((format & DT_BOTTOM) != 0) {
-            y = rect.bottom - size.cy;
-        }
-
-        const UINT options = (format & DT_NOCLIP) != 0 ? 0u : ETO_CLIPPED;
-        const RECT* clipRect = (format & DT_NOCLIP) != 0 ? nullptr : &rect;
-        ExtTextOutW(hdc, x, y, options, clipRect, wideText.c_str(), static_cast<UINT>(wideText.size()), nullptr);
-    } else {
-        RECT copy = rect;
-        ::DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
+    IDWriteTextFormat* textFormat = DWriteTextFormatForFont(font);
+    if (textFormat == nullptr) {
+        return;
     }
-    SelectObject(hdc, oldFont);
+    ConfigureDWriteTextFormat(textFormat, format);
+    ID2D1SolidColorBrush* brush = const_cast<DashboardRenderer*>(this)->D2DSolidBrush(color);
+    if (brush == nullptr) {
+        return;
+    }
+    const D2D1_DRAW_TEXT_OPTIONS options =
+        (format & DT_NOCLIP) != 0 ? D2D1_DRAW_TEXT_OPTIONS_NONE : D2D1_DRAW_TEXT_OPTIONS_CLIP;
+    d2dActiveRenderTarget_->DrawText(wideText.c_str(),
+        static_cast<UINT32>(wideText.size()),
+        textFormat,
+        D2D1::RectF(static_cast<float>(rect.left),
+            static_cast<float>(rect.top),
+            static_cast<float>(rect.right),
+            static_cast<float>(rect.bottom)),
+        brush,
+        options);
 }
 
-void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const {
+void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides || !overlayState.hoveredEditableWidget.has_value()) {
         return;
     }
@@ -770,21 +506,10 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc, const EditOverlaySta
     if (hoveredWidget == nullptr) {
         return;
     }
-    if (IsDirect2DActive()) {
-        const_cast<DashboardRenderer*>(this)->DrawSolidRect(hoveredWidget->rect, LayoutGuideColor());
-        return;
-    }
-
-    HPEN pen = SolidPen(LayoutGuideColor());
-    HGDIOBJ oldPen = SelectObject(hdc, pen);
-    HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
-    Rectangle(
-        hdc, hoveredWidget->rect.left, hoveredWidget->rect.top, hoveredWidget->rect.right, hoveredWidget->rect.bottom);
-    SelectObject(hdc, oldBrush);
-    SelectObject(hdc, oldPen);
+    const_cast<DashboardRenderer*>(this)->DrawSolidRect(hoveredWidget->rect, LayoutGuideColor());
 }
 
-void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const {
+void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides) {
         return;
     }
@@ -831,59 +556,24 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOv
     if (highlights.empty()) {
         return;
     }
-    if (IsDirect2DActive()) {
-        for (const auto& [highlighted, active] : highlights) {
-            const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
-            if (highlighted.drawTargetOutline && highlighted.targetRect.right > highlighted.targetRect.left &&
-                highlighted.targetRect.bottom > highlighted.targetRect.top) {
-                const_cast<DashboardRenderer*>(this)->DrawSolidRect(highlighted.targetRect, outlineColor, std::max(1, ScaleLogical(1)), true);
-            }
-            if (highlighted.shape == AnchorShape::Circle) {
-                const_cast<DashboardRenderer*>(this)->DrawSolidEllipse(
-                    highlighted.anchorRect, outlineColor, std::max(1, ScaleLogical(1)));
-            } else {
-                const_cast<DashboardRenderer*>(this)->FillSolidDiamond(highlighted.anchorRect, outlineColor);
-            }
-        }
-        return;
-    }
-
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
     for (const auto& [highlighted, active] : highlights) {
         const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
         if (highlighted.drawTargetOutline && highlighted.targetRect.right > highlighted.targetRect.left &&
             highlighted.targetRect.bottom > highlighted.targetRect.top) {
-            Gdiplus::Pen pen(
-                Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
-                static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
-            pen.SetDashStyle(Gdiplus::DashStyleDot);
-            const RECT& targetRect = highlighted.targetRect;
-            graphics.DrawRectangle(&pen,
-                static_cast<Gdiplus::REAL>(targetRect.left),
-                static_cast<Gdiplus::REAL>(targetRect.top),
-                static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.right - targetRect.left)),
-                static_cast<Gdiplus::REAL>(std::max<LONG>(1, targetRect.bottom - targetRect.top)));
+            const_cast<DashboardRenderer*>(this)->DrawSolidRect(
+                highlighted.targetRect, outlineColor, std::max(1, ScaleLogical(1)), true);
         }
 
         if (highlighted.shape == AnchorShape::Circle) {
-            const RECT& anchorRect = highlighted.anchorRect;
-            Gdiplus::Pen pen(
-                Gdiplus::Color(255, GetRValue(outlineColor), GetGValue(outlineColor), GetBValue(outlineColor)),
-                static_cast<Gdiplus::REAL>(std::max(1, ScaleLogical(1))));
-            graphics.DrawEllipse(&pen,
-                static_cast<Gdiplus::REAL>(anchorRect.left),
-                static_cast<Gdiplus::REAL>(anchorRect.top),
-                static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.right - anchorRect.left)),
-                static_cast<Gdiplus::REAL>(std::max<LONG>(1, anchorRect.bottom - anchorRect.top)));
+            const_cast<DashboardRenderer*>(this)->DrawSolidEllipse(
+                highlighted.anchorRect, outlineColor, std::max(1, ScaleLogical(1)));
         } else {
-            FillDiamond(hdc, highlighted.anchorRect, outlineColor);
+            const_cast<DashboardRenderer*>(this)->FillSolidDiamond(highlighted.anchorRect, outlineColor);
         }
     }
 }
 
-void DashboardRenderer::DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const {
+void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides || layoutEditGuides_.empty()) {
         return;
     }
@@ -892,28 +582,14 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc, const EditOverlayState& ov
         const bool active = overlayState.activeLayoutEditGuide.has_value() &&
                             MatchesLayoutEditGuide(guide, *overlayState.activeLayoutEditGuide);
         const COLORREF color = active ? ActiveEditColor() : LayoutGuideColor();
-        if (IsDirect2DActive()) {
-            const POINT start{guide.lineRect.left, guide.lineRect.top};
-            const POINT end = guide.axis == LayoutGuideAxis::Vertical ? POINT{guide.lineRect.left, guide.lineRect.bottom}
-                                                                     : POINT{guide.lineRect.right, guide.lineRect.top};
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(start, end, color);
-        } else {
-            HPEN pen = SolidPen(LayoutGuideColor());
-            HPEN activePen = SolidPen(ActiveEditColor());
-            HGDIOBJ oldPen = SelectObject(hdc, active ? activePen : pen);
-            if (guide.axis == LayoutGuideAxis::Vertical) {
-                MoveToEx(hdc, guide.lineRect.left, guide.lineRect.top, nullptr);
-                LineTo(hdc, guide.lineRect.left, guide.lineRect.bottom);
-            } else {
-                MoveToEx(hdc, guide.lineRect.left, guide.lineRect.top, nullptr);
-                LineTo(hdc, guide.lineRect.right, guide.lineRect.top);
-            }
-            SelectObject(hdc, oldPen);
-        }
+        const POINT start{guide.lineRect.left, guide.lineRect.top};
+        const POINT end = guide.axis == LayoutGuideAxis::Vertical ? POINT{guide.lineRect.left, guide.lineRect.bottom}
+                                                                  : POINT{guide.lineRect.right, guide.lineRect.top};
+        const_cast<DashboardRenderer*>(this)->DrawSolidLine(start, end, color);
     }
 }
 
-void DashboardRenderer::DrawWidgetEditGuides(HDC hdc, const EditOverlayState& overlayState) const {
+void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides || widgetEditGuides_.empty()) {
         return;
     }
@@ -939,16 +615,7 @@ void DashboardRenderer::DrawWidgetEditGuides(HDC hdc, const EditOverlayState& ov
         const bool active = overlayState.activeWidgetEditGuide.has_value() &&
                             MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
         const COLORREF color = active ? ActiveEditColor() : LayoutGuideColor();
-        if (IsDirect2DActive()) {
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart, guide.drawEnd, color);
-        } else {
-            HPEN pen = SolidPen(LayoutGuideColor());
-            HPEN activePen = SolidPen(ActiveEditColor());
-            HGDIOBJ oldPen = SelectObject(hdc, active ? activePen : pen);
-            MoveToEx(hdc, guide.drawStart.x, guide.drawStart.y, nullptr);
-            LineTo(hdc, guide.drawEnd.x, guide.drawEnd.y);
-            SelectObject(hdc, oldPen);
-        }
+        const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart, guide.drawEnd, color);
     }
 }
 
@@ -1096,7 +763,6 @@ void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const EditableAnchor
 void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
     const RECT& rect,
     const std::string& text,
-    HDC measureHdc,
     HFONT font,
     UINT format,
     const EditableAnchorBinding& editable) {
@@ -1104,8 +770,7 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
         return;
     }
 
-    const TextLayoutResult result = measureHdc != nullptr ? MeasureTextBlock(measureHdc, rect, text, font, format)
-                                                          : MeasureTextBlock(rect, text, font, format);
+    const TextLayoutResult result = MeasureTextBlock(rect, text, font, format);
     const int anchorSize = std::max(4, ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     const int anchorCenterX = result.textRect.right;
@@ -1160,19 +825,7 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
 
 void DashboardRenderer::RegisterStaticTextAnchor(
     const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
-    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, staticAnchorMeasureHdc_, font, format, editable);
-}
-
-void DashboardRenderer::RegisterDynamicTextAnchor(HDC hdc,
-    const RECT& rect,
-    const std::string& text,
-    HFONT font,
-    UINT format,
-    const EditableAnchorBinding& editable) {
-    if (!dynamicAnchorRegistrationEnabled_) {
-        return;
-    }
-    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, hdc, font, format, editable);
+    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, font, format, editable);
 }
 
 void DashboardRenderer::RegisterDynamicTextAnchor(
@@ -1188,85 +841,10 @@ void DashboardRenderer::RegisterDynamicTextAnchor(
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
-    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, nullptr, font, format, editable);
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, font, format, editable);
 }
 
-void DashboardRenderer::DrawAlphaCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-
-    if (alpha == 255) {
-        FillCapsule(hdc, rect, color, alpha);
-        return;
-    }
-
-    const AlphaCapsuleCacheKey key{color, alpha, width, height};
-    auto it = alphaCapsuleCache_.find(key);
-    if (it == alphaCapsuleCache_.end()) {
-        BITMAPINFO bitmapInfo{};
-        bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
-        bitmapInfo.bmiHeader.biWidth = width;
-        bitmapInfo.bmiHeader.biHeight = -height;
-        bitmapInfo.bmiHeader.biPlanes = 1;
-        bitmapInfo.bmiHeader.biBitCount = 32;
-        bitmapInfo.bmiHeader.biCompression = BI_RGB;
-
-        void* pixels = nullptr;
-        HDC sourceDc = CreateCompatibleDC(nullptr);
-        HBITMAP bitmap = CreateDIBSection(sourceDc, &bitmapInfo, DIB_RGB_COLORS, &pixels, nullptr, 0);
-        if (sourceDc == nullptr || bitmap == nullptr || pixels == nullptr) {
-            if (bitmap != nullptr) {
-                DeleteObject(bitmap);
-            }
-            if (sourceDc != nullptr) {
-                DeleteDC(sourceDc);
-            }
-            return;
-        }
-
-        SelectObject(sourceDc, bitmap);
-        auto* dst = static_cast<BYTE*>(pixels);
-        const int stride = width * 4;
-        constexpr int kSamplesPerAxis = 4;
-        constexpr int kSampleCount = kSamplesPerAxis * kSamplesPerAxis;
-        const std::array<double, kSamplesPerAxis> offsets{0.125, 0.375, 0.625, 0.875};
-        const BYTE red = GetRValue(color);
-        const BYTE green = GetGValue(color);
-        const BYTE blue = GetBValue(color);
-        const double alphaScale = static_cast<double>(alpha) / 255.0;
-        for (int y = 0; y < height; ++y) {
-            BYTE* row = dst + (y * stride);
-            for (int x = 0; x < width; ++x) {
-                int coveredSamples = 0;
-                for (double offsetY : offsets) {
-                    for (double offsetX : offsets) {
-                        if (CapsuleContainsSample(
-                                static_cast<double>(x) + offsetX, static_cast<double>(y) + offsetY, width, height)) {
-                            ++coveredSamples;
-                        }
-                    }
-                }
-
-                const double coverage = static_cast<double>(coveredSamples) / kSampleCount;
-                const BYTE sampleAlpha = static_cast<BYTE>(std::lround(255.0 * coverage * alphaScale));
-                row[x * 4 + 0] = static_cast<BYTE>(std::lround(static_cast<double>(blue) * sampleAlpha / 255.0));
-                row[x * 4 + 1] = static_cast<BYTE>(std::lround(static_cast<double>(green) * sampleAlpha / 255.0));
-                row[x * 4 + 2] = static_cast<BYTE>(std::lround(static_cast<double>(red) * sampleAlpha / 255.0));
-                row[x * 4 + 3] = sampleAlpha;
-            }
-        }
-
-        it = alphaCapsuleCache_.emplace(key, AlphaCapsuleBitmap{sourceDc, bitmap}).first;
-    }
-
-    BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
-    AlphaBlend(hdc, rect.left, rect.top, width, height, it->second.hdc, 0, 0, width, height, blend);
-}
-
-void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverlayState& overlayState) const {
+void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const {
     const int threshold = LayoutSimilarityThreshold();
     if (threshold <= 0) {
         return;
@@ -1426,35 +1004,20 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
             const int y = rect.top + offset;
             const int left = rect.left + inset;
             const int right = rect.right - inset;
-            if (IsDirect2DActive()) {
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left, y}, POINT{right, y}, color);
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left + cap, y - cap}, POINT{left, y}, color);
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left, y}, POINT{left + cap, y + cap + 1}, color);
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{right - cap, y - cap}, POINT{right, y}, color);
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{right, y}, POINT{right - cap, y + cap + 1}, color);
-            } else {
-                MoveToEx(hdc, left, y, nullptr);
-                LineTo(hdc, right, y);
-                MoveToEx(hdc, left + cap, y - cap, nullptr);
-                LineTo(hdc, left, y);
-                LineTo(hdc, left + cap, y + cap + 1);
-                MoveToEx(hdc, right - cap, y - cap, nullptr);
-                LineTo(hdc, right, y);
-                LineTo(hdc, right - cap, y + cap + 1);
-            }
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left, y}, POINT{right, y}, color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left + cap, y - cap}, POINT{left, y}, color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left, y}, POINT{left + cap, y + cap + 1}, color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{right - cap, y - cap}, POINT{right, y}, color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                POINT{right, y}, POINT{right - cap, y + cap + 1}, color);
             if (indicator.exactTypeOrdinal > 0) {
                 const int cx = left + std::max(0, (right - left) / 2);
                 const int count = indicator.exactTypeOrdinal;
                 const int totalWidth = (count - 1) * notchSpacing;
                 int notchX = cx - (totalWidth / 2);
                 for (int i = 0; i < count; ++i) {
-                    if (IsDirect2DActive()) {
-                        const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                            POINT{notchX, y - notchDepth}, POINT{notchX, y + notchDepth + 1}, color);
-                    } else {
-                        MoveToEx(hdc, notchX, y - notchDepth, nullptr);
-                        LineTo(hdc, notchX, y + notchDepth + 1);
-                    }
+                    const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                        POINT{notchX, y - notchDepth}, POINT{notchX, y + notchDepth + 1}, color);
                     notchX += notchSpacing;
                 }
             }
@@ -1462,35 +1025,20 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
             const int x = rect.left + offset;
             const int top = rect.top + inset;
             const int bottom = rect.bottom - inset;
-            if (IsDirect2DActive()) {
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x, top}, POINT{x, bottom}, color);
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x - cap, top + cap}, POINT{x, top}, color);
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x, top}, POINT{x + cap + 1, top + cap}, color);
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x - cap, bottom - cap}, POINT{x, bottom}, color);
-                const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x, bottom}, POINT{x + cap + 1, bottom - cap}, color);
-            } else {
-                MoveToEx(hdc, x, top, nullptr);
-                LineTo(hdc, x, bottom);
-                MoveToEx(hdc, x - cap, top + cap, nullptr);
-                LineTo(hdc, x, top);
-                LineTo(hdc, x + cap + 1, top + cap);
-                MoveToEx(hdc, x - cap, bottom - cap, nullptr);
-                LineTo(hdc, x, bottom);
-                LineTo(hdc, x + cap + 1, bottom - cap);
-            }
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x, top}, POINT{x, bottom}, color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x - cap, top + cap}, POINT{x, top}, color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x, top}, POINT{x + cap + 1, top + cap}, color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x - cap, bottom - cap}, POINT{x, bottom}, color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                POINT{x, bottom}, POINT{x + cap + 1, bottom - cap}, color);
             if (indicator.exactTypeOrdinal > 0) {
                 const int cy = top + std::max(0, (bottom - top) / 2);
                 const int count = indicator.exactTypeOrdinal;
                 const int totalHeight = (count - 1) * notchSpacing;
                 int notchY = cy - (totalHeight / 2);
                 for (int i = 0; i < count; ++i) {
-                    if (IsDirect2DActive()) {
-                        const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                            POINT{x - notchDepth, notchY}, POINT{x + notchDepth + 1, notchY}, color);
-                    } else {
-                        MoveToEx(hdc, x - notchDepth, notchY, nullptr);
-                        LineTo(hdc, x + notchDepth + 1, notchY);
-                    }
+                    const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                        POINT{x - notchDepth, notchY}, POINT{x + notchDepth + 1, notchY}, color);
                     notchY += notchSpacing;
                 }
             }
@@ -1498,62 +1046,10 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
     }
 }
 
-void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect) {
-    if (IsDirect2DActive()) {
-        const auto it = std::find_if(
-            panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) { return entry.first == iconName; });
-        if (it == panelIcons_.end() || it->second == nullptr || d2dActiveRenderTarget_ == nullptr) {
-            return;
-        }
-        const int width = std::max(0, static_cast<int>(iconRect.right - iconRect.left));
-        const int height = std::max(0, static_cast<int>(iconRect.bottom - iconRect.top));
-        if (width <= 0 || height <= 0) {
-            return;
-        }
-
-        const PanelIconCacheKey cacheKey{iconName, width, height};
-        auto scaled = d2dPanelIconCache_.find(cacheKey);
-        if (scaled == d2dPanelIconCache_.end()) {
-            Gdiplus::Bitmap surface(width, height, PixelFormat32bppPARGB);
-            Gdiplus::Graphics graphics(&surface);
-            graphics.Clear(Gdiplus::Color(0, 0, 0, 0));
-            graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-            graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-            graphics.DrawImage(it->second.get(), 0, 0, width, height);
-
-            Gdiplus::BitmapData bitmapData{};
-            const Gdiplus::Rect lockRect(0, 0, width, height);
-            if (surface.LockBits(&lockRect, Gdiplus::ImageLockModeRead, PixelFormat32bppPARGB, &bitmapData) !=
-                Gdiplus::Ok) {
-                return;
-            }
-
-            Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
-            const HRESULT hr = d2dActiveRenderTarget_->CreateBitmap(D2D1::SizeU(width, height),
-                bitmapData.Scan0,
-                static_cast<UINT32>(bitmapData.Stride),
-                D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)),
-                bitmap.GetAddressOf());
-            surface.UnlockBits(&bitmapData);
-            if (FAILED(hr) || bitmap == nullptr) {
-                return;
-            }
-            scaled = d2dPanelIconCache_.emplace(cacheKey, std::move(bitmap)).first;
-        }
-
-        d2dActiveRenderTarget_->DrawBitmap(scaled->second.Get(),
-            D2D1::RectF(static_cast<float>(iconRect.left),
-                static_cast<float>(iconRect.top),
-                static_cast<float>(iconRect.right),
-                static_cast<float>(iconRect.bottom)),
-            1.0f,
-            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
-        return;
-    }
-
+void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RECT& iconRect) {
     const auto it = std::find_if(
         panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) { return entry.first == iconName; });
-    if (it == panelIcons_.end() || it->second == nullptr) {
+    if (it == panelIcons_.end() || it->second == nullptr || d2dActiveRenderTarget_ == nullptr) {
         return;
     }
     const int width = std::max(0, static_cast<int>(iconRect.right - iconRect.left));
@@ -1563,8 +1059,8 @@ void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, cons
     }
 
     const PanelIconCacheKey cacheKey{iconName, width, height};
-    auto scaled = scaledPanelIconCache_.find(cacheKey);
-    if (scaled == scaledPanelIconCache_.end()) {
+    auto scaled = d2dPanelIconCache_.find(cacheKey);
+    if (scaled == d2dPanelIconCache_.end()) {
         Gdiplus::Bitmap surface(width, height, PixelFormat32bppPARGB);
         Gdiplus::Graphics graphics(&surface);
         graphics.Clear(Gdiplus::Color(0, 0, 0, 0));
@@ -1579,173 +1075,91 @@ void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, cons
             return;
         }
 
-        BITMAPINFO bitmapInfo{};
-        bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
-        bitmapInfo.bmiHeader.biWidth = width;
-        bitmapInfo.bmiHeader.biHeight = -height;
-        bitmapInfo.bmiHeader.biPlanes = 1;
-        bitmapInfo.bmiHeader.biBitCount = 32;
-        bitmapInfo.bmiHeader.biCompression = BI_RGB;
-        void* pixels = nullptr;
-        HDC sourceDc = CreateCompatibleDC(nullptr);
-        HBITMAP bitmap = CreateDIBSection(sourceDc, &bitmapInfo, DIB_RGB_COLORS, &pixels, nullptr, 0);
-        if (sourceDc == nullptr || bitmap == nullptr || pixels == nullptr) {
-            surface.UnlockBits(&bitmapData);
-            if (bitmap != nullptr) {
-                DeleteObject(bitmap);
-            }
-            if (sourceDc != nullptr) {
-                DeleteDC(sourceDc);
-            }
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+        const HRESULT hr = d2dActiveRenderTarget_->CreateBitmap(D2D1::SizeU(width, height),
+            bitmapData.Scan0,
+            static_cast<UINT32>(bitmapData.Stride),
+            D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)),
+            bitmap.GetAddressOf());
+        surface.UnlockBits(&bitmapData);
+        if (FAILED(hr) || bitmap == nullptr) {
             return;
         }
-        SelectObject(sourceDc, bitmap);
-        for (int y = 0; y < height; ++y) {
-            memcpy(static_cast<BYTE*>(pixels) + (y * width * 4),
-                static_cast<const BYTE*>(bitmapData.Scan0) + (y * bitmapData.Stride),
-                static_cast<size_t>(width) * 4);
-        }
-        surface.UnlockBits(&bitmapData);
-        scaled = scaledPanelIconCache_.emplace(cacheKey, AlphaCapsuleBitmap{sourceDc, bitmap}).first;
+        scaled = d2dPanelIconCache_.emplace(cacheKey, std::move(bitmap)).first;
     }
 
-    BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
-    AlphaBlend(hdc, iconRect.left, iconRect.top, width, height, scaled->second.hdc, 0, 0, width, height, blend);
+    d2dActiveRenderTarget_->DrawBitmap(scaled->second.Get(),
+        D2D1::RectF(static_cast<float>(iconRect.left),
+            static_cast<float>(iconRect.top),
+            static_cast<float>(iconRect.right),
+            static_cast<float>(iconRect.bottom)),
+        1.0f,
+        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 }
 
-void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
-    if (IsDirect2DActive()) {
-        const COLORREF borderColor = ToColorRef(config_.layout.colors.panelBorderColor);
-        const COLORREF fillColor = ToColorRef(config_.layout.colors.panelFillColor);
-        const float radius = static_cast<float>(std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius)));
-        const D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(D2D1::RectF(static_cast<float>(card.rect.left),
-                                                            static_cast<float>(card.rect.top),
-                                                            static_cast<float>(card.rect.right),
-                                                            static_cast<float>(card.rect.bottom)),
-            radius,
-            radius);
-        ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(fillColor);
-        ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(borderColor);
-        if (fillBrush != nullptr) {
-            d2dActiveRenderTarget_->FillRoundedRectangle(roundedRect, fillBrush);
-        }
-        if (borderBrush != nullptr) {
-            d2dActiveRenderTarget_->DrawRoundedRectangle(roundedRect,
-                borderBrush,
-                static_cast<float>(std::max(1, ScaleLogical(config_.layout.cardStyle.cardBorderWidth))));
-        }
-        if (!card.iconName.empty()) {
-            DrawPanelIcon(nullptr, card.iconName, card.iconRect);
-        }
-        if (!card.title.empty()) {
-            DrawText(nullptr,
-                card.titleRect,
-                card.title,
-                fonts_.title,
-                ForegroundColor(),
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-        }
-        return;
+void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
+    const COLORREF borderColor = ToColorRef(config_.layout.colors.panelBorderColor);
+    const COLORREF fillColor = ToColorRef(config_.layout.colors.panelFillColor);
+    const float radius = static_cast<float>(std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius)));
+    const D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(D2D1::RectF(static_cast<float>(card.rect.left),
+                                                                static_cast<float>(card.rect.top),
+                                                                static_cast<float>(card.rect.right),
+                                                                static_cast<float>(card.rect.bottom)),
+        radius,
+        radius);
+    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(fillColor);
+    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(borderColor);
+    if (fillBrush != nullptr) {
+        d2dActiveRenderTarget_->FillRoundedRectangle(roundedRect, fillBrush);
     }
-
-    HPEN border = SolidPen(ToColorRef(config_.layout.colors.panelBorderColor),
-        std::max(1, ScaleLogical(config_.layout.cardStyle.cardBorderWidth)));
-    HBRUSH fill = SolidBrush(ToColorRef(config_.layout.colors.panelFillColor));
-    HGDIOBJ oldPen = SelectObject(hdc, border);
-    HGDIOBJ oldBrush = SelectObject(hdc, fill);
-    const int radius = std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius));
-    RoundRect(hdc, card.rect.left, card.rect.top, card.rect.right, card.rect.bottom, radius, radius);
-    SelectObject(hdc, oldBrush);
-    SelectObject(hdc, oldPen);
+    if (borderBrush != nullptr) {
+        d2dActiveRenderTarget_->DrawRoundedRectangle(roundedRect,
+            borderBrush,
+            static_cast<float>(std::max(1, ScaleLogical(config_.layout.cardStyle.cardBorderWidth))));
+    }
     if (!card.iconName.empty()) {
-        DrawPanelIcon(hdc, card.iconName, card.iconRect);
+        DrawPanelIcon(card.iconName, card.iconRect);
     }
     if (!card.title.empty()) {
-        DrawText(
-            hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        DrawText(card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     }
 }
 
-void DashboardRenderer::DrawPillBar(
-    HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
-    if (IsDirect2DActive()) {
-        const COLORREF accentColor = AccentColor();
-        const auto fillCapsuleD2D = [&](const RECT& capsuleRect, COLORREF color, BYTE alpha = 255) {
-            const int capsuleWidth = std::max(0, static_cast<int>(capsuleRect.right - capsuleRect.left));
-            const int capsuleHeight = std::max(0, static_cast<int>(capsuleRect.bottom - capsuleRect.top));
-            if (capsuleWidth <= 0 || capsuleHeight <= 0) {
-                return;
-            }
-            ID2D1SolidColorBrush* brush = D2DSolidBrush(color, alpha);
-            if (brush == nullptr) {
-                return;
-            }
-            if (capsuleWidth <= capsuleHeight) {
-                const float radiusX = static_cast<float>(capsuleWidth) / 2.0f;
-                const float radiusY = static_cast<float>(capsuleHeight) / 2.0f;
-                d2dActiveRenderTarget_->FillEllipse(
-                    D2D1::Ellipse(D2D1::Point2F(static_cast<float>(capsuleRect.left) + radiusX,
-                                      static_cast<float>(capsuleRect.top) + radiusY),
-                        radiusX,
-                        radiusY),
-                    brush);
-            } else {
-                const float radius = static_cast<float>(capsuleHeight) / 2.0f;
-                d2dActiveRenderTarget_->FillRoundedRectangle(D2D1::RoundedRect(
-                                                                 D2D1::RectF(static_cast<float>(capsuleRect.left),
-                                                                     static_cast<float>(capsuleRect.top),
-                                                                     static_cast<float>(capsuleRect.right),
-                                                                     static_cast<float>(capsuleRect.bottom)),
-                                                                 radius,
-                                                                 radius),
-                    brush);
-            }
-        };
-        fillCapsuleD2D(rect, ToColorRef(config_.layout.colors.trackColor));
-        const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-        const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-        if (width <= 0 || height <= 0 || !drawFill) {
+void DashboardRenderer::DrawPillBar(const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
+    const COLORREF accentColor = AccentColor();
+    const auto fillCapsule = [&](const RECT& capsuleRect, COLORREF color, BYTE alpha = 255) {
+        const int capsuleWidth = std::max(0, static_cast<int>(capsuleRect.right - capsuleRect.left));
+        const int capsuleHeight = std::max(0, static_cast<int>(capsuleRect.bottom - capsuleRect.top));
+        if (capsuleWidth <= 0 || capsuleHeight <= 0) {
             return;
         }
-        const double clampedRatio = std::clamp(ratio, 0.0, 1.0);
-        const int straightWidth = std::max(0, width - height);
-        const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
-        RECT fillRect = rect;
-        fillRect.right = fillRect.left + fillWidth;
-        fillCapsuleD2D(fillRect, accentColor);
-        if (peakRatio.has_value()) {
-            const double peak = std::clamp(*peakRatio, 0.0, 1.0);
-            const int markerWidth = std::min(width, std::max(1, std::max(ScaleLogical(4), height)));
-            const int centerX = static_cast<int>(rect.left) + static_cast<int>(std::round(peak * width));
-            const int minLeft = static_cast<int>(rect.left);
-            const int maxLeft = static_cast<int>(rect.right) - markerWidth;
-            const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
-            RECT markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-            fillCapsuleD2D(markerRect, accentColor, 96);
-        }
-        return;
-    }
-
-    const auto fillOpaqueCapsule = [&](const RECT& capsuleRect, COLORREF color) {
-        const int width = std::max(0, static_cast<int>(capsuleRect.right - capsuleRect.left));
-        const int height = std::max(0, static_cast<int>(capsuleRect.bottom - capsuleRect.top));
-        if (width <= 0 || height <= 0) {
+        ID2D1SolidColorBrush* brush = D2DSolidBrush(color, alpha);
+        if (brush == nullptr) {
             return;
         }
-
-        HGDIOBJ oldBrush = SelectObject(hdc, SolidBrush(color));
-        HGDIOBJ oldPen = SelectObject(hdc, SolidPen(color));
-        if (width <= height) {
-            Ellipse(hdc, capsuleRect.left, capsuleRect.top, capsuleRect.right, capsuleRect.bottom);
+        if (capsuleWidth <= capsuleHeight) {
+            const float radiusX = static_cast<float>(capsuleWidth) / 2.0f;
+            const float radiusY = static_cast<float>(capsuleHeight) / 2.0f;
+            d2dActiveRenderTarget_->FillEllipse(
+                D2D1::Ellipse(D2D1::Point2F(static_cast<float>(capsuleRect.left) + radiusX,
+                                  static_cast<float>(capsuleRect.top) + radiusY),
+                    radiusX,
+                    radiusY),
+                brush);
         } else {
-            RoundRect(hdc, capsuleRect.left, capsuleRect.top, capsuleRect.right, capsuleRect.bottom, height, height);
+            const float radius = static_cast<float>(capsuleHeight) / 2.0f;
+            d2dActiveRenderTarget_->FillRoundedRectangle(
+                D2D1::RoundedRect(D2D1::RectF(static_cast<float>(capsuleRect.left),
+                                      static_cast<float>(capsuleRect.top),
+                                      static_cast<float>(capsuleRect.right),
+                                      static_cast<float>(capsuleRect.bottom)),
+                    radius,
+                    radius),
+                brush);
         }
-        SelectObject(hdc, oldPen);
-        SelectObject(hdc, oldBrush);
     };
 
-    const COLORREF accentColor = AccentColor();
-    fillOpaqueCapsule(rect, ToColorRef(config_.layout.colors.trackColor));
+    fillCapsule(rect, ToColorRef(config_.layout.colors.trackColor));
 
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
@@ -1762,7 +1176,7 @@ void DashboardRenderer::DrawPillBar(
     const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
     RECT fillRect = rect;
     fillRect.right = fillRect.left + fillWidth;
-    fillOpaqueCapsule(fillRect, accentColor);
+    fillCapsule(fillRect, accentColor);
 
     if (peakRatio.has_value()) {
         const double peak = std::clamp(*peakRatio, 0.0, 1.0);
@@ -1772,39 +1186,15 @@ void DashboardRenderer::DrawPillBar(
         const int maxLeft = static_cast<int>(rect.right) - markerWidth;
         const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
         RECT markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-        DrawAlphaCapsule(hdc, markerRect, accentColor, 96);
+        fillCapsule(markerRect, accentColor, 96);
     }
 }
 
-void DashboardRenderer::DrawResolvedWidget(
-    HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) {
+void DashboardRenderer::DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) {
     if (widget.widget == nullptr) {
         return;
     }
-    widget.widget->Draw(*this, hdc, widget, metrics);
-}
-
-void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot) {
-    Draw(hdc, snapshot, EditOverlayState{});
-}
-
-void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
-    dynamicEditableAnchorRegions_.clear();
-    dynamicAnchorRegistrationEnabled_ =
-        overlayState.showLayoutEditGuides && !overlayState.activeLayoutEditGuide.has_value();
-    const DashboardMetricSource& metrics = ResolveMetrics(snapshot);
-    for (const auto& card : resolvedLayout_.cards) {
-        DrawPanel(hdc, card);
-        for (const auto& widget : card.widgets) {
-            DrawResolvedWidget(hdc, widget, metrics);
-        }
-    }
-    DrawHoveredWidgetHighlight(hdc, overlayState);
-    DrawHoveredEditableAnchorHighlight(hdc, overlayState);
-    DrawLayoutEditGuides(hdc, overlayState);
-    DrawWidgetEditGuides(hdc, overlayState);
-    DrawLayoutSimilarityIndicators(hdc, overlayState);
-    dynamicAnchorRegistrationEnabled_ = false;
+    widget.widget->Draw(*this, widget, metrics);
 }
 
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
@@ -1832,18 +1222,16 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     const DashboardMetricSource& metrics = ResolveMetrics(snapshot);
     d2dActiveRenderTarget_->Clear(ToD2DColor(BackgroundColor()));
     for (const auto& card : resolvedLayout_.cards) {
-        DrawPanel(nullptr, card);
+        DrawPanel(card);
         for (const auto& widget : card.widgets) {
-            if (widget.widget != nullptr) {
-                widget.widget->Draw(*this, nullptr, widget, metrics);
-            }
+            DrawResolvedWidget(widget, metrics);
         }
     }
-    DrawHoveredWidgetHighlight(nullptr, overlayState);
-    DrawHoveredEditableAnchorHighlight(nullptr, overlayState);
-    DrawLayoutEditGuides(nullptr, overlayState);
-    DrawWidgetEditGuides(nullptr, overlayState);
-    DrawLayoutSimilarityIndicators(nullptr, overlayState);
+    DrawHoveredWidgetHighlight(overlayState);
+    DrawHoveredEditableAnchorHighlight(overlayState);
+    DrawLayoutEditGuides(overlayState);
+    DrawWidgetEditGuides(overlayState);
+    DrawLayoutSimilarityIndicators(overlayState);
     dynamicAnchorRegistrationEnabled_ = false;
 }
 
@@ -1860,8 +1248,7 @@ bool DashboardRenderer::SaveSnapshotPng(
     Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
     const UINT width = static_cast<UINT>(std::max(1, WindowWidth()));
     const UINT height = static_cast<UINT>(std::max(1, WindowHeight()));
-    HRESULT hr =
-        wicFactory_->CreateBitmap(width, height, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
+    HRESULT hr = wicFactory_->CreateBitmap(width, height, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
     if (FAILED(hr) || bitmap == nullptr) {
         lastError_ = "renderer:screenshot_wic_bitmap_failed hr=0x" + FormatHresult(hr);
         return false;
@@ -1992,33 +1379,20 @@ int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const
         return it->second;
     }
 
-    if (dwriteFactory_ != nullptr) {
-        const std::wstring& wideText = GetWideText(text);
-        if (wideText.empty()) {
-            return 0;
-        }
-        const RECT measureRect{0, 0, WindowWidth(), WindowHeight()};
-        const int width = std::max(0, static_cast<int>(MeasureTextBlockD2D(
-            measureRect, wideText, font, DT_LEFT | DT_SINGLELINE | DT_VCENTER, nullptr).textRect.right));
-        textWidthCache_.emplace(TextWidthCacheKey{font, std::string(text)}, width);
-        return width;
-    }
-
-    HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
-    if (hdc == nullptr) {
+    if (dwriteFactory_ == nullptr) {
         return 0;
     }
 
     const std::wstring& wideText = GetWideText(text);
-    SIZE size{};
-    HGDIOBJ oldFont = SelectObject(hdc, font);
-    if (!wideText.empty()) {
-        GetTextExtentPoint32W(hdc, wideText.c_str(), static_cast<int>(wideText.size()), &size);
+    if (wideText.empty()) {
+        return 0;
     }
-    SelectObject(hdc, oldFont);
-    ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
-    textWidthCache_.emplace(TextWidthCacheKey{font, std::string(text)}, size.cx);
-    return size.cx;
+    const RECT measureRect{0, 0, WindowWidth(), WindowHeight()};
+    const int width = std::max(0,
+        static_cast<int>(MeasureTextBlockD2D(measureRect, wideText, font, DT_LEFT | DT_SINGLELINE | DT_VCENTER, nullptr)
+                .textRect.right));
+    textWidthCache_.emplace(TextWidthCacheKey{font, std::string(text)}, width);
+    return width;
 }
 
 std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
@@ -2247,13 +1621,10 @@ void DashboardRenderer::Shutdown() {
     parsedWidgetInfoCache_.clear();
     wideTextCache_.clear();
     textWidthCache_.clear();
-    textExtentCache_.clear();
-    textMeasureCache_.clear();
     staticEditableAnchorRegions_.clear();
     dynamicEditableAnchorRegions_.clear();
     dynamicAnchorRegistrationEnabled_ = false;
     d2dFirstDrawWarmupPending_ = false;
-    ClearGdiCaches();
     ClearD2DCaches();
     ReleasePanelIcons();
     ShutdownDirect2D();
@@ -2278,8 +1649,7 @@ void DashboardRenderer::InvalidateMetricSourceCache() {
 
 bool DashboardRenderer::InitializeDirect2D() {
     if (d2dFactory_ == nullptr) {
-        const HRESULT hr =
-            D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, d2dFactory_.ReleaseAndGetAddressOf());
+        const HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, d2dFactory_.ReleaseAndGetAddressOf());
         if (FAILED(hr) || d2dFactory_ == nullptr) {
             lastError_ = "renderer:d2d_factory_failed hr=0x" + FormatHresult(hr);
             return false;
@@ -2301,9 +1671,13 @@ bool DashboardRenderer::InitializeDirect2D() {
         d2dFactory_->CreateStrokeStyle(D2D1::StrokeStyleProperties(), nullptr, 0, d2dSolidStrokeStyle_.GetAddressOf());
     }
     if (d2dDashedStrokeStyle_ == nullptr) {
-        const D2D1_STROKE_STYLE_PROPERTIES props = D2D1::StrokeStyleProperties(
-            D2D1_CAP_STYLE_FLAT, D2D1_CAP_STYLE_FLAT, D2D1_CAP_STYLE_FLAT, D2D1_LINE_JOIN_MITER, 10.0f,
-            D2D1_DASH_STYLE_DOT, 0.0f);
+        const D2D1_STROKE_STYLE_PROPERTIES props = D2D1::StrokeStyleProperties(D2D1_CAP_STYLE_FLAT,
+            D2D1_CAP_STYLE_FLAT,
+            D2D1_CAP_STYLE_FLAT,
+            D2D1_LINE_JOIN_MITER,
+            10.0f,
+            D2D1_DASH_STYLE_DOT,
+            0.0f);
         d2dFactory_->CreateStrokeStyle(props, nullptr, 0, d2dDashedStrokeStyle_.GetAddressOf());
     }
     return true;
@@ -2460,8 +1834,7 @@ ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(COLORREF color, BYTE alph
     }
 
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
-    if (FAILED(
-            d2dActiveRenderTarget_->CreateSolidColorBrush(ToD2DColor(color, alpha), brush.GetAddressOf())) ||
+    if (FAILED(d2dActiveRenderTarget_->CreateSolidColorBrush(ToD2DColor(color, alpha), brush.GetAddressOf())) ||
         brush == nullptr) {
         return nullptr;
     }
@@ -2471,9 +1844,9 @@ ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(COLORREF color, BYTE alph
 void DashboardRenderer::PushClipRect(const RECT& rect) {
     if (IsDirect2DActive()) {
         d2dActiveRenderTarget_->PushAxisAlignedClip(D2D1::RectF(static_cast<float>(rect.left),
-                                                     static_cast<float>(rect.top),
-                                                     static_cast<float>(rect.right),
-                                                     static_cast<float>(rect.bottom)),
+                                                        static_cast<float>(rect.top),
+                                                        static_cast<float>(rect.right),
+                                                        static_cast<float>(rect.bottom)),
             D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         ++d2dClipDepth_;
     }
@@ -2495,9 +1868,9 @@ bool DashboardRenderer::FillSolidRect(const RECT& rect, COLORREF color, BYTE alp
         return false;
     }
     d2dActiveRenderTarget_->FillRectangle(D2D1::RectF(static_cast<float>(rect.left),
-                                             static_cast<float>(rect.top),
-                                             static_cast<float>(rect.right),
-                                             static_cast<float>(rect.bottom)),
+                                              static_cast<float>(rect.top),
+                                              static_cast<float>(rect.right),
+                                              static_cast<float>(rect.bottom)),
         brush);
     return true;
 }
@@ -2554,9 +1927,9 @@ bool DashboardRenderer::DrawSolidRect(const RECT& rect, COLORREF color, int stro
         return false;
     }
     d2dActiveRenderTarget_->DrawRectangle(D2D1::RectF(static_cast<float>(rect.left),
-                                             static_cast<float>(rect.top),
-                                             static_cast<float>(rect.right),
-                                             static_cast<float>(rect.bottom)),
+                                              static_cast<float>(rect.top),
+                                              static_cast<float>(rect.right),
+                                              static_cast<float>(rect.bottom)),
         brush,
         static_cast<float>(std::max(1, strokeWidth)),
         dashed ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
@@ -2574,8 +1947,7 @@ bool DashboardRenderer::DrawSolidEllipse(const RECT& rect, COLORREF color, int s
     const float radiusX = static_cast<float>(std::max(1L, rect.right - rect.left)) / 2.0f;
     const float radiusY = static_cast<float>(std::max(1L, rect.bottom - rect.top)) / 2.0f;
     d2dActiveRenderTarget_->DrawEllipse(
-        D2D1::Ellipse(D2D1::Point2F(static_cast<float>(rect.left) + radiusX,
-                          static_cast<float>(rect.top) + radiusY),
+        D2D1::Ellipse(D2D1::Point2F(static_cast<float>(rect.left) + radiusX, static_cast<float>(rect.top) + radiusY),
             radiusX,
             radiusY),
         brush,
@@ -2652,8 +2024,7 @@ bool DashboardRenderer::DrawD2DPolyline(std::span<const POINT> points, COLORREF 
     if (FAILED(geometry->Open(sink.GetAddressOf())) || sink == nullptr) {
         return false;
     }
-    sink->BeginFigure(
-        D2D1::Point2F(static_cast<float>(points.front().x), static_cast<float>(points.front().y)),
+    sink->BeginFigure(D2D1::Point2F(static_cast<float>(points.front().x), static_cast<float>(points.front().y)),
         D2D1_FIGURE_BEGIN_HOLLOW);
     for (size_t i = 1; i < points.size(); ++i) {
         sink->AddLine(D2D1::Point2F(static_cast<float>(points[i].x), static_cast<float>(points[i].y)));
@@ -2672,15 +2043,24 @@ bool DashboardRenderer::DrawD2DPolyline(std::span<const POINT> points, COLORREF 
 }
 
 IDWriteTextFormat* DashboardRenderer::DWriteTextFormatForFont(HFONT font) const {
-    if (font == fonts_.title) return d2dTextFormats_.title.Get();
-    if (font == fonts_.big) return d2dTextFormats_.big.Get();
-    if (font == fonts_.value) return d2dTextFormats_.value.Get();
-    if (font == fonts_.label) return d2dTextFormats_.label.Get();
-    if (font == fonts_.text) return d2dTextFormats_.text.Get();
-    if (font == fonts_.smallFont) return d2dTextFormats_.smallFont.Get();
-    if (font == fonts_.footer) return d2dTextFormats_.footer.Get();
-    if (font == fonts_.clockTime) return d2dTextFormats_.clockTime.Get();
-    if (font == fonts_.clockDate) return d2dTextFormats_.clockDate.Get();
+    if (font == fonts_.title)
+        return d2dTextFormats_.title.Get();
+    if (font == fonts_.big)
+        return d2dTextFormats_.big.Get();
+    if (font == fonts_.value)
+        return d2dTextFormats_.value.Get();
+    if (font == fonts_.label)
+        return d2dTextFormats_.label.Get();
+    if (font == fonts_.text)
+        return d2dTextFormats_.text.Get();
+    if (font == fonts_.smallFont)
+        return d2dTextFormats_.smallFont.Get();
+    if (font == fonts_.footer)
+        return d2dTextFormats_.footer.Get();
+    if (font == fonts_.clockTime)
+        return d2dTextFormats_.clockTime.Get();
+    if (font == fonts_.clockDate)
+        return d2dTextFormats_.clockDate.Get();
     return nullptr;
 }
 
@@ -2725,8 +2105,7 @@ bool DashboardRenderer::CreateDWriteTextFormats() {
     return createFormat(titleFont, d2dTextFormats_.title) && createFormat(bigFont, d2dTextFormats_.big) &&
            createFormat(valueFont, d2dTextFormats_.value) && createFormat(labelFont, d2dTextFormats_.label) &&
            createFormat(textFont, d2dTextFormats_.text) && createFormat(smallFont, d2dTextFormats_.smallFont) &&
-           createFormat(footerFont, d2dTextFormats_.footer) &&
-           createFormat(clockTimeFont, d2dTextFormats_.clockTime) &&
+           createFormat(footerFont, d2dTextFormats_.footer) && createFormat(clockTimeFont, d2dTextFormats_.clockTime) &&
            createFormat(clockDateFont, d2dTextFormats_.clockDate);
 }
 
@@ -2737,8 +2116,8 @@ void DashboardRenderer::ConfigureDWriteTextFormat(IDWriteTextFormat* format, UIN
     format->SetTextAlignment(DWriteTextAlignment(drawTextFormat));
     format->SetParagraphAlignment(DWriteParagraphAlignment(drawTextFormat));
     format->SetWordWrapping(((drawTextFormat & DT_SINGLELINE) != 0 || (drawTextFormat & DT_END_ELLIPSIS) != 0)
-            ? DWRITE_WORD_WRAPPING_NO_WRAP
-            : DWRITE_WORD_WRAPPING_WRAP);
+                                ? DWRITE_WORD_WRAPPING_NO_WRAP
+                                : DWRITE_WORD_WRAPPING_WRAP);
 }
 
 DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlockD2D(const RECT& rect,
@@ -2865,29 +2244,6 @@ void DashboardRenderer::DestroyFonts() {
     d2dTextFormats_ = {};
     wideTextCache_.clear();
     textWidthCache_.clear();
-    textExtentCache_.clear();
-    textMeasureCache_.clear();
-}
-
-HBRUSH DashboardRenderer::SolidBrush(COLORREF color) const {
-    if (const auto it = solidBrushCache_.find(color); it != solidBrushCache_.end()) {
-        return it->second;
-    }
-
-    HBRUSH brush = CreateSolidBrush(color);
-    solidBrushCache_.emplace(color, brush);
-    return brush;
-}
-
-HPEN DashboardRenderer::SolidPen(COLORREF color, int width) const {
-    const PenCacheKey key{color, std::max(1, width)};
-    if (const auto it = solidPenCache_.find(key); it != solidPenCache_.end()) {
-        return it->second;
-    }
-
-    HPEN pen = CreatePen(PS_SOLID, key.width, color);
-    solidPenCache_.emplace(key, pen);
-    return pen;
 }
 
 const std::wstring& DashboardRenderer::GetWideText(std::string_view text) const {
@@ -2897,27 +2253,6 @@ const std::wstring& DashboardRenderer::GetWideText(std::string_view text) const 
 
     std::string key(text);
     return wideTextCache_.emplace(key, WideFromUtf8(key)).first->second;
-}
-
-void DashboardRenderer::ClearGdiCaches() {
-    for (const auto& entry : solidBrushCache_) {
-        DeleteObject(entry.second);
-    }
-    solidBrushCache_.clear();
-    for (const auto& entry : solidPenCache_) {
-        DeleteObject(entry.second);
-    }
-    solidPenCache_.clear();
-    for (const auto& entry : alphaCapsuleCache_) {
-        DeleteObject(entry.second.bitmap);
-        DeleteDC(entry.second.hdc);
-    }
-    alphaCapsuleCache_.clear();
-    for (const auto& entry : scaledPanelIconCache_) {
-        DeleteObject(entry.second.bitmap);
-        DeleteDC(entry.second.hdc);
-    }
-    scaledPanelIconCache_.clear();
 }
 
 void DashboardRenderer::ClearD2DCaches() {
@@ -2952,11 +2287,6 @@ bool DashboardRenderer::LoadPanelIcons() {
 }
 
 void DashboardRenderer::ReleasePanelIcons() {
-    for (const auto& entry : scaledPanelIconCache_) {
-        DeleteObject(entry.second.bitmap);
-        DeleteDC(entry.second.hdc);
-    }
-    scaledPanelIconCache_.clear();
     d2dPanelIconCache_.clear();
     panelIcons_.clear();
 }

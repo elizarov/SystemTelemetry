@@ -40,17 +40,14 @@ void NetworkFooterWidget::BuildEditGuides(DashboardRenderer& renderer, const Das
     renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
 }
 
-void NetworkFooterWidget::Draw(DashboardRenderer& renderer,
-    HDC hdc,
-    const DashboardWidgetLayout& widget,
-    const DashboardMetricSource& metrics) const {
+void NetworkFooterWidget::Draw(
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
         return;
     }
 
     const std::string text = metrics.ResolveNetworkFooter();
-    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(hdc,
-        widget.rect,
+    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         renderer.WidgetFonts().footer,
         renderer.MutedTextColor(),

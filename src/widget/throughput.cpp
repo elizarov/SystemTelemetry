@@ -15,22 +15,8 @@ COLORREF ToColorRef(unsigned int color) {
     return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
 }
 
-void FillCircle(DashboardRenderer& renderer, HDC hdc, int centerX, int centerY, int diameter, COLORREF color) {
-    if (renderer.IsDirect2DActive()) {
-        renderer.FillSolidEllipse(centerX, centerY, diameter, color);
-        return;
-    }
-    const int clampedDiameter = std::max(1, diameter);
-    const int radius = clampedDiameter / 2;
-    HGDIOBJ oldBrush = SelectObject(hdc, renderer.SolidBrush(color));
-    HGDIOBJ oldPen = SelectObject(hdc, renderer.SolidPen(color));
-    Ellipse(hdc,
-        centerX - radius,
-        centerY - radius,
-        centerX - radius + clampedDiameter,
-        centerY - radius + clampedDiameter);
-    SelectObject(hdc, oldPen);
-    SelectObject(hdc, oldBrush);
+void FillCircle(DashboardRenderer& renderer, int centerX, int centerY, int diameter, COLORREF color) {
+    renderer.FillSolidEllipse(centerX, centerY, diameter, color);
 }
 
 RECT MakeAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
@@ -63,7 +49,6 @@ ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, cons
 }
 
 void DrawGraph(DashboardRenderer& renderer,
-    HDC hdc,
     const RECT& rect,
     const ThroughputGraphLayout& layout,
     const std::vector<double>& history,
@@ -72,15 +57,9 @@ void DrawGraph(DashboardRenderer& renderer,
     double timeMarkerOffsetSamples,
     double timeMarkerIntervalSamples,
     const std::optional<DashboardRenderer::EditableAnchorBinding>& maxLabelEditable) {
-    if (renderer.IsDirect2DActive()) {
-        renderer.FillSolidRect(rect, ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
-    } else {
-        HBRUSH bg = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
-        FillRect(hdc, &rect, bg);
-    }
+    renderer.FillSolidRect(rect, ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
     const COLORREF markerColor = ToColorRef(renderer.Config().layout.colors.graphMarkerColor);
-    HBRUSH markerBrush = renderer.IsDirect2DActive() ? nullptr : renderer.SolidBrush(markerColor);
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
         const double ratio = tick / maxValue;
         const int centerY = layout.graphBottom - static_cast<int>(std::round(ratio * layout.plotHeight));
@@ -89,11 +68,7 @@ void DrawGraph(DashboardRenderer& renderer,
             std::max(layout.plotTop, lineTop),
             layout.graphRight,
             std::min(layout.graphBottom + 1, lineTop + layout.guideStrokeWidth)};
-        if (renderer.IsDirect2DActive()) {
-            renderer.FillSolidRect(lineRect, markerColor);
-        } else {
-            FillRect(hdc, &lineRect, markerBrush);
-        }
+        renderer.FillSolidRect(lineRect, markerColor);
     }
 
     if (!history.empty()) {
@@ -108,16 +83,11 @@ void DrawGraph(DashboardRenderer& renderer,
             const int lineLeft = centerX - (layout.guideStrokeWidth / 2);
             RECT lineRect{
                 lineLeft, rect.top, std::min(layout.graphRight + 1, lineLeft + layout.guideStrokeWidth), rect.bottom};
-            if (renderer.IsDirect2DActive()) {
-                renderer.FillSolidRect(lineRect, markerColor);
-            } else {
-                FillRect(hdc, &lineRect, markerBrush);
-            }
+            renderer.FillSolidRect(lineRect, markerColor);
         }
     }
 
     const COLORREF axisColor = ToColorRef(renderer.Config().layout.colors.graphAxisColor);
-    HBRUSH axisBrush = renderer.IsDirect2DActive() ? nullptr : renderer.SolidBrush(axisColor);
     const int verticalAxisCenterX = rect.left + layout.axisWidth;
     const int verticalAxisLeft = verticalAxisCenterX - (layout.guideStrokeWidth / 2);
     const int horizontalAxisCenterY = rect.bottom - 1;
@@ -130,20 +100,14 @@ void DrawGraph(DashboardRenderer& renderer,
         horizontalAxisTop,
         rect.right,
         std::min<LONG>(rect.bottom, horizontalAxisTop + layout.guideStrokeWidth)};
-    if (renderer.IsDirect2DActive()) {
-        renderer.FillSolidRect(verticalAxisRect, axisColor);
-        renderer.FillSolidRect(horizontalAxisRect, axisColor);
-    } else {
-        FillRect(hdc, &verticalAxisRect, axisBrush);
-        FillRect(hdc, &horizontalAxisRect, axisBrush);
-    }
+    renderer.FillSolidRect(verticalAxisRect, axisColor);
+    renderer.FillSolidRect(horizontalAxisRect, axisColor);
 
     char maxLabel[32];
     sprintf_s(maxLabel, "%.0f", maxValue);
     RECT maxRect{rect.left, rect.top, rect.left + layout.axisWidth, layout.graphTop};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        const DashboardRenderer::TextLayoutResult maxLabelLayout = renderer.DrawTextBlock(hdc,
-            maxRect,
+        const DashboardRenderer::TextLayoutResult maxLabelLayout = renderer.DrawTextBlock(maxRect,
             maxLabel,
             renderer.WidgetFonts().smallFont,
             renderer.MutedTextColor(),
@@ -168,18 +132,12 @@ void DrawGraph(DashboardRenderer& renderer,
         plotPoints.push_back(POINT{x, y});
     }
     if (plotPoints.size() >= 2) {
-        if (renderer.IsDirect2DActive()) {
-            renderer.DrawD2DPolyline(plotPoints, plotColor, layout.plotStrokeWidth);
-        } else {
-            HGDIOBJ oldPen = SelectObject(hdc, renderer.SolidPen(plotColor, layout.plotStrokeWidth));
-            Polyline(hdc, plotPoints.data(), static_cast<int>(plotPoints.size()));
-            SelectObject(hdc, oldPen);
-        }
+        renderer.DrawD2DPolyline(plotPoints, plotColor, layout.plotStrokeWidth);
     }
 
     if (!history.empty() && layout.leaderDiameter > 0) {
         const POINT lastPoint = plotPoints.empty() ? POINT{layout.graphLeft, layout.graphBottom} : plotPoints.back();
-        FillCircle(renderer, hdc, lastPoint.x, lastPoint.y, layout.leaderDiameter, plotColor);
+        FillCircle(renderer, lastPoint.x, lastPoint.y, layout.leaderDiameter, plotColor);
     }
 }
 
@@ -252,10 +210,8 @@ void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     layoutState_ = graphLayout;
 }
 
-void ThroughputWidget::Draw(DashboardRenderer& renderer,
-    HDC hdc,
-    const DashboardWidgetLayout& widget,
-    const DashboardMetricSource& metrics) const {
+void ThroughputWidget::Draw(
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
     const DashboardThroughputMetric& metric = metrics.ResolveThroughput(metric_);
     char buffer[64];
     if (metric.valueMbps >= 100.0) {
@@ -263,8 +219,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
     } else {
         sprintf_s(buffer, "%.1f MB/s", metric.valueMbps);
     }
-    const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(hdc,
-        layoutState_.valueRect,
+    const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(layoutState_.valueRect,
         metric.label,
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
@@ -276,8 +231,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         layoutState_.valueRect.right,
         layoutState_.valueRect.bottom};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        const DashboardRenderer::TextLayoutResult numberLayout = renderer.DrawTextBlock(hdc,
-            numberRect,
+        const DashboardRenderer::TextLayoutResult numberLayout = renderer.DrawTextBlock(numberRect,
             buffer,
             renderer.WidgetFonts().smallFont,
             renderer.ForegroundColor(),
@@ -290,7 +244,6 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
     }
     const ThroughputGraphLayout& layout = layoutState_;
     DrawGraph(renderer,
-        hdc,
         layout.graphRect,
         layout,
         metric.history,

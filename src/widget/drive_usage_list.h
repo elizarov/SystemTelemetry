@@ -59,7 +59,6 @@ public:
     int PreferredHeight(const DashboardRenderer& renderer) const override;
     void ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) override;
     void Draw(DashboardRenderer& renderer,
-        HDC hdc,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;
     void BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
