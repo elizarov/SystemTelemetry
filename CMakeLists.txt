@@ -105,6 +105,7 @@ add_executable(SystemTelemetry WIN32
     src/gpu_amd_adl.cpp
     src/board_vendor.cpp
     src/dashboard_metrics.cpp
+    src/render_types.cpp
     src/widget.cpp
     src/widget/text.cpp
     src/widget/gauge.cpp
@@ -238,6 +239,7 @@ add_executable(SystemTelemetryTests
     src/layout_edit_tooltip.cpp
     src/localization_catalog.cpp
     src/layout_snap_solver.cpp
+    src/render_types.cpp
     src/telemetry_retained_history.cpp
 )
 target_include_directories(SystemTelemetryTests PRIVATE
@@ -289,6 +291,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_edit_service.cpp
     src/layout_snap_solver.cpp
     src/dashboard_metrics.cpp
+    src/render_types.cpp
     src/widget.cpp
     src/widget/text.cpp
     src/widget/gauge.cpp
