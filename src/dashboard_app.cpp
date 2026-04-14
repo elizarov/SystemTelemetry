@@ -260,7 +260,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     wc.hInstance = instance;
     wc.lpszClassName = kWindowClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    wc.hbrBackground = CreateSolidBrush(BackgroundColor());
+    wc.hbrBackground = nullptr;
     appIconLarge_ = LoadAppIcon(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
     appIconSmall_ = LoadAppIcon(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
     wc.hIcon = appIconLarge_;
@@ -375,10 +375,6 @@ bool DashboardApp::InitializeFonts() {
 
 void DashboardApp::ReleaseFonts() {
     renderer_.Shutdown();
-}
-
-COLORREF DashboardApp::BackgroundColor() const {
-    return ToColorRef(controller_.State().config.layout.colors.backgroundColor);
 }
 
 HICON DashboardApp::LoadAppIcon(int width, int height) {

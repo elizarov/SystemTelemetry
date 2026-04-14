@@ -85,7 +85,6 @@ private:
     bool CreateTrayIcon();
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);
-    COLORREF BackgroundColor() const;
     int WindowWidth() const;
     int WindowHeight() const;
     void StartPlacementWatch();
