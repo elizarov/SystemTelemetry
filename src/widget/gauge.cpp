@@ -61,6 +61,17 @@ Gdiplus::PointF GaugePoint(float cx, float cy, float radius, double angleDegrees
         cy + static_cast<Gdiplus::REAL>(std::sin(radians) * radius));
 }
 
+std::shared_ptr<Gdiplus::GraphicsPath> BuildCombinedGaugePath(
+    const std::vector<std::shared_ptr<Gdiplus::GraphicsPath>>& segmentPaths, size_t segmentCount) {
+    auto combinedPath = std::make_shared<Gdiplus::GraphicsPath>();
+    for (size_t i = 0; i < segmentCount && i < segmentPaths.size(); ++i) {
+        if (segmentPaths[i] != nullptr) {
+            combinedPath->AddPath(segmentPaths[i].get(), FALSE);
+        }
+    }
+    return combinedPath;
+}
+
 std::shared_ptr<Gdiplus::GraphicsPath> BuildGaugeSegmentPath(
     float cx, float cy, float outerRadius, float thickness, double startAngleDegrees, double sweepAngleDegrees) {
     if (outerRadius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
@@ -98,75 +109,10 @@ std::shared_ptr<Gdiplus::GraphicsPath> BuildGaugeSegmentPath(
     return path;
 }
 
-void FillGaugeSegment(Gdiplus::Graphics& graphics,
-    float cx,
-    float cy,
-    float outerRadius,
-    float thickness,
-    double startAngleDegrees,
-    double sweepAngleDegrees,
-    const Gdiplus::Color& color) {
-    if (outerRadius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
-        return;
-    }
-
-    const float innerRadius = (std::max)(0.0f, outerRadius - thickness);
-    if (outerRadius <= innerRadius) {
-        return;
-    }
-
-    const float outerDiameter = outerRadius * 2.0f;
-    const float innerDiameter = innerRadius * 2.0f;
-    const Gdiplus::RectF outerRect(cx - outerRadius, cy - outerRadius, outerDiameter, outerDiameter);
-    const Gdiplus::RectF innerRect(cx - innerRadius, cy - innerRadius, innerDiameter, innerDiameter);
-    const Gdiplus::PointF outerStart = GaugePoint(cx, cy, outerRadius, startAngleDegrees);
-    const Gdiplus::PointF outerEnd = GaugePoint(cx, cy, outerRadius, startAngleDegrees + sweepAngleDegrees);
-    const Gdiplus::PointF innerEnd = GaugePoint(cx, cy, innerRadius, startAngleDegrees + sweepAngleDegrees);
-    const Gdiplus::PointF innerStart = GaugePoint(cx, cy, innerRadius, startAngleDegrees);
-
-    Gdiplus::SolidBrush brush(color);
-    const auto path = BuildGaugeSegmentPath(cx, cy, outerRadius, thickness, startAngleDegrees, sweepAngleDegrees);
-    if (path != nullptr) {
-        graphics.FillPath(&brush, path.get());
-    }
-}
-
 POINT PolarPoint(int cx, int cy, int radius, double angleDegrees) {
     const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
     return POINT{cx + static_cast<LONG>(std::lround(std::cos(radians) * static_cast<double>(radius))),
         cy + static_cast<LONG>(std::lround(std::sin(radians) * static_cast<double>(radius)))};
-}
-
-void StrokeGaugeSegment(HDC hdc,
-    int cx,
-    int cy,
-    int outerRadius,
-    int thickness,
-    double startAngleDegrees,
-    double sweepAngleDegrees,
-    HPEN pen) {
-    if (outerRadius <= 0 || thickness <= 0 || sweepAngleDegrees <= 0.0) {
-        return;
-    }
-
-    const int strokeRadius = (std::max)(1, outerRadius - (thickness / 2));
-    const POINT start = PolarPoint(cx, cy, strokeRadius, startAngleDegrees);
-    const POINT end = PolarPoint(cx, cy, strokeRadius, startAngleDegrees + sweepAngleDegrees);
-    const int oldDirection = SetArcDirection(hdc, AD_CLOCKWISE);
-    HGDIOBJ oldPen = SelectObject(hdc, pen);
-    HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
-    Arc(hdc,
-        cx - strokeRadius,
-        cy - strokeRadius,
-        cx + strokeRadius,
-        cy + strokeRadius,
-        start.x,
-        start.y,
-        end.x,
-        end.y);
-    SelectObject(hdc, oldBrush);
-    SelectObject(hdc, oldPen);
-    SetArcDirection(hdc, oldDirection);
 }
 
 RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
@@ -275,6 +221,12 @@ void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RE
             slotStart,
             layoutState_.segmentLayout.segmentSweep));
     }
+    layoutState_.trackPath = BuildCombinedGaugePath(layoutState_.segmentPaths, layoutState_.segmentPaths.size());
+    layoutState_.usagePaths.clear();
+    layoutState_.usagePaths.reserve(static_cast<size_t>(layoutState_.segmentLayout.segmentCount));
+    for (size_t i = 1; i <= layoutState_.segmentPaths.size(); ++i) {
+        layoutState_.usagePaths.push_back(BuildCombinedGaugePath(layoutState_.segmentPaths, i));
+    }
 }
 
 void GaugeWidget::Draw(DashboardRenderer& renderer,
@@ -300,64 +252,30 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
                   0,
                   gaugeLayout.segmentCount - 1);
 
-    if (renderer.IsLayoutGuideDragActive()) {
-        HPEN trackPen = renderer.SolidPen(renderer.TrackColor(), layoutState_.ringThickness);
-        HPEN usagePen = renderer.SolidPen(renderer.AccentColor(), layoutState_.ringThickness);
-        for (int i = 0; i < gaugeLayout.segmentCount; ++i) {
-            const double slotStart = gaugeLayout.gaugeStart + gaugeLayout.pitchSweep * static_cast<double>(i);
-            StrokeGaugeSegment(hdc,
-                layoutState_.cx,
-                layoutState_.cy,
-                layoutState_.outerRadius,
-                layoutState_.ringThickness,
-                slotStart,
-                gaugeLayout.segmentSweep,
-                trackPen);
-            if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && i < filledSegments) {
-                StrokeGaugeSegment(hdc,
-                    layoutState_.cx,
-                    layoutState_.cy,
-                    layoutState_.outerRadius,
-                    layoutState_.ringThickness,
-                    slotStart,
-                    gaugeLayout.segmentSweep,
-                    usagePen);
-            }
-        }
-    } else {
-        Gdiplus::Graphics graphics(hdc);
-        graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-        graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-        const Gdiplus::Color trackColor(
-            255, GetRValue(renderer.TrackColor()), GetGValue(renderer.TrackColor()), GetBValue(renderer.TrackColor()));
-        const Gdiplus::Color usageColor(255,
-            GetRValue(renderer.AccentColor()),
-            GetGValue(renderer.AccentColor()),
-            GetBValue(renderer.AccentColor()));
-        const Gdiplus::Color ghostColor(96,
-            GetRValue(renderer.AccentColor()),
-            GetGValue(renderer.AccentColor()),
-            GetBValue(renderer.AccentColor()));
-        Gdiplus::SolidBrush trackBrush(trackColor);
-        Gdiplus::SolidBrush usageBrush(usageColor);
-        Gdiplus::SolidBrush ghostBrush(ghostColor);
-
-        for (int i = 0; i < gaugeLayout.segmentCount; ++i) {
-            const std::shared_ptr<Gdiplus::GraphicsPath>& segmentPath =
-                layoutState_.segmentPaths[static_cast<size_t>(i)];
-            if (segmentPath == nullptr) {
-                continue;
-            }
-            graphics.FillPath(&trackBrush, segmentPath.get());
-
-            if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && i < filledSegments) {
-                graphics.FillPath(&usageBrush, segmentPath.get());
-            }
-
-            if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && i == peakSegment) {
-                graphics.FillPath(&ghostBrush, segmentPath.get());
-            }
-        }
+    Gdiplus::Graphics graphics(hdc);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    const Gdiplus::Color trackColor(
+        255, GetRValue(renderer.TrackColor()), GetGValue(renderer.TrackColor()), GetBValue(renderer.TrackColor()));
+    const Gdiplus::Color usageColor(
+        255, GetRValue(renderer.AccentColor()), GetGValue(renderer.AccentColor()), GetBValue(renderer.AccentColor()));
+    const Gdiplus::Color ghostColor(
+        96, GetRValue(renderer.AccentColor()), GetGValue(renderer.AccentColor()), GetBValue(renderer.AccentColor()));
+    Gdiplus::SolidBrush trackBrush(trackColor);
+    Gdiplus::SolidBrush usageBrush(usageColor);
+    Gdiplus::SolidBrush ghostBrush(ghostColor);
+    if (layoutState_.trackPath != nullptr) {
+        graphics.FillPath(&trackBrush, layoutState_.trackPath.get());
+    }
+    if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && filledSegments > 0 &&
+        static_cast<size_t>(filledSegments - 1) < layoutState_.usagePaths.size() &&
+        layoutState_.usagePaths[static_cast<size_t>(filledSegments - 1)] != nullptr) {
+        graphics.FillPath(&usageBrush, layoutState_.usagePaths[static_cast<size_t>(filledSegments - 1)].get());
+    }
+    if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && peakSegment >= 0 &&
+        static_cast<size_t>(peakSegment) < layoutState_.segmentPaths.size() &&
+        layoutState_.segmentPaths[static_cast<size_t>(peakSegment)] != nullptr) {
+        graphics.FillPath(&ghostBrush, layoutState_.segmentPaths[static_cast<size_t>(peakSegment)].get());
     }
 
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {

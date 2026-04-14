@@ -186,7 +186,6 @@ public:
     void SetInteractiveDragTraceActive(bool active);
     void RebuildEditArtifacts();
     bool SetLayoutEditPreviewWidgetType(EditOverlayState& overlayState, const std::string& widgetTypeName) const;
-    bool IsLayoutGuideDragActive() const;
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;

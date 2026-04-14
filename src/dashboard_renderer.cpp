@@ -48,25 +48,6 @@ std::string FormatWin32Error(DWORD error) {
     return message;
 }
 
-void AddCapsulePath(Gdiplus::GraphicsPath& path, const RECT& rect) {
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-
-    const int diameter = std::max(1, std::min(width, height));
-    const int centerWidth = std::max(0, width - diameter);
-    const int rightArcLeft = rect.left + centerWidth;
-
-    path.StartFigure();
-    path.AddArc(rect.left, rect.top, diameter, diameter, 180.0f, 90.0f);
-    path.AddArc(rightArcLeft, rect.top, diameter, diameter, 270.0f, 90.0f);
-    path.AddArc(rightArcLeft, rect.bottom - diameter, diameter, diameter, 0.0f, 90.0f);
-    path.AddArc(rect.left, rect.bottom - diameter, diameter, diameter, 90.0f, 90.0f);
-    path.CloseFigure();
-}
-
 void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
     const int width = std::max(0, static_cast<int>(rect.right - rect.left));
     const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
@@ -94,10 +75,36 @@ void FillCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha) {
     Gdiplus::Graphics graphics(hdc);
     graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
     graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    Gdiplus::GraphicsPath path;
-    AddCapsulePath(path, rect);
     Gdiplus::SolidBrush brush(Gdiplus::Color(alpha, GetRValue(color), GetGValue(color), GetBValue(color)));
-    graphics.FillPath(&brush, &path);
+    if (width <= height) {
+        graphics.FillEllipse(&brush,
+            static_cast<Gdiplus::REAL>(rect.left),
+            static_cast<Gdiplus::REAL>(rect.top),
+            static_cast<Gdiplus::REAL>(width),
+            static_cast<Gdiplus::REAL>(height));
+        return;
+    }
+
+    const int diameter = std::max(1, std::min(width, height));
+    const int centerWidth = std::max(0, width - diameter);
+    const int rightArcLeft = rect.left + centerWidth;
+    graphics.FillEllipse(&brush,
+        static_cast<Gdiplus::REAL>(rect.left),
+        static_cast<Gdiplus::REAL>(rect.top),
+        static_cast<Gdiplus::REAL>(diameter),
+        static_cast<Gdiplus::REAL>(height));
+    graphics.FillEllipse(&brush,
+        static_cast<Gdiplus::REAL>(rightArcLeft),
+        static_cast<Gdiplus::REAL>(rect.top),
+        static_cast<Gdiplus::REAL>(diameter),
+        static_cast<Gdiplus::REAL>(height));
+    if (centerWidth > 0) {
+        graphics.FillRectangle(&brush,
+            static_cast<Gdiplus::REAL>(rect.left + diameter / 2),
+            static_cast<Gdiplus::REAL>(rect.top),
+            static_cast<Gdiplus::REAL>(centerWidth),
+            static_cast<Gdiplus::REAL>(height));
+    }
 }
 
 void FillDiamond(HDC hdc, const RECT& rect, COLORREF color) {
@@ -341,10 +348,6 @@ bool DashboardRenderer::SetLayoutEditPreviewWidgetType(
     }
     overlayState.hoveredEditableWidget = widget;
     return true;
-}
-
-bool DashboardRenderer::IsLayoutGuideDragActive() const {
-    return layoutGuideDragActive_;
 }
 
 double DashboardRenderer::RenderScale() const {
@@ -1104,9 +1107,6 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
 }
 
 void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect) {
-    if (layoutGuideDragActive_) {
-        return;
-    }
     const auto it = std::find_if(
         panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) { return entry.first == iconName; });
     if (it == panelIcons_.end() || it->second == nullptr) {
@@ -1181,7 +1181,7 @@ void DashboardRenderer::DrawPillBar(
     fillRect.right = fillRect.left + fillWidth;
     fillOpaqueCapsule(fillRect, accentColor);
 
-    if (peakRatio.has_value() && !layoutGuideDragActive_) {
+    if (peakRatio.has_value()) {
         const double peak = std::clamp(*peakRatio, 0.0, 1.0);
         const int markerWidth = std::min(width, std::max(1, std::max(ScaleLogical(4), height)));
         const int centerX = static_cast<int>(rect.left) + static_cast<int>(std::round(peak * width));

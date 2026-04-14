@@ -48,6 +48,8 @@ public:
         RECT valueRect{};
         RECT labelRect{};
         std::vector<std::shared_ptr<Gdiplus::GraphicsPath>> segmentPaths;
+        std::shared_ptr<Gdiplus::GraphicsPath> trackPath;
+        std::vector<std::shared_ptr<Gdiplus::GraphicsPath>> usagePaths;
     };
 
     DashboardWidgetClass Class() const override;
