@@ -41,3 +41,20 @@ TEST(ConfigParser, ClampsParsedEditableValuesThroughSchemaPolicies) {
 
     std::filesystem::remove(path);
 }
+
+TEST(ConfigParser, ParsesRenamedCardStyleKeys) {
+    const std::filesystem::path path = WriteTestConfig("[card_style]\n"
+                                                       "header_icon_size = 21\n"
+                                                       "header_icon_gap = 7\n"
+                                                       "header_content_gap = 5\n"
+                                                       "row_gap = 4\n");
+
+    const AppConfig config = LoadConfig(path, true);
+
+    EXPECT_EQ(config.layout.cardStyle.headerIconSize, 21);
+    EXPECT_EQ(config.layout.cardStyle.headerIconGap, 7);
+    EXPECT_EQ(config.layout.cardStyle.headerContentGap, 5);
+    EXPECT_EQ(config.layout.cardStyle.rowGap, 4);
+
+    std::filesystem::remove(path);
+}

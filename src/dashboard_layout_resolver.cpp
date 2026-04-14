@@ -174,7 +174,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
 
     const bool horizontal = node.name == "columns";
     const int gap = horizontal ? renderer.ScaleLogical(renderer.config_.layout.cardStyle.columnGap)
-                               : renderer.ScaleLogical(renderer.config_.layout.cardStyle.widgetLineGap);
+                               : renderer.ScaleLogical(renderer.config_.layout.cardStyle.rowGap);
 
     const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
                                gap * static_cast<int>((std::max)(static_cast<size_t>(0), node.children.size() - 1));
@@ -322,7 +322,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
 
         const int padding = renderer.ScaleLogical(renderer.config_.layout.cardStyle.cardPadding);
         const int iconSize = renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerIconSize);
-        const int headerHeight = card.hasHeader ? renderer.EffectiveHeaderHeight() : 0;
+        const int headerHeight = card.hasHeader ? (std::max)(renderer.TextMetrics().title, iconSize) : 0;
         if (!card.iconName.empty()) {
             card.iconRect = RenderRect{card.rect.left + padding,
                 card.rect.top + padding + (std::max)(0, (headerHeight - iconSize) / 2),
@@ -334,13 +334,13 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         }
         const int titleLeft =
             !card.iconName.empty()
-                ? card.iconRect.right + renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerGap)
+                ? card.iconRect.right + renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerIconGap)
                 : card.rect.left + padding;
         card.titleRect = RenderRect{
             titleLeft, card.rect.top + padding, card.rect.right - padding, card.rect.top + padding + headerHeight};
         card.contentRect = RenderRect{card.rect.left + padding,
             card.rect.top + padding + headerHeight +
-                renderer.ScaleLogical(renderer.config_.layout.cardStyle.contentGap),
+                (card.hasHeader ? renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerContentGap) : 0),
             card.rect.right - padding,
             card.rect.bottom - padding};
 

@@ -106,12 +106,13 @@ Supported `[layout.<name>]` keys:
 - `card_padding = pixels`
 - `card_radius = pixels`
 - `card_border = pixels`
-- `header_height = pixels`
 - `header_icon_size = pixels`
-- `header_gap = pixels`
-- `content_gap = pixels`
+- `header_icon_gap = pixels`
+- `header_content_gap = pixels`
 - `column_gap = pixels`
-- `widget_line_gap = pixels`
+- `row_gap = pixels`
+
+Card headers size themselves from the larger of the configured header icon size and the measured title text height. `header_content_gap` applies only when the card renders a title or icon header.
 
 Config sections, config keys, card ids, container names, widget names, icon names, and metric references are case-sensitive and must use their documented spelling exactly.
 Undocumented key spellings and metric aliases are invalid.
@@ -323,10 +324,10 @@ Shared card chrome and inner spacing belong only in `[card_style]`, including:
 
 - border radius and border width
 - card padding
-- header height, icon size, and icon gap
-- shared content spacing
+- measured header size, icon size, and icon gap
+- header-to-content spacing when a card renders a header
 - column gap
-- `widget_line_gap`
+- `row_gap`
 
 Shared visual styling belongs only in:
 

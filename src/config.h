@@ -95,12 +95,11 @@ struct CardStyleConfig {
     CONFIG_VALUE(int, cardPadding, "card_padding");
     CONFIG_VALUE(int, cardRadius, "card_radius");
     CONFIG_VALUE(int, cardBorderWidth, "card_border");
-    CONFIG_VALUE(int, headerHeight, "header_height");
     CONFIG_VALUE(int, headerIconSize, "header_icon_size");
-    CONFIG_VALUE(int, headerGap, "header_gap");
-    CONFIG_VALUE(int, contentGap, "content_gap");
+    CONFIG_VALUE(int, headerIconGap, "header_icon_gap");
+    CONFIG_VALUE(int, headerContentGap, "header_content_gap");
     CONFIG_VALUE(int, columnGap, "column_gap");
-    CONFIG_VALUE(int, widgetLineGap, "widget_line_gap");
+    CONFIG_VALUE(int, rowGap, "row_gap");
     CONFIG_SECTION("card_style");
 };
 

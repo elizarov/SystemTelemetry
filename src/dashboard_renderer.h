@@ -510,7 +510,6 @@ private:
         std::vector<DashboardWidgetLayout>& widgets,
         bool instantiateWidgets = true);
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
-    int EffectiveHeaderHeight() const;
     bool SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const;
     std::vector<const DashboardWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
     int WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;

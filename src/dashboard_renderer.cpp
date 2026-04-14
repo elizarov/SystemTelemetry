@@ -2313,15 +2313,6 @@ bool DashboardRenderer::RebuildTextFormatsAndMetrics() {
     return true;
 }
 
-int DashboardRenderer::EffectiveHeaderHeight() const {
-    const int titleHeight = std::max(textStyleMetrics_.title, ScaleLogical(config_.layout.cardStyle.headerIconSize));
-    const int configured = ScaleLogical(config_.layout.cardStyle.headerHeight);
-    const int computed = std::max(configured, titleHeight);
-    WriteTrace("renderer:layout_header_height configured=" + std::to_string(configured) +
-               " title_or_icon=" + std::to_string(titleHeight) + " effective=" + std::to_string(computed));
-    return computed;
-}
-
 bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const {
     if (widget.widget == nullptr || widget.widget->IsVerticalSpring()) {
         return false;
@@ -2397,7 +2388,7 @@ int DashboardRenderer::PreferredNodeHeight(const LayoutNodeConfig& node, int) co
         for (size_t i = 0; i < node.children.size(); ++i) {
             total += PreferredNodeHeight(node.children[i], 0);
             if (i + 1 < node.children.size()) {
-                total += ScaleLogical(config_.layout.cardStyle.widgetLineGap);
+                total += ScaleLogical(config_.layout.cardStyle.rowGap);
             }
         }
         WriteTrace("renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(total));
