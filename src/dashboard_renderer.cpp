@@ -671,7 +671,7 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
                    anchor.key.widget.editCardId == overlayState.activeGapEditAnchor->widget.editCardId;
         }
         if (anchor.key.widget.kind == LayoutWidgetIdentity::Kind::DashboardChrome) {
-            return !overlayState.hoveredLayoutCard.has_value();
+            return true;
         }
         return overlayState.hoveredLayoutCard.has_value() &&
                anchor.key.widget.renderCardId == overlayState.hoveredLayoutCard->renderCardId &&
