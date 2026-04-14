@@ -50,7 +50,7 @@ void TextWidget::Draw(DashboardRenderer& renderer,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
     const std::string text = metrics.ResolveText(metric_);
-    renderer.DrawTextBlock(hdc,
+    renderer.DrawText(hdc,
         widget.rect,
         text,
         renderer.WidgetFonts().text,

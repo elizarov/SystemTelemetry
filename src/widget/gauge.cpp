@@ -61,6 +61,43 @@ Gdiplus::PointF GaugePoint(float cx, float cy, float radius, double angleDegrees
         cy + static_cast<Gdiplus::REAL>(std::sin(radians) * radius));
 }
 
+std::shared_ptr<Gdiplus::GraphicsPath> BuildGaugeSegmentPath(
+    float cx, float cy, float outerRadius, float thickness, double startAngleDegrees, double sweepAngleDegrees) {
+    if (outerRadius <= 0.0f || thickness <= 0.0f || sweepAngleDegrees <= 0.0) {
+        return {};
+    }
+
+    const float innerRadius = (std::max)(0.0f, outerRadius - thickness);
+    if (outerRadius <= innerRadius) {
+        return {};
+    }
+
+    const float outerDiameter = outerRadius * 2.0f;
+    const float innerDiameter = innerRadius * 2.0f;
+    const Gdiplus::RectF outerRect(cx - outerRadius, cy - outerRadius, outerDiameter, outerDiameter);
+    const Gdiplus::RectF innerRect(cx - innerRadius, cy - innerRadius, innerDiameter, innerDiameter);
+    const Gdiplus::PointF outerStart = GaugePoint(cx, cy, outerRadius, startAngleDegrees);
+    const Gdiplus::PointF outerEnd = GaugePoint(cx, cy, outerRadius, startAngleDegrees + sweepAngleDegrees);
+    const Gdiplus::PointF innerEnd = GaugePoint(cx, cy, innerRadius, startAngleDegrees + sweepAngleDegrees);
+    const Gdiplus::PointF innerStart = GaugePoint(cx, cy, innerRadius, startAngleDegrees);
+
+    auto path = std::make_shared<Gdiplus::GraphicsPath>();
+    path->StartFigure();
+    path->AddArc(
+        outerRect, static_cast<Gdiplus::REAL>(startAngleDegrees), static_cast<Gdiplus::REAL>(sweepAngleDegrees));
+    path->AddLine(outerEnd, innerEnd);
+    if (innerRadius > 0.0f) {
+        path->AddArc(innerRect,
+            static_cast<Gdiplus::REAL>(startAngleDegrees + sweepAngleDegrees),
+            static_cast<Gdiplus::REAL>(-sweepAngleDegrees));
+    } else {
+        path->AddLine(innerEnd, Gdiplus::PointF(cx, cy));
+    }
+    path->AddLine(innerStart, outerStart);
+    path->CloseFigure();
+    return path;
+}
+
 void FillGaugeSegment(Gdiplus::Graphics& graphics,
     float cx,
     float cy,
@@ -87,29 +124,49 @@ void FillGaugeSegment(Gdiplus::Graphics& graphics,
     const Gdiplus::PointF innerEnd = GaugePoint(cx, cy, innerRadius, startAngleDegrees + sweepAngleDegrees);
     const Gdiplus::PointF innerStart = GaugePoint(cx, cy, innerRadius, startAngleDegrees);
 
-    Gdiplus::GraphicsPath path;
-    path.StartFigure();
-    path.AddArc(
-        outerRect, static_cast<Gdiplus::REAL>(startAngleDegrees), static_cast<Gdiplus::REAL>(sweepAngleDegrees));
-    path.AddLine(outerEnd, innerEnd);
-    if (innerRadius > 0.0f) {
-        path.AddArc(innerRect,
-            static_cast<Gdiplus::REAL>(startAngleDegrees + sweepAngleDegrees),
-            static_cast<Gdiplus::REAL>(-sweepAngleDegrees));
-    } else {
-        path.AddLine(innerEnd, Gdiplus::PointF(cx, cy));
-    }
-    path.AddLine(innerStart, outerStart);
-    path.CloseFigure();
-
     Gdiplus::SolidBrush brush(color);
-    graphics.FillPath(&brush, &path);
+    const auto path = BuildGaugeSegmentPath(cx, cy, outerRadius, thickness, startAngleDegrees, sweepAngleDegrees);
+    if (path != nullptr) {
+        graphics.FillPath(&brush, path.get());
+    }
 }
 
 POINT PolarPoint(int cx, int cy, int radius, double angleDegrees) {
     const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
     return POINT{cx + static_cast<LONG>(std::lround(std::cos(radians) * static_cast<double>(radius))),
         cy + static_cast<LONG>(std::lround(std::sin(radians) * static_cast<double>(radius)))};
+}
+
+void StrokeGaugeSegment(HDC hdc,
+    int cx,
+    int cy,
+    int outerRadius,
+    int thickness,
+    double startAngleDegrees,
+    double sweepAngleDegrees,
+    HPEN pen) {
+    if (outerRadius <= 0 || thickness <= 0 || sweepAngleDegrees <= 0.0) {
+        return;
+    }
+
+    const int strokeRadius = (std::max)(1, outerRadius - (thickness / 2));
+    const POINT start = PolarPoint(cx, cy, strokeRadius, startAngleDegrees);
+    const POINT end = PolarPoint(cx, cy, strokeRadius, startAngleDegrees + sweepAngleDegrees);
+    const int oldDirection = SetArcDirection(hdc, AD_CLOCKWISE);
+    HGDIOBJ oldPen = SelectObject(hdc, pen);
+    HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
+    Arc(hdc,
+        cx - strokeRadius,
+        cy - strokeRadius,
+        cx + strokeRadius,
+        cy + strokeRadius,
+        start.x,
+        start.y,
+        end.x,
+        end.y);
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    SetArcDirection(hdc, oldDirection);
 }
 
 RECT ExpandSegmentBounds(POINT start, POINT end, int inset) {
@@ -206,6 +263,18 @@ void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RE
         layoutState_.cy + layoutState_.labelBottom - layoutState_.labelHeight,
         layoutState_.cx + layoutState_.halfWidth,
         layoutState_.cy + layoutState_.labelBottom};
+    layoutState_.segmentPaths.clear();
+    layoutState_.segmentPaths.reserve(static_cast<size_t>(layoutState_.segmentLayout.segmentCount));
+    for (int i = 0; i < layoutState_.segmentLayout.segmentCount; ++i) {
+        const double slotStart =
+            layoutState_.segmentLayout.gaugeStart + layoutState_.segmentLayout.pitchSweep * static_cast<double>(i);
+        layoutState_.segmentPaths.push_back(BuildGaugeSegmentPath(static_cast<float>(layoutState_.cx),
+            static_cast<float>(layoutState_.cy),
+            static_cast<float>(layoutState_.outerRadius),
+            static_cast<float>(layoutState_.ringThickness),
+            slotStart,
+            layoutState_.segmentLayout.segmentSweep));
+    }
 }
 
 void GaugeWidget::Draw(DashboardRenderer& renderer,
@@ -213,10 +282,6 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
     const DashboardGaugeMetric metric = metrics.ResolveGauge(metric_);
-    const int outerRadius = layoutState_.outerRadius;
-    const int cx = layoutState_.cx;
-    const int cy = layoutState_.cy;
-    const float segmentThickness = static_cast<float>(layoutState_.ringThickness);
     const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
     const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
     const int filledSegments =
@@ -235,54 +300,70 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
                   0,
                   gaugeLayout.segmentCount - 1);
 
-    Gdiplus::Graphics graphics(hdc);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    const Gdiplus::Color trackColor(
-        255, GetRValue(renderer.TrackColor()), GetGValue(renderer.TrackColor()), GetBValue(renderer.TrackColor()));
-    const Gdiplus::Color usageColor(
-        255, GetRValue(renderer.AccentColor()), GetGValue(renderer.AccentColor()), GetBValue(renderer.AccentColor()));
-    const Gdiplus::Color ghostColor(
-        96, GetRValue(renderer.AccentColor()), GetGValue(renderer.AccentColor()), GetBValue(renderer.AccentColor()));
-
-    for (int i = 0; i < gaugeLayout.segmentCount; ++i) {
-        const double slotStart = gaugeLayout.gaugeStart + gaugeLayout.pitchSweep * static_cast<double>(i);
-        FillGaugeSegment(graphics,
-            static_cast<float>(cx),
-            static_cast<float>(cy),
-            static_cast<float>(outerRadius),
-            segmentThickness,
-            slotStart,
-            gaugeLayout.segmentSweep,
-            trackColor);
-
-        if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && i < filledSegments) {
-            FillGaugeSegment(graphics,
-                static_cast<float>(cx),
-                static_cast<float>(cy),
-                static_cast<float>(outerRadius),
-                segmentThickness,
+    if (renderer.IsLayoutGuideDragActive()) {
+        HPEN trackPen = renderer.SolidPen(renderer.TrackColor(), layoutState_.ringThickness);
+        HPEN usagePen = renderer.SolidPen(renderer.AccentColor(), layoutState_.ringThickness);
+        for (int i = 0; i < gaugeLayout.segmentCount; ++i) {
+            const double slotStart = gaugeLayout.gaugeStart + gaugeLayout.pitchSweep * static_cast<double>(i);
+            StrokeGaugeSegment(hdc,
+                layoutState_.cx,
+                layoutState_.cy,
+                layoutState_.outerRadius,
+                layoutState_.ringThickness,
                 slotStart,
                 gaugeLayout.segmentSweep,
-                usageColor);
+                trackPen);
+            if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && i < filledSegments) {
+                StrokeGaugeSegment(hdc,
+                    layoutState_.cx,
+                    layoutState_.cy,
+                    layoutState_.outerRadius,
+                    layoutState_.ringThickness,
+                    slotStart,
+                    gaugeLayout.segmentSweep,
+                    usagePen);
+            }
         }
+    } else {
+        Gdiplus::Graphics graphics(hdc);
+        graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+        graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+        const Gdiplus::Color trackColor(
+            255, GetRValue(renderer.TrackColor()), GetGValue(renderer.TrackColor()), GetBValue(renderer.TrackColor()));
+        const Gdiplus::Color usageColor(255,
+            GetRValue(renderer.AccentColor()),
+            GetGValue(renderer.AccentColor()),
+            GetBValue(renderer.AccentColor()));
+        const Gdiplus::Color ghostColor(96,
+            GetRValue(renderer.AccentColor()),
+            GetGValue(renderer.AccentColor()),
+            GetBValue(renderer.AccentColor()));
+        Gdiplus::SolidBrush trackBrush(trackColor);
+        Gdiplus::SolidBrush usageBrush(usageColor);
+        Gdiplus::SolidBrush ghostBrush(ghostColor);
 
-        if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && i == peakSegment) {
-            FillGaugeSegment(graphics,
-                static_cast<float>(cx),
-                static_cast<float>(cy),
-                static_cast<float>(outerRadius),
-                segmentThickness,
-                slotStart,
-                gaugeLayout.segmentSweep,
-                ghostColor);
+        for (int i = 0; i < gaugeLayout.segmentCount; ++i) {
+            const std::shared_ptr<Gdiplus::GraphicsPath>& segmentPath =
+                layoutState_.segmentPaths[static_cast<size_t>(i)];
+            if (segmentPath == nullptr) {
+                continue;
+            }
+            graphics.FillPath(&trackBrush, segmentPath.get());
+
+            if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && i < filledSegments) {
+                graphics.FillPath(&usageBrush, segmentPath.get());
+            }
+
+            if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && i == peakSegment) {
+                graphics.FillPath(&ghostBrush, segmentPath.get());
+            }
         }
     }
 
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         char number[16];
         sprintf_s(number, "%.0f%%", metric.percent);
-        renderer.DrawTextBlock(hdc,
+        renderer.DrawText(hdc,
             layoutState_.valueRect,
             number,
             renderer.WidgetFonts().big,
@@ -295,7 +376,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
             renderer.MakeEditableTextBinding(
                 widget, DashboardRenderer::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
     }
-    renderer.DrawTextBlock(hdc,
+    renderer.DrawText(hdc,
         layoutState_.labelRect,
         "Load",
         renderer.WidgetFonts().smallFont,

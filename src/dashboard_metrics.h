@@ -7,7 +7,9 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "telemetry.h"
@@ -61,6 +63,29 @@ public:
     std::string ResolveClockDate() const;
 
 private:
+    struct ThroughputCacheEntry {
+        DashboardThroughputMetric metric;
+    };
+
+    struct ThroughputSharedState {
+        std::vector<double> networkUploadHistory;
+        std::vector<double> networkDownloadHistory;
+        std::vector<double> storageReadHistory;
+        std::vector<double> storageWriteHistory;
+        double networkMaxGraph = 10.0;
+        double storageMaxGraph = 10.0;
+        double timeMarkerOffsetSamples = 0.0;
+    };
+
     const SystemSnapshot& snapshot_;
     const MetricScaleConfig& metricScales_;
+    mutable std::unordered_map<std::string, std::string> textCache_;
+    mutable std::unordered_map<std::string, DashboardGaugeMetric> gaugeCache_;
+    mutable std::unordered_map<std::string, std::vector<DashboardMetricRow>> metricListCache_;
+    mutable std::unordered_map<std::string, ThroughputCacheEntry> throughputCache_;
+    mutable std::optional<ThroughputSharedState> throughputSharedState_;
+    mutable std::optional<std::string> networkFooterCache_;
+    mutable std::optional<std::vector<DashboardDriveRow>> driveRowsCache_;
+    mutable std::optional<std::string> clockTimeCache_;
+    mutable std::optional<std::string> clockDateCache_;
 };

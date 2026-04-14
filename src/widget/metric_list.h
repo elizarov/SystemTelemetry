@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "../dashboard_metrics.h"
 #include "../widget.h"
 
 class MetricListWidget final : public DashboardWidget {
@@ -38,5 +39,6 @@ public:
 
 private:
     std::vector<Entry> entries_;
+    std::vector<DashboardMetricListEntry> metricRefs_;
     LayoutState layoutState_{};
 };

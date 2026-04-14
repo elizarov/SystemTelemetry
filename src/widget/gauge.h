@@ -1,10 +1,15 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "../widget.h"
 
 struct GaugeSharedLayout;
+
+namespace Gdiplus {
+class GraphicsPath;
+}
 
 class GaugeWidget final : public DashboardWidget {
 public:
@@ -42,6 +47,7 @@ public:
         RECT ringThicknessAnchorRect{};
         RECT valueRect{};
         RECT labelRect{};
+        std::vector<std::shared_ptr<Gdiplus::GraphicsPath>> segmentPaths;
     };
 
     DashboardWidgetClass Class() const override;

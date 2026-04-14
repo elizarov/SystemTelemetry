@@ -256,12 +256,22 @@ public:
         RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);
     }
 
-    HWND WindowHandle() const { return hwnd_; }
+    HWND WindowHandle() const {
+        return hwnd_;
+    }
 
 private:
-    const AppConfig& LayoutEditConfig() const override { return config_; }
-    DashboardRenderer& LayoutEditRenderer() override { return renderer_; }
-    DashboardRenderer::EditOverlayState& LayoutEditOverlayState() override { return overlayState_; }
+    const AppConfig& LayoutEditConfig() const override {
+        return config_;
+    }
+
+    DashboardRenderer& LayoutEditRenderer() override {
+        return renderer_;
+    }
+
+    DashboardRenderer::EditOverlayState& LayoutEditOverlayState() override {
+        return overlayState_;
+    }
 
     bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) override {
         const auto start = Clock::now();
@@ -292,7 +302,9 @@ private:
         return applied;
     }
 
-    void InvalidateLayoutEdit() override { dirty_ = true; }
+    void InvalidateLayoutEdit() override {
+        dirty_ = true;
+    }
 
     void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override {
         phaseTotals_ = {};
@@ -421,8 +433,8 @@ int main(int argc, char** argv) {
     PrintPhaseResult(PhaseName(LayoutEditHost::TracePhase::Snap), phases[PhaseIndex(LayoutEditHost::TracePhase::Snap)]);
     PrintPhaseResult(
         PhaseName(LayoutEditHost::TracePhase::Apply), phases[PhaseIndex(LayoutEditHost::TracePhase::Apply)]);
-    PrintPhaseResult(PhaseName(LayoutEditHost::TracePhase::PaintTotal),
-        phases[PhaseIndex(LayoutEditHost::TracePhase::PaintTotal)]);
+    PrintPhaseResult(
+        PhaseName(LayoutEditHost::TracePhase::PaintTotal), phases[PhaseIndex(LayoutEditHost::TracePhase::PaintTotal)]);
     PrintPhaseResult(
         PhaseName(LayoutEditHost::TracePhase::PaintDraw), phases[PhaseIndex(LayoutEditHost::TracePhase::PaintDraw)]);
     return 0;

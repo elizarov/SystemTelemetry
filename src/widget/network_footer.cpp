@@ -49,7 +49,7 @@ void NetworkFooterWidget::Draw(DashboardRenderer& renderer,
     }
 
     const std::string text = metrics.ResolveNetworkFooter();
-    renderer.DrawTextBlock(hdc,
+    renderer.DrawText(hdc,
         widget.rect,
         text,
         renderer.WidgetFonts().footer,

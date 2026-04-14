@@ -87,34 +87,41 @@ void DrawGraph(DashboardRenderer& renderer,
     HBRUSH bg = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
     FillRect(hdc, &rect, bg);
 
-    const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
-    HBRUSH markerBrush = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphMarkerColor));
-    for (double tick = guideStep; tick < maxValue; tick += guideStep) {
-        const double ratio = tick / maxValue;
-        const int centerY = layout.graphBottom - static_cast<int>(std::round(ratio * layout.plotHeight));
-        const int lineTop = centerY - (layout.guideStrokeWidth / 2);
-        RECT lineRect{layout.graphLeft,
-            std::max(layout.plotTop, lineTop),
-            layout.graphRight,
-            std::min(layout.graphBottom + 1, lineTop + layout.guideStrokeWidth)};
-        FillRect(hdc, &lineRect, markerBrush);
-    }
+    const bool simplifiedDragPaint = renderer.IsLayoutGuideDragActive();
 
-    if (!history.empty()) {
-        const double markerInterval = timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
-        for (double sampleOffset = timeMarkerOffsetSamples;
-            sampleOffset <= static_cast<double>(history.size() - 1) + markerInterval;
-            sampleOffset += markerInterval) {
-            const double clampedOffset = std::clamp(sampleOffset, 0.0, static_cast<double>(history.size() - 1));
-            const int centerX =
-                layout.graphRight - static_cast<int>(std::round(
-                                        clampedOffset * layout.plotWidth / std::max<size_t>(1, history.size() - 1)));
-            const int lineLeft = centerX - (layout.guideStrokeWidth / 2);
-            RECT lineRect{
-                lineLeft, rect.top, std::min(layout.graphRight + 1, lineLeft + layout.guideStrokeWidth), rect.bottom};
+    if (!simplifiedDragPaint) {
+        const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
+        HBRUSH markerBrush = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphMarkerColor));
+        for (double tick = guideStep; tick < maxValue; tick += guideStep) {
+            const double ratio = tick / maxValue;
+            const int centerY = layout.graphBottom - static_cast<int>(std::round(ratio * layout.plotHeight));
+            const int lineTop = centerY - (layout.guideStrokeWidth / 2);
+            RECT lineRect{layout.graphLeft,
+                std::max(layout.plotTop, lineTop),
+                layout.graphRight,
+                std::min(layout.graphBottom + 1, lineTop + layout.guideStrokeWidth)};
             FillRect(hdc, &lineRect, markerBrush);
         }
+
+        if (!history.empty()) {
+            const double markerInterval = timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
+            for (double sampleOffset = timeMarkerOffsetSamples;
+                sampleOffset <= static_cast<double>(history.size() - 1) + markerInterval;
+                sampleOffset += markerInterval) {
+                const double clampedOffset = std::clamp(sampleOffset, 0.0, static_cast<double>(history.size() - 1));
+                const int centerX = layout.graphRight -
+                                    static_cast<int>(std::round(
+                                        clampedOffset * layout.plotWidth / std::max<size_t>(1, history.size() - 1)));
+                const int lineLeft = centerX - (layout.guideStrokeWidth / 2);
+                RECT lineRect{lineLeft,
+                    rect.top,
+                    std::min(layout.graphRight + 1, lineLeft + layout.guideStrokeWidth),
+                    rect.bottom};
+                FillRect(hdc, &lineRect, markerBrush);
+            }
+        }
     }
+
     HBRUSH axisBrush = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphAxisColor));
     const int verticalAxisCenterX = rect.left + layout.axisWidth;
     const int verticalAxisLeft = verticalAxisCenterX - (layout.guideStrokeWidth / 2);
@@ -135,7 +142,7 @@ void DrawGraph(DashboardRenderer& renderer,
     sprintf_s(maxLabel, "%.0f", maxValue);
     RECT maxRect{rect.left, rect.top, rect.left + layout.axisWidth, layout.graphTop};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        renderer.DrawTextBlock(hdc,
+        renderer.DrawText(hdc,
             maxRect,
             maxLabel,
             renderer.WidgetFonts().smallFont,
@@ -150,7 +157,7 @@ void DrawGraph(DashboardRenderer& renderer,
         }
     }
 
-    if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
+    if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank || simplifiedDragPaint) {
         return;
     }
 
@@ -269,7 +276,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
         layoutState_.valueRect.right,
         layoutState_.valueRect.bottom};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        renderer.DrawTextBlock(hdc,
+        renderer.DrawText(hdc,
             numberRect,
             buffer,
             renderer.WidgetFonts().smallFont,

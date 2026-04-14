@@ -343,6 +343,10 @@ bool DashboardRenderer::SetLayoutEditPreviewWidgetType(
     return true;
 }
 
+bool DashboardRenderer::IsLayoutGuideDragActive() const {
+    return layoutGuideDragActive_;
+}
+
 double DashboardRenderer::RenderScale() const {
     return renderScale_;
 }
@@ -492,7 +496,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
     } else {
         HGDIOBJ oldFont = SelectObject(hdc, font);
         RECT measureRect{0, 0, availableWidth, availableHeight};
-        DrawTextW(hdc, wideText.c_str(), -1, &measureRect, measureFormat);
+        ::DrawTextW(hdc, wideText.c_str(), -1, &measureRect, measureFormat);
         SelectObject(hdc, oldFont);
         measuredSize.cx = std::max(0, static_cast<int>(measureRect.right - measureRect.left));
         measuredSize.cy = std::max(0, static_cast<int>(measureRect.bottom - measureRect.top));
@@ -540,13 +544,18 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
 DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
     HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
     const TextLayoutResult result = MeasureTextBlock(hdc, rect, text, font, format);
+    DrawText(hdc, rect, text, font, color, format);
+    return result;
+}
+
+void DashboardRenderer::DrawText(
+    HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const {
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
     RECT copy = rect;
     const std::wstring& wideText = GetWideText(text);
-    DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
+    ::DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
     SelectObject(hdc, oldFont);
-    return result;
 }
 
 void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const {
@@ -1095,6 +1104,9 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
 }
 
 void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect) {
+    if (layoutGuideDragActive_) {
+        return;
+    }
     const auto it = std::find_if(
         panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) { return entry.first == iconName; });
     if (it == panelIcons_.end() || it->second == nullptr) {
@@ -1124,7 +1136,7 @@ void DashboardRenderer::DrawPanel(HDC hdc, const ResolvedCardLayout& card) {
         DrawPanelIcon(hdc, card.iconName, card.iconRect);
     }
     if (!card.title.empty()) {
-        DrawTextBlock(
+        DrawText(
             hdc, card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     }
 }
@@ -1143,8 +1155,7 @@ void DashboardRenderer::DrawPillBar(
         if (width <= height) {
             Ellipse(hdc, capsuleRect.left, capsuleRect.top, capsuleRect.right, capsuleRect.bottom);
         } else {
-            RoundRect(
-                hdc, capsuleRect.left, capsuleRect.top, capsuleRect.right, capsuleRect.bottom, height, height);
+            RoundRect(hdc, capsuleRect.left, capsuleRect.top, capsuleRect.right, capsuleRect.bottom, height, height);
         }
         SelectObject(hdc, oldPen);
         SelectObject(hdc, oldBrush);
@@ -1170,7 +1181,7 @@ void DashboardRenderer::DrawPillBar(
     fillRect.right = fillRect.left + fillWidth;
     fillOpaqueCapsule(fillRect, accentColor);
 
-    if (peakRatio.has_value()) {
+    if (peakRatio.has_value() && !layoutGuideDragActive_) {
         const double peak = std::clamp(*peakRatio, 0.0, 1.0);
         const int markerWidth = std::min(width, std::max(1, std::max(ScaleLogical(4), height)));
         const int centerX = static_cast<int>(rect.left) + static_cast<int>(std::round(peak * width));

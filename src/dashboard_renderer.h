@@ -186,6 +186,7 @@ public:
     void SetInteractiveDragTraceActive(bool active);
     void RebuildEditArtifacts();
     bool SetLayoutEditPreviewWidgetType(EditOverlayState& overlayState, const std::string& widgetTypeName) const;
+    bool IsLayoutGuideDragActive() const;
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
@@ -226,6 +227,7 @@ public:
     TextLayoutResult MeasureTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
     TextLayoutResult MeasureTextBlock(const RECT& rect, const std::string& text, HFONT font, UINT format) const;
+    void DrawText(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const;
     TextLayoutResult DrawTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);

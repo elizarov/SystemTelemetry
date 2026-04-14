@@ -83,11 +83,13 @@ std::unique_ptr<DashboardWidget> MetricListWidget::Clone() const {
 
 void MetricListWidget::Initialize(const LayoutNodeConfig& node) {
     entries_.clear();
+    metricRefs_.clear();
     std::stringstream stream(node.parameter);
     std::string item;
     while (std::getline(stream, item, ',')) {
         Entry entry = ParseMetricListEntry(item);
         if (!entry.metricRef.empty()) {
+            metricRefs_.push_back(DashboardMetricListEntry{entry.metricRef, entry.labelOverride});
             entries_.push_back(std::move(entry));
         }
     }
@@ -150,25 +152,20 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
     const int savedDc = SaveDC(hdc);
     IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
     int rowIndex = 0;
-    std::vector<DashboardMetricListEntry> entries;
-    entries.reserve(entries_.size());
-    for (const auto& entry : entries_) {
-        entries.push_back(DashboardMetricListEntry{entry.metricRef, entry.labelOverride});
-    }
-    for (const auto& row : metrics.ResolveMetricList(entries)) {
+    for (const auto& row : metrics.ResolveMetricList(metricRefs_)) {
         if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
             break;
         }
         const RECT& labelRect = layoutState_.labelRects[rowIndex];
         const RECT& valueRect = layoutState_.valueRects[rowIndex];
-        renderer.DrawTextBlock(hdc,
+        renderer.DrawText(hdc,
             labelRect,
             row.label,
             renderer.WidgetFonts().label,
             renderer.MutedTextColor(),
             DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-            renderer.DrawTextBlock(hdc,
+            renderer.DrawText(hdc,
                 valueRect,
                 row.valueText,
                 renderer.WidgetFonts().value,

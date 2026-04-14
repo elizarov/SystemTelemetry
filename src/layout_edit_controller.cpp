@@ -337,21 +337,21 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
         if (region.has_value()) {
             const double startDx = static_cast<double>(clientPoint.x - region->dragOrigin.x);
             const double startDy = static_cast<double>(clientPoint.y - region->dragOrigin.y);
-        activeAnchorEditDrag_ = AnchorEditDragState{region->key,
-            region->dragAxis,
-            region->dragMode,
-            region->dragOrigin,
-            region->dragScale,
+            activeAnchorEditDrag_ = AnchorEditDragState{region->key,
+                region->dragAxis,
+                region->dragMode,
+                region->dragOrigin,
+                region->dragScale,
                 region->value,
                 clientPoint,
                 std::sqrt((startDx * startDx) + (startDy * startDy))};
-        hoveredEditableWidget_ = region->key.widget;
-        renderer.SetInteractiveDragTraceActive(true);
-        host_.BeginLayoutEditTraceSession("anchor", DescribeEditableAnchor(region->key));
-        SyncRendererInteractionState();
-        SetCapture(hwnd);
-        return true;
-    }
+            hoveredEditableWidget_ = region->key.widget;
+            renderer.SetInteractiveDragTraceActive(true);
+            host_.BeginLayoutEditTraceSession("anchor", DescribeEditableAnchor(region->key));
+            SyncRendererInteractionState();
+            SetCapture(hwnd);
+            return true;
+        }
     }
 
     if (resolution.hoveredWidgetEditGuideIndex.has_value()) {

@@ -30,7 +30,7 @@ void ClockTimeWidget::Draw(DashboardRenderer& renderer,
     }
 
     const std::string text = metrics.ResolveClockTime();
-    renderer.DrawTextBlock(hdc,
+    renderer.DrawText(hdc,
         widget.rect,
         text,
         renderer.WidgetFonts().clockTime,

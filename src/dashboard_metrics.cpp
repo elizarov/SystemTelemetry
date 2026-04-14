@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <sstream>
 
 namespace {
 
@@ -208,121 +209,169 @@ DashboardMetricSource::DashboardMetricSource(const SystemSnapshot& snapshot, con
     : snapshot_(snapshot), metricScales_(metricScales) {}
 
 std::string DashboardMetricSource::ResolveText(const std::string& metricRef) const {
+    const auto cached = textCache_.find(metricRef);
+    if (cached != textCache_.end()) {
+        return cached->second;
+    }
+
+    std::string resolved = "N/A";
     if (metricRef == "cpu.name") {
-        return snapshot_.cpu.name;
+        resolved = snapshot_.cpu.name;
+    } else if (metricRef == "gpu.name") {
+        resolved = snapshot_.gpu.name;
     }
-    if (metricRef == "gpu.name") {
-        return snapshot_.gpu.name;
-    }
-    return "N/A";
+    return textCache_.emplace(metricRef, std::move(resolved)).first->second;
 }
 
 DashboardGaugeMetric DashboardMetricSource::ResolveGauge(const std::string& metricRef) const {
+    const auto cached = gaugeCache_.find(metricRef);
+    if (cached != gaugeCache_.end()) {
+        return cached->second;
+    }
+
+    DashboardGaugeMetric metric;
     if (metricRef == "cpu.load") {
         const double percent = std::clamp(snapshot_.cpu.loadPercent, 0.0, 100.0);
-        return DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "cpu.load", percent / 100.0)};
-    }
-    if (metricRef == "gpu.load") {
+        metric = DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "cpu.load", percent / 100.0)};
+    } else if (metricRef == "gpu.load") {
         const double percent = std::clamp(snapshot_.gpu.loadPercent, 0.0, 100.0);
-        return DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "gpu.load", percent / 100.0)};
+        metric = DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "gpu.load", percent / 100.0)};
     }
-    return DashboardGaugeMetric{};
+    return gaugeCache_.emplace(metricRef, metric).first->second;
 }
 
 std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(
     const std::vector<DashboardMetricListEntry>& metricRefs) const {
+    std::ostringstream cacheKey;
+    for (const auto& metricRef : metricRefs) {
+        cacheKey << metricRef.metricRef << "=" << metricRef.labelOverride << '\n';
+    }
+
+    const std::string key = cacheKey.str();
+    const auto cached = metricListCache_.find(key);
+    if (cached != metricListCache_.end()) {
+        return cached->second;
+    }
+
     std::vector<DashboardMetricRow> rows;
+    rows.reserve(metricRefs.size());
     for (const auto& metricRef : metricRefs) {
         if (auto row = ResolveMetricRow(snapshot_, metricScales_, metricRef.metricRef); row.has_value()) {
             ApplyMetricLabelOverride(*row, metricRef.labelOverride);
             rows.push_back(*row);
         }
     }
-    return rows;
+    return metricListCache_.emplace(key, std::move(rows)).first->second;
 }
 
 DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::string& metricRef) const {
-    const auto networkUploadHistory =
-        SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.upload"));
-    const auto networkDownloadHistory =
-        SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.download"));
-    const auto storageReadHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.read"));
-    const auto storageWriteHistory = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.write"));
-    const double networkMaxGraph = GetThroughputGraphMax(networkUploadHistory, networkDownloadHistory);
-    const double storageMaxGraph = GetThroughputGraphMax(storageReadHistory, storageWriteHistory);
-    const double timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot_.now);
+    const auto cached = throughputCache_.find(metricRef);
+    if (cached != throughputCache_.end()) {
+        return cached->second.metric;
+    }
+
+    if (!throughputSharedState_.has_value()) {
+        throughputSharedState_ = ThroughputSharedState{};
+        throughputSharedState_->networkUploadHistory =
+            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.upload"));
+        throughputSharedState_->networkDownloadHistory =
+            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.download"));
+        throughputSharedState_->storageReadHistory =
+            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.read"));
+        throughputSharedState_->storageWriteHistory =
+            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.write"));
+        throughputSharedState_->networkMaxGraph = GetThroughputGraphMax(
+            throughputSharedState_->networkUploadHistory, throughputSharedState_->networkDownloadHistory);
+        throughputSharedState_->storageMaxGraph = GetThroughputGraphMax(
+            throughputSharedState_->storageReadHistory, throughputSharedState_->storageWriteHistory);
+        throughputSharedState_->timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot_.now);
+    }
+
+    DashboardThroughputMetric metric;
     if (metricRef == "network.upload") {
-        return DashboardThroughputMetric{"Up",
-            ResolveDisplayedThroughputValue(snapshot_.network.uploadMbps, networkUploadHistory),
-            networkUploadHistory,
-            networkMaxGraph,
+        metric = DashboardThroughputMetric{"Up",
+            ResolveDisplayedThroughputValue(snapshot_.network.uploadMbps, throughputSharedState_->networkUploadHistory),
+            throughputSharedState_->networkUploadHistory,
+            throughputSharedState_->networkMaxGraph,
             5.0,
-            timeMarkerOffsetSamples,
+            throughputSharedState_->timeMarkerOffsetSamples,
             20.0};
-    }
-    if (metricRef == "network.download") {
-        return DashboardThroughputMetric{"Down",
-            ResolveDisplayedThroughputValue(snapshot_.network.downloadMbps, networkDownloadHistory),
-            networkDownloadHistory,
-            networkMaxGraph,
+    } else if (metricRef == "network.download") {
+        metric = DashboardThroughputMetric{"Down",
+            ResolveDisplayedThroughputValue(
+                snapshot_.network.downloadMbps, throughputSharedState_->networkDownloadHistory),
+            throughputSharedState_->networkDownloadHistory,
+            throughputSharedState_->networkMaxGraph,
             5.0,
-            timeMarkerOffsetSamples,
+            throughputSharedState_->timeMarkerOffsetSamples,
+            20.0};
+    } else if (metricRef == "storage.read") {
+        metric = DashboardThroughputMetric{"Read",
+            ResolveDisplayedThroughputValue(snapshot_.storage.readMbps, throughputSharedState_->storageReadHistory),
+            throughputSharedState_->storageReadHistory,
+            throughputSharedState_->storageMaxGraph,
+            GetStorageGuideStep(throughputSharedState_->storageMaxGraph),
+            throughputSharedState_->timeMarkerOffsetSamples,
+            20.0};
+    } else if (metricRef == "storage.write") {
+        metric = DashboardThroughputMetric{"Write",
+            ResolveDisplayedThroughputValue(snapshot_.storage.writeMbps, throughputSharedState_->storageWriteHistory),
+            throughputSharedState_->storageWriteHistory,
+            throughputSharedState_->storageMaxGraph,
+            GetStorageGuideStep(throughputSharedState_->storageMaxGraph),
+            throughputSharedState_->timeMarkerOffsetSamples,
             20.0};
     }
-    if (metricRef == "storage.read") {
-        return DashboardThroughputMetric{"Read",
-            ResolveDisplayedThroughputValue(snapshot_.storage.readMbps, storageReadHistory),
-            storageReadHistory,
-            storageMaxGraph,
-            GetStorageGuideStep(storageMaxGraph),
-            timeMarkerOffsetSamples,
-            20.0};
-    }
-    if (metricRef == "storage.write") {
-        return DashboardThroughputMetric{"Write",
-            ResolveDisplayedThroughputValue(snapshot_.storage.writeMbps, storageWriteHistory),
-            storageWriteHistory,
-            storageMaxGraph,
-            GetStorageGuideStep(storageMaxGraph),
-            timeMarkerOffsetSamples,
-            20.0};
-    }
-    return DashboardThroughputMetric{};
+    return throughputCache_.emplace(metricRef, ThroughputCacheEntry{metric}).first->second.metric;
 }
 
 std::string DashboardMetricSource::ResolveNetworkFooter() const {
-    if (snapshot_.network.adapterName.empty()) {
-        return snapshot_.network.ipAddress;
+    if (!networkFooterCache_.has_value()) {
+        if (snapshot_.network.adapterName.empty()) {
+            networkFooterCache_ = snapshot_.network.ipAddress;
+        } else {
+            networkFooterCache_ = snapshot_.network.adapterName + " | " + snapshot_.network.ipAddress;
+        }
     }
-    return snapshot_.network.adapterName + " | " + snapshot_.network.ipAddress;
+    return *networkFooterCache_;
 }
 
 std::vector<DashboardDriveRow> DashboardMetricSource::ResolveDriveRows() const {
-    std::vector<DashboardDriveRow> rows;
-    double totalReadMbps = 0.0;
-    double totalWriteMbps = 0.0;
-    for (const auto& drive : snapshot_.drives) {
-        totalReadMbps += std::max(0.0, drive.readMbps);
-        totalWriteMbps += std::max(0.0, drive.writeMbps);
+    if (!driveRowsCache_.has_value()) {
+        driveRowsCache_ = std::vector<DashboardDriveRow>{};
+        driveRowsCache_->reserve(snapshot_.drives.size());
+        double totalReadMbps = 0.0;
+        double totalWriteMbps = 0.0;
+        for (const auto& drive : snapshot_.drives) {
+            totalReadMbps += std::max(0.0, drive.readMbps);
+            totalWriteMbps += std::max(0.0, drive.writeMbps);
+        }
+        for (const auto& drive : snapshot_.drives) {
+            const double readActivity =
+                totalReadMbps > 0.0 ? std::clamp(drive.readMbps / totalReadMbps, 0.0, 1.0) : 0.0;
+            const double writeActivity =
+                totalWriteMbps > 0.0 ? std::clamp(drive.writeMbps / totalWriteMbps, 0.0, 1.0) : 0.0;
+            driveRowsCache_->push_back(DashboardDriveRow{
+                drive.label, readActivity, writeActivity, drive.usedPercent, FormatDriveFree(drive.freeGb)});
+        }
     }
-    for (const auto& drive : snapshot_.drives) {
-        const double readActivity = totalReadMbps > 0.0 ? std::clamp(drive.readMbps / totalReadMbps, 0.0, 1.0) : 0.0;
-        const double writeActivity =
-            totalWriteMbps > 0.0 ? std::clamp(drive.writeMbps / totalWriteMbps, 0.0, 1.0) : 0.0;
-        rows.push_back(DashboardDriveRow{
-            drive.label, readActivity, writeActivity, drive.usedPercent, FormatDriveFree(drive.freeGb)});
-    }
-    return rows;
+    return *driveRowsCache_;
 }
 
 std::string DashboardMetricSource::ResolveClockTime() const {
-    char buffer[32];
-    sprintf_s(buffer, "%02d:%02d", snapshot_.now.wHour, snapshot_.now.wMinute);
-    return buffer;
+    if (!clockTimeCache_.has_value()) {
+        char buffer[32];
+        sprintf_s(buffer, "%02d:%02d", snapshot_.now.wHour, snapshot_.now.wMinute);
+        clockTimeCache_ = buffer;
+    }
+    return *clockTimeCache_;
 }
 
 std::string DashboardMetricSource::ResolveClockDate() const {
-    char buffer[32];
-    sprintf_s(buffer, "%04d-%02d-%02d", snapshot_.now.wYear, snapshot_.now.wMonth, snapshot_.now.wDay);
-    return buffer;
+    if (!clockDateCache_.has_value()) {
+        char buffer[32];
+        sprintf_s(buffer, "%04d-%02d-%02d", snapshot_.now.wYear, snapshot_.now.wMonth, snapshot_.now.wDay);
+        clockDateCache_ = buffer;
+    }
+    return *clockDateCache_;
 }
