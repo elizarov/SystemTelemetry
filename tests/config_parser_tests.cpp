@@ -58,3 +58,18 @@ TEST(ConfigParser, ParsesRenamedCardStyleKeys) {
 
     std::filesystem::remove(path);
 }
+
+TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
+    const std::filesystem::path path = WriteTestConfig("[dashboard]\n"
+                                                       "outer_margin = 8\n"
+                                                       "row_gap = 9\n"
+                                                       "column_gap = 11\n");
+
+    const AppConfig config = LoadConfig(path, true);
+
+    EXPECT_EQ(config.layout.dashboard.outerMargin, 8);
+    EXPECT_EQ(config.layout.dashboard.rowGap, 9);
+    EXPECT_EQ(config.layout.dashboard.columnGap, 11);
+
+    std::filesystem::remove(path);
+}

@@ -86,7 +86,7 @@ struct DashboardSectionConfig {
     CONFIG_REFLECTED_STRUCT(DashboardSectionConfig)
     CONFIG_VALUE(int, outerMargin, "outer_margin");
     CONFIG_VALUE(int, rowGap, "row_gap");
-    CONFIG_VALUE(int, cardGap, "card_gap");
+    CONFIG_VALUE(int, columnGap, "column_gap");
     CONFIG_SECTION("dashboard");
 };
 
@@ -98,8 +98,8 @@ struct CardStyleConfig {
     CONFIG_EDITABLE_VALUE(int, headerIconSize, "header_icon_size");
     CONFIG_EDITABLE_VALUE_WITH(int, headerIconGap, "header_icon_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE_WITH(int, headerContentGap, "header_content_gap", configschema::NonNegativeIntPolicy);
-    CONFIG_VALUE(int, columnGap, "column_gap");
     CONFIG_VALUE(int, rowGap, "row_gap");
+    CONFIG_VALUE(int, columnGap, "column_gap");
     CONFIG_SECTION("card_style");
 };
 

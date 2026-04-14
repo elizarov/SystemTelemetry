@@ -99,7 +99,7 @@ Supported `[layout.<name>]` keys:
 
 - `outer_margin = pixels`
 - `row_gap = pixels`
-- `card_gap = pixels`
+- `column_gap = pixels`
 
 `[card_style]` owns shared card chrome and internal spacing:
 
@@ -109,8 +109,8 @@ Supported `[layout.<name>]` keys:
 - `header_icon_size = pixels`
 - `header_icon_gap = pixels`
 - `header_content_gap = pixels`
-- `column_gap = pixels`
 - `row_gap = pixels`
+- `column_gap = pixels`
 
 Card headers size themselves from the larger of the configured header icon size and the measured title text height. `header_content_gap` applies only when the card renders a title or icon header.
 
@@ -325,7 +325,7 @@ Shared absolute geometry belongs only in `[layout]`, including:
 Shared dashboard spacing belongs only in `[dashboard]`, including:
 
 - margins
-- row and card gaps
+- row and column gaps
 
 Shared card chrome and inner spacing belong only in `[card_style]`, including:
 

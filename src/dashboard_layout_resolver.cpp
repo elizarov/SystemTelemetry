@@ -501,7 +501,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             }
 
             const bool horizontal = node.name == "columns";
-            const int gap = horizontal ? renderer.ScaleLogical(renderer.config_.layout.dashboard.cardGap)
+            const int gap = horizontal ? renderer.ScaleLogical(renderer.config_.layout.dashboard.columnGap)
                                        : renderer.ScaleLogical(renderer.config_.layout.dashboard.rowGap);
             int totalWeight = 0;
             for (const auto& child : node.children) {
