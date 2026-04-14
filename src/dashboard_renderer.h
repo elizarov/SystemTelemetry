@@ -135,6 +135,13 @@ public:
         AllVertical,
     };
 
+    struct MoveOverlayState {
+        bool visible = false;
+        std::string monitorName;
+        RenderPoint relativePosition{};
+        double monitorScale = 1.0;
+    };
+
     struct EditOverlayState {
         bool showLayoutEditGuides = false;
         SimilarityIndicatorMode similarityIndicatorMode = SimilarityIndicatorMode::ActiveGuide;
@@ -143,6 +150,7 @@ public:
         std::optional<WidgetEditGuide> activeWidgetEditGuide;
         std::optional<EditableAnchorKey> hoveredEditableAnchor;
         std::optional<EditableAnchorKey> activeEditableAnchor;
+        MoveOverlayState moveOverlay{};
     };
 
     struct TextStyleMetrics {
@@ -445,6 +453,7 @@ private:
     void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
     void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
     void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
+    void DrawMoveOverlay(const MoveOverlayState& overlayState);
     void DrawPanel(const ResolvedCardLayout& card);
     void DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect);
     void DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);

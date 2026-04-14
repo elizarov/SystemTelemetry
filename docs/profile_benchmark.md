@@ -172,7 +172,7 @@ These changes produced real wins and remain in the codebase:
   - `build\SystemTelemetryBenchmarks.exe 480 2` ran at `drag_loop per_iter_ms=2.45`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=1.98`.
   - `profile_benchmark.cmd 240 2` kept the benchmark hotspot shape in `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, the display driver, and `win32kfull.sys`, with no new GDI text hotspot.
 - Conclusion:
-  - The type migration is safe to keep. It simplifies the Direct2D renderer boundary without costing measurable draw-path time and keeps raw Win32 types confined to the shell-owned move overlay and message-handling edge.
+  - The type migration is safe to keep. It simplifies the Direct2D renderer boundary without costing measurable draw-path time and keeps raw Win32 types confined to the shell message-handling and placement-tracking edge.
 
 ### Hypothesis: Reuse cached overlay pens for layout-edit guide and highlight draws
 

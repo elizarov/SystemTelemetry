@@ -224,12 +224,8 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactor
         return bitmapSource;
     }
 
-    hr = converter->Initialize(frame.Get(),
-        GUID_WICPixelFormat32bppPBGRA,
-        WICBitmapDitherTypeNone,
-        nullptr,
-        0.0,
-        WICBitmapPaletteTypeCustom);
+    hr = converter->Initialize(
+        frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
     if (FAILED(hr)) {
         return bitmapSource;
     }
@@ -1068,6 +1064,83 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
     }
 }
 
+void DashboardRenderer::DrawMoveOverlay(const MoveOverlayState& overlayState) {
+    if (!overlayState.visible || !IsDirect2DActive()) {
+        return;
+    }
+
+    const int margin = ScaleLogical(16);
+    const int padding = ScaleLogical(12);
+    const int lineGap = ScaleLogical(6);
+    const int cornerRadius = ScaleLogical(14);
+    const float borderWidth = static_cast<float>((std::max)(1, ScaleLogical(1)));
+    const int titleHeight = (std::max)(1, textStyleMetrics_.label);
+    const int bodyHeight = (std::max)(1, textStyleMetrics_.smallText);
+
+    char positionTextBuffer[96];
+    sprintf_s(positionTextBuffer, "Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
+    char scaleTextBuffer[96];
+    sprintf_s(scaleTextBuffer, "Scale: %.0f%% (%.2fx)", overlayState.monitorScale * 100.0, overlayState.monitorScale);
+
+    const std::string titleText = "Move Mode";
+    const std::string monitorText = "Monitor: " + overlayState.monitorName;
+    const std::string positionText = positionTextBuffer;
+    const std::string scaleText = scaleTextBuffer;
+    const std::string hintText = "Left-click to place. Copy monitor name, scale, and x/y into config.";
+
+    const int minContentWidth = ScaleLogical(220);
+    const int maxContentWidth = (std::max)(minContentWidth, WindowWidth() - margin * 2 - padding * 2);
+    int preferredContentWidth = minContentWidth;
+    preferredContentWidth = (std::max)(preferredContentWidth, MeasureTextWidth(TextStyleId::Label, titleText));
+    preferredContentWidth = (std::max)(preferredContentWidth, MeasureTextWidth(TextStyleId::Small, monitorText));
+    preferredContentWidth = (std::max)(preferredContentWidth, MeasureTextWidth(TextStyleId::Small, positionText));
+    preferredContentWidth = (std::max)(preferredContentWidth, MeasureTextWidth(TextStyleId::Small, scaleText));
+    const int contentWidth = (std::min)(maxContentWidth, preferredContentWidth);
+    const int hintHeight = MeasureTextBlock(
+        RenderRect{0, 0, contentWidth, WindowHeight()}, hintText, TextStyleId::Small, TextLayoutOptions::Wrapped())
+                               .textRect.Height();
+    const int overlayWidth = contentWidth + padding * 2;
+    const int overlayHeight = padding * 2 + titleHeight + lineGap + bodyHeight + lineGap + bodyHeight + lineGap +
+                              bodyHeight + lineGap + hintHeight;
+    const RenderRect overlayRect{margin, margin, margin + overlayWidth, margin + overlayHeight};
+
+    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(BackgroundColor());
+    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(AccentColor());
+    const D2D1_ROUNDED_RECT roundedRect =
+        D2D1::RoundedRect(overlayRect.ToD2DRectF(), static_cast<float>(cornerRadius), static_cast<float>(cornerRadius));
+    if (fillBrush != nullptr) {
+        d2dActiveRenderTarget_->FillRoundedRectangle(roundedRect, fillBrush);
+    }
+    if (borderBrush != nullptr) {
+        d2dActiveRenderTarget_->DrawRoundedRectangle(roundedRect, borderBrush, borderWidth, d2dSolidStrokeStyle_.Get());
+    }
+
+    int y = overlayRect.top + padding;
+    DrawText(RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, y + titleHeight},
+        titleText,
+        TextStyleId::Label,
+        AccentColor(),
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
+    y += titleHeight + lineGap;
+
+    const auto drawBodyLine = [&](const std::string& text, bool ellipsis = false) {
+        DrawText(RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, y + bodyHeight},
+            text,
+            TextStyleId::Small,
+            ForegroundColor(),
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center, true, ellipsis));
+        y += bodyHeight + lineGap;
+    };
+    drawBodyLine(monitorText, true);
+    drawBodyLine(positionText);
+    drawBodyLine(scaleText);
+    DrawText(RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, overlayRect.bottom - padding},
+        hintText,
+        TextStyleId::Small,
+        MutedTextColor(),
+        TextLayoutOptions::Wrapped());
+}
+
 void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect) {
     const auto it = std::find_if(
         panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) { return entry.first == iconName; });
@@ -1093,10 +1166,8 @@ void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RenderR
             return;
         }
 
-        hr = scaler->Initialize(it->second.Get(),
-            static_cast<UINT>(width),
-            static_cast<UINT>(height),
-            WICBitmapInterpolationModeFant);
+        hr = scaler->Initialize(
+            it->second.Get(), static_cast<UINT>(width), static_cast<UINT>(height), WICBitmapInterpolationModeFant);
         if (FAILED(hr)) {
             return;
         }
@@ -1256,6 +1327,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     DrawLayoutEditGuides(overlayState);
     DrawWidgetEditGuides(overlayState);
     DrawLayoutSimilarityIndicators(overlayState);
+    DrawMoveOverlay(overlayState.moveOverlay);
     dynamicAnchorRegistrationEnabled_ = false;
 }
 

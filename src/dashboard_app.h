@@ -75,8 +75,7 @@ private:
     void StartMoveMode();
     void StopMoveMode();
     void UpdateMoveTracking();
-    void DrawMoveOverlay(HDC hdc);
-    bool RebuildOverlayFonts();
+    void SyncMoveOverlayState();
     bool CreateLayoutEditTooltip();
     void DestroyLayoutEditTooltip();
     void HideLayoutEditTooltip();
@@ -87,18 +86,12 @@ private:
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);
     COLORREF BackgroundColor() const;
-    COLORREF ForegroundColor() const;
-    COLORREF AccentColor() const;
-    COLORREF MutedTextColor() const;
-    HFONT OverlayLabelFont() const;
-    HFONT OverlaySmallFont() const;
     int WindowWidth() const;
     int WindowHeight() const;
     void StartPlacementWatch();
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
 
-    void DrawTextBlock(HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
     void EndLayoutEditTraceSession(const std::string& reason) override;
@@ -119,8 +112,6 @@ private:
     MonitorPlacementInfo movePlacementInfo_{};
     HICON appIconLarge_ = nullptr;
     HICON appIconSmall_ = nullptr;
-    HFONT overlayLabelFont_ = nullptr;
-    HFONT overlaySmallFont_ = nullptr;
     DiagnosticsOptions diagnosticsOptions_;
     UINT currentDpi_ = kDefaultDpi;
     LayoutEditController layoutEditController_;

@@ -190,12 +190,10 @@ DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
     controller_.State().config = config;
     renderer_.SetConfig(config);
-    if (hwnd_ != nullptr) {
-        RebuildOverlayFonts();
-    }
     rendererEditOverlayState_.showLayoutEditGuides =
         controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
     rendererEditOverlayState_.similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions_);
+    SyncMoveOverlayState();
 }
 
 void DashboardApp::UpdateRendererScale(double scale) {
@@ -372,65 +370,15 @@ bool DashboardApp::InitializeFonts() {
     renderer_.SetConfig(controller_.State().config);
     renderer_.SetTraceOutput(
         controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
-    if (!renderer_.Initialize(hwnd_)) {
-        return false;
-    }
-    return RebuildOverlayFonts();
+    return renderer_.Initialize(hwnd_);
 }
 
 void DashboardApp::ReleaseFonts() {
     renderer_.Shutdown();
-    if (overlayLabelFont_ != nullptr) {
-        DeleteObject(overlayLabelFont_);
-        overlayLabelFont_ = nullptr;
-    }
-    if (overlaySmallFont_ != nullptr) {
-        DeleteObject(overlaySmallFont_);
-        overlaySmallFont_ = nullptr;
-    }
 }
 
 COLORREF DashboardApp::BackgroundColor() const {
     return ToColorRef(controller_.State().config.layout.colors.backgroundColor);
-}
-
-COLORREF DashboardApp::ForegroundColor() const {
-    return ToColorRef(controller_.State().config.layout.colors.foregroundColor);
-}
-
-COLORREF DashboardApp::AccentColor() const {
-    return ToColorRef(controller_.State().config.layout.colors.accentColor);
-}
-
-COLORREF DashboardApp::MutedTextColor() const {
-    return ToColorRef(controller_.State().config.layout.colors.mutedTextColor);
-}
-
-HFONT DashboardApp::OverlayLabelFont() const {
-    return overlayLabelFont_;
-}
-
-HFONT DashboardApp::OverlaySmallFont() const {
-    return overlaySmallFont_;
-}
-
-bool DashboardApp::RebuildOverlayFonts() {
-    if (overlayLabelFont_ != nullptr) {
-        DeleteObject(overlayLabelFont_);
-        overlayLabelFont_ = nullptr;
-    }
-    if (overlaySmallFont_ != nullptr) {
-        DeleteObject(overlaySmallFont_);
-        overlaySmallFont_ = nullptr;
-    }
-
-    UiFontConfig labelFont = controller_.State().config.layout.fonts.label;
-    UiFontConfig smallFont = controller_.State().config.layout.fonts.smallText;
-    labelFont.size = renderer_.ScaleLogical(labelFont.size);
-    smallFont.size = renderer_.ScaleLogical(smallFont.size);
-    overlayLabelFont_ = CreateUiFont(labelFont);
-    overlaySmallFont_ = CreateUiFont(smallFont);
-    return overlayLabelFont_ != nullptr && overlaySmallFont_ != nullptr;
 }
 
 HICON DashboardApp::LoadAppIcon(int width, int height) {
@@ -442,6 +390,7 @@ bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const
     renderer_.SetConfig(controller_.State().config);
     rendererEditOverlayState_.showLayoutEditGuides =
         controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
+    SyncMoveOverlayState();
     renderer_.SetTraceOutput(
         controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
     if (!renderer_.Initialize(hwnd_)) {
@@ -545,6 +494,7 @@ void DashboardApp::StartMoveMode() {
     controller_.State().isMoving = true;
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
     UpdateMoveTracking();
+    SyncMoveOverlayState();
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -555,6 +505,7 @@ void DashboardApp::StopMoveMode() {
     controller_.State().isMoving = false;
     KillTimer(hwnd_, kMoveTimerId);
     HideLayoutEditTooltip();
+    SyncMoveOverlayState();
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -564,18 +515,29 @@ void DashboardApp::UpdateMoveTracking() {
         return;
     }
 
-    HDC hdc = GetDC(hwnd_);
     int cursorOffset = ScaleLogicalToPhysical(24, CurrentWindowDpi());
-    if (hdc != nullptr) {
-        cursorOffset = std::max(
-            cursorOffset, MeasureFontHeight(hdc, OverlaySmallFont()) + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
-        ReleaseDC(hwnd_, hdc);
-    }
+    cursorOffset =
+        std::max(cursorOffset, renderer_.TextMetrics().smallText + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
 
     const int x = cursor.x - (WindowWidth() / 2);
     const int y = cursor.y - cursorOffset;
     SetWindowPos(hwnd_, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
+    SyncMoveOverlayState();
+}
+
+void DashboardApp::SyncMoveOverlayState() {
+    auto& overlayState = rendererEditOverlayState_.moveOverlay;
+    if (!controller_.State().isMoving) {
+        overlayState = {};
+        return;
+    }
+
+    overlayState.visible = true;
+    overlayState.monitorName = movePlacementInfo_.monitorName;
+    overlayState.relativePosition = RenderPoint{static_cast<int>(movePlacementInfo_.relativePosition.x),
+        static_cast<int>(movePlacementInfo_.relativePosition.y)};
+    overlayState.monitorScale = ScaleFromDpi(movePlacementInfo_.dpi);
 }
 
 HWND DashboardApp::WindowHandle() const {
@@ -1058,80 +1020,6 @@ std::optional<double> DashboardApp::PromptCustomScale() const {
     return std::nullopt;
 }
 
-void DashboardApp::DrawMoveOverlay(HDC hdc) {
-    const int margin = ScaleLogicalToPhysical(16, CurrentWindowDpi());
-    const int padding = ScaleLogicalToPhysical(12, CurrentWindowDpi());
-    const int lineGap = ScaleLogicalToPhysical(6, CurrentWindowDpi());
-    const int cornerRadius = ScaleLogicalToPhysical(14, CurrentWindowDpi());
-    const int borderWidth = std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi()));
-
-    char positionText[96];
-    sprintf_s(
-        positionText, "Pos: x=%ld y=%ld", movePlacementInfo_.relativePosition.x, movePlacementInfo_.relativePosition.y);
-    char scaleText[96];
-    const double scale = ScaleFromDpi(movePlacementInfo_.dpi);
-    sprintf_s(scaleText, "Scale: %.0f%% (%.2fx)", scale * 100.0, scale);
-
-    const std::string titleText = "Move Mode";
-    const std::string monitorText = "Monitor: " + movePlacementInfo_.monitorName;
-    const std::string hintText = "Left-click to place. Copy monitor name, scale, and x/y into config.";
-
-    const int titleHeight = MeasureFontHeight(hdc, OverlayLabelFont());
-    const int bodyHeight = MeasureFontHeight(hdc, OverlaySmallFont());
-    const int minContentWidth = ScaleLogicalToPhysical(220, CurrentWindowDpi());
-    const int maxContentWidth = std::max(minContentWidth, WindowWidth() - margin * 2 - padding * 2);
-    int preferredContentWidth = minContentWidth;
-    preferredContentWidth =
-        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, OverlayLabelFont(), titleText).cx));
-    preferredContentWidth =
-        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, OverlaySmallFont(), monitorText).cx));
-    preferredContentWidth =
-        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, OverlaySmallFont(), positionText).cx));
-    preferredContentWidth =
-        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, OverlaySmallFont(), scaleText).cx));
-    const int contentWidth = std::min(maxContentWidth, preferredContentWidth);
-    const int hintHeight = MeasureWrappedTextHeight(hdc, OverlaySmallFont(), hintText, contentWidth);
-    const int overlayWidth = contentWidth + padding * 2;
-    const int overlayHeight = padding * 2 + titleHeight + lineGap + bodyHeight + lineGap + bodyHeight + lineGap +
-                              bodyHeight + lineGap + hintHeight;
-    RECT overlay{margin, margin, margin + overlayWidth, margin + overlayHeight};
-
-    HBRUSH fill = CreateSolidBrush(BackgroundColor());
-    HPEN border = CreatePen(PS_SOLID, borderWidth, AccentColor());
-    HGDIOBJ oldBrush = SelectObject(hdc, fill);
-    HGDIOBJ oldPen = SelectObject(hdc, border);
-    RoundRect(hdc, overlay.left, overlay.top, overlay.right, overlay.bottom, cornerRadius, cornerRadius);
-    SelectObject(hdc, oldPen);
-    SelectObject(hdc, oldBrush);
-    DeleteObject(fill);
-    DeleteObject(border);
-
-    int y = overlay.top + padding;
-    RECT titleRect{overlay.left + padding, y, overlay.right - padding, y + titleHeight};
-    y = titleRect.bottom + lineGap;
-    RECT monitorRect{overlay.left + padding, y, overlay.right - padding, y + bodyHeight};
-    y = monitorRect.bottom + lineGap;
-    RECT positionRect{overlay.left + padding, y, overlay.right - padding, y + bodyHeight};
-    y = positionRect.bottom + lineGap;
-    RECT scaleRect{overlay.left + padding, y, overlay.right - padding, y + bodyHeight};
-    y = scaleRect.bottom + lineGap;
-    RECT hintRect{overlay.left + padding, y, overlay.right - padding, overlay.bottom - padding};
-
-    DrawTextBlock(hdc, titleRect, titleText, OverlayLabelFont(), AccentColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(hdc,
-        monitorRect,
-        monitorText,
-        OverlaySmallFont(),
-        ForegroundColor(),
-        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    DrawTextBlock(
-        hdc, positionRect, positionText, OverlaySmallFont(), ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(
-        hdc, scaleRect, scaleText, OverlaySmallFont(), ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
-    DrawTextBlock(
-        hdc, hintRect, hintText, OverlaySmallFont(), MutedTextColor(), DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
-}
-
 int DashboardApp::Run() {
     ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
     UpdateWindow(hwnd_);
@@ -1364,30 +1252,16 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
 void DashboardApp::Paint() {
     const auto paintStart = std::chrono::steady_clock::now();
     PAINTSTRUCT ps{};
-    HDC hdc = BeginPaint(hwnd_, &ps);
+    BeginPaint(hwnd_, &ps);
     const SystemSnapshot& snapshot = controller_.State().telemetry->Snapshot();
     const auto drawStart = std::chrono::steady_clock::now();
+    SyncMoveOverlayState();
     renderer_.DrawWindow(snapshot, rendererEditOverlayState_);
-    if (controller_.State().isMoving) {
-        DrawMoveOverlay(hdc);
-    }
     const auto drawEnd = std::chrono::steady_clock::now();
     EndPaint(hwnd_, &ps);
     const auto paintEnd = std::chrono::steady_clock::now();
     RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);
     RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);
-}
-
-void DashboardApp::DrawTextBlock(
-    HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
-    HGDIOBJ oldFont = SelectObject(hdc, font);
-    const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, color);
-    RECT copy = rect;
-    const std::wstring wideText = WideFromUtf8(text);
-    DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
-    SetBkMode(hdc, oldBkMode);
-    SelectObject(hdc, oldFont);
 }
 
 void DashboardApp::BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) {

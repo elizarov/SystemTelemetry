@@ -237,6 +237,7 @@ While moving, show an overlay in the top-left corner with:
 - Relative X/Y position on that monitor
 
 - The move overlay should size and space itself from the actual UI font metrics and monitor scale.
+- The move overlay must render as part of the same frame as the dashboard content so it stays consistently on top during move-mode repaints.
 - The overlay content should be easy to copy into configuration.
 - The application must also read the saved relative X/Y coordinates from configuration at startup and place the window accordingly.
 - The application must provide a `Save Config` action that writes the display identifier and relative X/Y placement back to the config file while preserving all other settings and unchanged explicit overrides.
