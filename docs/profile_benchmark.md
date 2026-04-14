@@ -24,18 +24,19 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `apply avg_ms=0.22`
   - `paint_draw avg_ms=1.98`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=2.49` to `2.50`
-  - `snap avg_ms=0.20`
+  - `drag_loop per_iter_ms=2.51` to `2.54`
+  - `snap avg_ms=0.19` to `0.20`
   - `apply avg_ms=0.28`
-  - `paint_draw avg_ms=2.01` to `2.02`
+  - `paint_draw avg_ms=2.03` to `2.06`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The exported WPA text still does not surface stable named renderer functions for the benchmark process, but the latest icon-path validation capture under `build\profile_benchmark_daemon\requests\22440_27226_5\` shows the heaviest benchmark-process module weights in `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, `amdxx64.dll`, `d3d11.dll`, and `win32kfull.sys`.
+- The exported WPA text still does not surface stable named renderer functions for the benchmark process, but the latest daemon-backed capture under `build\profile_benchmark_daemon\requests\7135_11885_27010\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `amdxx64.dll`, `d3d11.dll`, `DWrite.dll`, `win32kfull.sys`, `WindowsCodecs.dll`, and `TextShaping.dll`.
 - The latest fixed-text capture keeps the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape that the earlier full-D2D validation captures showed, so replacing the last GDI+ icon decode and scale path did not move the hot work away from the current frame stack.
 - `GdiPlus.dll` no longer appears in the benchmark-process module list after the panel-icon path moved fully onto WIC plus Direct2D upload.
+- No new benchmark-process hotspot stands out in app-owned code; the named app-side leaves that the call tree resolves remain scattered low-single-digit helpers under the same renderer-driven frame.
 - The fast benchmark reruns stay consistent enough that the draw-path win is real even though the coarse text export no longer pinpoints the remaining app-side leaves by symbol.
 
 Interpretation:
