@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cwchar>
+#include <functional>
 #include <sstream>
 #include <vector>
 
@@ -278,7 +279,10 @@ struct LayoutEditValueDialogState {
     std::wstring prompt;
     std::wstring initialText;
     configschema::ValueFormat valueFormat = configschema::ValueFormat::Integer;
+    std::function<bool(double)> preview;
+    std::function<void()> restore;
     std::optional<double> result;
+    bool accepted = false;
 };
 
 struct LayoutEditWeightsDialogState {
@@ -287,15 +291,108 @@ struct LayoutEditWeightsDialogState {
     std::wstring secondLabel;
     int firstValue = 1;
     int secondValue = 1;
+    std::function<bool(const std::pair<int, int>&)> preview;
+    std::function<void()> restore;
     std::optional<std::pair<int, int>> result;
+    bool accepted = false;
 };
 
 struct LayoutEditFontDialogState {
     std::wstring title;
     std::wstring prompt;
     UiFontConfig initialValue;
+    std::function<bool(const UiFontConfig&)> preview;
+    std::function<void()> restore;
     std::optional<UiFontConfig> result;
+    bool accepted = false;
 };
+
+void RestoreLayoutEditValueDialog(LayoutEditValueDialogState* state) {
+    if (state != nullptr && !state->accepted && state->restore) {
+        state->restore();
+    }
+}
+
+void RestoreLayoutEditWeightsDialog(LayoutEditWeightsDialogState* state) {
+    if (state != nullptr && !state->accepted && state->restore) {
+        state->restore();
+    }
+}
+
+void RestoreLayoutEditFontDialog(LayoutEditFontDialogState* state) {
+    if (state != nullptr && !state->accepted && state->restore) {
+        state->restore();
+    }
+}
+
+void PreviewLayoutEditValueDialog(LayoutEditValueDialogState* state, HWND hwnd) {
+    if (state == nullptr || !state->preview) {
+        return;
+    }
+
+    wchar_t buffer[128] = {};
+    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, buffer, ARRAYSIZE(buffer));
+    std::optional<double> value;
+    if (state->valueFormat == configschema::ValueFormat::Integer) {
+        if (const auto parsed = TryParseDialogInteger(buffer); parsed.has_value()) {
+            value = static_cast<double>(*parsed);
+        }
+    } else {
+        value = TryParseDialogDouble(buffer);
+    }
+    if (!value.has_value()) {
+        return;
+    }
+
+    if (state->preview(*value)) {
+        state->result = *value;
+    }
+}
+
+void PreviewLayoutEditWeightsDialog(LayoutEditWeightsDialogState* state, HWND hwnd) {
+    if (state == nullptr || !state->preview) {
+        return;
+    }
+
+    wchar_t firstBuffer[64] = {};
+    wchar_t secondBuffer[64] = {};
+    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT, firstBuffer, ARRAYSIZE(firstBuffer));
+    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT, secondBuffer, ARRAYSIZE(secondBuffer));
+    const std::optional<int> first = TryParseDialogInteger(firstBuffer);
+    const std::optional<int> second = TryParseDialogInteger(secondBuffer);
+    if (!first.has_value() || !second.has_value() || *first < 1 || *second < 1) {
+        return;
+    }
+
+    const std::pair<int, int> weights{*first, *second};
+    if (state->preview(weights)) {
+        state->result = weights;
+    }
+}
+
+void PreviewLayoutEditFontDialog(LayoutEditFontDialogState* state, HWND hwnd) {
+    if (state == nullptr || !state->preview) {
+        return;
+    }
+
+    wchar_t faceBuffer[256] = {};
+    wchar_t sizeBuffer[64] = {};
+    wchar_t weightBuffer[64] = {};
+    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, faceBuffer, ARRAYSIZE(faceBuffer));
+    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, sizeBuffer, ARRAYSIZE(sizeBuffer));
+    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, weightBuffer, ARRAYSIZE(weightBuffer));
+    const std::wstring faceText(faceBuffer);
+    const std::optional<int> size = TryParseDialogInteger(sizeBuffer);
+    const std::optional<int> weight = TryParseDialogInteger(weightBuffer);
+    if (faceText.empty() || !size.has_value() || *size < 1 || !weight.has_value()) {
+        return;
+    }
+
+    const UiFontConfig font{Utf8FromWide(faceText), *size, *weight};
+    if (state->preview(font)) {
+        state->result = font;
+    }
+}
 
 INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* state = reinterpret_cast<CustomScaleDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
@@ -343,9 +440,14 @@ INT_PTR CALLBACK LayoutEditValueDialogProc(HWND hwnd, UINT message, WPARAM wPara
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_PROMPT, state->prompt.c_str());
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, state->initialText.c_str());
             SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, EM_SETSEL, 0, -1);
+            PreviewLayoutEditValueDialog(state, hwnd);
             return TRUE;
         }
         case WM_COMMAND:
+            if (LOWORD(wParam) == IDC_LAYOUT_EDIT_VALUE_EDIT && HIWORD(wParam) == EN_CHANGE) {
+                PreviewLayoutEditValueDialog(state, hwnd);
+                return TRUE;
+            }
             switch (LOWORD(wParam)) {
                 case IDOK: {
                     wchar_t buffer[128] = {};
@@ -369,14 +471,20 @@ INT_PTR CALLBACK LayoutEditValueDialogProc(HWND hwnd, UINT message, WPARAM wPara
                         }
                         state->result = *value;
                     }
+                    state->accepted = true;
                     EndDialog(hwnd, IDOK);
                     return TRUE;
                 }
                 case IDCANCEL:
+                    RestoreLayoutEditValueDialog(state);
                     EndDialog(hwnd, IDCANCEL);
                     return TRUE;
             }
             break;
+        case WM_CLOSE:
+            RestoreLayoutEditValueDialog(state);
+            EndDialog(hwnd, IDCANCEL);
+            return TRUE;
     }
     return FALSE;
 }
@@ -395,9 +503,16 @@ INT_PTR CALLBACK LayoutEditWeightsDialogProc(HWND hwnd, UINT message, WPARAM wPa
             SetDlgItemTextW(
                 hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT, WideFromUtf8(std::to_string(state->secondValue)).c_str());
             SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT, EM_SETSEL, 0, -1);
+            PreviewLayoutEditWeightsDialog(state, hwnd);
             return TRUE;
         }
         case WM_COMMAND:
+            if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT) &&
+                HIWORD(wParam) == EN_CHANGE) {
+                PreviewLayoutEditWeightsDialog(state, hwnd);
+                return TRUE;
+            }
             switch (LOWORD(wParam)) {
                 case IDOK: {
                     wchar_t firstBuffer[64] = {};
@@ -414,14 +529,20 @@ INT_PTR CALLBACK LayoutEditWeightsDialogProc(HWND hwnd, UINT message, WPARAM wPa
                         return TRUE;
                     }
                     state->result = std::make_pair(*first, *second);
+                    state->accepted = true;
                     EndDialog(hwnd, IDOK);
                     return TRUE;
                 }
                 case IDCANCEL:
+                    RestoreLayoutEditWeightsDialog(state);
                     EndDialog(hwnd, IDCANCEL);
                     return TRUE;
             }
             break;
+        case WM_CLOSE:
+            RestoreLayoutEditWeightsDialog(state);
+            EndDialog(hwnd, IDCANCEL);
+            return TRUE;
     }
     return FALSE;
 }
@@ -441,9 +562,18 @@ INT_PTR CALLBACK LayoutEditFontDialogProc(HWND hwnd, UINT message, WPARAM wParam
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
                 WideFromUtf8(std::to_string(state->initialValue.weight)).c_str());
             SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, EM_SETSEL, 0, -1);
+            PreviewLayoutEditFontDialog(state, hwnd);
             return TRUE;
         }
         case WM_COMMAND:
+            if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT &&
+                    (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) ||
+                ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_SIZE_EDIT ||
+                     LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT) &&
+                    HIWORD(wParam) == EN_CHANGE)) {
+                PreviewLayoutEditFontDialog(state, hwnd);
+                return TRUE;
+            }
             switch (LOWORD(wParam)) {
                 case IDOK: {
                     wchar_t faceBuffer[256] = {};
@@ -473,14 +603,20 @@ INT_PTR CALLBACK LayoutEditFontDialogProc(HWND hwnd, UINT message, WPARAM wParam
                         return TRUE;
                     }
                     state->result = UiFontConfig{Utf8FromWide(faceText), *size, *weight};
+                    state->accepted = true;
                     EndDialog(hwnd, IDOK);
                     return TRUE;
                 }
                 case IDCANCEL:
+                    RestoreLayoutEditFontDialog(state);
                     EndDialog(hwnd, IDCANCEL);
                     return TRUE;
             }
             break;
+        case WM_CLOSE:
+            RestoreLayoutEditFontDialog(state);
+            EndDialog(hwnd, IDCANCEL);
+            return TRUE;
     }
     return FALSE;
 }
@@ -759,13 +895,17 @@ bool DashboardApp::IsLayoutEditModalUiActive() const {
     return layoutEditModalUiDepth_ > 0;
 }
 
-std::optional<double> DashboardApp::PromptLayoutEditValue(
-    const LayoutEditTooltipDescriptor& descriptor, double initialValue, const std::wstring& title) {
+std::optional<double> DashboardApp::PromptLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter,
+    const LayoutEditTooltipDescriptor& descriptor,
+    double initialValue,
+    const std::wstring& title) {
     LayoutEditValueDialogState state;
     state.title = title;
     state.prompt = WideFromUtf8("[" + descriptor.sectionName + "] " + descriptor.memberName);
     state.initialText = WideFromUtf8(FormatLayoutEditTooltipValue(initialValue, descriptor.valueFormat));
     state.valueFormat = descriptor.valueFormat;
+    state.preview = [this, parameter](double value) { return ApplyLayoutEditValue(parameter, value); };
+    state.restore = [this, parameter, initialValue]() { ApplyLayoutEditValue(parameter, initialValue); };
     DashboardAppLayoutEditModalUiScope scopedModalUi(*this);
     if (DialogBoxParamW(instance_,
             MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_VALUE),
@@ -794,6 +934,19 @@ std::optional<std::vector<int>> DashboardApp::PromptLayoutGuideWeights(
     state.secondLabel = BuildLayoutGuideItemLabel(*node, guide.separatorIndex + 1, guide.axis, false);
     state.firstValue = std::max(1, weights[guide.separatorIndex]);
     state.secondValue = std::max(1, weights[guide.separatorIndex + 1]);
+    const LayoutEditHost::LayoutTarget target = LayoutEditHost::LayoutTarget::ForGuide(guide);
+    const std::vector<int> originalWeights = weights;
+    state.preview = [this, target, originalWeights, separatorIndex = guide.separatorIndex](
+                        const std::pair<int, int>& editedWeights) {
+        std::vector<int> previewWeights = originalWeights;
+        if (separatorIndex + 1 >= previewWeights.size()) {
+            return false;
+        }
+        previewWeights[separatorIndex] = editedWeights.first;
+        previewWeights[separatorIndex + 1] = editedWeights.second;
+        return ApplyLayoutGuideWeights(target, previewWeights);
+    };
+    state.restore = [this, target, originalWeights]() { ApplyLayoutGuideWeights(target, originalWeights); };
     DashboardAppLayoutEditModalUiScope scopedModalUi(*this);
     if (DialogBoxParamW(instance_,
             MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_WEIGHTS),
@@ -809,12 +962,19 @@ std::optional<std::vector<int>> DashboardApp::PromptLayoutGuideWeights(
     return weights;
 }
 
-std::optional<UiFontConfig> DashboardApp::PromptLayoutEditFont(
-    const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& initialValue, const std::wstring& title) {
+std::optional<UiFontConfig> DashboardApp::PromptLayoutEditFont(DashboardRenderer::LayoutEditParameter parameter,
+    const LayoutEditTooltipDescriptor& descriptor,
+    const UiFontConfig& initialValue,
+    const std::wstring& title) {
     LayoutEditFontDialogState state;
     state.title = title;
     state.prompt = WideFromUtf8("[" + descriptor.sectionName + "] " + descriptor.memberName);
     state.initialValue = initialValue;
+    state.preview = [this, parameter](
+                        const UiFontConfig& value) { return controller_.ApplyLayoutEditFont(*this, parameter, value); };
+    state.restore = [this, parameter, initialValue]() {
+        controller_.ApplyLayoutEditFont(*this, parameter, initialValue);
+    };
     DashboardAppLayoutEditModalUiScope scopedModalUi(*this);
     if (DialogBoxParamW(instance_,
             MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_FONT),
@@ -847,14 +1007,14 @@ bool DashboardApp::PromptAndApplyLayoutEditTarget(const LayoutEditController::To
         if (!font.has_value() || *font == nullptr) {
             return false;
         }
-        const auto updated = PromptLayoutEditFont(*descriptor, **font, title);
+        const auto updated = PromptLayoutEditFont(parameter, *descriptor, **font, title);
         return updated.has_value() && controller_.ApplyLayoutEditFont(*this, parameter, *updated);
     }
 
     const double currentValue = target.kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide
                                     ? target.widgetGuide.value
                                     : static_cast<double>(target.editableAnchor.value);
-    const auto updated = PromptLayoutEditValue(*descriptor, currentValue, title);
+    const auto updated = PromptLayoutEditValue(parameter, *descriptor, currentValue, title);
     return updated.has_value() && ApplyLayoutEditValue(parameter, *updated);
 }
 

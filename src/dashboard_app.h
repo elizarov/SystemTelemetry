@@ -73,12 +73,16 @@ private:
     double ResolveCurrentDisplayScale(UINT dpi) const;
     std::optional<double> PromptCustomScale();
     bool PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target);
-    std::optional<double> PromptLayoutEditValue(
-        const LayoutEditTooltipDescriptor& descriptor, double initialValue, const std::wstring& title);
+    std::optional<double> PromptLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter,
+        const LayoutEditTooltipDescriptor& descriptor,
+        double initialValue,
+        const std::wstring& title);
     std::optional<std::vector<int>> PromptLayoutGuideWeights(
         const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title);
-    std::optional<UiFontConfig> PromptLayoutEditFont(
-        const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& initialValue, const std::wstring& title);
+    std::optional<UiFontConfig> PromptLayoutEditFont(DashboardRenderer::LayoutEditParameter parameter,
+        const LayoutEditTooltipDescriptor& descriptor,
+        const UiFontConfig& initialValue,
+        const std::wstring& title);
     bool IsLayoutEditMode() const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights,
