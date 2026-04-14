@@ -82,8 +82,16 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::FontClockTime, &GetFieldMetadata<UiFontSetConfig::clockTimeMeta>(), false, true},
     {Parameter::FontClockDate, &GetFieldMetadata<UiFontSetConfig::clockDateMeta>(), false, true},
 
+    {Parameter::CardRadius, &GetFieldMetadata<CardStyleConfig::cardRadiusMeta>(), false, true},
+    {Parameter::CardBorder, &GetFieldMetadata<CardStyleConfig::cardBorderWidthMeta>(), false, true},
+    {Parameter::CardHeaderIconSize, &GetFieldMetadata<CardStyleConfig::headerIconSizeMeta>(), false, true},
+
     {Parameter::TextBottomGap, &GetFieldMetadata<TextWidgetConfig::bottomGapMeta>(), true, false},
     {Parameter::NetworkFooterBottomGap, &GetFieldMetadata<NetworkFooterWidgetConfig::bottomGapMeta>(), true, false},
+
+    {Parameter::CardPadding, &GetFieldMetadata<CardStyleConfig::cardPaddingMeta>(), true, false},
+    {Parameter::CardHeaderIconGap, &GetFieldMetadata<CardStyleConfig::headerIconGapMeta>(), true, false},
+    {Parameter::CardHeaderContentGap, &GetFieldMetadata<CardStyleConfig::headerContentGapMeta>(), true, false},
 
     {Parameter::MetricListBarHeight, &GetFieldMetadata<MetricListWidgetConfig::barHeightMeta>(), false, true},
     {Parameter::MetricListLabelWidth, &GetFieldMetadata<MetricListWidgetConfig::labelWidthMeta>(), true, false},

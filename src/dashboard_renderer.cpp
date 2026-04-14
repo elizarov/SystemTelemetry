@@ -489,7 +489,8 @@ void DashboardRenderer::DrawText(const RenderRect& rect,
 }
 
 void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const {
-    if (!overlayState.showLayoutEditGuides || !overlayState.hoveredEditableWidget.has_value()) {
+    if (!overlayState.showLayoutEditGuides || !overlayState.hoveredEditableWidget.has_value() ||
+        overlayState.hoveredEditableWidget->kind != LayoutWidgetIdentity::Kind::Widget) {
         return;
     }
 
@@ -542,7 +543,8 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
                 if (!region.showWhenWidgetHovered) {
                     continue;
                 }
-                if (region.key.widget.renderCardId != overlayState.hoveredEditableWidget->renderCardId ||
+                if (region.key.widget.kind != LayoutWidgetIdentity::Kind::Widget ||
+                    region.key.widget.renderCardId != overlayState.hoveredEditableWidget->renderCardId ||
                     region.key.widget.editCardId != overlayState.hoveredEditableWidget->editCardId ||
                     region.key.widget.nodePath != overlayState.hoveredEditableWidget->nodePath) {
                     continue;
@@ -552,6 +554,20 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         };
         collectHovered(staticEditableAnchorRegions_);
         collectHovered(dynamicEditableAnchorRegions_);
+    }
+    if (overlayState.hoveredEditableCard.has_value()) {
+        const auto collectHoveredCard = [&](const std::vector<EditableAnchorRegion>& regions) {
+            for (const auto& region : regions) {
+                if (!region.showWhenWidgetHovered || region.key.widget.kind != LayoutWidgetIdentity::Kind::CardChrome ||
+                    region.key.widget.renderCardId != overlayState.hoveredEditableCard->renderCardId ||
+                    region.key.widget.editCardId != overlayState.hoveredEditableCard->editCardId) {
+                    continue;
+                }
+                appendHighlight(region, false);
+            }
+        };
+        collectHoveredCard(staticEditableAnchorRegions_);
+        collectHoveredCard(dynamicEditableAnchorRegions_);
     }
     appendByKey(overlayState.hoveredEditableAnchor, false);
     appendByKey(overlayState.activeEditableAnchor, true);
@@ -570,8 +586,10 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         if (highlighted.shape == AnchorShape::Circle) {
             const_cast<DashboardRenderer*>(this)->DrawSolidEllipse(highlighted.anchorRect,
                 RenderStroke::Solid(outlineColor, static_cast<float>(std::max(1, ScaleLogical(1)))));
-        } else {
+        } else if (highlighted.shape == AnchorShape::Diamond) {
             const_cast<DashboardRenderer*>(this)->FillSolidDiamond(highlighted.anchorRect, outlineColor);
+        } else {
+            const_cast<DashboardRenderer*>(this)->FillSolidRect(highlighted.anchorRect, outlineColor);
         }
     }
 }
@@ -600,14 +618,21 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
 
     const auto shouldDraw = [&](const WidgetEditGuide& guide) {
         if (overlayState.activeWidgetEditGuide.has_value()) {
-            return guide.widget.renderCardId == overlayState.activeWidgetEditGuide->widget.renderCardId &&
+            return guide.widget.kind == overlayState.activeWidgetEditGuide->widget.kind &&
+                   guide.widget.renderCardId == overlayState.activeWidgetEditGuide->widget.renderCardId &&
                    guide.widget.editCardId == overlayState.activeWidgetEditGuide->widget.editCardId &&
                    guide.widget.nodePath == overlayState.activeWidgetEditGuide->widget.nodePath;
+        }
+        if (guide.widget.kind == LayoutWidgetIdentity::Kind::CardChrome) {
+            return overlayState.hoveredEditableCard.has_value() &&
+                   guide.widget.renderCardId == overlayState.hoveredEditableCard->renderCardId &&
+                   guide.widget.editCardId == overlayState.hoveredEditableCard->editCardId;
         }
         if (!overlayState.hoveredEditableWidget.has_value()) {
             return false;
         }
-        return guide.widget.renderCardId == overlayState.hoveredEditableWidget->renderCardId &&
+        return guide.widget.kind == LayoutWidgetIdentity::Kind::Widget &&
+               guide.widget.renderCardId == overlayState.hoveredEditableWidget->renderCardId &&
                guide.widget.editCardId == overlayState.hoveredEditableWidget->editCardId &&
                guide.widget.nodePath == overlayState.hoveredEditableWidget->nodePath;
     };
@@ -639,7 +664,8 @@ bool DashboardRenderer::IsWidgetAffectedByGuide(
 
 bool DashboardRenderer::MatchesWidgetIdentity(
     const DashboardWidgetLayout& widget, const LayoutWidgetIdentity& identity) const {
-    return widget.cardId == identity.renderCardId && widget.editCardId == identity.editCardId &&
+    return identity.kind == LayoutWidgetIdentity::Kind::Widget && widget.cardId == identity.renderCardId &&
+           widget.editCardId == identity.editCardId &&
            widget.nodePath == identity.nodePath;
 }
 
@@ -649,13 +675,14 @@ bool DashboardRenderer::MatchesLayoutEditGuide(const LayoutEditGuide& left, cons
 }
 
 bool DashboardRenderer::MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const {
-    return left.parameter == right.parameter && left.anchorId == right.anchorId &&
+    return left.parameter == right.parameter && left.anchorId == right.anchorId && left.widget.kind == right.widget.kind &&
            left.widget.renderCardId == right.widget.renderCardId && left.widget.editCardId == right.widget.editCardId &&
            left.widget.nodePath == right.widget.nodePath;
 }
 
 bool DashboardRenderer::MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const {
     return left.axis == right.axis && left.parameter == right.parameter && left.guideId == right.guideId &&
+           left.widget.kind == right.widget.kind &&
            left.widget.renderCardId == right.widget.renderCardId && left.widget.editCardId == right.widget.editCardId &&
            left.widget.nodePath == right.widget.nodePath;
 }
@@ -1574,6 +1601,17 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
         return false;
     }
     return ResolveLayout(false);
+}
+
+std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableCard(
+    RenderPoint clientPoint) const {
+    for (const auto& card : resolvedLayout_.cards) {
+        if (!card.rect.Contains(clientPoint)) {
+            continue;
+        }
+        return LayoutWidgetIdentity{card.id, card.id, {}, LayoutWidgetIdentity::Kind::CardChrome};
+    }
+    return std::nullopt;
 }
 
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableWidget(

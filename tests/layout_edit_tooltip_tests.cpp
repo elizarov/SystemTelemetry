@@ -13,6 +13,16 @@ TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {
     EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
 }
 
+TEST(LayoutEditTooltip, BuildsCardStyleDescriptor) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::CardHeaderIconGap);
+
+    ASSERT_TRUE(descriptor.has_value());
+    EXPECT_EQ(descriptor->configKey, "config.card_style.header_icon_gap");
+    EXPECT_EQ(descriptor->sectionName, "card_style");
+    EXPECT_EQ(descriptor->memberName, "header_icon_gap");
+    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
+}
+
 TEST(LayoutEditTooltip, IncludesFontAnchors) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::FontLabel);
     ASSERT_TRUE(descriptor.has_value());
@@ -90,6 +100,7 @@ TEST(LayoutEditParameter, BuildsDisplayNamesForMenuActions) {
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::MetricListLabelWidth), "label width");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::GaugeSegmentCount), "segment count");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::FontClockTime), "clock time font");
+    EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::CardHeaderContentGap), "header content gap");
 }
 
 TEST(LayoutEditParameter, AppliesFullFontValueThroughMetadata) {
@@ -123,6 +134,8 @@ TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
         GetLayoutEditParameterHitPriority(LayoutEditParameter::MetricListLabelWidth));
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputLeaderDiameter),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputAxisPadding));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardBorder),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::CardPadding));
 }
 
 TEST(LayoutEditParameter, MetadataTableMatchesEnumOrder) {

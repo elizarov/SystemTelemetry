@@ -92,12 +92,12 @@ struct DashboardSectionConfig {
 
 struct CardStyleConfig {
     CONFIG_REFLECTED_STRUCT(CardStyleConfig)
-    CONFIG_VALUE(int, cardPadding, "card_padding");
-    CONFIG_VALUE(int, cardRadius, "card_radius");
-    CONFIG_VALUE(int, cardBorderWidth, "card_border");
-    CONFIG_VALUE(int, headerIconSize, "header_icon_size");
-    CONFIG_VALUE(int, headerIconGap, "header_icon_gap");
-    CONFIG_VALUE(int, headerContentGap, "header_content_gap");
+    CONFIG_EDITABLE_VALUE_WITH(int, cardPadding, "card_padding", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE(int, cardRadius, "card_radius");
+    CONFIG_EDITABLE_VALUE(int, cardBorderWidth, "card_border");
+    CONFIG_EDITABLE_VALUE(int, headerIconSize, "header_icon_size");
+    CONFIG_EDITABLE_VALUE_WITH(int, headerIconGap, "header_icon_gap", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, headerContentGap, "header_content_gap", configschema::NonNegativeIntPolicy);
     CONFIG_VALUE(int, columnGap, "column_gap");
     CONFIG_VALUE(int, rowGap, "row_gap");
     CONFIG_SECTION("card_style");
@@ -258,6 +258,7 @@ struct AppConfig {
 };
 
 CONFIG_EDITABLE_ROOT_BINDING_PATH(UiFontSetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::fontsBinding);
+CONFIG_EDITABLE_ROOT_BINDING_PATH(CardStyleConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::cardStyleBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(
     MetricListWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::metricListBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(

@@ -18,6 +18,18 @@ std::string FormatRect(const RenderRect& rect) {
            "," + std::to_string(rect.bottom) + ")";
 }
 
+RenderRect MakeSquareAnchorRect(int centerX, int centerY, int size) {
+    const int clampedSize = (std::max)(4, size);
+    const int radius = clampedSize / 2;
+    return RenderRect{centerX - radius, centerY - radius, centerX - radius + clampedSize, centerY - radius + clampedSize};
+}
+
+RenderRect MakeCircleAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
+    const int diameter = (std::max)(4, representedDiameter + extraDiameter);
+    const int radius = diameter / 2;
+    return RenderRect{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
+}
+
 }  // namespace
 
 void DashboardLayoutResolver::ResolveNodeWidgets(DashboardRenderer& renderer,
@@ -31,7 +43,75 @@ void DashboardLayoutResolver::ResolveNodeWidgets(DashboardRenderer& renderer,
 
 void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer) {
     renderer.widgetEditGuides_.clear();
+    const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     for (const auto& card : renderer.resolvedLayout_.cards) {
+        const DashboardRenderer::LayoutWidgetIdentity cardIdentity{
+            card.id, card.id, {}, DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome};
+        auto addCardGuide = [&](DashboardRenderer::LayoutGuideAxis axis,
+                                int guideId,
+                                DashboardRenderer::LayoutEditParameter parameter,
+                                int value,
+                                int dragDirection,
+                                RenderPoint start,
+                                RenderPoint end) {
+            DashboardRenderer::WidgetEditGuide guide;
+            guide.axis = axis;
+            guide.widget = cardIdentity;
+            guide.parameter = parameter;
+            guide.guideId = guideId;
+            guide.widgetRect = card.rect;
+            guide.drawStart = start;
+            guide.drawEnd = end;
+            if (axis == DashboardRenderer::LayoutGuideAxis::Vertical) {
+                guide.hitRect = RenderRect{start.x - hitInset, (std::min)(start.y, end.y), start.x + hitInset + 1,
+                    (std::max)(start.y, end.y)};
+            } else {
+                guide.hitRect = RenderRect{(std::min)(start.x, end.x), start.y - hitInset, (std::max)(start.x, end.x),
+                    start.y + hitInset + 1};
+            }
+            guide.value = value;
+            guide.dragDirection = dragDirection;
+            renderer.widgetEditGuides_.push_back(std::move(guide));
+        };
+
+        const int contentLeft = std::clamp(card.contentRect.left, static_cast<int>(card.rect.left), static_cast<int>(card.rect.right));
+        const int contentRight =
+            std::clamp(card.contentRect.right, contentLeft, static_cast<int>(card.rect.right));
+        const int paddingY = std::clamp(card.rect.top + renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardPadding),
+            static_cast<int>(card.rect.top),
+            static_cast<int>(card.rect.bottom));
+        addCardGuide(DashboardRenderer::LayoutGuideAxis::Horizontal,
+            0,
+            DashboardRenderer::LayoutEditParameter::CardPadding,
+            renderer.Config().layout.cardStyle.cardPadding,
+            1,
+            RenderPoint{contentLeft, paddingY},
+            RenderPoint{contentRight, paddingY});
+
+        if (!card.iconName.empty() && !card.title.empty()) {
+            const int guideX =
+                std::clamp(card.titleRect.left, static_cast<int>(card.rect.left), static_cast<int>(card.rect.right));
+            addCardGuide(DashboardRenderer::LayoutGuideAxis::Vertical,
+                1,
+                DashboardRenderer::LayoutEditParameter::CardHeaderIconGap,
+                renderer.Config().layout.cardStyle.headerIconGap,
+                1,
+                RenderPoint{guideX, card.titleRect.top},
+                RenderPoint{guideX, card.titleRect.bottom});
+        }
+
+        if (card.hasHeader) {
+            const int guideY =
+                std::clamp(card.contentRect.top, static_cast<int>(card.rect.top), static_cast<int>(card.rect.bottom));
+            addCardGuide(DashboardRenderer::LayoutGuideAxis::Horizontal,
+                2,
+                DashboardRenderer::LayoutEditParameter::CardHeaderContentGap,
+                renderer.Config().layout.cardStyle.headerContentGap,
+                1,
+                RenderPoint{contentLeft, guideY},
+                RenderPoint{contentRight, guideY});
+        }
+
         for (const auto& widget : card.widgets) {
             if (widget.widget != nullptr) {
                 widget.widget->BuildEditGuides(renderer, widget);
@@ -43,6 +123,59 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
 void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& renderer) {
     renderer.staticEditableAnchorRegions_.clear();
     for (const auto& card : renderer.resolvedLayout_.cards) {
+        const DashboardRenderer::LayoutWidgetIdentity cardIdentity{
+            card.id, card.id, {}, DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome};
+        const int squareAnchorSize = (std::max)(4, renderer.ScaleLogical(6));
+        const int radiusLogical = renderer.Config().layout.cardStyle.cardRadius;
+        const int radiusScaled = renderer.ScaleLogical(radiusLogical);
+        renderer.RegisterStaticEditableAnchorRegion(
+            DashboardRenderer::EditableAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardRadius, 0},
+            {},
+            MakeSquareAnchorRect(card.rect.left + radiusScaled, card.rect.top, squareAnchorSize),
+            DashboardRenderer::AnchorShape::Square,
+            DashboardRenderer::AnchorDragAxis::Vertical,
+            DashboardRenderer::AnchorDragMode::AxisDelta,
+            RenderPoint{card.rect.left + radiusScaled, card.rect.top},
+            1.0,
+            true,
+            false,
+            radiusLogical);
+
+        const int borderScaled = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth));
+        const int borderAnchorPadding = (std::max)(1, renderer.ScaleLogical(1));
+        const int borderCenterX = card.rect.left + (std::max)(0, (card.rect.right - card.rect.left) / 2);
+        const int borderCenterY = card.rect.top;
+        renderer.RegisterStaticEditableAnchorRegion(
+            DashboardRenderer::EditableAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardBorder, 0},
+            {},
+            MakeCircleAnchorRect(borderCenterX, borderCenterY, borderScaled, borderAnchorPadding),
+            DashboardRenderer::AnchorShape::Circle,
+            DashboardRenderer::AnchorDragAxis::Both,
+            DashboardRenderer::AnchorDragMode::RadialDistance,
+            RenderPoint{borderCenterX, borderCenterY},
+            2.0,
+            true,
+            false,
+            renderer.Config().layout.cardStyle.cardBorderWidth);
+
+        if (!card.iconName.empty()) {
+            const int anchorCenterX = card.iconRect.right;
+            const int anchorCenterY = card.iconRect.top;
+            renderer.RegisterStaticEditableAnchorRegion(
+                DashboardRenderer::EditableAnchorKey{
+                    cardIdentity, DashboardRenderer::LayoutEditParameter::CardHeaderIconSize, 0},
+                card.iconRect,
+                MakeSquareAnchorRect(anchorCenterX, anchorCenterY, squareAnchorSize),
+                DashboardRenderer::AnchorShape::Square,
+                DashboardRenderer::AnchorDragAxis::Vertical,
+                DashboardRenderer::AnchorDragMode::AxisDelta,
+                RenderPoint{anchorCenterX, anchorCenterY},
+                1.0,
+                false,
+                true,
+                renderer.Config().layout.cardStyle.headerIconSize);
+        }
+
         if (!card.title.empty()) {
             renderer.RegisterStaticTextAnchor(card.titleRect,
                 card.title,

@@ -57,6 +57,13 @@ public:
         std::string renderCardId;
         std::string editCardId;
         std::vector<size_t> nodePath;
+
+        enum class Kind {
+            Widget,
+            CardChrome,
+        };
+
+        Kind kind = Kind::Widget;
     };
 
     using LayoutEditParameter = ::LayoutEditParameter;
@@ -64,6 +71,7 @@ public:
     enum class AnchorShape {
         Circle,
         Diamond,
+        Square,
     };
 
     enum class AnchorDragAxis {
@@ -146,6 +154,7 @@ public:
         bool showLayoutEditGuides = false;
         SimilarityIndicatorMode similarityIndicatorMode = SimilarityIndicatorMode::ActiveGuide;
         std::optional<LayoutEditGuide> activeLayoutEditGuide;
+        std::optional<LayoutWidgetIdentity> hoveredEditableCard;
         std::optional<LayoutWidgetIdentity> hoveredEditableWidget;
         std::optional<WidgetEditGuide> activeWidgetEditGuide;
         std::optional<EditableAnchorKey> hoveredEditableAnchor;
@@ -209,6 +218,7 @@ public:
     std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
     bool ApplyLayoutGuideWeightsPreview(
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
+    std::optional<LayoutWidgetIdentity> HitTestEditableCard(RenderPoint clientPoint) const;
     std::optional<LayoutWidgetIdentity> HitTestEditableWidget(RenderPoint clientPoint) const;
     std::optional<EditableAnchorKey> HitTestEditableAnchorTarget(RenderPoint clientPoint) const;
     std::optional<EditableAnchorKey> HitTestEditableAnchorHandle(RenderPoint clientPoint) const;

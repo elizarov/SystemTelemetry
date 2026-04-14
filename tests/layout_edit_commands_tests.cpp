@@ -41,6 +41,9 @@ TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputAxisPadding, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::ThroughputHeaderGap, -1.0));
     ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::GaugeOuterPadding, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardPadding, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardHeaderIconGap, -1.0));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardHeaderContentGap, -1.0));
 
     EXPECT_EQ(config.layout.text.bottomGap, 0);
     EXPECT_EQ(config.layout.networkFooter.bottomGap, 0);
@@ -55,6 +58,9 @@ TEST(LayoutEditCommands, AllowsZeroForEditablePaddingAndGapFields) {
     EXPECT_EQ(config.layout.throughput.axisPadding, 0);
     EXPECT_EQ(config.layout.throughput.headerGap, 0);
     EXPECT_EQ(config.layout.gauge.outerPadding, 0);
+    EXPECT_EQ(config.layout.cardStyle.cardPadding, 0);
+    EXPECT_EQ(config.layout.cardStyle.headerIconGap, 0);
+    EXPECT_EQ(config.layout.cardStyle.headerContentGap, 0);
 }
 
 TEST(LayoutEditCommands, UpdatesMetricListAndGaugeFieldsThroughCommands) {
@@ -93,6 +99,24 @@ TEST(LayoutEditCommands, UpdatesThroughputAnchorFieldsThroughCommands) {
     EXPECT_EQ(config.layout.throughput.guideStrokeWidth, 4);
     EXPECT_EQ(config.layout.throughput.plotStrokeWidth, 6);
     EXPECT_EQ(config.layout.throughput.leaderDiameter, 9);
+}
+
+TEST(LayoutEditCommands, UpdatesCardStyleFieldsThroughCommands) {
+    AppConfig config;
+
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardRadius, 13.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardBorder, 2.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardHeaderIconSize, 19.6));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardPadding, 12.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardHeaderIconGap, 7.4));
+    ASSERT_TRUE(layout_edit::ApplyValue(config, LayoutEditParameter::CardHeaderContentGap, 5.4));
+
+    EXPECT_EQ(config.layout.cardStyle.cardRadius, 14);
+    EXPECT_EQ(config.layout.cardStyle.cardBorderWidth, 3);
+    EXPECT_EQ(config.layout.cardStyle.headerIconSize, 20);
+    EXPECT_EQ(config.layout.cardStyle.cardPadding, 12);
+    EXPECT_EQ(config.layout.cardStyle.headerIconGap, 7);
+    EXPECT_EQ(config.layout.cardStyle.headerContentGap, 5);
 }
 
 TEST(LayoutEditCommands, UpdatesDriveUsageGapFieldsThroughCommands) {

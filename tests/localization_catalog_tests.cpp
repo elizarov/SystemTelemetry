@@ -66,6 +66,12 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
         LayoutEditParameter::FontFooter,
         LayoutEditParameter::FontClockTime,
         LayoutEditParameter::FontClockDate,
+        LayoutEditParameter::CardPadding,
+        LayoutEditParameter::CardRadius,
+        LayoutEditParameter::CardBorder,
+        LayoutEditParameter::CardHeaderIconSize,
+        LayoutEditParameter::CardHeaderIconGap,
+        LayoutEditParameter::CardHeaderContentGap,
     };
 
     for (const auto parameter : parameters) {

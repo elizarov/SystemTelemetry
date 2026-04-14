@@ -13,9 +13,19 @@ enum class LayoutEditParameter {
     FontClockTime,
     FontClockDate,
 
+    // Card style anchors
+    CardRadius,
+    CardBorder,
+    CardHeaderIconSize,
+
     // Text
     TextBottomGap,
     NetworkFooterBottomGap,
+
+    // Card style guides
+    CardPadding,
+    CardHeaderIconGap,
+    CardHeaderContentGap,
 
     // Metric list
     MetricListBarHeight,

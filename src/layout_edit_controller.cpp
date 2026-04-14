@@ -12,7 +12,7 @@ namespace {
 
 bool WidgetIdentityEquals(
     const DashboardRenderer::LayoutWidgetIdentity& left, const DashboardRenderer::LayoutWidgetIdentity& right) {
-    return left.renderCardId == right.renderCardId && left.editCardId == right.editCardId &&
+    return left.kind == right.kind && left.renderCardId == right.renderCardId && left.editCardId == right.editCardId &&
            left.nodePath == right.nodePath;
 }
 
@@ -54,12 +54,17 @@ std::string DescribeWidgetParameter(LayoutEditParameter parameter) {
 
 std::string DescribeWidgetGuide(const DashboardRenderer::WidgetEditGuide& guide) {
     return "axis=" + std::string(AxisName(guide.axis)) + " parameter=" + DescribeWidgetParameter(guide.parameter) +
-           " guide_id=" + std::to_string(guide.guideId) + " path=" + FormatNodePath(guide.widget.nodePath);
+           " guide_id=" + std::to_string(guide.guideId) +
+           (guide.widget.kind == DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome
+                   ? " card=" + guide.widget.editCardId
+                   : " path=" + FormatNodePath(guide.widget.nodePath));
 }
 
 std::string DescribeEditableAnchor(const DashboardRenderer::EditableAnchorKey& key) {
     return "parameter=" + DescribeWidgetParameter(key.parameter) + " anchor_id=" + std::to_string(key.anchorId) +
-           " path=" + FormatNodePath(key.widget.nodePath);
+           (key.widget.kind == DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome
+                   ? " card=" + key.widget.editCardId
+                   : " path=" + FormatNodePath(key.widget.nodePath));
 }
 
 double NormalizeDegrees(double degrees) {
@@ -227,6 +232,7 @@ const DashboardRenderer::WidgetEditGuide* LayoutEditController::HitTestWidgetEdi
 LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderPoint clientPoint) const {
     HoverResolution resolution;
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
+    resolution.hoveredEditableCard = renderer.HitTestEditableCard(clientPoint);
 
     const std::optional<DashboardRenderer::EditableAnchorKey> anchorHandle =
         renderer.HitTestEditableAnchorHandle(clientPoint);
@@ -238,11 +244,15 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
         if (anchorPriority <= guidePriority) {
             resolution.hoveredEditableAnchor = anchorHandle;
             resolution.actionableAnchorHandle = anchorHandle;
-            resolution.hoveredEditableWidget = anchorHandle->widget;
+            if (anchorHandle->widget.kind == DashboardRenderer::LayoutWidgetIdentity::Kind::Widget) {
+                resolution.hoveredEditableWidget = anchorHandle->widget;
+            }
             return resolution;
         }
 
-        resolution.hoveredEditableWidget = widgetGuide->widget;
+        if (widgetGuide->widget.kind == DashboardRenderer::LayoutWidgetIdentity::Kind::Widget) {
+            resolution.hoveredEditableWidget = widgetGuide->widget;
+        }
         resolution.hoveredWidgetEditGuideIndex = widgetGuideIndex;
         return resolution;
     }
@@ -250,12 +260,16 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
     if (anchorHandle.has_value()) {
         resolution.hoveredEditableAnchor = anchorHandle;
         resolution.actionableAnchorHandle = anchorHandle;
-        resolution.hoveredEditableWidget = anchorHandle->widget;
+        if (anchorHandle->widget.kind == DashboardRenderer::LayoutWidgetIdentity::Kind::Widget) {
+            resolution.hoveredEditableWidget = anchorHandle->widget;
+        }
         return resolution;
     }
 
     if (widgetGuide != nullptr) {
-        resolution.hoveredEditableWidget = widgetGuide->widget;
+        if (widgetGuide->widget.kind == DashboardRenderer::LayoutWidgetIdentity::Kind::Widget) {
+            resolution.hoveredEditableWidget = widgetGuide->widget;
+        }
         resolution.hoveredWidgetEditGuideIndex = widgetGuideIndex;
         return resolution;
     }
@@ -295,17 +309,28 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     }
 
     const HoverResolution resolution = ResolveHover(clientPoint);
+    const std::optional<DashboardRenderer::LayoutWidgetIdentity>& nextHoveredCard = resolution.hoveredEditableCard;
     const std::optional<DashboardRenderer::LayoutWidgetIdentity>& nextHoveredWidget = resolution.hoveredEditableWidget;
     const std::optional<DashboardRenderer::EditableAnchorKey>& nextHoveredAnchor = resolution.hoveredEditableAnchor;
 
-    bool hoverChanged = (hoveredEditableWidget_.has_value() != nextHoveredWidget.has_value());
-    if (!hoverChanged && hoveredEditableWidget_.has_value() && nextHoveredWidget.has_value()) {
-        hoverChanged = !WidgetIdentityEquals(*hoveredEditableWidget_, *nextHoveredWidget);
+    bool hoverChanged = (hoveredEditableCard_.has_value() != nextHoveredCard.has_value());
+    if (!hoverChanged && hoveredEditableCard_.has_value() && nextHoveredCard.has_value()) {
+        hoverChanged = !WidgetIdentityEquals(*hoveredEditableCard_, *nextHoveredCard);
     }
     if (hoverChanged) {
+        hoveredEditableCard_ = nextHoveredCard;
+        host_.LayoutEditOverlayState().hoveredEditableCard = hoveredEditableCard_;
+    }
+
+    bool widgetHoverChanged = (hoveredEditableWidget_.has_value() != nextHoveredWidget.has_value());
+    if (!widgetHoverChanged && hoveredEditableWidget_.has_value() && nextHoveredWidget.has_value()) {
+        widgetHoverChanged = !WidgetIdentityEquals(*hoveredEditableWidget_, *nextHoveredWidget);
+    }
+    if (widgetHoverChanged) {
         hoveredEditableWidget_ = nextHoveredWidget;
         host_.LayoutEditOverlayState().hoveredEditableWidget = hoveredEditableWidget_;
     }
+    hoverChanged = hoverChanged || widgetHoverChanged;
     if (hoveredEditableAnchor_.has_value() != nextHoveredAnchor.has_value() ||
         (hoveredEditableAnchor_.has_value() && nextHoveredAnchor.has_value() &&
             !EditableAnchorKeyEquals(*hoveredEditableAnchor_, *nextHoveredAnchor))) {
@@ -337,6 +362,9 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
     lastClientPoint_ = clientPoint;
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
     const HoverResolution resolution = ResolveHover(clientPoint);
+    hoveredEditableCard_ = resolution.hoveredEditableCard;
+    hoveredEditableWidget_ = resolution.hoveredEditableWidget;
+    hoveredEditableAnchor_ = resolution.hoveredEditableAnchor;
     if (resolution.actionableAnchorHandle.has_value()) {
         const auto region = renderer.FindEditableAnchorRegion(*resolution.actionableAnchorHandle);
         if (region.has_value()) {
@@ -350,7 +378,12 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                 region->value,
                 clientPoint,
                 std::sqrt((startDx * startDx) + (startDy * startDy))};
-            hoveredEditableWidget_ = region->key.widget;
+            if (region->key.widget.kind == DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome) {
+                hoveredEditableCard_ = region->key.widget;
+                hoveredEditableWidget_.reset();
+            } else {
+                hoveredEditableWidget_ = region->key.widget;
+            }
             renderer.SetInteractiveDragTraceActive(true);
             host_.BeginLayoutEditTraceSession("anchor", DescribeEditableAnchor(region->key));
             SyncRendererInteractionState();
@@ -367,7 +400,12 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
             widgetGuide.value,
             widgetGuide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y,
         };
-        hoveredEditableWidget_ = widgetGuide.widget;
+        if (widgetGuide.widget.kind == DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome) {
+            hoveredEditableCard_ = widgetGuide.widget;
+            hoveredEditableWidget_.reset();
+        } else {
+            hoveredEditableWidget_ = widgetGuide.widget;
+        }
         hoveredWidgetEditGuideIndex_ = resolution.hoveredWidgetEditGuideIndex;
         renderer.SetInteractiveDragTraceActive(true);
         host_.BeginLayoutEditTraceSession("widget_guide", DescribeWidgetGuide(widgetGuide));
@@ -421,13 +459,15 @@ bool LayoutEditController::HandleMouseLeave() {
         return false;
     }
 
-    const bool hadHover = hoveredLayoutGuideIndex_.has_value() || hoveredEditableWidget_.has_value() ||
+    const bool hadHover = hoveredLayoutGuideIndex_.has_value() || hoveredEditableCard_.has_value() ||
+                          hoveredEditableWidget_.has_value() ||
                           hoveredWidgetEditGuideIndex_.has_value() || hoveredEditableAnchor_.has_value();
     if (!hadHover) {
         return false;
     }
 
     hoveredLayoutGuideIndex_.reset();
+    hoveredEditableCard_.reset();
     hoveredEditableWidget_.reset();
     hoveredWidgetEditGuideIndex_.reset();
     hoveredEditableAnchor_.reset();
@@ -526,7 +566,8 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
 }
 
 void LayoutEditController::CancelInteraction() {
-    const bool hadInteraction = hoveredLayoutGuideIndex_.has_value() || hoveredEditableWidget_.has_value() ||
+    const bool hadInteraction = hoveredLayoutGuideIndex_.has_value() || hoveredEditableCard_.has_value() ||
+                                hoveredEditableWidget_.has_value() ||
                                 hoveredWidgetEditGuideIndex_.has_value() || hoveredEditableAnchor_.has_value() ||
                                 activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
                                 activeAnchorEditDrag_.has_value();
@@ -614,6 +655,7 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
 
 void LayoutEditController::SyncRendererInteractionState() {
     DashboardRenderer::EditOverlayState& overlayState = host_.LayoutEditOverlayState();
+    overlayState.hoveredEditableCard = hoveredEditableCard_;
     overlayState.hoveredEditableWidget = hoveredEditableWidget_;
     overlayState.hoveredEditableAnchor = hoveredEditableAnchor_;
     overlayState.activeLayoutEditGuide =
@@ -631,6 +673,7 @@ void LayoutEditController::SyncRendererInteractionState() {
 
 void LayoutEditController::ClearInteractionState() {
     hoveredLayoutGuideIndex_.reset();
+    hoveredEditableCard_.reset();
     hoveredEditableWidget_.reset();
     hoveredWidgetEditGuideIndex_.reset();
     hoveredEditableAnchor_.reset();
@@ -819,6 +862,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(RenderPoint clientPoint) {
     const auto guideIt =
         std::find_if(guides.begin(), guides.end(), [&](const DashboardRenderer::WidgetEditGuide& candidate) {
             return candidate.parameter == drag.guide.parameter && candidate.guideId == drag.guide.guideId &&
+                   candidate.widget.kind == drag.guide.widget.kind &&
                    candidate.widget.renderCardId == drag.guide.widget.renderCardId &&
                    candidate.widget.editCardId == drag.guide.widget.editCardId &&
                    candidate.widget.nodePath == drag.guide.widget.nodePath;

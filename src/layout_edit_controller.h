@@ -76,6 +76,7 @@ public:
 
 private:
     struct HoverResolution {
+        std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableCard;
         std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget;
         std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor;
         std::optional<size_t> hoveredWidgetEditGuideIndex;
@@ -98,14 +99,16 @@ private:
         DashboardRenderer::LayoutWidgetIdentity widget;
 
         bool operator==(const ExtentCacheKey& other) const {
-            return weights == other.weights && widget.renderCardId == other.widget.renderCardId &&
-                   widget.editCardId == other.widget.editCardId && widget.nodePath == other.widget.nodePath;
+            return weights == other.weights && widget.kind == other.widget.kind &&
+                   widget.renderCardId == other.widget.renderCardId && widget.editCardId == other.widget.editCardId &&
+                   widget.nodePath == other.widget.nodePath;
         }
     };
 
     struct ExtentCacheKeyHash {
         size_t operator()(const ExtentCacheKey& key) const {
             size_t hash = WeightVectorHash{}(key.weights);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(static_cast<int>(key.widget.kind));
             hash = (hash * 1315423911u) ^ std::hash<std::string>{}(key.widget.renderCardId);
             hash = (hash * 1315423911u) ^ std::hash<std::string>{}(key.widget.editCardId);
             for (size_t index : key.widget.nodePath) {
@@ -157,6 +160,7 @@ private:
 
     LayoutEditHost& host_;
     std::optional<size_t> hoveredLayoutGuideIndex_;
+    std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableCard_;
     std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget_;
     std::optional<size_t> hoveredWidgetEditGuideIndex_;
     std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor_;
