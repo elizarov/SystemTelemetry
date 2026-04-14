@@ -86,6 +86,24 @@ TEST(LayoutEditParameter, RootLensReturnsUnderlyingFontField) {
     EXPECT_EQ(*font, &config.layout.fonts.label);
 }
 
+TEST(LayoutEditParameter, BuildsDisplayNamesForMenuActions) {
+    EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::MetricListLabelWidth), "label width");
+    EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::GaugeSegmentCount), "segment count");
+    EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::FontClockTime), "clock time font");
+}
+
+TEST(LayoutEditParameter, AppliesFullFontValueThroughMetadata) {
+    AppConfig config;
+    config.layout.fonts.label = UiFontConfig{"Segoe UI", 17, 600};
+
+    ASSERT_TRUE(
+        ApplyLayoutEditParameterFontValue(config, LayoutEditParameter::FontLabel, UiFontConfig{"Bahnschrift", 0, 450}));
+
+    EXPECT_EQ(config.layout.fonts.label.face, "Bahnschrift");
+    EXPECT_EQ(config.layout.fonts.label.size, 1);
+    EXPECT_EQ(config.layout.fonts.label.weight, 450);
+}
+
 TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeSegmentCount),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeOuterPadding));

@@ -28,6 +28,7 @@
 #include "dashboard_controller.h"
 #include "diagnostics_options.h"
 #include "layout_edit_controller.h"
+#include "layout_edit_parameter.h"
 #include "layout_edit_trace_session.h"
 
 class DashboardApp : private LayoutEditHost, public DashboardShellHost {
@@ -59,13 +60,22 @@ private:
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void Paint();
-    void ShowContextMenu(POINT screenPoint);
+    void ShowContextMenu(
+        POINT screenPoint, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget = std::nullopt);
     void BringOnTop();
     bool ApplyConfiguredWallpaper();
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     double ResolveCurrentDisplayScale(UINT dpi) const;
     std::optional<double> PromptCustomScale() const;
+    bool PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target);
+    std::optional<double> PromptLayoutEditValue(
+        const LayoutEditTooltipDescriptor& descriptor, double initialValue, const std::wstring& title) const;
+    std::optional<std::vector<int>> PromptLayoutGuideWeights(
+        const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title) const;
+    std::optional<UiFontConfig> PromptLayoutEditFont(const LayoutEditTooltipDescriptor& descriptor,
+        const UiFontConfig& initialValue,
+        const std::wstring& title) const;
     bool IsLayoutEditMode() const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights,

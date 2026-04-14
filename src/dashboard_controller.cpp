@@ -1,6 +1,7 @@
 #include "dashboard_controller.h"
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 
 #include "app_autostart.h"
@@ -9,6 +10,7 @@
 #include "app_paths.h"
 #include "config_resolution.h"
 #include "config_writer.h"
+#include "layout_edit_parameter.h"
 #include "layout_edit_service.h"
 
 namespace {
@@ -26,6 +28,31 @@ bool SaveRuntimeConfig(const std::filesystem::path& path, const AppConfig& confi
         return SaveConfig(path, config);
     }
     return SaveConfigElevated(path, config, owner);
+}
+
+double ClampGaugeSegmentGapForCurrentConfig(const AppConfig& config, double value) {
+    const double totalSweep = std::clamp(config.layout.gauge.sweepDegrees, 0.0, 360.0);
+    const int segmentCount = (std::max)(1, config.layout.gauge.segmentCount);
+    if (segmentCount <= 1) {
+        return 0.0;
+    }
+
+    const double minSegmentSweep = (std::min)(0.25, totalSweep / static_cast<double>(segmentCount));
+    const double maxSegmentGap = (std::max)(0.0,
+        (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1));
+    return std::clamp(value, 0.0, maxSegmentGap);
+}
+
+double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config, double value) {
+    const int segmentCount = (std::max)(1, config.layout.driveUsageList.activitySegments);
+    if (segmentCount <= 1) {
+        return 0.0;
+    }
+
+    const int rowContentHeight = (std::max)(config.layout.fonts.label.size,
+        (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
+    const int maxGap = (std::max)(0, (rowContentHeight - segmentCount) / (segmentCount - 1));
+    return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
 }
 
 }  // namespace
@@ -368,7 +395,23 @@ bool DashboardController::ApplyLayoutGuideWeights(
 
 bool DashboardController::ApplyLayoutEditValue(
     DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, double value) {
-    if (!layout_edit::ApplyValue(state_.config, parameter, value)) {
+    double nextValue = value;
+    if (parameter == DashboardRenderer::LayoutEditParameter::GaugeSegmentGapDegrees) {
+        nextValue = ClampGaugeSegmentGapForCurrentConfig(state_.config, nextValue);
+    } else if (parameter == DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegmentGap) {
+        nextValue = ClampDriveUsageActivitySegmentGapForCurrentConfig(state_.config, nextValue);
+    }
+    if (!layout_edit::ApplyValue(state_.config, parameter, nextValue)) {
+        return false;
+    }
+    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    shell.InvalidateShell();
+    return true;
+}
+
+bool DashboardController::ApplyLayoutEditFont(
+    DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value) {
+    if (!ApplyLayoutEditParameterFontValue(state_.config, parameter, value)) {
         return false;
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);

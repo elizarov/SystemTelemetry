@@ -32,6 +32,32 @@ template <typename Meta> std::optional<const UiFontConfig*> FindFontFieldValue(c
     }
 }
 
+template <typename Meta> bool ApplyFontFieldEdit(AppConfig& config, const UiFontConfig& value) {
+    if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
+        Meta::Set(config, value);
+        return true;
+    } else {
+        (void)config;
+        (void)value;
+        return false;
+    }
+}
+
+std::string HumanizeSnakeCase(std::string_view value) {
+    std::string text;
+    text.reserve(value.size());
+    for (const char ch : value) {
+        if (ch == '_') {
+            if (!text.empty()) {
+                text.push_back(' ');
+            }
+            continue;
+        }
+        text.push_back(ch);
+    }
+    return text;
+}
+
 template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata() {
     static const LayoutEditConfigFieldMetadata metadata{
         Meta::section_name,
@@ -39,6 +65,7 @@ template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata()
         Meta::traits_type::value_format,
         std::is_same_v<typename Meta::value_type, UiFontConfig>,
         &ApplyFieldEdit<Meta>,
+        &ApplyFontFieldEdit<Meta>,
         &FindFontFieldValue<Meta>,
     };
     return metadata;
@@ -125,6 +152,15 @@ bool IsFontLayoutEditParameter(LayoutEditParameter parameter) {
     return GetLayoutEditConfigFieldMetadata(parameter).isFont;
 }
 
+std::string GetLayoutEditParameterDisplayName(LayoutEditParameter parameter) {
+    const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
+    std::string label = HumanizeSnakeCase(field.parameterName);
+    if (field.isFont) {
+        label += " font";
+    }
+    return label;
+}
+
 std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(LayoutEditParameter parameter) {
     const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
     LayoutEditTooltipDescriptor descriptor;
@@ -142,4 +178,9 @@ std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(
 
 bool ApplyLayoutEditParameterValue(AppConfig& config, LayoutEditParameter parameter, double value) {
     return GetLayoutEditConfigFieldMetadata(parameter).applyValue(config, value);
+}
+
+bool ApplyLayoutEditParameterFontValue(AppConfig& config, LayoutEditParameter parameter, const UiFontConfig& value) {
+    const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
+    return field.applyFontValue != nullptr ? field.applyFontValue(config, value) : false;
 }
