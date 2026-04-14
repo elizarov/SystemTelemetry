@@ -19,30 +19,29 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured result reached during this workstream:
-  - `drag_loop per_iter_ms=2.52`
+  - `drag_loop per_iter_ms=2.45`
   - `snap avg_ms=0.20`
   - `apply avg_ms=0.22`
-  - `paint_draw avg_ms=2.09`
+  - `paint_draw avg_ms=1.98`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=2.45` to `2.49`
-  - `snap avg_ms=0.20` to `0.21`
-  - `apply avg_ms=0.27`
-  - `paint_draw avg_ms=1.98` to `2.01`
+  - `drag_loop per_iter_ms=2.49` to `2.50`
+  - `snap avg_ms=0.20`
+  - `apply avg_ms=0.28`
+  - `paint_draw avg_ms=2.01` to `2.02`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The exported WPA text no longer surfaces stable named renderer functions for the benchmark process, but it does show the heaviest benchmark-process module weights in `d2d1.dll`, `amdxx64.dll`, `win32kfull.sys`, and `d3d11.dll`.
-- The latest fixed-text capture also surfaces `DWrite.dll` and `TextShaping.dll` as meaningful benchmark-process module weights, which matches the restored full text path in the Direct2D renderer.
-- The latest type-migration validation capture under `build\profile_benchmark_daemon\requests\15442_29295_22877\` keeps that same Direct2D and DirectWrite hotspot shape, so replacing Win32 renderer-contract types did not reintroduce GDI text work into the hot path.
-- `GdiPlus.dll` still loads because panel icons are still decoded and scaled through GDI+ before upload into Direct2D bitmaps, but its weight in the benchmark process stays below the Direct2D, DirectWrite, and driver stack modules.
+- The exported WPA text still does not surface stable named renderer functions for the benchmark process, but the latest icon-path validation capture under `build\profile_benchmark_daemon\requests\22440_27226_5\` shows the heaviest benchmark-process module weights in `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, `amdxx64.dll`, `d3d11.dll`, and `win32kfull.sys`.
+- The latest fixed-text capture keeps the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape that the earlier full-D2D validation captures showed, so replacing the last GDI+ icon decode and scale path did not move the hot work away from the current frame stack.
+- `GdiPlus.dll` no longer appears in the benchmark-process module list after the panel-icon path moved fully onto WIC plus Direct2D upload.
 - The fast benchmark reruns stay consistent enough that the draw-path win is real even though the coarse text export no longer pinpoints the remaining app-side leaves by symbol.
 
 Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
-- The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in named app-side GDI+ widget functions.
+- The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely.
 
@@ -59,6 +58,7 @@ These changes produced real wins and remain in the codebase:
 - Reuse one cached `DashboardMetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse smoothed throughput history and formatted metric payloads until telemetry publishes a newer snapshot.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 - Remove the legacy renderer GDI fallback path and keep both live repaint and screenshot export on the same Direct2D and DirectWrite scene.
+- Decode embedded panel icons through WIC and scale them with `IWICBitmapScaler` before upload into render-target-local Direct2D bitmaps, so the renderer no longer depends on GDI+ for icon resources.
 - Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
 
 ## Tested Hypotheses
@@ -394,6 +394,19 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep uncached UTF-16 conversion in the draw path unless a future bounded cache shows a clear benchmark win without reintroducing unbounded growth.
 
+### Hypothesis: Replace the remaining panel-icon GDI+ decode and scale path with WIC
+
+- Change:
+  - Decode embedded PNG panel icons through WIC, keep the cached source bitmaps as `IWICBitmapSource`, scale them with `IWICBitmapScaler`, upload them into render-target-local Direct2D bitmaps on demand, and remove the `gdiplus` link dependency from the app and benchmark targets.
+- Result:
+  - Neutral for throughput and worth keeping for dependency cleanup.
+- Observed effect:
+  - `240`-iteration reruns landed at `drag_loop per_iter_ms=2.49` to `2.50`, `snap avg_ms=0.20`, `apply avg_ms=0.28`, and `paint_draw avg_ms=2.01` to `2.02`.
+- Why it helped:
+  - The benchmark keeps the same Direct2D and DirectWrite hotspot shape while removing the last benchmark-process `GdiPlus.dll` dependency and keeping icon decode, scale, screenshot export, and bitmap upload on one WIC plus Direct2D asset path.
+- Conclusion:
+  - Keep the WIC-based icon path. Future renderer cleanup can assume panel icons, screenshots, and the live frame all stay off GDI+.
+
 ### Hypothesis: Reuse one GDI+ `Graphics` object across the whole frame
 
 - Change:
@@ -412,7 +425,7 @@ These changes produced real wins and remain in the codebase:
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.
 - Do not retry GDI+ stroked-arc gauge segments in place of the current combined fill paths.
 - Do not retry throughput `MoveToEx` and `LineTo` in place of `Polyline` for the current graph shape.
-- Do not retry Direct2D through `ID2D1DCRenderTarget` on the current compatible-bitmap paint buffer; that interop path is much slower than the existing GDI/GDI+ renderer here.
+- Do not retry Direct2D through `ID2D1DCRenderTarget` on the old compatible-bitmap paint buffer; that interop path is much slower than the current full Direct2D renderer.
 - Do not retry partial GDI and Direct2D hybrid window passes; the full window-owned Direct2D and DirectWrite path is the only Direct2D experiment in this workstream that materially helps.
 - Do not reintroduce a renderer-side GDI fallback path for live repaint, diagnostics export, or benchmarks; it adds maintenance and can mask problems in the real Direct2D scene without improving the current benchmark.
 - Be skeptical of caches tied to graph or gauge size during drag; size changes every frame and cache maintenance can outweigh the saved draw work.

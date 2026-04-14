@@ -31,10 +31,6 @@
 #include "render_types.h"
 #include "widget.h"
 
-namespace Gdiplus {
-class Bitmap;
-}
-
 class DashboardRenderer {
 public:
     enum class LayoutGuideAxis {
@@ -476,8 +472,6 @@ private:
     void BuildStaticEditableAnchors();
     std::optional<LayoutWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
 
-    bool InitializeGdiplus();
-    void ShutdownGdiplus();
     bool InitializeDirect2D();
     bool InitializeWic();
     void ShutdownDirect2D();
@@ -546,8 +540,7 @@ private:
     AppConfig config_;
     HWND hwnd_ = nullptr;
     std::ostream* traceOutput_ = nullptr;
-    ULONG_PTR gdiplusToken_ = 0;
-    std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
+    std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>> panelIcons_;
     std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
     TextStyleMetrics textStyleMetrics_{};
     Palette palette_{};

@@ -188,7 +188,6 @@ target_link_libraries(SystemTelemetry PRIVATE
     user32
     gdi32
     msimg32
-    gdiplus
     d2d1
     dwrite
     windowscodecs
@@ -332,7 +331,6 @@ target_link_libraries(SystemTelemetryBenchmarks PRIVATE
     user32
     gdi32
     msimg32
-    gdiplus
     d2d1
     dwrite
     windowscodecs

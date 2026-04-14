@@ -21,7 +21,6 @@
 
 #include <d2d1.h>
 #include <dwrite.h>
-#include <gdiplus.h>
 #include <wincodec.h>
 
 #include "../resources/resource.h"
@@ -159,60 +158,84 @@ UiFontConfig FontConfigForStyle(const UiFontSetConfig& fonts, TextStyleId style)
     return fonts.text;
 }
 
-std::unique_ptr<Gdiplus::Bitmap> LoadPngResourceBitmap(UINT resourceId) {
+Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactory* wicFactory, UINT resourceId) {
+    Microsoft::WRL::ComPtr<IWICBitmapSource> bitmapSource;
+    if (wicFactory == nullptr) {
+        return bitmapSource;
+    }
+
     HMODULE module = GetModuleHandleW(nullptr);
     if (module == nullptr) {
-        return nullptr;
+        return bitmapSource;
     }
 
     HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), L"PNG");
     if (resource == nullptr) {
-        return nullptr;
+        return bitmapSource;
     }
 
     const DWORD resourceSize = SizeofResource(module, resource);
     HGLOBAL loadedResource = LoadResource(module, resource);
     if (loadedResource == nullptr || resourceSize == 0) {
-        return nullptr;
+        return bitmapSource;
     }
 
     const void* resourceData = LockResource(loadedResource);
     if (resourceData == nullptr) {
-        return nullptr;
+        return bitmapSource;
     }
 
     HGLOBAL copyHandle = GlobalAlloc(GMEM_MOVEABLE, resourceSize);
     if (copyHandle == nullptr) {
-        return nullptr;
+        return bitmapSource;
     }
 
     void* copyData = GlobalLock(copyHandle);
     if (copyData == nullptr) {
         GlobalFree(copyHandle);
-        return nullptr;
+        return bitmapSource;
     }
 
     memcpy(copyData, resourceData, resourceSize);
     GlobalUnlock(copyHandle);
 
-    IStream* stream = nullptr;
-    if (CreateStreamOnHGlobal(copyHandle, TRUE, &stream) != S_OK || stream == nullptr) {
+    Microsoft::WRL::ComPtr<IStream> stream;
+    if (CreateStreamOnHGlobal(copyHandle, TRUE, stream.GetAddressOf()) != S_OK || stream == nullptr) {
         GlobalFree(copyHandle);
-        return nullptr;
+        return bitmapSource;
     }
 
-    std::unique_ptr<Gdiplus::Bitmap> decoded(Gdiplus::Bitmap::FromStream(stream));
-    std::unique_ptr<Gdiplus::Bitmap> bitmap;
-    if (decoded != nullptr && decoded->GetLastStatus() == Gdiplus::Ok) {
-        Gdiplus::Rect rect(0, 0, decoded->GetWidth(), decoded->GetHeight());
-        bitmap.reset(decoded->Clone(rect, PixelFormat32bppARGB));
-        if (bitmap != nullptr && bitmap->GetLastStatus() != Gdiplus::Ok) {
-            bitmap.reset();
-        }
+    Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+    HRESULT hr = wicFactory->CreateDecoderFromStream(
+        stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf());
+    if (FAILED(hr) || decoder == nullptr) {
+        return bitmapSource;
     }
 
-    stream->Release();
-    return bitmap;
+    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+    hr = decoder->GetFrame(0, frame.GetAddressOf());
+    if (FAILED(hr) || frame == nullptr) {
+        return bitmapSource;
+    }
+
+    Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+    hr = wicFactory->CreateFormatConverter(converter.GetAddressOf());
+    if (FAILED(hr) || converter == nullptr) {
+        return bitmapSource;
+    }
+
+    hr = converter->Initialize(frame.Get(),
+        GUID_WICPixelFormat32bppPBGRA,
+        WICBitmapDitherTypeNone,
+        nullptr,
+        0.0,
+        WICBitmapPaletteTypeCustom);
+    if (FAILED(hr)) {
+        return bitmapSource;
+    }
+
+    bitmapSource = converter;
+    return bitmapSource;
 }
 
 }  // namespace
@@ -1060,27 +1083,26 @@ void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RenderR
     const PanelIconCacheKey cacheKey{iconName, width, height};
     auto scaled = d2dPanelIconCache_.find(cacheKey);
     if (scaled == d2dPanelIconCache_.end()) {
-        Gdiplus::Bitmap surface(width, height, PixelFormat32bppPARGB);
-        Gdiplus::Graphics graphics(&surface);
-        graphics.Clear(Gdiplus::Color(0, 0, 0, 0));
-        graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
-        graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-        graphics.DrawImage(it->second.get(), 0, 0, width, height);
+        if (wicFactory_ == nullptr) {
+            return;
+        }
 
-        Gdiplus::BitmapData bitmapData{};
-        const Gdiplus::Rect lockRect(0, 0, width, height);
-        if (surface.LockBits(&lockRect, Gdiplus::ImageLockModeRead, PixelFormat32bppPARGB, &bitmapData) !=
-            Gdiplus::Ok) {
+        Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
+        HRESULT hr = wicFactory_->CreateBitmapScaler(scaler.GetAddressOf());
+        if (FAILED(hr) || scaler == nullptr) {
+            return;
+        }
+
+        hr = scaler->Initialize(it->second.Get(),
+            static_cast<UINT>(width),
+            static_cast<UINT>(height),
+            WICBitmapInterpolationModeFant);
+        if (FAILED(hr)) {
             return;
         }
 
         Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
-        const HRESULT hr = d2dActiveRenderTarget_->CreateBitmap(D2D1::SizeU(width, height),
-            bitmapData.Scan0,
-            static_cast<UINT32>(bitmapData.Stride),
-            D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)),
-            bitmap.GetAddressOf());
-        surface.UnlockBits(&bitmapData);
+        hr = d2dActiveRenderTarget_->CreateBitmapFromWicBitmap(scaler.Get(), bitmap.GetAddressOf());
         if (FAILED(hr) || bitmap == nullptr) {
             return;
         }
@@ -1594,10 +1616,7 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
     hwnd_ = hwnd;
     lastError_.clear();
     RebuildPalette();
-    if (!InitializeGdiplus() || !LoadPanelIcons()) {
-        return false;
-    }
-    if (!InitializeDirect2D()) {
+    if (!InitializeDirect2D() || !LoadPanelIcons()) {
         return false;
     }
     if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
@@ -1622,7 +1641,6 @@ void DashboardRenderer::Shutdown() {
     ClearD2DCaches();
     ReleasePanelIcons();
     ShutdownDirect2D();
-    ShutdownGdiplus();
 }
 
 const DashboardMetricSource& DashboardRenderer::ResolveMetrics(const SystemSnapshot& snapshot) {
@@ -2112,26 +2130,6 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlockD2D(const
     return result;
 }
 
-bool DashboardRenderer::InitializeGdiplus() {
-    if (gdiplusToken_ != 0) {
-        return true;
-    }
-    Gdiplus::GdiplusStartupInput startupInput;
-    const Gdiplus::Status status = Gdiplus::GdiplusStartup(&gdiplusToken_, &startupInput, nullptr);
-    if (status != Gdiplus::Ok) {
-        lastError_ = "renderer:gdiplus_startup_failed status=" + std::to_string(static_cast<int>(status));
-        return false;
-    }
-    return true;
-}
-
-void DashboardRenderer::ShutdownGdiplus() {
-    if (gdiplusToken_ != 0) {
-        Gdiplus::GdiplusShutdown(gdiplusToken_);
-        gdiplusToken_ = 0;
-    }
-}
-
 void DashboardRenderer::RebuildPalette() {
     palette_.background = ToRenderColor(config_.layout.colors.backgroundColor);
     palette_.foreground = ToRenderColor(config_.layout.colors.foregroundColor);
@@ -2154,6 +2152,9 @@ void DashboardRenderer::ClearD2DCaches() {
 
 bool DashboardRenderer::LoadPanelIcons() {
     ReleasePanelIcons();
+    if (wicFactory_ == nullptr && !InitializeWic()) {
+        return false;
+    }
     std::set<std::string> uniqueIcons;
     for (const auto& card : config_.layout.cards) {
         if (!card.icon.empty()) {
@@ -2167,7 +2168,7 @@ bool DashboardRenderer::LoadPanelIcons() {
             ReleasePanelIcons();
             return false;
         }
-        auto bitmap = LoadPngResourceBitmap(resourceId);
+        auto bitmap = LoadPngResourceBitmap(wicFactory_.Get(), resourceId);
         if (bitmap == nullptr) {
             lastError_ = "renderer:icon_load_failed name=\"" + iconName + "\" resource=" + std::to_string(resourceId);
             ReleasePanelIcons();
