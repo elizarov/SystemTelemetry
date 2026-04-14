@@ -25,7 +25,6 @@
 #include "app_monitor.h"
 #include "app_paths.h"
 #include "app_strings.h"
-#include "app_win32_ui.h"
 #include "dashboard_controller.h"
 #include "diagnostics_options.h"
 #include "layout_edit_controller.h"

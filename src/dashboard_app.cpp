@@ -94,6 +94,14 @@ std::wstring BuildTooltipText(
     return text;
 }
 
+void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
+    MENUITEMINFOW info{};
+    info.cbSize = sizeof(info);
+    info.fMask = MIIM_FTYPE;
+    info.fType = MFT_RADIOCHECK;
+    SetMenuItemInfoW(menu, commandId, FALSE, &info);
+}
+
 std::string LayoutGuideTooltipSectionName(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
     if (!guide.editCardId.empty()) {
         return "card." + guide.editCardId;
