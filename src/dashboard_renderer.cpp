@@ -317,8 +317,8 @@ DashboardRenderer::RenderMode DashboardRenderer::CurrentRenderMode() const {
     return renderMode_;
 }
 
-bool DashboardRenderer::IsDirect2DActive() const {
-    return d2dDrawActive_ && d2dActiveRenderTarget_ != nullptr;
+bool DashboardRenderer::IsDrawActive() const {
+    return d2dActiveRenderTarget_ != nullptr;
 }
 
 RenderColor DashboardRenderer::TrackColor() const {
@@ -1065,7 +1065,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
 }
 
 void DashboardRenderer::DrawMoveOverlay(const MoveOverlayState& overlayState) {
-    if (!overlayState.visible || !IsDirect2DActive()) {
+    if (!overlayState.visible || !IsDrawActive()) {
         return;
     }
 
@@ -1793,7 +1793,6 @@ bool DashboardRenderer::InitializeWic() {
 }
 
 void DashboardRenderer::ShutdownDirect2D() {
-    d2dDrawActive_ = false;
     d2dClipDepth_ = 0;
     d2dActiveRenderTarget_ = nullptr;
     d2dCacheOwnerTarget_ = nullptr;
@@ -1870,13 +1869,12 @@ bool DashboardRenderer::BeginDirect2DDraw(ID2D1RenderTarget* target) {
     d2dActiveRenderTarget_->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
     d2dActiveRenderTarget_->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
     d2dActiveRenderTarget_->BeginDraw();
-    d2dDrawActive_ = true;
     d2dClipDepth_ = 0;
     return true;
 }
 
 void DashboardRenderer::EndDirect2DDraw() {
-    if (!d2dDrawActive_ || d2dActiveRenderTarget_ == nullptr) {
+    if (d2dActiveRenderTarget_ == nullptr) {
         return;
     }
     while (d2dClipDepth_ > 0) {
@@ -1886,7 +1884,6 @@ void DashboardRenderer::EndDirect2DDraw() {
     const bool activeWindowTarget = d2dActiveRenderTarget_ == d2dWindowRenderTarget_.Get();
     const HRESULT hr = d2dActiveRenderTarget_->EndDraw();
     d2dActiveRenderTarget_ = nullptr;
-    d2dDrawActive_ = false;
     if (activeWindowTarget && hr == D2DERR_RECREATE_TARGET) {
         d2dWindowRenderTarget_.Reset();
         d2dCacheOwnerTarget_ = nullptr;
@@ -1925,21 +1922,21 @@ ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(RenderColor color) {
 }
 
 void DashboardRenderer::PushClipRect(const RenderRect& rect) {
-    if (IsDirect2DActive()) {
+    if (IsDrawActive()) {
         d2dActiveRenderTarget_->PushAxisAlignedClip(rect.ToD2DRectF(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         ++d2dClipDepth_;
     }
 }
 
 void DashboardRenderer::PopClipRect() {
-    if (IsDirect2DActive() && d2dClipDepth_ > 0) {
+    if (IsDrawActive() && d2dClipDepth_ > 0) {
         d2dActiveRenderTarget_->PopAxisAlignedClip();
         --d2dClipDepth_;
     }
 }
 
 bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColor color) {
-    if (!IsDirect2DActive()) {
+    if (!IsDrawActive()) {
         return false;
     }
     ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
@@ -1951,7 +1948,7 @@ bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColor color)
 }
 
 bool DashboardRenderer::FillSolidEllipse(RenderPoint center, int diameter, RenderColor color) {
-    if (!IsDirect2DActive() || diameter <= 0) {
+    if (!IsDrawActive() || diameter <= 0) {
         return false;
     }
     ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
@@ -1964,7 +1961,7 @@ bool DashboardRenderer::FillSolidEllipse(RenderPoint center, int diameter, Rende
 }
 
 bool DashboardRenderer::FillSolidDiamond(const RenderRect& rect, RenderColor color) {
-    if (!IsDirect2DActive()) {
+    if (!IsDrawActive()) {
         return false;
     }
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = CreateD2DPathGeometry();
@@ -1993,7 +1990,7 @@ bool DashboardRenderer::FillSolidDiamond(const RenderRect& rect, RenderColor col
 }
 
 bool DashboardRenderer::DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) {
-    if (!IsDirect2DActive()) {
+    if (!IsDrawActive()) {
         return false;
     }
     ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
@@ -2008,7 +2005,7 @@ bool DashboardRenderer::DrawSolidRect(const RenderRect& rect, const RenderStroke
 }
 
 bool DashboardRenderer::DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) {
-    if (!IsDirect2DActive()) {
+    if (!IsDrawActive()) {
         return false;
     }
     ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
@@ -2025,7 +2022,7 @@ bool DashboardRenderer::DrawSolidEllipse(const RenderRect& rect, const RenderStr
 }
 
 bool DashboardRenderer::DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) {
-    if (!IsDirect2DActive()) {
+    if (!IsDrawActive()) {
         return false;
     }
     ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
@@ -2069,7 +2066,7 @@ Microsoft::WRL::ComPtr<ID2D1GeometryGroup> DashboardRenderer::CreateD2DGeometryG
 }
 
 bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, RenderColor color) {
-    if (!IsDirect2DActive() || geometry == nullptr) {
+    if (!IsDrawActive() || geometry == nullptr) {
         return false;
     }
     ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
@@ -2081,7 +2078,7 @@ bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, RenderColor col
 }
 
 bool DashboardRenderer::DrawD2DPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) {
-    if (!IsDirect2DActive() || points.size() < 2) {
+    if (!IsDrawActive() || points.size() < 2) {
         return false;
     }
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = CreateD2DPathGeometry();

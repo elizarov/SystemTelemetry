@@ -541,7 +541,7 @@ private:
     void RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
         const TextLayoutResult& layoutResult,
         const EditableAnchorBinding& editable);
-    bool IsDirect2DActive() const;
+    bool IsDrawActive() const;
     const DashboardMetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();
     void WriteTrace(const std::string& text) const;
@@ -583,6 +583,5 @@ private:
     ID2D1RenderTarget* d2dCacheOwnerTarget_ = nullptr;
     bool wicComInitialized_ = false;
     bool d2dFirstDrawWarmupPending_ = false;
-    bool d2dDrawActive_ = false;
     int d2dClipDepth_ = 0;
 };
