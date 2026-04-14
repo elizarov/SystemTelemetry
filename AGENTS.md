@@ -4,6 +4,7 @@
 - Keep `docs/diagnostics.md` in sync with diagnostics-flow and trace/dump/screenshot behavior changes before finishing work.
 - Keep `docs/architecture.md` in sync with structural/code-organization changes before finishing work.
 - Keep `docs/project.md` in sync with project-environment, build/setup, and engineering-constraint changes before finishing work.
+- Keep `docs/profile_benchmark.md` up to date after benchmark or profiling experiments by recording the latest baseline, hotspots, tested hypotheses, and whether each experiment helped or regressed.
 - Keep a single source of truth for every example, format description, and configuration-language reference; when one file is designated as the maintained source, update other docs to refer to it instead of duplicating the same example or format details.
 - Document new requirements briefly in the same style as the existing spec.
 - Keep docs/specs in present-tense steady-state language; describe only the intended behavior and structure, not transitions, historical notes, removals, or migration context.
@@ -42,3 +43,4 @@ Validation workflow:
 - Login startup and monitor hotplug can race ahead of monitor enumeration; when `display.monitor_name` is configured, keep a placement watch armed until the target display becomes enumerable instead of locking in a fallback monitor.
 - Gigabyte SIV assembly loading may temporarily need the SIV install directory as the process current directory, but always restore the original launch working directory afterward so diagnostics paths and Save dialogs keep using the startup folder.
 - `profile_benchmark.cmd` supports `/daemon-start`; start that elevated helper once when unattended benchmark runs need to be triggered repeatedly from the sandbox, then let ordinary benchmark invocations queue through the daemon so each request rebuilds in the elevated console before profiling without prompting for UAC each time.
+- When a benchmark optimization experiment fails or regresses, record that hypothesis and the observed benchmark result in `docs/profile_benchmark.md` before finishing so future work can avoid repeating it blindly.
