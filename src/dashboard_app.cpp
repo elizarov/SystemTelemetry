@@ -9,6 +9,20 @@
 #include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
 
+class DashboardAppLayoutEditModalUiScope {
+public:
+    explicit DashboardAppLayoutEditModalUiScope(DashboardApp& app) : app_(app) {
+        app_.BeginLayoutEditModalUi();
+    }
+
+    ~DashboardAppLayoutEditModalUiScope() {
+        app_.EndLayoutEditModalUi();
+    }
+
+private:
+    DashboardApp& app_;
+};
+
 namespace {
 
 constexpr UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
@@ -662,13 +676,36 @@ std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
     return PromptSavePath(hwnd_, GetWorkingDirectory(), defaultFileName, filter, defaultExtension);
 }
 
+void DashboardApp::BeginLayoutEditModalUi() {
+    ++layoutEditModalUiDepth_;
+    HideLayoutEditTooltip();
+    layoutEditMouseTracking_ = false;
+    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+}
+
+void DashboardApp::EndLayoutEditModalUi() {
+    if (layoutEditModalUiDepth_ <= 0) {
+        layoutEditModalUiDepth_ = 0;
+        return;
+    }
+    --layoutEditModalUiDepth_;
+    if (layoutEditModalUiDepth_ == 0) {
+        UpdateLayoutEditTooltip();
+    }
+}
+
+bool DashboardApp::IsLayoutEditModalUiActive() const {
+    return layoutEditModalUiDepth_ > 0;
+}
+
 std::optional<double> DashboardApp::PromptLayoutEditValue(
-    const LayoutEditTooltipDescriptor& descriptor, double initialValue, const std::wstring& title) const {
+    const LayoutEditTooltipDescriptor& descriptor, double initialValue, const std::wstring& title) {
     LayoutEditValueDialogState state;
     state.title = title;
     state.prompt = WideFromUtf8("[" + descriptor.sectionName + "] " + descriptor.memberName);
     state.initialText = WideFromUtf8(FormatLayoutEditTooltipValue(initialValue, descriptor.valueFormat));
     state.valueFormat = descriptor.valueFormat;
+    DashboardAppLayoutEditModalUiScope scopedModalUi(*this);
     if (DialogBoxParamW(instance_,
             MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_VALUE),
             hwnd_,
@@ -680,7 +717,7 @@ std::optional<double> DashboardApp::PromptLayoutEditValue(
 }
 
 std::optional<std::vector<int>> DashboardApp::PromptLayoutGuideWeights(
-    const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title) const {
+    const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title) {
     const LayoutNodeConfig* node = FindLayoutGuideNode(controller_.State().config, guide);
     if (node == nullptr) {
         return std::nullopt;
@@ -696,6 +733,7 @@ std::optional<std::vector<int>> DashboardApp::PromptLayoutGuideWeights(
     state.secondLabel = BuildLayoutGuideItemLabel(*node, guide.separatorIndex + 1, guide.axis, false);
     state.firstValue = std::max(1, weights[guide.separatorIndex]);
     state.secondValue = std::max(1, weights[guide.separatorIndex + 1]);
+    DashboardAppLayoutEditModalUiScope scopedModalUi(*this);
     if (DialogBoxParamW(instance_,
             MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_WEIGHTS),
             hwnd_,
@@ -711,11 +749,12 @@ std::optional<std::vector<int>> DashboardApp::PromptLayoutGuideWeights(
 }
 
 std::optional<UiFontConfig> DashboardApp::PromptLayoutEditFont(
-    const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& initialValue, const std::wstring& title) const {
+    const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& initialValue, const std::wstring& title) {
     LayoutEditFontDialogState state;
     state.title = title;
     state.prompt = WideFromUtf8("[" + descriptor.sectionName + "] " + descriptor.memberName);
     state.initialValue = initialValue;
+    DashboardAppLayoutEditModalUiScope scopedModalUi(*this);
     if (DialogBoxParamW(instance_,
             MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_FONT),
             hwnd_,
@@ -900,6 +939,7 @@ void DashboardApp::ShowError(const std::wstring& message) const {
 void DashboardApp::ShowContextMenu(
     POINT screenPoint, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) {
     HideLayoutEditTooltip();
+    DashboardAppLayoutEditModalUiScope scopedModalUi(*this);
     DashboardSessionState& state = controller_.State();
     HMENU menu = CreatePopupMenu();
     HMENU diagnosticsMenu = CreatePopupMenu();
@@ -1225,7 +1265,8 @@ void DashboardApp::HideLayoutEditTooltip() {
 }
 
 void DashboardApp::UpdateLayoutEditTooltip() {
-    if (layoutEditTooltipHwnd_ == nullptr || !controller_.State().isEditingLayout || controller_.State().isMoving) {
+    if (layoutEditTooltipHwnd_ == nullptr || !controller_.State().isEditingLayout || controller_.State().isMoving ||
+        IsLayoutEditModalUiActive()) {
         HideLayoutEditTooltip();
         return;
     }
@@ -1349,11 +1390,12 @@ void DashboardApp::RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wPara
     SendMessageW(layoutEditTooltipHwnd_, TTM_RELAYEVENT, 0, reinterpret_cast<LPARAM>(&msg));
 }
 
-std::optional<double> DashboardApp::PromptCustomScale() const {
+std::optional<double> DashboardApp::PromptCustomScale() {
     CustomScaleDialogState state;
     state.initialScale = HasExplicitDisplayScale(controller_.State().config.display.scale)
                              ? controller_.State().config.display.scale
                              : ResolveCurrentDisplayScale(CurrentWindowDpi());
+    DashboardAppLayoutEditModalUiScope scopedModalUi(*this);
     if (DialogBoxParamW(instance_,
             MAKEINTRESOURCEW(IDD_CUSTOM_SCALE),
             hwnd_,
@@ -1447,7 +1489,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             return 0;
         }
         case WM_LBUTTONDOWN:
-            if (state.isEditingLayout) {
+            if (state.isEditingLayout && !IsLayoutEditModalUiActive()) {
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 if (layoutEditController_.HandleLButtonDown(hwnd_, clientPoint)) {
                     UpdateLayoutEditTooltip();
@@ -1456,7 +1498,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             break;
         case WM_MOUSEMOVE:
-            if (state.isEditingLayout) {
+            if (state.isEditingLayout && !IsLayoutEditModalUiActive()) {
                 UpdateLayoutEditMouseTracking();
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 layoutEditController_.HandleMouseMove(clientPoint);
@@ -1466,7 +1508,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             break;
         case WM_MOUSELEAVE:
             layoutEditMouseTracking_ = false;
-            if (state.isEditingLayout) {
+            if (state.isEditingLayout && !IsLayoutEditModalUiActive()) {
                 POINT screenPoint{};
                 if (GetCursorPos(&screenPoint)) {
                     POINT clientPointWin32 = screenPoint;
@@ -1487,7 +1529,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             break;
         case WM_LBUTTONUP:
-            if (state.isEditingLayout) {
+            if (state.isEditingLayout && !IsLayoutEditModalUiActive()) {
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 if (layoutEditController_.HandleLButtonUp(clientPoint)) {
                     UpdateLayoutEditTooltip();
@@ -1513,14 +1555,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             break;
         case WM_CAPTURECHANGED:
-            if (state.isEditingLayout &&
+            if (state.isEditingLayout && !IsLayoutEditModalUiActive() &&
                 layoutEditController_.HandleCaptureChanged(hwnd_, reinterpret_cast<HWND>(lParam))) {
                 UpdateLayoutEditTooltip();
                 return 0;
             }
             break;
         case WM_SETCURSOR:
-            if (LOWORD(lParam) == HTCLIENT && state.isEditingLayout) {
+            if (LOWORD(lParam) == HTCLIENT && state.isEditingLayout && !IsLayoutEditModalUiActive()) {
                 layoutEditController_.HandleSetCursor(hwnd_);
                 return TRUE;
             }

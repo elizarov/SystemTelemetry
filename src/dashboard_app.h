@@ -31,6 +31,8 @@
 #include "layout_edit_parameter.h"
 #include "layout_edit_trace_session.h"
 
+class DashboardAppLayoutEditModalUiScope;
+
 class DashboardApp : private LayoutEditHost, public DashboardShellHost {
 public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {});
@@ -56,6 +58,8 @@ public:
     void ShowError(const std::wstring& message) const override;
 
 private:
+    friend class DashboardAppLayoutEditModalUiScope;
+
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
@@ -67,15 +71,14 @@ private:
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     double ResolveCurrentDisplayScale(UINT dpi) const;
-    std::optional<double> PromptCustomScale() const;
+    std::optional<double> PromptCustomScale();
     bool PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target);
     std::optional<double> PromptLayoutEditValue(
-        const LayoutEditTooltipDescriptor& descriptor, double initialValue, const std::wstring& title) const;
+        const LayoutEditTooltipDescriptor& descriptor, double initialValue, const std::wstring& title);
     std::optional<std::vector<int>> PromptLayoutGuideWeights(
-        const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title) const;
-    std::optional<UiFontConfig> PromptLayoutEditFont(const LayoutEditTooltipDescriptor& descriptor,
-        const UiFontConfig& initialValue,
-        const std::wstring& title) const;
+        const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title);
+    std::optional<UiFontConfig> PromptLayoutEditFont(
+        const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& initialValue, const std::wstring& title);
     bool IsLayoutEditMode() const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights,
@@ -91,6 +94,9 @@ private:
     void UpdateLayoutEditTooltip();
     void UpdateLayoutEditMouseTracking();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
+    void BeginLayoutEditModalUi();
+    void EndLayoutEditModalUi();
+    bool IsLayoutEditModalUiActive() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);
@@ -129,5 +135,6 @@ private:
     bool layoutEditMouseTracking_ = false;
     RECT layoutEditTooltipRect_{};
     bool layoutEditTooltipRectValid_ = false;
+    int layoutEditModalUiDepth_ = 0;
     LayoutEditTraceSession layoutEditTraceSession_{};
 };
