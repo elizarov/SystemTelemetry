@@ -9,6 +9,7 @@
 - Document new requirements briefly in the same style as the existing spec.
 - Keep docs/specs in present-tense steady-state language; describe only the intended behavior and structure, not transitions, historical notes, removals, or migration context.
 - After changing diagnostics behavior, update `docs/diagnostics.md` instead of restating those rules here.
+- Write miniaml commit message. One line, just action that was done starting the verb Added/Chaged/Refactored/Removed/etc and a very short summarization of the change. Focus on code/logic changes, only mention docs work if that was the only explicit task.
 
 ## Build And Validation
 
@@ -32,6 +33,7 @@ Validation workflow:
 
 - Ignore the stray `$null` file at the repository root when it appears; it is a Codex sandbox artifact, not a project file.
 - This project has a single deployment target; do not preserve backwards compatibility for legacy configs unless the user explicitly asks for it.
+- Keep headers declarative: non-template and non-inline-required production logic belongs in `.cpp` files, not in project headers.
 - If you trip over a project-specific pitfall and then resolve it, add a short note here for future work so the mistake is less likely to repeat.
 
 ## Pitfall Notes
