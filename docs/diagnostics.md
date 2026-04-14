@@ -43,6 +43,7 @@ This document is the single maintained source of truth for diagnostics command b
 - With `/default-config`, the application skips the executable-side `config.ini` overlay and keeps only the embedded default config for startup and `/reload` diagnostics runs.
 - With `/layout:<name>`, the application applies that named layout after loading `config.ini` and keeps that override active for the process lifetime, including `/reload` diagnostics runs.
 - With `/scale:<value>`, the application replaces the loaded `display.scale` value for the process lifetime, including live UI sizing, `/reload` diagnostics runs, and screenshot exports.
+- Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported PNGs reflect the live scale, text, and widget rendering instead of a separate bitmap-only renderer.
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
 - With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
 - With `/blank`, the application keeps the normal layout, panel chrome, card headers, CPU and GPU names, drive labels, and empty chart or bar tracks while suppressing dynamic metric rendering.

@@ -191,6 +191,7 @@ target_link_libraries(SystemTelemetry PRIVATE
     gdiplus
     d2d1
     dwrite
+    windowscodecs
     pdh
     iphlpapi
     dxgi
@@ -334,6 +335,7 @@ target_link_libraries(SystemTelemetryBenchmarks PRIVATE
     gdiplus
     d2d1
     dwrite
+    windowscodecs
 )
 set_target_properties(SystemTelemetryBenchmarks PROPERTIES
     PDB_NAME_RELEASE "SystemTelemetryBenchmarks"

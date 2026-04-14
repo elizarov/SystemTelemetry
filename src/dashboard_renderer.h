@@ -20,6 +20,7 @@
 
 #include <d2d1.h>
 #include <dwrite.h>
+#include <wincodec.h>
 #include <windows.h>
 #include <wrl/client.h>
 
@@ -590,6 +591,7 @@ private:
     bool InitializeGdiplus();
     void ShutdownGdiplus();
     bool InitializeDirect2D();
+    bool InitializeWic();
     void ShutdownDirect2D();
     bool CreateFonts();
     void DestroyFonts();
@@ -597,8 +599,12 @@ private:
     void ReleasePanelIcons();
     bool MeasureFonts();
     bool EnsureWindowRenderTarget();
+    bool BeginDirect2DDraw(ID2D1RenderTarget* target);
+    void EndDirect2DDraw();
     bool BeginWindowDraw();
     void EndWindowDraw();
+    void DrawDirect2DFrame(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    bool SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath);
     ID2D1SolidColorBrush* D2DSolidBrush(COLORREF color, BYTE alpha = 255);
     IDWriteTextFormat* DWriteTextFormatForFont(HFONT font) const;
     bool CreateDWriteTextFormats();
@@ -693,8 +699,13 @@ private:
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
     Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> d2dWindowRenderTarget_;
     Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory_;
+    Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory_;
     Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dSolidStrokeStyle_;
     Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dDashedStrokeStyle_;
+    ID2D1RenderTarget* d2dActiveRenderTarget_ = nullptr;
+    ID2D1RenderTarget* d2dCacheOwnerTarget_ = nullptr;
+    bool wicComInitialized_ = false;
+    bool d2dFirstDrawWarmupPending_ = false;
     bool d2dDrawActive_ = false;
     int d2dClipDepth_ = 0;
 };

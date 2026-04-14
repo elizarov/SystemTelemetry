@@ -19,28 +19,29 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured result reached during this workstream:
-  - `drag_loop per_iter_ms=0.96`
+  - `drag_loop per_iter_ms=2.59`
   - `snap avg_ms=0.20`
   - `apply avg_ms=0.23`
-  - `paint_draw avg_ms=0.50`
+  - `paint_draw avg_ms=2.15`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=0.96` to `0.98`
+  - `drag_loop per_iter_ms=2.59` to `2.61`
   - `snap avg_ms=0.20` to `0.21`
   - `apply avg_ms=0.23` to `0.24`
-  - `paint_draw avg_ms=0.50` to `0.53`
+  - `paint_draw avg_ms=2.15` to `2.17`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
 - The exported WPA text no longer surfaces stable named renderer functions for the benchmark process, but it does show the heaviest benchmark-process module weights in `d2d1.dll`, `amdxx64.dll`, `win32kfull.sys`, and `d3d11.dll`.
-- `GdiPlus.dll` still loads because screenshot export and some non-benchmark paths keep the legacy renderer available, but its weight in the benchmark process drops below the Direct2D and driver stack modules.
+- The latest fixed-text capture also surfaces `DWrite.dll` and `TextShaping.dll` as meaningful benchmark-process module weights, which matches the restored full text path in the Direct2D renderer.
+- `GdiPlus.dll` still loads because the renderer keeps legacy assets and fallback helpers available, but its weight in the benchmark process stays below the Direct2D, DirectWrite, and driver stack modules.
 - The fast benchmark reruns stay consistent enough that the draw-path win is real even though the coarse text export no longer pinpoints the remaining app-side leaves by symbol.
 
 Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
-- The remaining cost in the benchmarked live window path is now mostly in the Direct2D and driver stack rather than in named app-side GDI+ widget functions.
+- The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in named app-side GDI+ widget functions.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely.
 
@@ -336,16 +337,16 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Rewrite the live window draw path around Direct2D and DirectWrite
 
 - Change:
-  - Add a renderer-owned `ID2D1HwndRenderTarget` plus `IDWriteFactory`, route the live window frame through `DashboardRenderer::DrawWindow`, port renderer text and primitive helpers to Direct2D and DirectWrite, move throughput and gauge drawing onto Direct2D geometry draws, and keep the legacy compatible-bitmap renderer only for screenshot export and fallback cases.
+  - Add a renderer-owned `ID2D1HwndRenderTarget` plus `IDWriteFactory`, route the live window frame through `DashboardRenderer::DrawWindow`, port renderer text and primitive helpers to Direct2D and DirectWrite, move throughput and gauge drawing onto Direct2D geometry draws, export screenshots through a WIC-backed Direct2D render target that reuses the same scene, and refresh the font and layout resources once on the first Direct2D draw so startup and headless exports keep the full text path active.
 - Result:
   - Helped materially.
 - Observed effect:
-  - `240`-iteration reruns land around `drag_loop per_iter_ms=0.96` to `0.98`.
+  - `240`-iteration reruns land around `drag_loop per_iter_ms=2.59` to `2.61`.
   - `snap avg_ms` stays about `0.20` to `0.21`.
   - `apply avg_ms` lands about `0.23` to `0.24`.
-  - `paint_draw avg_ms` lands about `0.50` to `0.53`.
+  - `paint_draw avg_ms` lands about `2.15` to `2.17`.
 - Why it helped:
-  - The benchmarked live repaint no longer pays the compatible-DC backbuffer and mixed GDI/GDI+ pass structure. One real HWND-backed Direct2D and DirectWrite frame is much cheaper than any of the hybrid interop variants that were tested earlier.
+  - The benchmarked live repaint no longer pays the compatible-DC backbuffer and mixed GDI/GDI+ pass structure. One real HWND-backed Direct2D and DirectWrite frame with the full text path active is still much cheaper than any of the hybrid interop variants that were tested earlier.
 - Conclusion:
   - A full renderer rewrite onto a real window-backed Direct2D target is the first Direct2D path that clearly beats the old renderer on this workload, and future draw-path work should treat this all-D2D live path as the current baseline.
 
@@ -373,8 +374,8 @@ These changes produced real wins and remain in the codebase:
 - Prioritize experiments that reduce primitive count or switch to a cheaper primitive family while preserving the same pixels.
 - The most promising remaining directions are:
   - reducing throughput graph and gauge geometry cost inside the new Direct2D live path without falling back to hybrid interop
-  - using richer WPA views or call trees to isolate the remaining app-side work that the flat text export now hides behind `d2d1.dll` and the driver stack
-  - deciding whether the screenshot-export path should stay on the legacy bitmap renderer or eventually move onto a separate Direct2D export path
+  - using richer WPA views or call trees to isolate the remaining app-side work that the flat text export now hides behind `d2d1.dll`, `DWrite.dll`, and the driver stack
+  - reducing DirectWrite and text-shaping cost now that the real text path is active in both live repaint and screenshot export
   - favoring draw-path work over additional snap-path work unless a new experiment also moves `apply`
 
 ## Validation Notes
