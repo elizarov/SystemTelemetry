@@ -6,6 +6,7 @@
 
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
+#include "../numeric_safety.h"
 
 namespace {
 
@@ -54,10 +55,17 @@ void DrawGraph(DashboardRenderer& renderer,
     double timeMarkerIntervalSamples,
     const std::optional<LayoutEditAnchorBinding>& maxLabelEditable) {
     renderer.FillSolidRect(rect, renderer.GraphBackgroundColor());
-    const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
+    maxValue = FiniteNonNegativeOr(maxValue, 10.0);
+    if (maxValue <= 0.0) {
+        maxValue = 10.0;
+    }
+    const double guideStep = IsFiniteDouble(guideStepMbps) && guideStepMbps > 0.0 ? guideStepMbps : 5.0;
+    const double markerOffset = FiniteNonNegativeOr(timeMarkerOffsetSamples);
+    const double markerInterval =
+        IsFiniteDouble(timeMarkerIntervalSamples) && timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
     const RenderColor markerColor = renderer.GraphMarkerColor();
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
-        const double ratio = tick / maxValue;
+        const double ratio = ClampFinite(tick / maxValue, 0.0, 1.0);
         const int centerY = layout.graphBottom - static_cast<int>(std::round(ratio * layout.plotHeight));
         const int lineTop = centerY - (layout.guideStrokeWidth / 2);
         RenderRect lineRect{layout.graphLeft,
@@ -68,11 +76,10 @@ void DrawGraph(DashboardRenderer& renderer,
     }
 
     if (!history.empty()) {
-        const double markerInterval = timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
-        for (double sampleOffset = timeMarkerOffsetSamples;
+        for (double sampleOffset = markerOffset;
             sampleOffset <= static_cast<double>(history.size() - 1) + markerInterval;
             sampleOffset += markerInterval) {
-            const double clampedOffset = std::clamp(sampleOffset, 0.0, static_cast<double>(history.size() - 1));
+            const double clampedOffset = ClampFinite(sampleOffset, 0.0, static_cast<double>(history.size() - 1), 0.0);
             const int centerX =
                 layout.graphRight - static_cast<int>(std::round(
                                         clampedOffset * layout.plotWidth / std::max<size_t>(1, history.size() - 1)));
@@ -120,7 +127,7 @@ void DrawGraph(DashboardRenderer& renderer,
     std::vector<RenderPoint> plotPoints;
     plotPoints.reserve(history.size());
     for (size_t i = 0; i < history.size(); ++i) {
-        const double valueRatio = std::clamp(history[i] / maxValue, 0.0, 1.0);
+        const double valueRatio = ClampFinite(FiniteNonNegativeOr(history[i]) / maxValue, 0.0, 1.0);
         const int x = layout.graphLeft + static_cast<int>(i * layout.plotWidth / historyDenominator);
         const int y = layout.graphBottom - static_cast<int>(std::round(valueRatio * layout.plotHeight));
         plotPoints.push_back(RenderPoint{x, y});

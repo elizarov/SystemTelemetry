@@ -24,6 +24,7 @@
 #include <wincodec.h>
 
 #include "../resources/resource.h"
+#include "numeric_safety.h"
 #include "trace.h"
 #include "utf8.h"
 
@@ -1359,7 +1360,7 @@ void DashboardRenderer::DrawPillBar(
         return;
     }
 
-    const double clampedRatio = std::clamp(ratio, 0.0, 1.0);
+    const double clampedRatio = ClampFinite(ratio, 0.0, 1.0);
     const int straightWidth = std::max(0, width - height);
     const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
     RenderRect fillRect = rect;
@@ -1367,7 +1368,7 @@ void DashboardRenderer::DrawPillBar(
     fillCapsule(fillRect, accentColor);
 
     if (peakRatio.has_value()) {
-        const double peak = std::clamp(*peakRatio, 0.0, 1.0);
+        const double peak = ClampFinite(*peakRatio, 0.0, 1.0);
         const int markerWidth = std::min(width, std::max(1, std::max(ScaleLogical(4), height)));
         const int centerX = rect.left + static_cast<int>(std::round(peak * width));
         const int minLeft = rect.left;

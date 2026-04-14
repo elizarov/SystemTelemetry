@@ -7,6 +7,7 @@
 
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
+#include "../numeric_safety.h"
 
 struct GaugeSharedLayout {
     int radius = 0;
@@ -247,7 +248,7 @@ void GaugeWidget::Draw(
     DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
     const DashboardGaugeMetric& metric = metrics.ResolveGauge(metric_);
     const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
-    const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
+    const double clampedPercent = ClampFinite(metric.percent, 0.0, 100.0);
     const int filledSegments =
         clampedPercent <= 0.0
             ? 0
@@ -255,7 +256,7 @@ void GaugeWidget::Draw(
                   static_cast<int>(std::ceil(clampedPercent * static_cast<double>(gaugeLayout.segmentCount) / 100.0)),
                   1,
                   gaugeLayout.segmentCount);
-    const double clampedPeakRatio = std::clamp(metric.peakRatio, 0.0, 1.0);
+    const double clampedPeakRatio = ClampFinite(metric.peakRatio, 0.0, 1.0);
     const int peakSegment =
         clampedPeakRatio <= 0.0
             ? -1
@@ -286,7 +287,7 @@ void GaugeWidget::Draw(
 
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         char number[16];
-        sprintf_s(number, "%.0f%%", metric.percent);
+        sprintf_s(number, "%.0f%%", clampedPercent);
         const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(layoutState_.valueRect,
             number,
             TextStyleId::Big,

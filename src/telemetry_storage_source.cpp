@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "numeric_safety.h"
 #include "utf8.h"
 
 namespace {
@@ -198,7 +199,7 @@ void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
     if (storage_.readCounter != nullptr &&
         (readStatus = PdhGetFormattedCounterValue(storage_.readCounter, PDH_FMT_DOUBLE, nullptr, &value)) ==
             ERROR_SUCCESS) {
-        snapshot_.storage.readMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
+        snapshot_.storage.readMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
     } else if (!initializeOnly) {
         snapshot_.storage.readMbps = 0.0;
     }
@@ -206,7 +207,7 @@ void TelemetryCollector::Impl::UpdateStorageThroughput(bool initializeOnly) {
     if (storage_.writeCounter != nullptr &&
         (writeStatus = PdhGetFormattedCounterValue(storage_.writeCounter, PDH_FMT_DOUBLE, nullptr, &value)) ==
             ERROR_SUCCESS) {
-        snapshot_.storage.writeMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
+        snapshot_.storage.writeMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
     } else if (!initializeOnly) {
         snapshot_.storage.writeMbps = 0.0;
     }
@@ -265,13 +266,13 @@ void TelemetryCollector::Impl::RefreshDriveUsage() {
         if (counterIt != storage_.driveCounters.end() && counterIt->readCounter != nullptr) {
             readStatus = PdhGetFormattedCounterValue(counterIt->readCounter, PDH_FMT_DOUBLE, nullptr, &value);
             if (readStatus == ERROR_SUCCESS) {
-                drive.readMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
+                drive.readMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
             }
         }
         if (counterIt != storage_.driveCounters.end() && counterIt->writeCounter != nullptr) {
             writeStatus = PdhGetFormattedCounterValue(counterIt->writeCounter, PDH_FMT_DOUBLE, nullptr, &value);
             if (writeStatus == ERROR_SUCCESS) {
-                drive.writeMbps = (std::max)(0.0, value.doubleValue / (1024.0 * 1024.0));
+                drive.writeMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
             }
         }
         Trace(("telemetry:drive_space label=" + drive.label + " total_bytes=" + std::to_string(totalBytes.QuadPart) +

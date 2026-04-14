@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <limits>
+
 #include "telemetry_retained_history.h"
 
 TEST(TelemetryRetainedHistory, PushSampleCreatesSeriesAndKeepsRollingWindow) {
@@ -32,4 +34,16 @@ TEST(TelemetryRetainedHistory, PushBoardMetricSamplesUsesConfiguredScales) {
     EXPECT_EQ(snapshot.retainedHistories[0].samples.back(), 0.55);
     EXPECT_EQ(snapshot.retainedHistories[1].seriesRef, "board.fan.system");
     EXPECT_EQ(snapshot.retainedHistories[1].samples.back(), 0.6);
+}
+
+TEST(TelemetryRetainedHistory, PushSampleSanitizesNonFiniteValuesToZero) {
+    RetainedHistoryStore store;
+    SystemSnapshot snapshot;
+
+    store.PushSample(snapshot, "network.upload", std::numeric_limits<double>::quiet_NaN());
+    store.PushSample(snapshot, "network.upload", std::numeric_limits<double>::infinity());
+
+    ASSERT_EQ(snapshot.retainedHistories.size(), 1u);
+    EXPECT_DOUBLE_EQ(snapshot.retainedHistories[0].samples[snapshot.retainedHistories[0].samples.size() - 2], 0.0);
+    EXPECT_DOUBLE_EQ(snapshot.retainedHistories[0].samples.back(), 0.0);
 }

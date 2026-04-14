@@ -19,6 +19,7 @@
 
 #include "board_vendor.h"
 #include "gpu_vendor.h"
+#include "numeric_safety.h"
 #include "snapshot_dump.h"
 #include "telemetry.h"
 #include "telemetry_internal.h"
@@ -303,7 +304,7 @@ void TelemetryCollector::Impl::UpdateCpu() {
     PDH_STATUS loadStatus = PDH_INVALID_DATA;
     if (cpuLoadCounter_ != nullptr &&
         (loadStatus = PdhGetFormattedCounterValue(cpuLoadCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
-        snapshot_.cpu.loadPercent = std::clamp(value.doubleValue, 0.0, 100.0);
+        snapshot_.cpu.loadPercent = ClampFinite(value.doubleValue, 0.0, 100.0);
     }
     Trace(("telemetry:cpu_load " + tracing::Trace::FormatPdhStatus("status", loadStatus) + " " +
            tracing::Trace::FormatValueDouble("value", snapshot_.cpu.loadPercent, 2))
@@ -313,7 +314,7 @@ void TelemetryCollector::Impl::UpdateCpu() {
     if (cpuFrequencyCounter_ != nullptr &&
         (clockStatus = PdhGetFormattedCounterValue(cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value)) ==
             ERROR_SUCCESS) {
-        snapshot_.cpu.clock.value = value.doubleValue / 1000.0;
+        snapshot_.cpu.clock.value = FiniteOptional(value.doubleValue / 1000.0);
         snapshot_.cpu.clock.unit = "GHz";
     }
     Trace(("telemetry:cpu_clock " + tracing::Trace::FormatPdhStatus("status", clockStatus) + " value=" +
@@ -430,13 +431,16 @@ double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool requ
         if (items[i].FmtValue.CStatus != ERROR_SUCCESS) {
             continue;
         }
+        if (!IsFiniteDouble(items[i].FmtValue.doubleValue)) {
+            continue;
+        }
         total += items[i].FmtValue.doubleValue;
     }
     Trace(("telemetry:pdh_array_done " + tracing::Trace::FormatPdhStatus("status", status) +
            " count=" + std::to_string(itemCount) + " require3d=" + tracing::Trace::BoolText(require3d) + " " +
            tracing::Trace::FormatValueDouble("total", total, 2))
             .c_str());
-    return total;
+    return FiniteNonNegativeOr(total);
 }
 
 void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample) {
@@ -447,12 +451,15 @@ void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySamp
     if (sample.name.has_value() && !sample.name->empty()) {
         snapshot_.gpu.name = *sample.name;
     }
-    snapshot_.gpu.temperature.value = sample.temperatureC;
-    snapshot_.gpu.clock.value = sample.coreClockMhz;
+    snapshot_.gpu.temperature.value = FiniteOptional(sample.temperatureC);
+    snapshot_.gpu.clock.value = FiniteOptional(sample.coreClockMhz);
     snapshot_.gpu.clock.unit = "MHz";
-    snapshot_.gpu.fan.value = sample.fanRpm;
-    if (sample.totalVramGb.has_value() && *sample.totalVramGb > 0.0) {
-        snapshot_.gpu.vram.totalGb = *sample.totalVramGb;
+    snapshot_.gpu.fan.value = FiniteOptional(sample.fanRpm);
+    if (sample.totalVramGb.has_value()) {
+        const double totalVramGb = FiniteNonNegativeOr(*sample.totalVramGb);
+        if (totalVramGb > 0.0) {
+            snapshot_.gpu.vram.totalGb = totalVramGb;
+        }
     }
 }
 
@@ -462,7 +469,13 @@ void TelemetryCollector::Impl::ApplyBoardVendorSample(const BoardVendorTelemetry
     boardProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
     boardProviderAvailable_ = sample.available;
     snapshot_.boardTemperatures = sample.temperatures;
+    for (auto& metric : snapshot_.boardTemperatures) {
+        metric.metric.value = FiniteOptional(metric.metric.value);
+    }
     snapshot_.boardFans = sample.fans;
+    for (auto& metric : snapshot_.boardFans) {
+        metric.metric.value = FiniteOptional(metric.metric.value);
+    }
 }
 
 void TelemetryCollector::Impl::UpdateGpu() {
@@ -471,7 +484,7 @@ void TelemetryCollector::Impl::UpdateGpu() {
         Trace(("telemetry:gpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
         const double load3d = SumCounterArray(gpuLoadCounter_, true);
         const double loadAll = SumCounterArray(gpuLoadCounter_, false);
-        snapshot_.gpu.loadPercent = std::clamp(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
+        snapshot_.gpu.loadPercent = ClampFinite(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
         Trace(("telemetry:gpu_load load3d=" + tracing::Trace::FormatValueDouble("value", load3d, 2) +
                " loadAll=" + tracing::Trace::FormatValueDouble("value", loadAll, 2) +
                " selected=" + tracing::Trace::FormatValueDouble("value", snapshot_.gpu.loadPercent, 2))
@@ -482,7 +495,7 @@ void TelemetryCollector::Impl::UpdateGpu() {
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuMemoryQuery_);
         Trace(("telemetry:gpu_memory_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
         const double bytes = SumCounterArray(gpuDedicatedCounter_, false);
-        snapshot_.gpu.vram.usedGb = bytes / (1024.0 * 1024.0 * 1024.0);
+        snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(bytes / (1024.0 * 1024.0 * 1024.0));
         Trace(("telemetry:gpu_memory bytes=" + tracing::Trace::FormatValueDouble("value", bytes, 0) +
                " used_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.gpu.vram.usedGb, 2))
                 .c_str());

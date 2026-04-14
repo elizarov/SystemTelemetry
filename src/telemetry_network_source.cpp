@@ -6,6 +6,7 @@
 #include <cctype>
 #include <vector>
 
+#include "numeric_safety.h"
 #include "utf8.h"
 
 namespace {
@@ -376,11 +377,16 @@ void TelemetryCollector::Impl::CollectNetworkMetrics(bool initializeOnly) {
     snapshot_.network.ipAddress = network_.resolvedIpAddress;
     if (!initializeOnly && network_.previousTick.time_since_epoch().count() != 0) {
         const double seconds = std::chrono::duration<double>(now - network_.previousTick).count();
-        if (seconds > 0.0) {
+        if (IsFiniteDouble(seconds) && seconds > 0.0) {
+            const uint64_t inDelta =
+                selected->InOctets >= network_.previousInOctets ? (selected->InOctets - network_.previousInOctets) : 0;
+            const uint64_t outDelta = selected->OutOctets >= network_.previousOutOctets
+                                          ? (selected->OutOctets - network_.previousOutOctets)
+                                          : 0;
             snapshot_.network.downloadMbps =
-                ((selected->InOctets - network_.previousInOctets) / seconds) / (1024.0 * 1024.0);
+                FiniteNonNegativeOr((static_cast<double>(inDelta) / seconds) / (1024.0 * 1024.0));
             snapshot_.network.uploadMbps =
-                ((selected->OutOctets - network_.previousOutOctets) / seconds) / (1024.0 * 1024.0);
+                FiniteNonNegativeOr((static_cast<double>(outDelta) / seconds) / (1024.0 * 1024.0));
             retainedHistoryStore_.PushSample(snapshot_, "network.upload", snapshot_.network.uploadMbps);
             retainedHistoryStore_.PushSample(snapshot_, "network.download", snapshot_.network.downloadMbps);
             Trace(("telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
@@ -388,6 +394,9 @@ void TelemetryCollector::Impl::CollectNetworkMetrics(bool initializeOnly) {
                    " upload_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.network.uploadMbps, 3) +
                    " download_mbps=" + tracing::Trace::FormatValueDouble("value", snapshot_.network.downloadMbps, 3))
                     .c_str());
+        } else {
+            snapshot_.network.uploadMbps = 0.0;
+            snapshot_.network.downloadMbps = 0.0;
         }
     }
 

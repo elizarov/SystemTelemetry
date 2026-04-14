@@ -5,10 +5,12 @@
 #include <cstdio>
 #include <sstream>
 
+#include "numeric_safety.h"
+
 namespace {
 
 std::string FormatScalarValue(const ScalarMetric& metric, int precision) {
-    if (!metric.value.has_value()) {
+    if (!metric.value.has_value() || !IsFiniteDouble(*metric.value)) {
         return "N/A";
     }
     char buffer[64];
@@ -17,12 +19,18 @@ std::string FormatScalarValue(const ScalarMetric& metric, int precision) {
 }
 
 std::string FormatMemory(double usedGb, double totalGb) {
+    if (!IsFiniteDouble(usedGb) || !IsFiniteDouble(totalGb) || totalGb <= 0.0) {
+        return "N/A";
+    }
     char buffer[64];
     sprintf_s(buffer, "%.1f / %.0f GB", usedGb, totalGb);
     return buffer;
 }
 
 std::string FormatDriveFree(double freeGb) {
+    if (!IsFiniteDouble(freeGb) || freeGb < 0.0) {
+        return "N/A";
+    }
     char buffer[64];
     if (freeGb >= 1024.0) {
         sprintf_s(buffer, "%.1f TB", freeGb / 1024.0);
@@ -39,27 +47,27 @@ std::vector<double> SmoothThroughputHistory(const std::vector<double>& history) 
 
     std::vector<double> smoothed;
     smoothed.reserve(history.size());
-    smoothed.push_back(history.front());
+    smoothed.push_back(FiniteNonNegativeOr(history.front()));
     for (size_t i = 1; i < history.size(); ++i) {
-        smoothed.push_back((history[i - 1] + history[i]) / 2.0);
+        smoothed.push_back((FiniteNonNegativeOr(history[i - 1]) + FiniteNonNegativeOr(history[i])) / 2.0);
     }
     return smoothed;
 }
 
 double ResolveDisplayedThroughputValue(double fallbackValue, const std::vector<double>& smoothedHistory) {
     if (!smoothedHistory.empty()) {
-        return smoothedHistory.back();
+        return FiniteNonNegativeOr(smoothedHistory.back());
     }
-    return fallbackValue;
+    return FiniteNonNegativeOr(fallbackValue);
 }
 
 double GetThroughputGraphMax(const std::vector<double>& firstHistory, const std::vector<double>& secondHistory) {
     double rawMax = 10.0;
     for (double value : firstHistory) {
-        rawMax = std::max(rawMax, value);
+        rawMax = std::max(rawMax, FiniteNonNegativeOr(value));
     }
     for (double value : secondHistory) {
-        rawMax = std::max(rawMax, value);
+        rawMax = std::max(rawMax, FiniteNonNegativeOr(value));
     }
     const double roundingStep = rawMax > 100.0 ? 50.0 : 5.0;
     return std::max(10.0, std::ceil(rawMax / roundingStep) * roundingStep);
@@ -83,7 +91,7 @@ std::string BuildBoardMetricLabel(const std::string& name, const char* suffix) {
 }
 
 double ResolveScaleRatio(double value, double scale) {
-    if (scale <= 0.0) {
+    if (!IsFiniteDouble(value) || !IsFiniteDouble(scale) || scale <= 0.0) {
         return 0.0;
     }
     return value / scale;
@@ -100,13 +108,13 @@ const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, c
 double ResolvePeakRatio(const SystemSnapshot& snapshot, const std::string& metricRef, double fallbackRatio) {
     const auto* history = FindRetainedHistory(snapshot, metricRef);
     if (history == nullptr || history->empty()) {
-        return std::clamp(fallbackRatio, 0.0, 1.0);
+        return ClampFinite(fallbackRatio, 0.0, 1.0);
     }
     double peak = 0.0;
     for (double value : *history) {
-        peak = std::max(peak, value);
+        peak = std::max(peak, FiniteNonNegativeOr(value));
     }
-    return std::clamp(peak, 0.0, 1.0);
+    return ClampFinite(peak, 0.0, 1.0);
 }
 
 std::vector<double> ResolveRetainedHistorySamples(const SystemSnapshot& snapshot, const std::string& seriesRef) {
@@ -146,12 +154,13 @@ std::optional<DashboardMetricRow> ResolveMetricRow(
             "Clock", FormatScalarValue(snapshot.cpu.clock, 2), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "cpu.ram") {
-        const double total = snapshot.cpu.memory.totalGb;
-        const double ratio = total > 0.0 ? snapshot.cpu.memory.usedGb / total : 0.0;
-        return DashboardMetricRow{"RAM",
-            FormatMemory(snapshot.cpu.memory.usedGb, total),
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        const double rawTotal = snapshot.cpu.memory.totalGb;
+        const double rawUsed = snapshot.cpu.memory.usedGb;
+        const double total = FiniteNonNegativeOr(rawTotal);
+        const double used = FiniteNonNegativeOr(rawUsed);
+        const double ratio = total > 0.0 ? used / total : 0.0;
+        return DashboardMetricRow{
+            "RAM", FormatMemory(rawUsed, rawTotal), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.temp") {
         const double ratio =
@@ -172,11 +181,13 @@ std::optional<DashboardMetricRow> ResolveMetricRow(
             "Fan", FormatScalarValue(snapshot.gpu.fan, 0), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.vram") {
-        const double total = std::max(1.0, snapshot.gpu.vram.totalGb);
-        const double ratio =
-            snapshot.gpu.vram.totalGb > 0.0 ? snapshot.gpu.vram.usedGb / snapshot.gpu.vram.totalGb : 0.0;
+        const double rawTotalCapacity = snapshot.gpu.vram.totalGb;
+        const double rawUsed = snapshot.gpu.vram.usedGb;
+        const double totalCapacity = FiniteNonNegativeOr(rawTotalCapacity);
+        const double used = FiniteNonNegativeOr(rawUsed);
+        const double ratio = totalCapacity > 0.0 ? used / totalCapacity : 0.0;
         return DashboardMetricRow{
-            "VRAM", FormatMemory(snapshot.gpu.vram.usedGb, total), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+            "VRAM", FormatMemory(rawUsed, rawTotalCapacity), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef.rfind("board.temp.", 0) == 0) {
         return ResolveNamedBoardMetric(snapshot.boardTemperatures,
@@ -231,10 +242,10 @@ const DashboardGaugeMetric& DashboardMetricSource::ResolveGauge(const std::strin
 
     DashboardGaugeMetric metric;
     if (metricRef == "cpu.load") {
-        const double percent = std::clamp(snapshot_.cpu.loadPercent, 0.0, 100.0);
+        const double percent = ClampFinite(snapshot_.cpu.loadPercent, 0.0, 100.0);
         metric = DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "cpu.load", percent / 100.0)};
     } else if (metricRef == "gpu.load") {
-        const double percent = std::clamp(snapshot_.gpu.loadPercent, 0.0, 100.0);
+        const double percent = ClampFinite(snapshot_.gpu.loadPercent, 0.0, 100.0);
         metric = DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "gpu.load", percent / 100.0)};
     }
     return gaugeCache_.emplace(metricRef, metric).first->second;
@@ -343,16 +354,20 @@ const std::vector<DashboardDriveRow>& DashboardMetricSource::ResolveDriveRows() 
         double totalReadMbps = 0.0;
         double totalWriteMbps = 0.0;
         for (const auto& drive : snapshot_.drives) {
-            totalReadMbps += std::max(0.0, drive.readMbps);
-            totalWriteMbps += std::max(0.0, drive.writeMbps);
+            totalReadMbps += FiniteNonNegativeOr(drive.readMbps);
+            totalWriteMbps += FiniteNonNegativeOr(drive.writeMbps);
         }
         for (const auto& drive : snapshot_.drives) {
             const double readActivity =
-                totalReadMbps > 0.0 ? std::clamp(drive.readMbps / totalReadMbps, 0.0, 1.0) : 0.0;
+                totalReadMbps > 0.0 ? ClampFinite(FiniteNonNegativeOr(drive.readMbps) / totalReadMbps, 0.0, 1.0) : 0.0;
             const double writeActivity =
-                totalWriteMbps > 0.0 ? std::clamp(drive.writeMbps / totalWriteMbps, 0.0, 1.0) : 0.0;
-            driveRowsCache_->push_back(DashboardDriveRow{
-                drive.label, readActivity, writeActivity, drive.usedPercent, FormatDriveFree(drive.freeGb)});
+                totalWriteMbps > 0.0 ? ClampFinite(FiniteNonNegativeOr(drive.writeMbps) / totalWriteMbps, 0.0, 1.0)
+                                     : 0.0;
+            driveRowsCache_->push_back(DashboardDriveRow{drive.label,
+                readActivity,
+                writeActivity,
+                ClampFinite(drive.usedPercent, 0.0, 100.0),
+                FormatDriveFree(drive.freeGb)});
         }
     }
     return *driveRowsCache_;

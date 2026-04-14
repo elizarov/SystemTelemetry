@@ -80,6 +80,7 @@
 - `resources/SystemTelemetry.manifest`: embedded Win32 application manifest that keeps the app at `asInvoker`, disables file virtualization so config I/O targets the executable-side `config.ini`, and opts the process into per-monitor DPI-aware rendering.
 - `install.cmd`: elevated deployment script that stops running `SystemTelemetry.exe` instances across user sessions, waits for them to exit before replacing the binary, installs the prebuilt `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, waits for the elevated copy to finish, and leaves automatic startup to the runtime popup-menu toggle.
 - `lint.cmd` + `tools/check_architecture.py`: repo-local lint entry point plus architectural checker that scans non-vendored `src/` headers and implementation files for cross-file declaration ownership mismatches and non-template function bodies in headers; the optional `lint tidy` mode runs the maintained whole-repo `clang-tidy` sweep.
+- `src/numeric_safety.h` + `src/numeric_safety.cpp`: shared finite-value sanitizers for telemetry ingestion and renderer-facing ratio math so resume-time provider glitches degrade to empty-state values instead of reaching Direct2D or floating-point rounding paths.
 - `CMakeLists.txt`: single maintained build graph for the Win32 app plus the mixed-mode Gigabyte board-provider object library.
   - Defines the native source list once and keeps target outputs rooted in `build\`.
   - Exports `compile_commands.json` so `clangd` clients can resolve the project through the maintained CMake build tree.

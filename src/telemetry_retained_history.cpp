@@ -1,5 +1,7 @@
 #include "telemetry_retained_history.h"
 
+#include "numeric_safety.h"
+
 namespace {
 
 constexpr size_t kRecentHistorySamples = 60;
@@ -23,7 +25,7 @@ void PushHistorySample(std::vector<double>& history, double value) {
         return;
     }
     history.erase(history.begin());
-    history.push_back(value);
+    history.push_back(FiniteOr(value, 0.0));
 }
 
 }  // namespace
