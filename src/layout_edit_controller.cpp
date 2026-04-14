@@ -686,11 +686,8 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
             ++candidateIndex;
         }
 
-        const auto snappedWeight = layout_snap_solver::FindNearestSnapWeight(freeWeights[index],
-            combined,
-            threshold,
-            groupedCandidates,
-            [&](int firstWeight) -> std::optional<int> {
+        const auto snappedWeight = layout_snap_solver::FindNearestSnapWeight(
+            freeWeights[index], combined, threshold, groupedCandidates, [&](int firstWeight) -> std::optional<int> {
                 std::vector<int> attemptWeights = freeWeights;
                 attemptWeights[index] = firstWeight;
                 attemptWeights[index + 1] = combined - firstWeight;

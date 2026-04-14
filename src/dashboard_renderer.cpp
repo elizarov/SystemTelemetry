@@ -100,8 +100,7 @@ bool CapsuleContainsSample(double sampleX, double sampleY, double width, double 
     const double dxLeft = sampleX - leftCenterX;
     const double dxRight = sampleX - rightCenterX;
     const double dy = sampleY - centerY;
-    return (dxLeft * dxLeft) + (dy * dy) <= radius * radius ||
-           (dxRight * dxRight) + (dy * dy) <= radius * radius;
+    return (dxLeft * dxLeft) + (dy * dy) <= radius * radius || (dxRight * dxRight) + (dy * dy) <= radius * radius;
 }
 
 void FillDiamond(HDC hdc, const RECT& rect, COLORREF color) {
@@ -435,9 +434,11 @@ int DashboardRenderer::LayoutSimilarityThreshold() const {
     return std::max(0, ScaleLogical(config_.layout.layoutEditor.sizeSimilarityThreshold));
 }
 
-void DashboardRenderer::ResolveNodeWidgets(
-    const LayoutNodeConfig& node, const RECT& rect, std::vector<DashboardWidgetLayout>& widgets) {
-    DashboardLayoutResolver::ResolveNodeWidgets(*this, node, rect, widgets);
+void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node,
+    const RECT& rect,
+    std::vector<DashboardWidgetLayout>& widgets,
+    bool instantiateWidgets) {
+    DashboardLayoutResolver::ResolveNodeWidgets(*this, node, rect, widgets, instantiateWidgets);
 }
 
 void DashboardRenderer::BuildWidgetEditGuides() {
@@ -464,13 +465,14 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     std::vector<std::string>& cardReferenceStack,
     const std::string& renderCardId,
     const std::string& editCardId,
-    const std::vector<size_t>& nodePath) {
+    const std::vector<size_t>& nodePath,
+    bool instantiateWidgets) {
     DashboardLayoutResolver::ResolveNodeWidgetsInternal(
-        *this, node, rect, widgets, cardReferenceStack, renderCardId, editCardId, nodePath);
+        *this, node, rect, widgets, cardReferenceStack, renderCardId, editCardId, nodePath, instantiateWidgets);
 }
 
-bool DashboardRenderer::ResolveLayout() {
-    return DashboardLayoutResolver::ResolveLayout(*this);
+bool DashboardRenderer::ResolveLayout(bool includeWidgetState) {
+    return DashboardLayoutResolver::ResolveLayout(*this, includeWidgetState);
 }
 
 DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
@@ -553,10 +555,10 @@ void DashboardRenderer::DrawText(
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
     const std::wstring& wideText = GetWideText(text);
-    const bool fastSingleLine =
-        !wideText.empty() && (format & DT_SINGLELINE) != 0 && (format & DT_END_ELLIPSIS) == 0 &&
-        (format & DT_PATH_ELLIPSIS) == 0 && (format & DT_WORD_ELLIPSIS) == 0 && (format & DT_WORDBREAK) == 0 &&
-        (format & DT_EDITCONTROL) == 0 && (format & DT_EXPANDTABS) == 0;
+    const bool fastSingleLine = !wideText.empty() && (format & DT_SINGLELINE) != 0 && (format & DT_END_ELLIPSIS) == 0 &&
+                                (format & DT_PATH_ELLIPSIS) == 0 && (format & DT_WORD_ELLIPSIS) == 0 &&
+                                (format & DT_WORDBREAK) == 0 && (format & DT_EDITCONTROL) == 0 &&
+                                (format & DT_EXPANDTABS) == 0;
     if (fastSingleLine) {
         const TextWidthCacheKey cacheKey{font, text};
         SIZE size{};
@@ -919,8 +921,8 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
         return;
     }
 
-    const TextLayoutResult result =
-        measureHdc != nullptr ? MeasureTextBlock(measureHdc, rect, text, font, format) : MeasureTextBlock(rect, text, font, format);
+    const TextLayoutResult result = measureHdc != nullptr ? MeasureTextBlock(measureHdc, rect, text, font, format)
+                                                          : MeasureTextBlock(rect, text, font, format);
     const int anchorSize = std::max(4, ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     const int anchorCenterX = result.textRect.right;
@@ -948,8 +950,12 @@ void DashboardRenderer::RegisterStaticTextAnchor(
     RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, nullptr, font, format, editable);
 }
 
-void DashboardRenderer::RegisterDynamicTextAnchor(
-    HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
+void DashboardRenderer::RegisterDynamicTextAnchor(HDC hdc,
+    const RECT& rect,
+    const std::string& text,
+    HFONT font,
+    UINT format,
+    const EditableAnchorBinding& editable) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
@@ -1593,7 +1599,7 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
     if (!layout_edit::ApplyGuideWeights(config_, target, weights)) {
         return false;
     }
-    return ResolveLayout();
+    return ResolveLayout(false);
 }
 
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableWidget(
@@ -2088,11 +2094,12 @@ const DashboardRenderer::ParsedWidgetInfo* DashboardRenderer::FindParsedWidgetIn
     return &parsedWidgetInfoCache_.emplace(&node, std::move(info)).first->second;
 }
 
-DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const {
+DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(
+    const LayoutNodeConfig& node, const RECT& rect, bool instantiateWidget) const {
     DashboardWidgetLayout widget;
     widget.rect = rect;
     const ParsedWidgetInfo* info = FindParsedWidgetInfo(node);
-    if (info != nullptr) {
+    if (instantiateWidget && info != nullptr) {
         widget.widget = info->widgetPrototype->Clone();
     }
     return widget;

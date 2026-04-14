@@ -260,8 +260,12 @@ public:
         int value);
     void RegisterStaticTextAnchor(
         const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
-    void RegisterDynamicTextAnchor(
-        HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
+    void RegisterDynamicTextAnchor(HDC hdc,
+        const RECT& rect,
+        const std::string& text,
+        HFONT font,
+        UINT format,
+        const EditableAnchorBinding& editable);
     void RegisterDynamicTextAnchor(
         const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
@@ -412,7 +416,8 @@ private:
     void DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect);
     void DrawResolvedWidget(HDC hdc, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
     const ParsedWidgetInfo* FindParsedWidgetInfo(const LayoutNodeConfig& node) const;
-    DashboardWidgetLayout ResolveWidgetLayout(const LayoutNodeConfig& node, const RECT& rect) const;
+    DashboardWidgetLayout ResolveWidgetLayout(
+        const LayoutNodeConfig& node, const RECT& rect, bool instantiateWidget) const;
     bool UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
@@ -428,7 +433,8 @@ private:
         std::vector<std::string>& cardReferenceStack,
         const std::string& renderCardId,
         const std::string& editCardId,
-        const std::vector<size_t>& nodePath);
+        const std::vector<size_t>& nodePath,
+        bool instantiateWidgets);
     void BuildWidgetEditGuides();
     void BuildStaticEditableAnchors();
     std::optional<LayoutWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
@@ -440,9 +446,11 @@ private:
     bool LoadPanelIcons();
     void ReleasePanelIcons();
     bool MeasureFonts();
-    bool ResolveLayout();
-    void ResolveNodeWidgets(
-        const LayoutNodeConfig& node, const RECT& rect, std::vector<DashboardWidgetLayout>& widgets);
+    bool ResolveLayout(bool includeWidgetState = true);
+    void ResolveNodeWidgets(const LayoutNodeConfig& node,
+        const RECT& rect,
+        std::vector<DashboardWidgetLayout>& widgets,
+        bool instantiateWidgets = true);
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
     int EffectiveHeaderHeight() const;
     bool SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const;

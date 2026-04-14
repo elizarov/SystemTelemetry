@@ -19,31 +19,31 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured result reached during this workstream:
-  - `drag_loop per_iter_ms=4.80`
-  - `snap avg_ms=0.47`
-  - `paint_draw avg_ms=3.83`
+  - `drag_loop per_iter_ms=4.50`
+  - `snap avg_ms=0.19`
+  - `paint_draw avg_ms=3.78`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=5.4` to `6.1`
-  - `snap avg_ms=0.48` to `0.53`
-  - `apply avg_ms=0.44` to `0.55`
-  - `paint_draw avg_ms=4.28` to `4.86`
+  - `drag_loop per_iter_ms=5.05` to `5.55`
+  - `snap avg_ms=0.21` to `0.22`
+  - `apply avg_ms=0.42` to `0.47`
+  - `paint_draw avg_ms=4.17` to `4.57`
 
 ## Current Confirmed Hotspots
 
 Confirmed inclusive hotspots from the latest useful WPR capture in this workstream:
 
-- `DashboardRenderer::Draw` about `44%`
-- `DashboardLayoutResolver::ResolveLayout` about `19%`
-- `ThroughputWidget::Draw` about `12%`
-- ``anonymous namespace'::DrawGraph`` about `12%`
-- `GaugeWidget::Draw` about `11%`
-- `DashboardRenderer::RegisterTextAnchor` and `RegisterStaticTextAnchor` both around `10%`
+- `DashboardRenderer::Draw` about `58%`
+- `ThroughputWidget::Draw` about `18%`
+- ``anonymous namespace'::DrawGraph`` about `18%`
+- `GaugeWidget::Draw` about `13%`
+- `DashboardRenderer::RegisterTextAnchor` about `12.5%`
+- `DashboardRenderer::RegisterStaticTextAnchor` about `12.5%`
 
 Interpretation:
 
-- Snap-path work is no longer the main limiter after the latest gauge-layout optimization.
-- The remaining wall time is now dominated by real paint work, especially throughput graph drawing and gauge fills.
-- Layout resolution still matters, but its cost dropped materially once gauge relayout stopped prebuilding unused cumulative fill paths.
+- Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
+- The remaining wall time is now dominated by real paint work, especially throughput graph drawing, gauge fills, and edit-mode text-anchor registration.
+- `DashboardLayoutResolver::ResolveLayout` no longer appears among the top benchmark user-mode functions in the latest useful capture, which matches the large drop in `snap avg_ms`.
 
 ## Kept Optimizations
 
@@ -53,6 +53,7 @@ These changes produced real wins and remain in the codebase:
 - Group snap candidates by widget so one snap search can serve multiple target extents with shared extent evaluation.
 - Refactor layout similarity indicator collection to avoid repeated representative scans and reduce per-frame container churn.
 - Build only the one live gauge usage-fill path that the current metric needs instead of prebuilding every cumulative gauge fill path during each relayout.
+- Resolve snap-preview guide probes through an extent-only layout pass that skips widget instantiation, widget layout-state caching, and edit-artifact rebuilds.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 
 ## Tested Hypotheses
@@ -104,6 +105,20 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Prebuilding unused cumulative gauge fill paths was the largest remaining source of avoidable relayout churn in the drag path, and deferring that work until the one live fill count is known is worth keeping.
 
+### Hypothesis: Use an extent-only layout resolve for snap-preview probes
+
+- Change:
+  - Keep renderer-side preview weight application, but resolve only the card and widget rectangles needed for extent comparison during snap probing instead of instantiating widgets, finalizing class groups, rebuilding widget layout state, and rebuilding edit artifacts on every tentative guide weight.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - `drag_loop per_iter_ms` improved from about `4.80` to about `4.50`.
+  - `snap avg_ms` improved from about `0.47` to about `0.19` to `0.20`.
+  - `apply avg_ms` stayed about flat at `0.37` to `0.38`.
+  - `paint_draw avg_ms` stayed about flat or slightly better at `3.78` to `3.87`.
+- Conclusion:
+  - Snap probing only needs resolved extents, so reusing the full widget-state resolve path for those tentative weights was avoidable overhead and is worth skipping.
+
 ### Hypothesis: Replace throughput `Polyline` with incremental `MoveToEx` and `LineTo`
 
 - Change:
@@ -140,6 +155,19 @@ These changes produced real wins and remain in the codebase:
   - `DrawTextBlock` adds layout work to the fast single-line text path, so avoiding one later measurement cost more than it saved.
 - Conclusion:
   - The current fast single-line draw path is more valuable than consolidating measurement into the draw call.
+
+### Hypothesis: Replace text-anchor `DT_CALCRECT` measurement with cached single-line extents
+
+- Change:
+  - Add a fast single-line text-layout path inside `MeasureTextBlock` so text-anchor registration can avoid `DrawTextW(...DT_CALCRECT)` for simple one-line labels.
+- Result:
+  - Neutral to slightly worse and was reverted.
+- Observed effect:
+  - Post-rebuild reruns stayed around `drag_loop per_iter_ms=5.34` to `5.47`, `snap avg_ms=0.22` to `0.23`, `apply avg_ms=0.45`, and `paint_draw avg_ms=4.38` to `4.52`.
+- Why it failed:
+  - The anchor-registration measurement cost is not isolated enough for this micro-optimization to move the real drag benchmark, and the extra branching did not produce a clear win.
+- Conclusion:
+  - Text-anchor work still matters, but this specific single-line measurement shortcut is not worth keeping as-is.
 
 ### Hypothesis: Reuse a throughput plot-point scratch buffer
 
@@ -193,6 +221,7 @@ These changes produced real wins and remain in the codebase:
   - reducing throughput graph draw cost without replacing `Polyline` with per-segment line commands
   - reducing the amount of GDI+ work inside `GaugeWidget::Draw`
   - trimming text-anchor registration cost when layout-edit behavior can stay identical
+  - favoring draw-path work over additional snap-path work unless a new experiment also moves `apply`
 
 ## Validation Notes
 

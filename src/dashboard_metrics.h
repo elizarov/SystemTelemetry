@@ -55,7 +55,8 @@ public:
 
     const std::string& ResolveText(const std::string& metricRef) const;
     const DashboardGaugeMetric& ResolveGauge(const std::string& metricRef) const;
-    const std::vector<DashboardMetricRow>& ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const;
+    const std::vector<DashboardMetricRow>& ResolveMetricList(
+        const std::vector<DashboardMetricListEntry>& metricRefs) const;
     const DashboardThroughputMetric& ResolveThroughput(const std::string& metricRef) const;
     const std::string& ResolveNetworkFooter() const;
     const std::vector<DashboardDriveRow>& ResolveDriveRows() const;
