@@ -112,16 +112,13 @@ bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& ta
 }
 
 std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer,
-    const AppConfig& baseConfig,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,
     const DashboardRenderer::LayoutWidgetIdentity& widget,
     DashboardRenderer::LayoutGuideAxis axis) {
-    AppConfig candidateConfig = baseConfig;
-    if (!ApplyGuideWeights(candidateConfig, target, weights)) {
+    if (!renderer.ApplyLayoutGuideWeightsPreview(target.editCardId, target.nodePath, weights)) {
         return std::nullopt;
     }
-    renderer.SetConfig(candidateConfig);
     return renderer.FindLayoutWidgetExtent(widget, axis);
 }
 

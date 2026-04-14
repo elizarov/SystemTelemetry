@@ -17,7 +17,6 @@ std::vector<int> SeedGuideWeights(const DashboardRenderer::LayoutEditGuide& guid
 bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
 
 std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer,
-    const AppConfig& baseConfig,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,
     const DashboardRenderer::LayoutWidgetIdentity& widget,

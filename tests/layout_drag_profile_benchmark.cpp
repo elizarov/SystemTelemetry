@@ -339,7 +339,7 @@ private:
         const std::vector<int>& weights,
         const DashboardRenderer::LayoutWidgetIdentity& widget,
         DashboardRenderer::LayoutGuideAxis axis) override {
-        return layout_edit::EvaluateWidgetExtentForGuideWeights(renderer_, config_, target, weights, widget, axis);
+        return layout_edit::EvaluateWidgetExtentForGuideWeights(renderer_, target, weights, widget, axis);
     }
 
     bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override {

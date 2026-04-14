@@ -667,26 +667,35 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
         return std::nullopt;
     }
 
-    for (const auto& candidate : drag.snapCandidates) {
-        const auto snappedWeight = layout_snap_solver::FindNearestSnapWeight(freeWeights[index],
-            combined,
-            threshold,
-            {layout_snap_solver::SnapCandidate{
+    for (size_t candidateIndex = 0; candidateIndex < drag.snapCandidates.size();) {
+        const auto& widget = drag.snapCandidates[candidateIndex].widget;
+        std::vector<layout_snap_solver::SnapCandidate> groupedCandidates;
+        while (candidateIndex < drag.snapCandidates.size() &&
+               WidgetIdentityEquals(drag.snapCandidates[candidateIndex].widget, widget)) {
+            const auto& candidate = drag.snapCandidates[candidateIndex];
+            groupedCandidates.push_back(layout_snap_solver::SnapCandidate{
                 candidate.targetExtent,
                 candidate.startDistance,
                 candidate.groupOrder,
-            }},
+            });
+            ++candidateIndex;
+        }
+
+        const auto snappedWeight = layout_snap_solver::FindNearestSnapWeight(freeWeights[index],
+            combined,
+            threshold,
+            groupedCandidates,
             [&](int firstWeight) -> std::optional<int> {
                 std::vector<int> attemptWeights = freeWeights;
                 attemptWeights[index] = firstWeight;
                 attemptWeights[index + 1] = combined - firstWeight;
-                const ExtentCacheKey cacheKey{attemptWeights, candidate.widget};
+                const ExtentCacheKey cacheKey{attemptWeights, widget};
                 if (const auto cached = drag.extentCache.find(cacheKey); cached != drag.extentCache.end()) {
                     return cached->second;
                 }
 
                 std::optional<int> extent = host_.EvaluateLayoutWidgetExtentForWeights(
-                    LayoutEditHost::LayoutTarget::ForGuide(drag.guide), attemptWeights, candidate.widget, drag.guide.axis);
+                    LayoutEditHost::LayoutTarget::ForGuide(drag.guide), attemptWeights, widget, drag.guide.axis);
                 drag.extentCache.emplace(std::move(cacheKey), extent);
                 return extent;
             });

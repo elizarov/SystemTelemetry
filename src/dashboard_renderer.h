@@ -204,6 +204,8 @@ public:
     int LayoutSimilarityThreshold() const;
     std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
     std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
+    bool ApplyLayoutGuideWeightsPreview(
+        const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
     std::optional<LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
     std::optional<EditableAnchorKey> HitTestEditableAnchorTarget(POINT clientPoint) const;
     std::optional<EditableAnchorKey> HitTestEditableAnchorHandle(POINT clientPoint) const;

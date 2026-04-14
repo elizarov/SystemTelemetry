@@ -1,5 +1,6 @@
 #include "dashboard_renderer.h"
 #include "dashboard_layout_resolver.h"
+#include "layout_edit_service.h"
 #include "layout_edit_parameter.h"
 
 #include <algorithm>
@@ -1552,6 +1553,17 @@ std::optional<int> DashboardRenderer::FindLayoutWidgetExtent(
         }
     }
     return std::nullopt;
+}
+
+bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
+    const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights) {
+    LayoutEditHost::LayoutTarget target;
+    target.editCardId = editCardId;
+    target.nodePath = nodePath;
+    if (!layout_edit::ApplyGuideWeights(config_, target, weights)) {
+        return false;
+    }
+    return ResolveLayout();
 }
 
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableWidget(

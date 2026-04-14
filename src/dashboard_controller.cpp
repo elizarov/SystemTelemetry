@@ -381,8 +381,7 @@ std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(Das
     const std::vector<int>& weights,
     const DashboardRenderer::LayoutWidgetIdentity& widget,
     DashboardRenderer::LayoutGuideAxis axis) {
-    return layout_edit::EvaluateWidgetExtentForGuideWeights(
-        shell.Renderer(), state_.config, target, weights, widget, axis);
+    return layout_edit::EvaluateWidgetExtentForGuideWeights(shell.Renderer(), target, weights, widget, axis);
 }
 
 AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {

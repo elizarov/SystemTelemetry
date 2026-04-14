@@ -58,22 +58,6 @@ ThroughputGraphLayout ComputeGraphLayout(const DashboardRenderer& renderer, cons
     return layout;
 }
 
-POINT ThroughputLastPoint(const ThroughputGraphLayout& layout, const std::vector<double>& history, double maxValue) {
-    POINT lastPoint{layout.graphLeft, layout.graphBottom};
-    if (history.empty()) {
-        return lastPoint;
-    }
-
-    const size_t historyDenominator = std::max<size_t>(1, history.size() - 1);
-    for (size_t i = 0; i < history.size(); ++i) {
-        const double valueRatio = std::clamp(history[i] / maxValue, 0.0, 1.0);
-        const int x = layout.graphLeft + static_cast<int>(i * layout.plotWidth / historyDenominator);
-        const int y = layout.graphBottom - static_cast<int>(std::round(valueRatio * layout.plotHeight));
-        lastPoint = POINT{x, y};
-    }
-    return lastPoint;
-}
-
 void DrawGraph(DashboardRenderer& renderer,
     HDC hdc,
     const RECT& rect,
@@ -172,7 +156,7 @@ void DrawGraph(DashboardRenderer& renderer,
     }
 
     if (!history.empty() && layout.leaderDiameter > 0) {
-        const POINT lastPoint = plotPoints.empty() ? ThroughputLastPoint(layout, history, maxValue) : plotPoints.back();
+        const POINT lastPoint = plotPoints.empty() ? POINT{layout.graphLeft, layout.graphBottom} : plotPoints.back();
         FillCircle(renderer, hdc, lastPoint.x, lastPoint.y, layout.leaderDiameter, plotColor);
     }
 }
