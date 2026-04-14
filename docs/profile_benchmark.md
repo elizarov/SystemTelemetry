@@ -23,10 +23,10 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=0.20`
   - `paint_draw avg_ms=3.73`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=4.43` to `5.70`
-  - `snap avg_ms=0.19` to `0.21`
-  - `apply avg_ms=0.38` to `0.49`
-  - `paint_draw avg_ms=3.73` to `4.69`
+  - `drag_loop per_iter_ms=6.32`
+  - `snap avg_ms=0.20`
+  - `apply avg_ms=0.56` to `0.57`
+  - `paint_draw avg_ms=4.97` to `4.98`
 
 ## Current Confirmed Hotspots
 
@@ -317,6 +317,22 @@ These changes produced real wins and remain in the codebase:
   - Binding a Direct2D DC render target onto the current compatible-bitmap backbuffer adds much more interop cost than the saved primitive work on this benchmark path.
 - Conclusion:
   - Do not retry Direct2D through `ID2D1DCRenderTarget` on top of the current GDI memory-DC backbuffer. If Direct2D is revisited, it needs a real HWND or DXGI-owned target path rather than this interop layer.
+
+### Hypothesis: Move throughput and gauge drawing onto a real HWND-backed Direct2D target
+
+- Change:
+  - Add a renderer-owned `ID2D1HwndRenderTarget` plus GDI interop passes, route throughput graph primitives and gauge fills through that hybrid window-backed Direct2D path, and benchmark it against the same layout-edit drag workload.
+- Result:
+  - Regressed and was reverted.
+- Observed effect:
+  - `drag_loop per_iter_ms` rose to about `7.73` to `7.74`.
+  - `snap avg_ms` rose to about `0.24`.
+  - `apply avg_ms` rose to about `0.55` to `0.62`.
+  - `paint_draw avg_ms` rose to about `6.87` to `6.94`.
+- Why it failed:
+  - The mixed GDI and Direct2D window passes still paid enough interop and extra frame-pass overhead to outweigh the faster primitive drawing.
+- Conclusion:
+  - A partial real-HWND Direct2D migration is not competitive on this benchmark path. If Direct2D is revisited, it likely needs a more complete renderer rewrite that avoids the mixed GDI and Direct2D pass structure.
 
 ### Hypothesis: Reuse one GDI+ `Graphics` object across the whole frame
 
