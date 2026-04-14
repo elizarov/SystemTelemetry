@@ -446,7 +446,6 @@ private:
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
     int EffectiveHeaderHeight() const;
     bool SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const;
-    bool IsFirstWidgetForSimilarityIndicator(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;
     std::vector<const DashboardWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
     int WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const DashboardWidgetLayout& widget, const LayoutEditGuide& guide) const;

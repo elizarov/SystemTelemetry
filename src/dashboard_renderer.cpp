@@ -15,6 +15,8 @@
 #include <objidl.h>
 #include <optional>
 #include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <gdiplus.h>
@@ -1047,11 +1049,23 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
         DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
         int extent = 0;
 
+        bool operator==(const SimilarityTypeKey& other) const {
+            return widgetClass == other.widgetClass && extent == other.extent;
+        }
+
         bool operator<(const SimilarityTypeKey& other) const {
             if (widgetClass != other.widgetClass) {
                 return widgetClass < other.widgetClass;
             }
             return extent < other.extent;
+        }
+    };
+
+    struct SimilarityTypeKeyHash {
+        size_t operator()(const SimilarityTypeKey& key) const {
+            size_t hash = std::hash<int>{}(static_cast<int>(key.widgetClass));
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.extent);
+            return hash;
         }
     };
 
@@ -1087,8 +1101,19 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
         return;
     }
 
-    std::set<const DashboardWidgetLayout*> visibleWidgets;
-    std::map<const DashboardWidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
+    std::unordered_map<DashboardWidgetClass, std::vector<const DashboardWidgetLayout*>> widgetsByClass;
+    widgetsByClass.reserve(allWidgets.size());
+    for (const DashboardWidgetLayout* widget : allWidgets) {
+        if (widget->widget == nullptr) {
+            continue;
+        }
+        widgetsByClass[widget->widget->Class()].push_back(widget);
+    }
+
+    std::unordered_set<const DashboardWidgetLayout*> visibleWidgets;
+    visibleWidgets.reserve(allWidgets.size());
+    std::unordered_map<const DashboardWidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
+    exactTypeByWidget.reserve(allWidgets.size());
     for (const DashboardWidgetLayout* affected : affectedWidgets) {
         const int affectedExtent = WidgetExtentForAxis(*affected, axis);
         if (affectedExtent <= 0 || affected->widget == nullptr) {
@@ -1096,7 +1121,11 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
         }
         const SimilarityTypeKey typeKey{affected->widget->Class(), affectedExtent};
         bool hasExactMatch = false;
-        for (const DashboardWidgetLayout* candidate : allWidgets) {
+        const auto classIt = widgetsByClass.find(typeKey.widgetClass);
+        if (classIt == widgetsByClass.end()) {
+            continue;
+        }
+        for (const DashboardWidgetLayout* candidate : classIt->second) {
             if (candidate == affected || candidate->widget == nullptr ||
                 candidate->widget->Class() != affected->widget->Class()) {
                 continue;
@@ -1117,7 +1146,8 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
         }
     }
 
-    std::map<SimilarityTypeKey, int> exactTypeOrdinals;
+    std::unordered_map<SimilarityTypeKey, int, SimilarityTypeKeyHash> exactTypeOrdinals;
+    exactTypeOrdinals.reserve(exactTypeByWidget.size());
     int nextOrdinal = 1;
     for (const DashboardWidgetLayout* widget : allWidgets) {
         if (!visibleWidgets.contains(widget)) {
@@ -1941,45 +1971,57 @@ bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const DashboardWidgetL
     return true;
 }
 
-bool DashboardRenderer::IsFirstWidgetForSimilarityIndicator(
-    const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {
-    const int extent = WidgetExtentForAxis(widget, axis);
-    if (extent <= 0) {
-        return false;
-    }
-
-    for (const auto& card : resolvedLayout_.cards) {
-        for (const auto& candidate : card.widgets) {
-            if (&candidate == &widget || candidate.cardId != widget.cardId || candidate.widget == nullptr ||
-                widget.widget == nullptr || candidate.widget->Class() != widget.widget->Class()) {
-                continue;
-            }
-            if (!SupportsLayoutSimilarityIndicator(candidate) || WidgetExtentForAxis(candidate, axis) != extent) {
-                continue;
-            }
-
-            if (axis == LayoutGuideAxis::Vertical) {
-                if (candidate.rect.left == widget.rect.left && candidate.rect.right == widget.rect.right &&
-                    candidate.rect.top < widget.rect.top) {
-                    return false;
-                }
-            } else {
-                if (candidate.rect.top == widget.rect.top && candidate.rect.bottom == widget.rect.bottom &&
-                    candidate.rect.left < widget.rect.left) {
-                    return false;
-                }
-            }
-        }
-    }
-    return true;
-}
-
 std::vector<const DashboardWidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWidgets(
     LayoutGuideAxis axis) const {
+    struct SimilarityRepresentativeKey {
+        std::string cardId;
+        DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
+        int extent = 0;
+        int edgeStart = 0;
+        int edgeEnd = 0;
+
+        bool operator==(const SimilarityRepresentativeKey& other) const {
+            return cardId == other.cardId && widgetClass == other.widgetClass && extent == other.extent &&
+                   edgeStart == other.edgeStart && edgeEnd == other.edgeEnd;
+        }
+    };
+
+    struct SimilarityRepresentativeKeyHash {
+        size_t operator()(const SimilarityRepresentativeKey& key) const {
+            size_t hash = std::hash<std::string>{}(key.cardId);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(static_cast<int>(key.widgetClass));
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.extent);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.edgeStart);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.edgeEnd);
+            return hash;
+        }
+    };
+
     std::vector<const DashboardWidgetLayout*> widgets;
+    std::unordered_set<SimilarityRepresentativeKey, SimilarityRepresentativeKeyHash> seenKeys;
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (!SupportsLayoutSimilarityIndicator(widget) || !IsFirstWidgetForSimilarityIndicator(widget, axis)) {
+            if (!SupportsLayoutSimilarityIndicator(widget) || widget.widget == nullptr) {
+                continue;
+            }
+
+            const int extent = WidgetExtentForAxis(widget, axis);
+            if (extent <= 0) {
+                continue;
+            }
+
+            SimilarityRepresentativeKey key;
+            key.cardId = widget.cardId;
+            key.widgetClass = widget.widget->Class();
+            key.extent = extent;
+            if (axis == LayoutGuideAxis::Vertical) {
+                key.edgeStart = widget.rect.left;
+                key.edgeEnd = widget.rect.right;
+            } else {
+                key.edgeStart = widget.rect.top;
+                key.edgeEnd = widget.rect.bottom;
+            }
+            if (!seenKeys.insert(std::move(key)).second) {
                 continue;
             }
             widgets.push_back(&widget);
