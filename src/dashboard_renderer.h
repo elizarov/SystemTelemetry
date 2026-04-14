@@ -61,6 +61,7 @@ public:
         enum class Kind {
             Widget,
             CardChrome,
+            DashboardChrome,
         };
 
         Kind kind = Kind::Widget;
@@ -124,6 +125,23 @@ public:
         int dragDirection = 1;
     };
 
+    struct GapEditAnchorKey {
+        LayoutWidgetIdentity widget;
+        LayoutEditParameter parameter = LayoutEditParameter::CardRowGap;
+        std::vector<size_t> nodePath;
+    };
+
+    struct GapEditAnchor {
+        LayoutGuideAxis axis = LayoutGuideAxis::Vertical;
+        GapEditAnchorKey key;
+        RenderPoint drawStart{};
+        RenderPoint drawEnd{};
+        RenderRect handleRect{};
+        RenderRect hitRect{};
+        AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
+        double value = 0.0;
+    };
+
     struct LayoutGuideSnapCandidate {
         LayoutWidgetIdentity widget;
         int targetExtent = 0;
@@ -154,9 +172,12 @@ public:
         bool showLayoutEditGuides = false;
         SimilarityIndicatorMode similarityIndicatorMode = SimilarityIndicatorMode::ActiveGuide;
         std::optional<LayoutEditGuide> activeLayoutEditGuide;
+        std::optional<LayoutWidgetIdentity> hoveredLayoutCard;
         std::optional<LayoutWidgetIdentity> hoveredEditableCard;
         std::optional<LayoutWidgetIdentity> hoveredEditableWidget;
         std::optional<WidgetEditGuide> activeWidgetEditGuide;
+        std::optional<GapEditAnchorKey> hoveredGapEditAnchor;
+        std::optional<GapEditAnchorKey> activeGapEditAnchor;
         std::optional<EditableAnchorKey> hoveredEditableAnchor;
         std::optional<EditableAnchorKey> activeEditableAnchor;
         MoveOverlayState moveOverlay{};
@@ -213,13 +234,17 @@ public:
     void SetTraceOutput(std::ostream* traceOutput);
     const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
     const std::vector<WidgetEditGuide>& WidgetEditGuides() const;
+    const std::vector<GapEditAnchor>& GapEditAnchors() const;
     int LayoutSimilarityThreshold() const;
     std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
     std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
     bool ApplyLayoutGuideWeightsPreview(
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
+    std::optional<LayoutWidgetIdentity> HitTestLayoutCard(RenderPoint clientPoint) const;
     std::optional<LayoutWidgetIdentity> HitTestEditableCard(RenderPoint clientPoint) const;
     std::optional<LayoutWidgetIdentity> HitTestEditableWidget(RenderPoint clientPoint) const;
+    std::optional<GapEditAnchorKey> HitTestGapEditAnchor(RenderPoint clientPoint) const;
+    std::optional<GapEditAnchor> FindGapEditAnchor(const GapEditAnchorKey& key) const;
     std::optional<EditableAnchorKey> HitTestEditableAnchorTarget(RenderPoint clientPoint) const;
     std::optional<EditableAnchorKey> HitTestEditableAnchorHandle(RenderPoint clientPoint) const;
     std::optional<EditableAnchorRegion> FindEditableAnchorRegion(const EditableAnchorKey& key) const;
@@ -298,6 +323,7 @@ public:
         const TextLayoutOptions& options,
         const EditableAnchorBinding& editable);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
+    std::vector<GapEditAnchor>& GapEditAnchorsMutable();
     int ScaleLogical(int value) const;
     int MeasureTextWidth(TextStyleId style, std::string_view text) const;
 
@@ -462,6 +488,7 @@ private:
     void DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
     void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
+    void DrawGapEditAnchors(const EditOverlayState& overlayState) const;
     void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
     void DrawMoveOverlay(const MoveOverlayState& overlayState);
     void DrawPanel(const ResolvedCardLayout& card);
@@ -525,6 +552,7 @@ private:
     int WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const DashboardWidgetLayout& widget, const LayoutEditGuide& guide) const;
     bool MatchesWidgetIdentity(const DashboardWidgetLayout& widget, const LayoutWidgetIdentity& identity) const;
+    bool MatchesGapEditAnchorKey(const GapEditAnchorKey& left, const GapEditAnchorKey& right) const;
     bool MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const;
     bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const;
     bool MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const;
@@ -565,6 +593,7 @@ private:
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<WidgetEditGuide> widgetEditGuides_;
+    std::vector<GapEditAnchor> gapEditAnchors_;
     std::vector<EditableAnchorRegion> staticEditableAnchorRegions_;
     std::vector<EditableAnchorRegion> dynamicEditableAnchorRegions_;
     bool dynamicAnchorRegistrationEnabled_ = false;

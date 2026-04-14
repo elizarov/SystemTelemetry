@@ -329,6 +329,10 @@ std::vector<DashboardRenderer::WidgetEditGuide>& DashboardRenderer::WidgetEditGu
     return widgetEditGuides_;
 }
 
+std::vector<DashboardRenderer::GapEditAnchor>& DashboardRenderer::GapEditAnchorsMutable() {
+    return gapEditAnchors_;
+}
+
 int DashboardRenderer::WindowWidth() const {
     return std::max(1, ScaleLogical(config_.layout.structure.window.width));
 }
@@ -383,6 +387,10 @@ const std::vector<DashboardRenderer::LayoutEditGuide>& DashboardRenderer::Layout
 
 const std::vector<DashboardRenderer::WidgetEditGuide>& DashboardRenderer::WidgetEditGuides() const {
     return widgetEditGuides_;
+}
+
+const std::vector<DashboardRenderer::GapEditAnchor>& DashboardRenderer::GapEditAnchors() const {
+    return gapEditAnchors_;
 }
 
 int DashboardRenderer::LayoutSimilarityThreshold() const {
@@ -648,6 +656,72 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
     }
 }
 
+void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState) const {
+    if (!overlayState.showLayoutEditGuides || gapEditAnchors_.empty()) {
+        return;
+    }
+
+    const auto shouldDraw = [&](const GapEditAnchor& anchor) {
+        if (overlayState.activeGapEditAnchor.has_value()) {
+            if (anchor.key.widget.kind == LayoutWidgetIdentity::Kind::DashboardChrome) {
+                return overlayState.activeGapEditAnchor->widget.kind == LayoutWidgetIdentity::Kind::DashboardChrome;
+            }
+            return overlayState.activeGapEditAnchor->widget.kind == LayoutWidgetIdentity::Kind::CardChrome &&
+                   anchor.key.widget.renderCardId == overlayState.activeGapEditAnchor->widget.renderCardId &&
+                   anchor.key.widget.editCardId == overlayState.activeGapEditAnchor->widget.editCardId;
+        }
+        if (anchor.key.widget.kind == LayoutWidgetIdentity::Kind::DashboardChrome) {
+            return !overlayState.hoveredLayoutCard.has_value();
+        }
+        return overlayState.hoveredLayoutCard.has_value() &&
+               anchor.key.widget.renderCardId == overlayState.hoveredLayoutCard->renderCardId &&
+               anchor.key.widget.editCardId == overlayState.hoveredLayoutCard->editCardId;
+    };
+
+    const int capHalf = (std::max)(2, ScaleLogical(4));
+    const int lineWidth = (std::max)(1, ScaleLogical(1));
+    const int handleOutline = (std::max)(1, ScaleLogical(1));
+    for (const auto& anchor : gapEditAnchors_) {
+        if (!shouldDraw(anchor)) {
+            continue;
+        }
+        const bool active = overlayState.activeGapEditAnchor.has_value() &&
+                            MatchesGapEditAnchorKey(anchor.key, *overlayState.activeGapEditAnchor);
+        const bool hovered = overlayState.hoveredGapEditAnchor.has_value() &&
+                             MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
+        const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
+
+        const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+            anchor.drawStart, anchor.drawEnd, RenderStroke::Solid(color, static_cast<float>(lineWidth)));
+        if (anchor.axis == LayoutGuideAxis::Vertical) {
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{anchor.drawStart.x - capHalf, anchor.drawStart.y},
+                RenderPoint{anchor.drawStart.x + capHalf, anchor.drawStart.y},
+                RenderStroke::Solid(color, static_cast<float>(lineWidth)));
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{anchor.drawEnd.x - capHalf, anchor.drawEnd.y},
+                RenderPoint{anchor.drawEnd.x + capHalf, anchor.drawEnd.y},
+                RenderStroke::Solid(color, static_cast<float>(lineWidth)));
+        } else {
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{anchor.drawStart.x, anchor.drawStart.y - capHalf},
+                RenderPoint{anchor.drawStart.x, anchor.drawStart.y + capHalf},
+                RenderStroke::Solid(color, static_cast<float>(lineWidth)));
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{anchor.drawEnd.x, anchor.drawEnd.y - capHalf},
+                RenderPoint{anchor.drawEnd.x, anchor.drawEnd.y + capHalf},
+                RenderStroke::Solid(color, static_cast<float>(lineWidth)));
+        }
+
+        if (active || hovered) {
+            const_cast<DashboardRenderer*>(this)->FillSolidRect(anchor.handleRect, color);
+        } else {
+            const_cast<DashboardRenderer*>(this)->DrawSolidRect(
+                anchor.handleRect, RenderStroke::Solid(color, static_cast<float>(handleOutline)));
+        }
+    }
+}
+
 int DashboardRenderer::WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {
     return axis == LayoutGuideAxis::Vertical ? std::max(0, static_cast<int>(widget.rect.right - widget.rect.left))
                                              : std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
@@ -665,8 +739,7 @@ bool DashboardRenderer::IsWidgetAffectedByGuide(
 bool DashboardRenderer::MatchesWidgetIdentity(
     const DashboardWidgetLayout& widget, const LayoutWidgetIdentity& identity) const {
     return identity.kind == LayoutWidgetIdentity::Kind::Widget && widget.cardId == identity.renderCardId &&
-           widget.editCardId == identity.editCardId &&
-           widget.nodePath == identity.nodePath;
+           widget.editCardId == identity.editCardId && widget.nodePath == identity.nodePath;
 }
 
 bool DashboardRenderer::MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const {
@@ -674,17 +747,22 @@ bool DashboardRenderer::MatchesLayoutEditGuide(const LayoutEditGuide& left, cons
            left.nodePath == right.nodePath && left.separatorIndex == right.separatorIndex;
 }
 
-bool DashboardRenderer::MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const {
-    return left.parameter == right.parameter && left.anchorId == right.anchorId && left.widget.kind == right.widget.kind &&
+bool DashboardRenderer::MatchesGapEditAnchorKey(const GapEditAnchorKey& left, const GapEditAnchorKey& right) const {
+    return left.parameter == right.parameter && left.widget.kind == right.widget.kind &&
            left.widget.renderCardId == right.widget.renderCardId && left.widget.editCardId == right.widget.editCardId &&
-           left.widget.nodePath == right.widget.nodePath;
+           left.widget.nodePath == right.widget.nodePath && left.nodePath == right.nodePath;
+}
+
+bool DashboardRenderer::MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const {
+    return left.parameter == right.parameter && left.anchorId == right.anchorId &&
+           left.widget.kind == right.widget.kind && left.widget.renderCardId == right.widget.renderCardId &&
+           left.widget.editCardId == right.widget.editCardId && left.widget.nodePath == right.widget.nodePath;
 }
 
 bool DashboardRenderer::MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const {
     return left.axis == right.axis && left.parameter == right.parameter && left.guideId == right.guideId &&
-           left.widget.kind == right.widget.kind &&
-           left.widget.renderCardId == right.widget.renderCardId && left.widget.editCardId == right.widget.editCardId &&
-           left.widget.nodePath == right.widget.nodePath;
+           left.widget.kind == right.widget.kind && left.widget.renderCardId == right.widget.renderCardId &&
+           left.widget.editCardId == right.widget.editCardId && left.widget.nodePath == right.widget.nodePath;
 }
 
 DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBinding(
@@ -1352,6 +1430,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     DrawHoveredWidgetHighlight(overlayState);
     DrawHoveredEditableAnchorHighlight(overlayState);
     DrawLayoutEditGuides(overlayState);
+    DrawGapEditAnchors(overlayState);
     DrawWidgetEditGuides(overlayState);
     DrawLayoutSimilarityIndicators(overlayState);
     DrawMoveOverlay(overlayState.moveOverlay);
@@ -1603,6 +1682,16 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
     return ResolveLayout(false);
 }
 
+std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestLayoutCard(
+    RenderPoint clientPoint) const {
+    for (const auto& card : resolvedLayout_.cards) {
+        if (card.rect.Contains(clientPoint)) {
+            return LayoutWidgetIdentity{card.id, card.id, {}, LayoutWidgetIdentity::Kind::CardChrome};
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableCard(
     RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
@@ -1625,6 +1714,24 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
         }
     }
     return std::nullopt;
+}
+
+std::optional<DashboardRenderer::GapEditAnchorKey> DashboardRenderer::HitTestGapEditAnchor(
+    RenderPoint clientPoint) const {
+    const GapEditAnchor* bestAnchor = nullptr;
+    int bestPriority = 0;
+    for (auto it = gapEditAnchors_.rbegin(); it != gapEditAnchors_.rend(); ++it) {
+        if (!it->hitRect.Contains(clientPoint)) {
+            continue;
+        }
+
+        const int priority = GetLayoutEditParameterHitPriority(it->key.parameter);
+        if (bestAnchor == nullptr || priority < bestPriority) {
+            bestAnchor = &(*it);
+            bestPriority = priority;
+        }
+    }
+    return bestAnchor != nullptr ? std::optional<GapEditAnchorKey>(bestAnchor->key) : std::nullopt;
 }
 
 std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(
@@ -1701,6 +1808,17 @@ std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEd
         return staticRegion;
     }
     return findIn(dynamicEditableAnchorRegions_);
+}
+
+std::optional<DashboardRenderer::GapEditAnchor> DashboardRenderer::FindGapEditAnchor(
+    const GapEditAnchorKey& key) const {
+    const auto it = std::find_if(gapEditAnchors_.begin(), gapEditAnchors_.end(), [&](const GapEditAnchor& anchor) {
+        return MatchesGapEditAnchorKey(anchor.key, key);
+    });
+    if (it == gapEditAnchors_.end()) {
+        return std::nullopt;
+    }
+    return *it;
 }
 
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(

@@ -26,6 +26,12 @@ enum class LayoutEditParameter {
     CardPadding,
     CardHeaderIconGap,
     CardHeaderContentGap,
+    CardRowGap,
+    CardColumnGap,
+
+    // Dashboard guides
+    DashboardRowGap,
+    DashboardColumnGap,
 
     // Metric list
     MetricListBarHeight,

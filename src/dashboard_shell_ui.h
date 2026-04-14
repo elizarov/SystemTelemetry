@@ -25,8 +25,9 @@ public:
     ~DashboardShellUi();
 
     bool IsLayoutEditModalUiActive() const;
-    void ShowContextMenu(
-        MenuSource source, POINT screenPoint, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget);
+    void ShowContextMenu(MenuSource source,
+        POINT screenPoint,
+        const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget);
     void InvokeDefaultAction(MenuSource source,
         const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
         std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
@@ -34,8 +35,8 @@ public:
     void EndLayoutEditModalUi();
 
 private:
-    UINT ResolveDefaultCommand(MenuSource source, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget)
-        const;
+    UINT ResolveDefaultCommand(
+        MenuSource source, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) const;
     void ExecuteCommand(UINT selected,
         const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
         std::optional<POINT> cursorAnchorClientPoint = std::nullopt);

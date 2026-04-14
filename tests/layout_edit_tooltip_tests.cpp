@@ -23,6 +23,16 @@ TEST(LayoutEditTooltip, BuildsCardStyleDescriptor) {
     EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
 }
 
+TEST(LayoutEditTooltip, BuildsDashboardDescriptor) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::DashboardColumnGap);
+
+    ASSERT_TRUE(descriptor.has_value());
+    EXPECT_EQ(descriptor->configKey, "config.dashboard.column_gap");
+    EXPECT_EQ(descriptor->sectionName, "dashboard");
+    EXPECT_EQ(descriptor->memberName, "column_gap");
+    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
+}
+
 TEST(LayoutEditTooltip, IncludesFontAnchors) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::FontLabel);
     ASSERT_TRUE(descriptor.has_value());
@@ -101,6 +111,8 @@ TEST(LayoutEditParameter, BuildsDisplayNamesForMenuActions) {
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::GaugeSegmentCount), "segment count");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::FontClockTime), "clock time font");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::CardHeaderContentGap), "header content gap");
+    EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::CardRowGap), "row gap");
+    EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::DashboardColumnGap), "column gap");
 }
 
 TEST(LayoutEditParameter, AppliesFullFontValueThroughMetadata) {

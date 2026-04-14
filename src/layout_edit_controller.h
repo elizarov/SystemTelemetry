@@ -50,6 +50,7 @@ public:
         enum class Kind {
             LayoutGuide,
             WidgetGuide,
+            GapEditAnchor,
             EditableAnchor,
         };
 
@@ -57,6 +58,7 @@ public:
         RenderPoint clientPoint{};
         DashboardRenderer::LayoutEditGuide layoutGuide{};
         DashboardRenderer::WidgetEditGuide widgetGuide{};
+        DashboardRenderer::GapEditAnchor gapEditAnchor{};
         DashboardRenderer::EditableAnchorRegion editableAnchor{};
     };
 
@@ -76,11 +78,15 @@ public:
 
 private:
     struct HoverResolution {
+        std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredLayoutCard;
         std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableCard;
         std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget;
+        std::optional<DashboardRenderer::GapEditAnchorKey> hoveredGapEditAnchor;
         std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor;
+        std::optional<size_t> hoveredGapEditAnchorIndex;
         std::optional<size_t> hoveredWidgetEditGuideIndex;
         std::optional<size_t> hoveredLayoutGuideIndex;
+        std::optional<DashboardRenderer::GapEditAnchorKey> actionableGapEditAnchor;
         std::optional<DashboardRenderer::EditableAnchorKey> actionableAnchorHandle;
     };
 
@@ -143,14 +149,23 @@ private:
         double dragStartDistancePixels = 0.0;
     };
 
+    struct GapEditDragState {
+        DashboardRenderer::GapEditAnchor anchor;
+        double initialValue = 0.0;
+        int dragStartCoordinate = 0;
+    };
+
     const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(
         RenderPoint clientPoint, size_t* index = nullptr) const;
     const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(
+        RenderPoint clientPoint, size_t* index = nullptr) const;
+    const DashboardRenderer::GapEditAnchor* HitTestGapEditAnchor(
         RenderPoint clientPoint, size_t* index = nullptr) const;
     HoverResolution ResolveHover(RenderPoint clientPoint) const;
     void RefreshHover(RenderPoint clientPoint);
     bool UpdateLayoutDrag(RenderPoint clientPoint);
     bool UpdateWidgetEditDrag(RenderPoint clientPoint);
+    bool UpdateGapEditDrag(RenderPoint clientPoint);
     bool UpdateAnchorEditDrag(RenderPoint clientPoint);
     void SyncRendererInteractionState();
     void ClearInteractionState();
@@ -160,12 +175,16 @@ private:
 
     LayoutEditHost& host_;
     std::optional<size_t> hoveredLayoutGuideIndex_;
+    std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredLayoutCard_;
     std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableCard_;
     std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget_;
+    std::optional<size_t> hoveredGapEditAnchorIndex_;
     std::optional<size_t> hoveredWidgetEditGuideIndex_;
+    std::optional<DashboardRenderer::GapEditAnchorKey> hoveredGapEditAnchor_;
     std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor_;
     std::optional<LayoutDragState> activeLayoutDrag_;
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
+    std::optional<GapEditDragState> activeGapEditDrag_;
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
     RenderPoint lastClientPoint_{};
 };

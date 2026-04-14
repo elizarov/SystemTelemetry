@@ -85,8 +85,8 @@ CONFIG_SECTION_CODEC(BoardConfig, configschema::BoardSectionCodec);
 struct DashboardSectionConfig {
     CONFIG_REFLECTED_STRUCT(DashboardSectionConfig)
     CONFIG_VALUE(int, outerMargin, "outer_margin");
-    CONFIG_VALUE(int, rowGap, "row_gap");
-    CONFIG_VALUE(int, columnGap, "column_gap");
+    CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, columnGap, "column_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("dashboard");
 };
 
@@ -98,8 +98,8 @@ struct CardStyleConfig {
     CONFIG_EDITABLE_VALUE(int, headerIconSize, "header_icon_size");
     CONFIG_EDITABLE_VALUE_WITH(int, headerIconGap, "header_icon_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE_WITH(int, headerContentGap, "header_content_gap", configschema::NonNegativeIntPolicy);
-    CONFIG_VALUE(int, rowGap, "row_gap");
-    CONFIG_VALUE(int, columnGap, "column_gap");
+    CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
+    CONFIG_EDITABLE_VALUE_WITH(int, columnGap, "column_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("card_style");
 };
 
@@ -258,6 +258,8 @@ struct AppConfig {
 };
 
 CONFIG_EDITABLE_ROOT_BINDING_PATH(UiFontSetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::fontsBinding);
+CONFIG_EDITABLE_ROOT_BINDING_PATH(
+    DashboardSectionConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::dashboardBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(CardStyleConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::cardStyleBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(
     MetricListWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::metricListBinding);

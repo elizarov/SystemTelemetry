@@ -509,8 +509,9 @@ INT_PTR CALLBACK LayoutEditFontDialogProc(HWND hwnd, UINT message, WPARAM wParam
             PopulateFontFaceComboBox(hwnd, WideFromUtf8(state->initialValue.face));
             SetDlgItemTextW(
                 hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, WideFromUtf8(std::to_string(state->initialValue.size)).c_str());
-            SetDlgItemTextW(
-                hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, WideFromUtf8(std::to_string(state->initialValue.weight)).c_str());
+            SetDlgItemTextW(hwnd,
+                IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
+                WideFromUtf8(std::to_string(state->initialValue.weight)).c_str());
             SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, EM_SETSEL, 0, -1);
             PreviewLayoutEditFontDialog(state, hwnd);
             return TRUE;
@@ -680,8 +681,9 @@ std::optional<UiFontConfig> DashboardShellUi::PromptLayoutEditFont(DashboardRend
     state.preview = [this, parameter](const UiFontConfig& value) {
         return app_.controller_.ApplyLayoutEditFont(app_, parameter, value);
     };
-    state.restore =
-        [this, parameter, initialValue]() { app_.controller_.ApplyLayoutEditFont(app_, parameter, initialValue); };
+    state.restore = [this, parameter, initialValue]() {
+        app_.controller_.ApplyLayoutEditFont(app_, parameter, initialValue);
+    };
     DashboardShellUiModalScope scopedModalUi(*this);
     if (DialogBoxParamW(app_.instance_,
             MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_FONT),
@@ -702,11 +704,9 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
     }
 
     const DashboardRenderer::LayoutEditParameter parameter =
-        target.kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide
-            ? target.widgetGuide.parameter
-            : target.kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor
-                  ? target.gapEditAnchor.key.parameter
-                  : target.editableAnchor.key.parameter;
+        target.kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide     ? target.widgetGuide.parameter
+        : target.kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor ? target.gapEditAnchor.key.parameter
+                                                                                  : target.editableAnchor.key.parameter;
     const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
     if (!descriptor.has_value()) {
         return false;
@@ -721,12 +721,11 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
         return updated.has_value() && app_.controller_.ApplyLayoutEditFont(app_, parameter, *updated);
     }
 
-    const double currentValue =
-        target.kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide
-            ? target.widgetGuide.value
-            : target.kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor
-                  ? target.gapEditAnchor.value
-                  : static_cast<double>(target.editableAnchor.value);
+    const double currentValue = target.kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide
+                                    ? target.widgetGuide.value
+                                : target.kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor
+                                    ? target.gapEditAnchor.value
+                                    : static_cast<double>(target.editableAnchor.value);
     const auto updated = PromptLayoutEditValue(parameter, *descriptor, currentValue, title);
     return updated.has_value() && app_.ApplyLayoutEditValue(parameter, *updated);
 }
@@ -755,8 +754,7 @@ UINT DashboardShellUi::ResolveDefaultCommand(
     return layoutEditTarget.has_value() ? kCommandEditLayoutTarget : kCommandMove;
 }
 
-void DashboardShellUi::ExecuteCommand(
-    UINT selected,
+void DashboardShellUi::ExecuteCommand(UINT selected,
     const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
     std::optional<POINT> cursorAnchorClientPoint) {
     DashboardSessionState& state = app_.controller_.State();
@@ -861,8 +859,7 @@ void DashboardShellUi::ExecuteCommand(
     }
 }
 
-void DashboardShellUi::InvokeDefaultAction(
-    MenuSource source,
+void DashboardShellUi::InvokeDefaultAction(MenuSource source,
     const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
     std::optional<POINT> cursorAnchorClientPoint) {
     if (source == MenuSource::AppWindow && app_.controller_.State().isEditingLayout) {
@@ -1004,19 +1001,17 @@ void DashboardShellUi::ShowContextMenu(
             const DashboardRenderer::LayoutEditParameter parameter =
                 layoutEditTarget->kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide
                     ? layoutEditTarget->widgetGuide.parameter
-                    : layoutEditTarget->kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor
-                          ? layoutEditTarget->gapEditAnchor.key.parameter
-                          : layoutEditTarget->editableAnchor.key.parameter;
+                : layoutEditTarget->kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor
+                    ? layoutEditTarget->gapEditAnchor.key.parameter
+                    : layoutEditTarget->editableAnchor.key.parameter;
             label = BuildLayoutEditMenuLabel(WideFromUtf8(GetLayoutEditParameterDisplayName(parameter)));
         }
         AppendMenuW(menu, MF_STRING, kCommandEditLayoutTarget, label.c_str());
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     }
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
-    AppendMenuW(menu,
-        MF_STRING | (state.isEditingLayout ? MF_CHECKED : MF_UNCHECKED),
-        kCommandEditLayout,
-        L"Edit layout");
+    AppendMenuW(
+        menu, MF_STRING | (state.isEditingLayout ? MF_CHECKED : MF_UNCHECKED), kCommandEditLayout, L"Edit layout");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");

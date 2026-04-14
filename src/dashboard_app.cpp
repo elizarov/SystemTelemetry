@@ -588,6 +588,17 @@ void DashboardApp::UpdateLayoutEditTooltip() {
                 target->layoutGuide.lineRect.top +
                 (std::max<LONG>(0, target->layoutGuide.lineRect.bottom - target->layoutGuide.lineRect.top) / 2);
         }
+    } else if (target->kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor) {
+        descriptor = FindLayoutEditTooltipDescriptor(target->gapEditAnchor.key.parameter);
+        value = target->gapEditAnchor.value;
+        if (clientPoint.x == 0 && clientPoint.y == 0) {
+            clientPoint.x =
+                target->gapEditAnchor.handleRect.left +
+                (std::max<LONG>(0, target->gapEditAnchor.handleRect.right - target->gapEditAnchor.handleRect.left) / 2);
+            clientPoint.y =
+                target->gapEditAnchor.handleRect.top +
+                (std::max<LONG>(0, target->gapEditAnchor.handleRect.bottom - target->gapEditAnchor.handleRect.top) / 2);
+        }
     } else if (target->kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide) {
         descriptor = FindLayoutEditTooltipDescriptor(target->widgetGuide.parameter);
         value = target->widgetGuide.value;

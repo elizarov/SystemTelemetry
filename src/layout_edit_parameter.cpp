@@ -92,6 +92,11 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::CardPadding, &GetFieldMetadata<CardStyleConfig::cardPaddingMeta>(), true, false},
     {Parameter::CardHeaderIconGap, &GetFieldMetadata<CardStyleConfig::headerIconGapMeta>(), true, false},
     {Parameter::CardHeaderContentGap, &GetFieldMetadata<CardStyleConfig::headerContentGapMeta>(), true, false},
+    {Parameter::CardRowGap, &GetFieldMetadata<CardStyleConfig::rowGapMeta>(), true, false},
+    {Parameter::CardColumnGap, &GetFieldMetadata<CardStyleConfig::columnGapMeta>(), true, false},
+
+    {Parameter::DashboardRowGap, &GetFieldMetadata<DashboardSectionConfig::rowGapMeta>(), true, false},
+    {Parameter::DashboardColumnGap, &GetFieldMetadata<DashboardSectionConfig::columnGapMeta>(), true, false},
 
     {Parameter::MetricListBarHeight, &GetFieldMetadata<MetricListWidgetConfig::barHeightMeta>(), false, true},
     {Parameter::MetricListLabelWidth, &GetFieldMetadata<MetricListWidgetConfig::labelWidthMeta>(), true, false},

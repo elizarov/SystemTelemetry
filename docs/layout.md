@@ -221,13 +221,17 @@ Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is
 In a vertical `rows(...)` container, fixed-height direct children such as `text`, `network_footer`, and `vertical_spacer(...)` keep their preferred height and the remaining space goes to flexible siblings when no `vertical_spring` is present.
 When one or more direct `vertical_spring` children are present in `rows(...)`, every spring absorbs the remaining height before weighted stretching and multiple springs divide that height by weight.
 Interactive layout editing always exposes the container guides for `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, snaps to the nearest same-type exact-size group as soon as the similarity ruler threshold is reached by iteratively re-evaluating nested weighted layouts, lets `Alt` temporarily bypass that snap and continue free dragging, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
+When the pointer is outside every card in layout-edit mode, every dashboard `rows(...)` and `columns(...)` container also shows one gap anchor for its first rendered gap, using `[dashboard].row_gap` or `[dashboard].column_gap`.
 When the pointer hovers the top band of a card in layout-edit mode, up to the top edge of the content area, the renderer shows that card's shared `[card_style]` guides and anchors.
+When the pointer is anywhere inside a rendered card in layout-edit mode, every `rows(...)` and `columns(...)` container resolved inside that card also shows one gap anchor for its first rendered gap, using `[card_style].row_gap` or `[card_style].column_gap`.
 `[card_style].card_padding` exposes a horizontal guide at the top inner edge of the card padding band.
 `[card_style].card_radius` exposes a square anchor at the top-left rounded-corner tangent point.
 `[card_style].card_border` exposes a circular radial size anchor centered on the top card border.
 Hovering a card header icon exposes a dotted icon highlight plus a square upper-right anchor for `[card_style].header_icon_size`.
 `[card_style].header_icon_gap` exposes a vertical guide at the start of the card title text when the card renders both an icon and title.
 `[card_style].header_content_gap` exposes a horizontal guide at the top edge of the card content area when the card renders a header.
+`row_gap` gap anchors render as vertical lines on the left edge of the topmost rendered gap with T-caps at both ends and a square drag handle at the bottom end; dragging that handle down increases the gap.
+`column_gap` gap anchors render as horizontal lines on the top edge of the leftmost rendered gap with T-caps at both ends and a square drag handle at the right end; dragging that handle right increases the gap.
 When the pointer hovers a non-empty widget in layout-edit mode, the renderer outlines that widget's resolved box and shows any widget-local size guides that widget supports.
 `metric_list(...)` exposes a vertical guide for `[metric_list].label_width` at the label/value split.
 `metric_list(...)` also exposes horizontal guides after each visible non-empty row for `[metric_list].row_gap`.

@@ -21,7 +21,8 @@ std::string FormatRect(const RenderRect& rect) {
 RenderRect MakeSquareAnchorRect(int centerX, int centerY, int size) {
     const int clampedSize = (std::max)(4, size);
     const int radius = clampedSize / 2;
-    return RenderRect{centerX - radius, centerY - radius, centerX - radius + clampedSize, centerY - radius + clampedSize};
+    return RenderRect{
+        centerX - radius, centerY - radius, centerX - radius + clampedSize, centerY - radius + clampedSize};
 }
 
 RenderRect MakeCircleAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
@@ -63,23 +64,24 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
             guide.drawStart = start;
             guide.drawEnd = end;
             if (axis == DashboardRenderer::LayoutGuideAxis::Vertical) {
-                guide.hitRect = RenderRect{start.x - hitInset, (std::min)(start.y, end.y), start.x + hitInset + 1,
-                    (std::max)(start.y, end.y)};
+                guide.hitRect = RenderRect{
+                    start.x - hitInset, (std::min)(start.y, end.y), start.x + hitInset + 1, (std::max)(start.y, end.y)};
             } else {
-                guide.hitRect = RenderRect{(std::min)(start.x, end.x), start.y - hitInset, (std::max)(start.x, end.x),
-                    start.y + hitInset + 1};
+                guide.hitRect = RenderRect{
+                    (std::min)(start.x, end.x), start.y - hitInset, (std::max)(start.x, end.x), start.y + hitInset + 1};
             }
             guide.value = value;
             guide.dragDirection = dragDirection;
             renderer.widgetEditGuides_.push_back(std::move(guide));
         };
 
-        const int contentLeft = std::clamp(card.contentRect.left, static_cast<int>(card.rect.left), static_cast<int>(card.rect.right));
-        const int contentRight =
-            std::clamp(card.contentRect.right, contentLeft, static_cast<int>(card.rect.right));
-        const int paddingY = std::clamp(card.rect.top + renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardPadding),
-            static_cast<int>(card.rect.top),
-            static_cast<int>(card.rect.bottom));
+        const int contentLeft =
+            std::clamp(card.contentRect.left, static_cast<int>(card.rect.left), static_cast<int>(card.rect.right));
+        const int contentRight = std::clamp(card.contentRect.right, contentLeft, static_cast<int>(card.rect.right));
+        const int paddingY =
+            std::clamp(card.rect.top + renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardPadding),
+                static_cast<int>(card.rect.top),
+                static_cast<int>(card.rect.bottom));
         addCardGuide(DashboardRenderer::LayoutGuideAxis::Horizontal,
             0,
             DashboardRenderer::LayoutEditParameter::CardPadding,
@@ -141,7 +143,8 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
             false,
             radiusLogical);
 
-        const int borderScaled = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth));
+        const int borderScaled =
+            (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth));
         const int borderAnchorPadding = (std::max)(1, renderer.ScaleLogical(1));
         const int borderCenterX = card.rect.left + (std::max)(0, (card.rect.right - card.rect.left) / 2);
         const int borderCenterY = card.rect.top;
@@ -214,6 +217,47 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     }
 
     const bool horizontal = node.name == "columns";
+    {
+        DashboardRenderer::GapEditAnchor anchor;
+        anchor.axis =
+            horizontal ? DashboardRenderer::LayoutGuideAxis::Horizontal : DashboardRenderer::LayoutGuideAxis::Vertical;
+        anchor.key.widget =
+            renderCardId.empty()
+                ? DashboardRenderer::LayoutWidgetIdentity{"",
+                      "",
+                      {},
+                      DashboardRenderer::LayoutWidgetIdentity::Kind::DashboardChrome}
+                : DashboardRenderer::LayoutWidgetIdentity{
+                      renderCardId, renderCardId, {}, DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome};
+        anchor.key.parameter = renderCardId.empty()
+                                   ? (horizontal ? DashboardRenderer::LayoutEditParameter::DashboardColumnGap
+                                                 : DashboardRenderer::LayoutEditParameter::DashboardRowGap)
+                                   : (horizontal ? DashboardRenderer::LayoutEditParameter::CardColumnGap
+                                                 : DashboardRenderer::LayoutEditParameter::CardRowGap);
+        anchor.key.nodePath = nodePath;
+        const RenderRect& firstGapLead = childRects.front();
+        const RenderRect& firstGapTrail = childRects[1];
+        const int handleSize = (std::max)(4, renderer.ScaleLogical(6));
+        const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
+        if (horizontal) {
+            anchor.drawStart = RenderPoint{firstGapLead.right, rect.top};
+            anchor.drawEnd = RenderPoint{firstGapTrail.left, rect.top};
+            anchor.dragAxis = DashboardRenderer::AnchorDragAxis::Horizontal;
+            anchor.handleRect = MakeSquareAnchorRect(anchor.drawEnd.x, anchor.drawEnd.y, handleSize);
+            anchor.value = renderCardId.empty() ? renderer.Config().layout.dashboard.columnGap
+                                                : renderer.Config().layout.cardStyle.columnGap;
+        } else {
+            anchor.drawStart = RenderPoint{rect.left, firstGapLead.bottom};
+            anchor.drawEnd = RenderPoint{rect.left, firstGapTrail.top};
+            anchor.dragAxis = DashboardRenderer::AnchorDragAxis::Vertical;
+            anchor.handleRect = MakeSquareAnchorRect(anchor.drawEnd.x, anchor.drawEnd.y, handleSize);
+            anchor.value = renderCardId.empty() ? renderer.Config().layout.dashboard.rowGap
+                                                : renderer.Config().layout.cardStyle.rowGap;
+        }
+        anchor.hitRect = anchor.handleRect.Inflate(hitInset, hitInset);
+        renderer.gapEditAnchors_.push_back(std::move(anchor));
+    }
+
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     std::vector<bool> childFixedExtents;
     childFixedExtents.reserve(node.children.size());
@@ -418,6 +462,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     renderer.resolvedLayout_ = {};
     renderer.layoutEditGuides_.clear();
     renderer.widgetEditGuides_.clear();
+    renderer.gapEditAnchors_.clear();
     renderer.staticEditableAnchorRegions_.clear();
     renderer.dynamicEditableAnchorRegions_.clear();
     renderer.parsedWidgetInfoCache_.clear();

@@ -72,6 +72,10 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
         LayoutEditParameter::CardHeaderIconSize,
         LayoutEditParameter::CardHeaderIconGap,
         LayoutEditParameter::CardHeaderContentGap,
+        LayoutEditParameter::CardRowGap,
+        LayoutEditParameter::CardColumnGap,
+        LayoutEditParameter::DashboardRowGap,
+        LayoutEditParameter::DashboardColumnGap,
     };
 
     for (const auto parameter : parameters) {
