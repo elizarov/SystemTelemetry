@@ -189,6 +189,8 @@ target_link_libraries(SystemTelemetry PRIVATE
     gdi32
     msimg32
     gdiplus
+    d2d1
+    dwrite
     pdh
     iphlpapi
     dxgi
@@ -330,6 +332,8 @@ target_link_libraries(SystemTelemetryBenchmarks PRIVATE
     gdi32
     msimg32
     gdiplus
+    d2d1
+    dwrite
 )
 set_target_properties(SystemTelemetryBenchmarks PROPERTIES
     PDB_NAME_RELEASE "SystemTelemetryBenchmarks"

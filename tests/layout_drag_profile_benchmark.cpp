@@ -245,9 +245,6 @@ public:
     }
 
     bool Initialize() {
-        if (!renderer_.Initialize()) {
-            return false;
-        }
         hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
             L"STATIC",
             L"SystemTelemetryBenchmarkHost",
@@ -260,7 +257,15 @@ public:
             nullptr,
             GetModuleHandleW(nullptr),
             nullptr);
-        return hwnd_ != nullptr;
+        if (hwnd_ == nullptr) {
+            return false;
+        }
+        if (!renderer_.Initialize(hwnd_)) {
+            DestroyWindow(hwnd_);
+            hwnd_ = nullptr;
+            return false;
+        }
+        return true;
     }
 
     LayoutEditController& Controller() {
@@ -282,25 +287,30 @@ public:
 
         dirty_ = false;
         const auto paintStart = Clock::now();
-        HDC hdc = GetDC(hwnd_);
         RECT client{0, 0, renderer_.WindowWidth(), renderer_.WindowHeight()};
-        if (hdc == nullptr || !paintBuffer_.Ensure(hdc, client.right, client.bottom)) {
-            if (hdc != nullptr) {
-                ReleaseDC(hwnd_, hdc);
-            }
-            return;
-        }
-        HBRUSH background = CreateSolidBrush(renderer_.BackgroundColor());
-        FillRect(paintBuffer_.dc, &client, background);
-        DeleteObject(background);
-        SetBkMode(paintBuffer_.dc, TRANSPARENT);
-
         const auto drawStart = Clock::now();
-        renderer_.Draw(paintBuffer_.dc, snapshot_, overlayState_);
+        bool drewWindow = renderer_.DrawWindow(snapshot_, overlayState_);
+        HDC hdc = nullptr;
+        if (!drewWindow) {
+            hdc = GetDC(hwnd_);
+            if (hdc == nullptr || !paintBuffer_.Ensure(hdc, client.right, client.bottom)) {
+                if (hdc != nullptr) {
+                    ReleaseDC(hwnd_, hdc);
+                }
+                return;
+            }
+            HBRUSH background = CreateSolidBrush(renderer_.BackgroundColor());
+            FillRect(paintBuffer_.dc, &client, background);
+            DeleteObject(background);
+            SetBkMode(paintBuffer_.dc, TRANSPARENT);
+            renderer_.Draw(paintBuffer_.dc, snapshot_, overlayState_);
+        }
         const auto drawEnd = Clock::now();
 
-        BitBlt(hdc, 0, 0, client.right, client.bottom, paintBuffer_.dc, 0, 0, SRCCOPY);
-        ReleaseDC(hwnd_, hdc);
+        if (!drewWindow) {
+            BitBlt(hdc, 0, 0, client.right, client.bottom, paintBuffer_.dc, 0, 0, SRCCOPY);
+            ReleaseDC(hwnd_, hdc);
+        }
 
         const auto paintEnd = Clock::now();
         RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);

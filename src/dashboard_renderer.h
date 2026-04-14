@@ -11,13 +11,17 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <ostream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
+#include <d2d1.h>
+#include <dwrite.h>
 #include <windows.h>
+#include <wrl/client.h>
 
 #include "config.h"
 #include "dashboard_metrics.h"
@@ -218,6 +222,8 @@ public:
 
     void Draw(HDC hdc, const SystemSnapshot& snapshot);
     void Draw(HDC hdc, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    bool DrawWindow(const SystemSnapshot& snapshot);
+    bool DrawWindow(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
     bool SaveSnapshotPng(
         const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
@@ -226,6 +232,7 @@ public:
     const FontHeights& FontMetrics() const;
     const Fonts& WidgetFonts() const;
     RenderMode CurrentRenderMode() const;
+    bool IsDirect2DActive() const;
     COLORREF TrackColor() const;
     TextLayoutResult MeasureTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, UINT format) const;
@@ -234,6 +241,19 @@ public:
     TextLayoutResult DrawTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
+    void PushClipRect(const RECT& rect);
+    void PopClipRect();
+    bool FillSolidRect(const RECT& rect, COLORREF color, BYTE alpha = 255);
+    bool FillSolidEllipse(int centerX, int centerY, int diameter, COLORREF color, BYTE alpha = 255);
+    bool FillSolidDiamond(const RECT& rect, COLORREF color, BYTE alpha = 255);
+    bool DrawSolidRect(const RECT& rect, COLORREF color, int strokeWidth = 1, bool dashed = false);
+    bool DrawSolidEllipse(const RECT& rect, COLORREF color, int strokeWidth = 1);
+    bool DrawSolidLine(POINT start, POINT end, COLORREF color, int strokeWidth = 1);
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DPathGeometry() const;
+    Microsoft::WRL::ComPtr<ID2D1GeometryGroup> CreateD2DGeometryGroup(
+        std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
+    bool FillD2DGeometry(ID2D1Geometry* geometry, COLORREF color, BYTE alpha = 255);
+    bool DrawD2DPolyline(std::span<const POINT> points, COLORREF color, int strokeWidth);
     HBRUSH SolidBrush(COLORREF color) const;
     HPEN SolidPen(COLORREF color, int width = 1) const;
     EditableAnchorBinding MakeEditableTextBinding(
@@ -505,8 +525,36 @@ private:
         }
     };
 
+    struct D2DBrushCacheKey {
+        COLORREF color = 0;
+        BYTE alpha = 255;
+
+        bool operator==(const D2DBrushCacheKey& other) const {
+            return color == other.color && alpha == other.alpha;
+        }
+    };
+
+    struct D2DBrushCacheKeyHash {
+        size_t operator()(const D2DBrushCacheKey& key) const {
+            return (std::hash<COLORREF>{}(key.color) * 1315423911u) ^ std::hash<int>{}(key.alpha);
+        }
+    };
+
+    struct D2DTextFormats {
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> title;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> big;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> value;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> label;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> text;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> smallFont;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> footer;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> clockTime;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> clockDate;
+    };
+
     const std::wstring& GetWideText(std::string_view text) const;
     void ClearGdiCaches();
+    void ClearD2DCaches();
     void DrawHoveredWidgetHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(HDC hdc, const EditOverlayState& overlayState) const;
@@ -541,11 +589,25 @@ private:
 
     bool InitializeGdiplus();
     void ShutdownGdiplus();
+    bool InitializeDirect2D();
+    void ShutdownDirect2D();
     bool CreateFonts();
     void DestroyFonts();
     bool LoadPanelIcons();
     void ReleasePanelIcons();
     bool MeasureFonts();
+    bool EnsureWindowRenderTarget();
+    bool BeginWindowDraw();
+    void EndWindowDraw();
+    ID2D1SolidColorBrush* D2DSolidBrush(COLORREF color, BYTE alpha = 255);
+    IDWriteTextFormat* DWriteTextFormatForFont(HFONT font) const;
+    bool CreateDWriteTextFormats();
+    void ConfigureDWriteTextFormat(IDWriteTextFormat* format, UINT drawTextFormat) const;
+    TextLayoutResult MeasureTextBlockD2D(const RECT& rect,
+        const std::wstring& wideText,
+        HFONT font,
+        UINT format,
+        Microsoft::WRL::ComPtr<IDWriteTextLayout>* layout = nullptr) const;
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RECT& rect,
@@ -595,6 +657,7 @@ private:
     ULONG_PTR gdiplusToken_ = 0;
     std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
     Fonts fonts_{};
+    D2DTextFormats d2dTextFormats_{};
     FontHeights fontHeights_{};
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
@@ -613,6 +676,12 @@ private:
     mutable std::unordered_map<PenCacheKey, HPEN, PenCacheKeyHash> solidPenCache_;
     std::unordered_map<AlphaCapsuleCacheKey, AlphaCapsuleBitmap, AlphaCapsuleCacheKeyHash> alphaCapsuleCache_;
     std::unordered_map<PanelIconCacheKey, AlphaCapsuleBitmap, PanelIconCacheKeyHash> scaledPanelIconCache_;
+    std::unordered_map<D2DBrushCacheKey,
+        Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>,
+        D2DBrushCacheKeyHash>
+        d2dSolidBrushCache_;
+    std::unordered_map<PanelIconCacheKey, Microsoft::WRL::ComPtr<ID2D1Bitmap>, PanelIconCacheKeyHash>
+        d2dPanelIconCache_;
     std::unique_ptr<DashboardMetricSource> cachedMetricSource_;
     const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
     uint64_t cachedMetricSnapshotRevision_ = 0;
@@ -621,4 +690,11 @@ private:
     RenderMode renderMode_ = RenderMode::Normal;
     bool layoutGuideDragActive_ = false;
     bool interactiveDragTraceActive_ = false;
+    Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
+    Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> d2dWindowRenderTarget_;
+    Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory_;
+    Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dSolidStrokeStyle_;
+    Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dDashedStrokeStyle_;
+    bool d2dDrawActive_ = false;
+    int d2dClipDepth_ = 0;
 };

@@ -149,8 +149,12 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
-    const int savedDc = SaveDC(hdc);
-    IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
+    const int savedDc = renderer.IsDirect2DActive() ? 0 : SaveDC(hdc);
+    if (renderer.IsDirect2DActive()) {
+        renderer.PushClipRect(widget.rect);
+    } else {
+        IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
+    }
     int rowIndex = 0;
     for (const auto& row : metrics.ResolveMetricList(metricRefs_)) {
         if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
@@ -186,7 +190,11 @@ void MetricListWidget::Draw(DashboardRenderer& renderer,
 
         ++rowIndex;
     }
-    RestoreDC(hdc, savedDc);
+    if (renderer.IsDirect2DActive()) {
+        renderer.PopClipRect();
+    } else {
+        RestoreDC(hdc, savedDc);
+    }
 }
 
 void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

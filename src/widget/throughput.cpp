@@ -16,6 +16,10 @@ COLORREF ToColorRef(unsigned int color) {
 }
 
 void FillCircle(DashboardRenderer& renderer, HDC hdc, int centerX, int centerY, int diameter, COLORREF color) {
+    if (renderer.IsDirect2DActive()) {
+        renderer.FillSolidEllipse(centerX, centerY, diameter, color);
+        return;
+    }
     const int clampedDiameter = std::max(1, diameter);
     const int radius = clampedDiameter / 2;
     HGDIOBJ oldBrush = SelectObject(hdc, renderer.SolidBrush(color));
@@ -68,10 +72,15 @@ void DrawGraph(DashboardRenderer& renderer,
     double timeMarkerOffsetSamples,
     double timeMarkerIntervalSamples,
     const std::optional<DashboardRenderer::EditableAnchorBinding>& maxLabelEditable) {
-    HBRUSH bg = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
-    FillRect(hdc, &rect, bg);
+    if (renderer.IsDirect2DActive()) {
+        renderer.FillSolidRect(rect, ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
+    } else {
+        HBRUSH bg = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphBackgroundColor));
+        FillRect(hdc, &rect, bg);
+    }
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
-    HBRUSH markerBrush = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphMarkerColor));
+    const COLORREF markerColor = ToColorRef(renderer.Config().layout.colors.graphMarkerColor);
+    HBRUSH markerBrush = renderer.IsDirect2DActive() ? nullptr : renderer.SolidBrush(markerColor);
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
         const double ratio = tick / maxValue;
         const int centerY = layout.graphBottom - static_cast<int>(std::round(ratio * layout.plotHeight));
@@ -80,7 +89,11 @@ void DrawGraph(DashboardRenderer& renderer,
             std::max(layout.plotTop, lineTop),
             layout.graphRight,
             std::min(layout.graphBottom + 1, lineTop + layout.guideStrokeWidth)};
-        FillRect(hdc, &lineRect, markerBrush);
+        if (renderer.IsDirect2DActive()) {
+            renderer.FillSolidRect(lineRect, markerColor);
+        } else {
+            FillRect(hdc, &lineRect, markerBrush);
+        }
     }
 
     if (!history.empty()) {
@@ -95,11 +108,16 @@ void DrawGraph(DashboardRenderer& renderer,
             const int lineLeft = centerX - (layout.guideStrokeWidth / 2);
             RECT lineRect{
                 lineLeft, rect.top, std::min(layout.graphRight + 1, lineLeft + layout.guideStrokeWidth), rect.bottom};
-            FillRect(hdc, &lineRect, markerBrush);
+            if (renderer.IsDirect2DActive()) {
+                renderer.FillSolidRect(lineRect, markerColor);
+            } else {
+                FillRect(hdc, &lineRect, markerBrush);
+            }
         }
     }
 
-    HBRUSH axisBrush = renderer.SolidBrush(ToColorRef(renderer.Config().layout.colors.graphAxisColor));
+    const COLORREF axisColor = ToColorRef(renderer.Config().layout.colors.graphAxisColor);
+    HBRUSH axisBrush = renderer.IsDirect2DActive() ? nullptr : renderer.SolidBrush(axisColor);
     const int verticalAxisCenterX = rect.left + layout.axisWidth;
     const int verticalAxisLeft = verticalAxisCenterX - (layout.guideStrokeWidth / 2);
     const int horizontalAxisCenterY = rect.bottom - 1;
@@ -112,8 +130,13 @@ void DrawGraph(DashboardRenderer& renderer,
         horizontalAxisTop,
         rect.right,
         std::min<LONG>(rect.bottom, horizontalAxisTop + layout.guideStrokeWidth)};
-    FillRect(hdc, &verticalAxisRect, axisBrush);
-    FillRect(hdc, &horizontalAxisRect, axisBrush);
+    if (renderer.IsDirect2DActive()) {
+        renderer.FillSolidRect(verticalAxisRect, axisColor);
+        renderer.FillSolidRect(horizontalAxisRect, axisColor);
+    } else {
+        FillRect(hdc, &verticalAxisRect, axisBrush);
+        FillRect(hdc, &horizontalAxisRect, axisBrush);
+    }
 
     char maxLabel[32];
     sprintf_s(maxLabel, "%.0f", maxValue);
@@ -145,9 +168,13 @@ void DrawGraph(DashboardRenderer& renderer,
         plotPoints.push_back(POINT{x, y});
     }
     if (plotPoints.size() >= 2) {
-        HGDIOBJ oldPen = SelectObject(hdc, renderer.SolidPen(plotColor, layout.plotStrokeWidth));
-        Polyline(hdc, plotPoints.data(), static_cast<int>(plotPoints.size()));
-        SelectObject(hdc, oldPen);
+        if (renderer.IsDirect2DActive()) {
+            renderer.DrawD2DPolyline(plotPoints, plotColor, layout.plotStrokeWidth);
+        } else {
+            HGDIOBJ oldPen = SelectObject(hdc, renderer.SolidPen(plotColor, layout.plotStrokeWidth));
+            Polyline(hdc, plotPoints.data(), static_cast<int>(plotPoints.size()));
+            SelectObject(hdc, oldPen);
+        }
     }
 
     if (!history.empty() && layout.leaderDiameter > 0) {

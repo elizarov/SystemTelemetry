@@ -3,6 +3,9 @@
 #include <memory>
 #include <vector>
 
+#include <d2d1.h>
+#include <wrl/client.h>
+
 #include "../widget.h"
 
 struct GaugeSharedLayout;
@@ -49,8 +52,11 @@ public:
         RECT labelRect{};
         std::vector<std::shared_ptr<Gdiplus::GraphicsPath>> segmentPaths;
         std::shared_ptr<Gdiplus::GraphicsPath> trackPath;
+        std::vector<Microsoft::WRL::ComPtr<ID2D1PathGeometry>> d2dSegmentPaths;
+        Microsoft::WRL::ComPtr<ID2D1GeometryGroup> d2dTrackPath;
         mutable int cachedUsageSegmentCount = -1;
         mutable std::shared_ptr<Gdiplus::GraphicsPath> cachedUsagePath;
+        mutable Microsoft::WRL::ComPtr<ID2D1GeometryGroup> d2dCachedUsagePath;
     };
 
     DashboardWidgetClass Class() const override;

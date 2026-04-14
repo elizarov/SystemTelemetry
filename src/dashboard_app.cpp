@@ -1347,35 +1347,40 @@ void DashboardApp::Paint() {
     HDC hdc = BeginPaint(hwnd_, &ps);
     RECT client{};
     GetClientRect(hwnd_, &client);
-    if (paintBufferDc_ == nullptr || paintBufferSize_.cx != client.right || paintBufferSize_.cy != client.bottom) {
-        ReleasePaintBuffer();
-        paintBufferDc_ = CreateCompatibleDC(hdc);
-        if (paintBufferDc_ != nullptr) {
-            paintBufferBitmap_ = CreateCompatibleBitmap(hdc, client.right, client.bottom);
-        }
-        if (paintBufferDc_ == nullptr || paintBufferBitmap_ == nullptr) {
-            ReleasePaintBuffer();
-            EndPaint(hwnd_, &ps);
-            return;
-        }
-        paintBufferOldBitmap_ = static_cast<HBITMAP>(SelectObject(paintBufferDc_, paintBufferBitmap_));
-        paintBufferSize_.cx = client.right;
-        paintBufferSize_.cy = client.bottom;
-    }
-
-    HBRUSH background = CreateSolidBrush(BackgroundColor());
-    FillRect(paintBufferDc_, &client, background);
-    DeleteObject(background);
-    SetBkMode(paintBufferDc_, TRANSPARENT);
-
+    const SystemSnapshot& snapshot = controller_.State().telemetry->Snapshot();
     const auto drawStart = std::chrono::steady_clock::now();
-    DrawLayout(paintBufferDc_, controller_.State().telemetry->Snapshot());
+    bool drewWindow = renderer_.DrawWindow(snapshot, rendererEditOverlayState_);
+    if (!drewWindow) {
+        if (paintBufferDc_ == nullptr || paintBufferSize_.cx != client.right || paintBufferSize_.cy != client.bottom) {
+            ReleasePaintBuffer();
+            paintBufferDc_ = CreateCompatibleDC(hdc);
+            if (paintBufferDc_ != nullptr) {
+                paintBufferBitmap_ = CreateCompatibleBitmap(hdc, client.right, client.bottom);
+            }
+            if (paintBufferDc_ == nullptr || paintBufferBitmap_ == nullptr) {
+                ReleasePaintBuffer();
+                EndPaint(hwnd_, &ps);
+                return;
+            }
+            paintBufferOldBitmap_ = static_cast<HBITMAP>(SelectObject(paintBufferDc_, paintBufferBitmap_));
+            paintBufferSize_.cx = client.right;
+            paintBufferSize_.cy = client.bottom;
+        }
+
+        HBRUSH background = CreateSolidBrush(BackgroundColor());
+        FillRect(paintBufferDc_, &client, background);
+        DeleteObject(background);
+        SetBkMode(paintBufferDc_, TRANSPARENT);
+        DrawLayout(paintBufferDc_, snapshot);
+    }
     if (controller_.State().isMoving) {
-        DrawMoveOverlay(paintBufferDc_);
+        DrawMoveOverlay(drewWindow ? hdc : paintBufferDc_);
     }
     const auto drawEnd = std::chrono::steady_clock::now();
 
-    BitBlt(hdc, 0, 0, client.right, client.bottom, paintBufferDc_, 0, 0, SRCCOPY);
+    if (!drewWindow) {
+        BitBlt(hdc, 0, 0, client.right, client.bottom, paintBufferDc_, 0, 0, SRCCOPY);
+    }
     EndPaint(hwnd_, &ps);
     const auto paintEnd = std::chrono::steady_clock::now();
     RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);

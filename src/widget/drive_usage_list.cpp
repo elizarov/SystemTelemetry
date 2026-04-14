@@ -106,8 +106,8 @@ void DrawSegmentIndicator(DashboardRenderer& renderer,
         clampedRatio > 0.0
             ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
             : 0;
-    HBRUSH trackBrush = renderer.SolidBrush(trackColor);
-    HBRUSH fillBrush = filledSegments > 0 ? renderer.SolidBrush(accentColor) : nullptr;
+    HBRUSH trackBrush = renderer.IsDirect2DActive() ? nullptr : renderer.SolidBrush(trackColor);
+    HBRUSH fillBrush = renderer.IsDirect2DActive() || filledSegments <= 0 ? nullptr : renderer.SolidBrush(accentColor);
     int top = rect.top;
     for (int index = segmentCount - 1; index >= 0; --index) {
         const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
@@ -116,10 +116,18 @@ void DrawSegmentIndicator(DashboardRenderer& renderer,
         const int segmentTop = top + (std::max)(0, (segmentHeight - visualHeight) / 2);
         RECT segmentRect{
             rect.left, segmentTop, rect.right, (std::min)(rect.bottom, static_cast<LONG>(segmentTop + visualHeight))};
-        FillRect(hdc, &segmentRect, trackBrush);
+        if (renderer.IsDirect2DActive()) {
+            renderer.FillSolidRect(segmentRect, trackColor);
+        } else {
+            FillRect(hdc, &segmentRect, trackBrush);
+        }
 
-        if (fillBrush != nullptr && index < filledSegments) {
-            FillRect(hdc, &segmentRect, fillBrush);
+        if (index < filledSegments) {
+            if (renderer.IsDirect2DActive()) {
+                renderer.FillSolidRect(segmentRect, accentColor);
+            } else if (fillBrush != nullptr) {
+                FillRect(hdc, &segmentRect, fillBrush);
+            }
         }
 
         top = segmentRect.bottom + clampedGap;
@@ -268,8 +276,12 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
-    const int savedDc = SaveDC(hdc);
-    IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
+    const int savedDc = renderer.IsDirect2DActive() ? 0 : SaveDC(hdc);
+    if (renderer.IsDirect2DActive()) {
+        renderer.PushClipRect(widget.rect);
+    } else {
+        IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
+    }
     renderer.DrawText(hdc,
         layoutState_.headerReadLabelRect,
         "R",
@@ -364,7 +376,11 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
         }
     }
 
-    RestoreDC(hdc, savedDc);
+    if (renderer.IsDirect2DActive()) {
+        renderer.PopClipRect();
+    } else {
+        RestoreDC(hdc, savedDc);
+    }
 }
 
 void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

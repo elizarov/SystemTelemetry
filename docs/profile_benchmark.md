@@ -19,31 +19,30 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured result reached during this workstream:
-  - `drag_loop per_iter_ms=4.43`
+  - `drag_loop per_iter_ms=0.96`
   - `snap avg_ms=0.20`
-  - `paint_draw avg_ms=3.73`
+  - `apply avg_ms=0.23`
+  - `paint_draw avg_ms=0.50`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=6.32`
-  - `snap avg_ms=0.20`
-  - `apply avg_ms=0.56` to `0.57`
-  - `paint_draw avg_ms=4.97` to `4.98`
+  - `drag_loop per_iter_ms=0.96` to `0.98`
+  - `snap avg_ms=0.20` to `0.21`
+  - `apply avg_ms=0.23` to `0.24`
+  - `paint_draw avg_ms=0.50` to `0.53`
 
 ## Current Confirmed Hotspots
 
-Confirmed inclusive hotspots from the latest useful WPR capture in this workstream:
+Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- `DashboardRenderer::Draw` about `60%`
-- `ThroughputWidget::Draw` about `18%`
-- ``anonymous namespace'::DrawGraph`` about `18%`
-- `GaugeWidget::Draw` about `14%`
-- `GdiPlus.dll` still accounts for about `21%` of inclusive module hits, while the coarse function table only surfaces minor named leaves such as `DashboardRenderer::DrawPanel` and `DashboardRenderer::DrawAlphaCapsule` beyond the main widget hot path.
+- The exported WPA text no longer surfaces stable named renderer functions for the benchmark process, but it does show the heaviest benchmark-process module weights in `d2d1.dll`, `amdxx64.dll`, `win32kfull.sys`, and `d3d11.dll`.
+- `GdiPlus.dll` still loads because screenshot export and some non-benchmark paths keep the legacy renderer available, but its weight in the benchmark process drops below the Direct2D and driver stack modules.
+- The fast benchmark reruns stay consistent enough that the draw-path win is real even though the coarse text export no longer pinpoints the remaining app-side leaves by symbol.
 
 Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
-- The remaining wall time is now dominated by real paint work, especially throughput graph drawing and gauge fills, while text-anchor bookkeeping still benefits from staying on the cheapest available path.
-- Fresh rebuilds and profile runs on this machine still show meaningful variance, so treat the best reruns as opportunity signals and the wider range above as the safer working baseline.
-- `DashboardLayoutResolver::ResolveLayout` no longer appears among the top benchmark user-mode functions in the latest useful capture, which matches the large drop in `snap avg_ms`.
+- The remaining cost in the benchmarked live window path is now mostly in the Direct2D and driver stack rather than in named app-side GDI+ widget functions.
+- Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
+- Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely.
 
 ## Kept Optimizations
 
@@ -334,6 +333,22 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - A partial real-HWND Direct2D migration is not competitive on this benchmark path. If Direct2D is revisited, it likely needs a more complete renderer rewrite that avoids the mixed GDI and Direct2D pass structure.
 
+### Hypothesis: Rewrite the live window draw path around Direct2D and DirectWrite
+
+- Change:
+  - Add a renderer-owned `ID2D1HwndRenderTarget` plus `IDWriteFactory`, route the live window frame through `DashboardRenderer::DrawWindow`, port renderer text and primitive helpers to Direct2D and DirectWrite, move throughput and gauge drawing onto Direct2D geometry draws, and keep the legacy compatible-bitmap renderer only for screenshot export and fallback cases.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - `240`-iteration reruns land around `drag_loop per_iter_ms=0.96` to `0.98`.
+  - `snap avg_ms` stays about `0.20` to `0.21`.
+  - `apply avg_ms` lands about `0.23` to `0.24`.
+  - `paint_draw avg_ms` lands about `0.50` to `0.53`.
+- Why it helped:
+  - The benchmarked live repaint no longer pays the compatible-DC backbuffer and mixed GDI/GDI+ pass structure. One real HWND-backed Direct2D and DirectWrite frame is much cheaper than any of the hybrid interop variants that were tested earlier.
+- Conclusion:
+  - A full renderer rewrite onto a real window-backed Direct2D target is the first Direct2D path that clearly beats the old renderer on this workload, and future draw-path work should treat this all-D2D live path as the current baseline.
+
 ### Hypothesis: Reuse one GDI+ `Graphics` object across the whole frame
 
 - Change:
@@ -353,12 +368,13 @@ These changes produced real wins and remain in the codebase:
 - Do not retry GDI+ stroked-arc gauge segments in place of the current combined fill paths.
 - Do not retry throughput `MoveToEx` and `LineTo` in place of `Polyline` for the current graph shape.
 - Do not retry Direct2D through `ID2D1DCRenderTarget` on the current compatible-bitmap paint buffer; that interop path is much slower than the existing GDI/GDI+ renderer here.
+- Do not retry partial GDI and Direct2D hybrid window passes; the full window-owned Direct2D and DirectWrite path is the only Direct2D experiment in this workstream that materially helps.
 - Be skeptical of caches tied to graph or gauge size during drag; size changes every frame and cache maintenance can outweigh the saved draw work.
 - Prioritize experiments that reduce primitive count or switch to a cheaper primitive family while preserving the same pixels.
 - The most promising remaining directions are:
-  - reducing throughput graph draw cost without replacing `Polyline` with per-segment line commands
-  - reducing the amount of GDI+ work inside `GaugeWidget::Draw`
-  - exploring a renderer-owned direct-to-backbuffer raster path if a software widget experiment can avoid the extra bitmap copy that made the standalone gauge rasterizer fail
+  - reducing throughput graph and gauge geometry cost inside the new Direct2D live path without falling back to hybrid interop
+  - using richer WPA views or call trees to isolate the remaining app-side work that the flat text export now hides behind `d2d1.dll` and the driver stack
+  - deciding whether the screenshot-export path should stay on the legacy bitmap renderer or eventually move onto a separate Direct2D export path
   - favoring draw-path work over additional snap-path work unless a new experiment also moves `apply`
 
 ## Validation Notes
