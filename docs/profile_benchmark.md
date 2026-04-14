@@ -23,10 +23,10 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=0.20`
   - `paint_draw avg_ms=3.73`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=4.43` to `5.21`
+  - `drag_loop per_iter_ms=4.43` to `5.70`
   - `snap avg_ms=0.19` to `0.21`
-  - `apply avg_ms=0.38` to `0.45`
-  - `paint_draw avg_ms=3.73` to `4.37`
+  - `apply avg_ms=0.38` to `0.49`
+  - `paint_draw avg_ms=3.73` to `4.69`
 
 ## Current Confirmed Hotspots
 
@@ -304,11 +304,39 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Do not retry stroked-arc gauge segments as a substitute for the current combined fill-path gauge rendering.
 
+### Hypothesis: Move throughput and gauge drawing onto a Direct2D DC render target
+
+- Change:
+  - Add a renderer-owned Direct2D DC render target, switch throughput graph primitives and gauge fills to Direct2D geometry draws, and test both per-widget bind/end draws and one frame-scoped bind with explicit flushes before the remaining GDI text.
+- Result:
+  - Regressed catastrophically and was reverted.
+- Observed effect:
+  - Per-widget Direct2D bind/end draws pushed `drag_loop per_iter_ms` to about `15.24` and `paint_draw avg_ms` to about `14.24`.
+  - One frame-scoped Direct2D session with explicit flushes still stayed much worse at about `drag_loop per_iter_ms=9.45` and `paint_draw avg_ms=8.49`.
+- Why it failed:
+  - Binding a Direct2D DC render target onto the current compatible-bitmap backbuffer adds much more interop cost than the saved primitive work on this benchmark path.
+- Conclusion:
+  - Do not retry Direct2D through `ID2D1DCRenderTarget` on top of the current GDI memory-DC backbuffer. If Direct2D is revisited, it needs a real HWND or DXGI-owned target path rather than this interop layer.
+
+### Hypothesis: Reuse one GDI+ `Graphics` object across the whole frame
+
+- Change:
+  - Keep one frame-scoped GDI+ `Graphics` instance alive and route gauge and editable-anchor highlight draws through it instead of constructing a fresh `Graphics` wrapper for each draw.
+- Result:
+  - Regressed and was reverted.
+- Observed effect:
+  - Reruns landed around `drag_loop per_iter_ms=5.31` to `5.66` and `paint_draw avg_ms=4.41` to `4.66`.
+- Why it failed:
+  - The shared `Graphics` path did not offset its own state-management overhead on this workload, and the original per-draw setup stays cheaper in practice.
+- Conclusion:
+  - Keep the existing local `Gdiplus::Graphics` construction in the hot gauge and highlight paths.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.
 - Do not retry GDI+ stroked-arc gauge segments in place of the current combined fill paths.
 - Do not retry throughput `MoveToEx` and `LineTo` in place of `Polyline` for the current graph shape.
+- Do not retry Direct2D through `ID2D1DCRenderTarget` on the current compatible-bitmap paint buffer; that interop path is much slower than the existing GDI/GDI+ renderer here.
 - Be skeptical of caches tied to graph or gauge size during drag; size changes every frame and cache maintenance can outweigh the saved draw work.
 - Prioritize experiments that reduce primitive count or switch to a cheaper primitive family while preserving the same pixels.
 - The most promising remaining directions are:
