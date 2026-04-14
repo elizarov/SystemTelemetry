@@ -18,10 +18,6 @@ enum class LayoutEditParameter {
     CardBorder,
     CardHeaderIconSize,
 
-    // Text
-    TextBottomGap,
-    NetworkFooterBottomGap,
-
     // Card style guides
     CardPadding,
     CardHeaderIconGap,
@@ -32,6 +28,10 @@ enum class LayoutEditParameter {
     // Dashboard guides
     DashboardRowGap,
     DashboardColumnGap,
+
+    // Text
+    TextBottomGap,
+    NetworkFooterBottomGap,
 
     // Metric list
     MetricListBarHeight,

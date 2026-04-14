@@ -148,6 +148,10 @@ TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
         GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputAxisPadding));
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardBorder),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::CardPadding));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardRowGap),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::DashboardColumnGap),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::MetricListRowGap));
 }
 
 TEST(LayoutEditParameter, MetadataTableMatchesEnumOrder) {
