@@ -275,6 +275,11 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
         return resolution;
     }
 
+    if (anchorTarget.has_value()) {
+        resolution.hoveredEditableAnchor = anchorTarget;
+        return resolution;
+    }
+
     size_t layoutGuideIndex = 0;
     if (HitTestLayoutGuide(clientPoint, &layoutGuideIndex) != nullptr) {
         resolution.hoveredLayoutGuideIndex = layoutGuideIndex;
