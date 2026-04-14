@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cwchar>
 #include <sstream>
+#include <vector>
 
 #include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"
@@ -210,6 +211,63 @@ std::wstring BuildLayoutGuideItemLabel(
     return side + L" " + childName + L" weight:";
 }
 
+int CALLBACK CollectFontFamilyProc(const LOGFONTW* logFont, const TEXTMETRICW*, DWORD, LPARAM lParam) {
+    auto* families = reinterpret_cast<std::vector<std::wstring>*>(lParam);
+    if (families == nullptr || logFont == nullptr || logFont->lfFaceName[0] == L'\0' ||
+        logFont->lfFaceName[0] == L'@') {
+        return 1;
+    }
+    families->push_back(logFont->lfFaceName);
+    return 1;
+}
+
+bool CaseInsensitiveLess(const std::wstring& left, const std::wstring& right) {
+    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_LESS_THAN;
+}
+
+bool CaseInsensitiveEqual(const std::wstring& left, const std::wstring& right) {
+    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
+}
+
+std::vector<std::wstring> EnumerateInstalledFontFamilies(HWND hwnd) {
+    std::vector<std::wstring> families;
+    HDC dc = GetDC(hwnd);
+    if (dc == nullptr) {
+        return families;
+    }
+
+    LOGFONTW filter{};
+    filter.lfCharSet = DEFAULT_CHARSET;
+    EnumFontFamiliesExW(dc, &filter, CollectFontFamilyProc, reinterpret_cast<LPARAM>(&families), 0);
+    ReleaseDC(hwnd, dc);
+
+    std::sort(families.begin(), families.end(), CaseInsensitiveLess);
+    families.erase(std::unique(families.begin(), families.end(), CaseInsensitiveEqual), families.end());
+    return families;
+}
+
+void PopulateFontFaceComboBox(HWND hwnd, const std::wstring& selectedFace) {
+    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
+    if (combo == nullptr) {
+        return;
+    }
+
+    const auto families = EnumerateInstalledFontFamilies(hwnd);
+    int selectedIndex = CB_ERR;
+    for (const auto& family : families) {
+        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(family.c_str()));
+        if (index != CB_ERR && selectedIndex == CB_ERR && CaseInsensitiveEqual(family, selectedFace)) {
+            selectedIndex = static_cast<int>(index);
+        }
+    }
+
+    if (selectedIndex != CB_ERR) {
+        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
+    } else {
+        SetWindowTextW(combo, selectedFace.c_str());
+    }
+}
+
 struct CustomScaleDialogState {
     double initialScale = 1.0;
     std::optional<double> result;
@@ -376,7 +434,7 @@ INT_PTR CALLBACK LayoutEditFontDialogProc(HWND hwnd, UINT message, WPARAM wParam
             SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
             SetWindowTextW(hwnd, state->title.c_str());
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_PROMPT, state->prompt.c_str());
-            SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, WideFromUtf8(state->initialValue.face).c_str());
+            PopulateFontFaceComboBox(hwnd, WideFromUtf8(state->initialValue.face));
             SetDlgItemTextW(
                 hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, WideFromUtf8(std::to_string(state->initialValue.size)).c_str());
             SetDlgItemTextW(hwnd,
