@@ -1344,10 +1344,12 @@ void DashboardApp::Paint() {
 void DashboardApp::DrawTextBlock(
     HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
     HGDIOBJ oldFont = SelectObject(hdc, font);
+    const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, color);
     RECT copy = rect;
     const std::wstring wideText = WideFromUtf8(text);
     DrawTextW(hdc, wideText.c_str(), -1, &copy, format);
+    SetBkMode(hdc, oldBkMode);
     SelectObject(hdc, oldFont);
 }
 

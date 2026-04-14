@@ -560,8 +560,10 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
         if (highlighted.drawTargetOutline && highlighted.targetRect.right > highlighted.targetRect.left &&
             highlighted.targetRect.bottom > highlighted.targetRect.top) {
+            RECT outlineRect = highlighted.targetRect;
+            InflateRect(&outlineRect, std::max(1, ScaleLogical(1)), std::max(1, ScaleLogical(1)));
             const_cast<DashboardRenderer*>(this)->DrawSolidRect(
-                highlighted.targetRect, outlineColor, std::max(1, ScaleLogical(1)), true);
+                outlineRect, outlineColor, std::max(1, ScaleLogical(1)), true);
         }
 
         if (highlighted.shape == AnchorShape::Circle) {
@@ -1671,10 +1673,10 @@ bool DashboardRenderer::InitializeDirect2D() {
         d2dFactory_->CreateStrokeStyle(D2D1::StrokeStyleProperties(), nullptr, 0, d2dSolidStrokeStyle_.GetAddressOf());
     }
     if (d2dDashedStrokeStyle_ == nullptr) {
-        const D2D1_STROKE_STYLE_PROPERTIES props = D2D1::StrokeStyleProperties(D2D1_CAP_STYLE_FLAT,
-            D2D1_CAP_STYLE_FLAT,
-            D2D1_CAP_STYLE_FLAT,
-            D2D1_LINE_JOIN_MITER,
+        const D2D1_STROKE_STYLE_PROPERTIES props = D2D1::StrokeStyleProperties(D2D1_CAP_STYLE_ROUND,
+            D2D1_CAP_STYLE_ROUND,
+            D2D1_CAP_STYLE_ROUND,
+            D2D1_LINE_JOIN_ROUND,
             10.0f,
             D2D1_DASH_STYLE_DOT,
             0.0f);
