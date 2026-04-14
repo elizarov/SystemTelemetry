@@ -19,13 +19,14 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured result reached during this workstream:
-  - `drag_loop per_iter_ms=6.06`
-  - `snap avg_ms=1.43`
-  - `paint_draw avg_ms=3.88`
-- Clean-tree result after the latest reverted draw experiments:
-  - `drag_loop per_iter_ms=6.10`
-  - `snap avg_ms=1.44`
-  - `paint_draw avg_ms=3.91`
+  - `drag_loop per_iter_ms=4.80`
+  - `snap avg_ms=0.47`
+  - `paint_draw avg_ms=3.83`
+- Current repeatable result on the optimized tree:
+  - `drag_loop per_iter_ms=4.80` to `4.86`
+  - `snap avg_ms=0.47`
+  - `apply avg_ms=0.37`
+  - `paint_draw avg_ms=3.83` to `3.88`
 
 ## Current Confirmed Hotspots
 
@@ -40,9 +41,9 @@ Confirmed inclusive hotspots from the latest useful WPR capture in this workstre
 
 Interpretation:
 
-- Snap-path work improved materially already and is no longer the main limiter.
-- The remaining wall time is dominated by real paint work plus layout resolution on apply.
-- The biggest draw-path costs are still the throughput graph primitives and the gauge GDI+ fills.
+- Snap-path work is no longer the main limiter after the latest gauge-layout optimization.
+- The remaining wall time is now dominated by real paint work, especially throughput graph drawing and gauge fills.
+- Layout resolution still matters, but its cost dropped materially once gauge relayout stopped prebuilding unused cumulative fill paths.
 
 ## Kept Optimizations
 
@@ -51,6 +52,7 @@ These changes produced real wins and remain in the codebase:
 - Avoid full config copies during snap evaluation by applying preview weights directly in the renderer and resolving layout from there.
 - Group snap candidates by widget so one snap search can serve multiple target extents with shared extent evaluation.
 - Refactor layout similarity indicator collection to avoid repeated representative scans and reduce per-frame container churn.
+- Build only the one live gauge usage-fill path that the current metric needs instead of prebuilding every cumulative gauge fill path during each relayout.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 
 ## Tested Hypotheses
@@ -87,6 +89,20 @@ These changes produced real wins and remain in the codebase:
   - Did not materially move the full benchmark, but removed obvious repeated widget scanning and reduced overlay bookkeeping.
 - Conclusion:
   - The similarity overlay is not the dominant limiter, but the refactor is still cleaner and cheaper.
+
+### Hypothesis: Stop prebuilding every cumulative gauge usage path during relayout
+
+- Change:
+  - Keep the per-segment gauge paths and shared track path, but lazily build just the currently needed cumulative usage path on demand during draw instead of materializing all cumulative fill combinations during every `ResolveLayoutState`.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - `drag_loop per_iter_ms` improved from about `6.08` to about `4.80`.
+  - `snap avg_ms` improved from about `1.42` to about `0.47`.
+  - `apply avg_ms` improved from about `0.63` to about `0.37`.
+  - `paint_draw avg_ms` stayed about flat at `3.83` to `3.89`.
+- Conclusion:
+  - Prebuilding unused cumulative gauge fill paths was the largest remaining source of avoidable relayout churn in the drag path, and deferring that work until the one live fill count is known is worth keeping.
 
 ### Hypothesis: Replace throughput `Polyline` with incremental `MoveToEx` and `LineTo`
 
@@ -158,10 +174,10 @@ These changes produced real wins and remain in the codebase:
 - Be skeptical of caches tied to graph or gauge size during drag; size changes every frame and cache maintenance can outweigh the saved draw work.
 - Prioritize experiments that reduce primitive count or switch to a cheaper primitive family while preserving the same pixels.
 - The most promising remaining directions are:
-  - reducing the amount of GDI+ work inside `GaugeWidget::Draw`
   - replacing expensive gauge fill operations with a visually equivalent but cheaper drawing method
   - reducing throughput graph draw cost without replacing `Polyline` with per-segment line commands
-  - minimizing repeated layout resolution only if a change can be made without changing drag behavior
+  - reducing the amount of GDI+ work inside `GaugeWidget::Draw`
+  - trimming text-anchor registration cost when layout-edit behavior can stay identical
 
 ## Validation Notes
 

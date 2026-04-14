@@ -222,11 +222,8 @@ void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RE
             layoutState_.segmentLayout.segmentSweep));
     }
     layoutState_.trackPath = BuildCombinedGaugePath(layoutState_.segmentPaths, layoutState_.segmentPaths.size());
-    layoutState_.usagePaths.clear();
-    layoutState_.usagePaths.reserve(static_cast<size_t>(layoutState_.segmentLayout.segmentCount));
-    for (size_t i = 1; i <= layoutState_.segmentPaths.size(); ++i) {
-        layoutState_.usagePaths.push_back(BuildCombinedGaugePath(layoutState_.segmentPaths, i));
-    }
+    layoutState_.cachedUsageSegmentCount = -1;
+    layoutState_.cachedUsagePath.reset();
 }
 
 void GaugeWidget::Draw(DashboardRenderer& renderer,
@@ -267,10 +264,15 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     if (layoutState_.trackPath != nullptr) {
         graphics.FillPath(&trackBrush, layoutState_.trackPath.get());
     }
-    if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && filledSegments > 0 &&
-        static_cast<size_t>(filledSegments - 1) < layoutState_.usagePaths.size() &&
-        layoutState_.usagePaths[static_cast<size_t>(filledSegments - 1)] != nullptr) {
-        graphics.FillPath(&usageBrush, layoutState_.usagePaths[static_cast<size_t>(filledSegments - 1)].get());
+    if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && filledSegments > 0) {
+        if (layoutState_.cachedUsageSegmentCount != filledSegments) {
+            layoutState_.cachedUsagePath =
+                BuildCombinedGaugePath(layoutState_.segmentPaths, static_cast<size_t>(filledSegments));
+            layoutState_.cachedUsageSegmentCount = filledSegments;
+        }
+        if (layoutState_.cachedUsagePath != nullptr) {
+            graphics.FillPath(&usageBrush, layoutState_.cachedUsagePath.get());
+        }
     }
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && peakSegment >= 0 &&
         static_cast<size_t>(peakSegment) < layoutState_.segmentPaths.size() &&

@@ -53,14 +53,14 @@ class DashboardMetricSource {
 public:
     DashboardMetricSource(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales);
 
-    std::string ResolveText(const std::string& metricRef) const;
-    DashboardGaugeMetric ResolveGauge(const std::string& metricRef) const;
-    std::vector<DashboardMetricRow> ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const;
-    DashboardThroughputMetric ResolveThroughput(const std::string& metricRef) const;
-    std::string ResolveNetworkFooter() const;
-    std::vector<DashboardDriveRow> ResolveDriveRows() const;
-    std::string ResolveClockTime() const;
-    std::string ResolveClockDate() const;
+    const std::string& ResolveText(const std::string& metricRef) const;
+    const DashboardGaugeMetric& ResolveGauge(const std::string& metricRef) const;
+    const std::vector<DashboardMetricRow>& ResolveMetricList(const std::vector<DashboardMetricListEntry>& metricRefs) const;
+    const DashboardThroughputMetric& ResolveThroughput(const std::string& metricRef) const;
+    const std::string& ResolveNetworkFooter() const;
+    const std::vector<DashboardDriveRow>& ResolveDriveRows() const;
+    const std::string& ResolveClockTime() const;
+    const std::string& ResolveClockDate() const;
 
 private:
     struct ThroughputCacheEntry {

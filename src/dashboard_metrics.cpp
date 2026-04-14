@@ -208,7 +208,7 @@ void ApplyMetricLabelOverride(DashboardMetricRow& row, const std::string& labelO
 DashboardMetricSource::DashboardMetricSource(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales)
     : snapshot_(snapshot), metricScales_(metricScales) {}
 
-std::string DashboardMetricSource::ResolveText(const std::string& metricRef) const {
+const std::string& DashboardMetricSource::ResolveText(const std::string& metricRef) const {
     const auto cached = textCache_.find(metricRef);
     if (cached != textCache_.end()) {
         return cached->second;
@@ -223,7 +223,7 @@ std::string DashboardMetricSource::ResolveText(const std::string& metricRef) con
     return textCache_.emplace(metricRef, std::move(resolved)).first->second;
 }
 
-DashboardGaugeMetric DashboardMetricSource::ResolveGauge(const std::string& metricRef) const {
+const DashboardGaugeMetric& DashboardMetricSource::ResolveGauge(const std::string& metricRef) const {
     const auto cached = gaugeCache_.find(metricRef);
     if (cached != gaugeCache_.end()) {
         return cached->second;
@@ -240,7 +240,7 @@ DashboardGaugeMetric DashboardMetricSource::ResolveGauge(const std::string& metr
     return gaugeCache_.emplace(metricRef, metric).first->second;
 }
 
-std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(
+const std::vector<DashboardMetricRow>& DashboardMetricSource::ResolveMetricList(
     const std::vector<DashboardMetricListEntry>& metricRefs) const {
     std::ostringstream cacheKey;
     for (const auto& metricRef : metricRefs) {
@@ -264,7 +264,7 @@ std::vector<DashboardMetricRow> DashboardMetricSource::ResolveMetricList(
     return metricListCache_.emplace(key, std::move(rows)).first->second;
 }
 
-DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::string& metricRef) const {
+const DashboardThroughputMetric& DashboardMetricSource::ResolveThroughput(const std::string& metricRef) const {
     const auto cached = throughputCache_.find(metricRef);
     if (cached != throughputCache_.end()) {
         return cached->second.metric;
@@ -325,7 +325,7 @@ DashboardThroughputMetric DashboardMetricSource::ResolveThroughput(const std::st
     return throughputCache_.emplace(metricRef, ThroughputCacheEntry{metric}).first->second.metric;
 }
 
-std::string DashboardMetricSource::ResolveNetworkFooter() const {
+const std::string& DashboardMetricSource::ResolveNetworkFooter() const {
     if (!networkFooterCache_.has_value()) {
         if (snapshot_.network.adapterName.empty()) {
             networkFooterCache_ = snapshot_.network.ipAddress;
@@ -336,7 +336,7 @@ std::string DashboardMetricSource::ResolveNetworkFooter() const {
     return *networkFooterCache_;
 }
 
-std::vector<DashboardDriveRow> DashboardMetricSource::ResolveDriveRows() const {
+const std::vector<DashboardDriveRow>& DashboardMetricSource::ResolveDriveRows() const {
     if (!driveRowsCache_.has_value()) {
         driveRowsCache_ = std::vector<DashboardDriveRow>{};
         driveRowsCache_->reserve(snapshot_.drives.size());
@@ -358,7 +358,7 @@ std::vector<DashboardDriveRow> DashboardMetricSource::ResolveDriveRows() const {
     return *driveRowsCache_;
 }
 
-std::string DashboardMetricSource::ResolveClockTime() const {
+const std::string& DashboardMetricSource::ResolveClockTime() const {
     if (!clockTimeCache_.has_value()) {
         char buffer[32];
         sprintf_s(buffer, "%02d:%02d", snapshot_.now.wHour, snapshot_.now.wMinute);
@@ -367,7 +367,7 @@ std::string DashboardMetricSource::ResolveClockTime() const {
     return *clockTimeCache_;
 }
 
-std::string DashboardMetricSource::ResolveClockDate() const {
+const std::string& DashboardMetricSource::ResolveClockDate() const {
     if (!clockDateCache_.has_value()) {
         char buffer[32];
         sprintf_s(buffer, "%04d-%02d-%02d", snapshot_.now.wYear, snapshot_.now.wMonth, snapshot_.now.wDay);

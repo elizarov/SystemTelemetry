@@ -81,7 +81,8 @@ int ComputeLowestStackedSegmentTop(int top, int height, int width, int segmentCo
     return lastSegmentTop;
 }
 
-void DrawSegmentIndicator(HDC hdc,
+void DrawSegmentIndicator(DashboardRenderer& renderer,
+    HDC hdc,
     const RECT& rect,
     int segmentCount,
     int segmentGap,
@@ -105,8 +106,8 @@ void DrawSegmentIndicator(HDC hdc,
         clampedRatio > 0.0
             ? std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(segmentCount))), 1, segmentCount)
             : 0;
-    HBRUSH trackBrush = CreateSolidBrush(trackColor);
-    HBRUSH fillBrush = filledSegments > 0 ? CreateSolidBrush(accentColor) : nullptr;
+    HBRUSH trackBrush = renderer.SolidBrush(trackColor);
+    HBRUSH fillBrush = filledSegments > 0 ? renderer.SolidBrush(accentColor) : nullptr;
     int top = rect.top;
     for (int index = segmentCount - 1; index >= 0; --index) {
         const int extra = (segmentCount - 1 - index) < remainder ? 1 : 0;
@@ -123,10 +124,6 @@ void DrawSegmentIndicator(HDC hdc,
 
         top = segmentRect.bottom + clampedGap;
     }
-    if (fillBrush != nullptr) {
-        DeleteObject(fillBrush);
-    }
-    DeleteObject(trackBrush);
 }
 
 int EffectiveDriveHeaderHeight(const DashboardRenderer& renderer) {
@@ -273,25 +270,25 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
     const DashboardMetricSource& metrics) const {
     const int savedDc = SaveDC(hdc);
     IntersectClipRect(hdc, widget.rect.left, widget.rect.top, widget.rect.right, widget.rect.bottom);
-    renderer.DrawTextBlock(hdc,
+    renderer.DrawText(hdc,
         layoutState_.headerReadLabelRect,
         "R",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
-    renderer.DrawTextBlock(hdc,
+    renderer.DrawText(hdc,
         layoutState_.headerWriteLabelRect,
         "W",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOCLIP);
-    renderer.DrawTextBlock(hdc,
+    renderer.DrawText(hdc,
         layoutState_.usageHeaderRect,
         "Usage",
         renderer.WidgetFonts().smallFont,
         renderer.MutedTextColor(),
         DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-    renderer.DrawTextBlock(hdc,
+    renderer.DrawText(hdc,
         layoutState_.headerColumns.free,
         "Free",
         renderer.WidgetFonts().smallFont,
@@ -307,7 +304,7 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
         const RECT& writeIndicatorRect = layoutState_.rowWriteIndicatorRects[rowIndex];
         const RECT& barRect = layoutState_.rowBarRects[rowIndex];
 
-        renderer.DrawTextBlock(hdc,
+        renderer.DrawText(hdc,
             columns.label,
             drive.label,
             renderer.WidgetFonts().label,
@@ -322,14 +319,16 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
                 DashboardRenderer::LayoutEditParameter::FontLabel,
                 textBaseId,
                 renderer.Config().layout.fonts.label.size));
-        DrawSegmentIndicator(hdc,
+        DrawSegmentIndicator(renderer,
+            hdc,
             readIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
             renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank ? 0.0 : drive.readActivity,
             renderer.TrackColor(),
             renderer.AccentColor());
-        DrawSegmentIndicator(hdc,
+        DrawSegmentIndicator(renderer,
+            hdc,
             writeIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
@@ -344,7 +343,7 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
             char percent[16];
             sprintf_s(percent, "%.0f%%", drive.usedPercent);
-            renderer.DrawTextBlock(hdc,
+            renderer.DrawText(hdc,
                 columns.percent,
                 percent,
                 renderer.WidgetFonts().label,
@@ -359,7 +358,7 @@ void DriveUsageListWidget::Draw(DashboardRenderer& renderer,
                     DashboardRenderer::LayoutEditParameter::FontLabel,
                     textBaseId + 1,
                     renderer.Config().layout.fonts.label.size));
-            renderer.DrawTextBlock(hdc,
+            renderer.DrawText(hdc,
                 columns.free,
                 drive.freeText,
                 renderer.WidgetFonts().smallFont,
