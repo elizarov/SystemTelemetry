@@ -13,6 +13,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -28,14 +29,14 @@
 #include "dashboard_controller.h"
 #include "diagnostics_options.h"
 #include "layout_edit_controller.h"
-#include "layout_edit_parameter.h"
 #include "layout_edit_trace_session.h"
 
-class DashboardAppLayoutEditModalUiScope;
+class DashboardShellUi;
 
 class DashboardApp : private LayoutEditHost, public DashboardShellHost {
 public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {});
+    ~DashboardApp();
     bool Initialize(HINSTANCE instance);
     int Run();
     bool InitializeFonts() override;
@@ -58,31 +59,17 @@ public:
     void ShowError(const std::wstring& message) const override;
 
 private:
-    friend class DashboardAppLayoutEditModalUiScope;
+    friend class DashboardShellUi;
 
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void Paint();
-    void ShowContextMenu(
-        POINT screenPoint, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget = std::nullopt);
     void BringOnTop();
     bool ApplyConfiguredWallpaper();
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void UpdateRendererScale(double scale);
     double ResolveCurrentDisplayScale(UINT dpi) const;
-    std::optional<double> PromptCustomScale();
-    bool PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target);
-    std::optional<double> PromptLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter,
-        const LayoutEditTooltipDescriptor& descriptor,
-        double initialValue,
-        const std::wstring& title);
-    std::optional<std::vector<int>> PromptLayoutGuideWeights(
-        const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title);
-    std::optional<UiFontConfig> PromptLayoutEditFont(DashboardRenderer::LayoutEditParameter parameter,
-        const LayoutEditTooltipDescriptor& descriptor,
-        const UiFontConfig& initialValue,
-        const std::wstring& title);
     bool IsLayoutEditMode() const;
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights,
@@ -98,9 +85,6 @@ private:
     void UpdateLayoutEditTooltip();
     void UpdateLayoutEditMouseTracking();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
-    void BeginLayoutEditModalUi();
-    void EndLayoutEditModalUi();
-    bool IsLayoutEditModalUiActive() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);
@@ -133,6 +117,7 @@ private:
     DiagnosticsOptions diagnosticsOptions_;
     UINT currentDpi_ = kDefaultDpi;
     LayoutEditController layoutEditController_;
+    std::unique_ptr<DashboardShellUi> shellUi_;
     HWND layoutEditTooltipHwnd_ = nullptr;
     std::wstring layoutEditTooltipText_;
     bool layoutEditTooltipVisible_ = false;
