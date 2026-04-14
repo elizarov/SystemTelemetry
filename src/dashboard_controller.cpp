@@ -422,8 +422,8 @@ bool DashboardController::ApplyLayoutEditFont(
 std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,
-    const DashboardRenderer::LayoutWidgetIdentity& widget,
-    DashboardRenderer::LayoutGuideAxis axis) {
+    const layout_edit::LayoutEditWidgetIdentity& widget,
+    layout_edit::LayoutGuideAxis axis) {
     return layout_edit::EvaluateWidgetExtentForGuideWeights(shell.Renderer(), target, weights, widget, axis);
 }
 

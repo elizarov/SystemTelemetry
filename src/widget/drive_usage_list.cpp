@@ -6,6 +6,14 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+using layout_edit::AnchorDragAxis;
+using layout_edit::AnchorDragMode;
+using layout_edit::AnchorShape;
+using layout_edit::LayoutEditAnchorKey;
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+
 namespace {
 
 DriveUsageListWidget::MeasuredColumnWidths MeasureColumnWidths(const DashboardRenderer& renderer) {
@@ -354,16 +362,15 @@ void DriveUsageListWidget::Draw(
 void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.driveUsageList;
     renderer.RegisterStaticEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegments,
-            0,
-        },
+            0},
         layoutState_.activityTargetRect,
         layoutState_.activityAnchorRect,
-        DashboardRenderer::AnchorShape::Diamond,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::AxisDelta,
+        AnchorShape::Diamond,
+        AnchorDragAxis::Both,
+        AnchorDragMode::AxisDelta,
         RenderPoint{layoutState_.activityAnchorCenterX, layoutState_.firstRowContentTop},
         1.0,
         true,
@@ -410,16 +417,15 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
         const int anchorCenterX = anchorRect.left + ((std::max)(0, anchorRect.right - anchorRect.left) / 2);
         const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
         renderer.RegisterStaticEditableAnchorRegion(
-            DashboardRenderer::EditableAnchorKey{
-                DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            LayoutEditAnchorKey{
+                LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 DashboardRenderer::LayoutEditParameter::DriveUsageBarHeight,
-                rowIndex,
-            },
+                rowIndex},
             barRect,
             anchorRect,
-            DashboardRenderer::AnchorShape::Circle,
-            DashboardRenderer::AnchorDragAxis::Horizontal,
-            DashboardRenderer::AnchorDragMode::AxisDelta,
+            AnchorShape::Circle,
+            AnchorDragAxis::Horizontal,
+            AnchorDragMode::AxisDelta,
             RenderPoint{anchorCenterX, anchorCenterY},
             1.0,
             false,
@@ -440,9 +446,9 @@ void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const Da
     const auto addVerticalGuide =
         [&](int guideId, int x, DashboardRenderer::LayoutEditParameter parameter, int value, int dragDirection) {
             const int clampedX = std::clamp(x, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
-            DashboardRenderer::WidgetEditGuide guide;
-            guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
-            guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+            LayoutEditWidgetGuide guide;
+            guide.axis = LayoutGuideAxis::Vertical;
+            guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
             guide.parameter = parameter;
             guide.guideId = guideId;
             guide.widgetRect = widget.rect;
@@ -464,9 +470,9 @@ void DriveUsageListWidget::BuildEditGuides(DashboardRenderer& renderer, const Da
         const int clampedY = std::clamp(y, static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
         const int guideLeft = std::clamp(left, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
         const int guideRight = std::clamp(right, guideLeft, static_cast<int>(widget.rect.right));
-        DashboardRenderer::WidgetEditGuide guide;
-        guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
-        guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        LayoutEditWidgetGuide guide;
+        guide.axis = LayoutGuideAxis::Horizontal;
+        guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
         guide.parameter = parameter;
         guide.guideId = guideId;
         guide.widgetRect = widget.rect;

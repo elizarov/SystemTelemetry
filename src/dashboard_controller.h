@@ -83,8 +83,8 @@ public:
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
         const LayoutEditHost::LayoutTarget& target,
         const std::vector<int>& weights,
-        const DashboardRenderer::LayoutWidgetIdentity& widget,
-        DashboardRenderer::LayoutGuideAxis axis);
+        const layout_edit::LayoutEditWidgetIdentity& widget,
+        layout_edit::LayoutGuideAxis axis);
     AppConfig BuildCurrentConfigForSaving(DashboardShellHost& shell) const;
     void UpdateConfigFromCurrentPlacement(DashboardShellHost& shell);
 

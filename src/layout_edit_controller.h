@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include <windows.h>
@@ -26,7 +27,7 @@ public:
         std::string editCardId;
         std::vector<size_t> nodePath;
 
-        static LayoutTarget ForGuide(const DashboardRenderer::LayoutEditGuide& guide);
+        static LayoutTarget ForGuide(const layout_edit::LayoutEditGuide& guide);
     };
 
     virtual const AppConfig& LayoutEditConfig() const = 0;
@@ -35,8 +36,8 @@ public:
     virtual bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) = 0;
     virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights,
-        const DashboardRenderer::LayoutWidgetIdentity& widget,
-        DashboardRenderer::LayoutGuideAxis axis) = 0;
+        const layout_edit::LayoutEditWidgetIdentity& widget,
+        layout_edit::LayoutGuideAxis axis) = 0;
     virtual bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) = 0;
     virtual void InvalidateLayoutEdit() = 0;
     virtual void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) = 0;
@@ -47,19 +48,8 @@ public:
 class LayoutEditController {
 public:
     struct TooltipTarget {
-        enum class Kind {
-            LayoutGuide,
-            WidgetGuide,
-            GapEditAnchor,
-            EditableAnchor,
-        };
-
-        Kind kind = Kind::LayoutGuide;
-        RenderPoint clientPoint{};
-        DashboardRenderer::LayoutEditGuide layoutGuide{};
-        DashboardRenderer::WidgetEditGuide widgetGuide{};
-        DashboardRenderer::GapEditAnchor gapEditAnchor{};
-        DashboardRenderer::EditableAnchorRegion editableAnchor{};
+        std::optional<RenderPoint> clientPoint;
+        layout_edit::TooltipPayload payload;
     };
 
     explicit LayoutEditController(LayoutEditHost& host);
@@ -78,16 +68,16 @@ public:
 
 private:
     struct HoverResolution {
-        std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredLayoutCard;
-        std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableCard;
-        std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget;
-        std::optional<DashboardRenderer::GapEditAnchorKey> hoveredGapEditAnchor;
-        std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor;
+        std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredLayoutCard;
+        std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredEditableCard;
+        std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredEditableWidget;
+        std::optional<layout_edit::LayoutEditGapAnchorKey> hoveredGapEditAnchor;
+        std::optional<layout_edit::LayoutEditAnchorKey> hoveredEditableAnchor;
         std::optional<size_t> hoveredGapEditAnchorIndex;
         std::optional<size_t> hoveredWidgetEditGuideIndex;
         std::optional<size_t> hoveredLayoutGuideIndex;
-        std::optional<DashboardRenderer::GapEditAnchorKey> actionableGapEditAnchor;
-        std::optional<DashboardRenderer::EditableAnchorKey> actionableAnchorHandle;
+        std::optional<layout_edit::LayoutEditGapAnchorKey> actionableGapEditAnchor;
+        std::optional<layout_edit::LayoutEditAnchorKey> actionableAnchorHandle;
     };
 
     struct WeightVectorHash {
@@ -102,7 +92,7 @@ private:
 
     struct ExtentCacheKey {
         std::vector<int> weights;
-        DashboardRenderer::LayoutWidgetIdentity widget;
+        layout_edit::LayoutEditWidgetIdentity widget;
 
         bool operator==(const ExtentCacheKey& other) const {
             return weights == other.weights && widget.kind == other.widget.kind &&
@@ -125,23 +115,23 @@ private:
     };
 
     struct LayoutDragState {
-        DashboardRenderer::LayoutEditGuide guide;
+        layout_edit::LayoutEditGuide guide;
         std::vector<int> initialWeights;
-        std::vector<DashboardRenderer::LayoutGuideSnapCandidate> snapCandidates;
+        std::vector<layout_edit::LayoutGuideSnapCandidate> snapCandidates;
         int dragStartCoordinate = 0;
         std::unordered_map<ExtentCacheKey, std::optional<int>, ExtentCacheKeyHash> extentCache;
     };
 
     struct WidgetEditDragState {
-        DashboardRenderer::WidgetEditGuide guide;
+        layout_edit::LayoutEditWidgetGuide guide;
         double initialValue = 0.0;
         int dragStartCoordinate = 0;
     };
 
     struct AnchorEditDragState {
-        DashboardRenderer::EditableAnchorKey key;
-        DashboardRenderer::AnchorDragAxis dragAxis = DashboardRenderer::AnchorDragAxis::Vertical;
-        DashboardRenderer::AnchorDragMode dragMode = DashboardRenderer::AnchorDragMode::AxisDelta;
+        layout_edit::LayoutEditAnchorKey key;
+        layout_edit::AnchorDragAxis dragAxis = layout_edit::AnchorDragAxis::Vertical;
+        layout_edit::AnchorDragMode dragMode = layout_edit::AnchorDragMode::AxisDelta;
         RenderPoint dragOrigin{};
         double dragScale = 1.0;
         int initialValue = 0;
@@ -150,16 +140,16 @@ private:
     };
 
     struct GapEditDragState {
-        DashboardRenderer::GapEditAnchor anchor;
+        layout_edit::LayoutEditGapAnchor anchor;
         double initialValue = 0.0;
         int dragStartCoordinate = 0;
     };
 
-    const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(
+    const layout_edit::LayoutEditGuide* HitTestLayoutGuide(
         RenderPoint clientPoint, size_t* index = nullptr) const;
-    const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(
+    const layout_edit::LayoutEditWidgetGuide* HitTestWidgetEditGuide(
         RenderPoint clientPoint, size_t* index = nullptr) const;
-    const DashboardRenderer::GapEditAnchor* HitTestGapEditAnchor(
+    const layout_edit::LayoutEditGapAnchor* HitTestGapEditAnchor(
         RenderPoint clientPoint, size_t* index = nullptr) const;
     HoverResolution ResolveHover(RenderPoint clientPoint) const;
     void RefreshHover(RenderPoint clientPoint);
@@ -175,13 +165,13 @@ private:
 
     LayoutEditHost& host_;
     std::optional<size_t> hoveredLayoutGuideIndex_;
-    std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredLayoutCard_;
-    std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableCard_;
-    std::optional<DashboardRenderer::LayoutWidgetIdentity> hoveredEditableWidget_;
+    std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredLayoutCard_;
+    std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredEditableCard_;
+    std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredEditableWidget_;
     std::optional<size_t> hoveredGapEditAnchorIndex_;
     std::optional<size_t> hoveredWidgetEditGuideIndex_;
-    std::optional<DashboardRenderer::GapEditAnchorKey> hoveredGapEditAnchor_;
-    std::optional<DashboardRenderer::EditableAnchorKey> hoveredEditableAnchor_;
+    std::optional<layout_edit::LayoutEditGapAnchorKey> hoveredGapEditAnchor_;
+    std::optional<layout_edit::LayoutEditAnchorKey> hoveredEditableAnchor_;
     std::optional<LayoutDragState> activeLayoutDrag_;
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
     std::optional<GapEditDragState> activeGapEditDrag_;

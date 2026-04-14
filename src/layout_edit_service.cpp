@@ -55,7 +55,7 @@ const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditH
     return FindLayoutNodeByPath(cardIt->layout, target.nodePath);
 }
 
-std::vector<int> SeedGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const LayoutNodeConfig* node) {
+std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNodeConfig* node) {
     if (node == nullptr || node->children.size() != guide.childExtents.size()) {
         return guide.childExtents;
     }
@@ -114,8 +114,8 @@ bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& ta
 std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,
-    const DashboardRenderer::LayoutWidgetIdentity& widget,
-    DashboardRenderer::LayoutGuideAxis axis) {
+    const LayoutEditWidgetIdentity& widget,
+    LayoutGuideAxis axis) {
     if (!renderer.ApplyLayoutGuideWeightsPreview(target.editCardId, target.nodePath, weights)) {
         return std::nullopt;
     }

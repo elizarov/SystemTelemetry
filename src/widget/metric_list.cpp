@@ -7,6 +7,14 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+using layout_edit::AnchorDragAxis;
+using layout_edit::AnchorDragMode;
+using layout_edit::AnchorShape;
+using layout_edit::LayoutEditAnchorKey;
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+
 namespace {
 
 std::string Trim(std::string value) {
@@ -197,16 +205,15 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         const int anchorCenterX = anchorRect.left + ((std::max)(0, anchorRect.right - anchorRect.left) / 2);
         const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
         renderer.RegisterStaticEditableAnchorRegion(
-            DashboardRenderer::EditableAnchorKey{
-                DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            LayoutEditAnchorKey{
+                LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 DashboardRenderer::LayoutEditParameter::MetricListBarHeight,
-                rowIndex,
-            },
+                rowIndex},
             barRect,
             anchorRect,
-            DashboardRenderer::AnchorShape::Circle,
-            DashboardRenderer::AnchorDragAxis::Horizontal,
-            DashboardRenderer::AnchorDragMode::AxisDelta,
+            AnchorShape::Circle,
+            AnchorDragAxis::Horizontal,
+            AnchorDragMode::AxisDelta,
             RenderPoint{anchorCenterX, anchorCenterY},
             1.0,
             false,
@@ -233,9 +240,9 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
         static_cast<int>(widget.rect.right));
 
     auto& guides = renderer.WidgetEditGuidesMutable();
-    DashboardRenderer::WidgetEditGuide guide;
-    guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
-    guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    LayoutEditWidgetGuide guide;
+    guide.axis = LayoutGuideAxis::Vertical;
+    guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
     guide.parameter = DashboardRenderer::LayoutEditParameter::MetricListLabelWidth;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
@@ -249,8 +256,8 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
         const int y = layoutState_.rowRects[rowIndex].bottom;
         guide = {};
-        guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
-        guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        guide.axis = LayoutGuideAxis::Horizontal;
+        guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
         guide.parameter = DashboardRenderer::LayoutEditParameter::MetricListRowGap;
         guide.guideId = 1 + rowIndex;
         guide.widgetRect = widget.rect;

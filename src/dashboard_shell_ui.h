@@ -47,7 +47,7 @@ private:
         double initialValue,
         const std::wstring& title);
     std::optional<std::vector<int>> PromptLayoutGuideWeights(
-        const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title);
+        const layout_edit::LayoutEditGuide& guide, const std::wstring& title);
     std::optional<UiFontConfig> PromptLayoutEditFont(DashboardRenderer::LayoutEditParameter parameter,
         const LayoutEditTooltipDescriptor& descriptor,
         const UiFontConfig& initialValue,

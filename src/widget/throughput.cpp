@@ -7,6 +7,15 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+using layout_edit::AnchorDragAxis;
+using layout_edit::AnchorDragMode;
+using layout_edit::AnchorShape;
+using layout_edit::LayoutEditAnchorBinding;
+using layout_edit::LayoutEditAnchorKey;
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+
 namespace {
 
 using ThroughputGraphLayout = ThroughputWidget::LayoutState;
@@ -52,7 +61,7 @@ void DrawGraph(DashboardRenderer& renderer,
     double guideStepMbps,
     double timeMarkerOffsetSamples,
     double timeMarkerIntervalSamples,
-    const std::optional<DashboardRenderer::EditableAnchorBinding>& maxLabelEditable) {
+    const std::optional<LayoutEditAnchorBinding>& maxLabelEditable) {
     renderer.FillSolidRect(rect, renderer.GraphBackgroundColor());
     const double guideStep = guideStepMbps > 0.0 ? guideStepMbps : 5.0;
     const RenderColor markerColor = renderer.GraphMarkerColor();
@@ -256,16 +265,15 @@ void ThroughputWidget::Draw(
 void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const ThroughputGraphLayout& layout = layoutState_;
     renderer.RegisterStaticEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::ThroughputLeaderDiameter,
-            0,
-        },
+            0},
         layout.leaderAnchorRect,
         layout.leaderAnchorRect,
-        DashboardRenderer::AnchorShape::Circle,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::RadialDistance,
+        AnchorShape::Circle,
+        AnchorDragAxis::Both,
+        AnchorDragMode::RadialDistance,
         RenderPoint{layout.leaderAnchorCenterX, layout.leaderAnchorCenterY},
         2.0,
         true,
@@ -273,16 +281,15 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         renderer.Config().layout.throughput.leaderDiameter);
 
     renderer.RegisterStaticEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::ThroughputPlotStrokeWidth,
-            0,
-        },
+            0},
         layout.plotAnchorRect,
         layout.plotAnchorRect,
-        DashboardRenderer::AnchorShape::Circle,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::RadialDistance,
+        AnchorShape::Circle,
+        AnchorDragAxis::Both,
+        AnchorDragMode::RadialDistance,
         RenderPoint{layout.plotAnchorCenterX, layout.plotAnchorCenterY},
         2.0,
         true,
@@ -290,16 +297,15 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         renderer.Config().layout.throughput.plotStrokeWidth);
 
     renderer.RegisterStaticEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::ThroughputGuideStrokeWidth,
-            0,
-        },
+            0},
         layout.guideAnchorRect,
         layout.guideAnchorRect,
-        DashboardRenderer::AnchorShape::Circle,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::RadialDistance,
+        AnchorShape::Circle,
+        AnchorDragAxis::Both,
+        AnchorDragMode::RadialDistance,
         RenderPoint{layout.guideCenterX, layout.guideCenterY},
         2.0,
         true,
@@ -323,12 +329,12 @@ void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
 
     auto& guides = renderer.WidgetEditGuidesMutable();
-    DashboardRenderer::WidgetEditGuide guide;
+    LayoutEditWidgetGuide guide;
     const int x = std::clamp(static_cast<int>(layoutState_.graphRect.left) + layoutState_.axisWidth,
         static_cast<int>(widget.rect.left),
         static_cast<int>(widget.rect.right));
-    guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
-    guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    guide.axis = LayoutGuideAxis::Vertical;
+    guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
     guide.parameter = DashboardRenderer::LayoutEditParameter::ThroughputAxisPadding;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
@@ -344,8 +350,8 @@ void ThroughputWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
         static_cast<int>(widget.rect.top),
         static_cast<int>(widget.rect.bottom));
     guide = {};
-    guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
-    guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    guide.axis = LayoutGuideAxis::Horizontal;
+    guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
     guide.parameter = DashboardRenderer::LayoutEditParameter::ThroughputHeaderGap;
     guide.guideId = 1;
     guide.widgetRect = widget.rect;

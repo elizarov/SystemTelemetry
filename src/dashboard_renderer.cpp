@@ -27,6 +27,26 @@
 #include "trace.h"
 #include "utf8.h"
 
+using layout_edit::AnchorDragAxis;
+using layout_edit::AnchorDragMode;
+using layout_edit::AnchorShape;
+using layout_edit::LayoutEditAnchorBinding;
+using layout_edit::LayoutEditAnchorKey;
+using layout_edit::LayoutEditAnchorRegion;
+using layout_edit::LayoutEditGapAnchor;
+using layout_edit::LayoutEditGapAnchorKey;
+using layout_edit::LayoutEditGuide;
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+using layout_edit::LayoutGuideSnapCandidate;
+using EditableAnchorKey = layout_edit::LayoutEditAnchorKey;
+using EditableAnchorRegion = layout_edit::LayoutEditAnchorRegion;
+using GapEditAnchor = layout_edit::LayoutEditGapAnchor;
+using GapEditAnchorKey = layout_edit::LayoutEditGapAnchorKey;
+using LayoutWidgetIdentity = layout_edit::LayoutEditWidgetIdentity;
+using WidgetEditGuide = layout_edit::LayoutEditWidgetGuide;
+
 namespace {
 
 RenderColor ToRenderColor(unsigned int color, std::uint8_t alpha = 255) {
@@ -325,11 +345,11 @@ RenderColor DashboardRenderer::TrackColor() const {
     return palette_.track;
 }
 
-std::vector<DashboardRenderer::WidgetEditGuide>& DashboardRenderer::WidgetEditGuidesMutable() {
+std::vector<LayoutEditWidgetGuide>& DashboardRenderer::WidgetEditGuidesMutable() {
     return widgetEditGuides_;
 }
 
-std::vector<DashboardRenderer::GapEditAnchor>& DashboardRenderer::GapEditAnchorsMutable() {
+std::vector<LayoutEditGapAnchor>& DashboardRenderer::GapEditAnchorsMutable() {
     return gapEditAnchors_;
 }
 
@@ -381,15 +401,15 @@ void DashboardRenderer::SetTraceOutput(std::ostream* traceOutput) {
     traceOutput_ = traceOutput;
 }
 
-const std::vector<DashboardRenderer::LayoutEditGuide>& DashboardRenderer::LayoutEditGuides() const {
+const std::vector<LayoutEditGuide>& DashboardRenderer::LayoutEditGuides() const {
     return layoutEditGuides_;
 }
 
-const std::vector<DashboardRenderer::WidgetEditGuide>& DashboardRenderer::WidgetEditGuides() const {
+const std::vector<LayoutEditWidgetGuide>& DashboardRenderer::WidgetEditGuides() const {
     return widgetEditGuides_;
 }
 
-const std::vector<DashboardRenderer::GapEditAnchor>& DashboardRenderer::GapEditAnchors() const {
+const std::vector<LayoutEditGapAnchor>& DashboardRenderer::GapEditAnchors() const {
     return gapEditAnchors_;
 }
 
@@ -528,7 +548,7 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
     std::vector<std::pair<EditableAnchorRegion, bool>> highlights;
     const auto appendHighlight = [&](const EditableAnchorRegion& region, bool active) {
         const auto existing = std::find_if(highlights.begin(), highlights.end(), [&](const auto& entry) {
-            return MatchesEditableAnchorKey(entry.first.key, region.key);
+            return layout_edit::MatchesEditableAnchorKey(entry.first.key, region.key);
         });
         if (existing == highlights.end()) {
             highlights.push_back({region, active});
@@ -609,7 +629,7 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
 
     for (const auto& guide : layoutEditGuides_) {
         const bool active = overlayState.activeLayoutEditGuide.has_value() &&
-                            MatchesLayoutEditGuide(guide, *overlayState.activeLayoutEditGuide);
+                            layout_edit::MatchesLayoutEditGuide(guide, *overlayState.activeLayoutEditGuide);
         const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
         const RenderPoint start{guide.lineRect.left, guide.lineRect.top};
         const RenderPoint end = guide.axis == LayoutGuideAxis::Vertical
@@ -650,7 +670,7 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
             continue;
         }
         const bool active = overlayState.activeWidgetEditGuide.has_value() &&
-                            MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
+                            layout_edit::MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
         const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart, guide.drawEnd, RenderStroke::Solid(color));
     }
@@ -686,9 +706,9 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
             continue;
         }
         const bool active = overlayState.activeGapEditAnchor.has_value() &&
-                            MatchesGapEditAnchorKey(anchor.key, *overlayState.activeGapEditAnchor);
+                            layout_edit::MatchesGapEditAnchorKey(anchor.key, *overlayState.activeGapEditAnchor);
         const bool hovered = overlayState.hoveredGapEditAnchor.has_value() &&
-                             MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
+                             layout_edit::MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
         const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
 
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(
@@ -737,37 +757,14 @@ bool DashboardRenderer::IsWidgetAffectedByGuide(
 }
 
 bool DashboardRenderer::MatchesWidgetIdentity(
-    const DashboardWidgetLayout& widget, const LayoutWidgetIdentity& identity) const {
-    return identity.kind == LayoutWidgetIdentity::Kind::Widget && widget.cardId == identity.renderCardId &&
+    const DashboardWidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const {
+    return identity.kind == LayoutEditWidgetIdentity::Kind::Widget && widget.cardId == identity.renderCardId &&
            widget.editCardId == identity.editCardId && widget.nodePath == identity.nodePath;
 }
 
-bool DashboardRenderer::MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) const {
-    return left.axis == right.axis && left.renderCardId == right.renderCardId && left.editCardId == right.editCardId &&
-           left.nodePath == right.nodePath && left.separatorIndex == right.separatorIndex;
-}
-
-bool DashboardRenderer::MatchesGapEditAnchorKey(const GapEditAnchorKey& left, const GapEditAnchorKey& right) const {
-    return left.parameter == right.parameter && left.widget.kind == right.widget.kind &&
-           left.widget.renderCardId == right.widget.renderCardId && left.widget.editCardId == right.widget.editCardId &&
-           left.widget.nodePath == right.widget.nodePath && left.nodePath == right.nodePath;
-}
-
-bool DashboardRenderer::MatchesEditableAnchorKey(const EditableAnchorKey& left, const EditableAnchorKey& right) const {
-    return left.parameter == right.parameter && left.anchorId == right.anchorId &&
-           left.widget.kind == right.widget.kind && left.widget.renderCardId == right.widget.renderCardId &&
-           left.widget.editCardId == right.widget.editCardId && left.widget.nodePath == right.widget.nodePath;
-}
-
-bool DashboardRenderer::MatchesWidgetEditGuide(const WidgetEditGuide& left, const WidgetEditGuide& right) const {
-    return left.axis == right.axis && left.parameter == right.parameter && left.guideId == right.guideId &&
-           left.widget.kind == right.widget.kind && left.widget.renderCardId == right.widget.renderCardId &&
-           left.widget.editCardId == right.widget.editCardId && left.widget.nodePath == right.widget.nodePath;
-}
-
-DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBinding(
+LayoutEditAnchorBinding DashboardRenderer::MakeEditableTextBinding(
     const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const {
-    return EditableAnchorBinding{
+    return LayoutEditAnchorBinding{
         EditableAnchorKey{
             LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             parameter,
@@ -780,7 +777,7 @@ DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBind
     };
 }
 
-void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<EditableAnchorRegion>& regions,
+void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
     const EditableAnchorKey& key,
     const RenderRect& targetRect,
     const RenderRect& anchorRect,
@@ -795,7 +792,7 @@ void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<EditableAnchorR
     if (anchorRect.right <= anchorRect.left || anchorRect.bottom <= anchorRect.top) {
         return;
     }
-    EditableAnchorRegion region;
+    LayoutEditAnchorRegion region;
     region.key = key;
     region.targetRect = targetRect;
     region.anchorRect = anchorRect;
@@ -816,7 +813,7 @@ void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<EditableAnchorR
     regions.push_back(std::move(region));
 }
 
-void DashboardRenderer::RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
+void DashboardRenderer::RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
     const RenderRect& targetRect,
     const RenderRect& anchorRect,
     AnchorShape shape,
@@ -841,7 +838,7 @@ void DashboardRenderer::RegisterStaticEditableAnchorRegion(const EditableAnchorK
         value);
 }
 
-void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const EditableAnchorKey& key,
+void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
     const RenderRect& targetRect,
     const RenderRect& anchorRect,
     AnchorShape shape,
@@ -869,12 +866,12 @@ void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const EditableAnchor
         value);
 }
 
-void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
+void DashboardRenderer::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
     const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     const TextLayoutOptions& options,
-    const EditableAnchorBinding& editable) {
+    const LayoutEditAnchorBinding& editable) {
     if (text.empty()) {
         return;
     }
@@ -902,9 +899,9 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
         editable.value);
 }
 
-void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
+void DashboardRenderer::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
     const TextLayoutResult& layoutResult,
-    const EditableAnchorBinding& editable) {
+    const LayoutEditAnchorBinding& editable) {
     const RenderRect& textRect = layoutResult.textRect;
     if (textRect.right <= textRect.left || textRect.bottom <= textRect.top) {
         return;
@@ -936,12 +933,12 @@ void DashboardRenderer::RegisterStaticTextAnchor(const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     const TextLayoutOptions& options,
-    const EditableAnchorBinding& editable) {
+    const LayoutEditAnchorBinding& editable) {
     RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, style, options, editable);
 }
 
 void DashboardRenderer::RegisterDynamicTextAnchor(
-    const TextLayoutResult& layoutResult, const EditableAnchorBinding& editable) {
+    const TextLayoutResult& layoutResult, const LayoutEditAnchorBinding& editable) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
@@ -952,7 +949,7 @@ void DashboardRenderer::RegisterDynamicTextAnchor(const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     const TextLayoutOptions& options,
-    const EditableAnchorBinding& editable) {
+    const LayoutEditAnchorBinding& editable) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
@@ -1601,7 +1598,7 @@ int DashboardRenderer::MeasureTextWidth(TextStyleId style, std::string_view text
     return width;
 }
 
-std::vector<DashboardRenderer::LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
+std::vector<LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
     const LayoutEditGuide& guide) const {
     struct SimilarityTypeKey {
         DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
@@ -1682,7 +1679,7 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
     return ResolveLayout(false);
 }
 
-std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestLayoutCard(
+std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestLayoutCard(
     RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         if (card.rect.Contains(clientPoint)) {
@@ -1692,7 +1689,7 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableCard(
+std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableCard(
     RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         if (!card.rect.Contains(clientPoint) || clientPoint.y > card.contentRect.top) {
@@ -1703,7 +1700,7 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableWidget(
+std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableWidget(
     RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
@@ -1716,7 +1713,7 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::GapEditAnchorKey> DashboardRenderer::HitTestGapEditAnchor(
+std::optional<LayoutEditGapAnchorKey> DashboardRenderer::HitTestGapEditAnchor(
     RenderPoint clientPoint) const {
     const GapEditAnchor* bestAnchor = nullptr;
     int bestPriority = 0;
@@ -1734,7 +1731,7 @@ std::optional<DashboardRenderer::GapEditAnchorKey> DashboardRenderer::HitTestGap
     return bestAnchor != nullptr ? std::optional<GapEditAnchorKey>(bestAnchor->key) : std::nullopt;
 }
 
-std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(
+std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(
     RenderPoint clientPoint) const {
     std::vector<const EditableAnchorRegion*> regions;
     regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
@@ -1752,7 +1749,7 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
     return std::nullopt;
 }
 
-std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(
+std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(
     RenderPoint clientPoint) const {
     std::vector<const EditableAnchorRegion*> regions;
     regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
@@ -1793,11 +1790,11 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
     return bestRegion != nullptr ? std::optional<EditableAnchorKey>(bestRegion->key) : std::nullopt;
 }
 
-std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
+std::optional<LayoutEditAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
     const EditableAnchorKey& key) const {
     const auto findIn = [&](const std::vector<EditableAnchorRegion>& regions) -> std::optional<EditableAnchorRegion> {
         const auto it = std::find_if(regions.begin(), regions.end(), [&](const EditableAnchorRegion& region) {
-            return MatchesEditableAnchorKey(region.key, key);
+            return layout_edit::MatchesEditableAnchorKey(region.key, key);
         });
         if (it == regions.end()) {
             return std::nullopt;
@@ -1810,10 +1807,10 @@ std::optional<DashboardRenderer::EditableAnchorRegion> DashboardRenderer::FindEd
     return findIn(dynamicEditableAnchorRegions_);
 }
 
-std::optional<DashboardRenderer::GapEditAnchor> DashboardRenderer::FindGapEditAnchor(
+std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(
     const GapEditAnchorKey& key) const {
     const auto it = std::find_if(gapEditAnchors_.begin(), gapEditAnchors_.end(), [&](const GapEditAnchor& anchor) {
-        return MatchesGapEditAnchorKey(anchor.key, key);
+        return layout_edit::MatchesGapEditAnchorKey(anchor.key, key);
     });
     if (it == gapEditAnchors_.end()) {
         return std::nullopt;
@@ -1821,7 +1818,7 @@ std::optional<DashboardRenderer::GapEditAnchor> DashboardRenderer::FindGapEditAn
     return *it;
 }
 
-std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
+std::optional<LayoutEditWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
     const std::string& widgetTypeName) const {
     const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
     const auto widgetClass = FindDashboardWidgetClass(normalizedName);

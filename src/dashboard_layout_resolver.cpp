@@ -7,6 +7,17 @@
 #include <functional>
 #include <map>
 
+using layout_edit::AnchorDragAxis;
+using layout_edit::AnchorDragMode;
+using layout_edit::AnchorShape;
+using layout_edit::LayoutEditAnchorBinding;
+using layout_edit::LayoutEditAnchorKey;
+using layout_edit::LayoutEditGapAnchor;
+using layout_edit::LayoutEditGuide;
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+
 namespace {
 
 bool ContainsCardReference(const std::vector<std::string>& stack, const std::string& cardId) {
@@ -46,16 +57,15 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
     renderer.widgetEditGuides_.clear();
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     for (const auto& card : renderer.resolvedLayout_.cards) {
-        const DashboardRenderer::LayoutWidgetIdentity cardIdentity{
-            card.id, card.id, {}, DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome};
-        auto addCardGuide = [&](DashboardRenderer::LayoutGuideAxis axis,
+        const LayoutEditWidgetIdentity cardIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+        auto addCardGuide = [&](LayoutGuideAxis axis,
                                 int guideId,
                                 DashboardRenderer::LayoutEditParameter parameter,
                                 int value,
                                 int dragDirection,
                                 RenderPoint start,
                                 RenderPoint end) {
-            DashboardRenderer::WidgetEditGuide guide;
+            LayoutEditWidgetGuide guide;
             guide.axis = axis;
             guide.widget = cardIdentity;
             guide.parameter = parameter;
@@ -63,7 +73,7 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
             guide.widgetRect = card.rect;
             guide.drawStart = start;
             guide.drawEnd = end;
-            if (axis == DashboardRenderer::LayoutGuideAxis::Vertical) {
+            if (axis == LayoutGuideAxis::Vertical) {
                 guide.hitRect = RenderRect{
                     start.x - hitInset, (std::min)(start.y, end.y), start.x + hitInset + 1, (std::max)(start.y, end.y)};
             } else {
@@ -82,7 +92,7 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
             std::clamp(card.rect.top + renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardPadding),
                 static_cast<int>(card.rect.top),
                 static_cast<int>(card.rect.bottom));
-        addCardGuide(DashboardRenderer::LayoutGuideAxis::Horizontal,
+        addCardGuide(LayoutGuideAxis::Horizontal,
             0,
             DashboardRenderer::LayoutEditParameter::CardPadding,
             renderer.Config().layout.cardStyle.cardPadding,
@@ -93,7 +103,7 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
         if (!card.iconName.empty() && !card.title.empty()) {
             const int guideX =
                 std::clamp(card.titleRect.left, static_cast<int>(card.rect.left), static_cast<int>(card.rect.right));
-            addCardGuide(DashboardRenderer::LayoutGuideAxis::Vertical,
+            addCardGuide(LayoutGuideAxis::Vertical,
                 1,
                 DashboardRenderer::LayoutEditParameter::CardHeaderIconGap,
                 renderer.Config().layout.cardStyle.headerIconGap,
@@ -105,7 +115,7 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
         if (card.hasHeader) {
             const int guideY =
                 std::clamp(card.contentRect.top, static_cast<int>(card.rect.top), static_cast<int>(card.rect.bottom));
-            addCardGuide(DashboardRenderer::LayoutGuideAxis::Horizontal,
+            addCardGuide(LayoutGuideAxis::Horizontal,
                 2,
                 DashboardRenderer::LayoutEditParameter::CardHeaderContentGap,
                 renderer.Config().layout.cardStyle.headerContentGap,
@@ -125,18 +135,17 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
 void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& renderer) {
     renderer.staticEditableAnchorRegions_.clear();
     for (const auto& card : renderer.resolvedLayout_.cards) {
-        const DashboardRenderer::LayoutWidgetIdentity cardIdentity{
-            card.id, card.id, {}, DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome};
+        const LayoutEditWidgetIdentity cardIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
         const int squareAnchorSize = (std::max)(4, renderer.ScaleLogical(6));
         const int radiusLogical = renderer.Config().layout.cardStyle.cardRadius;
         const int radiusScaled = renderer.ScaleLogical(radiusLogical);
         renderer.RegisterStaticEditableAnchorRegion(
-            DashboardRenderer::EditableAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardRadius, 0},
+            LayoutEditAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardRadius, 0},
             {},
             MakeSquareAnchorRect(card.rect.left + radiusScaled, card.rect.top, squareAnchorSize),
-            DashboardRenderer::AnchorShape::Square,
-            DashboardRenderer::AnchorDragAxis::Vertical,
-            DashboardRenderer::AnchorDragMode::AxisDelta,
+            AnchorShape::Square,
+            AnchorDragAxis::Vertical,
+            AnchorDragMode::AxisDelta,
             RenderPoint{card.rect.left + radiusScaled, card.rect.top},
             1.0,
             true,
@@ -149,12 +158,12 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
         const int borderCenterX = card.rect.left + (std::max)(0, (card.rect.right - card.rect.left) / 2);
         const int borderCenterY = card.rect.top;
         renderer.RegisterStaticEditableAnchorRegion(
-            DashboardRenderer::EditableAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardBorder, 0},
+            LayoutEditAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardBorder, 0},
             {},
             MakeCircleAnchorRect(borderCenterX, borderCenterY, borderScaled, borderAnchorPadding),
-            DashboardRenderer::AnchorShape::Circle,
-            DashboardRenderer::AnchorDragAxis::Both,
-            DashboardRenderer::AnchorDragMode::RadialDistance,
+            AnchorShape::Circle,
+            AnchorDragAxis::Both,
+            AnchorDragMode::RadialDistance,
             RenderPoint{borderCenterX, borderCenterY},
             2.0,
             true,
@@ -165,13 +174,12 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
             const int anchorCenterX = card.iconRect.right;
             const int anchorCenterY = card.iconRect.top;
             renderer.RegisterStaticEditableAnchorRegion(
-                DashboardRenderer::EditableAnchorKey{
-                    cardIdentity, DashboardRenderer::LayoutEditParameter::CardHeaderIconSize, 0},
+                LayoutEditAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardHeaderIconSize, 0},
                 card.iconRect,
                 MakeSquareAnchorRect(anchorCenterX, anchorCenterY, squareAnchorSize),
-                DashboardRenderer::AnchorShape::Square,
-                DashboardRenderer::AnchorDragAxis::Vertical,
-                DashboardRenderer::AnchorDragMode::AxisDelta,
+                AnchorShape::Square,
+                AnchorDragAxis::Vertical,
+                AnchorDragMode::AxisDelta,
                 RenderPoint{anchorCenterX, anchorCenterY},
                 1.0,
                 false,
@@ -184,16 +192,13 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 card.title,
                 TextStyleId::Title,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
-                DashboardRenderer::EditableAnchorBinding{
-                    DashboardRenderer::EditableAnchorKey{
-                        DashboardRenderer::LayoutWidgetIdentity{card.id, card.id, {}},
-                        DashboardRenderer::LayoutEditParameter::FontTitle,
-                        0,
-                    },
+                LayoutEditAnchorBinding{
+                    LayoutEditAnchorKey{
+                        LayoutEditWidgetIdentity{card.id, card.id, {}}, DashboardRenderer::LayoutEditParameter::FontTitle, 0},
                     renderer.Config().layout.fonts.title.size,
-                    DashboardRenderer::AnchorShape::Circle,
-                    DashboardRenderer::AnchorDragAxis::Vertical,
-                    DashboardRenderer::AnchorDragMode::AxisDelta,
+                    AnchorShape::Circle,
+                    AnchorDragAxis::Vertical,
+                    AnchorDragMode::AxisDelta,
                 });
         }
         for (const auto& widget : card.widgets) {
@@ -217,12 +222,10 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     }
 
     const bool horizontal = node.name == "columns";
-    const DashboardRenderer::LayoutWidgetIdentity gapWidgetIdentity =
-        renderCardId.empty()
-            ? DashboardRenderer::LayoutWidgetIdentity{
-                  "", "", {}, DashboardRenderer::LayoutWidgetIdentity::Kind::DashboardChrome}
-            : DashboardRenderer::LayoutWidgetIdentity{
-                  renderCardId, renderCardId, {}, DashboardRenderer::LayoutWidgetIdentity::Kind::CardChrome};
+    const LayoutEditWidgetIdentity gapWidgetIdentity =
+        renderCardId.empty() ? LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome}
+                             : LayoutEditWidgetIdentity{
+                                   renderCardId, renderCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
     const DashboardRenderer::LayoutEditParameter gapParameter =
         renderCardId.empty() ? (horizontal ? DashboardRenderer::LayoutEditParameter::DashboardColumnGap
                                            : DashboardRenderer::LayoutEditParameter::DashboardRowGap)
@@ -235,9 +238,8 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
                    anchor.key.widget.editCardId == gapWidgetIdentity.editCardId;
         });
     if (!gapAnchorAlreadyRegistered) {
-        DashboardRenderer::GapEditAnchor anchor;
-        anchor.axis =
-            horizontal ? DashboardRenderer::LayoutGuideAxis::Horizontal : DashboardRenderer::LayoutGuideAxis::Vertical;
+        LayoutEditGapAnchor anchor;
+        anchor.axis = horizontal ? LayoutGuideAxis::Horizontal : LayoutGuideAxis::Vertical;
         anchor.key.widget = gapWidgetIdentity;
         anchor.key.parameter = gapParameter;
         anchor.key.nodePath = nodePath;
@@ -248,14 +250,14 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
         if (horizontal) {
             anchor.drawStart = RenderPoint{firstGapLead.right, rect.top};
             anchor.drawEnd = RenderPoint{firstGapTrail.left, rect.top};
-            anchor.dragAxis = DashboardRenderer::AnchorDragAxis::Horizontal;
+            anchor.dragAxis = AnchorDragAxis::Horizontal;
             anchor.handleRect = MakeSquareAnchorRect(anchor.drawEnd.x, anchor.drawEnd.y, handleSize);
             anchor.value = renderCardId.empty() ? renderer.Config().layout.dashboard.columnGap
                                                 : renderer.Config().layout.cardStyle.columnGap;
         } else {
             anchor.drawStart = RenderPoint{rect.left, firstGapLead.bottom};
             anchor.drawEnd = RenderPoint{rect.left, firstGapTrail.top};
-            anchor.dragAxis = DashboardRenderer::AnchorDragAxis::Vertical;
+            anchor.dragAxis = AnchorDragAxis::Vertical;
             anchor.handleRect = MakeSquareAnchorRect(anchor.drawEnd.x, anchor.drawEnd.y, handleSize);
             anchor.value = renderCardId.empty() ? renderer.Config().layout.dashboard.rowGap
                                                 : renderer.Config().layout.cardStyle.rowGap;
@@ -276,9 +278,8 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
         if (!horizontal && (childFixedExtents[i] || childFixedExtents[i + 1])) {
             continue;
         }
-        DashboardRenderer::LayoutEditGuide guide;
-        guide.axis =
-            horizontal ? DashboardRenderer::LayoutGuideAxis::Vertical : DashboardRenderer::LayoutGuideAxis::Horizontal;
+        LayoutEditGuide guide;
+        guide.axis = horizontal ? LayoutGuideAxis::Vertical : LayoutGuideAxis::Horizontal;
         guide.renderCardId = renderCardId;
         guide.editCardId = editCardId;
         guide.nodePath = nodePath;
@@ -490,10 +491,9 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
                         " cards_root=\"" + renderer.config_.layout.structure.cardsLayout.name + "\"");
 
     if (includeWidgetState && !renderer.layoutGuideDragActive_) {
-        DashboardRenderer::GapEditAnchor anchor;
-        anchor.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
-        anchor.key.widget =
-            DashboardRenderer::LayoutWidgetIdentity{"", "", {}, DashboardRenderer::LayoutWidgetIdentity::Kind::DashboardChrome};
+        LayoutEditGapAnchor anchor;
+        anchor.axis = LayoutGuideAxis::Horizontal;
+        anchor.key.widget = LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome};
         anchor.key.parameter = DashboardRenderer::LayoutEditParameter::DashboardOuterMargin;
         const int handleSize = (std::max)(4, renderer.ScaleLogical(6));
         const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
@@ -501,7 +501,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         anchor.drawEnd = RenderPoint{dashboardRect.left, dashboardRect.top};
         anchor.handleRect = MakeSquareAnchorRect(anchor.drawEnd.x, anchor.drawEnd.y, handleSize);
         anchor.hitRect = anchor.handleRect.Inflate(hitInset, hitInset);
-        anchor.dragAxis = DashboardRenderer::AnchorDragAxis::Horizontal;
+        anchor.dragAxis = AnchorDragAxis::Horizontal;
         anchor.value = renderer.Config().layout.dashboard.outerMargin;
         renderer.gapEditAnchors_.push_back(std::move(anchor));
     }

@@ -12,14 +12,14 @@ namespace layout_edit {
 
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditHost::LayoutTarget& target);
 
-std::vector<int> SeedGuideWeights(const DashboardRenderer::LayoutEditGuide& guide, const LayoutNodeConfig* node);
+std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNodeConfig* node);
 
 bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
 
 std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,
-    const DashboardRenderer::LayoutWidgetIdentity& widget,
-    DashboardRenderer::LayoutGuideAxis axis);
+    const LayoutEditWidgetIdentity& widget,
+    LayoutGuideAxis axis);
 
 }  // namespace layout_edit

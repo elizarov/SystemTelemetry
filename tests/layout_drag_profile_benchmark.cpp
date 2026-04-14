@@ -20,6 +20,10 @@
 #include "layout_edit_service.h"
 #include "layout_edit_trace_session.h"
 
+using layout_edit::LayoutEditGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+
 namespace {
 
 using Clock = std::chrono::steady_clock;
@@ -127,12 +131,12 @@ SystemSnapshot BuildSyntheticSnapshot(const AppConfig& config) {
     return snapshot;
 }
 
-std::optional<DashboardRenderer::LayoutEditGuide> FindTopLevelGuide(const DashboardRenderer& renderer) {
+std::optional<LayoutEditGuide> FindTopLevelGuide(const DashboardRenderer& renderer) {
     const auto& guides = renderer.LayoutEditGuides();
     const auto it = std::find_if(guides.begin(), guides.end(), [](const auto& guide) {
         return guide.editCardId.empty() && guide.nodePath.size() <= 1 && guide.childExtents.size() >= 2;
     });
-    return it != guides.end() ? std::optional<DashboardRenderer::LayoutEditGuide>(*it) : std::nullopt;
+    return it != guides.end() ? std::optional<LayoutEditGuide>(*it) : std::nullopt;
 }
 
 std::vector<std::vector<int>> BuildWeightSequence(const std::vector<int>& seedWeights, size_t iterations) {
@@ -158,17 +162,17 @@ std::vector<std::vector<int>> BuildWeightSequence(const std::vector<int>& seedWe
     return sequence;
 }
 
-RenderPoint GuideDragStartPoint(const DashboardRenderer::LayoutEditGuide& guide) {
+RenderPoint GuideDragStartPoint(const LayoutEditGuide& guide) {
     return RenderPoint{(guide.hitRect.left + guide.hitRect.right) / 2, (guide.hitRect.top + guide.hitRect.bottom) / 2};
 }
 
-RenderPoint DragPointForWeights(const DashboardRenderer::LayoutEditGuide& guide,
+RenderPoint DragPointForWeights(const LayoutEditGuide& guide,
     const std::vector<int>& initialWeights,
     const std::vector<int>& targetWeights) {
     RenderPoint dragPoint = GuideDragStartPoint(guide);
     if (guide.separatorIndex < initialWeights.size() && guide.separatorIndex < targetWeights.size()) {
         const int delta = targetWeights[guide.separatorIndex] - initialWeights[guide.separatorIndex];
-        if (guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical) {
+        if (guide.axis == LayoutGuideAxis::Vertical) {
             dragPoint.x += delta;
         } else {
             dragPoint.y += delta;
@@ -275,8 +279,8 @@ private:
 
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights,
-        const DashboardRenderer::LayoutWidgetIdentity& widget,
-        DashboardRenderer::LayoutGuideAxis axis) override {
+        const LayoutEditWidgetIdentity& widget,
+        LayoutGuideAxis axis) override {
         return layout_edit::EvaluateWidgetExtentForGuideWeights(renderer_, target, weights, widget, axis);
     }
 
@@ -327,7 +331,7 @@ private:
 };
 
 BenchResult RunDragBenchmark(BenchmarkDragHost& host,
-    const DashboardRenderer::LayoutEditGuide& guide,
+    const LayoutEditGuide& guide,
     const std::vector<int>& initialWeights,
     const std::vector<std::vector<int>>& weightSequence) {
     LayoutEditController& controller = host.Controller();
@@ -396,7 +400,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const std::optional<DashboardRenderer::LayoutEditGuide> guide = FindTopLevelGuide(host.LayoutRenderer());
+    const std::optional<LayoutEditGuide> guide = FindTopLevelGuide(host.LayoutRenderer());
     if (!guide.has_value()) {
         std::cerr << "no top-level layout guide found\n";
         return 1;

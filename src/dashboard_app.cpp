@@ -9,6 +9,13 @@
 #include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
 
+using layout_edit::LayoutEditAnchorRegion;
+using layout_edit::LayoutEditGapAnchor;
+using layout_edit::LayoutEditGuide;
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+
 namespace {
 
 constexpr UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
@@ -44,7 +51,7 @@ std::wstring BuildTooltipText(
     return text;
 }
 
-std::string LayoutGuideTooltipSectionName(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+std::string LayoutGuideTooltipSectionName(const AppConfig& config, const LayoutEditGuide& guide) {
     if (!guide.editCardId.empty()) {
         return "card." + guide.editCardId;
     }
@@ -54,11 +61,11 @@ std::string LayoutGuideTooltipSectionName(const AppConfig& config, const Dashboa
     return "layout";
 }
 
-std::string LayoutGuideTooltipConfigMember(const DashboardRenderer::LayoutEditGuide& guide) {
+std::string LayoutGuideTooltipConfigMember(const LayoutEditGuide& guide) {
     return guide.editCardId.empty() ? "cards" : "layout";
 }
 
-const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const LayoutEditGuide& guide) {
     return layout_edit::FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
 }
 
@@ -66,7 +73,7 @@ std::string LayoutGuideChildName(const LayoutNodeConfig& node) {
     return node.name.empty() ? "unknown" : node.name;
 }
 
-std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const LayoutEditGuide& guide) {
     const std::string sectionName = LayoutGuideTooltipSectionName(config, guide);
     const std::string configMember = LayoutGuideTooltipConfigMember(guide);
     const LayoutNodeConfig* node = FindLayoutGuideNode(config, guide);
@@ -81,7 +88,7 @@ std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const Dashboard
            std::to_string(std::max(1, rightChild.weight)) + ")";
 }
 
-std::wstring BuildLayoutGuideTooltipText(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+std::wstring BuildLayoutGuideTooltipText(const AppConfig& config, const LayoutEditGuide& guide) {
     std::wstring text = WideFromUtf8(BuildLayoutGuideTooltipLine(config, guide));
     const std::wstring description = WideFromUtf8(FindLocalizedText("layout_edit.layout_guide"));
     if (!description.empty()) {
@@ -372,8 +379,8 @@ bool DashboardApp::ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter p
 
 std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,
-    const DashboardRenderer::LayoutWidgetIdentity& widget,
-    DashboardRenderer::LayoutGuideAxis axis) {
+    const LayoutEditWidgetIdentity& widget,
+    LayoutGuideAxis axis) {
     return controller_.EvaluateLayoutWidgetExtentForWeights(*this, target, weights, widget, axis);
 }
 
@@ -577,60 +584,29 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     std::optional<LayoutEditTooltipDescriptor> descriptor;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
-    RenderPoint clientPoint = target->clientPoint;
-    if (target->kind == LayoutEditController::TooltipTarget::Kind::LayoutGuide) {
-        layoutEditTooltipText_ = BuildLayoutGuideTooltipText(controller_.State().config, target->layoutGuide);
-        if (clientPoint.x == 0 && clientPoint.y == 0) {
-            clientPoint.x =
-                target->layoutGuide.lineRect.left +
-                (std::max<LONG>(0, target->layoutGuide.lineRect.right - target->layoutGuide.lineRect.left) / 2);
-            clientPoint.y =
-                target->layoutGuide.lineRect.top +
-                (std::max<LONG>(0, target->layoutGuide.lineRect.bottom - target->layoutGuide.lineRect.top) / 2);
-        }
-    } else if (target->kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor) {
-        descriptor = FindLayoutEditTooltipDescriptor(target->gapEditAnchor.key.parameter);
-        value = target->gapEditAnchor.value;
-        if (clientPoint.x == 0 && clientPoint.y == 0) {
-            clientPoint.x =
-                target->gapEditAnchor.handleRect.left +
-                (std::max<LONG>(0, target->gapEditAnchor.handleRect.right - target->gapEditAnchor.handleRect.left) / 2);
-            clientPoint.y =
-                target->gapEditAnchor.handleRect.top +
-                (std::max<LONG>(0, target->gapEditAnchor.handleRect.bottom - target->gapEditAnchor.handleRect.top) / 2);
-        }
-    } else if (target->kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide) {
-        descriptor = FindLayoutEditTooltipDescriptor(target->widgetGuide.parameter);
-        value = target->widgetGuide.value;
-        if (clientPoint.x == 0 && clientPoint.y == 0) {
-            clientPoint = target->widgetGuide.drawEnd;
-        }
+    const RenderPoint clientPoint = target->clientPoint.value_or(layout_edit::TooltipPayloadAnchorPoint(target->payload));
+    if (const auto* guide = std::get_if<LayoutEditGuide>(&target->payload)) {
+        layoutEditTooltipText_ = BuildLayoutGuideTooltipText(controller_.State().config, *guide);
     } else {
-        descriptor = FindLayoutEditTooltipDescriptor(target->editableAnchor.key.parameter);
-        value = static_cast<double>(target->editableAnchor.value);
-        if (const auto currentFont =
-                FindLayoutEditTooltipFontValue(controller_.State().config, target->editableAnchor.key.parameter);
-            currentFont.has_value() && *currentFont != nullptr) {
-            fontValue = **currentFont;
-        }
-        if (clientPoint.x == 0 && clientPoint.y == 0) {
-            clientPoint.x =
-                target->editableAnchor.anchorRect.left +
-                (std::max<LONG>(0, target->editableAnchor.anchorRect.right - target->editableAnchor.anchorRect.left) /
-                    2);
-            clientPoint.y =
-                target->editableAnchor.anchorRect.top +
-                (std::max<LONG>(0, target->editableAnchor.anchorRect.bottom - target->editableAnchor.anchorRect.top) /
-                    2);
+        if (const auto parameter = layout_edit::TooltipPayloadParameter(target->payload); parameter.has_value()) {
+            descriptor = FindLayoutEditTooltipDescriptor(*parameter);
+            value = layout_edit::TooltipPayloadNumericValue(target->payload).value_or(0.0);
+            if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target->payload)) {
+                if (const auto currentFont =
+                        FindLayoutEditTooltipFontValue(controller_.State().config, anchor->key.parameter);
+                    currentFont.has_value() && *currentFont != nullptr) {
+                    fontValue = **currentFont;
+                }
+            }
         }
     }
 
-    if (target->kind != LayoutEditController::TooltipTarget::Kind::LayoutGuide && !descriptor.has_value()) {
+    if (!layout_edit::IsLayoutGuidePayload(target->payload) && !descriptor.has_value()) {
         HideLayoutEditTooltip();
         return;
     }
 
-    if (target->kind != LayoutEditController::TooltipTarget::Kind::LayoutGuide) {
+    if (!layout_edit::IsLayoutGuidePayload(target->payload)) {
         const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
         layoutEditTooltipText_ = descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()
                                      ? BuildTooltipText(*descriptor, *fontValue, description)

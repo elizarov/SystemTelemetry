@@ -221,6 +221,7 @@ find_package(GTest CONFIG REQUIRED)
 add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_commands_tests.cpp
+    tests/layout_edit_types_tests.cpp
     tests/layout_edit_tooltip_tests.cpp
     tests/localization_catalog_tests.cpp
     tests/config_parser_tests.cpp

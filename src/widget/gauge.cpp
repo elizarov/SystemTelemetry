@@ -8,6 +8,14 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+using layout_edit::AnchorDragAxis;
+using layout_edit::AnchorDragMode;
+using layout_edit::AnchorShape;
+using layout_edit::LayoutEditAnchorKey;
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+
 struct GaugeSharedLayout {
     int radius = 0;
 };
@@ -308,48 +316,45 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
     const int cy = layoutState_.cy;
     const int outerRadius = layoutState_.outerRadius;
     renderer.RegisterStaticEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::GaugeSegmentCount,
-            0,
-        },
+            0},
         widget.rect,
         layoutState_.segmentCountAnchorRect,
-        DashboardRenderer::AnchorShape::Diamond,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::AxisDelta,
+        AnchorShape::Diamond,
+        AnchorDragAxis::Both,
+        AnchorDragMode::AxisDelta,
         RenderPoint{cx, cy - outerRadius},
         1.0,
         true,
         true,
         renderer.Config().layout.gauge.segmentCount);
     renderer.RegisterStaticEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::GaugeOuterPadding,
-            0,
-        },
+            0},
         layoutState_.outerPaddingAnchorRect,
         layoutState_.outerPaddingAnchorRect,
-        DashboardRenderer::AnchorShape::Circle,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::RadialDistance,
+        AnchorShape::Circle,
+        AnchorDragAxis::Both,
+        AnchorDragMode::RadialDistance,
         RenderPoint{cx, cy},
         -1.0,
         true,
         false,
         renderer.Config().layout.gauge.outerPadding);
     renderer.RegisterStaticEditableAnchorRegion(
-        DashboardRenderer::EditableAnchorKey{
-            DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::GaugeRingThickness,
-            0,
-        },
+            0},
         layoutState_.ringThicknessAnchorRect,
         layoutState_.ringThicknessAnchorRect,
-        DashboardRenderer::AnchorShape::Circle,
-        DashboardRenderer::AnchorDragAxis::Both,
-        DashboardRenderer::AnchorDragMode::RadialDistance,
+        AnchorShape::Circle,
+        AnchorDragAxis::Both,
+        AnchorDragMode::RadialDistance,
         RenderPoint{cx, cy},
         -1.0,
         true,
@@ -389,9 +394,9 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
         const int outerGuideRadius = outerRadius + guideHalfExtension;
         const RenderPoint guideStart = PolarPoint(cx, cy, innerGuideRadius, angleDegrees);
         const RenderPoint guideEnd = PolarPoint(cx, cy, outerGuideRadius, angleDegrees);
-        DashboardRenderer::WidgetEditGuide guide;
-        guide.axis = DashboardRenderer::LayoutGuideAxis::Vertical;
-        guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+        LayoutEditWidgetGuide guide;
+        guide.axis = LayoutGuideAxis::Vertical;
+        guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
         guide.parameter = parameter;
         guide.guideId = guideId;
         guide.widgetRect = widget.rect;
@@ -422,9 +427,9 @@ void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWi
     const auto addHorizontalGuide =
         [&](DashboardRenderer::LayoutEditParameter parameter, int guideId, int bottomOffset) {
             const int y = cy + renderer.ScaleLogical(bottomOffset);
-            DashboardRenderer::WidgetEditGuide guide;
-            guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
-            guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+            LayoutEditWidgetGuide guide;
+            guide.axis = LayoutGuideAxis::Horizontal;
+            guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
             guide.parameter = parameter;
             guide.guideId = guideId;
             guide.widgetRect = widget.rect;

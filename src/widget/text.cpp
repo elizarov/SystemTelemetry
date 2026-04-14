@@ -5,6 +5,10 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutEditWidgetIdentity;
+using layout_edit::LayoutGuideAxis;
+
 DashboardWidgetClass TextWidget::Class() const {
     return DashboardWidgetClass::Text;
 }
@@ -31,9 +35,9 @@ void TextWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWid
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     const int y = widget.rect.bottom;
 
-    DashboardRenderer::WidgetEditGuide guide;
-    guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
-    guide.widget = DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    LayoutEditWidgetGuide guide;
+    guide.axis = LayoutGuideAxis::Horizontal;
+    guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
     guide.parameter = DashboardRenderer::LayoutEditParameter::TextBottomGap;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;

@@ -10,6 +10,12 @@
 #include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"
 
+using layout_edit::LayoutEditAnchorRegion;
+using layout_edit::LayoutEditGapAnchor;
+using layout_edit::LayoutEditGuide;
+using layout_edit::LayoutEditWidgetGuide;
+using layout_edit::LayoutGuideAxis;
+
 namespace {
 
 class DashboardShellUiModalScope {
@@ -129,18 +135,18 @@ std::string LayoutGuideChildName(const LayoutNodeConfig& node) {
     return node.name.empty() ? "unknown" : node.name;
 }
 
-std::wstring BuildLayoutGuideEditLabel(const DashboardRenderer::LayoutEditGuide& guide) {
+std::wstring BuildLayoutGuideEditLabel(const LayoutEditGuide& guide) {
     return guide.editCardId.empty() ? L"cards weights" : L"layout weights";
 }
 
-const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const DashboardRenderer::LayoutEditGuide& guide) {
+const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const LayoutEditGuide& guide) {
     return layout_edit::FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
 }
 
 std::wstring BuildLayoutGuideItemLabel(
-    const LayoutNodeConfig& node, size_t childIndex, DashboardRenderer::LayoutGuideAxis axis, bool first) {
-    const std::wstring side = axis == DashboardRenderer::LayoutGuideAxis::Vertical ? (first ? L"Left" : L"Right")
-                                                                                   : (first ? L"Top" : L"Bottom");
+    const LayoutNodeConfig& node, size_t childIndex, LayoutGuideAxis axis, bool first) {
+    const std::wstring side = axis == LayoutGuideAxis::Vertical ? (first ? L"Left" : L"Right")
+                                                                : (first ? L"Top" : L"Bottom");
     const std::wstring childName = WideFromUtf8(LayoutGuideChildName(node.children[childIndex]));
     return side + L" " + childName + L" weight:";
 }
@@ -626,7 +632,7 @@ std::optional<double> DashboardShellUi::PromptLayoutEditValue(DashboardRenderer:
 }
 
 std::optional<std::vector<int>> DashboardShellUi::PromptLayoutGuideWeights(
-    const DashboardRenderer::LayoutEditGuide& guide, const std::wstring& title) {
+    const LayoutEditGuide& guide, const std::wstring& title) {
     const LayoutNodeConfig* node = FindLayoutGuideNode(app_.controller_.State().config, guide);
     if (node == nullptr) {
         return std::nullopt;
@@ -696,38 +702,34 @@ std::optional<UiFontConfig> DashboardShellUi::PromptLayoutEditFont(DashboardRend
 }
 
 bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target) {
-    if (target.kind == LayoutEditController::TooltipTarget::Kind::LayoutGuide) {
-        const std::wstring title = BuildLayoutEditDialogTitle(BuildLayoutGuideEditLabel(target.layoutGuide));
-        const auto weights = PromptLayoutGuideWeights(target.layoutGuide, title);
+    if (const auto* guide = std::get_if<LayoutEditGuide>(&target.payload)) {
+        const std::wstring title = BuildLayoutEditDialogTitle(BuildLayoutGuideEditLabel(*guide));
+        const auto weights = PromptLayoutGuideWeights(*guide, title);
         return weights.has_value() &&
-               app_.ApplyLayoutGuideWeights(LayoutEditHost::LayoutTarget::ForGuide(target.layoutGuide), *weights);
+               app_.ApplyLayoutGuideWeights(LayoutEditHost::LayoutTarget::ForGuide(*guide), *weights);
     }
 
-    const DashboardRenderer::LayoutEditParameter parameter =
-        target.kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide     ? target.widgetGuide.parameter
-        : target.kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor ? target.gapEditAnchor.key.parameter
-                                                                                  : target.editableAnchor.key.parameter;
-    const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
+    const auto parameter = layout_edit::TooltipPayloadParameter(target.payload);
+    if (!parameter.has_value()) {
+        return false;
+    }
+    const auto descriptor = FindLayoutEditTooltipDescriptor(*parameter);
     if (!descriptor.has_value()) {
         return false;
     }
-    const std::wstring title = BuildLayoutEditDialogTitle(WideFromUtf8(GetLayoutEditParameterDisplayName(parameter)));
+    const std::wstring title = BuildLayoutEditDialogTitle(WideFromUtf8(GetLayoutEditParameterDisplayName(*parameter)));
     if (descriptor->valueFormat == configschema::ValueFormat::FontSpec) {
-        const auto font = FindLayoutEditTooltipFontValue(app_.controller_.State().config, parameter);
+        const auto font = FindLayoutEditTooltipFontValue(app_.controller_.State().config, *parameter);
         if (!font.has_value() || *font == nullptr) {
             return false;
         }
-        const auto updated = PromptLayoutEditFont(parameter, *descriptor, **font, title);
-        return updated.has_value() && app_.controller_.ApplyLayoutEditFont(app_, parameter, *updated);
+        const auto updated = PromptLayoutEditFont(*parameter, *descriptor, **font, title);
+        return updated.has_value() && app_.controller_.ApplyLayoutEditFont(app_, *parameter, *updated);
     }
 
-    const double currentValue = target.kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide
-                                    ? target.widgetGuide.value
-                                : target.kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor
-                                    ? target.gapEditAnchor.value
-                                    : static_cast<double>(target.editableAnchor.value);
-    const auto updated = PromptLayoutEditValue(parameter, *descriptor, currentValue, title);
-    return updated.has_value() && app_.ApplyLayoutEditValue(parameter, *updated);
+    const double currentValue = layout_edit::TooltipPayloadNumericValue(target.payload).value_or(0.0);
+    const auto updated = PromptLayoutEditValue(*parameter, *descriptor, currentValue, title);
+    return updated.has_value() && app_.ApplyLayoutEditValue(*parameter, *updated);
 }
 
 std::optional<double> DashboardShellUi::PromptCustomScale() {
@@ -995,16 +997,13 @@ void DashboardShellUi::ShowContextMenu(
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
     if (layoutEditTarget.has_value()) {
         std::wstring label;
-        if (layoutEditTarget->kind == LayoutEditController::TooltipTarget::Kind::LayoutGuide) {
-            label = BuildLayoutEditMenuLabel(BuildLayoutGuideEditLabel(layoutEditTarget->layoutGuide));
+        if (const auto* guide = std::get_if<LayoutEditGuide>(&layoutEditTarget->payload)) {
+            label = BuildLayoutEditMenuLabel(BuildLayoutGuideEditLabel(*guide));
         } else {
-            const DashboardRenderer::LayoutEditParameter parameter =
-                layoutEditTarget->kind == LayoutEditController::TooltipTarget::Kind::WidgetGuide
-                    ? layoutEditTarget->widgetGuide.parameter
-                : layoutEditTarget->kind == LayoutEditController::TooltipTarget::Kind::GapEditAnchor
-                    ? layoutEditTarget->gapEditAnchor.key.parameter
-                    : layoutEditTarget->editableAnchor.key.parameter;
-            label = BuildLayoutEditMenuLabel(WideFromUtf8(GetLayoutEditParameterDisplayName(parameter)));
+            const auto parameter = layout_edit::TooltipPayloadParameter(layoutEditTarget->payload);
+            if (parameter.has_value()) {
+                label = BuildLayoutEditMenuLabel(WideFromUtf8(GetLayoutEditParameterDisplayName(*parameter)));
+            }
         }
         AppendMenuW(menu, MF_STRING, kCommandEditLayoutTarget, label.c_str());
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
