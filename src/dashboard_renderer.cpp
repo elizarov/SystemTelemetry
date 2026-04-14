@@ -1606,7 +1606,7 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableCard(
     RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
-        if (!card.rect.Contains(clientPoint)) {
+        if (!card.rect.Contains(clientPoint) || clientPoint.y > card.contentRect.top) {
             continue;
         }
         return LayoutWidgetIdentity{card.id, card.id, {}, LayoutWidgetIdentity::Kind::CardChrome};
