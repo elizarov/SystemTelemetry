@@ -23,10 +23,10 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=0.47`
   - `paint_draw avg_ms=3.83`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=4.80` to `4.86`
-  - `snap avg_ms=0.47`
-  - `apply avg_ms=0.37`
-  - `paint_draw avg_ms=3.83` to `3.88`
+  - `drag_loop per_iter_ms=5.4` to `6.1`
+  - `snap avg_ms=0.48` to `0.53`
+  - `apply avg_ms=0.44` to `0.55`
+  - `paint_draw avg_ms=4.28` to `4.86`
 
 ## Current Confirmed Hotspots
 
@@ -153,6 +153,21 @@ These changes produced real wins and remain in the codebase:
   - Allocation overhead was not the dominant cost; the extra mutable state and reuse pattern did not improve the hot path.
 - Conclusion:
   - Throughput graph cost is in drawing and point generation itself, not in vector allocation alone.
+
+### Hypothesis: Precompute throughput header label layout during relayout
+
+- Change:
+  - Move the static throughput header-label measurement out of `ThroughputWidget::Draw` and into `ResolveLayoutState`, then draw from the premeasured rect during paint.
+- Result:
+  - Regressed badly and was reverted.
+- Observed effect:
+  - `drag_loop per_iter_ms` rose to about `11.95`.
+  - `snap avg_ms` rose to about `5.19`.
+  - `apply avg_ms` rose to about `1.65`.
+- Why it failed:
+  - The drag path resolves layout every frame, so moving text measurement from draw into relayout multiplied the cost in the snap and apply phases instead of removing meaningful repeated paint work.
+- Conclusion:
+  - Throughput header-label measurement is cheap enough in the current draw path that relocating it into per-frame relayout is the wrong trade.
 
 ### Hypothesis: Fill gauge segments individually instead of filling combined paths
 

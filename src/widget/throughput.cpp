@@ -234,7 +234,7 @@ void ThroughputWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
-    const DashboardThroughputMetric metric = metrics.ResolveThroughput(metric_);
+    const DashboardThroughputMetric& metric = metrics.ResolveThroughput(metric_);
     char buffer[64];
     if (metric.valueMbps >= 100.0) {
         sprintf_s(buffer, "%.0f MB/s", metric.valueMbps);
