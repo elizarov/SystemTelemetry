@@ -145,7 +145,7 @@ for /f "usebackq tokens=1,* delims==" %%A in ("%DAEMON_STATUS%") do (
     if /i "%%A"=="pid" set "DAEMON_PID=%%B"
 )
 if not defined DAEMON_PID exit /b 1
-tasklist /fi "PID eq %DAEMON_PID%" 2>nul | findstr /r /c:"[ ]%DAEMON_PID% " >nul
+powershell -NoProfile -Command "if (Get-Process -Id %DAEMON_PID% -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul 2>nul
 if errorlevel 1 exit /b 1
 exit /b 0
 
@@ -162,7 +162,7 @@ if "%WAIT_RETRIES%"=="0" (
     echo Check the elevated daemon console for startup errors.
     exit /b 1
 )
-timeout /t 1 /nobreak >nul
+powershell -NoProfile -Command "Start-Sleep -Seconds 1" >nul
 set /a WAIT_RETRIES-=1
 goto wait_for_daemon_ready_loop
 
@@ -178,7 +178,7 @@ if "%WAIT_RETRIES%"=="0" (
     echo Timed out waiting for the benchmark daemon to stop.
     exit /b 1
 )
-timeout /t 1 /nobreak >nul
+powershell -NoProfile -Command "Start-Sleep -Seconds 1" >nul
 set /a WAIT_RETRIES-=1
 goto wait_for_daemon_exit_loop
 
@@ -230,7 +230,7 @@ if "%WAIT_RETRIES%"=="0" (
     echo Timed out waiting for the benchmark daemon to finish the request.
     endlocal & exit /b 1
 )
-timeout /t 1 /nobreak >nul
+powershell -NoProfile -Command "Start-Sleep -Seconds 1" >nul
 set /a WAIT_RETRIES-=1
 goto wait_for_request_completion_loop
 
