@@ -102,14 +102,18 @@ try {
                 $env:PROFILE_BENCHMARK_FORCE_BUILD = "1"
                 & $profileScript $iterations $renderScale /run-request $requestDir.FullName
                 $exitCode = $LASTEXITCODE
-                $lines = @(
-                    "exit_code=$exitCode"
-                    "etl=$etlPath"
-                    "summary=$summaryPath"
-                    "calltree=$calltreePath"
-                )
-                Set-Content -LiteralPath $doneFile -Value $lines -Encoding ascii
-                Remove-Item -LiteralPath $errorFile -Force -ErrorAction SilentlyContinue
+                if (-not (Test-Path -LiteralPath $doneFile) -and -not (Test-Path -LiteralPath $errorFile)) {
+                    $lines = @(
+                        "exit_code=$exitCode"
+                        "etl=$etlPath"
+                        "summary=$summaryPath"
+                        "calltree=$calltreePath"
+                    )
+                    Set-Content -LiteralPath $doneFile -Value $lines -Encoding ascii
+                }
+                if (Test-Path -LiteralPath $doneFile) {
+                    Remove-Item -LiteralPath $errorFile -Force -ErrorAction SilentlyContinue
+                }
                 Write-Host "[daemon] Request $($requestDir.Name) finished with exit code $exitCode"
             } catch {
                 Set-Content -LiteralPath $errorFile -Value $_.Exception.Message -Encoding utf8

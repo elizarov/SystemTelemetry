@@ -11,6 +11,7 @@ This file records the current layout-edit drag benchmark baseline, the latest co
 - Capture a full profile with `profile_benchmark.cmd 240 2` when a change materially moves the benchmark or when hotspot confirmation is needed.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
+- Daemon-backed and one-shot elevated runs persist the benchmark stdout in the request directory and replay it in the caller window after the request finishes, so the requesting shell sees the same timing lines that the elevated process produced.
 - `profile_benchmark.cmd` rebuilds automatically through the daemon path, so profiling runs do not need a separate preceding `build.cmd` step.
 - Treat `build\SystemTelemetryBenchmarks.exe 240 2` as the fast comparison loop and the WPR profile as hotspot validation.
 

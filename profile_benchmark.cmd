@@ -134,8 +134,22 @@ if not defined REQUEST_DIR (
     echo Missing request directory for /run-request.
     exit /b 1
 )
-call :run_benchmark "%REQUEST_DIR%\layout_edit_benchmark_wpr.etl" "%REQUEST_DIR%\layout_edit_benchmark_wpr.txt" "%REQUEST_DIR%\layout_edit_benchmark_wpr_calltree.html"
-exit /b %errorlevel%
+set "TRACE_ETL=%REQUEST_DIR%\layout_edit_benchmark_wpr.etl"
+set "TRACE_TXT=%REQUEST_DIR%\layout_edit_benchmark_wpr.txt"
+set "TRACE_CALLTREE_HTML=%REQUEST_DIR%\layout_edit_benchmark_wpr_calltree.html"
+set "BENCHMARK_OUTPUT=%REQUEST_DIR%\layout_edit_benchmark_stdout.txt"
+del /q "%REQUEST_DIR%\done.env" >nul 2>nul
+del /q "%REQUEST_DIR%\error.txt" >nul 2>nul
+call :run_benchmark "%TRACE_ETL%" "%TRACE_TXT%" "%TRACE_CALLTREE_HTML%" "%BENCHMARK_OUTPUT%"
+set "REQUEST_EXIT_CODE=%errorlevel%"
+> "%REQUEST_DIR%\done.env" (
+    echo exit_code=%REQUEST_EXIT_CODE%
+    echo etl=%TRACE_ETL%
+    echo summary=%TRACE_TXT%
+    echo calltree=%TRACE_CALLTREE_HTML%
+    echo benchmark_output=%BENCHMARK_OUTPUT%
+)
+exit /b %REQUEST_EXIT_CODE%
 
 :load_daemon_status
 set "DAEMON_PID="
@@ -197,7 +211,8 @@ if errorlevel 1 (
 )
 echo Waiting for benchmark daemon request %REQUEST_ID%...
 call :wait_for_request_completion "%REQUEST_DIR%" 600
-exit /b %errorlevel%
+call :read_request_exit_code "%REQUEST_DIR%\done.env"
+exit /b %REQUEST_RESULT_CODE%
 
 :wait_for_request_completion
 setlocal EnableExtensions EnableDelayedExpansion
@@ -209,18 +224,23 @@ if exist "%REQUEST_WAIT_DIR%\done.env" (
     set "REQUEST_ETL="
     set "REQUEST_SUMMARY="
     set "REQUEST_CALLTREE="
+    set "REQUEST_BENCHMARK_OUTPUT="
     for /f "usebackq tokens=1,* delims==" %%A in ("%REQUEST_WAIT_DIR%\done.env") do (
         if /i "%%A"=="exit_code" set "REQUEST_EXIT_CODE=%%B"
         if /i "%%A"=="etl" set "REQUEST_ETL=%%B"
         if /i "%%A"=="summary" set "REQUEST_SUMMARY=%%B"
         if /i "%%A"=="calltree" set "REQUEST_CALLTREE=%%B"
+        if /i "%%A"=="benchmark_output" set "REQUEST_BENCHMARK_OUTPUT=%%B"
     )
     echo Done.
+    if defined REQUEST_BENCHMARK_OUTPUT if exist "!REQUEST_BENCHMARK_OUTPUT!" (
+        type "!REQUEST_BENCHMARK_OUTPUT!"
+    )
     if defined REQUEST_ETL echo ETL: !REQUEST_ETL!
     if defined REQUEST_SUMMARY echo CPU summary: !REQUEST_SUMMARY!
     if defined REQUEST_CALLTREE echo Call tree: !REQUEST_CALLTREE!
     if not defined REQUEST_EXIT_CODE set "REQUEST_EXIT_CODE=1"
-    endlocal & exit /b %REQUEST_EXIT_CODE%
+    endlocal & exit /b !REQUEST_EXIT_CODE!
 )
 if exist "%REQUEST_WAIT_DIR%\error.txt" (
     type "%REQUEST_WAIT_DIR%\error.txt"
@@ -234,10 +254,23 @@ powershell -NoProfile -Command "Start-Sleep -Seconds 1" >nul
 set /a WAIT_RETRIES-=1
 goto wait_for_request_completion_loop
 
+:read_request_exit_code
+setlocal EnableExtensions
+set "REQUEST_DONE_FILE=%~1"
+set /a REQUEST_RESULT_CODE=1
+if exist "%REQUEST_DONE_FILE%" (
+    for /f "usebackq tokens=1,* delims==" %%A in ("%REQUEST_DONE_FILE%") do (
+        if /i "%%A"=="exit_code" set /a REQUEST_RESULT_CODE=%%B+0
+    )
+)
+endlocal & set "REQUEST_RESULT_CODE=%REQUEST_RESULT_CODE%"
+exit /b 0
+
 :run_benchmark
 set "TRACE_ETL=%~1"
 set "TRACE_TXT=%~2"
 set "TRACE_CALLTREE_HTML=%~3"
+set "BENCHMARK_OUTPUT=%~4"
 set "WPR_EXE=%SystemRoot%\System32\wpr.exe"
 set "XPERF_EXE=C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\xperf.exe"
 set "BENCHMARK_EXE=%REPO_ROOT%\build\SystemTelemetryBenchmarks.exe"
@@ -275,6 +308,7 @@ set "_NT_SYMBOL_PATH=%REPO_ROOT%\build;%BENCHMARK_PDB_DIR%"
 del /q "%TRACE_ETL%" >nul 2>nul
 del /q "%TRACE_TXT%" >nul 2>nul
 del /q "%TRACE_CALLTREE_HTML%" >nul 2>nul
+if defined BENCHMARK_OUTPUT del /q "%BENCHMARK_OUTPUT%" >nul 2>nul
 
 echo Starting CPU profile capture...
 "%WPR_EXE%" -cancel >nul 2>nul
@@ -285,7 +319,12 @@ if errorlevel 1 (
 )
 
 echo Running benchmark iterations=%ITERATIONS% scale=%RENDER_SCALE%...
-"%BENCHMARK_EXE%" %ITERATIONS% %RENDER_SCALE%
+if defined BENCHMARK_OUTPUT (
+    set "PROFILE_BENCHMARK_STDOUT=%BENCHMARK_OUTPUT%"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & $env:BENCHMARK_EXE %ITERATIONS% %RENDER_SCALE% 2>&1 | Tee-Object -FilePath $env:PROFILE_BENCHMARK_STDOUT; exit $LASTEXITCODE }"
+) else (
+    "%BENCHMARK_EXE%" %ITERATIONS% %RENDER_SCALE%
+)
 set "BENCHMARK_RC=%errorlevel%"
 
 echo Stopping trace and writing "%TRACE_ETL%"...
@@ -317,10 +356,18 @@ if "%IS_ELEVATED_RELAUNCH%"=="1" (
 )
 
 if not exist "%DAEMON_ROOT%\adhoc" mkdir "%DAEMON_ROOT%\adhoc"
+del /q "%DAEMON_ROOT%\adhoc\done.env" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\error.txt" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\layout_edit_benchmark_stdout.txt" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\layout_edit_benchmark_wpr.etl" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\layout_edit_benchmark_wpr.txt" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\layout_edit_benchmark_wpr_calltree.html" >nul 2>nul
 echo Requesting administrator access for WPR CPU profiling...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$process = Start-Process -FilePath $env:ComSpec -ArgumentList '/c ""%~f0"" %ITERATIONS% %RENDER_SCALE% /elevated /run-request ""%DAEMON_ROOT%\adhoc""' -WorkingDirectory '%REPO_ROOT%' -Verb RunAs -Wait -PassThru; exit $process.ExitCode"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:ComSpec -ArgumentList '/c ""%~f0"" %ITERATIONS% %RENDER_SCALE% /elevated /run-request ""%DAEMON_ROOT%\adhoc""' -WorkingDirectory '%REPO_ROOT%' -Verb RunAs -Wait | Out-Null"
 if errorlevel 1 (
     echo Administrator approval is required to capture the benchmark CPU profile.
     exit /b 1
 )
-exit /b 0
+call :wait_for_request_completion "%DAEMON_ROOT%\adhoc" 10
+call :read_request_exit_code "%DAEMON_ROOT%\adhoc\done.env"
+exit /b %REQUEST_RESULT_CODE%
