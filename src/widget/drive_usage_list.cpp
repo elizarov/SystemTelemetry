@@ -354,8 +354,7 @@ void DriveUsageListWidget::Draw(
 void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.driveUsageList;
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegments,
             0},
         layoutState_.activityTargetRect,
@@ -409,8 +408,7 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
         const int anchorCenterX = anchorRect.left + ((std::max)(0, anchorRect.right - anchorRect.left) / 2);
         const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
         renderer.RegisterStaticEditableAnchorRegion(
-            LayoutEditAnchorKey{
-                LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 DashboardRenderer::LayoutEditParameter::DriveUsageBarHeight,
                 rowIndex},
             barRect,

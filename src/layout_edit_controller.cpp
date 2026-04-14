@@ -143,8 +143,7 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
     return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
 }
 
-std::optional<double> ComputeGaugeSegmentGapDegrees(
-    const LayoutEditWidgetGuide& guide, RenderPoint clientPoint) {
+std::optional<double> ComputeGaugeSegmentGapDegrees(const LayoutEditWidgetGuide& guide, RenderPoint clientPoint) {
     const auto pointerAngle = ComputeGaugePointerAngle(guide.dragOrigin, clientPoint);
     if (!pointerAngle.has_value()) {
         return std::nullopt;
@@ -188,8 +187,7 @@ void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
     host_.InvalidateLayoutEdit();
 }
 
-const LayoutEditGuide* LayoutEditController::HitTestLayoutGuide(
-    RenderPoint clientPoint, size_t* index) const {
+const LayoutEditGuide* LayoutEditController::HitTestLayoutGuide(RenderPoint clientPoint, size_t* index) const {
     const auto& guides = host_.LayoutEditRenderer().LayoutEditGuides();
     for (size_t i = 0; i < guides.size(); ++i) {
         if (guides[i].hitRect.Contains(clientPoint)) {
@@ -226,8 +224,7 @@ const LayoutEditWidgetGuide* LayoutEditController::HitTestWidgetEditGuide(
     return bestGuide;
 }
 
-const LayoutEditGapAnchor* LayoutEditController::HitTestGapEditAnchor(
-    RenderPoint clientPoint, size_t* index) const {
+const LayoutEditGapAnchor* LayoutEditController::HitTestGapEditAnchor(RenderPoint clientPoint, size_t* index) const {
     const auto& anchors = host_.LayoutEditRenderer().GapEditAnchors();
     const LayoutEditGapAnchor* bestAnchor = nullptr;
     size_t bestIndex = 0;
@@ -661,27 +658,25 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
             activeAnchorEditDrag_->dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL
             : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both         ? IDC_SIZEALL
             : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical     ? IDC_SIZEWE
-                                                                                                 : IDC_SIZENS));
+                                                                              : IDC_SIZENS));
         return true;
     }
     if (activeGapEditDrag_.has_value()) {
-        SetCursor(LoadCursorW(nullptr,
-            activeGapEditDrag_->anchor.dragAxis == AnchorDragAxis::Horizontal ? IDC_SIZEWE
-                                                                                                 : IDC_SIZENS));
+        SetCursor(LoadCursorW(
+            nullptr, activeGapEditDrag_->anchor.dragAxis == AnchorDragAxis::Horizontal ? IDC_SIZEWE : IDC_SIZENS));
         return true;
     }
     if (activeWidgetEditDrag_.has_value()) {
         const auto& guide = activeWidgetEditDrag_->guide;
         SetCursor(LoadCursorW(nullptr,
-            guide.angularDrag                                            ? IDC_CROSS
+            guide.angularDrag                         ? IDC_CROSS
             : guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
-                                                                         : IDC_SIZENS));
+                                                      : IDC_SIZENS));
         return true;
     }
     if (activeLayoutDrag_.has_value()) {
         const auto& guide = activeLayoutDrag_->guide;
-        SetCursor(
-            LoadCursorW(nullptr, guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadCursorW(nullptr, guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return true;
     }
 
@@ -779,20 +774,16 @@ void LayoutEditController::SyncRendererInteractionState() {
     overlayState.hoveredGapEditAnchor = hoveredGapEditAnchor_;
     overlayState.hoveredEditableAnchor = hoveredEditableAnchor_;
     overlayState.activeLayoutEditGuide =
-        activeLayoutDrag_.has_value() ? std::optional<LayoutEditGuide>(activeLayoutDrag_->guide)
-                                      : std::nullopt;
-    overlayState.activeWidgetEditGuide =
-        activeWidgetEditDrag_.has_value()
-            ? std::optional<LayoutEditWidgetGuide>(activeWidgetEditDrag_->guide)
-            : std::nullopt;
-    overlayState.activeGapEditAnchor =
-        activeGapEditDrag_.has_value()
-            ? std::optional<LayoutEditGapAnchorKey>(activeGapEditDrag_->anchor.key)
-            : std::nullopt;
-    overlayState.activeEditableAnchor =
-        activeAnchorEditDrag_.has_value()
-            ? std::optional<LayoutEditAnchorKey>(activeAnchorEditDrag_->key)
-            : std::nullopt;
+        activeLayoutDrag_.has_value() ? std::optional<LayoutEditGuide>(activeLayoutDrag_->guide) : std::nullopt;
+    overlayState.activeWidgetEditGuide = activeWidgetEditDrag_.has_value()
+                                             ? std::optional<LayoutEditWidgetGuide>(activeWidgetEditDrag_->guide)
+                                             : std::nullopt;
+    overlayState.activeGapEditAnchor = activeGapEditDrag_.has_value()
+                                           ? std::optional<LayoutEditGapAnchorKey>(activeGapEditDrag_->anchor.key)
+                                           : std::nullopt;
+    overlayState.activeEditableAnchor = activeAnchorEditDrag_.has_value()
+                                            ? std::optional<LayoutEditAnchorKey>(activeAnchorEditDrag_->key)
+                                            : std::nullopt;
 }
 
 void LayoutEditController::ClearInteractionState() {
@@ -829,7 +820,7 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
             dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL
             : dragAxis == AnchorDragAxis::Both         ? IDC_SIZEALL
             : dragAxis == AnchorDragAxis::Vertical     ? IDC_SIZEWE
-                                                                          : IDC_SIZENS));
+                                                       : IDC_SIZENS));
         return;
     }
 
@@ -837,17 +828,16 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
         const auto& guides = host_.LayoutEditRenderer().WidgetEditGuides();
         const LayoutEditWidgetGuide& widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
         SetCursor(LoadCursorW(nullptr,
-            widgetGuide.angularDrag                                            ? IDC_CROSS
+            widgetGuide.angularDrag                         ? IDC_CROSS
             : widgetGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
-                                                                               : IDC_SIZENS));
+                                                            : IDC_SIZENS));
         return;
     }
 
     if (resolution.hoveredLayoutGuideIndex.has_value()) {
         const auto& guides = host_.LayoutEditRenderer().LayoutEditGuides();
         const LayoutEditGuide& layoutGuide = guides[*resolution.hoveredLayoutGuideIndex];
-        SetCursor(LoadCursorW(
-            nullptr, layoutGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadCursorW(nullptr, layoutGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return;
     }
 
@@ -915,8 +905,7 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
 
 bool LayoutEditController::UpdateLayoutDrag(RenderPoint clientPoint) {
     LayoutDragState& drag = *activeLayoutDrag_;
-    const int currentCoordinate =
-        drag.guide.axis == LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
+    const int currentCoordinate = drag.guide.axis == LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
     const int delta = currentCoordinate - drag.dragStartCoordinate;
     const size_t index = drag.guide.separatorIndex;
     if (index + 1 >= drag.initialWeights.size()) {
@@ -944,11 +933,10 @@ bool LayoutEditController::UpdateLayoutDrag(RenderPoint clientPoint) {
     }
 
     const auto& guides = host_.LayoutEditRenderer().LayoutEditGuides();
-    const auto guideIt =
-        std::find_if(guides.begin(), guides.end(), [&](const LayoutEditGuide& candidate) {
-            return candidate.renderCardId == drag.guide.renderCardId && candidate.editCardId == drag.guide.editCardId &&
-                   candidate.nodePath == drag.guide.nodePath && candidate.separatorIndex == drag.guide.separatorIndex;
-        });
+    const auto guideIt = std::find_if(guides.begin(), guides.end(), [&](const LayoutEditGuide& candidate) {
+        return candidate.renderCardId == drag.guide.renderCardId && candidate.editCardId == drag.guide.editCardId &&
+               candidate.nodePath == drag.guide.nodePath && candidate.separatorIndex == drag.guide.separatorIndex;
+    });
     if (guideIt != guides.end()) {
         drag.guide = *guideIt;
     }
@@ -978,8 +966,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(RenderPoint clientPoint) {
             return false;
         }
     } else {
-        const int currentCoordinate =
-            drag.guide.axis == LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
+        const int currentCoordinate = drag.guide.axis == LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
         const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;
         const int logicalDelta =
             static_cast<int>(std::lround(static_cast<double>(pixelDelta * drag.guide.dragDirection) /
@@ -994,14 +981,13 @@ bool LayoutEditController::UpdateWidgetEditDrag(RenderPoint clientPoint) {
     }
 
     const auto& guides = host_.LayoutEditRenderer().WidgetEditGuides();
-    const auto guideIt =
-        std::find_if(guides.begin(), guides.end(), [&](const LayoutEditWidgetGuide& candidate) {
-            return candidate.parameter == drag.guide.parameter && candidate.guideId == drag.guide.guideId &&
-                   candidate.widget.kind == drag.guide.widget.kind &&
-                   candidate.widget.renderCardId == drag.guide.widget.renderCardId &&
-                   candidate.widget.editCardId == drag.guide.widget.editCardId &&
-                   candidate.widget.nodePath == drag.guide.widget.nodePath;
-        });
+    const auto guideIt = std::find_if(guides.begin(), guides.end(), [&](const LayoutEditWidgetGuide& candidate) {
+        return candidate.parameter == drag.guide.parameter && candidate.guideId == drag.guide.guideId &&
+               candidate.widget.kind == drag.guide.widget.kind &&
+               candidate.widget.renderCardId == drag.guide.widget.renderCardId &&
+               candidate.widget.editCardId == drag.guide.widget.editCardId &&
+               candidate.widget.nodePath == drag.guide.widget.nodePath;
+    });
     if (guideIt != guides.end()) {
         drag.guide = *guideIt;
     }
@@ -1012,8 +998,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(RenderPoint clientPoint) {
 
 bool LayoutEditController::UpdateGapEditDrag(RenderPoint clientPoint) {
     GapEditDragState& drag = *activeGapEditDrag_;
-    const int currentCoordinate =
-        drag.anchor.dragAxis == AnchorDragAxis::Horizontal ? clientPoint.x : clientPoint.y;
+    const int currentCoordinate = drag.anchor.dragAxis == AnchorDragAxis::Horizontal ? clientPoint.x : clientPoint.y;
     const int pixelDelta = currentCoordinate - drag.dragStartCoordinate;
     const int logicalDelta = static_cast<int>(
         std::lround(static_cast<double>(pixelDelta) / (std::max)(0.1, host_.LayoutEditRenderer().RenderScale())));
@@ -1047,11 +1032,9 @@ bool LayoutEditController::UpdateAnchorEditDrag(RenderPoint clientPoint) {
             pixelDelta = (clientPoint.x - drag.dragStartPoint.x) + (clientPoint.y - drag.dragStartPoint.y);
             scaleDivisor = 4.0;
         } else {
-            const int currentCoordinate =
-                drag.dragAxis == AnchorDragAxis::Vertical ? clientPoint.x : clientPoint.y;
-            const int startCoordinate = drag.dragAxis == AnchorDragAxis::Vertical
-                                            ? drag.dragStartPoint.x
-                                            : drag.dragStartPoint.y;
+            const int currentCoordinate = drag.dragAxis == AnchorDragAxis::Vertical ? clientPoint.x : clientPoint.y;
+            const int startCoordinate =
+                drag.dragAxis == AnchorDragAxis::Vertical ? drag.dragStartPoint.x : drag.dragStartPoint.y;
             pixelDelta = currentCoordinate - startCoordinate;
         }
         logicalDelta =

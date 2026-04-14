@@ -449,8 +449,9 @@ private:
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable);
-    void RegisterTextAnchor(
-        std::vector<LayoutEditAnchorRegion>& regions, const TextLayoutResult& layoutResult, const LayoutEditAnchorBinding& editable);
+    void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
+        const TextLayoutResult& layoutResult,
+        const LayoutEditAnchorBinding& editable);
     bool IsDrawActive() const;
     const DashboardMetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();

@@ -308,8 +308,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
     const int cy = layoutState_.cy;
     const int outerRadius = layoutState_.outerRadius;
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::GaugeSegmentCount,
             0},
         widget.rect,
@@ -323,8 +322,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         true,
         renderer.Config().layout.gauge.segmentCount);
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::GaugeOuterPadding,
             0},
         layoutState_.outerPaddingAnchorRect,
@@ -338,8 +336,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         false,
         renderer.Config().layout.gauge.outerPadding);
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::GaugeRingThickness,
             0},
         layoutState_.ringThicknessAnchorRect,

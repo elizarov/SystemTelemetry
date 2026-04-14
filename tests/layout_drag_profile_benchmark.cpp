@@ -163,9 +163,8 @@ RenderPoint GuideDragStartPoint(const LayoutEditGuide& guide) {
     return RenderPoint{(guide.hitRect.left + guide.hitRect.right) / 2, (guide.hitRect.top + guide.hitRect.bottom) / 2};
 }
 
-RenderPoint DragPointForWeights(const LayoutEditGuide& guide,
-    const std::vector<int>& initialWeights,
-    const std::vector<int>& targetWeights) {
+RenderPoint DragPointForWeights(
+    const LayoutEditGuide& guide, const std::vector<int>& initialWeights, const std::vector<int>& targetWeights) {
     RenderPoint dragPoint = GuideDragStartPoint(guide);
     if (guide.separatorIndex < initialWeights.size() && guide.separatorIndex < targetWeights.size()) {
         const int delta = targetWeights[guide.separatorIndex] - initialWeights[guide.separatorIndex];

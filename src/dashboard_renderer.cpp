@@ -1660,8 +1660,7 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
     return ResolveLayout(false);
 }
 
-std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestLayoutCard(
-    RenderPoint clientPoint) const {
+std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestLayoutCard(RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         if (card.rect.Contains(clientPoint)) {
             return LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
@@ -1670,8 +1669,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestLayoutCard(
     return std::nullopt;
 }
 
-std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableCard(
-    RenderPoint clientPoint) const {
+std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableCard(RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         if (!card.rect.Contains(clientPoint) || clientPoint.y > card.contentRect.top) {
             continue;
@@ -1681,8 +1679,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableCard(
     return std::nullopt;
 }
 
-std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableWidget(
-    RenderPoint clientPoint) const {
+std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableWidget(RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (widget.widget == nullptr || !widget.widget->IsHoverable() || !widget.rect.Contains(clientPoint)) {
@@ -1694,8 +1691,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableWidget
     return std::nullopt;
 }
 
-std::optional<LayoutEditGapAnchorKey> DashboardRenderer::HitTestGapEditAnchor(
-    RenderPoint clientPoint) const {
+std::optional<LayoutEditGapAnchorKey> DashboardRenderer::HitTestGapEditAnchor(RenderPoint clientPoint) const {
     const LayoutEditGapAnchor* bestAnchor = nullptr;
     int bestPriority = 0;
     for (auto it = gapEditAnchors_.rbegin(); it != gapEditAnchors_.rend(); ++it) {
@@ -1712,8 +1708,7 @@ std::optional<LayoutEditGapAnchorKey> DashboardRenderer::HitTestGapEditAnchor(
     return bestAnchor != nullptr ? std::optional<LayoutEditGapAnchorKey>(bestAnchor->key) : std::nullopt;
 }
 
-std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(
-    RenderPoint clientPoint) const {
+std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(RenderPoint clientPoint) const {
     std::vector<const LayoutEditAnchorRegion*> regions;
     regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
     for (const auto& region : staticEditableAnchorRegions_) {
@@ -1730,8 +1725,7 @@ std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorTarge
     return std::nullopt;
 }
 
-std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(
-    RenderPoint clientPoint) const {
+std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(RenderPoint clientPoint) const {
     std::vector<const LayoutEditAnchorRegion*> regions;
     regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
     for (const auto& region : staticEditableAnchorRegions_) {
@@ -1775,26 +1769,24 @@ std::optional<LayoutEditAnchorRegion> DashboardRenderer::FindEditableAnchorRegio
     const LayoutEditAnchorKey& key) const {
     const auto findIn =
         [&](const std::vector<LayoutEditAnchorRegion>& regions) -> std::optional<LayoutEditAnchorRegion> {
-            const auto it = std::find_if(regions.begin(), regions.end(), [&](const LayoutEditAnchorRegion& region) {
+        const auto it = std::find_if(regions.begin(), regions.end(), [&](const LayoutEditAnchorRegion& region) {
             return MatchesEditableAnchorKey(region.key, key);
         });
         if (it == regions.end()) {
             return std::nullopt;
         }
         return *it;
-        };
+    };
     if (const auto staticRegion = findIn(staticEditableAnchorRegions_); staticRegion.has_value()) {
         return staticRegion;
     }
     return findIn(dynamicEditableAnchorRegions_);
 }
 
-std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(
-    const LayoutEditGapAnchorKey& key) const {
-    const auto it =
-        std::find_if(gapEditAnchors_.begin(), gapEditAnchors_.end(), [&](const LayoutEditGapAnchor& anchor) {
-        return MatchesGapEditAnchorKey(anchor.key, key);
-    });
+std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(const LayoutEditGapAnchorKey& key) const {
+    const auto it = std::find_if(gapEditAnchors_.begin(),
+        gapEditAnchors_.end(),
+        [&](const LayoutEditGapAnchor& anchor) { return MatchesGapEditAnchorKey(anchor.key, key); });
     if (it == gapEditAnchors_.end()) {
         return std::nullopt;
     }

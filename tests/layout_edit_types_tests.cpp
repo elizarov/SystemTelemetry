@@ -5,7 +5,8 @@
 TEST(LayoutEditTypes, MatchesWidgetIdentityUsingKindAndPath) {
     const LayoutEditWidgetIdentity widgetA{"card-a", "card-a", {1, 2, 3}};
     const LayoutEditWidgetIdentity widgetB{"card-a", "card-a", {1, 2, 3}};
-    const LayoutEditWidgetIdentity cardChrome{"card-a", "card-a", {1, 2, 3}, LayoutEditWidgetIdentity::Kind::CardChrome};
+    const LayoutEditWidgetIdentity cardChrome{
+        "card-a", "card-a", {1, 2, 3}, LayoutEditWidgetIdentity::Kind::CardChrome};
 
     EXPECT_TRUE(MatchesWidgetIdentity(widgetA, widgetB));
     EXPECT_FALSE(MatchesWidgetIdentity(widgetA, cardChrome));

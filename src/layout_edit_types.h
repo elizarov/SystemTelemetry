@@ -130,7 +130,8 @@ struct LayoutEditAnchorBinding {
     AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
 };
 
-using TooltipPayload = std::variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion>;
+using TooltipPayload =
+    std::variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion>;
 
 bool MatchesWidgetIdentity(const LayoutEditWidgetIdentity& left, const LayoutEditWidgetIdentity& right);
 bool MatchesParameterSubject(const LayoutEditParameterSubject& left, const LayoutEditParameterSubject& right);

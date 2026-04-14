@@ -256,8 +256,7 @@ void ThroughputWidget::Draw(
 void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const ThroughputGraphLayout& layout = layoutState_;
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::ThroughputLeaderDiameter,
             0},
         layout.leaderAnchorRect,
@@ -272,8 +271,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         renderer.Config().layout.throughput.leaderDiameter);
 
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::ThroughputPlotStrokeWidth,
             0},
         layout.plotAnchorRect,
@@ -288,8 +286,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         renderer.Config().layout.throughput.plotStrokeWidth);
 
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             DashboardRenderer::LayoutEditParameter::ThroughputGuideStrokeWidth,
             0},
         layout.guideAnchorRect,

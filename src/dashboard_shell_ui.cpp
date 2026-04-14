@@ -139,8 +139,8 @@ const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const Layou
 
 std::wstring BuildLayoutGuideItemLabel(
     const LayoutNodeConfig& node, size_t childIndex, LayoutGuideAxis axis, bool first) {
-    const std::wstring side = axis == LayoutGuideAxis::Vertical ? (first ? L"Left" : L"Right")
-                                                                : (first ? L"Top" : L"Bottom");
+    const std::wstring side =
+        axis == LayoutGuideAxis::Vertical ? (first ? L"Left" : L"Right") : (first ? L"Top" : L"Bottom");
     const std::wstring childName = WideFromUtf8(LayoutGuideChildName(node.children[childIndex]));
     return side + L" " + childName + L" weight:";
 }

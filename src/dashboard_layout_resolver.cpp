@@ -182,8 +182,9 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 TextStyleId::Title,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
                 LayoutEditAnchorBinding{
-                    LayoutEditAnchorKey{
-                        LayoutEditWidgetIdentity{card.id, card.id, {}}, DashboardRenderer::LayoutEditParameter::FontTitle, 0},
+                    LayoutEditAnchorKey{LayoutEditWidgetIdentity{card.id, card.id, {}},
+                        DashboardRenderer::LayoutEditParameter::FontTitle,
+                        0},
                     renderer.Config().layout.fonts.title.size,
                     AnchorShape::Circle,
                     AnchorDragAxis::Vertical,
@@ -212,9 +213,9 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
 
     const bool horizontal = node.name == "columns";
     const LayoutEditWidgetIdentity gapWidgetIdentity =
-        renderCardId.empty() ? LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome}
-                             : LayoutEditWidgetIdentity{
-                                   renderCardId, renderCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+        renderCardId.empty()
+            ? LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome}
+            : LayoutEditWidgetIdentity{renderCardId, renderCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
     const DashboardRenderer::LayoutEditParameter gapParameter =
         renderCardId.empty() ? (horizontal ? DashboardRenderer::LayoutEditParameter::DashboardColumnGap
                                            : DashboardRenderer::LayoutEditParameter::DashboardRowGap)

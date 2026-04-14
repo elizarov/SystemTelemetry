@@ -145,12 +145,9 @@ private:
         int dragStartCoordinate = 0;
     };
 
-    const LayoutEditGuide* HitTestLayoutGuide(
-        RenderPoint clientPoint, size_t* index = nullptr) const;
-    const LayoutEditWidgetGuide* HitTestWidgetEditGuide(
-        RenderPoint clientPoint, size_t* index = nullptr) const;
-    const LayoutEditGapAnchor* HitTestGapEditAnchor(
-        RenderPoint clientPoint, size_t* index = nullptr) const;
+    const LayoutEditGuide* HitTestLayoutGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
+    const LayoutEditWidgetGuide* HitTestWidgetEditGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
+    const LayoutEditGapAnchor* HitTestGapEditAnchor(RenderPoint clientPoint, size_t* index = nullptr) const;
     HoverResolution ResolveHover(RenderPoint clientPoint) const;
     void RefreshHover(RenderPoint clientPoint);
     bool UpdateLayoutDrag(RenderPoint clientPoint);

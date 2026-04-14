@@ -68,7 +68,8 @@ RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload) {
         [](const auto& value) -> RenderPoint {
             using T = std::decay_t<decltype(value)>;
             if constexpr (std::is_same_v<T, LayoutEditGuide>) {
-                return RenderPoint{value.lineRect.left + (std::max<LONG>(0, value.lineRect.right - value.lineRect.left) / 2),
+                return RenderPoint{
+                    value.lineRect.left + (std::max<LONG>(0, value.lineRect.right - value.lineRect.left) / 2),
                     value.lineRect.top + (std::max<LONG>(0, value.lineRect.bottom - value.lineRect.top) / 2)};
             } else if constexpr (std::is_same_v<T, LayoutEditGapAnchor>) {
                 return RenderPoint{
