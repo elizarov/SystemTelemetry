@@ -17,6 +17,7 @@
 #include "dashboard_metrics.h"
 #include "dashboard_renderer.h"
 #include "layout_edit_controller.h"
+#include "layout_edit_parameter.h"
 #include "layout_edit_service.h"
 #include "layout_edit_trace_session.h"
 
@@ -282,7 +283,7 @@ private:
 
     bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override {
         const auto start = Clock::now();
-        const bool applied = ApplyValue(config_, parameter, value);
+        const bool applied = ApplyLayoutEditParameterValue(config_, parameter, value);
         if (applied) {
             renderer_.SetConfig(config_);
             dirty_ = true;

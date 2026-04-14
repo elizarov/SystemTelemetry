@@ -84,7 +84,6 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_trace_session.cpp
     src/layout_edit_types.cpp
     src/layout_edit_parameter.cpp
-    src/layout_edit_commands.cpp
     src/layout_edit_tooltip.cpp
     src/layout_edit_service.cpp
     src/config_parser.cpp
@@ -222,7 +221,7 @@ find_package(GTest CONFIG REQUIRED)
 
 add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
-    tests/layout_edit_commands_tests.cpp
+    tests/layout_edit_parameter_apply_tests.cpp
     tests/layout_edit_types_tests.cpp
     tests/layout_edit_tooltip_tests.cpp
     tests/localization_catalog_tests.cpp
@@ -235,7 +234,6 @@ add_executable(SystemTelemetryTests
     src/config_resolution.cpp
     src/layout_edit_types.cpp
     src/layout_edit_parameter.cpp
-    src/layout_edit_commands.cpp
     src/layout_edit_tooltip.cpp
     src/localization_catalog.cpp
     src/layout_snap_solver.cpp
@@ -285,7 +283,6 @@ add_executable(SystemTelemetryBenchmarks
     src/config_resolution.cpp
     src/layout_edit_types.cpp
     src/layout_edit_parameter.cpp
-    src/layout_edit_commands.cpp
     src/layout_edit_controller.cpp
     src/layout_edit_trace_session.cpp
     src/layout_edit_service.cpp

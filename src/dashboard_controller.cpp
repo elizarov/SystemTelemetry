@@ -401,7 +401,7 @@ bool DashboardController::ApplyLayoutEditValue(
     } else if (parameter == DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegmentGap) {
         nextValue = ClampDriveUsageActivitySegmentGapForCurrentConfig(state_.config, nextValue);
     }
-    if (!ApplyValue(state_.config, parameter, nextValue)) {
+    if (!ApplyLayoutEditParameterValue(state_.config, parameter, nextValue)) {
         return false;
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
