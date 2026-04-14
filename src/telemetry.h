@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -87,6 +88,7 @@ struct SystemSnapshot {
     StorageTelemetry storage;
     std::vector<DriveInfo> drives;
     SYSTEMTIME now{};
+    uint64_t revision = 0;
 };
 
 struct GpuProviderTelemetryState {

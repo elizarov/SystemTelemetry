@@ -101,6 +101,7 @@ private:
         dump_.snapshot.network.adapterName =
             resolvedNetwork_.adapterName.empty() ? "Auto" : resolvedNetwork_.adapterName;
         dump_.snapshot.network.ipAddress = resolvedNetwork_.ipAddress.empty() ? "N/A" : resolvedNetwork_.ipAddress;
+        ++dump_.snapshot.revision;
     }
 
     void RefreshStorageSelection() {
@@ -117,6 +118,7 @@ private:
             }
             dump_.snapshot.drives.push_back(drive);
         }
+        ++dump_.snapshot.revision;
     }
 
     bool ReloadFakeDump(bool required) {

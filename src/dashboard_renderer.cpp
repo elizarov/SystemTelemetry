@@ -287,6 +287,7 @@ DashboardRenderer::~DashboardRenderer() {
 }
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
+    InvalidateMetricSourceCache();
     const bool fontsChanged = !FontSetConfigEquals(config_.layout.fonts, config.layout.fonts);
     config_ = config;
     if (fontsChanged) {
@@ -496,7 +497,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
     const int availableWidth = std::max(0, static_cast<int>(rect.right - rect.left));
     const int availableHeight = std::max(0, static_cast<int>(rect.bottom - rect.top));
 
-    const TextMeasureCacheKey cacheKey{font, text, measureFormat, availableWidth, availableHeight};
+    const TextMeasureCacheLookupKey cacheKey{font, text, measureFormat, availableWidth, availableHeight};
     SIZE measuredSize{};
     const auto cached = textMeasureCache_.find(cacheKey);
     if (cached != textMeasureCache_.end()) {
@@ -508,7 +509,8 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
         SelectObject(hdc, oldFont);
         measuredSize.cx = std::max(0, static_cast<int>(measureRect.right - measureRect.left));
         measuredSize.cy = std::max(0, static_cast<int>(measureRect.bottom - measureRect.top));
-        textMeasureCache_.emplace(cacheKey, measuredSize);
+        textMeasureCache_.emplace(
+            TextMeasureCacheKey{font, std::string(text), measureFormat, availableWidth, availableHeight}, measuredSize);
     }
 
     const int measuredWidth = measuredSize.cx;
@@ -560,13 +562,13 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
     HGDIOBJ oldFont = SelectObject(hdc, font);
     SetTextColor(hdc, color);
     if (IsFastSingleLineTextFormat(wideText, format)) {
-        const TextWidthCacheKey cacheKey{font, text};
+        const TextWidthCacheLookupKey cacheKey{font, text};
         SIZE size{};
         if (const auto it = textExtentCache_.find(cacheKey); it != textExtentCache_.end()) {
             size = it->second;
         } else {
             GetTextExtentPoint32W(hdc, wideText.c_str(), static_cast<int>(wideText.size()), &size);
-            textExtentCache_.emplace(cacheKey, size);
+            textExtentCache_.emplace(TextWidthCacheKey{font, text}, size);
         }
 
         int x = rect.left;
@@ -607,13 +609,13 @@ void DashboardRenderer::DrawText(
     const std::wstring& wideText = GetWideText(text);
     const bool fastSingleLine = IsFastSingleLineTextFormat(wideText, format);
     if (fastSingleLine) {
-        const TextWidthCacheKey cacheKey{font, text};
+        const TextWidthCacheLookupKey cacheKey{font, text};
         SIZE size{};
         if (const auto it = textExtentCache_.find(cacheKey); it != textExtentCache_.end()) {
             size = it->second;
         } else {
             GetTextExtentPoint32W(hdc, wideText.c_str(), static_cast<int>(wideText.size()), &size);
-            textExtentCache_.emplace(cacheKey, size);
+            textExtentCache_.emplace(TextWidthCacheKey{font, text}, size);
         }
 
         int x = rect.left;
@@ -661,14 +663,13 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(HDC hdc, const EditOverlaySta
         return;
     }
 
-    HPEN pen = CreatePen(PS_SOLID, 1, LayoutGuideColor());
+    HPEN pen = SolidPen(LayoutGuideColor());
     HGDIOBJ oldPen = SelectObject(hdc, pen);
     HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(HOLLOW_BRUSH));
     Rectangle(
         hdc, hoveredWidget->rect.left, hoveredWidget->rect.top, hoveredWidget->rect.right, hoveredWidget->rect.bottom);
     SelectObject(hdc, oldBrush);
     SelectObject(hdc, oldPen);
-    DeleteObject(pen);
 }
 
 void DashboardRenderer::DrawHoveredEditableAnchorHighlight(HDC hdc, const EditOverlayState& overlayState) const {
@@ -759,8 +760,8 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc, const EditOverlayState& ov
         return;
     }
 
-    HPEN pen = CreatePen(PS_SOLID, 1, LayoutGuideColor());
-    HPEN activePen = CreatePen(PS_SOLID, 1, ActiveEditColor());
+    HPEN pen = SolidPen(LayoutGuideColor());
+    HPEN activePen = SolidPen(ActiveEditColor());
     HGDIOBJ oldPen = SelectObject(hdc, pen);
     for (const auto& guide : layoutEditGuides_) {
         const bool active = overlayState.activeLayoutEditGuide.has_value() &&
@@ -775,8 +776,6 @@ void DashboardRenderer::DrawLayoutEditGuides(HDC hdc, const EditOverlayState& ov
         }
     }
     SelectObject(hdc, oldPen);
-    DeleteObject(activePen);
-    DeleteObject(pen);
 }
 
 void DashboardRenderer::DrawWidgetEditGuides(HDC hdc, const EditOverlayState& overlayState) const {
@@ -798,8 +797,8 @@ void DashboardRenderer::DrawWidgetEditGuides(HDC hdc, const EditOverlayState& ov
                guide.widget.nodePath == overlayState.hoveredEditableWidget->nodePath;
     };
 
-    HPEN pen = CreatePen(PS_SOLID, 1, LayoutGuideColor());
-    HPEN activePen = CreatePen(PS_SOLID, 1, ActiveEditColor());
+    HPEN pen = SolidPen(LayoutGuideColor());
+    HPEN activePen = SolidPen(ActiveEditColor());
     HGDIOBJ oldPen = SelectObject(hdc, pen);
     for (const auto& guide : widgetEditGuides_) {
         if (!shouldDraw(guide)) {
@@ -812,8 +811,6 @@ void DashboardRenderer::DrawWidgetEditGuides(HDC hdc, const EditOverlayState& ov
         LineTo(hdc, guide.drawEnd.x, guide.drawEnd.y);
     }
     SelectObject(hdc, oldPen);
-    DeleteObject(activePen);
-    DeleteObject(pen);
 }
 
 int DashboardRenderer::WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {
@@ -1284,7 +1281,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
     const int notchDepth = std::max(3, ScaleLogical(4));
     const int notchSpacing = std::max(3, ScaleLogical(4));
 
-    HPEN pen = CreatePen(PS_SOLID, 1, color);
+    HPEN pen = SolidPen(color);
     HGDIOBJ oldPen = SelectObject(hdc, pen);
     for (const SimilarityIndicator& indicator : indicators) {
         const RECT& rect = indicator.rect;
@@ -1337,7 +1334,6 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(HDC hdc, const EditOverla
         }
     }
     SelectObject(hdc, oldPen);
-    DeleteObject(pen);
 }
 
 void DashboardRenderer::DrawPanelIcon(HDC hdc, const std::string& iconName, const RECT& iconRect) {
@@ -1490,7 +1486,7 @@ void DashboardRenderer::Draw(HDC hdc, const SystemSnapshot& snapshot, const Edit
     dynamicEditableAnchorRegions_.clear();
     dynamicAnchorRegistrationEnabled_ =
         overlayState.showLayoutEditGuides && !overlayState.activeLayoutEditGuide.has_value();
-    DashboardMetricSource metrics(snapshot, config_.metricScales);
+    const DashboardMetricSource& metrics = ResolveMetrics(snapshot);
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(hdc, card);
         for (const auto& widget : card.widgets) {
@@ -1584,7 +1580,7 @@ int DashboardRenderer::ScaleLogical(int value) const {
 }
 
 int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const {
-    TextWidthCacheKey cacheKey{font, std::string(text)};
+    const TextWidthCacheLookupKey cacheKey{font, text};
     if (const auto it = textWidthCache_.find(cacheKey); it != textWidthCache_.end()) {
         return it->second;
     }
@@ -1602,7 +1598,7 @@ int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const
     }
     SelectObject(hdc, oldFont);
     ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
-    textWidthCache_.emplace(std::move(cacheKey), size.cx);
+    textWidthCache_.emplace(TextWidthCacheKey{font, std::string(text)}, size.cx);
     return size.cx;
 }
 
@@ -1821,6 +1817,7 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
 }
 
 void DashboardRenderer::Shutdown() {
+    InvalidateMetricSourceCache();
     DestroyFonts();
     fontHeights_ = {};
     resolvedLayout_ = {};
@@ -1835,6 +1832,22 @@ void DashboardRenderer::Shutdown() {
     ClearGdiCaches();
     ReleasePanelIcons();
     ShutdownGdiplus();
+}
+
+const DashboardMetricSource& DashboardRenderer::ResolveMetrics(const SystemSnapshot& snapshot) {
+    if (cachedMetricSource_ == nullptr || cachedMetricSnapshot_ != &snapshot ||
+        cachedMetricSnapshotRevision_ != snapshot.revision) {
+        cachedMetricSource_ = std::make_unique<DashboardMetricSource>(snapshot, config_.metricScales);
+        cachedMetricSnapshot_ = &snapshot;
+        cachedMetricSnapshotRevision_ = snapshot.revision;
+    }
+    return *cachedMetricSource_;
+}
+
+void DashboardRenderer::InvalidateMetricSourceCache() {
+    cachedMetricSource_.reset();
+    cachedMetricSnapshot_ = nullptr;
+    cachedMetricSnapshotRevision_ = 0;
 }
 
 bool DashboardRenderer::InitializeGdiplus() {
@@ -1914,7 +1927,7 @@ void DashboardRenderer::DestroyFonts() {
     textMeasureCache_.clear();
 }
 
-HBRUSH DashboardRenderer::SolidBrush(COLORREF color) {
+HBRUSH DashboardRenderer::SolidBrush(COLORREF color) const {
     if (const auto it = solidBrushCache_.find(color); it != solidBrushCache_.end()) {
         return it->second;
     }
@@ -1924,7 +1937,7 @@ HBRUSH DashboardRenderer::SolidBrush(COLORREF color) {
     return brush;
 }
 
-HPEN DashboardRenderer::SolidPen(COLORREF color, int width) {
+HPEN DashboardRenderer::SolidPen(COLORREF color, int width) const {
     const PenCacheKey key{color, std::max(1, width)};
     if (const auto it = solidPenCache_.find(key); it != solidPenCache_.end()) {
         return it->second;
@@ -1936,11 +1949,11 @@ HPEN DashboardRenderer::SolidPen(COLORREF color, int width) {
 }
 
 const std::wstring& DashboardRenderer::GetWideText(std::string_view text) const {
-    const std::string key(text);
-    if (const auto it = wideTextCache_.find(key); it != wideTextCache_.end()) {
+    if (const auto it = wideTextCache_.find(text); it != wideTextCache_.end()) {
         return it->second;
     }
 
+    std::string key(text);
     return wideTextCache_.emplace(key, WideFromUtf8(key)).first->second;
 }
 

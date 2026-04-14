@@ -190,6 +190,7 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     impl_->UpdateCpu();
     impl_->UpdateGpu();
     GetLocalTime(&impl_->snapshot_.now);
+    ++impl_->snapshot_.revision;
     impl_->trace_.Write("telemetry:initialize_done");
     return true;
 }
@@ -247,6 +248,7 @@ const std::vector<StorageDriveCandidate>& TelemetryCollector::StorageDriveCandid
 void TelemetryCollector::SetPreferredNetworkAdapterName(std::string adapterName) {
     impl_->config_.network.adapterName = std::move(adapterName);
     impl_->ResolveNetworkSelection();
+    ++impl_->snapshot_.revision;
 }
 
 void TelemetryCollector::SetSelectedStorageDrives(std::vector<std::string> driveLetters) {
@@ -264,11 +266,13 @@ void TelemetryCollector::SetSelectedStorageDrives(std::vector<std::string> drive
     std::sort(normalized.begin(), normalized.end());
     impl_->config_.storage.drives = std::move(normalized);
     impl_->ResolveStorageSelection();
+    ++impl_->snapshot_.revision;
 }
 
 void TelemetryCollector::RefreshSelections() {
     impl_->ResolveNetworkSelection();
     impl_->ResolveStorageSelection();
+    ++impl_->snapshot_.revision;
 }
 
 void TelemetryCollector::UpdateSnapshot() {
@@ -279,6 +283,7 @@ void TelemetryCollector::UpdateSnapshot() {
     impl_->CollectStorageMetrics(false);
     impl_->UpdateMemory();
     GetLocalTime(&impl_->snapshot_.now);
+    ++impl_->snapshot_.revision;
     impl_->trace_.Write("telemetry:update_snapshot_done");
 }
 

@@ -7,11 +7,13 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -232,8 +234,8 @@ public:
     TextLayoutResult DrawTextBlock(
         HDC hdc, const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
     void DrawPillBar(HDC hdc, const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
-    HBRUSH SolidBrush(COLORREF color);
-    HPEN SolidPen(COLORREF color, int width = 1);
+    HBRUSH SolidBrush(COLORREF color) const;
+    HPEN SolidPen(COLORREF color, int width = 1) const;
     EditableAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
     void RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
@@ -316,9 +318,68 @@ private:
         }
     };
 
+    struct TransparentStringHash {
+        using is_transparent = void;
+
+        size_t operator()(std::string_view value) const {
+            return std::hash<std::string_view>{}(value);
+        }
+
+        size_t operator()(const std::string& value) const {
+            return (*this)(std::string_view(value));
+        }
+    };
+
+    struct TransparentStringEqual {
+        using is_transparent = void;
+
+        bool operator()(std::string_view left, std::string_view right) const {
+            return left == right;
+        }
+
+        bool operator()(const std::string& left, const std::string& right) const {
+            return left == right;
+        }
+
+        bool operator()(const std::string& left, std::string_view right) const {
+            return std::string_view(left) == right;
+        }
+
+        bool operator()(std::string_view left, const std::string& right) const {
+            return left == std::string_view(right);
+        }
+    };
+
+    struct TextWidthCacheLookupKey {
+        HFONT font = nullptr;
+        std::string_view text;
+    };
+
     struct TextWidthCacheKeyHash {
+        using is_transparent = void;
+
         size_t operator()(const TextWidthCacheKey& key) const {
-            return (std::hash<HFONT>{}(key.font) * 1315423911u) ^ std::hash<std::string>{}(key.text);
+            return (std::hash<HFONT>{}(key.font) * 1315423911u) ^ TransparentStringHash {}(key.text);
+        }
+
+        size_t operator()(const TextWidthCacheLookupKey& key) const {
+            return (std::hash<HFONT>{}(key.font) * 1315423911u) ^ TransparentStringHash {}(key.text);
+        }
+    };
+
+    struct TextWidthCacheKeyEqual {
+        using is_transparent = void;
+
+        bool operator()(const TextWidthCacheKey& left, const TextWidthCacheKey& right) const {
+            return left.font == right.font && left.text == right.text;
+        }
+
+        bool operator()(const TextWidthCacheKey& left, const TextWidthCacheLookupKey& right) const {
+            return left.font == right.font && std::string_view(left.text) == right.text;
+        }
+
+        bool operator()(const TextWidthCacheLookupKey& left, const TextWidthCacheKey& right) const {
+            return left.font == right.font && left.text == std::string_view(right.text);
         }
     };
 
@@ -335,14 +396,52 @@ private:
         }
     };
 
+    struct TextMeasureCacheLookupKey {
+        HFONT font = nullptr;
+        std::string_view text;
+        UINT format = 0;
+        int width = 0;
+        int height = 0;
+    };
+
     struct TextMeasureCacheKeyHash {
+        using is_transparent = void;
+
         size_t operator()(const TextMeasureCacheKey& key) const {
             size_t hash = std::hash<HFONT>{}(key.font);
-            hash = (hash * 1315423911u) ^ std::hash<std::string>{}(key.text);
+            hash = (hash * 1315423911u) ^ TransparentStringHash {}(key.text);
             hash = (hash * 1315423911u) ^ std::hash<UINT>{}(key.format);
             hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
             hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
             return hash;
+        }
+
+        size_t operator()(const TextMeasureCacheLookupKey& key) const {
+            size_t hash = std::hash<HFONT>{}(key.font);
+            hash = (hash * 1315423911u) ^ TransparentStringHash {}(key.text);
+            hash = (hash * 1315423911u) ^ std::hash<UINT>{}(key.format);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
+            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
+            return hash;
+        }
+    };
+
+    struct TextMeasureCacheKeyEqual {
+        using is_transparent = void;
+
+        bool operator()(const TextMeasureCacheKey& left, const TextMeasureCacheKey& right) const {
+            return left.font == right.font && left.text == right.text && left.format == right.format &&
+                   left.width == right.width && left.height == right.height;
+        }
+
+        bool operator()(const TextMeasureCacheKey& left, const TextMeasureCacheLookupKey& right) const {
+            return left.font == right.font && std::string_view(left.text) == right.text &&
+                   left.format == right.format && left.width == right.width && left.height == right.height;
+        }
+
+        bool operator()(const TextMeasureCacheLookupKey& left, const TextMeasureCacheKey& right) const {
+            return left.font == right.font && left.text == std::string_view(right.text) &&
+                   left.format == right.format && left.width == right.width && left.height == right.height;
         }
     };
 
@@ -486,6 +585,8 @@ private:
         const TextLayoutResult& layoutResult,
         const EditableAnchorBinding& editable);
     void DrawAlphaCapsule(HDC hdc, const RECT& rect, COLORREF color, BYTE alpha);
+    const DashboardMetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
+    void InvalidateMetricSourceCache();
     void WriteTrace(const std::string& text) const;
 
     AppConfig config_;
@@ -503,14 +604,18 @@ private:
     HDC staticAnchorMeasureHdc_ = nullptr;
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
-    mutable std::unordered_map<std::string, std::wstring> wideTextCache_;
-    mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash> textWidthCache_;
-    mutable std::unordered_map<TextWidthCacheKey, SIZE, TextWidthCacheKeyHash> textExtentCache_;
-    mutable std::unordered_map<TextMeasureCacheKey, SIZE, TextMeasureCacheKeyHash> textMeasureCache_;
-    std::unordered_map<COLORREF, HBRUSH> solidBrushCache_;
-    std::unordered_map<PenCacheKey, HPEN, PenCacheKeyHash> solidPenCache_;
+    mutable std::unordered_map<std::string, std::wstring, TransparentStringHash, TransparentStringEqual> wideTextCache_;
+    mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textWidthCache_;
+    mutable std::unordered_map<TextWidthCacheKey, SIZE, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textExtentCache_;
+    mutable std::unordered_map<TextMeasureCacheKey, SIZE, TextMeasureCacheKeyHash, TextMeasureCacheKeyEqual>
+        textMeasureCache_;
+    mutable std::unordered_map<COLORREF, HBRUSH> solidBrushCache_;
+    mutable std::unordered_map<PenCacheKey, HPEN, PenCacheKeyHash> solidPenCache_;
     std::unordered_map<AlphaCapsuleCacheKey, AlphaCapsuleBitmap, AlphaCapsuleCacheKeyHash> alphaCapsuleCache_;
     std::unordered_map<PanelIconCacheKey, AlphaCapsuleBitmap, PanelIconCacheKeyHash> scaledPanelIconCache_;
+    std::unique_ptr<DashboardMetricSource> cachedMetricSource_;
+    const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
+    uint64_t cachedMetricSnapshotRevision_ = 0;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

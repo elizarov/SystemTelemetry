@@ -19,29 +19,30 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured result reached during this workstream:
-  - `drag_loop per_iter_ms=4.50`
-  - `snap avg_ms=0.19`
-  - `paint_draw avg_ms=3.78`
-- Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=4.54` to `4.81`
+  - `drag_loop per_iter_ms=4.43`
   - `snap avg_ms=0.20`
-  - `apply avg_ms=0.38` to `0.40`
-  - `paint_draw avg_ms=3.82` to `4.05`
+  - `paint_draw avg_ms=3.73`
+- Current repeatable result on the optimized tree:
+  - `drag_loop per_iter_ms=4.43` to `5.21`
+  - `snap avg_ms=0.19` to `0.21`
+  - `apply avg_ms=0.38` to `0.45`
+  - `paint_draw avg_ms=3.73` to `4.37`
 
 ## Current Confirmed Hotspots
 
 Confirmed inclusive hotspots from the latest useful WPR capture in this workstream:
 
-- `DashboardRenderer::Draw` about `58%`
+- `DashboardRenderer::Draw` about `60%`
 - `ThroughputWidget::Draw` about `18%`
 - ``anonymous namespace'::DrawGraph`` about `18%`
-- `GaugeWidget::Draw` about `13%`
-- Before the latest text-anchor optimization, `DashboardRenderer::RegisterTextAnchor` and `DashboardRenderer::RegisterStaticTextAnchor` were both about `12.5%`; a follow-up coarse WPR text summary after the change still surfaced `DashboardRenderer::Draw`, `ThroughputWidget::Draw`, and `DrawGraph`, but it no longer surfaced those anchor functions near the top benchmark-side rows.
+- `GaugeWidget::Draw` about `14%`
+- `GdiPlus.dll` still accounts for about `21%` of inclusive module hits, while the coarse function table only surfaces minor named leaves such as `DashboardRenderer::DrawPanel` and `DashboardRenderer::DrawAlphaCapsule` beyond the main widget hot path.
 
 Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining wall time is now dominated by real paint work, especially throughput graph drawing and gauge fills, while text-anchor bookkeeping still benefits from staying on the cheapest available path.
+- Fresh rebuilds and profile runs on this machine still show meaningful variance, so treat the best reruns as opportunity signals and the wider range above as the safer working baseline.
 - `DashboardLayoutResolver::ResolveLayout` no longer appears among the top benchmark user-mode functions in the latest useful capture, which matches the large drop in `snap avg_ms`.
 
 ## Kept Optimizations
@@ -54,6 +55,7 @@ These changes produced real wins and remain in the codebase:
 - Build only the one live gauge usage-fill path that the current metric needs instead of prebuilding every cumulative gauge fill path during each relayout.
 - Resolve snap-preview guide probes through an extent-only layout pass that skips widget instantiation, widget layout-state caching, and edit-artifact rebuilds.
 - Reuse draw-time text layout results for dynamic text anchors and measure static text anchors through one shared HDC during static-anchor rebuilds.
+- Reuse one cached `DashboardMetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse smoothed throughput history and formatted metric payloads until telemetry publishes a newer snapshot.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 
 ## Tested Hypotheses
@@ -132,6 +134,54 @@ These changes produced real wins and remain in the codebase:
   - `paint_draw avg_ms` improved from about `4.17-4.57` down to about `3.82-4.05`.
 - Conclusion:
   - Text-anchor bookkeeping still contained measurable repeated text-layout and DC-management overhead, and removing that duplicate work is worth keeping.
+
+### Hypothesis: Reuse resolved widget metrics across unchanged snapshots
+
+- Change:
+  - Keep one renderer-owned `DashboardMetricSource` alive across draw calls and invalidate it only when the incoming `SystemSnapshot` revision changes, instead of rebuilding throughput smoothing and per-widget metric caches on every drag repaint.
+- Result:
+  - Helped modestly.
+- Observed effect:
+  - `drag_loop per_iter_ms` improved from about `4.54-4.56` down to about `4.44-4.46` on `480`-iteration reruns.
+  - `paint_draw avg_ms` improved from about `3.82-3.84` down to about `3.73-3.76`.
+- Conclusion:
+  - Drag repaints often reuse the same telemetry snapshot, so keeping the resolved metric cache alive until telemetry publishes a newer snapshot revision removes real paint-path churn and is worth keeping.
+
+### Hypothesis: Remove temporary text-cache key construction in renderer text lookups
+
+- Change:
+  - Use heterogenous cache lookup keys for cached wide-text, text-width, and text-layout queries so draw-time cache hits avoid constructing owned temporary string keys first.
+- Result:
+  - Neutral or too small to credit separately, but safe to keep.
+- Observed effect:
+  - Current reruns with this cleanup in place stay inside about `drag_loop per_iter_ms=4.45-4.59` and `paint_draw avg_ms=3.75-3.88`, which does not move clearly beyond the renderer-metric-cache win on its own.
+- Conclusion:
+  - The text-cache key churn is real overhead, but this specific cleanup does not move the full drag benchmark enough to treat it as an independent win.
+
+### Hypothesis: Reuse cached overlay pens for layout-edit guide and highlight draws
+
+- Change:
+  - Route hovered-widget outlines, layout-edit guides, widget-edit guides, and similarity-indicator strokes through the renderer's existing solid-pen cache instead of creating and deleting short-lived GDI pens every frame.
+- Result:
+  - Neutral or too small to credit separately, but safe to keep.
+- Observed effect:
+  - Post-change reruns stayed in the same `drag_loop per_iter_ms=4.45-4.59` and `paint_draw avg_ms=3.75-3.88` band.
+- Conclusion:
+  - Short-lived overlay pen churn is not a dominant limiter after the larger draw-path fixes, so this cleanup is acceptable to keep but is not a major benchmark lever by itself.
+
+### Hypothesis: Pre-resolve throughput and gauge display payloads inside `DashboardMetricSource`
+
+- Change:
+  - Preformat throughput and gauge value strings, pre-normalize throughput history, and precompute throughput guide ratios and marker offsets inside the cached metric source so draw no longer performs that preparation work per frame.
+- Result:
+  - Regressed and was reverted.
+- Observed effect:
+  - `drag_loop per_iter_ms` rose to about `5.13` on `480`-iteration reruns and about `5.83` on `240`-iteration reruns.
+  - `paint_draw avg_ms` rose to about `4.31` to `4.91`.
+- Why it failed:
+  - The larger cached payloads and extra per-metric allocations outweighed the saved per-frame formatting and normalization work.
+- Conclusion:
+  - Keep the cached metric payloads compact; not every per-snapshot prebake helps the hot draw path.
 
 ### Hypothesis: Replace throughput `Polyline` with incremental `MoveToEx` and `LineTo`
 
@@ -240,9 +290,24 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - A software gauge path is not promising unless it can draw directly into the renderer-owned frame buffer without the extra per-widget raster-and-blit cost.
 
+### Hypothesis: Replace gauge combined-path fills with GDI+ stroked arc segments
+
+- Change:
+  - Draw the gauge track, usage, and peak ghost with thick `Gdiplus::Graphics::DrawArc` strokes that use flat caps instead of filling combined annular segment paths.
+- Result:
+  - Regressed catastrophically and was reverted.
+- Observed effect:
+  - `drag_loop per_iter_ms` rose to about `11.62` on `240` iterations and about `9.92` on `480` iterations.
+  - `paint_draw avg_ms` rose to about `10.73` on `240` iterations and about `9.13` on `480` iterations.
+- Why it failed:
+  - GDI+ stroked arcs are much slower than the existing combined fill-path gauge draw in this workload.
+- Conclusion:
+  - Do not retry stroked-arc gauge segments as a substitute for the current combined fill-path gauge rendering.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.
+- Do not retry GDI+ stroked-arc gauge segments in place of the current combined fill paths.
 - Do not retry throughput `MoveToEx` and `LineTo` in place of `Polyline` for the current graph shape.
 - Be skeptical of caches tied to graph or gauge size during drag; size changes every frame and cache maintenance can outweigh the saved draw work.
 - Prioritize experiments that reduce primitive count or switch to a cheaper primitive family while preserving the same pixels.

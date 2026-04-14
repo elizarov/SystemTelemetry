@@ -91,6 +91,7 @@ Examples include:
 - In a vertical `rows(...)` container, any resolved fixed-height direct child must keep its preferred configured height and any remaining height reduction must be absorbed by flexible non-spring siblings such as throughput plots when no `vertical_spring` is present.
 - The shipped `vertical_spacer(network_footer)` layout pattern must reserve the same fixed preferred height as `network_footer` while drawing nothing.
 - The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
+- Each published telemetry snapshot must advance a snapshot revision when its rendered content changes so renderer-side metric caches can be reused only across unchanged snapshots.
 - Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the fill bar and peak ghost stay aligned.
 - The renderer must support a blank rendering mode that preserves panel chrome, card titles, card icons, CPU and GPU names, drive labels, and empty chart or bar tracks while omitting dynamic metric text, time, date, plot lines, chart leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 

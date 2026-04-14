@@ -230,7 +230,7 @@ void GaugeWidget::Draw(DashboardRenderer& renderer,
     HDC hdc,
     const DashboardWidgetLayout& widget,
     const DashboardMetricSource& metrics) const {
-    const DashboardGaugeMetric metric = metrics.ResolveGauge(metric_);
+    const DashboardGaugeMetric& metric = metrics.ResolveGauge(metric_);
     const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
     const double clampedPercent = std::clamp(metric.percent, 0.0, 100.0);
     const int filledSegments =
