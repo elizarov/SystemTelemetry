@@ -98,6 +98,8 @@ try {
 
             try {
                 Write-Host "[daemon] Running request $($requestDir.Name) iterations=$iterations scale=$renderScale"
+                $previousForceBuild = $env:PROFILE_BENCHMARK_FORCE_BUILD
+                $env:PROFILE_BENCHMARK_FORCE_BUILD = "1"
                 & $profileScript $iterations $renderScale /run-request $requestDir.FullName
                 $exitCode = $LASTEXITCODE
                 $lines = @(
@@ -113,6 +115,11 @@ try {
                 Set-Content -LiteralPath $errorFile -Value $_.Exception.Message -Encoding utf8
                 Write-Host "[daemon] Request $($requestDir.Name) failed: $($_.Exception.Message)"
             } finally {
+                if ($null -eq $previousForceBuild) {
+                    Remove-Item Env:PROFILE_BENCHMARK_FORCE_BUILD -ErrorAction SilentlyContinue
+                } else {
+                    $env:PROFILE_BENCHMARK_FORCE_BUILD = $previousForceBuild
+                }
                 Remove-Item -LiteralPath $lockFile -Force -ErrorAction SilentlyContinue
             }
         }

@@ -242,6 +242,7 @@ set "WPR_EXE=%SystemRoot%\System32\wpr.exe"
 set "XPERF_EXE=C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\xperf.exe"
 set "BENCHMARK_EXE=%REPO_ROOT%\build\SystemTelemetryBenchmarks.exe"
 set "BENCHMARK_PDB_DIR=%REPO_ROOT%\build\cmake\CMakeFiles\SystemTelemetryBenchmarks.dir\Release"
+set "FORCE_BUILD=%PROFILE_BENCHMARK_FORCE_BUILD%"
 
 if not exist "%WPR_EXE%" (
     echo Windows Performance Recorder was not found at "%WPR_EXE%".
@@ -260,7 +261,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "%BENCHMARK_EXE%" (
+if /i "%FORCE_BUILD%"=="1" (
+    echo Building Release benchmark binaries before profiling...
+    call "%REPO_ROOT%\build.cmd" Release
+    if errorlevel 1 exit /b %errorlevel%
+) else if not exist "%BENCHMARK_EXE%" (
     call "%REPO_ROOT%\build.cmd" Release
     if errorlevel 1 exit /b %errorlevel%
 )
