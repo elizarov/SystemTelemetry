@@ -370,18 +370,36 @@ void PreviewLayoutEditWeightsDialog(LayoutEditWeightsDialogState* state, HWND hw
     }
 }
 
-void PreviewLayoutEditFontDialog(LayoutEditFontDialogState* state, HWND hwnd) {
+std::wstring ReadFontDialogFaceText(HWND hwnd, UINT notificationCode) {
+    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
+    if (combo == nullptr) {
+        return {};
+    }
+
+    if (notificationCode == CBN_SELCHANGE) {
+        const LRESULT selection = SendMessageW(combo, CB_GETCURSEL, 0, 0);
+        if (selection != CB_ERR) {
+            wchar_t selectedFace[256] = {};
+            SendMessageW(combo, CB_GETLBTEXT, static_cast<WPARAM>(selection), reinterpret_cast<LPARAM>(selectedFace));
+            return selectedFace;
+        }
+    }
+
+    wchar_t faceBuffer[256] = {};
+    GetWindowTextW(combo, faceBuffer, ARRAYSIZE(faceBuffer));
+    return faceBuffer;
+}
+
+void PreviewLayoutEditFontDialog(LayoutEditFontDialogState* state, HWND hwnd, UINT notificationCode = 0) {
     if (state == nullptr || !state->preview) {
         return;
     }
 
-    wchar_t faceBuffer[256] = {};
     wchar_t sizeBuffer[64] = {};
     wchar_t weightBuffer[64] = {};
-    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, faceBuffer, ARRAYSIZE(faceBuffer));
     GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, sizeBuffer, ARRAYSIZE(sizeBuffer));
     GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, weightBuffer, ARRAYSIZE(weightBuffer));
-    const std::wstring faceText(faceBuffer);
+    const std::wstring faceText = ReadFontDialogFaceText(hwnd, notificationCode);
     const std::optional<int> size = TryParseDialogInteger(sizeBuffer);
     const std::optional<int> weight = TryParseDialogInteger(weightBuffer);
     if (faceText.empty() || !size.has_value() || *size < 1 || !weight.has_value()) {
@@ -571,7 +589,7 @@ INT_PTR CALLBACK LayoutEditFontDialogProc(HWND hwnd, UINT message, WPARAM wParam
                 ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_SIZE_EDIT ||
                      LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT) &&
                     HIWORD(wParam) == EN_CHANGE)) {
-                PreviewLayoutEditFontDialog(state, hwnd);
+                PreviewLayoutEditFontDialog(state, hwnd, HIWORD(wParam));
                 return TRUE;
             }
             switch (LOWORD(wParam)) {
