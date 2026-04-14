@@ -13,7 +13,7 @@ namespace {
 constexpr UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
 constexpr UINT kLayoutEditTooltipFlags = TTF_SUBCLASS | TTF_TRANSPARENT;
 
-RECT RectFromPoint(POINT point, int radius) {
+RECT RectFromPoint(RenderPoint point, int radius) {
     return RECT{point.x - radius, point.y - radius, point.x + radius + 1, point.y + radius + 1};
 }
 
@@ -190,6 +190,9 @@ DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
     controller_.State().config = config;
     renderer_.SetConfig(config);
+    if (hwnd_ != nullptr) {
+        RebuildOverlayFonts();
+    }
     rendererEditOverlayState_.showLayoutEditGuides =
         controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
     rendererEditOverlayState_.similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions_);
@@ -369,11 +372,22 @@ bool DashboardApp::InitializeFonts() {
     renderer_.SetConfig(controller_.State().config);
     renderer_.SetTraceOutput(
         controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
-    return renderer_.Initialize(hwnd_);
+    if (!renderer_.Initialize(hwnd_)) {
+        return false;
+    }
+    return RebuildOverlayFonts();
 }
 
 void DashboardApp::ReleaseFonts() {
     renderer_.Shutdown();
+    if (overlayLabelFont_ != nullptr) {
+        DeleteObject(overlayLabelFont_);
+        overlayLabelFont_ = nullptr;
+    }
+    if (overlaySmallFont_ != nullptr) {
+        DeleteObject(overlaySmallFont_);
+        overlaySmallFont_ = nullptr;
+    }
 }
 
 COLORREF DashboardApp::BackgroundColor() const {
@@ -390,6 +404,33 @@ COLORREF DashboardApp::AccentColor() const {
 
 COLORREF DashboardApp::MutedTextColor() const {
     return ToColorRef(controller_.State().config.layout.colors.mutedTextColor);
+}
+
+HFONT DashboardApp::OverlayLabelFont() const {
+    return overlayLabelFont_;
+}
+
+HFONT DashboardApp::OverlaySmallFont() const {
+    return overlaySmallFont_;
+}
+
+bool DashboardApp::RebuildOverlayFonts() {
+    if (overlayLabelFont_ != nullptr) {
+        DeleteObject(overlayLabelFont_);
+        overlayLabelFont_ = nullptr;
+    }
+    if (overlaySmallFont_ != nullptr) {
+        DeleteObject(overlaySmallFont_);
+        overlaySmallFont_ = nullptr;
+    }
+
+    UiFontConfig labelFont = controller_.State().config.layout.fonts.label;
+    UiFontConfig smallFont = controller_.State().config.layout.fonts.smallText;
+    labelFont.size = renderer_.ScaleLogical(labelFont.size);
+    smallFont.size = renderer_.ScaleLogical(smallFont.size);
+    overlayLabelFont_ = CreateUiFont(labelFont);
+    overlaySmallFont_ = CreateUiFont(smallFont);
+    return overlayLabelFont_ != nullptr && overlaySmallFont_ != nullptr;
 }
 
 HICON DashboardApp::LoadAppIcon(int width, int height) {
@@ -526,8 +567,8 @@ void DashboardApp::UpdateMoveTracking() {
     HDC hdc = GetDC(hwnd_);
     int cursorOffset = ScaleLogicalToPhysical(24, CurrentWindowDpi());
     if (hdc != nullptr) {
-        cursorOffset = std::max(cursorOffset,
-            MeasureFontHeight(hdc, renderer_.SmallFont()) + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
+        cursorOffset = std::max(
+            cursorOffset, MeasureFontHeight(hdc, OverlaySmallFont()) + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
         ReleaseDC(hwnd_, hdc);
     }
 
@@ -892,7 +933,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     std::optional<LayoutEditTooltipDescriptor> descriptor;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
-    POINT clientPoint = target->clientPoint;
+    RenderPoint clientPoint = target->clientPoint;
     if (target->kind == LayoutEditController::TooltipTarget::Kind::LayoutGuide) {
         layoutEditTooltipText_ = BuildLayoutGuideTooltipText(controller_.State().config, target->layoutGuide);
         if (clientPoint.x == 0 && clientPoint.y == 0) {
@@ -1035,21 +1076,21 @@ void DashboardApp::DrawMoveOverlay(HDC hdc) {
     const std::string monitorText = "Monitor: " + movePlacementInfo_.monitorName;
     const std::string hintText = "Left-click to place. Copy monitor name, scale, and x/y into config.";
 
-    const int titleHeight = MeasureFontHeight(hdc, renderer_.LabelFont());
-    const int bodyHeight = MeasureFontHeight(hdc, renderer_.SmallFont());
+    const int titleHeight = MeasureFontHeight(hdc, OverlayLabelFont());
+    const int bodyHeight = MeasureFontHeight(hdc, OverlaySmallFont());
     const int minContentWidth = ScaleLogicalToPhysical(220, CurrentWindowDpi());
     const int maxContentWidth = std::max(minContentWidth, WindowWidth() - margin * 2 - padding * 2);
     int preferredContentWidth = minContentWidth;
     preferredContentWidth =
-        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, renderer_.LabelFont(), titleText).cx));
+        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, OverlayLabelFont(), titleText).cx));
     preferredContentWidth =
-        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, renderer_.SmallFont(), monitorText).cx));
+        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, OverlaySmallFont(), monitorText).cx));
     preferredContentWidth =
-        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, renderer_.SmallFont(), positionText).cx));
+        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, OverlaySmallFont(), positionText).cx));
     preferredContentWidth =
-        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, renderer_.SmallFont(), scaleText).cx));
+        std::max(preferredContentWidth, static_cast<int>(MeasureTextSize(hdc, OverlaySmallFont(), scaleText).cx));
     const int contentWidth = std::min(maxContentWidth, preferredContentWidth);
-    const int hintHeight = MeasureWrappedTextHeight(hdc, renderer_.SmallFont(), hintText, contentWidth);
+    const int hintHeight = MeasureWrappedTextHeight(hdc, OverlaySmallFont(), hintText, contentWidth);
     const int overlayWidth = contentWidth + padding * 2;
     const int overlayHeight = padding * 2 + titleHeight + lineGap + bodyHeight + lineGap + bodyHeight + lineGap +
                               bodyHeight + lineGap + hintHeight;
@@ -1076,24 +1117,19 @@ void DashboardApp::DrawMoveOverlay(HDC hdc) {
     y = scaleRect.bottom + lineGap;
     RECT hintRect{overlay.left + padding, y, overlay.right - padding, overlay.bottom - padding};
 
-    DrawTextBlock(
-        hdc, titleRect, titleText, renderer_.LabelFont(), AccentColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(hdc, titleRect, titleText, OverlayLabelFont(), AccentColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     DrawTextBlock(hdc,
         monitorRect,
         monitorText,
-        renderer_.SmallFont(),
+        OverlaySmallFont(),
         ForegroundColor(),
         DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
-    DrawTextBlock(hdc,
-        positionRect,
-        positionText,
-        renderer_.SmallFont(),
-        ForegroundColor(),
-        DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     DrawTextBlock(
-        hdc, scaleRect, scaleText, renderer_.SmallFont(), ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        hdc, positionRect, positionText, OverlaySmallFont(), ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     DrawTextBlock(
-        hdc, hintRect, hintText, renderer_.SmallFont(), MutedTextColor(), DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
+        hdc, scaleRect, scaleText, OverlaySmallFont(), ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    DrawTextBlock(
+        hdc, hintRect, hintText, OverlaySmallFont(), MutedTextColor(), DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS);
 }
 
 int DashboardApp::Run() {
@@ -1170,7 +1206,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         }
         case WM_LBUTTONDOWN:
             if (state.isEditingLayout) {
-                POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 if (layoutEditController_.HandleLButtonDown(hwnd_, clientPoint)) {
                     UpdateLayoutEditTooltip();
                     return 0;
@@ -1180,7 +1216,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_MOUSEMOVE:
             if (state.isEditingLayout) {
                 UpdateLayoutEditMouseTracking();
-                POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 layoutEditController_.HandleMouseMove(clientPoint);
                 UpdateLayoutEditTooltip();
                 return 0;
@@ -1191,11 +1227,12 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (state.isEditingLayout) {
                 POINT screenPoint{};
                 if (GetCursorPos(&screenPoint)) {
-                    POINT clientPoint = screenPoint;
-                    ScreenToClient(hwnd_, &clientPoint);
+                    POINT clientPointWin32 = screenPoint;
+                    ScreenToClient(hwnd_, &clientPointWin32);
                     RECT clientRect{};
                     GetClientRect(hwnd_, &clientRect);
-                    if (PtInRect(&clientRect, clientPoint)) {
+                    if (PtInRect(&clientRect, clientPointWin32)) {
+                        const RenderPoint clientPoint{clientPointWin32.x, clientPointWin32.y};
                         UpdateLayoutEditMouseTracking();
                         layoutEditController_.HandleMouseMove(clientPoint);
                         UpdateLayoutEditTooltip();
@@ -1209,7 +1246,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             break;
         case WM_LBUTTONUP:
             if (state.isEditingLayout) {
-                POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 if (layoutEditController_.HandleLButtonUp(clientPoint)) {
                     UpdateLayoutEditTooltip();
                     return 0;

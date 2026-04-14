@@ -13,7 +13,7 @@ bool ContainsCardReference(const std::vector<std::string>& stack, const std::str
     return std::find(stack.begin(), stack.end(), cardId) != stack.end();
 }
 
-std::string FormatRect(const RECT& rect) {
+std::string FormatRect(const RenderRect& rect) {
     return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," + std::to_string(rect.right) +
            "," + std::to_string(rect.bottom) + ")";
 }
@@ -22,7 +22,7 @@ std::string FormatRect(const RECT& rect) {
 
 void DashboardLayoutResolver::ResolveNodeWidgets(DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
-    const RECT& rect,
+    const RenderRect& rect,
     std::vector<DashboardWidgetLayout>& widgets,
     bool instantiateWidgets) {
     std::vector<std::string> cardReferenceStack;
@@ -46,8 +46,8 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
         if (!card.title.empty()) {
             renderer.RegisterStaticTextAnchor(card.titleRect,
                 card.title,
-                renderer.WidgetFonts().title,
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+                TextStyleId::Title,
+                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
                 DashboardRenderer::EditableAnchorBinding{
                     DashboardRenderer::EditableAnchorKey{
                         DashboardRenderer::LayoutWidgetIdentity{card.id, card.id, {}},
@@ -70,8 +70,8 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
 
 void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
-    const RECT& rect,
-    const std::vector<RECT>& childRects,
+    const RenderRect& rect,
+    const std::vector<RenderRect>& childRects,
     int gap,
     const std::string& renderCardId,
     const std::string& editCardId,
@@ -81,7 +81,7 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     }
 
     const bool horizontal = node.name == "columns";
-    const int hitInset = std::max(3, renderer.ScaleLogical(4));
+    const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     std::vector<bool> childFixedExtents;
     childFixedExtents.reserve(node.children.size());
     for (const auto& child : node.children) {
@@ -105,19 +105,19 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
         guide.childExtents.reserve(childRects.size());
         guide.childFixedExtents = childFixedExtents;
         guide.childRects = childRects;
-        for (const RECT& childRect : childRects) {
+        for (const RenderRect& childRect : childRects) {
             guide.childExtents.push_back(
                 horizontal ? (childRect.right - childRect.left) : (childRect.bottom - childRect.top));
         }
 
         if (horizontal) {
-            const int x = childRects[i].right + std::max(0, gap / 2);
-            guide.lineRect = RECT{x, rect.top, x + 1, rect.bottom};
-            guide.hitRect = RECT{x - hitInset, rect.top, x + hitInset + 1, rect.bottom};
+            const int x = childRects[i].right + (std::max)(0, gap / 2);
+            guide.lineRect = RenderRect{x, rect.top, x + 1, rect.bottom};
+            guide.hitRect = RenderRect{x - hitInset, rect.top, x + hitInset + 1, rect.bottom};
         } else {
-            const int y = childRects[i].bottom + std::max(0, gap / 2);
-            guide.lineRect = RECT{rect.left, y, rect.right, y + 1};
-            guide.hitRect = RECT{rect.left, y - hitInset, rect.right, y + hitInset + 1};
+            const int y = childRects[i].bottom + (std::max)(0, gap / 2);
+            guide.lineRect = RenderRect{rect.left, y, rect.right, y + 1};
+            guide.hitRect = RenderRect{rect.left, y - hitInset, rect.right, y + hitInset + 1};
         }
         renderer.layoutEditGuides_.push_back(std::move(guide));
     }
@@ -125,7 +125,7 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
 
 void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
-    const RECT& rect,
+    const RenderRect& rect,
     std::vector<DashboardWidgetLayout>& widgets,
     std::vector<std::string>& cardReferenceStack,
     const std::string& renderCardId,
@@ -177,7 +177,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
                                : renderer.ScaleLogical(renderer.config_.layout.cardStyle.widgetLineGap);
 
     const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
-                               gap * static_cast<int>(std::max<size_t>(0, node.children.size() - 1));
+                               gap * static_cast<int>((std::max)(static_cast<size_t>(0), node.children.size() - 1));
     int reservedPreferred = 0;
     int totalWeight = 0;
     int springWeight = 0;
@@ -190,31 +190,30 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         for (const auto& child : node.children) {
             const DashboardRenderer::ParsedWidgetInfo* childWidget = renderer.FindParsedWidgetInfo(child);
             if (childWidget != nullptr && childWidget->verticalSpring) {
-                springWeight += std::max(1, child.weight);
+                springWeight += (std::max)(1, child.weight);
                 continue;
             }
             if (childWidget != nullptr && childWidget->fixedPreferredHeightInRows) {
-                reservedPreferred += std::max(0, childWidget->preferredHeight);
+                reservedPreferred += (std::max)(0, childWidget->preferredHeight);
             } else if (rowsUseSprings) {
-                reservedPreferred +=
-                    std::max(0, renderer.PreferredNodeHeight(child, static_cast<int>(rect.right - rect.left)));
+                reservedPreferred += (std::max)(0, renderer.PreferredNodeHeight(child, rect.right - rect.left));
             } else {
-                totalWeight += std::max(1, child.weight);
+                totalWeight += (std::max)(1, child.weight);
             }
         }
     } else {
         for (const auto& child : node.children) {
-            totalWeight += std::max(1, child.weight);
+            totalWeight += (std::max)(1, child.weight);
         }
     }
-    const int distributableAvailable = horizontal ? totalAvailable : std::max(0, totalAvailable - reservedPreferred);
+    const int distributableAvailable = horizontal ? totalAvailable : (std::max)(0, totalAvailable - reservedPreferred);
     if (horizontal && totalWeight <= 0) {
         return;
     }
 
     int remainingDistributable = distributableAvailable;
     int cursor = horizontal ? rect.left : rect.top;
-    std::vector<RECT> childRects;
+    std::vector<RenderRect> childRects;
     childRects.reserve(node.children.size());
     for (size_t i = 0; i < node.children.size(); ++i) {
         const auto& child = node.children[i];
@@ -222,28 +221,29 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         const bool fixedPreferred = !horizontal && childWidget != nullptr && childWidget->fixedPreferredHeightInRows;
         const bool verticalSpring = !horizontal && childWidget != nullptr && childWidget->verticalSpring;
         const bool preferredPacked = !horizontal && rowsUseSprings && !verticalSpring;
-        const int childWeight = (fixedPreferred || preferredPacked) ? 0 : std::max(1, child.weight);
-        const int remainingWeight = std::max(1, totalWeight);
+        const int childWeight = (fixedPreferred || preferredPacked) ? 0 : (std::max)(1, child.weight);
+        const int remainingWeight = (std::max)(1, totalWeight);
         int size = 0;
         if (fixedPreferred) {
-            size = std::max(0, childWidget->preferredHeight);
+            size = (std::max)(0, childWidget->preferredHeight);
         } else if (preferredPacked) {
-            size = std::max(0, renderer.PreferredNodeHeight(child, static_cast<int>(rect.right - rect.left)));
+            size = (std::max)(0, renderer.PreferredNodeHeight(child, rect.right - rect.left));
         } else if (verticalSpring) {
             if (i + 1 == node.children.size()) {
                 size = remainingDistributable;
             } else {
-                size = std::max(0, remainingDistributable * std::max(1, child.weight) / std::max(1, springWeight));
+                size =
+                    (std::max)(0, remainingDistributable * (std::max)(1, child.weight) / (std::max)(1, springWeight));
             }
         } else if (i + 1 == node.children.size()) {
             size = (horizontal ? rect.right : rect.bottom) - cursor;
         } else {
-            size = std::max(0, remainingDistributable * childWeight / remainingWeight);
+            size = (std::max)(0, remainingDistributable * childWeight / remainingWeight);
         }
-        const int remainingExtent = std::max(0, static_cast<int>((horizontal ? rect.right : rect.bottom) - cursor));
-        size = std::min(std::max(0, size), remainingExtent);
+        const int remainingExtent = (std::max)(0, (horizontal ? rect.right : rect.bottom) - cursor);
+        size = (std::min)((std::max)(0, size), remainingExtent);
 
-        RECT childRect = rect;
+        RenderRect childRect = rect;
         if (horizontal) {
             childRect.left = cursor;
             childRect.right = cursor + size;
@@ -270,7 +270,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         cursor += size + gap;
         if (verticalSpring) {
             remainingDistributable -= size;
-            springWeight -= std::max(1, child.weight);
+            springWeight -= (std::max)(1, child.weight);
         } else if (!fixedPreferred && !preferredPacked) {
             remainingDistributable -= size;
             totalWeight -= childWeight;
@@ -291,7 +291,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     renderer.resolvedLayout_.windowWidth = renderer.WindowWidth();
     renderer.resolvedLayout_.windowHeight = renderer.WindowHeight();
 
-    const RECT dashboardRect{renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin),
+    const RenderRect dashboardRect{renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin),
         renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin),
         renderer.WindowWidth() - renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin),
         renderer.WindowHeight() - renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin)};
@@ -305,7 +305,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
                         std::to_string(renderer.resolvedLayout_.windowHeight) + " " + FormatRect(dashboardRect) +
                         " cards_root=\"" + renderer.config_.layout.structure.cardsLayout.name + "\"");
 
-    const auto resolveCard = [&](const LayoutNodeConfig& node, const RECT& rect) {
+    const auto resolveCard = [&](const LayoutNodeConfig& node, const RenderRect& rect) {
         const auto cardIt = std::find_if(renderer.config_.layout.cards.begin(),
             renderer.config_.layout.cards.end(),
             [&](const auto& card) { return card.id == node.name; });
@@ -324,21 +324,21 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         const int iconSize = renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerIconSize);
         const int headerHeight = card.hasHeader ? renderer.EffectiveHeaderHeight() : 0;
         if (!card.iconName.empty()) {
-            card.iconRect = RECT{card.rect.left + padding,
+            card.iconRect = RenderRect{card.rect.left + padding,
                 card.rect.top + padding + (std::max)(0, (headerHeight - iconSize) / 2),
                 card.rect.left + padding + iconSize,
                 card.rect.top + padding + (std::max)(0, (headerHeight - iconSize) / 2) + iconSize};
         } else {
-            card.iconRect = RECT{
+            card.iconRect = RenderRect{
                 card.rect.left + padding, card.rect.top + padding, card.rect.left + padding, card.rect.top + padding};
         }
         const int titleLeft =
             !card.iconName.empty()
                 ? card.iconRect.right + renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerGap)
                 : card.rect.left + padding;
-        card.titleRect =
-            RECT{titleLeft, card.rect.top + padding, card.rect.right - padding, card.rect.top + padding + headerHeight};
-        card.contentRect = RECT{card.rect.left + padding,
+        card.titleRect = RenderRect{
+            titleLeft, card.rect.top + padding, card.rect.right - padding, card.rect.top + padding + headerHeight};
+        card.contentRect = RenderRect{card.rect.left + padding,
             card.rect.top + padding + headerHeight +
                 renderer.ScaleLogical(renderer.config_.layout.cardStyle.contentGap),
             card.rect.right - padding,
@@ -360,8 +360,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         renderer.resolvedLayout_.cards.push_back(std::move(card));
     };
 
-    std::function<void(const LayoutNodeConfig&, const RECT&, const std::vector<size_t>&)> resolveDashboardNode =
-        [&](const LayoutNodeConfig& node, const RECT& rect, const std::vector<size_t>& nodePath) {
+    std::function<void(const LayoutNodeConfig&, const RenderRect&, const std::vector<size_t>&)> resolveDashboardNode =
+        [&](const LayoutNodeConfig& node, const RenderRect& rect, const std::vector<size_t>& nodePath) {
             if (!DashboardRenderer::IsContainerNode(node)) {
                 resolveCard(node, rect);
                 return;
@@ -384,7 +384,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             int remainingAvailable = totalAvailable;
             int cursor = horizontal ? rect.left : rect.top;
             int remainingWeight = totalWeight;
-            std::vector<RECT> childRects;
+            std::vector<RenderRect> childRects;
             childRects.reserve(node.children.size());
             for (size_t i = 0; i < node.children.size(); ++i) {
                 const auto& child = node.children[i];
@@ -393,7 +393,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
                                      ? ((horizontal ? rect.right : rect.bottom) - cursor)
                                      : (std::max)(0, remainingAvailable * childWeight / (std::max)(1, remainingWeight));
 
-                RECT childRect = rect;
+                RenderRect childRect = rect;
                 if (horizontal) {
                     childRect.left = cursor;
                     childRect.right = cursor + size;

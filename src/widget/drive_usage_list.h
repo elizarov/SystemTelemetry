@@ -5,12 +5,12 @@
 class DriveUsageListWidget final : public DashboardWidget {
 public:
     struct ColumnRects {
-        RECT label{};
-        RECT read{};
-        RECT write{};
-        RECT bar{};
-        RECT percent{};
-        RECT free{};
+        RenderRect label{};
+        RenderRect read{};
+        RenderRect write{};
+        RenderRect bar{};
+        RenderRect percent{};
+        RenderRect free{};
     };
 
     struct MeasuredColumnWidths {
@@ -38,26 +38,26 @@ public:
         int visibleRows = 0;
         int clampedActivitySegmentGap = 0;
         int lowestSegmentTop = 0;
-        RECT headerRect{};
+        RenderRect headerRect{};
         ColumnRects headerColumns{};
-        RECT usageHeaderRect{};
-        RECT headerReadLabelRect{};
-        RECT headerWriteLabelRect{};
-        RECT activityTargetRect{};
-        RECT activityAnchorRect{};
-        std::vector<RECT> rowBands;
+        RenderRect usageHeaderRect{};
+        RenderRect headerReadLabelRect{};
+        RenderRect headerWriteLabelRect{};
+        RenderRect activityTargetRect{};
+        RenderRect activityAnchorRect{};
+        std::vector<RenderRect> rowBands;
         std::vector<ColumnRects> rowColumns;
-        std::vector<RECT> rowReadIndicatorRects;
-        std::vector<RECT> rowWriteIndicatorRects;
-        std::vector<RECT> rowBarRects;
-        std::vector<RECT> rowBarAnchorRects;
+        std::vector<RenderRect> rowReadIndicatorRects;
+        std::vector<RenderRect> rowWriteIndicatorRects;
+        std::vector<RenderRect> rowBarRects;
+        std::vector<RenderRect> rowBarAnchorRects;
     };
 
     DashboardWidgetClass Class() const override;
     std::unique_ptr<DashboardWidget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const DashboardRenderer& renderer) const override;
-    void ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) override;
+    void ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) override;
     void Draw(DashboardRenderer& renderer,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;

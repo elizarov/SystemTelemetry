@@ -25,7 +25,7 @@ bool DashboardWidget::IsVerticalSpring() const {
     return false;
 }
 
-void DashboardWidget::ResolveLayoutState(const DashboardRenderer&, const RECT&) {}
+void DashboardWidget::ResolveLayoutState(const DashboardRenderer&, const RenderRect&) {}
 
 void DashboardWidget::Draw(DashboardRenderer&, const DashboardWidgetLayout&, const DashboardMetricSource&) const {}
 

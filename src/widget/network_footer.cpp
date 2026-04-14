@@ -14,7 +14,7 @@ std::unique_ptr<DashboardWidget> NetworkFooterWidget::Clone() const {
 void NetworkFooterWidget::Initialize(const LayoutNodeConfig&) {}
 
 int NetworkFooterWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return renderer.FontMetrics().footer +
+    return renderer.TextMetrics().footer +
            (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
 }
 
@@ -24,7 +24,7 @@ bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
 
 void NetworkFooterWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
-    const int y = widget.rect.top + renderer.FontMetrics().footer;
+    const int y = widget.rect.top + renderer.TextMetrics().footer;
 
     DashboardRenderer::WidgetEditGuide guide;
     guide.axis = DashboardRenderer::LayoutGuideAxis::Horizontal;
@@ -32,9 +32,9 @@ void NetworkFooterWidget::BuildEditGuides(DashboardRenderer& renderer, const Das
     guide.parameter = DashboardRenderer::LayoutEditParameter::NetworkFooterBottomGap;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
-    guide.drawStart = POINT{widget.rect.left, y};
-    guide.drawEnd = POINT{widget.rect.right, y};
-    guide.hitRect = RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
+    guide.drawStart = RenderPoint{widget.rect.left, y};
+    guide.drawEnd = RenderPoint{widget.rect.right, y};
+    guide.hitRect = RenderRect{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
     guide.value = renderer.Config().layout.networkFooter.bottomGap;
     guide.dragDirection = -1;
     renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
@@ -49,9 +49,9 @@ void NetworkFooterWidget::Draw(
     const std::string text = metrics.ResolveNetworkFooter();
     const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
-        renderer.WidgetFonts().footer,
+        TextStyleId::Footer,
         renderer.MutedTextColor(),
-        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(
             widget, DashboardRenderer::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size));

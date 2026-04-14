@@ -13,9 +13,8 @@
 #include <string_view>
 #include <vector>
 
-#include <windows.h>
-
 #include "config.h"
+#include "render_types.h"
 
 class DashboardMetricSource;
 class DashboardRenderer;
@@ -45,7 +44,7 @@ public:
     virtual bool UsesFixedPreferredHeightInRows() const;
     virtual bool IsHoverable() const;
     virtual bool IsVerticalSpring() const;
-    virtual void ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect);
+    virtual void ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect);
     virtual void Draw(DashboardRenderer& renderer,
         const struct DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const;
@@ -56,7 +55,7 @@ public:
 };
 
 struct DashboardWidgetLayout {
-    RECT rect{};
+    RenderRect rect{};
     std::string cardId;
     std::string editCardId;
     std::vector<size_t> nodePath;

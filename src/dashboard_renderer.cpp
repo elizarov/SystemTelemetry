@@ -30,16 +30,15 @@
 
 namespace {
 
-COLORREF ToColorRef(unsigned int color) {
-    return RGB((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu);
+RenderColor ToRenderColor(unsigned int color, std::uint8_t alpha = 255) {
+    return RenderColor{static_cast<std::uint8_t>((color >> 16) & 0xFFu),
+        static_cast<std::uint8_t>((color >> 8) & 0xFFu),
+        static_cast<std::uint8_t>(color & 0xFFu),
+        alpha};
 }
 
-D2D1_COLOR_F ToD2DColor(COLORREF color, BYTE alpha = 255) {
-    constexpr float kChannelScale = 1.0f / 255.0f;
-    return D2D1::ColorF(static_cast<float>(GetRValue(color)) * kChannelScale,
-        static_cast<float>(GetGValue(color)) * kChannelScale,
-        static_cast<float>(GetBValue(color)) * kChannelScale,
-        static_cast<float>(alpha) * kChannelScale);
+std::size_t TextStyleSlot(TextStyleId style) {
+    return static_cast<std::size_t>(style);
 }
 
 std::string FormatHresult(HRESULT hr) {
@@ -48,24 +47,28 @@ std::string FormatHresult(HRESULT hr) {
     return buffer;
 }
 
-DWRITE_TEXT_ALIGNMENT DWriteTextAlignment(UINT format) {
-    if ((format & DT_CENTER) != 0) {
-        return DWRITE_TEXT_ALIGNMENT_CENTER;
+DWRITE_TEXT_ALIGNMENT DWriteTextAlignment(const TextLayoutOptions& options) {
+    switch (options.horizontalAlign) {
+        case TextHorizontalAlign::Center:
+            return DWRITE_TEXT_ALIGNMENT_CENTER;
+        case TextHorizontalAlign::Trailing:
+            return DWRITE_TEXT_ALIGNMENT_TRAILING;
+        case TextHorizontalAlign::Leading:
+        default:
+            return DWRITE_TEXT_ALIGNMENT_LEADING;
     }
-    if ((format & DT_RIGHT) != 0) {
-        return DWRITE_TEXT_ALIGNMENT_TRAILING;
-    }
-    return DWRITE_TEXT_ALIGNMENT_LEADING;
 }
 
-DWRITE_PARAGRAPH_ALIGNMENT DWriteParagraphAlignment(UINT format) {
-    if ((format & DT_VCENTER) != 0) {
-        return DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
+DWRITE_PARAGRAPH_ALIGNMENT DWriteParagraphAlignment(const TextLayoutOptions& options) {
+    switch (options.verticalAlign) {
+        case TextVerticalAlign::Center:
+            return DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
+        case TextVerticalAlign::Bottom:
+            return DWRITE_PARAGRAPH_ALIGNMENT_FAR;
+        case TextVerticalAlign::Top:
+        default:
+            return DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
     }
-    if ((format & DT_BOTTOM) != 0) {
-        return DWRITE_PARAGRAPH_ALIGNMENT_FAR;
-    }
-    return DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
 }
 
 std::string FormatWin32Error(DWORD error) {
@@ -132,22 +135,28 @@ UINT GetPanelIconResourceId(const std::string& iconName) {
     return 0;
 }
 
-HFONT CreateUiFont(const UiFontConfig& font) {
-    const std::wstring face = WideFromUtf8(font.face);
-    return CreateFontW(-font.size,
-        0,
-        0,
-        0,
-        font.weight,
-        FALSE,
-        FALSE,
-        FALSE,
-        DEFAULT_CHARSET,
-        OUT_DEFAULT_PRECIS,
-        CLIP_DEFAULT_PRECIS,
-        CLEARTYPE_QUALITY,
-        VARIABLE_PITCH,
-        face.c_str());
+UiFontConfig FontConfigForStyle(const UiFontSetConfig& fonts, TextStyleId style) {
+    switch (style) {
+        case TextStyleId::Title:
+            return fonts.title;
+        case TextStyleId::Big:
+            return fonts.big;
+        case TextStyleId::Value:
+            return fonts.value;
+        case TextStyleId::Label:
+            return fonts.label;
+        case TextStyleId::Text:
+            return fonts.text;
+        case TextStyleId::Small:
+            return fonts.smallText;
+        case TextStyleId::Footer:
+            return fonts.footer;
+        case TextStyleId::ClockTime:
+            return fonts.clockTime;
+        case TextStyleId::ClockDate:
+            return fonts.clockDate;
+    }
+    return fonts.text;
 }
 
 std::unique_ptr<Gdiplus::Bitmap> LoadPngResourceBitmap(UINT resourceId) {
@@ -216,19 +225,10 @@ DashboardRenderer::~DashboardRenderer() {
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
     InvalidateMetricSourceCache();
-    const bool fontsChanged = !FontSetConfigEquals(config_.layout.fonts, config.layout.fonts);
     config_ = config;
-    if (fontsChanged) {
-        DestroyFonts();
-        if (!CreateFonts()) {
-            lastError_ = "renderer:font_create_failed";
-            return;
-        }
-    }
-    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr && fonts_.label != nullptr &&
-        fonts_.text != nullptr && fonts_.smallFont != nullptr && fonts_.footer != nullptr &&
-        fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
-        if (!MeasureFonts() || !ResolveLayout()) {
+    RebuildPalette();
+    if (dwriteFactory_ != nullptr) {
+        if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:reconfigure_failed" : lastError_;
         } else {
             d2dFirstDrawWarmupPending_ = true;
@@ -242,15 +242,8 @@ void DashboardRenderer::SetRenderScale(double scale) {
         return;
     }
     renderScale_ = nextScale;
-    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr && fonts_.label != nullptr &&
-        fonts_.text != nullptr && fonts_.smallFont != nullptr && fonts_.footer != nullptr &&
-        fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
-        DestroyFonts();
-        if (!CreateFonts()) {
-            lastError_ = "renderer:font_create_failed";
-            return;
-        }
-        if (!MeasureFonts() || !ResolveLayout()) {
+    if (dwriteFactory_ != nullptr) {
+        if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:rescale_failed" : lastError_;
         } else {
             d2dFirstDrawWarmupPending_ = true;
@@ -297,12 +290,8 @@ const AppConfig& DashboardRenderer::Config() const {
     return config_;
 }
 
-const DashboardRenderer::FontHeights& DashboardRenderer::FontMetrics() const {
-    return fontHeights_;
-}
-
-const DashboardRenderer::Fonts& DashboardRenderer::WidgetFonts() const {
-    return fonts_;
+const DashboardRenderer::TextStyleMetrics& DashboardRenderer::TextMetrics() const {
+    return textStyleMetrics_;
 }
 
 DashboardRenderer::RenderMode DashboardRenderer::CurrentRenderMode() const {
@@ -313,8 +302,8 @@ bool DashboardRenderer::IsDirect2DActive() const {
     return d2dDrawActive_ && d2dActiveRenderTarget_ != nullptr;
 }
 
-COLORREF DashboardRenderer::TrackColor() const {
-    return ToColorRef(config_.layout.colors.trackColor);
+RenderColor DashboardRenderer::TrackColor() const {
+    return palette_.track;
 }
 
 std::vector<DashboardRenderer::WidgetEditGuide>& DashboardRenderer::WidgetEditGuidesMutable() {
@@ -329,36 +318,40 @@ int DashboardRenderer::WindowHeight() const {
     return std::max(1, ScaleLogical(config_.layout.structure.window.height));
 }
 
-COLORREF DashboardRenderer::BackgroundColor() const {
-    return ToColorRef(config_.layout.colors.backgroundColor);
+RenderColor DashboardRenderer::BackgroundColor() const {
+    return palette_.background;
 }
 
-COLORREF DashboardRenderer::ForegroundColor() const {
-    return ToColorRef(config_.layout.colors.foregroundColor);
+RenderColor DashboardRenderer::ForegroundColor() const {
+    return palette_.foreground;
 }
 
-COLORREF DashboardRenderer::AccentColor() const {
-    return ToColorRef(config_.layout.colors.accentColor);
+RenderColor DashboardRenderer::AccentColor() const {
+    return palette_.accent;
 }
 
-COLORREF DashboardRenderer::LayoutGuideColor() const {
-    return ToColorRef(config_.layout.colors.layoutGuideColor);
+RenderColor DashboardRenderer::LayoutGuideColor() const {
+    return palette_.layoutGuide;
 }
 
-COLORREF DashboardRenderer::ActiveEditColor() const {
-    return ToColorRef(config_.layout.colors.activeEditColor);
+RenderColor DashboardRenderer::ActiveEditColor() const {
+    return palette_.activeEdit;
 }
 
-COLORREF DashboardRenderer::MutedTextColor() const {
-    return ToColorRef(config_.layout.colors.mutedTextColor);
+RenderColor DashboardRenderer::MutedTextColor() const {
+    return palette_.mutedText;
 }
 
-HFONT DashboardRenderer::LabelFont() const {
-    return fonts_.label;
+RenderColor DashboardRenderer::GraphBackgroundColor() const {
+    return palette_.graphBackground;
 }
 
-HFONT DashboardRenderer::SmallFont() const {
-    return fonts_.smallFont;
+RenderColor DashboardRenderer::GraphMarkerColor() const {
+    return palette_.graphMarker;
+}
+
+RenderColor DashboardRenderer::GraphAxisColor() const {
+    return palette_.graphAxis;
 }
 
 void DashboardRenderer::SetTraceOutput(std::ostream* traceOutput) {
@@ -378,7 +371,7 @@ int DashboardRenderer::LayoutSimilarityThreshold() const {
 }
 
 void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node,
-    const RECT& rect,
+    const RenderRect& rect,
     std::vector<DashboardWidgetLayout>& widgets,
     bool instantiateWidgets) {
     DashboardLayoutResolver::ResolveNodeWidgets(*this, node, rect, widgets, instantiateWidgets);
@@ -393,8 +386,8 @@ void DashboardRenderer::BuildStaticEditableAnchors() {
 }
 
 void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
-    const RECT& rect,
-    const std::vector<RECT>& childRects,
+    const RenderRect& rect,
+    const std::vector<RenderRect>& childRects,
     int gap,
     const std::string& renderCardId,
     const std::string& editCardId,
@@ -403,7 +396,7 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
 }
 
 void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
-    const RECT& rect,
+    const RenderRect& rect,
     std::vector<DashboardWidgetLayout>& widgets,
     std::vector<std::string>& cardReferenceStack,
     const std::string& renderCardId,
@@ -419,71 +412,61 @@ bool DashboardRenderer::ResolveLayout(bool includeWidgetState) {
 }
 
 DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
-    const RECT& rect, const std::string& text, HFONT font, UINT format) const {
+    const RenderRect& rect, const std::string& text, TextStyleId style, const TextLayoutOptions& options) const {
     const std::wstring wideText = WideFromUtf8(text);
     if (wideText.empty()) {
         return TextLayoutResult{rect};
     }
-    return MeasureTextBlockD2D(rect, wideText, font, format, nullptr);
+    return MeasureTextBlockD2D(rect, wideText, style, options, nullptr);
 }
 
-DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(
-    const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) {
+DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(const RenderRect& rect,
+    const std::string& text,
+    TextStyleId style,
+    RenderColor color,
+    const TextLayoutOptions& options) {
     TextLayoutResult result{rect};
     const std::wstring wideText = WideFromUtf8(text);
     if (wideText.empty()) {
         return result;
     }
-    result = MeasureTextBlockD2D(rect, wideText, font, format, nullptr);
-    IDWriteTextFormat* textFormat = DWriteTextFormatForFont(font);
+    result = MeasureTextBlockD2D(rect, wideText, style, options, nullptr);
+    IDWriteTextFormat* textFormat = DWriteTextFormat(style);
     if (textFormat == nullptr) {
         return result;
     }
-    ConfigureDWriteTextFormat(textFormat, format);
+    ConfigureDWriteTextFormat(textFormat, options);
     ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
     if (brush == nullptr) {
         return result;
     }
-    const D2D1_DRAW_TEXT_OPTIONS options =
-        (format & DT_NOCLIP) != 0 ? D2D1_DRAW_TEXT_OPTIONS_NONE : D2D1_DRAW_TEXT_OPTIONS_CLIP;
-    d2dActiveRenderTarget_->DrawText(wideText.c_str(),
-        static_cast<UINT32>(wideText.size()),
-        textFormat,
-        D2D1::RectF(static_cast<float>(rect.left),
-            static_cast<float>(rect.top),
-            static_cast<float>(rect.right),
-            static_cast<float>(rect.bottom)),
-        brush,
-        options);
+    const D2D1_DRAW_TEXT_OPTIONS drawOptions = options.clip ? D2D1_DRAW_TEXT_OPTIONS_CLIP : D2D1_DRAW_TEXT_OPTIONS_NONE;
+    d2dActiveRenderTarget_->DrawText(
+        wideText.c_str(), static_cast<UINT32>(wideText.size()), textFormat, rect.ToD2DRectF(), brush, drawOptions);
     return result;
 }
 
-void DashboardRenderer::DrawText(
-    const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const {
+void DashboardRenderer::DrawText(const RenderRect& rect,
+    const std::string& text,
+    TextStyleId style,
+    RenderColor color,
+    const TextLayoutOptions& options) const {
     const std::wstring wideText = WideFromUtf8(text);
     if (wideText.empty()) {
         return;
     }
-    IDWriteTextFormat* textFormat = DWriteTextFormatForFont(font);
+    IDWriteTextFormat* textFormat = DWriteTextFormat(style);
     if (textFormat == nullptr) {
         return;
     }
-    ConfigureDWriteTextFormat(textFormat, format);
+    ConfigureDWriteTextFormat(textFormat, options);
     ID2D1SolidColorBrush* brush = const_cast<DashboardRenderer*>(this)->D2DSolidBrush(color);
     if (brush == nullptr) {
         return;
     }
-    const D2D1_DRAW_TEXT_OPTIONS options =
-        (format & DT_NOCLIP) != 0 ? D2D1_DRAW_TEXT_OPTIONS_NONE : D2D1_DRAW_TEXT_OPTIONS_CLIP;
-    d2dActiveRenderTarget_->DrawText(wideText.c_str(),
-        static_cast<UINT32>(wideText.size()),
-        textFormat,
-        D2D1::RectF(static_cast<float>(rect.left),
-            static_cast<float>(rect.top),
-            static_cast<float>(rect.right),
-            static_cast<float>(rect.bottom)),
-        brush,
-        options);
+    const D2D1_DRAW_TEXT_OPTIONS drawOptions = options.clip ? D2D1_DRAW_TEXT_OPTIONS_CLIP : D2D1_DRAW_TEXT_OPTIONS_NONE;
+    d2dActiveRenderTarget_->DrawText(
+        wideText.c_str(), static_cast<UINT32>(wideText.size()), textFormat, rect.ToD2DRectF(), brush, drawOptions);
 }
 
 void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const {
@@ -506,7 +489,7 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overl
     if (hoveredWidget == nullptr) {
         return;
     }
-    const_cast<DashboardRenderer*>(this)->DrawSolidRect(hoveredWidget->rect, LayoutGuideColor());
+    const_cast<DashboardRenderer*>(this)->DrawSolidRect(hoveredWidget->rect, RenderStroke::Solid(LayoutGuideColor()));
 }
 
 void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const {
@@ -557,18 +540,17 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         return;
     }
     for (const auto& [highlighted, active] : highlights) {
-        const COLORREF outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
-        if (highlighted.drawTargetOutline && highlighted.targetRect.right > highlighted.targetRect.left &&
-            highlighted.targetRect.bottom > highlighted.targetRect.top) {
-            RECT outlineRect = highlighted.targetRect;
-            InflateRect(&outlineRect, std::max(1, ScaleLogical(1)), std::max(1, ScaleLogical(1)));
+        const RenderColor outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
+        if (highlighted.drawTargetOutline && !highlighted.targetRect.IsEmpty()) {
+            const RenderRect outlineRect =
+                highlighted.targetRect.Inflate(std::max(1, ScaleLogical(1)), std::max(1, ScaleLogical(1)));
             const_cast<DashboardRenderer*>(this)->DrawSolidRect(
-                outlineRect, outlineColor, std::max(1, ScaleLogical(1)), true);
+                outlineRect, RenderStroke::Dotted(outlineColor, static_cast<float>(std::max(1, ScaleLogical(1)))));
         }
 
         if (highlighted.shape == AnchorShape::Circle) {
-            const_cast<DashboardRenderer*>(this)->DrawSolidEllipse(
-                highlighted.anchorRect, outlineColor, std::max(1, ScaleLogical(1)));
+            const_cast<DashboardRenderer*>(this)->DrawSolidEllipse(highlighted.anchorRect,
+                RenderStroke::Solid(outlineColor, static_cast<float>(std::max(1, ScaleLogical(1)))));
         } else {
             const_cast<DashboardRenderer*>(this)->FillSolidDiamond(highlighted.anchorRect, outlineColor);
         }
@@ -583,11 +565,12 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
     for (const auto& guide : layoutEditGuides_) {
         const bool active = overlayState.activeLayoutEditGuide.has_value() &&
                             MatchesLayoutEditGuide(guide, *overlayState.activeLayoutEditGuide);
-        const COLORREF color = active ? ActiveEditColor() : LayoutGuideColor();
-        const POINT start{guide.lineRect.left, guide.lineRect.top};
-        const POINT end = guide.axis == LayoutGuideAxis::Vertical ? POINT{guide.lineRect.left, guide.lineRect.bottom}
-                                                                  : POINT{guide.lineRect.right, guide.lineRect.top};
-        const_cast<DashboardRenderer*>(this)->DrawSolidLine(start, end, color);
+        const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
+        const RenderPoint start{guide.lineRect.left, guide.lineRect.top};
+        const RenderPoint end = guide.axis == LayoutGuideAxis::Vertical
+                                    ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
+                                    : RenderPoint{guide.lineRect.right, guide.lineRect.top};
+        const_cast<DashboardRenderer*>(this)->DrawSolidLine(start, end, RenderStroke::Solid(color));
     }
 }
 
@@ -616,8 +599,8 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
         }
         const bool active = overlayState.activeWidgetEditGuide.has_value() &&
                             MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
-        const COLORREF color = active ? ActiveEditColor() : LayoutGuideColor();
-        const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart, guide.drawEnd, color);
+        const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
+        const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart, guide.drawEnd, RenderStroke::Solid(color));
     }
 }
 
@@ -675,12 +658,12 @@ DashboardRenderer::EditableAnchorBinding DashboardRenderer::MakeEditableTextBind
 
 void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<EditableAnchorRegion>& regions,
     const EditableAnchorKey& key,
-    const RECT& targetRect,
-    const RECT& anchorRect,
+    const RenderRect& targetRect,
+    const RenderRect& anchorRect,
     AnchorShape shape,
     AnchorDragAxis dragAxis,
     AnchorDragMode dragMode,
-    POINT dragOrigin,
+    RenderPoint dragOrigin,
     double dragScale,
     bool showWhenWidgetHovered,
     bool drawTargetOutline,
@@ -695,7 +678,7 @@ void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<EditableAnchorR
     region.shape = shape;
     const int anchorHitInset = std::max(3, ScaleLogical(4));
     region.anchorHitPadding = anchorHitInset;
-    region.anchorHitRect = RECT{region.anchorRect.left - anchorHitInset,
+    region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
         region.anchorRect.top - anchorHitInset,
         region.anchorRect.right + anchorHitInset,
         region.anchorRect.bottom + anchorHitInset};
@@ -710,12 +693,12 @@ void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<EditableAnchorR
 }
 
 void DashboardRenderer::RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
-    const RECT& targetRect,
-    const RECT& anchorRect,
+    const RenderRect& targetRect,
+    const RenderRect& anchorRect,
     AnchorShape shape,
     AnchorDragAxis dragAxis,
     AnchorDragMode dragMode,
-    POINT dragOrigin,
+    RenderPoint dragOrigin,
     double dragScale,
     bool showWhenWidgetHovered,
     bool drawTargetOutline,
@@ -735,12 +718,12 @@ void DashboardRenderer::RegisterStaticEditableAnchorRegion(const EditableAnchorK
 }
 
 void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const EditableAnchorKey& key,
-    const RECT& targetRect,
-    const RECT& anchorRect,
+    const RenderRect& targetRect,
+    const RenderRect& anchorRect,
     AnchorShape shape,
     AnchorDragAxis dragAxis,
     AnchorDragMode dragMode,
-    POINT dragOrigin,
+    RenderPoint dragOrigin,
     double dragScale,
     bool showWhenWidgetHovered,
     bool drawTargetOutline,
@@ -763,21 +746,21 @@ void DashboardRenderer::RegisterDynamicEditableAnchorRegion(const EditableAnchor
 }
 
 void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
-    const RECT& rect,
+    const RenderRect& rect,
     const std::string& text,
-    HFONT font,
-    UINT format,
+    TextStyleId style,
+    const TextLayoutOptions& options,
     const EditableAnchorBinding& editable) {
     if (text.empty()) {
         return;
     }
 
-    const TextLayoutResult result = MeasureTextBlock(rect, text, font, format);
+    const TextLayoutResult result = MeasureTextBlock(rect, text, style, options);
     const int anchorSize = std::max(4, ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     const int anchorCenterX = result.textRect.right;
     const int anchorCenterY = result.textRect.top;
-    const RECT anchorRect{anchorCenterX - anchorHalf,
+    const RenderRect anchorRect{anchorCenterX - anchorHalf,
         anchorCenterY - anchorHalf,
         anchorCenterX - anchorHalf + anchorSize,
         anchorCenterY - anchorHalf + anchorSize};
@@ -788,7 +771,7 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
         editable.shape,
         editable.dragAxis,
         editable.dragMode,
-        POINT{anchorCenterX, anchorCenterY},
+        RenderPoint{anchorCenterX, anchorCenterY},
         1.0,
         false,
         true,
@@ -798,7 +781,7 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
 void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
     const TextLayoutResult& layoutResult,
     const EditableAnchorBinding& editable) {
-    const RECT& textRect = layoutResult.textRect;
+    const RenderRect& textRect = layoutResult.textRect;
     if (textRect.right <= textRect.left || textRect.bottom <= textRect.top) {
         return;
     }
@@ -807,7 +790,7 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
     const int anchorHalf = anchorSize / 2;
     const int anchorCenterX = textRect.right;
     const int anchorCenterY = textRect.top;
-    const RECT anchorRect{anchorCenterX - anchorHalf,
+    const RenderRect anchorRect{anchorCenterX - anchorHalf,
         anchorCenterY - anchorHalf,
         anchorCenterX - anchorHalf + anchorSize,
         anchorCenterY - anchorHalf + anchorSize};
@@ -818,16 +801,19 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<EditableAnchorRegion>& re
         editable.shape,
         editable.dragAxis,
         editable.dragMode,
-        POINT{anchorCenterX, anchorCenterY},
+        RenderPoint{anchorCenterX, anchorCenterY},
         1.0,
         false,
         true,
         editable.value);
 }
 
-void DashboardRenderer::RegisterStaticTextAnchor(
-    const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
-    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, font, format, editable);
+void DashboardRenderer::RegisterStaticTextAnchor(const RenderRect& rect,
+    const std::string& text,
+    TextStyleId style,
+    const TextLayoutOptions& options,
+    const EditableAnchorBinding& editable) {
+    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, style, options, editable);
 }
 
 void DashboardRenderer::RegisterDynamicTextAnchor(
@@ -838,12 +824,15 @@ void DashboardRenderer::RegisterDynamicTextAnchor(
     RegisterTextAnchor(dynamicEditableAnchorRegions_, layoutResult, editable);
 }
 
-void DashboardRenderer::RegisterDynamicTextAnchor(
-    const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable) {
+void DashboardRenderer::RegisterDynamicTextAnchor(const RenderRect& rect,
+    const std::string& text,
+    TextStyleId style,
+    const TextLayoutOptions& options,
+    const EditableAnchorBinding& editable) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
-    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, font, format, editable);
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, style, options, editable);
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const {
@@ -993,7 +982,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
         }
     }
 
-    const COLORREF color = LayoutGuideColor();
+    const RenderColor color = LayoutGuideColor();
     const int inset = std::max(2, ScaleLogical(4));
     const int cap = std::max(3, ScaleLogical(4));
     const int offset = std::max(4, ScaleLogical(6));
@@ -1001,17 +990,21 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
     const int notchSpacing = std::max(3, ScaleLogical(4));
 
     for (const SimilarityIndicator& indicator : indicators) {
-        const RECT& rect = indicator.rect;
+        const RenderRect& rect = indicator.rect;
         if (indicator.axis == LayoutGuideAxis::Vertical) {
             const int y = rect.top + offset;
             const int left = rect.left + inset;
             const int right = rect.right - inset;
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left, y}, POINT{right, y}, color);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left + cap, y - cap}, POINT{left, y}, color);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{left, y}, POINT{left + cap, y + cap + 1}, color);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{right - cap, y - cap}, POINT{right, y}, color);
+            const RenderStroke stroke = RenderStroke::Solid(color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(RenderPoint{left, y}, RenderPoint{right, y}, stroke);
             const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                POINT{right, y}, POINT{right - cap, y + cap + 1}, color);
+                RenderPoint{left + cap, y - cap}, RenderPoint{left, y}, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{left, y}, RenderPoint{left + cap, y + cap + 1}, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{right - cap, y - cap}, RenderPoint{right, y}, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{right, y}, RenderPoint{right - cap, y + cap + 1}, stroke);
             if (indicator.exactTypeOrdinal > 0) {
                 const int cx = left + std::max(0, (right - left) / 2);
                 const int count = indicator.exactTypeOrdinal;
@@ -1019,7 +1012,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
                 int notchX = cx - (totalWidth / 2);
                 for (int i = 0; i < count; ++i) {
                     const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                        POINT{notchX, y - notchDepth}, POINT{notchX, y + notchDepth + 1}, color);
+                        RenderPoint{notchX, y - notchDepth}, RenderPoint{notchX, y + notchDepth + 1}, stroke);
                     notchX += notchSpacing;
                 }
             }
@@ -1027,12 +1020,16 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
             const int x = rect.left + offset;
             const int top = rect.top + inset;
             const int bottom = rect.bottom - inset;
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x, top}, POINT{x, bottom}, color);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x - cap, top + cap}, POINT{x, top}, color);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x, top}, POINT{x + cap + 1, top + cap}, color);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(POINT{x - cap, bottom - cap}, POINT{x, bottom}, color);
+            const RenderStroke stroke = RenderStroke::Solid(color);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(RenderPoint{x, top}, RenderPoint{x, bottom}, stroke);
             const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                POINT{x, bottom}, POINT{x + cap + 1, bottom - cap}, color);
+                RenderPoint{x - cap, top + cap}, RenderPoint{x, top}, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{x, top}, RenderPoint{x + cap + 1, top + cap}, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{x - cap, bottom - cap}, RenderPoint{x, bottom}, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+                RenderPoint{x, bottom}, RenderPoint{x + cap + 1, bottom - cap}, stroke);
             if (indicator.exactTypeOrdinal > 0) {
                 const int cy = top + std::max(0, (bottom - top) / 2);
                 const int count = indicator.exactTypeOrdinal;
@@ -1040,7 +1037,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
                 int notchY = cy - (totalHeight / 2);
                 for (int i = 0; i < count; ++i) {
                     const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                        POINT{x - notchDepth, notchY}, POINT{x + notchDepth + 1, notchY}, color);
+                        RenderPoint{x - notchDepth, notchY}, RenderPoint{x + notchDepth + 1, notchY}, stroke);
                     notchY += notchSpacing;
                 }
             }
@@ -1048,7 +1045,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
     }
 }
 
-void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RECT& iconRect) {
+void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect) {
     const auto it = std::find_if(
         panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) { return entry.first == iconName; });
     if (it == panelIcons_.end() || it->second == nullptr || d2dActiveRenderTarget_ == nullptr) {
@@ -1100,8 +1097,6 @@ void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RECT& i
 }
 
 void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
-    const COLORREF borderColor = ToColorRef(config_.layout.colors.panelBorderColor);
-    const COLORREF fillColor = ToColorRef(config_.layout.colors.panelFillColor);
     const float radius = static_cast<float>(std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius)));
     const D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(D2D1::RectF(static_cast<float>(card.rect.left),
                                                                 static_cast<float>(card.rect.top),
@@ -1109,8 +1104,8 @@ void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
                                                                 static_cast<float>(card.rect.bottom)),
         radius,
         radius);
-    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(fillColor);
-    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(borderColor);
+    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(palette_.panelFill);
+    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(palette_.panelBorder);
     if (fillBrush != nullptr) {
         d2dActiveRenderTarget_->FillRoundedRectangle(roundedRect, fillBrush);
     }
@@ -1123,19 +1118,24 @@ void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
         DrawPanelIcon(card.iconName, card.iconRect);
     }
     if (!card.title.empty()) {
-        DrawText(card.titleRect, card.title, fonts_.title, ForegroundColor(), DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        DrawText(card.titleRect,
+            card.title,
+            TextStyleId::Title,
+            ForegroundColor(),
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
     }
 }
 
-void DashboardRenderer::DrawPillBar(const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
-    const COLORREF accentColor = AccentColor();
-    const auto fillCapsule = [&](const RECT& capsuleRect, COLORREF color, BYTE alpha = 255) {
-        const int capsuleWidth = std::max(0, static_cast<int>(capsuleRect.right - capsuleRect.left));
-        const int capsuleHeight = std::max(0, static_cast<int>(capsuleRect.bottom - capsuleRect.top));
+void DashboardRenderer::DrawPillBar(
+    const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
+    const RenderColor accentColor = AccentColor();
+    const auto fillCapsule = [&](const RenderRect& capsuleRect, RenderColor color) {
+        const int capsuleWidth = capsuleRect.Width();
+        const int capsuleHeight = capsuleRect.Height();
         if (capsuleWidth <= 0 || capsuleHeight <= 0) {
             return;
         }
-        ID2D1SolidColorBrush* brush = D2DSolidBrush(color, alpha);
+        ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
         if (brush == nullptr) {
             return;
         }
@@ -1161,10 +1161,10 @@ void DashboardRenderer::DrawPillBar(const RECT& rect, double ratio, std::optiona
         }
     };
 
-    fillCapsule(rect, ToColorRef(config_.layout.colors.trackColor));
+    fillCapsule(rect, TrackColor());
 
-    const int width = std::max(0, static_cast<int>(rect.right - rect.left));
-    const int height = std::max(0, static_cast<int>(rect.bottom - rect.top));
+    const int width = rect.Width();
+    const int height = rect.Height();
     if (width <= 0 || height <= 0) {
         return;
     }
@@ -1176,19 +1176,19 @@ void DashboardRenderer::DrawPillBar(const RECT& rect, double ratio, std::optiona
     const double clampedRatio = std::clamp(ratio, 0.0, 1.0);
     const int straightWidth = std::max(0, width - height);
     const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
-    RECT fillRect = rect;
+    RenderRect fillRect = rect;
     fillRect.right = fillRect.left + fillWidth;
     fillCapsule(fillRect, accentColor);
 
     if (peakRatio.has_value()) {
         const double peak = std::clamp(*peakRatio, 0.0, 1.0);
         const int markerWidth = std::min(width, std::max(1, std::max(ScaleLogical(4), height)));
-        const int centerX = static_cast<int>(rect.left) + static_cast<int>(std::round(peak * width));
-        const int minLeft = static_cast<int>(rect.left);
-        const int maxLeft = static_cast<int>(rect.right) - markerWidth;
+        const int centerX = rect.left + static_cast<int>(std::round(peak * width));
+        const int minLeft = rect.left;
+        const int maxLeft = rect.right - markerWidth;
         const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
-        RECT markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-        fillCapsule(markerRect, accentColor, 96);
+        RenderRect markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
+        fillCapsule(markerRect, accentColor.WithAlpha(96));
     }
 }
 
@@ -1222,7 +1222,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     dynamicAnchorRegistrationEnabled_ =
         overlayState.showLayoutEditGuides && !overlayState.activeLayoutEditGuide.has_value();
     const DashboardMetricSource& metrics = ResolveMetrics(snapshot);
-    d2dActiveRenderTarget_->Clear(ToD2DColor(BackgroundColor()));
+    d2dActiveRenderTarget_->Clear(BackgroundColor().ToD2DColorF());
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(card);
         for (const auto& widget : card.widgets) {
@@ -1375,8 +1375,8 @@ int DashboardRenderer::ScaleLogical(int value) const {
     return std::max(1, static_cast<int>(std::lround(static_cast<double>(value) * renderScale_)));
 }
 
-int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const {
-    const TextWidthCacheLookupKey cacheKey{font, text};
+int DashboardRenderer::MeasureTextWidth(TextStyleId style, std::string_view text) const {
+    const TextWidthCacheLookupKey cacheKey{style, text};
     if (const auto it = textWidthCache_.find(cacheKey); it != textWidthCache_.end()) {
         return it->second;
     }
@@ -1389,11 +1389,15 @@ int DashboardRenderer::MeasureTextWidth(HFONT font, std::string_view text) const
     if (wideText.empty()) {
         return 0;
     }
-    const RECT measureRect{0, 0, WindowWidth(), WindowHeight()};
+    const RenderRect measureRect{0, 0, WindowWidth(), WindowHeight()};
     const int width = std::max(0,
-        static_cast<int>(MeasureTextBlockD2D(measureRect, wideText, font, DT_LEFT | DT_SINGLELINE | DT_VCENTER, nullptr)
+        static_cast<int>(MeasureTextBlockD2D(measureRect,
+            wideText,
+            style,
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
+            nullptr)
                 .textRect.right));
-    textWidthCache_.emplace(TextWidthCacheKey{font, std::string(text)}, width);
+    textWidthCache_.emplace(TextWidthCacheKey{style, std::string(text)}, width);
     return width;
 }
 
@@ -1479,10 +1483,10 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
 }
 
 std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTestEditableWidget(
-    POINT clientPoint) const {
+    RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (widget.widget == nullptr || !widget.widget->IsHoverable() || !PtInRect(&widget.rect, clientPoint)) {
+            if (widget.widget == nullptr || !widget.widget->IsHoverable() || !widget.rect.Contains(clientPoint)) {
                 continue;
             }
             return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -1492,7 +1496,7 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::HitTes
 }
 
 std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(
-    POINT clientPoint) const {
+    RenderPoint clientPoint) const {
     std::vector<const EditableAnchorRegion*> regions;
     regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
     for (const auto& region : staticEditableAnchorRegions_) {
@@ -1502,7 +1506,7 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
         regions.push_back(&region);
     }
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
-        if (PtInRect(&(*it)->targetRect, clientPoint)) {
+        if ((*it)->targetRect.Contains(clientPoint)) {
             return (*it)->key;
         }
     }
@@ -1510,7 +1514,7 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
 }
 
 std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(
-    POINT clientPoint) const {
+    RenderPoint clientPoint) const {
     std::vector<const EditableAnchorRegion*> regions;
     regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
     for (const auto& region : staticEditableAnchorRegions_) {
@@ -1525,8 +1529,8 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
         const EditableAnchorRegion& region = *(*it);
         bool hit = false;
         if (region.shape == AnchorShape::Circle) {
-            const int width = std::max(1L, region.anchorRect.right - region.anchorRect.left);
-            const int height = std::max(1L, region.anchorRect.bottom - region.anchorRect.top);
+            const int width = std::max(1, region.anchorRect.right - region.anchorRect.left);
+            const int height = std::max(1, region.anchorRect.bottom - region.anchorRect.top);
             const double radius = static_cast<double>(std::max(width, height)) / 2.0;
             const double centerX = static_cast<double>(region.anchorRect.left) + static_cast<double>(width) / 2.0;
             const double centerY = static_cast<double>(region.anchorRect.top) + static_cast<double>(height) / 2.0;
@@ -1535,7 +1539,7 @@ std::optional<DashboardRenderer::EditableAnchorKey> DashboardRenderer::HitTestEd
             const double distance = std::sqrt((dx * dx) + (dy * dy));
             hit = std::abs(distance - radius) <= static_cast<double>(region.anchorHitPadding);
         } else {
-            hit = PtInRect(&region.anchorHitRect, clientPoint);
+            hit = region.anchorHitRect.Contains(clientPoint);
         }
         if (!hit) {
             continue;
@@ -1589,25 +1593,14 @@ std::optional<DashboardRenderer::LayoutWidgetIdentity> DashboardRenderer::FindFi
 bool DashboardRenderer::Initialize(HWND hwnd) {
     hwnd_ = hwnd;
     lastError_.clear();
+    RebuildPalette();
     if (!InitializeGdiplus() || !LoadPanelIcons()) {
         return false;
     }
     if (!InitializeDirect2D()) {
         return false;
     }
-    if (!CreateFonts()) {
-        lastError_ = "renderer:font_create_failed";
-        Shutdown();
-        return false;
-    }
-    if (fonts_.title == nullptr || fonts_.big == nullptr || fonts_.value == nullptr || fonts_.label == nullptr ||
-        fonts_.text == nullptr || fonts_.smallFont == nullptr || fonts_.footer == nullptr ||
-        fonts_.clockTime == nullptr || fonts_.clockDate == nullptr) {
-        lastError_ = "renderer:font_create_failed";
-        Shutdown();
-        return false;
-    }
-    if (!MeasureFonts() || !ResolveLayout()) {
+    if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
         Shutdown();
         return false;
     }
@@ -1617,8 +1610,8 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
 
 void DashboardRenderer::Shutdown() {
     InvalidateMetricSourceCache();
-    DestroyFonts();
-    fontHeights_ = {};
+    dwriteTextFormats_ = {};
+    textStyleMetrics_ = {};
     resolvedLayout_ = {};
     parsedWidgetInfoCache_.clear();
     textWidthCache_.clear();
@@ -1773,8 +1766,7 @@ bool DashboardRenderer::BeginDirect2DDraw(ID2D1RenderTarget* target) {
     }
     if (d2dFirstDrawWarmupPending_) {
         d2dFirstDrawWarmupPending_ = false;
-        DestroyFonts();
-        if (!CreateFonts() || !MeasureFonts() || !ResolveLayout()) {
+        if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
             d2dFirstDrawWarmupPending_ = true;
             return false;
         }
@@ -1825,30 +1817,26 @@ void DashboardRenderer::EndWindowDraw() {
     EndDirect2DDraw();
 }
 
-ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(COLORREF color, BYTE alpha) {
+ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(RenderColor color) {
     if (d2dActiveRenderTarget_ == nullptr) {
         return nullptr;
     }
-    const D2DBrushCacheKey key{color, alpha};
+    const D2DBrushCacheKey key{color};
     if (const auto it = d2dSolidBrushCache_.find(key); it != d2dSolidBrushCache_.end()) {
         return it->second.Get();
     }
 
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
-    if (FAILED(d2dActiveRenderTarget_->CreateSolidColorBrush(ToD2DColor(color, alpha), brush.GetAddressOf())) ||
+    if (FAILED(d2dActiveRenderTarget_->CreateSolidColorBrush(color.ToD2DColorF(), brush.GetAddressOf())) ||
         brush == nullptr) {
         return nullptr;
     }
     return d2dSolidBrushCache_.emplace(key, std::move(brush)).first->second.Get();
 }
 
-void DashboardRenderer::PushClipRect(const RECT& rect) {
+void DashboardRenderer::PushClipRect(const RenderRect& rect) {
     if (IsDirect2DActive()) {
-        d2dActiveRenderTarget_->PushAxisAlignedClip(D2D1::RectF(static_cast<float>(rect.left),
-                                                        static_cast<float>(rect.top),
-                                                        static_cast<float>(rect.right),
-                                                        static_cast<float>(rect.bottom)),
-            D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        d2dActiveRenderTarget_->PushAxisAlignedClip(rect.ToD2DRectF(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         ++d2dClipDepth_;
     }
 }
@@ -1860,37 +1848,32 @@ void DashboardRenderer::PopClipRect() {
     }
 }
 
-bool DashboardRenderer::FillSolidRect(const RECT& rect, COLORREF color, BYTE alpha) {
+bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColor color) {
     if (!IsDirect2DActive()) {
         return false;
     }
-    ID2D1SolidColorBrush* brush = D2DSolidBrush(color, alpha);
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->FillRectangle(D2D1::RectF(static_cast<float>(rect.left),
-                                              static_cast<float>(rect.top),
-                                              static_cast<float>(rect.right),
-                                              static_cast<float>(rect.bottom)),
-        brush);
+    d2dActiveRenderTarget_->FillRectangle(rect.ToD2DRectF(), brush);
     return true;
 }
 
-bool DashboardRenderer::FillSolidEllipse(int centerX, int centerY, int diameter, COLORREF color, BYTE alpha) {
+bool DashboardRenderer::FillSolidEllipse(RenderPoint center, int diameter, RenderColor color) {
     if (!IsDirect2DActive() || diameter <= 0) {
         return false;
     }
-    ID2D1SolidColorBrush* brush = D2DSolidBrush(color, alpha);
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
     if (brush == nullptr) {
         return false;
     }
     const float radius = static_cast<float>(diameter) / 2.0f;
-    d2dActiveRenderTarget_->FillEllipse(
-        D2D1::Ellipse(D2D1::Point2F(static_cast<float>(centerX), static_cast<float>(centerY)), radius, radius), brush);
+    d2dActiveRenderTarget_->FillEllipse(D2D1::Ellipse(center.ToD2DPoint2F(), radius, radius), brush);
     return true;
 }
 
-bool DashboardRenderer::FillSolidDiamond(const RECT& rect, COLORREF color, BYTE alpha) {
+bool DashboardRenderer::FillSolidDiamond(const RenderRect& rect, RenderColor color) {
     if (!IsDirect2DActive()) {
         return false;
     }
@@ -1916,60 +1899,54 @@ bool DashboardRenderer::FillSolidDiamond(const RECT& rect, COLORREF color, BYTE 
     if (FAILED(sink->Close())) {
         return false;
     }
-    return FillD2DGeometry(geometry.Get(), color, alpha);
+    return FillD2DGeometry(geometry.Get(), color);
 }
 
-bool DashboardRenderer::DrawSolidRect(const RECT& rect, COLORREF color, int strokeWidth, bool dashed) {
+bool DashboardRenderer::DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) {
     if (!IsDirect2DActive()) {
         return false;
     }
-    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawRectangle(D2D1::RectF(static_cast<float>(rect.left),
-                                              static_cast<float>(rect.top),
-                                              static_cast<float>(rect.right),
-                                              static_cast<float>(rect.bottom)),
+    d2dActiveRenderTarget_->DrawRectangle(rect.ToD2DRectF(),
         brush,
-        static_cast<float>(std::max(1, strokeWidth)),
-        dashed ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
+        (std::max)(1.0f, stroke.width),
+        stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
     return true;
 }
 
-bool DashboardRenderer::DrawSolidEllipse(const RECT& rect, COLORREF color, int strokeWidth) {
+bool DashboardRenderer::DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) {
     if (!IsDirect2DActive()) {
         return false;
     }
-    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
     if (brush == nullptr) {
         return false;
     }
-    const float radiusX = static_cast<float>(std::max(1L, rect.right - rect.left)) / 2.0f;
-    const float radiusY = static_cast<float>(std::max(1L, rect.bottom - rect.top)) / 2.0f;
-    d2dActiveRenderTarget_->DrawEllipse(
-        D2D1::Ellipse(D2D1::Point2F(static_cast<float>(rect.left) + radiusX, static_cast<float>(rect.top) + radiusY),
-            radiusX,
-            radiusY),
+    const float radiusX = static_cast<float>((std::max)(1, rect.Width())) / 2.0f;
+    const float radiusY = static_cast<float>((std::max)(1, rect.Height())) / 2.0f;
+    d2dActiveRenderTarget_->DrawEllipse(D2D1::Ellipse(rect.Center().ToD2DPoint2F(), radiusX, radiusY),
         brush,
-        static_cast<float>(std::max(1, strokeWidth)),
+        (std::max)(1.0f, stroke.width),
         d2dSolidStrokeStyle_.Get());
     return true;
 }
 
-bool DashboardRenderer::DrawSolidLine(POINT start, POINT end, COLORREF color, int strokeWidth) {
+bool DashboardRenderer::DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) {
     if (!IsDirect2DActive()) {
         return false;
     }
-    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawLine(D2D1::Point2F(static_cast<float>(start.x), static_cast<float>(start.y)),
-        D2D1::Point2F(static_cast<float>(end.x), static_cast<float>(end.y)),
+    d2dActiveRenderTarget_->DrawLine(start.ToD2DPoint2F(),
+        end.ToD2DPoint2F(),
         brush,
-        static_cast<float>(std::max(1, strokeWidth)),
-        d2dSolidStrokeStyle_.Get());
+        (std::max)(1.0f, stroke.width),
+        stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
     return true;
 }
 
@@ -2001,11 +1978,11 @@ Microsoft::WRL::ComPtr<ID2D1GeometryGroup> DashboardRenderer::CreateD2DGeometryG
     return group;
 }
 
-bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, COLORREF color, BYTE alpha) {
+bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, RenderColor color) {
     if (!IsDirect2DActive() || geometry == nullptr) {
         return false;
     }
-    ID2D1SolidColorBrush* brush = D2DSolidBrush(color, alpha);
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
     if (brush == nullptr) {
         return false;
     }
@@ -2013,7 +1990,7 @@ bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, COLORREF color,
     return true;
 }
 
-bool DashboardRenderer::DrawD2DPolyline(std::span<const POINT> points, COLORREF color, int strokeWidth) {
+bool DashboardRenderer::DrawD2DPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) {
     if (!IsDirect2DActive() || points.size() < 2) {
         return false;
     }
@@ -2025,54 +2002,40 @@ bool DashboardRenderer::DrawD2DPolyline(std::span<const POINT> points, COLORREF 
     if (FAILED(geometry->Open(sink.GetAddressOf())) || sink == nullptr) {
         return false;
     }
-    sink->BeginFigure(D2D1::Point2F(static_cast<float>(points.front().x), static_cast<float>(points.front().y)),
-        D2D1_FIGURE_BEGIN_HOLLOW);
+    sink->BeginFigure(points.front().ToD2DPoint2F(), D2D1_FIGURE_BEGIN_HOLLOW);
     for (size_t i = 1; i < points.size(); ++i) {
-        sink->AddLine(D2D1::Point2F(static_cast<float>(points[i].x), static_cast<float>(points[i].y)));
+        sink->AddLine(points[i].ToD2DPoint2F());
     }
     sink->EndFigure(D2D1_FIGURE_END_OPEN);
     if (FAILED(sink->Close())) {
         return false;
     }
-    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawGeometry(
-        geometry.Get(), brush, static_cast<float>(std::max(1, strokeWidth)), d2dSolidStrokeStyle_.Get());
+    d2dActiveRenderTarget_->DrawGeometry(geometry.Get(),
+        brush,
+        (std::max)(1.0f, stroke.width),
+        stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
     return true;
 }
 
-IDWriteTextFormat* DashboardRenderer::DWriteTextFormatForFont(HFONT font) const {
-    if (font == fonts_.title)
-        return d2dTextFormats_.title.Get();
-    if (font == fonts_.big)
-        return d2dTextFormats_.big.Get();
-    if (font == fonts_.value)
-        return d2dTextFormats_.value.Get();
-    if (font == fonts_.label)
-        return d2dTextFormats_.label.Get();
-    if (font == fonts_.text)
-        return d2dTextFormats_.text.Get();
-    if (font == fonts_.smallFont)
-        return d2dTextFormats_.smallFont.Get();
-    if (font == fonts_.footer)
-        return d2dTextFormats_.footer.Get();
-    if (font == fonts_.clockTime)
-        return d2dTextFormats_.clockTime.Get();
-    if (font == fonts_.clockDate)
-        return d2dTextFormats_.clockDate.Get();
-    return nullptr;
+IDWriteTextFormat* DashboardRenderer::DWriteTextFormat(TextStyleId style) const {
+    return dwriteTextFormats_[TextStyleSlot(style)].Get();
 }
 
 bool DashboardRenderer::CreateDWriteTextFormats() {
-    d2dTextFormats_ = {};
+    dwriteTextFormats_ = {};
     if (dwriteFactory_ == nullptr) {
         return true;
     }
 
-    const auto createFormat = [&](const UiFontConfig& fontConfig, Microsoft::WRL::ComPtr<IDWriteTextFormat>& format) {
+    const auto createFormat = [&](TextStyleId style) {
+        UiFontConfig fontConfig = FontConfigForStyle(config_.layout.fonts, style);
+        fontConfig.size = ScaleLogical(fontConfig.size);
         const std::wstring face = WideFromUtf8(fontConfig.face);
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
         const HRESULT hr = dwriteFactory_->CreateTextFormat(face.c_str(),
             nullptr,
             static_cast<DWRITE_FONT_WEIGHT>(fontConfig.weight),
@@ -2080,61 +2043,43 @@ bool DashboardRenderer::CreateDWriteTextFormats() {
             DWRITE_FONT_STRETCH_NORMAL,
             static_cast<FLOAT>(fontConfig.size),
             L"en-us",
-            format.ReleaseAndGetAddressOf());
-        return SUCCEEDED(hr) && format != nullptr;
+            format.GetAddressOf());
+        if (FAILED(hr) || format == nullptr) {
+            return false;
+        }
+        dwriteTextFormats_[TextStyleSlot(style)] = std::move(format);
+        return true;
     };
 
-    UiFontConfig titleFont = config_.layout.fonts.title;
-    UiFontConfig bigFont = config_.layout.fonts.big;
-    UiFontConfig valueFont = config_.layout.fonts.value;
-    UiFontConfig labelFont = config_.layout.fonts.label;
-    UiFontConfig textFont = config_.layout.fonts.text;
-    UiFontConfig smallFont = config_.layout.fonts.smallText;
-    UiFontConfig footerFont = config_.layout.fonts.footer;
-    UiFontConfig clockTimeFont = config_.layout.fonts.clockTime;
-    UiFontConfig clockDateFont = config_.layout.fonts.clockDate;
-    titleFont.size = ScaleLogical(titleFont.size);
-    bigFont.size = ScaleLogical(bigFont.size);
-    valueFont.size = ScaleLogical(valueFont.size);
-    labelFont.size = ScaleLogical(labelFont.size);
-    textFont.size = ScaleLogical(textFont.size);
-    smallFont.size = ScaleLogical(smallFont.size);
-    footerFont.size = ScaleLogical(footerFont.size);
-    clockTimeFont.size = ScaleLogical(clockTimeFont.size);
-    clockDateFont.size = ScaleLogical(clockDateFont.size);
-
-    return createFormat(titleFont, d2dTextFormats_.title) && createFormat(bigFont, d2dTextFormats_.big) &&
-           createFormat(valueFont, d2dTextFormats_.value) && createFormat(labelFont, d2dTextFormats_.label) &&
-           createFormat(textFont, d2dTextFormats_.text) && createFormat(smallFont, d2dTextFormats_.smallFont) &&
-           createFormat(footerFont, d2dTextFormats_.footer) && createFormat(clockTimeFont, d2dTextFormats_.clockTime) &&
-           createFormat(clockDateFont, d2dTextFormats_.clockDate);
+    return createFormat(TextStyleId::Title) && createFormat(TextStyleId::Big) && createFormat(TextStyleId::Value) &&
+           createFormat(TextStyleId::Label) && createFormat(TextStyleId::Text) && createFormat(TextStyleId::Small) &&
+           createFormat(TextStyleId::Footer) && createFormat(TextStyleId::ClockTime) &&
+           createFormat(TextStyleId::ClockDate);
 }
 
-void DashboardRenderer::ConfigureDWriteTextFormat(IDWriteTextFormat* format, UINT drawTextFormat) const {
+void DashboardRenderer::ConfigureDWriteTextFormat(IDWriteTextFormat* format, const TextLayoutOptions& options) const {
     if (format == nullptr) {
         return;
     }
-    format->SetTextAlignment(DWriteTextAlignment(drawTextFormat));
-    format->SetParagraphAlignment(DWriteParagraphAlignment(drawTextFormat));
-    format->SetWordWrapping(((drawTextFormat & DT_SINGLELINE) != 0 || (drawTextFormat & DT_END_ELLIPSIS) != 0)
-                                ? DWRITE_WORD_WRAPPING_NO_WRAP
-                                : DWRITE_WORD_WRAPPING_WRAP);
+    format->SetTextAlignment(DWriteTextAlignment(options));
+    format->SetParagraphAlignment(DWriteParagraphAlignment(options));
+    format->SetWordWrapping(options.wrap ? DWRITE_WORD_WRAPPING_WRAP : DWRITE_WORD_WRAPPING_NO_WRAP);
 }
 
-DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlockD2D(const RECT& rect,
+DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlockD2D(const RenderRect& rect,
     const std::wstring& wideText,
-    HFONT font,
-    UINT format,
+    TextStyleId style,
+    const TextLayoutOptions& options,
     Microsoft::WRL::ComPtr<IDWriteTextLayout>* layoutOut) const {
     TextLayoutResult result{rect};
-    IDWriteTextFormat* textFormat = DWriteTextFormatForFont(font);
+    IDWriteTextFormat* textFormat = DWriteTextFormat(style);
     if (dwriteFactory_ == nullptr || textFormat == nullptr || wideText.empty()) {
         return result;
     }
-    ConfigureDWriteTextFormat(textFormat, format);
+    ConfigureDWriteTextFormat(textFormat, options);
 
-    const float layoutWidth = static_cast<float>(std::max(1L, rect.right - rect.left));
-    const float layoutHeight = static_cast<float>(std::max(1L, rect.bottom - rect.top));
+    const float layoutWidth = static_cast<float>((std::max)(1, rect.Width()));
+    const float layoutHeight = static_cast<float>((std::max)(1, rect.Height()));
     Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
     if (FAILED(dwriteFactory_->CreateTextLayout(
             wideText.c_str(), static_cast<UINT32>(wideText.size()), textFormat, layoutWidth, layoutHeight, &layout)) ||
@@ -2142,7 +2087,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlockD2D(const
         return result;
     }
 
-    if ((format & DT_END_ELLIPSIS) != 0) {
+    if (options.ellipsis) {
         DWRITE_TRIMMING trimming{};
         trimming.granularity = DWRITE_TRIMMING_GRANULARITY_CHARACTER;
         Microsoft::WRL::ComPtr<IDWriteInlineObject> ellipsis;
@@ -2160,7 +2105,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlockD2D(const
     const int top = rect.top + static_cast<int>(std::lround(metrics.top));
     const int width = static_cast<int>(std::lround(metrics.widthIncludingTrailingWhitespace));
     const int height = static_cast<int>(std::lround(metrics.height));
-    result.textRect = RECT{left, top, left + width, top + height};
+    result.textRect = RenderRect{left, top, left + width, top + height};
     if (layoutOut != nullptr) {
         *layoutOut = std::move(layout);
     }
@@ -2187,63 +2132,19 @@ void DashboardRenderer::ShutdownGdiplus() {
     }
 }
 
-bool DashboardRenderer::CreateFonts() {
-    if (fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr && fonts_.label != nullptr &&
-        fonts_.text != nullptr && fonts_.smallFont != nullptr && fonts_.footer != nullptr &&
-        fonts_.clockTime != nullptr && fonts_.clockDate != nullptr) {
-        return true;
-    }
-
-    DestroyFonts();
-    UiFontConfig titleFont = config_.layout.fonts.title;
-    UiFontConfig bigFont = config_.layout.fonts.big;
-    UiFontConfig valueFont = config_.layout.fonts.value;
-    UiFontConfig labelFont = config_.layout.fonts.label;
-    UiFontConfig textFont = config_.layout.fonts.text;
-    UiFontConfig smallFont = config_.layout.fonts.smallText;
-    UiFontConfig footerFont = config_.layout.fonts.footer;
-    UiFontConfig clockTimeFont = config_.layout.fonts.clockTime;
-    UiFontConfig clockDateFont = config_.layout.fonts.clockDate;
-    titleFont.size = ScaleLogical(titleFont.size);
-    bigFont.size = ScaleLogical(bigFont.size);
-    valueFont.size = ScaleLogical(valueFont.size);
-    labelFont.size = ScaleLogical(labelFont.size);
-    textFont.size = ScaleLogical(textFont.size);
-    smallFont.size = ScaleLogical(smallFont.size);
-    footerFont.size = ScaleLogical(footerFont.size);
-    clockTimeFont.size = ScaleLogical(clockTimeFont.size);
-    clockDateFont.size = ScaleLogical(clockDateFont.size);
-    fonts_.title = CreateUiFont(titleFont);
-    fonts_.big = CreateUiFont(bigFont);
-    fonts_.value = CreateUiFont(valueFont);
-    fonts_.label = CreateUiFont(labelFont);
-    fonts_.text = CreateUiFont(textFont);
-    fonts_.smallFont = CreateUiFont(smallFont);
-    fonts_.footer = CreateUiFont(footerFont);
-    fonts_.clockTime = CreateUiFont(clockTimeFont);
-    fonts_.clockDate = CreateUiFont(clockDateFont);
-    const bool fontsCreated = fonts_.title != nullptr && fonts_.big != nullptr && fonts_.value != nullptr &&
-                              fonts_.label != nullptr && fonts_.text != nullptr && fonts_.smallFont != nullptr &&
-                              fonts_.footer != nullptr && fonts_.clockTime != nullptr && fonts_.clockDate != nullptr;
-    if (!fontsCreated) {
-        return false;
-    }
-    return CreateDWriteTextFormats();
-}
-
-void DashboardRenderer::DestroyFonts() {
-    DeleteObject(fonts_.title);
-    DeleteObject(fonts_.big);
-    DeleteObject(fonts_.value);
-    DeleteObject(fonts_.label);
-    DeleteObject(fonts_.text);
-    DeleteObject(fonts_.smallFont);
-    DeleteObject(fonts_.footer);
-    DeleteObject(fonts_.clockTime);
-    DeleteObject(fonts_.clockDate);
-    fonts_ = {};
-    d2dTextFormats_ = {};
-    textWidthCache_.clear();
+void DashboardRenderer::RebuildPalette() {
+    palette_.background = ToRenderColor(config_.layout.colors.backgroundColor);
+    palette_.foreground = ToRenderColor(config_.layout.colors.foregroundColor);
+    palette_.accent = ToRenderColor(config_.layout.colors.accentColor);
+    palette_.mutedText = ToRenderColor(config_.layout.colors.mutedTextColor);
+    palette_.track = ToRenderColor(config_.layout.colors.trackColor);
+    palette_.layoutGuide = ToRenderColor(config_.layout.colors.layoutGuideColor);
+    palette_.activeEdit = ToRenderColor(config_.layout.colors.activeEditColor);
+    palette_.panelBorder = ToRenderColor(config_.layout.colors.panelBorderColor);
+    palette_.panelFill = ToRenderColor(config_.layout.colors.panelFillColor);
+    palette_.graphBackground = ToRenderColor(config_.layout.colors.graphBackgroundColor);
+    palette_.graphMarker = ToRenderColor(config_.layout.colors.graphMarkerColor);
+    palette_.graphAxis = ToRenderColor(config_.layout.colors.graphAxisColor);
 }
 
 void DashboardRenderer::ClearD2DCaches() {
@@ -2293,40 +2194,57 @@ void DashboardRenderer::WriteTrace(const std::string& text) const {
     trace.Write(text);
 }
 
-bool DashboardRenderer::MeasureFonts() {
-    HDC hdc = GetDC(hwnd_ != nullptr ? hwnd_ : nullptr);
-    if (hdc == nullptr) {
-        lastError_ = "renderer:measure_fonts_failed " + FormatWin32Error(GetLastError());
+bool DashboardRenderer::RebuildTextFormatsAndMetrics() {
+    if (!CreateDWriteTextFormats()) {
+        lastError_ = "renderer:text_format_create_failed";
         return false;
     }
-    const auto measure = [&](HFONT font) {
-        TEXTMETRICW metrics{};
-        HGDIOBJ oldFont = SelectObject(hdc, font);
-        GetTextMetricsW(hdc, &metrics);
-        SelectObject(hdc, oldFont);
-        return static_cast<int>(metrics.tmHeight);
+    textWidthCache_.clear();
+    textStyleMetrics_ = {};
+    if (dwriteFactory_ == nullptr) {
+        return true;
+    }
+
+    const auto measureStyle = [&](TextStyleId style) -> int {
+        IDWriteTextFormat* format = DWriteTextFormat(style);
+        if (format == nullptr) {
+            return 0;
+        }
+        Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
+        const wchar_t sample[] = L"Ag";
+        if (FAILED(dwriteFactory_->CreateTextLayout(
+                sample, static_cast<UINT32>(std::size(sample) - 1), format, 1024.0f, 1024.0f, &layout)) ||
+            layout == nullptr) {
+            return 0;
+        }
+        DWRITE_TEXT_METRICS metrics{};
+        if (FAILED(layout->GetMetrics(&metrics))) {
+            return 0;
+        }
+        return (std::max)(1, static_cast<int>(std::lround(metrics.height)));
     };
-    fontHeights_.title = measure(fonts_.title);
-    fontHeights_.big = measure(fonts_.big);
-    fontHeights_.value = measure(fonts_.value);
-    fontHeights_.label = measure(fonts_.label);
-    fontHeights_.text = measure(fonts_.text);
-    fontHeights_.smallText = measure(fonts_.smallFont);
-    fontHeights_.footer = measure(fonts_.footer);
-    fontHeights_.clockTime = measure(fonts_.clockTime);
-    fontHeights_.clockDate = measure(fonts_.clockDate);
-    ReleaseDC(hwnd_ != nullptr ? hwnd_ : nullptr, hdc);
-    WriteTrace("renderer:font_metrics title=" + std::to_string(fontHeights_.title) +
-               " big=" + std::to_string(fontHeights_.big) + " value=" + std::to_string(fontHeights_.value) +
-               " label=" + std::to_string(fontHeights_.label) + " text=" + std::to_string(fontHeights_.text) +
-               " small=" + std::to_string(fontHeights_.smallText) + " footer=" + std::to_string(fontHeights_.footer) +
-               " clock_time=" + std::to_string(fontHeights_.clockTime) + " clock_date=" +
-               std::to_string(fontHeights_.clockDate) + " render_scale=" + std::to_string(renderScale_));
+
+    textStyleMetrics_.title = measureStyle(TextStyleId::Title);
+    textStyleMetrics_.big = measureStyle(TextStyleId::Big);
+    textStyleMetrics_.value = measureStyle(TextStyleId::Value);
+    textStyleMetrics_.label = measureStyle(TextStyleId::Label);
+    textStyleMetrics_.text = measureStyle(TextStyleId::Text);
+    textStyleMetrics_.smallText = measureStyle(TextStyleId::Small);
+    textStyleMetrics_.footer = measureStyle(TextStyleId::Footer);
+    textStyleMetrics_.clockTime = measureStyle(TextStyleId::ClockTime);
+    textStyleMetrics_.clockDate = measureStyle(TextStyleId::ClockDate);
+    WriteTrace("renderer:text_metrics title=" + std::to_string(textStyleMetrics_.title) +
+               " big=" + std::to_string(textStyleMetrics_.big) + " value=" + std::to_string(textStyleMetrics_.value) +
+               " label=" + std::to_string(textStyleMetrics_.label) + " text=" + std::to_string(textStyleMetrics_.text) +
+               " small=" + std::to_string(textStyleMetrics_.smallText) + " footer=" +
+               std::to_string(textStyleMetrics_.footer) + " clock_time=" + std::to_string(textStyleMetrics_.clockTime) +
+               " clock_date=" + std::to_string(textStyleMetrics_.clockDate) +
+               " render_scale=" + std::to_string(renderScale_));
     return true;
 }
 
 int DashboardRenderer::EffectiveHeaderHeight() const {
-    const int titleHeight = std::max(fontHeights_.title, ScaleLogical(config_.layout.cardStyle.headerIconSize));
+    const int titleHeight = std::max(textStyleMetrics_.title, ScaleLogical(config_.layout.cardStyle.headerIconSize));
     const int configured = ScaleLogical(config_.layout.cardStyle.headerHeight);
     const int computed = std::max(configured, titleHeight);
     WriteTrace("renderer:layout_header_height configured=" + std::to_string(configured) +
@@ -2462,7 +2380,7 @@ const DashboardRenderer::ParsedWidgetInfo* DashboardRenderer::FindParsedWidgetIn
 }
 
 DashboardWidgetLayout DashboardRenderer::ResolveWidgetLayout(
-    const LayoutNodeConfig& node, const RECT& rect, bool instantiateWidget) const {
+    const LayoutNodeConfig& node, const RenderRect& rect, bool instantiateWidget) const {
     DashboardWidgetLayout widget;
     widget.rect = rect;
     const ParsedWidgetInfo* info = FindParsedWidgetInfo(node);

@@ -158,23 +158,23 @@ std::vector<std::vector<int>> BuildWeightSequence(const std::vector<int>& seedWe
     return sequence;
 }
 
-POINT GuideDragStartPoint(const DashboardRenderer::LayoutEditGuide& guide) {
-    return POINT{(guide.hitRect.left + guide.hitRect.right) / 2, (guide.hitRect.top + guide.hitRect.bottom) / 2};
+RenderPoint GuideDragStartPoint(const DashboardRenderer::LayoutEditGuide& guide) {
+    return RenderPoint{(guide.hitRect.left + guide.hitRect.right) / 2, (guide.hitRect.top + guide.hitRect.bottom) / 2};
 }
 
-POINT DragPointForWeights(const DashboardRenderer::LayoutEditGuide& guide,
+RenderPoint DragPointForWeights(const DashboardRenderer::LayoutEditGuide& guide,
     const std::vector<int>& initialWeights,
     const std::vector<int>& targetWeights) {
-    POINT point = GuideDragStartPoint(guide);
+    RenderPoint dragPoint = GuideDragStartPoint(guide);
     if (guide.separatorIndex < initialWeights.size() && guide.separatorIndex < targetWeights.size()) {
         const int delta = targetWeights[guide.separatorIndex] - initialWeights[guide.separatorIndex];
         if (guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical) {
-            point.x += delta;
+            dragPoint.x += delta;
         } else {
-            point.y += delta;
+            dragPoint.y += delta;
         }
     }
-    return point;
+    return dragPoint;
 }
 
 class BenchmarkDragHost : private LayoutEditHost {
@@ -333,7 +333,7 @@ BenchResult RunDragBenchmark(BenchmarkDragHost& host,
     LayoutEditController& controller = host.Controller();
     controller.StartSession();
 
-    const POINT startPoint = GuideDragStartPoint(guide);
+    const RenderPoint startPoint = GuideDragStartPoint(guide);
     controller.HandleMouseMove(startPoint);
     host.FlushPaintIfDirty();
 

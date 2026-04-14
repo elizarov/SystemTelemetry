@@ -8,6 +8,7 @@
 #endif
 
 #include <cstdint>
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -27,6 +28,7 @@
 #include "config.h"
 #include "dashboard_metrics.h"
 #include "layout_edit_parameter_id.h"
+#include "render_types.h"
 #include "widget.h"
 
 namespace Gdiplus {
@@ -46,13 +48,13 @@ public:
         std::string editCardId;
         std::vector<size_t> nodePath;
         size_t separatorIndex = 0;
-        RECT containerRect{};
-        RECT lineRect{};
-        RECT hitRect{};
+        RenderRect containerRect{};
+        RenderRect lineRect{};
+        RenderRect hitRect{};
         int gap = 0;
         std::vector<int> childExtents;
         std::vector<bool> childFixedExtents;
-        std::vector<RECT> childRects;
+        std::vector<RenderRect> childRects;
     };
 
     struct LayoutWidgetIdentity {
@@ -87,14 +89,14 @@ public:
 
     struct EditableAnchorRegion {
         EditableAnchorKey key;
-        RECT targetRect{};
-        RECT anchorRect{};
-        RECT anchorHitRect{};
+        RenderRect targetRect{};
+        RenderRect anchorRect{};
+        RenderRect anchorHitRect{};
         int anchorHitPadding = 0;
         AnchorShape shape = AnchorShape::Circle;
         AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
         AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
-        POINT dragOrigin{};
+        RenderPoint dragOrigin{};
         double dragScale = 1.0;
         bool showWhenWidgetHovered = false;
         bool drawTargetOutline = true;
@@ -106,11 +108,11 @@ public:
         LayoutWidgetIdentity widget;
         LayoutEditParameter parameter = LayoutEditParameter::DriveUsageActivityWidth;
         int guideId = 0;
-        RECT widgetRect{};
-        POINT drawStart{};
-        POINT drawEnd{};
-        RECT hitRect{};
-        POINT dragOrigin{};
+        RenderRect widgetRect{};
+        RenderPoint drawStart{};
+        RenderPoint drawEnd{};
+        RenderRect hitRect{};
+        RenderPoint dragOrigin{};
         double value = 0.0;
         bool angularDrag = false;
         double angularMin = 0.0;
@@ -147,7 +149,7 @@ public:
         std::optional<EditableAnchorKey> activeEditableAnchor;
     };
 
-    struct FontHeights {
+    struct TextStyleMetrics {
         int title = 0;
         int big = 0;
         int value = 0;
@@ -159,18 +161,6 @@ public:
         int clockDate = 0;
     };
 
-    struct Fonts {
-        HFONT title = nullptr;
-        HFONT big = nullptr;
-        HFONT value = nullptr;
-        HFONT label = nullptr;
-        HFONT text = nullptr;
-        HFONT smallFont = nullptr;
-        HFONT footer = nullptr;
-        HFONT clockTime = nullptr;
-        HFONT clockDate = nullptr;
-    };
-
     struct EditableAnchorBinding {
         EditableAnchorKey key;
         int value = 0;
@@ -180,7 +170,7 @@ public:
     };
 
     struct TextLayoutResult {
-        RECT textRect{};
+        RenderRect textRect{};
     };
 
     DashboardRenderer();
@@ -197,14 +187,16 @@ public:
     int WindowWidth() const;
     int WindowHeight() const;
 
-    COLORREF BackgroundColor() const;
-    COLORREF ForegroundColor() const;
-    COLORREF AccentColor() const;
-    COLORREF LayoutGuideColor() const;
-    COLORREF ActiveEditColor() const;
-    COLORREF MutedTextColor() const;
-    HFONT LabelFont() const;
-    HFONT SmallFont() const;
+    RenderColor BackgroundColor() const;
+    RenderColor ForegroundColor() const;
+    RenderColor AccentColor() const;
+    RenderColor LayoutGuideColor() const;
+    RenderColor ActiveEditColor() const;
+    RenderColor MutedTextColor() const;
+    RenderColor TrackColor() const;
+    RenderColor GraphBackgroundColor() const;
+    RenderColor GraphMarkerColor() const;
+    RenderColor GraphAxisColor() const;
     void SetTraceOutput(std::ostream* traceOutput);
     const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
     const std::vector<WidgetEditGuide>& WidgetEditGuides() const;
@@ -213,9 +205,9 @@ public:
     std::optional<int> FindLayoutWidgetExtent(const LayoutWidgetIdentity& widget, LayoutGuideAxis axis) const;
     bool ApplyLayoutGuideWeightsPreview(
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
-    std::optional<LayoutWidgetIdentity> HitTestEditableWidget(POINT clientPoint) const;
-    std::optional<EditableAnchorKey> HitTestEditableAnchorTarget(POINT clientPoint) const;
-    std::optional<EditableAnchorKey> HitTestEditableAnchorHandle(POINT clientPoint) const;
+    std::optional<LayoutWidgetIdentity> HitTestEditableWidget(RenderPoint clientPoint) const;
+    std::optional<EditableAnchorKey> HitTestEditableAnchorTarget(RenderPoint clientPoint) const;
+    std::optional<EditableAnchorKey> HitTestEditableAnchorHandle(RenderPoint clientPoint) const;
     std::optional<EditableAnchorRegion> FindEditableAnchorRegion(const EditableAnchorKey& key) const;
 
     bool Initialize(HWND hwnd = nullptr);
@@ -228,66 +220,79 @@ public:
         const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     const std::string& LastError() const;
     const AppConfig& Config() const;
-    const FontHeights& FontMetrics() const;
-    const Fonts& WidgetFonts() const;
+    const TextStyleMetrics& TextMetrics() const;
     RenderMode CurrentRenderMode() const;
-    COLORREF TrackColor() const;
-    TextLayoutResult MeasureTextBlock(const RECT& rect, const std::string& text, HFONT font, UINT format) const;
-    void DrawText(const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format) const;
-    TextLayoutResult DrawTextBlock(const RECT& rect, const std::string& text, HFONT font, COLORREF color, UINT format);
-    void DrawPillBar(const RECT& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
-    void PushClipRect(const RECT& rect);
+    TextLayoutResult MeasureTextBlock(
+        const RenderRect& rect, const std::string& text, TextStyleId style, const TextLayoutOptions& options) const;
+    void DrawText(const RenderRect& rect,
+        const std::string& text,
+        TextStyleId style,
+        RenderColor color,
+        const TextLayoutOptions& options) const;
+    TextLayoutResult DrawTextBlock(const RenderRect& rect,
+        const std::string& text,
+        TextStyleId style,
+        RenderColor color,
+        const TextLayoutOptions& options);
+    void DrawPillBar(const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
+    void PushClipRect(const RenderRect& rect);
     void PopClipRect();
-    bool FillSolidRect(const RECT& rect, COLORREF color, BYTE alpha = 255);
-    bool FillSolidEllipse(int centerX, int centerY, int diameter, COLORREF color, BYTE alpha = 255);
-    bool FillSolidDiamond(const RECT& rect, COLORREF color, BYTE alpha = 255);
-    bool DrawSolidRect(const RECT& rect, COLORREF color, int strokeWidth = 1, bool dashed = false);
-    bool DrawSolidEllipse(const RECT& rect, COLORREF color, int strokeWidth = 1);
-    bool DrawSolidLine(POINT start, POINT end, COLORREF color, int strokeWidth = 1);
+    bool FillSolidRect(const RenderRect& rect, RenderColor color);
+    bool FillSolidEllipse(RenderPoint center, int diameter, RenderColor color);
+    bool FillSolidDiamond(const RenderRect& rect, RenderColor color);
+    bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke);
+    bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke);
+    bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke);
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DPathGeometry() const;
     Microsoft::WRL::ComPtr<ID2D1GeometryGroup> CreateD2DGeometryGroup(
         std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
-    bool FillD2DGeometry(ID2D1Geometry* geometry, COLORREF color, BYTE alpha = 255);
-    bool DrawD2DPolyline(std::span<const POINT> points, COLORREF color, int strokeWidth);
+    bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColor color);
+    bool DrawD2DPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke);
     EditableAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
     void RegisterStaticEditableAnchorRegion(const EditableAnchorKey& key,
-        const RECT& targetRect,
-        const RECT& anchorRect,
+        const RenderRect& targetRect,
+        const RenderRect& anchorRect,
         AnchorShape shape,
         AnchorDragAxis dragAxis,
         AnchorDragMode dragMode,
-        POINT dragOrigin,
+        RenderPoint dragOrigin,
         double dragScale,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
     void RegisterDynamicEditableAnchorRegion(const EditableAnchorKey& key,
-        const RECT& targetRect,
-        const RECT& anchorRect,
+        const RenderRect& targetRect,
+        const RenderRect& anchorRect,
         AnchorShape shape,
         AnchorDragAxis dragAxis,
         AnchorDragMode dragMode,
-        POINT dragOrigin,
+        RenderPoint dragOrigin,
         double dragScale,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
-    void RegisterStaticTextAnchor(
-        const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
+    void RegisterStaticTextAnchor(const RenderRect& rect,
+        const std::string& text,
+        TextStyleId style,
+        const TextLayoutOptions& options,
+        const EditableAnchorBinding& editable);
     void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult, const EditableAnchorBinding& editable);
-    void RegisterDynamicTextAnchor(
-        const RECT& rect, const std::string& text, HFONT font, UINT format, const EditableAnchorBinding& editable);
+    void RegisterDynamicTextAnchor(const RenderRect& rect,
+        const std::string& text,
+        TextStyleId style,
+        const TextLayoutOptions& options,
+        const EditableAnchorBinding& editable);
     std::vector<WidgetEditGuide>& WidgetEditGuidesMutable();
     int ScaleLogical(int value) const;
-    int MeasureTextWidth(HFONT font, std::string_view text) const;
+    int MeasureTextWidth(TextStyleId style, std::string_view text) const;
 
 private:
     friend struct DashboardLayoutResolver;
 
     struct SimilarityIndicator {
         LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
-        RECT rect{};
+        RenderRect rect{};
         int exactTypeOrdinal = 0;
     };
 
@@ -296,10 +301,10 @@ private:
         std::string title;
         std::string iconName;
         bool hasHeader = true;
-        RECT rect{};
-        RECT titleRect{};
-        RECT iconRect{};
-        RECT contentRect{};
+        RenderRect rect{};
+        RenderRect titleRect{};
+        RenderRect iconRect{};
+        RenderRect contentRect{};
         std::vector<DashboardWidgetLayout> widgets;
     };
 
@@ -317,11 +322,11 @@ private:
     };
 
     struct TextWidthCacheKey {
-        HFONT font = nullptr;
+        TextStyleId style = TextStyleId::Text;
         std::string text;
 
         bool operator==(const TextWidthCacheKey& other) const {
-            return font == other.font && text == other.text;
+            return style == other.style && text == other.text;
         }
     };
 
@@ -358,7 +363,7 @@ private:
     };
 
     struct TextWidthCacheLookupKey {
-        HFONT font = nullptr;
+        TextStyleId style = TextStyleId::Text;
         std::string_view text;
     };
 
@@ -366,11 +371,11 @@ private:
         using is_transparent = void;
 
         size_t operator()(const TextWidthCacheKey& key) const {
-            return (std::hash<HFONT>{}(key.font) * 1315423911u) ^ TransparentStringHash {}(key.text);
+            return (std::hash<int>{}(static_cast<int>(key.style)) * 1315423911u) ^ TransparentStringHash {}(key.text);
         }
 
         size_t operator()(const TextWidthCacheLookupKey& key) const {
-            return (std::hash<HFONT>{}(key.font) * 1315423911u) ^ TransparentStringHash {}(key.text);
+            return (std::hash<int>{}(static_cast<int>(key.style)) * 1315423911u) ^ TransparentStringHash {}(key.text);
         }
     };
 
@@ -378,15 +383,15 @@ private:
         using is_transparent = void;
 
         bool operator()(const TextWidthCacheKey& left, const TextWidthCacheKey& right) const {
-            return left.font == right.font && left.text == right.text;
+            return left.style == right.style && left.text == right.text;
         }
 
         bool operator()(const TextWidthCacheKey& left, const TextWidthCacheLookupKey& right) const {
-            return left.font == right.font && std::string_view(left.text) == right.text;
+            return left.style == right.style && std::string_view(left.text) == right.text;
         }
 
         bool operator()(const TextWidthCacheLookupKey& left, const TextWidthCacheKey& right) const {
-            return left.font == right.font && left.text == std::string_view(right.text);
+            return left.style == right.style && left.text == std::string_view(right.text);
         }
     };
 
@@ -410,30 +415,32 @@ private:
     };
 
     struct D2DBrushCacheKey {
-        COLORREF color = 0;
-        BYTE alpha = 255;
+        RenderColor color{};
 
         bool operator==(const D2DBrushCacheKey& other) const {
-            return color == other.color && alpha == other.alpha;
+            return color == other.color;
         }
     };
 
     struct D2DBrushCacheKeyHash {
         size_t operator()(const D2DBrushCacheKey& key) const {
-            return (std::hash<COLORREF>{}(key.color) * 1315423911u) ^ std::hash<int>{}(key.alpha);
+            return std::hash<std::uint32_t>{}(key.color.PackedRgba());
         }
     };
 
-    struct D2DTextFormats {
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> title;
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> big;
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> value;
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> label;
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> text;
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> smallFont;
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> footer;
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> clockTime;
-        Microsoft::WRL::ComPtr<IDWriteTextFormat> clockDate;
+    struct Palette {
+        RenderColor background{};
+        RenderColor foreground{};
+        RenderColor accent{};
+        RenderColor mutedText{};
+        RenderColor track{};
+        RenderColor layoutGuide{};
+        RenderColor activeEdit{};
+        RenderColor panelBorder{};
+        RenderColor panelFill{};
+        RenderColor graphBackground{};
+        RenderColor graphMarker{};
+        RenderColor graphAxis{};
     };
 
     void ClearD2DCaches();
@@ -443,22 +450,22 @@ private:
     void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
     void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
     void DrawPanel(const ResolvedCardLayout& card);
-    void DrawPanelIcon(const std::string& iconName, const RECT& iconRect);
+    void DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect);
     void DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
     const ParsedWidgetInfo* FindParsedWidgetInfo(const LayoutNodeConfig& node) const;
     DashboardWidgetLayout ResolveWidgetLayout(
-        const LayoutNodeConfig& node, const RECT& rect, bool instantiateWidget) const;
+        const LayoutNodeConfig& node, const RenderRect& rect, bool instantiateWidget) const;
     bool UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
-        const RECT& rect,
-        const std::vector<RECT>& childRects,
+        const RenderRect& rect,
+        const std::vector<RenderRect>& childRects,
         int gap,
         const std::string& renderCardId,
         const std::string& editCardId,
         const std::vector<size_t>& nodePath);
     void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
-        const RECT& rect,
+        const RenderRect& rect,
         std::vector<DashboardWidgetLayout>& widgets,
         std::vector<std::string>& cardReferenceStack,
         const std::string& renderCardId,
@@ -474,11 +481,10 @@ private:
     bool InitializeDirect2D();
     bool InitializeWic();
     void ShutdownDirect2D();
-    bool CreateFonts();
-    void DestroyFonts();
+    void RebuildPalette();
     bool LoadPanelIcons();
     void ReleasePanelIcons();
-    bool MeasureFonts();
+    bool RebuildTextFormatsAndMetrics();
     bool EnsureWindowRenderTarget();
     bool BeginDirect2DDraw(ID2D1RenderTarget* target);
     void EndDirect2DDraw();
@@ -486,18 +492,18 @@ private:
     void EndWindowDraw();
     void DrawDirect2DFrame(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     bool SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath);
-    ID2D1SolidColorBrush* D2DSolidBrush(COLORREF color, BYTE alpha = 255);
-    IDWriteTextFormat* DWriteTextFormatForFont(HFONT font) const;
+    ID2D1SolidColorBrush* D2DSolidBrush(RenderColor color);
+    IDWriteTextFormat* DWriteTextFormat(TextStyleId style) const;
     bool CreateDWriteTextFormats();
-    void ConfigureDWriteTextFormat(IDWriteTextFormat* format, UINT drawTextFormat) const;
-    TextLayoutResult MeasureTextBlockD2D(const RECT& rect,
+    void ConfigureDWriteTextFormat(IDWriteTextFormat* format, const TextLayoutOptions& options) const;
+    TextLayoutResult MeasureTextBlockD2D(const RenderRect& rect,
         const std::wstring& wideText,
-        HFONT font,
-        UINT format,
+        TextStyleId style,
+        const TextLayoutOptions& options,
         Microsoft::WRL::ComPtr<IDWriteTextLayout>* layout = nullptr) const;
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
-        const RECT& rect,
+        const RenderRect& rect,
         std::vector<DashboardWidgetLayout>& widgets,
         bool instantiateWidgets = true);
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
@@ -513,21 +519,21 @@ private:
     static bool IsContainerNode(const LayoutNodeConfig& node);
     void RegisterEditableAnchorRegion(std::vector<EditableAnchorRegion>& regions,
         const EditableAnchorKey& key,
-        const RECT& targetRect,
-        const RECT& anchorRect,
+        const RenderRect& targetRect,
+        const RenderRect& anchorRect,
         AnchorShape shape,
         AnchorDragAxis dragAxis,
         AnchorDragMode dragMode,
-        POINT dragOrigin,
+        RenderPoint dragOrigin,
         double dragScale,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
     void RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
-        const RECT& rect,
+        const RenderRect& rect,
         const std::string& text,
-        HFONT font,
-        UINT format,
+        TextStyleId style,
+        const TextLayoutOptions& options,
         const EditableAnchorBinding& editable);
     void RegisterTextAnchor(std::vector<EditableAnchorRegion>& regions,
         const TextLayoutResult& layoutResult,
@@ -542,9 +548,9 @@ private:
     std::ostream* traceOutput_ = nullptr;
     ULONG_PTR gdiplusToken_ = 0;
     std::vector<std::pair<std::string, std::unique_ptr<Gdiplus::Bitmap>>> panelIcons_;
-    Fonts fonts_{};
-    D2DTextFormats d2dTextFormats_{};
-    FontHeights fontHeights_{};
+    std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
+    TextStyleMetrics textStyleMetrics_{};
+    Palette palette_{};
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<WidgetEditGuide> widgetEditGuides_;

@@ -54,7 +54,7 @@ public:
         };
 
         Kind kind = Kind::LayoutGuide;
-        POINT clientPoint{};
+        RenderPoint clientPoint{};
         DashboardRenderer::LayoutEditGuide layoutGuide{};
         DashboardRenderer::WidgetEditGuide widgetGuide{};
         DashboardRenderer::EditableAnchorRegion editableAnchor{};
@@ -65,10 +65,10 @@ public:
     void StartSession();
     void StopSession(bool showLayoutEditGuidesAfterStop);
 
-    bool HandleLButtonDown(HWND hwnd, POINT clientPoint);
-    bool HandleMouseMove(POINT clientPoint);
+    bool HandleLButtonDown(HWND hwnd, RenderPoint clientPoint);
+    bool HandleMouseMove(RenderPoint clientPoint);
     bool HandleMouseLeave();
-    bool HandleLButtonUp(POINT clientPoint);
+    bool HandleLButtonUp(RenderPoint clientPoint);
     bool HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner);
     bool HandleSetCursor(HWND hwnd);
     std::optional<TooltipTarget> CurrentTooltipTarget();
@@ -132,23 +132,25 @@ private:
         DashboardRenderer::EditableAnchorKey key;
         DashboardRenderer::AnchorDragAxis dragAxis = DashboardRenderer::AnchorDragAxis::Vertical;
         DashboardRenderer::AnchorDragMode dragMode = DashboardRenderer::AnchorDragMode::AxisDelta;
-        POINT dragOrigin{};
+        RenderPoint dragOrigin{};
         double dragScale = 1.0;
         int initialValue = 0;
-        POINT dragStartPoint{};
+        RenderPoint dragStartPoint{};
         double dragStartDistancePixels = 0.0;
     };
 
-    const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(POINT clientPoint, size_t* index = nullptr) const;
-    const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(POINT clientPoint, size_t* index = nullptr) const;
-    HoverResolution ResolveHover(POINT clientPoint) const;
-    void RefreshHover(POINT clientPoint);
-    bool UpdateLayoutDrag(POINT clientPoint);
-    bool UpdateWidgetEditDrag(POINT clientPoint);
-    bool UpdateAnchorEditDrag(POINT clientPoint);
+    const DashboardRenderer::LayoutEditGuide* HitTestLayoutGuide(
+        RenderPoint clientPoint, size_t* index = nullptr) const;
+    const DashboardRenderer::WidgetEditGuide* HitTestWidgetEditGuide(
+        RenderPoint clientPoint, size_t* index = nullptr) const;
+    HoverResolution ResolveHover(RenderPoint clientPoint) const;
+    void RefreshHover(RenderPoint clientPoint);
+    bool UpdateLayoutDrag(RenderPoint clientPoint);
+    bool UpdateWidgetEditDrag(RenderPoint clientPoint);
+    bool UpdateAnchorEditDrag(RenderPoint clientPoint);
     void SyncRendererInteractionState();
     void ClearInteractionState();
-    void SetCursorForPoint(POINT clientPoint);
+    void SetCursorForPoint(RenderPoint clientPoint);
     std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(
         LayoutDragState& drag, const std::vector<int>& freeWeights);
 
@@ -160,5 +162,5 @@ private:
     std::optional<LayoutDragState> activeLayoutDrag_;
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
-    POINT lastClientPoint_{};
+    RenderPoint lastClientPoint_{};
 };

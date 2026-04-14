@@ -20,7 +20,7 @@ void TextWidget::Initialize(const LayoutNodeConfig& node) {
 }
 
 int TextWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return renderer.FontMetrics().text + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.text.bottomGap));
+    return renderer.TextMetrics().text + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.text.bottomGap));
 }
 
 bool TextWidget::UsesFixedPreferredHeightInRows() const {
@@ -37,9 +37,9 @@ void TextWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWid
     guide.parameter = DashboardRenderer::LayoutEditParameter::TextBottomGap;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
-    guide.drawStart = POINT{widget.rect.left, y};
-    guide.drawEnd = POINT{widget.rect.right, y};
-    guide.hitRect = RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
+    guide.drawStart = RenderPoint{widget.rect.left, y};
+    guide.drawEnd = RenderPoint{widget.rect.right, y};
+    guide.hitRect = RenderRect{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
     guide.value = renderer.Config().layout.text.bottomGap;
     guide.dragDirection = 1;
     renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
@@ -50,9 +50,9 @@ void TextWidget::Draw(
     const std::string text = metrics.ResolveText(metric_);
     const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
-        renderer.WidgetFonts().text,
+        TextStyleId::Text,
         renderer.ForegroundColor(),
-        DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     const auto binding = renderer.MakeEditableTextBinding(
         widget, DashboardRenderer::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
     if (metric_ == "cpu.name" || metric_ == "gpu.name") {
@@ -60,8 +60,8 @@ void TextWidget::Draw(
             cachedStaticText_ = text;
             renderer.RegisterStaticTextAnchor(widget.rect,
                 cachedStaticText_,
-                renderer.WidgetFonts().text,
-                DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS,
+                TextStyleId::Text,
+                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true),
                 binding);
             staticAnchorRegistered_ = true;
         }

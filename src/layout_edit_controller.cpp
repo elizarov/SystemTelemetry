@@ -70,7 +70,7 @@ double NormalizeDegrees(double degrees) {
     return normalized;
 }
 
-std::optional<double> ComputeGaugeSweepDegrees(POINT origin, POINT clientPoint) {
+std::optional<double> ComputeGaugeSweepDegrees(RenderPoint origin, RenderPoint clientPoint) {
     const double dx = static_cast<double>(clientPoint.x - origin.x);
     const double dy = static_cast<double>(clientPoint.y - origin.y);
     if (std::abs(dx) < 0.001 && std::abs(dy) < 0.001) {
@@ -86,7 +86,7 @@ std::optional<double> ComputeGaugeSweepDegrees(POINT origin, POINT clientPoint) 
     return std::clamp(360.0 - (gapHalf * 2.0), 0.0, 360.0);
 }
 
-std::optional<double> ComputeGaugePointerAngle(POINT origin, POINT clientPoint) {
+std::optional<double> ComputeGaugePointerAngle(RenderPoint origin, RenderPoint clientPoint) {
     const double dx = static_cast<double>(clientPoint.x - origin.x);
     const double dy = static_cast<double>(clientPoint.y - origin.y);
     if (std::abs(dx) < 0.001 && std::abs(dy) < 0.001) {
@@ -142,7 +142,7 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
 }
 
 std::optional<double> ComputeGaugeSegmentGapDegrees(
-    const DashboardRenderer::WidgetEditGuide& guide, POINT clientPoint) {
+    const DashboardRenderer::WidgetEditGuide& guide, RenderPoint clientPoint) {
     const auto pointerAngle = ComputeGaugePointerAngle(guide.dragOrigin, clientPoint);
     if (!pointerAngle.has_value()) {
         return std::nullopt;
@@ -187,10 +187,10 @@ void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
 }
 
 const DashboardRenderer::LayoutEditGuide* LayoutEditController::HitTestLayoutGuide(
-    POINT clientPoint, size_t* index) const {
+    RenderPoint clientPoint, size_t* index) const {
     const auto& guides = host_.LayoutEditRenderer().LayoutEditGuides();
     for (size_t i = 0; i < guides.size(); ++i) {
-        if (PtInRect(&guides[i].hitRect, clientPoint)) {
+        if (guides[i].hitRect.Contains(clientPoint)) {
             if (index != nullptr) {
                 *index = i;
             }
@@ -201,13 +201,13 @@ const DashboardRenderer::LayoutEditGuide* LayoutEditController::HitTestLayoutGui
 }
 
 const DashboardRenderer::WidgetEditGuide* LayoutEditController::HitTestWidgetEditGuide(
-    POINT clientPoint, size_t* index) const {
+    RenderPoint clientPoint, size_t* index) const {
     const auto& guides = host_.LayoutEditRenderer().WidgetEditGuides();
     const DashboardRenderer::WidgetEditGuide* bestGuide = nullptr;
     size_t bestIndex = 0;
     int bestPriority = (std::numeric_limits<int>::max)();
     for (size_t i = 0; i < guides.size(); ++i) {
-        if (!PtInRect(&guides[i].hitRect, clientPoint)) {
+        if (!guides[i].hitRect.Contains(clientPoint)) {
             continue;
         }
 
@@ -224,7 +224,7 @@ const DashboardRenderer::WidgetEditGuide* LayoutEditController::HitTestWidgetEdi
     return bestGuide;
 }
 
-LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT clientPoint) const {
+LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderPoint clientPoint) const {
     HoverResolution resolution;
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
 
@@ -289,7 +289,7 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(POINT c
     return resolution;
 }
 
-void LayoutEditController::RefreshHover(POINT clientPoint) {
+void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     if (activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeAnchorEditDrag_.has_value()) {
         return;
     }
@@ -333,7 +333,7 @@ void LayoutEditController::RefreshHover(POINT clientPoint) {
     SetCursorForPoint(clientPoint);
 }
 
-bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
+bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint) {
     lastClientPoint_ = clientPoint;
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
     const HoverResolution resolution = ResolveHover(clientPoint);
@@ -400,7 +400,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, POINT clientPoint) {
     return false;
 }
 
-bool LayoutEditController::HandleMouseMove(POINT clientPoint) {
+bool LayoutEditController::HandleMouseMove(RenderPoint clientPoint) {
     lastClientPoint_ = clientPoint;
     if (activeLayoutDrag_.has_value()) {
         return UpdateLayoutDrag(clientPoint);
@@ -436,7 +436,7 @@ bool LayoutEditController::HandleMouseLeave() {
     return true;
 }
 
-bool LayoutEditController::HandleLButtonUp(POINT clientPoint) {
+bool LayoutEditController::HandleLButtonUp(RenderPoint clientPoint) {
     lastClientPoint_ = clientPoint;
     bool released = false;
     bool releasedLayoutDrag = false;
@@ -521,7 +521,7 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     POINT cursor{};
     GetCursorPos(&cursor);
     ScreenToClient(hwnd, &cursor);
-    RefreshHover(cursor);
+    RefreshHover(RenderPoint{cursor.x, cursor.y});
     return true;
 }
 
@@ -620,7 +620,7 @@ void LayoutEditController::ClearInteractionState() {
     activeAnchorEditDrag_.reset();
 }
 
-void LayoutEditController::SetCursorForPoint(POINT clientPoint) {
+void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
     const HoverResolution resolution = ResolveHover(clientPoint);
     if (resolution.actionableAnchorHandle.has_value()) {
         const auto region = host_.LayoutEditRenderer().FindEditableAnchorRegion(*resolution.actionableAnchorHandle);
@@ -714,7 +714,7 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
     return std::nullopt;
 }
 
-bool LayoutEditController::UpdateLayoutDrag(POINT clientPoint) {
+bool LayoutEditController::UpdateLayoutDrag(RenderPoint clientPoint) {
     LayoutDragState& drag = *activeLayoutDrag_;
     const int currentCoordinate =
         drag.guide.axis == DashboardRenderer::LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y;
@@ -759,7 +759,7 @@ bool LayoutEditController::UpdateLayoutDrag(POINT clientPoint) {
     return true;
 }
 
-bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
+bool LayoutEditController::UpdateWidgetEditDrag(RenderPoint clientPoint) {
     WidgetEditDragState& drag = *activeWidgetEditDrag_;
     double nextValue = drag.initialValue;
     if (drag.guide.angularDrag) {
@@ -810,7 +810,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(POINT clientPoint) {
     return true;
 }
 
-bool LayoutEditController::UpdateAnchorEditDrag(POINT clientPoint) {
+bool LayoutEditController::UpdateAnchorEditDrag(RenderPoint clientPoint) {
     AnchorEditDragState& drag = *activeAnchorEditDrag_;
     int logicalDelta = 0;
     if (drag.dragMode == DashboardRenderer::AnchorDragMode::RadialDistance) {

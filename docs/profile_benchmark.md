@@ -24,10 +24,10 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `apply avg_ms=0.22`
   - `paint_draw avg_ms=2.09`
 - Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=2.52` to `2.53`
+  - `drag_loop per_iter_ms=2.45` to `2.49`
   - `snap avg_ms=0.20` to `0.21`
-  - `apply avg_ms=0.22` to `0.23`
-  - `paint_draw avg_ms=2.09` to `2.11`
+  - `apply avg_ms=0.27`
+  - `paint_draw avg_ms=1.98` to `2.01`
 
 ## Current Confirmed Hotspots
 
@@ -35,6 +35,7 @@ Current useful hotspot signals from the latest daemon-backed WPR capture on the 
 
 - The exported WPA text no longer surfaces stable named renderer functions for the benchmark process, but it does show the heaviest benchmark-process module weights in `d2d1.dll`, `amdxx64.dll`, `win32kfull.sys`, and `d3d11.dll`.
 - The latest fixed-text capture also surfaces `DWrite.dll` and `TextShaping.dll` as meaningful benchmark-process module weights, which matches the restored full text path in the Direct2D renderer.
+- The latest type-migration validation capture under `build\profile_benchmark_daemon\requests\15442_29295_22877\` keeps that same Direct2D and DirectWrite hotspot shape, so replacing Win32 renderer-contract types did not reintroduce GDI text work into the hot path.
 - `GdiPlus.dll` still loads because panel icons are still decoded and scaled through GDI+ before upload into Direct2D bitmaps, but its weight in the benchmark process stays below the Direct2D, DirectWrite, and driver stack modules.
 - The fast benchmark reruns stay consistent enough that the draw-path win is real even though the coarse text export no longer pinpoints the remaining app-side leaves by symbol.
 
@@ -58,6 +59,7 @@ These changes produced real wins and remain in the codebase:
 - Reuse one cached `DashboardMetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse smoothed throughput history and formatted metric payloads until telemetry publishes a newer snapshot.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 - Remove the legacy renderer GDI fallback path and keep both live repaint and screenshot export on the same Direct2D and DirectWrite scene.
+- Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
 
 ## Tested Hypotheses
 
@@ -158,6 +160,19 @@ These changes produced real wins and remain in the codebase:
   - Current reruns with this cleanup in place stay inside about `drag_loop per_iter_ms=4.45-4.59` and `paint_draw avg_ms=3.75-3.88`, which does not move clearly beyond the renderer-metric-cache win on its own.
 - Conclusion:
   - The text-cache key churn is real overhead, but this specific cleanup does not move the full drag benchmark enough to treat it as an independent win.
+
+### Hypothesis: Replace Win32 renderer-contract types with renderer-owned D2D-native contract types
+
+- Change:
+  - Introduce shared render-space `RenderPoint`, `RenderRect`, `RenderColor`, `RenderStroke`, `TextStyleId`, and `TextLayoutOptions` types, migrate renderer and widget contracts onto those types, move renderer text style lookup to DirectWrite text-format ids, and keep raw Win32 input and GDI overlay types only at the `DashboardApp` shell boundary.
+- Result:
+  - Neutral to slightly helpful, and kept.
+- Observed effect:
+  - `build\SystemTelemetryBenchmarks.exe 240 2` ran at `drag_loop per_iter_ms=2.48`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=2.00`.
+  - `build\SystemTelemetryBenchmarks.exe 480 2` ran at `drag_loop per_iter_ms=2.45`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=1.98`.
+  - `profile_benchmark.cmd 240 2` kept the benchmark hotspot shape in `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, the display driver, and `win32kfull.sys`, with no new GDI text hotspot.
+- Conclusion:
+  - The type migration is safe to keep. It simplifies the Direct2D renderer boundary without costing measurable draw-path time and keeps raw Win32 types confined to the shell-owned move overlay and message-handling edge.
 
 ### Hypothesis: Reuse cached overlay pens for layout-edit guide and highlight draws
 

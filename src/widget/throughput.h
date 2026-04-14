@@ -5,11 +5,11 @@
 class ThroughputWidget final : public DashboardWidget {
 public:
     struct LayoutState {
-        RECT valueRect{};
-        RECT graphRect{};
-        RECT leaderAnchorRect{};
-        RECT plotAnchorRect{};
-        RECT guideAnchorRect{};
+        RenderRect valueRect{};
+        RenderRect graphRect{};
+        RenderRect leaderAnchorRect{};
+        RenderRect plotAnchorRect{};
+        RenderRect guideAnchorRect{};
         int axisWidth = 1;
         int labelBandHeight = 0;
         int graphTop = 0;
@@ -35,7 +35,7 @@ public:
     std::unique_ptr<DashboardWidget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const DashboardRenderer& renderer) const override;
-    void ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) override;
+    void ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) override;
     void Draw(DashboardRenderer& renderer,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;

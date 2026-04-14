@@ -14,7 +14,7 @@ std::unique_ptr<DashboardWidget> ClockDateWidget::Clone() const {
 void ClockDateWidget::Initialize(const LayoutNodeConfig&) {}
 
 int ClockDateWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return renderer.FontMetrics().clockDate;
+    return renderer.TextMetrics().clockDate;
 }
 
 bool ClockDateWidget::UsesFixedPreferredHeightInRows() const {
@@ -30,9 +30,9 @@ void ClockDateWidget::Draw(
     const std::string text = metrics.ResolveClockDate();
     const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
-        renderer.WidgetFonts().clockDate,
+        TextStyleId::ClockDate,
         renderer.MutedTextColor(),
-        DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontClockDate,

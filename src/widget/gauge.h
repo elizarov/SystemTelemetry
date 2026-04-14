@@ -10,10 +10,6 @@
 
 struct GaugeSharedLayout;
 
-namespace Gdiplus {
-class GraphicsPath;
-}
-
 class GaugeWidget final : public DashboardWidget {
 public:
     struct SegmentLayout {
@@ -45,17 +41,14 @@ public:
         int labelHeight = 0;
         int guideHalfExtension = 1;
         int hitInset = 4;
-        RECT segmentCountAnchorRect{};
-        RECT outerPaddingAnchorRect{};
-        RECT ringThicknessAnchorRect{};
-        RECT valueRect{};
-        RECT labelRect{};
-        std::vector<std::shared_ptr<Gdiplus::GraphicsPath>> segmentPaths;
-        std::shared_ptr<Gdiplus::GraphicsPath> trackPath;
+        RenderRect segmentCountAnchorRect{};
+        RenderRect outerPaddingAnchorRect{};
+        RenderRect ringThicknessAnchorRect{};
+        RenderRect valueRect{};
+        RenderRect labelRect{};
         std::vector<Microsoft::WRL::ComPtr<ID2D1PathGeometry>> d2dSegmentPaths;
         Microsoft::WRL::ComPtr<ID2D1GeometryGroup> d2dTrackPath;
         mutable int cachedUsageSegmentCount = -1;
-        mutable std::shared_ptr<Gdiplus::GraphicsPath> cachedUsagePath;
         mutable Microsoft::WRL::ComPtr<ID2D1GeometryGroup> d2dCachedUsagePath;
     };
 
@@ -63,7 +56,7 @@ public:
     std::unique_ptr<DashboardWidget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const DashboardRenderer& renderer) const override;
-    void ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) override;
+    void ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) override;
     void Draw(DashboardRenderer& renderer,
         const DashboardWidgetLayout& widget,
         const DashboardMetricSource& metrics) const override;

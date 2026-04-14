@@ -32,7 +32,7 @@ MetricListWidget::Entry ParseMetricListEntry(std::string item) {
 }
 
 int EffectiveMetricRowHeight(const DashboardRenderer& renderer) {
-    const int valueHeight = renderer.FontMetrics().value;
+    const int valueHeight = renderer.TextMetrics().value;
     const int barHeight = std::max(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
     const int rowGap = std::max(0, renderer.ScaleLogical(renderer.Config().layout.metricList.rowGap));
     return valueHeight + rowGap + barHeight;
@@ -99,18 +99,17 @@ int MetricListWidget::PreferredHeight(const DashboardRenderer& renderer) const {
     return static_cast<int>(entries_.size()) * EffectiveMetricRowHeight(renderer);
 }
 
-void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RECT& rect) {
+void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) {
     layoutState_ = {};
     layoutState_.rowHeight = EffectiveMetricRowHeight(renderer);
     layoutState_.labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
     layoutState_.metricBarHeight = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
     layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
-    const int valueHeight = renderer.FontMetrics().value;
+    const int valueHeight = renderer.TextMetrics().value;
     const int rowContentHeight = valueHeight + layoutState_.metricBarHeight;
     layoutState_.visibleRows =
         layoutState_.rowHeight > 0
-            ? std::clamp(((std::max)(0, static_cast<int>(rect.bottom - rect.top)) + layoutState_.rowHeight - 1) /
-                             layoutState_.rowHeight,
+            ? std::clamp(((std::max)(0, rect.bottom - rect.top) + layoutState_.rowHeight - 1) / layoutState_.rowHeight,
                   0,
                   static_cast<int>(entries_.size()))
             : 0;
@@ -119,29 +118,34 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     layoutState_.valueRects.clear();
     layoutState_.barRects.clear();
     layoutState_.barAnchorRects.clear();
-    RECT rowRect{rect.left, rect.top, rect.right, rect.top + layoutState_.rowHeight};
+    RenderRect rowRect{rect.left, rect.top, rect.right, rect.top + layoutState_.rowHeight};
     for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
         layoutState_.rowRects.push_back(rowRect);
-        RECT labelRect{rowRect.left,
+        RenderRect labelRect{rowRect.left,
             rowRect.top,
             (std::min)(rowRect.right, rowRect.left + layoutState_.labelWidth),
             rowRect.bottom};
         const int contentTop =
             static_cast<int>(rowRect.top) + (std::max)(0, (layoutState_.rowHeight - rowContentHeight) / 2);
-        RECT valueRect{labelRect.right, contentTop, rowRect.right, contentTop + valueHeight};
+        RenderRect valueRect{labelRect.right, contentTop, rowRect.right, contentTop + valueHeight};
         const int barTop = valueRect.bottom;
         const int barBottom = barTop + layoutState_.metricBarHeight;
         layoutState_.labelRects.push_back(labelRect);
         layoutState_.valueRects.push_back(valueRect);
-        layoutState_.barRects.push_back(RECT{valueRect.left, barTop, rowRect.right, barBottom});
+        layoutState_.barRects.push_back(RenderRect{valueRect.left, barTop, rowRect.right, barBottom});
         const int anchorCenterX =
             static_cast<int>(valueRect.left) + ((std::max)(0, static_cast<int>(rowRect.right - valueRect.left) / 2));
         const int anchorCenterY = barBottom;
-        layoutState_.barAnchorRects.push_back(RECT{anchorCenterX - (layoutState_.anchorSize / 2),
+        layoutState_.barAnchorRects.push_back(RenderRect{anchorCenterX - (layoutState_.anchorSize / 2),
             anchorCenterY - (layoutState_.anchorSize / 2),
             anchorCenterX - (layoutState_.anchorSize / 2) + layoutState_.anchorSize,
             anchorCenterY - (layoutState_.anchorSize / 2) + layoutState_.anchorSize});
-        OffsetRect(&rowRect, 0, layoutState_.rowHeight);
+        rowRect = RenderRect{
+            rowRect.left,
+            rowRect.top + layoutState_.rowHeight,
+            rowRect.right,
+            rowRect.bottom + layoutState_.rowHeight,
+        };
     }
 }
 
@@ -153,26 +157,26 @@ void MetricListWidget::Draw(
         if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
             break;
         }
-        const RECT& labelRect = layoutState_.labelRects[rowIndex];
-        const RECT& valueRect = layoutState_.valueRects[rowIndex];
+        const RenderRect& labelRect = layoutState_.labelRects[rowIndex];
+        const RenderRect& valueRect = layoutState_.valueRects[rowIndex];
         renderer.DrawText(labelRect,
             row.label,
-            renderer.WidgetFonts().label,
+            TextStyleId::Label,
             renderer.MutedTextColor(),
-            DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
             const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(valueRect,
                 row.valueText,
-                renderer.WidgetFonts().value,
+                TextStyleId::Value,
                 renderer.ForegroundColor(),
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
             renderer.RegisterDynamicTextAnchor(valueLayout,
                 renderer.MakeEditableTextBinding(widget,
                     DashboardRenderer::LayoutEditParameter::FontValue,
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size));
         }
-        const RECT& barRect = layoutState_.barRects[rowIndex];
+        const RenderRect& barRect = layoutState_.barRects[rowIndex];
         renderer.DrawPillBar(
             barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
 
@@ -188,10 +192,10 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         rowIndex < static_cast<int>(layoutState_.barAnchorRects.size()) &&
         rowIndex < static_cast<int>(layoutState_.labelRects.size()) && rowIndex < static_cast<int>(entries_.size());
         ++rowIndex) {
-        const RECT& barRect = layoutState_.barRects[rowIndex];
-        const RECT& anchorRect = layoutState_.barAnchorRects[rowIndex];
-        const int anchorCenterX = anchorRect.left + ((std::max)(0L, anchorRect.right - anchorRect.left) / 2);
-        const int anchorCenterY = anchorRect.top + ((std::max)(0L, anchorRect.bottom - anchorRect.top) / 2);
+        const RenderRect& barRect = layoutState_.barRects[rowIndex];
+        const RenderRect& anchorRect = layoutState_.barAnchorRects[rowIndex];
+        const int anchorCenterX = anchorRect.left + ((std::max)(0, anchorRect.right - anchorRect.left) / 2);
+        const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
         renderer.RegisterStaticEditableAnchorRegion(
             DashboardRenderer::EditableAnchorKey{
                 DashboardRenderer::LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -203,7 +207,7 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
             DashboardRenderer::AnchorShape::Circle,
             DashboardRenderer::AnchorDragAxis::Horizontal,
             DashboardRenderer::AnchorDragMode::AxisDelta,
-            POINT{anchorCenterX, anchorCenterY},
+            RenderPoint{anchorCenterX, anchorCenterY},
             1.0,
             false,
             true,
@@ -212,8 +216,8 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         if (!label.empty()) {
             renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
                 label,
-                renderer.WidgetFonts().label,
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+                TextStyleId::Label,
+                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
                 renderer.MakeEditableTextBinding(widget,
                     DashboardRenderer::LayoutEditParameter::FontLabel,
                     rowIndex * 2,
@@ -235,9 +239,9 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
     guide.parameter = DashboardRenderer::LayoutEditParameter::MetricListLabelWidth;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
-    guide.drawStart = POINT{x, widget.rect.top};
-    guide.drawEnd = POINT{x, widget.rect.bottom};
-    guide.hitRect = RECT{x - hitInset, widget.rect.top, x + hitInset + 1, widget.rect.bottom};
+    guide.drawStart = RenderPoint{x, widget.rect.top};
+    guide.drawEnd = RenderPoint{x, widget.rect.bottom};
+    guide.hitRect = RenderRect{x - hitInset, widget.rect.top, x + hitInset + 1, widget.rect.bottom};
     guide.value = renderer.Config().layout.metricList.labelWidth;
     guide.dragDirection = 1;
     guides.push_back(guide);
@@ -250,9 +254,9 @@ void MetricListWidget::BuildEditGuides(DashboardRenderer& renderer, const Dashbo
         guide.parameter = DashboardRenderer::LayoutEditParameter::MetricListRowGap;
         guide.guideId = 1 + rowIndex;
         guide.widgetRect = widget.rect;
-        guide.drawStart = POINT{widget.rect.left, y};
-        guide.drawEnd = POINT{widget.rect.right, y};
-        guide.hitRect = RECT{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
+        guide.drawStart = RenderPoint{widget.rect.left, y};
+        guide.drawEnd = RenderPoint{widget.rect.right, y};
+        guide.hitRect = RenderRect{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
         guide.value = renderer.Config().layout.metricList.rowGap;
         guide.dragDirection = 1;
         guides.push_back(std::move(guide));
