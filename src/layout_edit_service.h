@@ -8,8 +8,6 @@
 #include "layout_edit_commands.h"
 #include "layout_edit_controller.h"
 
-namespace layout_edit {
-
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditHost::LayoutTarget& target);
 
 std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNodeConfig* node);
@@ -21,5 +19,3 @@ std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& render
     const std::vector<int>& weights,
     const LayoutEditWidgetIdentity& widget,
     LayoutGuideAxis axis);
-
-}  // namespace layout_edit

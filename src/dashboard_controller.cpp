@@ -385,7 +385,7 @@ void DashboardController::StopLayoutEditMode(
 
 bool DashboardController::ApplyLayoutGuideWeights(
     DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
-    if (!layout_edit::ApplyGuideWeights(state_.config, target, weights)) {
+    if (!ApplyGuideWeights(state_.config, target, weights)) {
         return false;
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
@@ -401,7 +401,7 @@ bool DashboardController::ApplyLayoutEditValue(
     } else if (parameter == DashboardRenderer::LayoutEditParameter::DriveUsageActivitySegmentGap) {
         nextValue = ClampDriveUsageActivitySegmentGapForCurrentConfig(state_.config, nextValue);
     }
-    if (!layout_edit::ApplyValue(state_.config, parameter, nextValue)) {
+    if (!ApplyValue(state_.config, parameter, nextValue)) {
         return false;
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
@@ -422,9 +422,9 @@ bool DashboardController::ApplyLayoutEditFont(
 std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,
-    const layout_edit::LayoutEditWidgetIdentity& widget,
-    layout_edit::LayoutGuideAxis axis) {
-    return layout_edit::EvaluateWidgetExtentForGuideWeights(shell.Renderer(), target, weights, widget, axis);
+    const LayoutEditWidgetIdentity& widget,
+    LayoutGuideAxis axis) {
+    return EvaluateWidgetExtentForGuideWeights(shell.Renderer(), target, weights, widget, axis);
 }
 
 AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {

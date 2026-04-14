@@ -10,10 +10,6 @@
 #include "layout_edit_parameter.h"
 #include "render_types.h"
 
-namespace layout_edit {
-
-using LayoutEditParameter = ::LayoutEditParameter;
-
 enum class LayoutGuideAxis {
     Horizontal,
     Vertical,
@@ -219,5 +215,3 @@ inline RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload) {
         },
         payload);
 }
-
-}  // namespace layout_edit

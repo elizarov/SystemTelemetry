@@ -27,26 +27,6 @@
 #include "trace.h"
 #include "utf8.h"
 
-using layout_edit::AnchorDragAxis;
-using layout_edit::AnchorDragMode;
-using layout_edit::AnchorShape;
-using layout_edit::LayoutEditAnchorBinding;
-using layout_edit::LayoutEditAnchorKey;
-using layout_edit::LayoutEditAnchorRegion;
-using layout_edit::LayoutEditGapAnchor;
-using layout_edit::LayoutEditGapAnchorKey;
-using layout_edit::LayoutEditGuide;
-using layout_edit::LayoutEditWidgetGuide;
-using layout_edit::LayoutEditWidgetIdentity;
-using layout_edit::LayoutGuideAxis;
-using layout_edit::LayoutGuideSnapCandidate;
-using EditableAnchorKey = layout_edit::LayoutEditAnchorKey;
-using EditableAnchorRegion = layout_edit::LayoutEditAnchorRegion;
-using GapEditAnchor = layout_edit::LayoutEditGapAnchor;
-using GapEditAnchorKey = layout_edit::LayoutEditGapAnchorKey;
-using LayoutWidgetIdentity = layout_edit::LayoutEditWidgetIdentity;
-using WidgetEditGuide = layout_edit::LayoutEditWidgetGuide;
-
 namespace {
 
 RenderColor ToRenderColor(unsigned int color, std::uint8_t alpha = 255) {
@@ -518,7 +498,7 @@ void DashboardRenderer::DrawText(const RenderRect& rect,
 
 void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides || !overlayState.hoveredEditableWidget.has_value() ||
-        overlayState.hoveredEditableWidget->kind != LayoutWidgetIdentity::Kind::Widget) {
+        overlayState.hoveredEditableWidget->kind != LayoutEditWidgetIdentity::Kind::Widget) {
         return;
     }
 
@@ -545,10 +525,10 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         return;
     }
 
-    std::vector<std::pair<EditableAnchorRegion, bool>> highlights;
-    const auto appendHighlight = [&](const EditableAnchorRegion& region, bool active) {
+    std::vector<std::pair<LayoutEditAnchorRegion, bool>> highlights;
+    const auto appendHighlight = [&](const LayoutEditAnchorRegion& region, bool active) {
         const auto existing = std::find_if(highlights.begin(), highlights.end(), [&](const auto& entry) {
-            return layout_edit::MatchesEditableAnchorKey(entry.first.key, region.key);
+            return MatchesEditableAnchorKey(entry.first.key, region.key);
         });
         if (existing == highlights.end()) {
             highlights.push_back({region, active});
@@ -556,7 +536,7 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         }
         existing->second = existing->second || active;
     };
-    const auto appendByKey = [&](const std::optional<EditableAnchorKey>& key, bool active) {
+    const auto appendByKey = [&](const std::optional<LayoutEditAnchorKey>& key, bool active) {
         if (!key.has_value()) {
             return;
         }
@@ -566,12 +546,12 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         }
     };
     if (overlayState.hoveredEditableWidget.has_value()) {
-        const auto collectHovered = [&](const std::vector<EditableAnchorRegion>& regions) {
+        const auto collectHovered = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
             for (const auto& region : regions) {
                 if (!region.showWhenWidgetHovered) {
                     continue;
                 }
-                if (region.key.widget.kind != LayoutWidgetIdentity::Kind::Widget ||
+                if (region.key.widget.kind != LayoutEditWidgetIdentity::Kind::Widget ||
                     region.key.widget.renderCardId != overlayState.hoveredEditableWidget->renderCardId ||
                     region.key.widget.editCardId != overlayState.hoveredEditableWidget->editCardId ||
                     region.key.widget.nodePath != overlayState.hoveredEditableWidget->nodePath) {
@@ -584,9 +564,10 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         collectHovered(dynamicEditableAnchorRegions_);
     }
     if (overlayState.hoveredEditableCard.has_value()) {
-        const auto collectHoveredCard = [&](const std::vector<EditableAnchorRegion>& regions) {
+        const auto collectHoveredCard = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
             for (const auto& region : regions) {
-                if (!region.showWhenWidgetHovered || region.key.widget.kind != LayoutWidgetIdentity::Kind::CardChrome ||
+                if (!region.showWhenWidgetHovered ||
+                    region.key.widget.kind != LayoutEditWidgetIdentity::Kind::CardChrome ||
                     region.key.widget.renderCardId != overlayState.hoveredEditableCard->renderCardId ||
                     region.key.widget.editCardId != overlayState.hoveredEditableCard->editCardId) {
                     continue;
@@ -629,7 +610,7 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
 
     for (const auto& guide : layoutEditGuides_) {
         const bool active = overlayState.activeLayoutEditGuide.has_value() &&
-                            layout_edit::MatchesLayoutEditGuide(guide, *overlayState.activeLayoutEditGuide);
+                            MatchesLayoutEditGuide(guide, *overlayState.activeLayoutEditGuide);
         const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
         const RenderPoint start{guide.lineRect.left, guide.lineRect.top};
         const RenderPoint end = guide.axis == LayoutGuideAxis::Vertical
@@ -644,14 +625,14 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
         return;
     }
 
-    const auto shouldDraw = [&](const WidgetEditGuide& guide) {
+    const auto shouldDraw = [&](const LayoutEditWidgetGuide& guide) {
         if (overlayState.activeWidgetEditGuide.has_value()) {
             return guide.widget.kind == overlayState.activeWidgetEditGuide->widget.kind &&
                    guide.widget.renderCardId == overlayState.activeWidgetEditGuide->widget.renderCardId &&
                    guide.widget.editCardId == overlayState.activeWidgetEditGuide->widget.editCardId &&
                    guide.widget.nodePath == overlayState.activeWidgetEditGuide->widget.nodePath;
         }
-        if (guide.widget.kind == LayoutWidgetIdentity::Kind::CardChrome) {
+        if (guide.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
             return overlayState.hoveredEditableCard.has_value() &&
                    guide.widget.renderCardId == overlayState.hoveredEditableCard->renderCardId &&
                    guide.widget.editCardId == overlayState.hoveredEditableCard->editCardId;
@@ -659,7 +640,7 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
         if (!overlayState.hoveredEditableWidget.has_value()) {
             return false;
         }
-        return guide.widget.kind == LayoutWidgetIdentity::Kind::Widget &&
+        return guide.widget.kind == LayoutEditWidgetIdentity::Kind::Widget &&
                guide.widget.renderCardId == overlayState.hoveredEditableWidget->renderCardId &&
                guide.widget.editCardId == overlayState.hoveredEditableWidget->editCardId &&
                guide.widget.nodePath == overlayState.hoveredEditableWidget->nodePath;
@@ -670,7 +651,7 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
             continue;
         }
         const bool active = overlayState.activeWidgetEditGuide.has_value() &&
-                            layout_edit::MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
+                            MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
         const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart, guide.drawEnd, RenderStroke::Solid(color));
     }
@@ -681,16 +662,16 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
         return;
     }
 
-    const auto shouldDraw = [&](const GapEditAnchor& anchor) {
+    const auto shouldDraw = [&](const LayoutEditGapAnchor& anchor) {
         if (overlayState.activeGapEditAnchor.has_value()) {
-            if (anchor.key.widget.kind == LayoutWidgetIdentity::Kind::DashboardChrome) {
-                return overlayState.activeGapEditAnchor->widget.kind == LayoutWidgetIdentity::Kind::DashboardChrome;
+            if (anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome) {
+                return overlayState.activeGapEditAnchor->widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome;
             }
-            return overlayState.activeGapEditAnchor->widget.kind == LayoutWidgetIdentity::Kind::CardChrome &&
+            return overlayState.activeGapEditAnchor->widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
                    anchor.key.widget.renderCardId == overlayState.activeGapEditAnchor->widget.renderCardId &&
                    anchor.key.widget.editCardId == overlayState.activeGapEditAnchor->widget.editCardId;
         }
-        if (anchor.key.widget.kind == LayoutWidgetIdentity::Kind::DashboardChrome) {
+        if (anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome) {
             return true;
         }
         return overlayState.hoveredLayoutCard.has_value() &&
@@ -706,9 +687,9 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
             continue;
         }
         const bool active = overlayState.activeGapEditAnchor.has_value() &&
-                            layout_edit::MatchesGapEditAnchorKey(anchor.key, *overlayState.activeGapEditAnchor);
+                            MatchesGapEditAnchorKey(anchor.key, *overlayState.activeGapEditAnchor);
         const bool hovered = overlayState.hoveredGapEditAnchor.has_value() &&
-                             layout_edit::MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
+                             MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
         const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
 
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(
@@ -765,8 +746,8 @@ bool DashboardRenderer::MatchesWidgetIdentity(
 LayoutEditAnchorBinding DashboardRenderer::MakeEditableTextBinding(
     const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const {
     return LayoutEditAnchorBinding{
-        EditableAnchorKey{
-            LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             parameter,
             anchorId,
         },
@@ -778,7 +759,7 @@ LayoutEditAnchorBinding DashboardRenderer::MakeEditableTextBinding(
 }
 
 void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
-    const EditableAnchorKey& key,
+    const LayoutEditAnchorKey& key,
     const RenderRect& targetRect,
     const RenderRect& anchorRect,
     AnchorShape shape,
@@ -1657,7 +1638,7 @@ std::vector<LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapC
 }
 
 std::optional<int> DashboardRenderer::FindLayoutWidgetExtent(
-    const LayoutWidgetIdentity& identity, LayoutGuideAxis axis) const {
+    const LayoutEditWidgetIdentity& identity, LayoutGuideAxis axis) const {
     for (const auto& card : resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (MatchesWidgetIdentity(widget, identity)) {
@@ -1673,7 +1654,7 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
     LayoutEditHost::LayoutTarget target;
     target.editCardId = editCardId;
     target.nodePath = nodePath;
-    if (!layout_edit::ApplyGuideWeights(config_, target, weights)) {
+    if (!ApplyGuideWeights(config_, target, weights)) {
         return false;
     }
     return ResolveLayout(false);
@@ -1683,7 +1664,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestLayoutCard(
     RenderPoint clientPoint) const {
     for (const auto& card : resolvedLayout_.cards) {
         if (card.rect.Contains(clientPoint)) {
-            return LayoutWidgetIdentity{card.id, card.id, {}, LayoutWidgetIdentity::Kind::CardChrome};
+            return LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
         }
     }
     return std::nullopt;
@@ -1695,7 +1676,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableCard(
         if (!card.rect.Contains(clientPoint) || clientPoint.y > card.contentRect.top) {
             continue;
         }
-        return LayoutWidgetIdentity{card.id, card.id, {}, LayoutWidgetIdentity::Kind::CardChrome};
+        return LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
     }
     return std::nullopt;
 }
@@ -1707,7 +1688,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableWidget
             if (widget.widget == nullptr || !widget.widget->IsHoverable() || !widget.rect.Contains(clientPoint)) {
                 continue;
             }
-            return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+            return LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
         }
     }
     return std::nullopt;
@@ -1715,7 +1696,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableWidget
 
 std::optional<LayoutEditGapAnchorKey> DashboardRenderer::HitTestGapEditAnchor(
     RenderPoint clientPoint) const {
-    const GapEditAnchor* bestAnchor = nullptr;
+    const LayoutEditGapAnchor* bestAnchor = nullptr;
     int bestPriority = 0;
     for (auto it = gapEditAnchors_.rbegin(); it != gapEditAnchors_.rend(); ++it) {
         if (!it->hitRect.Contains(clientPoint)) {
@@ -1728,12 +1709,12 @@ std::optional<LayoutEditGapAnchorKey> DashboardRenderer::HitTestGapEditAnchor(
             bestPriority = priority;
         }
     }
-    return bestAnchor != nullptr ? std::optional<GapEditAnchorKey>(bestAnchor->key) : std::nullopt;
+    return bestAnchor != nullptr ? std::optional<LayoutEditGapAnchorKey>(bestAnchor->key) : std::nullopt;
 }
 
 std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorTarget(
     RenderPoint clientPoint) const {
-    std::vector<const EditableAnchorRegion*> regions;
+    std::vector<const LayoutEditAnchorRegion*> regions;
     regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
     for (const auto& region : staticEditableAnchorRegions_) {
         regions.push_back(&region);
@@ -1751,7 +1732,7 @@ std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorTarge
 
 std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(
     RenderPoint clientPoint) const {
-    std::vector<const EditableAnchorRegion*> regions;
+    std::vector<const LayoutEditAnchorRegion*> regions;
     regions.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
     for (const auto& region : staticEditableAnchorRegions_) {
         regions.push_back(&region);
@@ -1759,10 +1740,10 @@ std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandl
     for (const auto& region : dynamicEditableAnchorRegions_) {
         regions.push_back(&region);
     }
-    const EditableAnchorRegion* bestRegion = nullptr;
+    const LayoutEditAnchorRegion* bestRegion = nullptr;
     int bestPriority = 0;
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
-        const EditableAnchorRegion& region = *(*it);
+        const LayoutEditAnchorRegion& region = *(*it);
         bool hit = false;
         if (region.shape == AnchorShape::Circle) {
             const int width = std::max(1, region.anchorRect.right - region.anchorRect.left);
@@ -1787,20 +1768,21 @@ std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandl
             bestPriority = priority;
         }
     }
-    return bestRegion != nullptr ? std::optional<EditableAnchorKey>(bestRegion->key) : std::nullopt;
+    return bestRegion != nullptr ? std::optional<LayoutEditAnchorKey>(bestRegion->key) : std::nullopt;
 }
 
 std::optional<LayoutEditAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
-    const EditableAnchorKey& key) const {
-    const auto findIn = [&](const std::vector<EditableAnchorRegion>& regions) -> std::optional<EditableAnchorRegion> {
-        const auto it = std::find_if(regions.begin(), regions.end(), [&](const EditableAnchorRegion& region) {
-            return layout_edit::MatchesEditableAnchorKey(region.key, key);
+    const LayoutEditAnchorKey& key) const {
+    const auto findIn =
+        [&](const std::vector<LayoutEditAnchorRegion>& regions) -> std::optional<LayoutEditAnchorRegion> {
+            const auto it = std::find_if(regions.begin(), regions.end(), [&](const LayoutEditAnchorRegion& region) {
+            return MatchesEditableAnchorKey(region.key, key);
         });
         if (it == regions.end()) {
             return std::nullopt;
         }
         return *it;
-    };
+        };
     if (const auto staticRegion = findIn(staticEditableAnchorRegions_); staticRegion.has_value()) {
         return staticRegion;
     }
@@ -1808,9 +1790,10 @@ std::optional<LayoutEditAnchorRegion> DashboardRenderer::FindEditableAnchorRegio
 }
 
 std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(
-    const GapEditAnchorKey& key) const {
-    const auto it = std::find_if(gapEditAnchors_.begin(), gapEditAnchors_.end(), [&](const GapEditAnchor& anchor) {
-        return layout_edit::MatchesGapEditAnchorKey(anchor.key, key);
+    const LayoutEditGapAnchorKey& key) const {
+    const auto it =
+        std::find_if(gapEditAnchors_.begin(), gapEditAnchors_.end(), [&](const LayoutEditGapAnchor& anchor) {
+        return MatchesGapEditAnchorKey(anchor.key, key);
     });
     if (it == gapEditAnchors_.end()) {
         return std::nullopt;
@@ -1831,7 +1814,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPr
             if (widget.widget == nullptr || !widget.widget->IsHoverable() || widget.widget->Class() != *widgetClass) {
                 continue;
             }
-            return LayoutWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+            return LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
         }
     }
     return std::nullopt;

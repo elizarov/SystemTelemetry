@@ -10,12 +10,6 @@
 #include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"
 
-using layout_edit::LayoutEditAnchorRegion;
-using layout_edit::LayoutEditGapAnchor;
-using layout_edit::LayoutEditGuide;
-using layout_edit::LayoutEditWidgetGuide;
-using layout_edit::LayoutGuideAxis;
-
 namespace {
 
 class DashboardShellUiModalScope {
@@ -140,7 +134,7 @@ std::wstring BuildLayoutGuideEditLabel(const LayoutEditGuide& guide) {
 }
 
 const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const LayoutEditGuide& guide) {
-    return layout_edit::FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
+    return FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
 }
 
 std::wstring BuildLayoutGuideItemLabel(
@@ -637,7 +631,7 @@ std::optional<std::vector<int>> DashboardShellUi::PromptLayoutGuideWeights(
     if (node == nullptr) {
         return std::nullopt;
     }
-    std::vector<int> weights = layout_edit::SeedGuideWeights(guide, node);
+    std::vector<int> weights = SeedGuideWeights(guide, node);
     if (guide.separatorIndex + 1 >= weights.size() || guide.separatorIndex + 1 >= node->children.size()) {
         return std::nullopt;
     }
@@ -709,7 +703,7 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
                app_.ApplyLayoutGuideWeights(LayoutEditHost::LayoutTarget::ForGuide(*guide), *weights);
     }
 
-    const auto parameter = layout_edit::TooltipPayloadParameter(target.payload);
+    const auto parameter = TooltipPayloadParameter(target.payload);
     if (!parameter.has_value()) {
         return false;
     }
@@ -727,7 +721,7 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
         return updated.has_value() && app_.controller_.ApplyLayoutEditFont(app_, *parameter, *updated);
     }
 
-    const double currentValue = layout_edit::TooltipPayloadNumericValue(target.payload).value_or(0.0);
+    const double currentValue = TooltipPayloadNumericValue(target.payload).value_or(0.0);
     const auto updated = PromptLayoutEditValue(*parameter, *descriptor, currentValue, title);
     return updated.has_value() && app_.ApplyLayoutEditValue(*parameter, *updated);
 }
@@ -1000,7 +994,7 @@ void DashboardShellUi::ShowContextMenu(
         if (const auto* guide = std::get_if<LayoutEditGuide>(&layoutEditTarget->payload)) {
             label = BuildLayoutEditMenuLabel(BuildLayoutGuideEditLabel(*guide));
         } else {
-            const auto parameter = layout_edit::TooltipPayloadParameter(layoutEditTarget->payload);
+            const auto parameter = TooltipPayloadParameter(layoutEditTarget->payload);
             if (parameter.has_value()) {
                 label = BuildLayoutEditMenuLabel(WideFromUtf8(GetLayoutEditParameterDisplayName(*parameter)));
             }

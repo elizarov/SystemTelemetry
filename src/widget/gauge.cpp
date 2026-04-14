@@ -8,14 +8,6 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
-using layout_edit::AnchorDragAxis;
-using layout_edit::AnchorDragMode;
-using layout_edit::AnchorShape;
-using layout_edit::LayoutEditAnchorKey;
-using layout_edit::LayoutEditWidgetGuide;
-using layout_edit::LayoutEditWidgetIdentity;
-using layout_edit::LayoutGuideAxis;
-
 struct GaugeSharedLayout {
     int radius = 0;
 };

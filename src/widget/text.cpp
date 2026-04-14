@@ -5,10 +5,6 @@
 #include "../dashboard_metrics.h"
 #include "../dashboard_renderer.h"
 
-using layout_edit::LayoutEditWidgetGuide;
-using layout_edit::LayoutEditWidgetIdentity;
-using layout_edit::LayoutGuideAxis;
-
 DashboardWidgetClass TextWidget::Class() const {
     return DashboardWidgetClass::Text;
 }

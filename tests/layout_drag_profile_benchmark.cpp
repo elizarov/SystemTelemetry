@@ -20,10 +20,6 @@
 #include "layout_edit_service.h"
 #include "layout_edit_trace_session.h"
 
-using layout_edit::LayoutEditGuide;
-using layout_edit::LayoutEditWidgetIdentity;
-using layout_edit::LayoutGuideAxis;
-
 namespace {
 
 using Clock = std::chrono::steady_clock;
@@ -268,7 +264,7 @@ private:
 
     bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) override {
         const auto start = Clock::now();
-        const bool applied = layout_edit::ApplyGuideWeights(config_, target, weights);
+        const bool applied = ApplyGuideWeights(config_, target, weights);
         if (applied) {
             renderer_.SetConfig(config_);
             dirty_ = true;
@@ -281,12 +277,12 @@ private:
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) override {
-        return layout_edit::EvaluateWidgetExtentForGuideWeights(renderer_, target, weights, widget, axis);
+        return EvaluateWidgetExtentForGuideWeights(renderer_, target, weights, widget, axis);
     }
 
     bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override {
         const auto start = Clock::now();
-        const bool applied = layout_edit::ApplyValue(config_, parameter, value);
+        const bool applied = ApplyValue(config_, parameter, value);
         if (applied) {
             renderer_.SetConfig(config_);
             dirty_ = true;
@@ -407,8 +403,8 @@ int main(int argc, char** argv) {
     }
 
     const LayoutEditHost::LayoutTarget target = LayoutEditHost::LayoutTarget::ForGuide(*guide);
-    const LayoutNodeConfig* node = layout_edit::FindGuideNode(config, target);
-    const std::vector<int> initialWeights = layout_edit::SeedGuideWeights(*guide, node);
+    const LayoutNodeConfig* node = FindGuideNode(config, target);
+    const std::vector<int> initialWeights = SeedGuideWeights(*guide, node);
     const std::vector<std::vector<int>> weightSequence = BuildWeightSequence(initialWeights, iterations);
     if (weightSequence.empty()) {
         std::cerr << "weight sequence generation failed\n";

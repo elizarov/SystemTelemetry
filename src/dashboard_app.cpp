@@ -9,13 +9,6 @@
 #include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
 
-using layout_edit::LayoutEditAnchorRegion;
-using layout_edit::LayoutEditGapAnchor;
-using layout_edit::LayoutEditGuide;
-using layout_edit::LayoutEditWidgetGuide;
-using layout_edit::LayoutEditWidgetIdentity;
-using layout_edit::LayoutGuideAxis;
-
 namespace {
 
 constexpr UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
@@ -66,7 +59,7 @@ std::string LayoutGuideTooltipConfigMember(const LayoutEditGuide& guide) {
 }
 
 const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const LayoutEditGuide& guide) {
-    return layout_edit::FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
+    return FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
 }
 
 std::string LayoutGuideChildName(const LayoutNodeConfig& node) {
@@ -584,13 +577,13 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     std::optional<LayoutEditTooltipDescriptor> descriptor;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
-    const RenderPoint clientPoint = target->clientPoint.value_or(layout_edit::TooltipPayloadAnchorPoint(target->payload));
+    const RenderPoint clientPoint = target->clientPoint.value_or(TooltipPayloadAnchorPoint(target->payload));
     if (const auto* guide = std::get_if<LayoutEditGuide>(&target->payload)) {
         layoutEditTooltipText_ = BuildLayoutGuideTooltipText(controller_.State().config, *guide);
     } else {
-        if (const auto parameter = layout_edit::TooltipPayloadParameter(target->payload); parameter.has_value()) {
+        if (const auto parameter = TooltipPayloadParameter(target->payload); parameter.has_value()) {
             descriptor = FindLayoutEditTooltipDescriptor(*parameter);
-            value = layout_edit::TooltipPayloadNumericValue(target->payload).value_or(0.0);
+            value = TooltipPayloadNumericValue(target->payload).value_or(0.0);
             if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target->payload)) {
                 if (const auto currentFont =
                         FindLayoutEditTooltipFontValue(controller_.State().config, anchor->key.parameter);
@@ -601,12 +594,12 @@ void DashboardApp::UpdateLayoutEditTooltip() {
         }
     }
 
-    if (!layout_edit::IsLayoutGuidePayload(target->payload) && !descriptor.has_value()) {
+    if (!IsLayoutGuidePayload(target->payload) && !descriptor.has_value()) {
         HideLayoutEditTooltip();
         return;
     }
 
-    if (!layout_edit::IsLayoutGuidePayload(target->payload)) {
+    if (!IsLayoutGuidePayload(target->payload)) {
         const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
         layoutEditTooltipText_ = descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()
                                      ? BuildTooltipText(*descriptor, *fontValue, description)

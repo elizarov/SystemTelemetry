@@ -57,15 +57,15 @@ public:
     struct EditOverlayState {
         bool showLayoutEditGuides = false;
         SimilarityIndicatorMode similarityIndicatorMode = SimilarityIndicatorMode::ActiveGuide;
-        std::optional<layout_edit::LayoutEditGuide> activeLayoutEditGuide;
-        std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredLayoutCard;
-        std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredEditableCard;
-        std::optional<layout_edit::LayoutEditWidgetIdentity> hoveredEditableWidget;
-        std::optional<layout_edit::LayoutEditWidgetGuide> activeWidgetEditGuide;
-        std::optional<layout_edit::LayoutEditGapAnchorKey> hoveredGapEditAnchor;
-        std::optional<layout_edit::LayoutEditGapAnchorKey> activeGapEditAnchor;
-        std::optional<layout_edit::LayoutEditAnchorKey> hoveredEditableAnchor;
-        std::optional<layout_edit::LayoutEditAnchorKey> activeEditableAnchor;
+        std::optional<LayoutEditGuide> activeLayoutEditGuide;
+        std::optional<LayoutEditWidgetIdentity> hoveredLayoutCard;
+        std::optional<LayoutEditWidgetIdentity> hoveredEditableCard;
+        std::optional<LayoutEditWidgetIdentity> hoveredEditableWidget;
+        std::optional<LayoutEditWidgetGuide> activeWidgetEditGuide;
+        std::optional<LayoutEditGapAnchorKey> hoveredGapEditAnchor;
+        std::optional<LayoutEditGapAnchorKey> activeGapEditAnchor;
+        std::optional<LayoutEditAnchorKey> hoveredEditableAnchor;
+        std::optional<LayoutEditAnchorKey> activeEditableAnchor;
         MoveOverlayState moveOverlay{};
     };
 
@@ -110,26 +110,22 @@ public:
     RenderColor GraphMarkerColor() const;
     RenderColor GraphAxisColor() const;
     void SetTraceOutput(std::ostream* traceOutput);
-    const std::vector<layout_edit::LayoutEditGuide>& LayoutEditGuides() const;
-    const std::vector<layout_edit::LayoutEditWidgetGuide>& WidgetEditGuides() const;
-    const std::vector<layout_edit::LayoutEditGapAnchor>& GapEditAnchors() const;
+    const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
+    const std::vector<LayoutEditWidgetGuide>& WidgetEditGuides() const;
+    const std::vector<LayoutEditGapAnchor>& GapEditAnchors() const;
     int LayoutSimilarityThreshold() const;
-    std::vector<layout_edit::LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(
-        const layout_edit::LayoutEditGuide& guide) const;
-    std::optional<int> FindLayoutWidgetExtent(
-        const layout_edit::LayoutEditWidgetIdentity& widget, layout_edit::LayoutGuideAxis axis) const;
+    std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
+    std::optional<int> FindLayoutWidgetExtent(const LayoutEditWidgetIdentity& widget, LayoutGuideAxis axis) const;
     bool ApplyLayoutGuideWeightsPreview(
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
-    std::optional<layout_edit::LayoutEditWidgetIdentity> HitTestLayoutCard(RenderPoint clientPoint) const;
-    std::optional<layout_edit::LayoutEditWidgetIdentity> HitTestEditableCard(RenderPoint clientPoint) const;
-    std::optional<layout_edit::LayoutEditWidgetIdentity> HitTestEditableWidget(RenderPoint clientPoint) const;
-    std::optional<layout_edit::LayoutEditGapAnchorKey> HitTestGapEditAnchor(RenderPoint clientPoint) const;
-    std::optional<layout_edit::LayoutEditGapAnchor> FindGapEditAnchor(
-        const layout_edit::LayoutEditGapAnchorKey& key) const;
-    std::optional<layout_edit::LayoutEditAnchorKey> HitTestEditableAnchorTarget(RenderPoint clientPoint) const;
-    std::optional<layout_edit::LayoutEditAnchorKey> HitTestEditableAnchorHandle(RenderPoint clientPoint) const;
-    std::optional<layout_edit::LayoutEditAnchorRegion> FindEditableAnchorRegion(
-        const layout_edit::LayoutEditAnchorKey& key) const;
+    std::optional<LayoutEditWidgetIdentity> HitTestLayoutCard(RenderPoint clientPoint) const;
+    std::optional<LayoutEditWidgetIdentity> HitTestEditableCard(RenderPoint clientPoint) const;
+    std::optional<LayoutEditWidgetIdentity> HitTestEditableWidget(RenderPoint clientPoint) const;
+    std::optional<LayoutEditGapAnchorKey> HitTestGapEditAnchor(RenderPoint clientPoint) const;
+    std::optional<LayoutEditGapAnchor> FindGapEditAnchor(const LayoutEditGapAnchorKey& key) const;
+    std::optional<LayoutEditAnchorKey> HitTestEditableAnchorTarget(RenderPoint clientPoint) const;
+    std::optional<LayoutEditAnchorKey> HitTestEditableAnchorHandle(RenderPoint clientPoint) const;
+    std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -169,25 +165,25 @@ public:
         std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
     bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColor color);
     bool DrawD2DPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke);
-    layout_edit::LayoutEditAnchorBinding MakeEditableTextBinding(
+    LayoutEditAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
-    void RegisterStaticEditableAnchorRegion(const layout_edit::LayoutEditAnchorKey& key,
+    void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,
-        layout_edit::AnchorShape shape,
-        layout_edit::AnchorDragAxis dragAxis,
-        layout_edit::AnchorDragMode dragMode,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
         RenderPoint dragOrigin,
         double dragScale,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
-    void RegisterDynamicEditableAnchorRegion(const layout_edit::LayoutEditAnchorKey& key,
+    void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,
-        layout_edit::AnchorShape shape,
-        layout_edit::AnchorDragAxis dragAxis,
-        layout_edit::AnchorDragMode dragMode,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
         RenderPoint dragOrigin,
         double dragScale,
         bool showWhenWidgetHovered,
@@ -197,16 +193,15 @@ public:
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
-        const layout_edit::LayoutEditAnchorBinding& editable);
-    void RegisterDynamicTextAnchor(
-        const TextLayoutResult& layoutResult, const layout_edit::LayoutEditAnchorBinding& editable);
+        const LayoutEditAnchorBinding& editable);
+    void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult, const LayoutEditAnchorBinding& editable);
     void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
-        const layout_edit::LayoutEditAnchorBinding& editable);
-    std::vector<layout_edit::LayoutEditWidgetGuide>& WidgetEditGuidesMutable();
-    std::vector<layout_edit::LayoutEditGapAnchor>& GapEditAnchorsMutable();
+        const LayoutEditAnchorBinding& editable);
+    std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable();
+    std::vector<LayoutEditGapAnchor>& GapEditAnchorsMutable();
     int ScaleLogical(int value) const;
     int MeasureTextWidth(TextStyleId style, std::string_view text) const;
 
@@ -214,7 +209,7 @@ private:
     friend struct DashboardLayoutResolver;
 
     struct SimilarityIndicator {
-        layout_edit::LayoutGuideAxis axis = layout_edit::LayoutGuideAxis::Horizontal;
+        LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
         RenderRect rect{};
         int exactTypeOrdinal = 0;
     };
@@ -399,8 +394,7 @@ private:
         bool instantiateWidgets);
     void BuildWidgetEditGuides();
     void BuildStaticEditableAnchors();
-    std::optional<layout_edit::LayoutEditWidgetIdentity> FindFirstLayoutEditPreviewWidget(
-        const std::string& widgetTypeName) const;
+    std::optional<LayoutEditWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
 
     bool InitializeDirect2D();
     bool InitializeWic();
@@ -432,33 +426,31 @@ private:
         bool instantiateWidgets = true);
     int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
     bool SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const;
-    std::vector<const DashboardWidgetLayout*> CollectSimilarityIndicatorWidgets(layout_edit::LayoutGuideAxis axis) const;
-    int WidgetExtentForAxis(const DashboardWidgetLayout& widget, layout_edit::LayoutGuideAxis axis) const;
-    bool IsWidgetAffectedByGuide(const DashboardWidgetLayout& widget, const layout_edit::LayoutEditGuide& guide) const;
-    bool MatchesWidgetIdentity(
-        const DashboardWidgetLayout& widget, const layout_edit::LayoutEditWidgetIdentity& identity) const;
+    std::vector<const DashboardWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
+    int WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;
+    bool IsWidgetAffectedByGuide(const DashboardWidgetLayout& widget, const LayoutEditGuide& guide) const;
+    bool MatchesWidgetIdentity(const DashboardWidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const;
     static bool IsContainerNode(const LayoutNodeConfig& node);
-    void RegisterEditableAnchorRegion(std::vector<layout_edit::LayoutEditAnchorRegion>& regions,
-        const layout_edit::LayoutEditAnchorKey& key,
+    void RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
+        const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,
-        layout_edit::AnchorShape shape,
-        layout_edit::AnchorDragAxis dragAxis,
-        layout_edit::AnchorDragMode dragMode,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
         RenderPoint dragOrigin,
         double dragScale,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
-    void RegisterTextAnchor(std::vector<layout_edit::LayoutEditAnchorRegion>& regions,
+    void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
         const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
-        const layout_edit::LayoutEditAnchorBinding& editable);
-    void RegisterTextAnchor(std::vector<layout_edit::LayoutEditAnchorRegion>& regions,
-        const TextLayoutResult& layoutResult,
-        const layout_edit::LayoutEditAnchorBinding& editable);
+        const LayoutEditAnchorBinding& editable);
+    void RegisterTextAnchor(
+        std::vector<LayoutEditAnchorRegion>& regions, const TextLayoutResult& layoutResult, const LayoutEditAnchorBinding& editable);
     bool IsDrawActive() const;
     const DashboardMetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();
@@ -472,11 +464,11 @@ private:
     TextStyleMetrics textStyleMetrics_{};
     Palette palette_{};
     ResolvedDashboardLayout resolvedLayout_{};
-    std::vector<layout_edit::LayoutEditGuide> layoutEditGuides_;
-    std::vector<layout_edit::LayoutEditWidgetGuide> widgetEditGuides_;
-    std::vector<layout_edit::LayoutEditGapAnchor> gapEditAnchors_;
-    std::vector<layout_edit::LayoutEditAnchorRegion> staticEditableAnchorRegions_;
-    std::vector<layout_edit::LayoutEditAnchorRegion> dynamicEditableAnchorRegions_;
+    std::vector<LayoutEditGuide> layoutEditGuides_;
+    std::vector<LayoutEditWidgetGuide> widgetEditGuides_;
+    std::vector<LayoutEditGapAnchor> gapEditAnchors_;
+    std::vector<LayoutEditAnchorRegion> staticEditableAnchorRegions_;
+    std::vector<LayoutEditAnchorRegion> dynamicEditableAnchorRegions_;
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textWidthCache_;

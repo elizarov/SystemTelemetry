@@ -2,8 +2,6 @@
 
 #include <algorithm>
 
-namespace layout_edit {
-
 namespace {
 
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
@@ -121,5 +119,3 @@ std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& render
     }
     return renderer.FindLayoutWidgetExtent(widget, axis);
 }
-
-}  // namespace layout_edit

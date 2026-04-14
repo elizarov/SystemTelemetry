@@ -8,21 +8,6 @@
 #include "layout_edit_service.h"
 #include "layout_snap_solver.h"
 
-using layout_edit::AnchorDragAxis;
-using layout_edit::AnchorDragMode;
-using layout_edit::LayoutEditAnchorKey;
-using layout_edit::LayoutEditGapAnchor;
-using layout_edit::LayoutEditGapAnchorKey;
-using layout_edit::LayoutEditGuide;
-using layout_edit::LayoutEditWidgetGuide;
-using layout_edit::LayoutEditWidgetIdentity;
-using layout_edit::LayoutGuideAxis;
-using EditableAnchorKey = layout_edit::LayoutEditAnchorKey;
-using GapEditAnchor = layout_edit::LayoutEditGapAnchor;
-using GapEditAnchorKey = layout_edit::LayoutEditGapAnchorKey;
-using LayoutWidgetIdentity = layout_edit::LayoutEditWidgetIdentity;
-using WidgetEditGuide = layout_edit::LayoutEditWidgetGuide;
-
 namespace {
 
 std::string FormatNodePath(const std::vector<size_t>& path) {
@@ -55,16 +40,16 @@ std::string DescribeWidgetParameter(LayoutEditParameter parameter) {
     return std::string(metadata.sectionName) + "." + std::string(metadata.parameterName);
 }
 
-std::string DescribeWidgetGuide(const WidgetEditGuide& guide) {
+std::string DescribeWidgetGuide(const LayoutEditWidgetGuide& guide) {
     return "axis=" + std::string(AxisName(guide.axis)) + " parameter=" + DescribeWidgetParameter(guide.parameter) +
            " guide_id=" + std::to_string(guide.guideId) +
-           (guide.widget.kind == LayoutWidgetIdentity::Kind::CardChrome
+           (guide.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome
                    ? " card=" + guide.widget.editCardId
                    : " path=" + FormatNodePath(guide.widget.nodePath));
 }
 
-std::string DescribeGapEditAnchor(const GapEditAnchor& anchor) {
-    const std::string scope = anchor.key.widget.kind == LayoutWidgetIdentity::Kind::DashboardChrome
+std::string DescribeGapEditAnchor(const LayoutEditGapAnchor& anchor) {
+    const std::string scope = anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome
                                   ? " dashboard"
                                   : " card=" + anchor.key.widget.renderCardId;
     return "axis=" + std::string(AxisName(anchor.axis)) +
@@ -72,9 +57,9 @@ std::string DescribeGapEditAnchor(const GapEditAnchor& anchor) {
            " path=" + FormatNodePath(anchor.key.nodePath) + scope;
 }
 
-std::string DescribeEditableAnchor(const EditableAnchorKey& key) {
+std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
     return "parameter=" + DescribeWidgetParameter(key.parameter) + " anchor_id=" + std::to_string(key.anchorId) +
-           (key.widget.kind == LayoutWidgetIdentity::Kind::CardChrome
+           (key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome
                    ? " card=" + key.widget.editCardId
                    : " path=" + FormatNodePath(key.widget.nodePath));
 }
@@ -159,7 +144,7 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
 }
 
 std::optional<double> ComputeGaugeSegmentGapDegrees(
-    const WidgetEditGuide& guide, RenderPoint clientPoint) {
+    const LayoutEditWidgetGuide& guide, RenderPoint clientPoint) {
     const auto pointerAngle = ComputeGaugePointerAngle(guide.dragOrigin, clientPoint);
     if (!pointerAngle.has_value()) {
         return std::nullopt;
@@ -217,10 +202,10 @@ const LayoutEditGuide* LayoutEditController::HitTestLayoutGuide(
     return nullptr;
 }
 
-const WidgetEditGuide* LayoutEditController::HitTestWidgetEditGuide(
+const LayoutEditWidgetGuide* LayoutEditController::HitTestWidgetEditGuide(
     RenderPoint clientPoint, size_t* index) const {
     const auto& guides = host_.LayoutEditRenderer().WidgetEditGuides();
-    const WidgetEditGuide* bestGuide = nullptr;
+    const LayoutEditWidgetGuide* bestGuide = nullptr;
     size_t bestIndex = 0;
     int bestPriority = (std::numeric_limits<int>::max)();
     for (size_t i = 0; i < guides.size(); ++i) {
@@ -241,10 +226,10 @@ const WidgetEditGuide* LayoutEditController::HitTestWidgetEditGuide(
     return bestGuide;
 }
 
-const GapEditAnchor* LayoutEditController::HitTestGapEditAnchor(
+const LayoutEditGapAnchor* LayoutEditController::HitTestGapEditAnchor(
     RenderPoint clientPoint, size_t* index) const {
     const auto& anchors = host_.LayoutEditRenderer().GapEditAnchors();
-    const GapEditAnchor* bestAnchor = nullptr;
+    const LayoutEditGapAnchor* bestAnchor = nullptr;
     size_t bestIndex = 0;
     int bestPriority = (std::numeric_limits<int>::max)();
     for (size_t i = 0; i < anchors.size(); ++i) {
@@ -271,19 +256,18 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
     resolution.hoveredLayoutCard = renderer.HitTestLayoutCard(clientPoint);
     resolution.hoveredEditableCard = renderer.HitTestEditableCard(clientPoint);
 
-    const std::optional<EditableAnchorKey> anchorHandle =
-        renderer.HitTestEditableAnchorHandle(clientPoint);
+    const std::optional<LayoutEditAnchorKey> anchorHandle = renderer.HitTestEditableAnchorHandle(clientPoint);
     size_t gapAnchorIndex = 0;
-    const GapEditAnchor* gapAnchor = HitTestGapEditAnchor(clientPoint, &gapAnchorIndex);
+    const LayoutEditGapAnchor* gapAnchor = HitTestGapEditAnchor(clientPoint, &gapAnchorIndex);
     size_t widgetGuideIndex = 0;
-    const WidgetEditGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
+    const LayoutEditWidgetGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
     if (anchorHandle.has_value() && gapAnchor != nullptr) {
         const int anchorPriority = GetLayoutEditParameterHitPriority(anchorHandle->parameter);
         const int gapPriority = GetLayoutEditParameterHitPriority(gapAnchor->key.parameter);
         if (anchorPriority <= gapPriority) {
             resolution.hoveredEditableAnchor = anchorHandle;
             resolution.actionableAnchorHandle = anchorHandle;
-            if (anchorHandle->widget.kind == LayoutWidgetIdentity::Kind::Widget) {
+            if (anchorHandle->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
                 resolution.hoveredEditableWidget = anchorHandle->widget;
             }
             return resolution;
@@ -300,13 +284,13 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
         if (anchorPriority <= guidePriority) {
             resolution.hoveredEditableAnchor = anchorHandle;
             resolution.actionableAnchorHandle = anchorHandle;
-            if (anchorHandle->widget.kind == LayoutWidgetIdentity::Kind::Widget) {
+            if (anchorHandle->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
                 resolution.hoveredEditableWidget = anchorHandle->widget;
             }
             return resolution;
         }
 
-        if (widgetGuide->widget.kind == LayoutWidgetIdentity::Kind::Widget) {
+        if (widgetGuide->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
             resolution.hoveredEditableWidget = widgetGuide->widget;
         }
         resolution.hoveredWidgetEditGuideIndex = widgetGuideIndex;
@@ -323,7 +307,7 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
             return resolution;
         }
 
-        if (widgetGuide->widget.kind == LayoutWidgetIdentity::Kind::Widget) {
+        if (widgetGuide->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
             resolution.hoveredEditableWidget = widgetGuide->widget;
         }
         resolution.hoveredWidgetEditGuideIndex = widgetGuideIndex;
@@ -333,7 +317,7 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
     if (anchorHandle.has_value()) {
         resolution.hoveredEditableAnchor = anchorHandle;
         resolution.actionableAnchorHandle = anchorHandle;
-        if (anchorHandle->widget.kind == LayoutWidgetIdentity::Kind::Widget) {
+        if (anchorHandle->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
             resolution.hoveredEditableWidget = anchorHandle->widget;
         }
         return resolution;
@@ -347,21 +331,19 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
     }
 
     if (widgetGuide != nullptr) {
-        if (widgetGuide->widget.kind == LayoutWidgetIdentity::Kind::Widget) {
+        if (widgetGuide->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
             resolution.hoveredEditableWidget = widgetGuide->widget;
         }
         resolution.hoveredWidgetEditGuideIndex = widgetGuideIndex;
         return resolution;
     }
 
-    const std::optional<EditableAnchorKey> anchorTarget =
-        renderer.HitTestEditableAnchorTarget(clientPoint);
-    const std::optional<LayoutWidgetIdentity> hoveredWidget =
-        renderer.HitTestEditableWidget(clientPoint);
+    const std::optional<LayoutEditAnchorKey> anchorTarget = renderer.HitTestEditableAnchorTarget(clientPoint);
+    const std::optional<LayoutEditWidgetIdentity> hoveredWidget = renderer.HitTestEditableWidget(clientPoint);
     if (hoveredWidget.has_value()) {
         resolution.hoveredEditableWidget = hoveredWidget;
 
-        if (anchorTarget.has_value() && layout_edit::MatchesWidgetIdentity(anchorTarget->widget, *hoveredWidget)) {
+        if (anchorTarget.has_value() && MatchesWidgetIdentity(anchorTarget->widget, *hoveredWidget)) {
             resolution.hoveredEditableAnchor = anchorTarget;
             return resolution;
         }
@@ -390,15 +372,15 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     }
 
     const HoverResolution resolution = ResolveHover(clientPoint);
-    const std::optional<LayoutWidgetIdentity>& nextHoveredLayoutCard = resolution.hoveredLayoutCard;
-    const std::optional<LayoutWidgetIdentity>& nextHoveredCard = resolution.hoveredEditableCard;
-    const std::optional<LayoutWidgetIdentity>& nextHoveredWidget = resolution.hoveredEditableWidget;
-    const std::optional<GapEditAnchorKey>& nextHoveredGapAnchor = resolution.hoveredGapEditAnchor;
-    const std::optional<EditableAnchorKey>& nextHoveredAnchor = resolution.hoveredEditableAnchor;
+    const std::optional<LayoutEditWidgetIdentity>& nextHoveredLayoutCard = resolution.hoveredLayoutCard;
+    const std::optional<LayoutEditWidgetIdentity>& nextHoveredCard = resolution.hoveredEditableCard;
+    const std::optional<LayoutEditWidgetIdentity>& nextHoveredWidget = resolution.hoveredEditableWidget;
+    const std::optional<LayoutEditGapAnchorKey>& nextHoveredGapAnchor = resolution.hoveredGapEditAnchor;
+    const std::optional<LayoutEditAnchorKey>& nextHoveredAnchor = resolution.hoveredEditableAnchor;
 
     bool hoverChanged = (hoveredLayoutCard_.has_value() != nextHoveredLayoutCard.has_value());
     if (!hoverChanged && hoveredLayoutCard_.has_value() && nextHoveredLayoutCard.has_value()) {
-        hoverChanged = !layout_edit::MatchesWidgetIdentity(*hoveredLayoutCard_, *nextHoveredLayoutCard);
+        hoverChanged = !MatchesWidgetIdentity(*hoveredLayoutCard_, *nextHoveredLayoutCard);
     }
     if (hoverChanged) {
         hoveredLayoutCard_ = nextHoveredLayoutCard;
@@ -407,7 +389,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
 
     bool cardHoverChanged = (hoveredEditableCard_.has_value() != nextHoveredCard.has_value());
     if (!cardHoverChanged && hoveredEditableCard_.has_value() && nextHoveredCard.has_value()) {
-        cardHoverChanged = !layout_edit::MatchesWidgetIdentity(*hoveredEditableCard_, *nextHoveredCard);
+        cardHoverChanged = !MatchesWidgetIdentity(*hoveredEditableCard_, *nextHoveredCard);
     }
     if (cardHoverChanged) {
         hoveredEditableCard_ = nextHoveredCard;
@@ -417,7 +399,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
 
     bool widgetHoverChanged = (hoveredEditableWidget_.has_value() != nextHoveredWidget.has_value());
     if (!widgetHoverChanged && hoveredEditableWidget_.has_value() && nextHoveredWidget.has_value()) {
-        widgetHoverChanged = !layout_edit::MatchesWidgetIdentity(*hoveredEditableWidget_, *nextHoveredWidget);
+        widgetHoverChanged = !MatchesWidgetIdentity(*hoveredEditableWidget_, *nextHoveredWidget);
     }
     if (widgetHoverChanged) {
         hoveredEditableWidget_ = nextHoveredWidget;
@@ -427,7 +409,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
 
     if (hoveredGapEditAnchor_.has_value() != nextHoveredGapAnchor.has_value() ||
         (hoveredGapEditAnchor_.has_value() && nextHoveredGapAnchor.has_value() &&
-            !layout_edit::MatchesGapEditAnchorKey(*hoveredGapEditAnchor_, *nextHoveredGapAnchor))) {
+            !MatchesGapEditAnchorKey(*hoveredGapEditAnchor_, *nextHoveredGapAnchor))) {
         hoveredGapEditAnchor_ = nextHoveredGapAnchor;
         host_.LayoutEditOverlayState().hoveredGapEditAnchor = hoveredGapEditAnchor_;
         hoverChanged = true;
@@ -441,7 +423,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
 
     if (hoveredEditableAnchor_.has_value() != nextHoveredAnchor.has_value() ||
         (hoveredEditableAnchor_.has_value() && nextHoveredAnchor.has_value() &&
-            !layout_edit::MatchesEditableAnchorKey(*hoveredEditableAnchor_, *nextHoveredAnchor))) {
+            !MatchesEditableAnchorKey(*hoveredEditableAnchor_, *nextHoveredAnchor))) {
         hoveredEditableAnchor_ = nextHoveredAnchor;
         host_.LayoutEditOverlayState().hoveredEditableAnchor = hoveredEditableAnchor_;
         hoverChanged = true;
@@ -488,7 +470,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                 region->value,
                 clientPoint,
                 std::sqrt((startDx * startDx) + (startDy * startDy))};
-            if (region->key.widget.kind == LayoutWidgetIdentity::Kind::CardChrome) {
+            if (region->key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
                 hoveredEditableCard_ = region->key.widget;
                 hoveredEditableWidget_.reset();
             } else {
@@ -521,13 +503,13 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
 
     if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
         const auto& guides = renderer.WidgetEditGuides();
-        const WidgetEditGuide& widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
+        const LayoutEditWidgetGuide& widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
         activeWidgetEditDrag_ = WidgetEditDragState{
             widgetGuide,
             widgetGuide.value,
             widgetGuide.axis == LayoutGuideAxis::Vertical ? clientPoint.x : clientPoint.y,
         };
-        if (widgetGuide.widget.kind == LayoutWidgetIdentity::Kind::CardChrome) {
+        if (widgetGuide.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
             hoveredEditableCard_ = widgetGuide.widget;
             hoveredEditableWidget_.reset();
         } else {
@@ -545,8 +527,8 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
         const auto& guides = renderer.LayoutEditGuides();
         const LayoutEditGuide& guide = guides[*resolution.hoveredLayoutGuideIndex];
         const LayoutNodeConfig* guideNode =
-            layout_edit::FindGuideNode(host_.LayoutEditConfig(), LayoutEditHost::LayoutTarget::ForGuide(guide));
-        const std::vector<int> initialWeights = layout_edit::SeedGuideWeights(guide, guideNode);
+            FindGuideNode(host_.LayoutEditConfig(), LayoutEditHost::LayoutTarget::ForGuide(guide));
+        const std::vector<int> initialWeights = SeedGuideWeights(guide, guideNode);
         activeLayoutDrag_ = LayoutDragState{
             guide,
             initialWeights,
@@ -801,15 +783,15 @@ void LayoutEditController::SyncRendererInteractionState() {
                                       : std::nullopt;
     overlayState.activeWidgetEditGuide =
         activeWidgetEditDrag_.has_value()
-            ? std::optional<WidgetEditGuide>(activeWidgetEditDrag_->guide)
+            ? std::optional<LayoutEditWidgetGuide>(activeWidgetEditDrag_->guide)
             : std::nullopt;
     overlayState.activeGapEditAnchor =
         activeGapEditDrag_.has_value()
-            ? std::optional<GapEditAnchorKey>(activeGapEditDrag_->anchor.key)
+            ? std::optional<LayoutEditGapAnchorKey>(activeGapEditDrag_->anchor.key)
             : std::nullopt;
     overlayState.activeEditableAnchor =
         activeAnchorEditDrag_.has_value()
-            ? std::optional<EditableAnchorKey>(activeAnchorEditDrag_->key)
+            ? std::optional<LayoutEditAnchorKey>(activeAnchorEditDrag_->key)
             : std::nullopt;
 }
 
@@ -853,7 +835,7 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
 
     if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
         const auto& guides = host_.LayoutEditRenderer().WidgetEditGuides();
-        const WidgetEditGuide& widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
+        const LayoutEditWidgetGuide& widgetGuide = guides[*resolution.hoveredWidgetEditGuideIndex];
         SetCursor(LoadCursorW(nullptr,
             widgetGuide.angularDrag                                            ? IDC_CROSS
             : widgetGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
@@ -893,7 +875,7 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
         const auto& widget = drag.snapCandidates[candidateIndex].widget;
         std::vector<layout_snap_solver::SnapCandidate> groupedCandidates;
         while (candidateIndex < drag.snapCandidates.size() &&
-               layout_edit::MatchesWidgetIdentity(drag.snapCandidates[candidateIndex].widget, widget)) {
+               MatchesWidgetIdentity(drag.snapCandidates[candidateIndex].widget, widget)) {
             const auto& candidate = drag.snapCandidates[candidateIndex];
             groupedCandidates.push_back(layout_snap_solver::SnapCandidate{
                 candidate.targetExtent,
@@ -1013,7 +995,7 @@ bool LayoutEditController::UpdateWidgetEditDrag(RenderPoint clientPoint) {
 
     const auto& guides = host_.LayoutEditRenderer().WidgetEditGuides();
     const auto guideIt =
-        std::find_if(guides.begin(), guides.end(), [&](const WidgetEditGuide& candidate) {
+        std::find_if(guides.begin(), guides.end(), [&](const LayoutEditWidgetGuide& candidate) {
             return candidate.parameter == drag.guide.parameter && candidate.guideId == drag.guide.guideId &&
                    candidate.widget.kind == drag.guide.widget.kind &&
                    candidate.widget.renderCardId == drag.guide.widget.renderCardId &&

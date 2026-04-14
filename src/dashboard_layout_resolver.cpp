@@ -7,17 +7,6 @@
 #include <functional>
 #include <map>
 
-using layout_edit::AnchorDragAxis;
-using layout_edit::AnchorDragMode;
-using layout_edit::AnchorShape;
-using layout_edit::LayoutEditAnchorBinding;
-using layout_edit::LayoutEditAnchorKey;
-using layout_edit::LayoutEditGapAnchor;
-using layout_edit::LayoutEditGuide;
-using layout_edit::LayoutEditWidgetGuide;
-using layout_edit::LayoutEditWidgetIdentity;
-using layout_edit::LayoutGuideAxis;
-
 namespace {
 
 bool ContainsCardReference(const std::vector<std::string>& stack, const std::string& cardId) {
