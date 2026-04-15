@@ -17,10 +17,6 @@ std::filesystem::path WriteTestConfig(const std::string& text) {
 
 }  // namespace
 
-std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view) {
-    return std::nullopt;
-}
-
 TEST(ConfigParser, ClampsParsedEditableValuesThroughSchemaPolicies) {
     const std::filesystem::path path = WriteTestConfig("[fonts]\n"
                                                        "label = Segoe UI,-5,600\n"

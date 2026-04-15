@@ -72,6 +72,14 @@ std::vector<std::string> ChildLabels(const LayoutEditTreeNode& node) {
     return labels;
 }
 
+void ExpectSpecialSelectionHighlight(
+    const LayoutEditTreeNode* node, LayoutEditSelectionHighlightSpecial expectedHighlight) {
+    ASSERT_NE(node, nullptr);
+    ASSERT_TRUE(node->selectionHighlight.has_value());
+    ASSERT_TRUE(std::holds_alternative<LayoutEditSelectionHighlightSpecial>(*node->selectionHighlight));
+    EXPECT_EQ(std::get<LayoutEditSelectionHighlightSpecial>(*node->selectionHighlight), expectedHighlight);
+}
+
 AppConfig MakeBaseConfig() {
     AppConfig config;
     config.display.layout = "primary";
@@ -111,10 +119,28 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
     EXPECT_EQ(FindRootNode(model, "colors"), nullptr);
     EXPECT_EQ(FindRootNode(model, "layout_editor"), nullptr);
 
-    EXPECT_NE(FindRootNode(model, "gauge"), nullptr);
-    EXPECT_NE(FindRootNode(model, "dashboard"), nullptr);
-    EXPECT_NE(FindRootNode(model, "card_style"), nullptr);
-    EXPECT_NE(FindRootNode(model, "fonts"), nullptr);
+    const LayoutEditTreeNode* gaugeRoot = FindRootNode(model, "gauge");
+    ASSERT_NE(gaugeRoot, nullptr);
+    ASSERT_TRUE(gaugeRoot->selectionHighlight.has_value());
+    ASSERT_TRUE(std::holds_alternative<DashboardWidgetClass>(*gaugeRoot->selectionHighlight));
+    EXPECT_EQ(std::get<DashboardWidgetClass>(*gaugeRoot->selectionHighlight), DashboardWidgetClass::Gauge);
+
+    ExpectSpecialSelectionHighlight(
+        FindRootNode(model, "dashboard"), LayoutEditSelectionHighlightSpecial::DashboardBounds);
+    ExpectSpecialSelectionHighlight(FindRootNode(model, "card_style"), LayoutEditSelectionHighlightSpecial::AllCards);
+    ExpectSpecialSelectionHighlight(FindRootNode(model, "fonts"), LayoutEditSelectionHighlightSpecial::AllTexts);
+    ExpectSpecialSelectionHighlight(
+        FindRootNode(model, "layout.primary"), LayoutEditSelectionHighlightSpecial::DashboardBounds);
+
+    const LayoutEditTreeNode* alphaRoot = FindRootNode(model, "card.alpha");
+    ASSERT_NE(alphaRoot, nullptr);
+    ASSERT_TRUE(alphaRoot->selectionHighlight.has_value());
+    ASSERT_TRUE(std::holds_alternative<LayoutEditWidgetIdentity>(*alphaRoot->selectionHighlight));
+    const auto& alphaHighlight = std::get<LayoutEditWidgetIdentity>(*alphaRoot->selectionHighlight);
+    EXPECT_EQ(alphaHighlight.renderCardId, "alpha");
+    EXPECT_EQ(alphaHighlight.editCardId, "alpha");
+    EXPECT_TRUE(alphaHighlight.nodePath.empty());
+    EXPECT_EQ(alphaHighlight.kind, LayoutEditWidgetIdentity::Kind::CardChrome);
 }
 
 TEST(LayoutEditTree, IncludesOnlyTheActiveLayoutSection) {

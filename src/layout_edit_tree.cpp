@@ -320,6 +320,7 @@ std::optional<LayoutEditTreeNode> BuildActiveLayoutSectionNode(const AppConfig& 
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "layout." + config.display.layout;
     sectionNode.initiallyExpanded = true;
+    sectionNode.selectionHighlight = LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
     if (const auto groupNode = BuildStructureGroup(sectionNode.label, "cards", "", config.layout.structure.cardsLayout);
         groupNode.has_value()) {
         sectionNode.children.push_back(*groupNode);
@@ -335,6 +336,8 @@ std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& c
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "card." + card.id;
     sectionNode.initiallyExpanded = true;
+    sectionNode.selectionHighlight = LayoutEditSelectionHighlight{
+        LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome}};
     if (const auto groupNode = BuildStructureGroup(sectionNode.label, "layout", card.id, card.layout);
         groupNode.has_value()) {
         sectionNode.children.push_back(*groupNode);
@@ -373,14 +376,7 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
         switch (section.kind) {
             case TemplateSectionKind::StaticSection:
                 if (const auto treeSection = BuildStaticSectionNode(section); treeSection.has_value()) {
-                    LayoutEditTreeNode root = *treeSection;
-                    if (!root.selectionHighlight.has_value()) {
-                        if (const auto selectionHighlight = SectionSelectionHighlight(root.label);
-                            selectionHighlight.has_value()) {
-                            root.selectionHighlight = *selectionHighlight;
-                        }
-                    }
-                    model.roots.push_back(std::move(root));
+                    model.roots.push_back(*treeSection);
                 }
                 break;
             case TemplateSectionKind::LayoutSectionSlot:

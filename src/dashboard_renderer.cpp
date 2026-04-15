@@ -679,7 +679,7 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
         }
         if (*special == LayoutEditSelectionHighlightSpecial::DashboardBounds) {
             const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(
-                RenderRect{0, 0, resolvedLayout_.windowWidth, resolvedLayout_.windowHeight}, color, true);
+                RenderRect{0, 0, resolvedLayout_.windowWidth, resolvedLayout_.windowHeight}, color, true, false);
             return;
         }
     }
@@ -871,14 +871,19 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
     }
 }
 
-void DashboardRenderer::DrawDottedHighlightRect(const RenderRect& rect, RenderColor color, bool active) const {
+void DashboardRenderer::DrawDottedHighlightRect(
+    const RenderRect& rect, RenderColor color, bool active, bool outside) const {
     if (rect.IsEmpty()) {
         return;
     }
-    const RenderRect outlineRect = rect.Inflate(std::max(1, ScaleLogical(1)), std::max(1, ScaleLogical(1)));
+    const int padding = std::max(1, ScaleLogical(1));
+    const RenderRect outlineRect =
+        outside ? rect.Inflate(padding, padding)
+                : RenderRect{rect.left + padding, rect.top + padding, rect.right - padding, rect.bottom - padding};
     const float outlineWidth =
         static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
-    const_cast<DashboardRenderer*>(this)->DrawSolidRect(outlineRect, RenderStroke::Dotted(color, outlineWidth));
+    const_cast<DashboardRenderer*>(this)->DrawSolidRect(
+        outlineRect.IsEmpty() ? rect : outlineRect, RenderStroke::Dotted(color, outlineWidth));
 }
 
 int DashboardRenderer::WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {

@@ -371,7 +371,7 @@ private:
     void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
     void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
     void DrawGapEditAnchors(const EditOverlayState& overlayState) const;
-    void DrawDottedHighlightRect(const RenderRect& rect, RenderColor color, bool active) const;
+    void DrawDottedHighlightRect(const RenderRect& rect, RenderColor color, bool active, bool outside = true) const;
     void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
     void DrawMoveOverlay(const MoveOverlayState& overlayState);
     void DrawPanel(const ResolvedCardLayout& card);

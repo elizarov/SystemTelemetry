@@ -488,36 +488,7 @@ void ExpandTreeAncestors(HWND tree, HTREEITEM item) {
 }
 
 std::optional<LayoutEditSelectionHighlight> SelectionHighlightForTreeNode(const LayoutEditTreeNode* node) {
-    if (node == nullptr) {
-        return std::nullopt;
-    }
-    if (node->selectionHighlight.has_value()) {
-        return node->selectionHighlight;
-    }
-    if (node->kind != LayoutEditTreeNodeKind::Section) {
-        return std::nullopt;
-    }
-    if (node->label == "card_style") {
-        return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::AllCards};
-    }
-    if (node->label == "fonts") {
-        return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::AllTexts};
-    }
-    if (node->label == "dashboard") {
-        return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
-    }
-    if (node->label.rfind("layout.", 0) == 0) {
-        return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
-    }
-    if (node->label.rfind("card.", 0) == 0) {
-        const std::string cardId = node->label.substr(5);
-        return LayoutEditSelectionHighlight{
-            LayoutEditWidgetIdentity{cardId, cardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome}};
-    }
-    if (const auto widgetClass = FindDashboardWidgetClass(node->label); widgetClass.has_value()) {
-        return LayoutEditSelectionHighlight{*widgetClass};
-    }
-    return std::nullopt;
+    return node != nullptr ? node->selectionHighlight : std::nullopt;
 }
 
 void SelectLayoutEditTreeItem(LayoutEditDialogState* state, HWND hwnd, HTREEITEM item) {
