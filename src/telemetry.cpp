@@ -28,18 +28,6 @@
 #include "trace.h"
 #include "utf8.h"
 
-namespace {
-
-double ResolveConfiguredMetricRatio(const MetricsSectionConfig& metrics, std::string_view metricRef, double value) {
-    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
-    if (definition == nullptr || definition->telemetryScale || definition->scale <= 0.0) {
-        return 0.0;
-    }
-    return value / definition->scale;
-}
-
-}  // namespace
-
 TelemetryCollector::Impl::~Impl() {
     if (cpuQuery_ != nullptr) {
         PdhCloseQuery(cpuQuery_);
@@ -64,12 +52,12 @@ TelemetryCollector::TelemetryCollector(TelemetryCollector&&) noexcept = default;
 
 TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept = default;
 
-bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* traceStream) {
-    impl_->config_ = config;
+bool TelemetryCollector::Initialize(const TelemetrySettings& settings, std::ostream* traceStream) {
+    impl_->settings_ = settings;
     impl_->trace_.SetOutput(traceStream);
     impl_->snapshot_.boardTemperatures =
-        CreateRequestedBoardMetrics(config.board.requestedTemperatureNames, ScalarMetricUnit::Celsius);
-    impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(config.board.requestedFanNames, ScalarMetricUnit::Rpm);
+        CreateRequestedBoardMetrics(settings.board.requestedTemperatureNames, ScalarMetricUnit::Celsius);
+    impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(settings.board.requestedFanNames, ScalarMetricUnit::Rpm);
     impl_->retainedHistoryStore_.Reset(impl_->snapshot_);
     if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {
         impl_->snapshot_.cpu.name = cpuName;
@@ -109,7 +97,7 @@ bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* trace
     }
     if (impl_->boardProvider_ != nullptr) {
         impl_->trace_.Write("telemetry:board_provider_initialize_begin");
-        if (impl_->boardProvider_->Initialize(config)) {
+        if (impl_->boardProvider_->Initialize(settings.board)) {
             impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
             impl_->trace_.Write("telemetry:board_provider_initialize_done provider=" + impl_->boardProviderName_ +
                                 " available=" + tracing::Trace::BoolText(impl_->boardProviderAvailable_) +
@@ -232,21 +220,8 @@ TelemetryDump TelemetryCollector::Dump() const {
     return dump;
 }
 
-AppConfig TelemetryCollector::EffectiveConfig() const {
-    AppConfig config = impl_->config_;
-    if (!impl_->network_.resolvedAdapterName.empty()) {
-        config.network.adapterName = impl_->network_.resolvedAdapterName;
-    }
-    config.storage.drives = impl_->storage_.resolvedDriveLetters;
-    return config;
-}
-
-const std::string& TelemetryCollector::ResolvedNetworkAdapterName() const {
-    return impl_->network_.resolvedAdapterName;
-}
-
-const std::vector<std::string>& TelemetryCollector::ResolvedStorageDrives() const {
-    return impl_->storage_.resolvedDriveLetters;
+const ResolvedTelemetrySelections& TelemetryCollector::ResolvedSelections() const {
+    return impl_->resolvedSelections_;
 }
 
 const std::vector<NetworkAdapterCandidate>& TelemetryCollector::NetworkAdapterCandidates() const {
@@ -258,7 +233,7 @@ const std::vector<StorageDriveCandidate>& TelemetryCollector::StorageDriveCandid
 }
 
 void TelemetryCollector::SetPreferredNetworkAdapterName(std::string adapterName) {
-    impl_->config_.network.adapterName = std::move(adapterName);
+    impl_->settings_.selection.preferredAdapterName = std::move(adapterName);
     impl_->ResolveNetworkSelection();
     ++impl_->snapshot_.revision;
 }
@@ -276,7 +251,7 @@ void TelemetryCollector::SetSelectedStorageDrives(std::vector<std::string> drive
         }
     }
     std::sort(normalized.begin(), normalized.end());
-    impl_->config_.storage.drives = std::move(normalized);
+    impl_->settings_.selection.configuredDrives = std::move(normalized);
     impl_->ResolveStorageSelection();
     ++impl_->snapshot_.revision;
 }
@@ -320,7 +295,7 @@ void TelemetryCollector::Impl::UpdateCpu() {
     Trace(("telemetry:cpu_load " + tracing::Trace::FormatPdhStatus("status", loadStatus) + " " +
            tracing::Trace::FormatValueDouble("value", snapshot_.cpu.loadPercent, 2))
             .c_str());
-    retainedHistoryStore_.PushSample(snapshot_, "cpu.load", snapshot_.cpu.loadPercent / 100.0);
+    retainedHistoryStore_.PushSample(snapshot_, "cpu.load", snapshot_.cpu.loadPercent);
     PDH_STATUS clockStatus = PDH_INVALID_DATA;
     if (cpuFrequencyCounter_ != nullptr &&
         (clockStatus = PdhGetFormattedCounterValue(cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value)) ==
@@ -337,10 +312,8 @@ void TelemetryCollector::Impl::UpdateCpu() {
                tracing::Trace::BoolText(boardProviderAvailable_) + " diagnostics=\"" + boardProviderDiagnostics_ + "\"")
                 .c_str());
     }
-    retainedHistoryStore_.PushSample(snapshot_,
-        "cpu.clock",
-        ResolveConfiguredMetricRatio(config_.metrics, "cpu.clock", snapshot_.cpu.clock.value.value_or(0.0)));
-    retainedHistoryStore_.PushBoardMetricSamples(snapshot_, config_.metrics);
+    retainedHistoryStore_.PushSample(snapshot_, "cpu.clock", snapshot_.cpu.clock.value.value_or(0.0));
+    retainedHistoryStore_.PushBoardMetricSamples(snapshot_);
 }
 
 void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
@@ -501,7 +474,7 @@ void TelemetryCollector::Impl::UpdateGpu() {
                " selected=" + tracing::Trace::FormatValueDouble("value", snapshot_.gpu.loadPercent, 2))
                 .c_str());
     }
-    retainedHistoryStore_.PushSample(snapshot_, "gpu.load", snapshot_.gpu.loadPercent / 100.0);
+    retainedHistoryStore_.PushSample(snapshot_, "gpu.load", snapshot_.gpu.loadPercent);
     if (gpuMemoryQuery_ != nullptr) {
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuMemoryQuery_);
         Trace(("telemetry:gpu_memory_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
@@ -517,18 +490,10 @@ void TelemetryCollector::Impl::UpdateGpu() {
                tracing::Trace::BoolText(gpuProviderAvailable_) + " diagnostics=\"" + gpuProviderDiagnostics_ + "\"")
                 .c_str());
     }
-    retainedHistoryStore_.PushSample(snapshot_,
-        "gpu.temp",
-        ResolveConfiguredMetricRatio(config_.metrics, "gpu.temp", snapshot_.gpu.temperature.value.value_or(0.0)));
-    retainedHistoryStore_.PushSample(snapshot_,
-        "gpu.clock",
-        ResolveConfiguredMetricRatio(config_.metrics, "gpu.clock", snapshot_.gpu.clock.value.value_or(0.0)));
-    retainedHistoryStore_.PushSample(snapshot_,
-        "gpu.fan",
-        ResolveConfiguredMetricRatio(config_.metrics, "gpu.fan", snapshot_.gpu.fan.value.value_or(0.0)));
-    const double totalVram = snapshot_.gpu.vram.totalGb;
-    retainedHistoryStore_.PushSample(
-        snapshot_, "gpu.vram", totalVram > 0.0 ? snapshot_.gpu.vram.usedGb / totalVram : 0.0);
+    retainedHistoryStore_.PushSample(snapshot_, "gpu.temp", snapshot_.gpu.temperature.value.value_or(0.0));
+    retainedHistoryStore_.PushSample(snapshot_, "gpu.clock", snapshot_.gpu.clock.value.value_or(0.0));
+    retainedHistoryStore_.PushSample(snapshot_, "gpu.fan", snapshot_.gpu.fan.value.value_or(0.0));
+    retainedHistoryStore_.PushSample(snapshot_, "gpu.vram", snapshot_.gpu.vram.usedGb);
 }
 
 void TelemetryCollector::Impl::UpdateMemory() {
@@ -543,7 +508,5 @@ void TelemetryCollector::Impl::UpdateMemory() {
            " total_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.totalGb, 2) +
            " used_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.usedGb, 2))
             .c_str());
-    retainedHistoryStore_.PushSample(snapshot_,
-        "cpu.ram",
-        snapshot_.cpu.memory.totalGb > 0.0 ? snapshot_.cpu.memory.usedGb / snapshot_.cpu.memory.totalGb : 0.0);
+    retainedHistoryStore_.PushSample(snapshot_, "cpu.ram", snapshot_.cpu.memory.usedGb);
 }

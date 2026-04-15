@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "config.h"
 #include "metric_types.h"
+#include "telemetry_settings.h"
 
 namespace tracing {
 class Trace;
@@ -28,7 +28,7 @@ struct BoardVendorTelemetrySample {
 class BoardVendorTelemetryProvider {
 public:
     virtual ~BoardVendorTelemetryProvider() = default;
-    virtual bool Initialize(const AppConfig& config) = 0;
+    virtual bool Initialize(const BoardTelemetrySettings& settings) = 0;
     virtual BoardVendorTelemetrySample Sample() = 0;
 };
 

@@ -10,7 +10,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v7";
+constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v8";
 
 std::string TrimDumpWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");

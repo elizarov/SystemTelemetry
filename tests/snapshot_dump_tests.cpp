@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include "snapshot_dump.h"
+#include "telemetry_retained_history.h"
 
 TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     TelemetryDump dump;
@@ -38,7 +39,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
 
 TEST(SnapshotDump, AcceptsLegacyCelsiusSpellingsOnLoad) {
     std::istringstream input(
-        "format=system_telemetry_snapshot_v7\n"
+        "format=system_telemetry_snapshot_v8\n"
         "cpu.name=\"CPU\"\n"
         "cpu.load_percent=0\n"
         "cpu.clock.value=null\n"
@@ -82,4 +83,31 @@ TEST(SnapshotDump, AcceptsLegacyCelsiusSpellingsOnLoad) {
     EXPECT_EQ(loaded.snapshot.gpu.temperature.unit, ScalarMetricUnit::Celsius);
     ASSERT_EQ(loaded.snapshot.boardTemperatures.size(), 1u);
     EXPECT_EQ(loaded.snapshot.boardTemperatures[0].metric.unit, ScalarMetricUnit::Celsius);
+}
+
+TEST(SnapshotDump, RoundTripsRawRetainedHistorySamples) {
+    TelemetryDump dump;
+    dump.snapshot.retainedHistories.push_back({"cpu.load", std::vector<double>{20.0, 91.0, 63.0}});
+    dump.snapshot.retainedHistories.push_back({"board.temp.cpu", std::vector<double>{10.0, 55.0, 40.0}});
+    RebuildRetainedHistoryIndex(dump.snapshot);
+
+    std::ostringstream output;
+    ASSERT_TRUE(WriteTelemetryDump(output, dump));
+
+    std::istringstream input(output.str());
+    TelemetryDump loaded;
+    std::string error;
+    ASSERT_TRUE(LoadTelemetryDump(input, loaded, &error)) << error;
+    ASSERT_EQ(loaded.snapshot.retainedHistories.size(), 2u);
+    EXPECT_EQ(loaded.snapshot.retainedHistories[0].samples, (std::vector<double>{20.0, 91.0, 63.0}));
+    EXPECT_EQ(loaded.snapshot.retainedHistories[1].samples, (std::vector<double>{10.0, 55.0, 40.0}));
+}
+
+TEST(SnapshotDump, RejectsPreviousNormalizedHistoryFormatVersion) {
+    std::istringstream input("format=system_telemetry_snapshot_v7\n");
+
+    TelemetryDump loaded;
+    std::string error;
+    EXPECT_FALSE(LoadTelemetryDump(input, loaded, &error));
+    EXPECT_EQ(error, "Unsupported or missing dump format.");
 }

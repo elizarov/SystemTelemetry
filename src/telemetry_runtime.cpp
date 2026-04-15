@@ -3,9 +3,8 @@
 namespace {
 class RealTelemetryRuntime : public TelemetryRuntime {
 public:
-    bool Initialize(const AppConfig& config, std::ostream* traceStream) override {
-        effectiveConfig_ = config;
-        if (!telemetry_.Initialize(config, traceStream)) {
+    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream) override {
+        if (!telemetry_.Initialize(settings, traceStream)) {
             return false;
         }
         networkAdapters_ = telemetry_.NetworkAdapterCandidates();
@@ -21,8 +20,8 @@ public:
         return telemetry_.Dump();
     }
 
-    AppConfig EffectiveConfig() const override {
-        return BuildEffectiveRuntimeConfig(effectiveConfig_, telemetry_.EffectiveConfig());
+    const ResolvedTelemetrySelections& ResolvedSelections() const override {
+        return telemetry_.ResolvedSelections();
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
@@ -33,18 +32,12 @@ public:
         return storageDrives_;
     }
 
-    void SetEffectiveConfig(const AppConfig& config) override {
-        effectiveConfig_ = config;
-    }
-
     void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
-        effectiveConfig_.network.adapterName = adapterName;
         telemetry_.SetPreferredNetworkAdapterName(adapterName);
         networkAdapters_ = telemetry_.NetworkAdapterCandidates();
     }
 
     void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) override {
-        effectiveConfig_.storage.drives = driveLetters;
         telemetry_.SetSelectedStorageDrives(driveLetters);
         storageDrives_ = telemetry_.StorageDriveCandidates();
     }
@@ -62,7 +55,6 @@ public:
 
 private:
     TelemetryCollector telemetry_;
-    AppConfig effectiveConfig_{};
     std::vector<NetworkAdapterCandidate> networkAdapters_{};
     std::vector<StorageDriveCandidate> storageDrives_{};
 };

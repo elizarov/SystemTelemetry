@@ -146,7 +146,9 @@ void MarkSelectedStorageDriveCandidates(
 
 void TelemetryCollector::Impl::ResolveStorageSelection() {
     storage_.driveCandidates = EnumerateStorageDriveCandidates();
-    storage_.resolvedDriveLetters = ResolveConfiguredStorageDrives(config_.storage.drives, storage_.driveCandidates);
+    storage_.resolvedDriveLetters =
+        ResolveConfiguredStorageDrives(settings_.selection.configuredDrives, storage_.driveCandidates);
+    resolvedSelections_.drives = storage_.resolvedDriveLetters;
     MarkSelectedStorageDriveCandidates(storage_.driveCandidates, storage_.resolvedDriveLetters);
 
     snapshot_.drives.clear();

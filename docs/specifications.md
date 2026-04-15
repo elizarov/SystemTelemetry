@@ -96,6 +96,7 @@ Examples include:
 - The renderer must obtain widget data through a separate metric-source abstraction that can provide text, unified resolved metrics for both `gauge(...)` and `metric_list(...)`, throughput series, and drive rows by metric name.
 - Each published telemetry snapshot must advance a snapshot revision when its rendered content changes so renderer-side metric caches can be reused only across unchanged snapshots.
 - Live telemetry, retained histories, and derived widget ratios must treat non-finite sampled values as unavailable or empty so resume-time provider glitches cannot propagate NaN or infinity into rendering math.
+- Retained metric histories stored in the runtime snapshot and dump must keep raw sampled values in their native runtime units, while metric-list and gauge rendering normalize those retained values through the current `[metrics]` scale at draw time.
 - Metric-list rows, gauge fill, and their retained recent-peak history series must use the same `[metrics]`-driven normalization scale for each bound metric so fill and peak rendering stay aligned.
 - Dashboard display labels and units must come from `[metrics]` instead of hard-coded widget strings, with metric display formatting driven by the configured metric style.
 - The renderer must support a blank rendering mode that preserves panel chrome, card titles, card icons, CPU and GPU names, drive labels, and empty chart or bar tracks while omitting dynamic metric text, time, date, plot lines, chart leaders, peak ghosts, gauge fill, and drive activity or usage fill.
@@ -274,7 +275,7 @@ While moving, show an overlay in the top-left corner with:
 - The application must provide a `Save Config` action that writes the display identifier and relative X/Y placement back to the config file while preserving all other settings and unchanged explicit overrides.
 - The `Save full config to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_full_config.ini`, and export the full embedded-template-shaped config with current live values.
 - The `Save dump to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_dump.txt`, and write the same text dump format used by diagnostics output.
-- The dump format contains only the snapshot fields that `/fake` loads and the dashboard renders, and keeps the internal scalar-unit tokens used by the snapshot model for round-tripping; provider-debug details remain trace-only diagnostics data.
+- The dump format contains only the snapshot fields that `/fake` loads and the dashboard renders, keeps retained histories in raw sampled units, and keeps the internal scalar-unit tokens used by the snapshot model for round-tripping; provider-debug details remain trace-only diagnostics data.
 - The `Save screenshot to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_screenshot.png`, and write the same PNG output format used by diagnostics output.
 
 ## Tray behavior
@@ -336,6 +337,7 @@ While moving, show an overlay in the top-left corner with:
 - Gauge and drive-usage segment layout resolution must keep every configured segment drawable even if a saved or indirectly derived gap would otherwise consume all remaining extent, reducing the visible segment to a hairline at worst instead of dropping it entirely.
 - Gauge fill must quantize to whole pills only; any usage above 0 percent lights the first pill, additional pills round up from the usage percentage, and partially filled pills must not be drawn.
 - CPU and GPU load gauges must also overlay a small translucent max-ghost on the single segmented pill that corresponds to the highest retained load ratio seen in the shared recent 30 second history window.
+- Gauge and metric-row max ghosts must immediately reflect `[metrics]` scale edits without requiring telemetry to rebuild retained history.
 - Each top-level panel header must show a small monochrome icon derived from the dashboard sketch for CPU, GPU, Network, Storage, and Time, with those icon assets stored under `resources\` and compiled into the executable.
 - The application must define a custom app icon asset under `resources\`, embed it into the executable, and use that embedded icon for the executable and the tray icon.
 - The CPU metrics stack must use the same vertical spacing and bar rhythm as the GPU metrics stack so both top cards read as a matched pair.

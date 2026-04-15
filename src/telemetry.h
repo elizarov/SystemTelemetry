@@ -10,9 +10,9 @@
 #include <windows.h>
 
 #include "board_vendor.h"
-#include "config.h"
 #include "gpu_vendor.h"
 #include "metric_types.h"
+#include "telemetry_settings.h"
 
 struct MemoryMetric {
     double usedGb = 0.0;
@@ -113,12 +113,10 @@ public:
     TelemetryCollector(TelemetryCollector&&) noexcept;
     TelemetryCollector& operator=(TelemetryCollector&&) noexcept;
 
-    bool Initialize(const AppConfig& config, std::ostream* traceStream = nullptr);
+    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream = nullptr);
     const SystemSnapshot& Snapshot() const;
     TelemetryDump Dump() const;
-    AppConfig EffectiveConfig() const;
-    const std::string& ResolvedNetworkAdapterName() const;
-    const std::vector<std::string>& ResolvedStorageDrives() const;
+    const ResolvedTelemetrySelections& ResolvedSelections() const;
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const;
     const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const;
     void SetPreferredNetworkAdapterName(std::string adapterName);

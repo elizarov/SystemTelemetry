@@ -29,8 +29,8 @@ public:
     FakeTelemetryRuntime(std::filesystem::path fakePath, bool showDialogs)
         : fakePath_(std::move(fakePath)), showDialogs_(showDialogs) {}
 
-    bool Initialize(const AppConfig& config, std::ostream* traceStream) override {
-        effectiveConfig_ = config;
+    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream) override {
+        selectionSettings_ = settings.selection;
         trace_.SetOutput(traceStream);
         trace_.Write("fake:initialize_begin path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
         if (!ReloadFakeDump(true)) {
@@ -49,11 +49,8 @@ public:
         return dump_;
     }
 
-    AppConfig EffectiveConfig() const override {
-        AppConfig resolvedConfig = effectiveConfig_;
-        resolvedConfig.network.adapterName = resolvedNetwork_.adapterName;
-        resolvedConfig.storage.drives = resolvedStorageDrives_;
-        return BuildEffectiveRuntimeConfig(effectiveConfig_, resolvedConfig);
+    const ResolvedTelemetrySelections& ResolvedSelections() const override {
+        return resolvedSelections_;
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
@@ -64,17 +61,13 @@ public:
         return storageDrives_;
     }
 
-    void SetEffectiveConfig(const AppConfig& config) override {
-        effectiveConfig_ = config;
-    }
-
     void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
-        effectiveConfig_.network.adapterName = adapterName;
+        selectionSettings_.preferredAdapterName = adapterName;
         RefreshNetworkSelection();
     }
 
     void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) override {
-        effectiveConfig_.storage.drives = driveLetters;
+        selectionSettings_.configuredDrives = driveLetters;
         RefreshStorageSelection();
     }
 
@@ -93,8 +86,9 @@ public:
 private:
     void RefreshNetworkSelection() {
         networkAdapters_ = EnumerateSnapshotNetworkCandidates(sourceDump_.snapshot);
-        resolvedNetwork_ = ResolveConfiguredNetworkCandidate(effectiveConfig_.network.adapterName, networkAdapters_);
+        resolvedNetwork_ = ResolveConfiguredNetworkCandidate(selectionSettings_.preferredAdapterName, networkAdapters_);
         MarkSelectedNetworkAdapterCandidates(networkAdapters_, resolvedNetwork_);
+        resolvedSelections_.adapterName = resolvedNetwork_.adapterName;
 
         dump_.snapshot.network.adapterName =
             resolvedNetwork_.adapterName.empty() ? "Auto" : resolvedNetwork_.adapterName;
@@ -104,7 +98,8 @@ private:
 
     void RefreshStorageSelection() {
         storageDrives_ = EnumerateSnapshotStorageDriveCandidates(sourceDump_.snapshot);
-        resolvedStorageDrives_ = ResolveConfiguredStorageDrives(effectiveConfig_.storage.drives, storageDrives_);
+        resolvedStorageDrives_ = ResolveConfiguredStorageDrives(selectionSettings_.configuredDrives, storageDrives_);
+        resolvedSelections_.drives = resolvedStorageDrives_;
         MarkSelectedStorageDriveCandidates(storageDrives_, resolvedStorageDrives_);
 
         dump_.snapshot.drives.clear();
@@ -152,7 +147,8 @@ private:
 
     std::filesystem::path fakePath_;
     bool showDialogs_ = true;
-    AppConfig effectiveConfig_{};
+    TelemetrySelectionSettings selectionSettings_{};
+    ResolvedTelemetrySelections resolvedSelections_{};
     TelemetryDump sourceDump_{};
     TelemetryDump dump_{};
     std::vector<NetworkAdapterCandidate> networkAdapters_{};

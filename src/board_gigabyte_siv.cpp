@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cwctype>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -346,8 +347,8 @@ public:
     explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace)
         : trace_(trace), runtime_(gcnew GigabyteRuntimeContext()) {}
 
-    bool Initialize(const AppConfig& config) override {
-        config_ = config;
+    bool Initialize(const BoardTelemetrySettings& settings) override {
+        settings_ = settings;
         trace().Write("gigabyte_siv:initialize_begin");
 
         boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
@@ -376,8 +377,8 @@ public:
     BoardVendorTelemetrySample Sample() override {
         BoardVendorTelemetrySample sample;
         sample.providerName = "Gigabyte";
-        sample.requestedFanNames = config_.board.requestedFanNames;
-        sample.requestedTemperatureNames = config_.board.requestedTemperatureNames;
+        sample.requestedFanNames = settings_.requestedFanNames;
+        sample.requestedTemperatureNames = settings_.requestedTemperatureNames;
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
         sample.driverLibrary = loadedLibrary_;
@@ -417,11 +418,11 @@ public:
 
 private:
     std::string ResolveTemperatureSensorName(const std::string& logicalName) const {
-        return ResolveMappedSensorName(config_.board.temperatureSensorNames, logicalName);
+        return ResolveMappedSensorName(settings_.temperatureSensorNames, logicalName);
     }
 
     std::string ResolveFanSensorName(const std::string& logicalName) const {
-        return ResolveMappedSensorName(config_.board.fanSensorNames, logicalName);
+        return ResolveMappedSensorName(settings_.fanSensorNames, logicalName);
     }
 
     tracing::Trace& trace() {
@@ -431,7 +432,7 @@ private:
 
     std::vector<NamedScalarMetric> BuildRequestedTemperatures() const {
         std::vector<NamedScalarMetric> metrics =
-            CreateRequestedBoardMetrics(config_.board.requestedTemperatureNames, ScalarMetricUnit::Celsius);
+            CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         for (auto& metric : metrics) {
             if (const TemperatureReading* reading =
                     FindReadingByName(tempReadings_, ResolveTemperatureSensorName(metric.name));
@@ -444,7 +445,7 @@ private:
 
     std::vector<NamedScalarMetric> BuildRequestedFans() const {
         std::vector<NamedScalarMetric> metrics =
-            CreateRequestedBoardMetrics(config_.board.requestedFanNames, ScalarMetricUnit::Rpm);
+            CreateRequestedBoardMetrics(settings_.requestedFanNames, ScalarMetricUnit::Rpm);
         for (auto& metric : metrics) {
             if (const FanReading* reading = FindReadingByName(fanReadings_, ResolveFanSensorName(metric.name));
                 reading != nullptr) {
@@ -455,7 +456,7 @@ private:
     }
 
     tracing::Trace* trace_ = nullptr;
-    AppConfig config_{};
+    BoardTelemetrySettings settings_{};
     gcroot<GigabyteRuntimeContext ^> runtime_;
     std::string boardManufacturer_;
     std::string boardProduct_;

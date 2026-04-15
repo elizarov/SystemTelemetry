@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config_schema.h"
+#include "telemetry_settings.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -318,7 +319,9 @@ CONFIG_EDITABLE_ROOT_BINDING_PATH(
 
 const MetricDefinitionConfig* FindMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id);
 MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std::string_view id);
-AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const AppConfig& resolvedRuntimeConfig);
+TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& config);
+TelemetrySettings ExtractTelemetrySettings(const AppConfig& config);
+AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections);
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition);
 std::string_view MetricDisplayStyleName(MetricDisplayStyle style);
 bool ParseMetricDisplayStyle(std::string_view text, MetricDisplayStyle& style);

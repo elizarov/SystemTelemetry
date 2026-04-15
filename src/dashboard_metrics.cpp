@@ -159,14 +159,18 @@ const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, c
     return &snapshot.retainedHistories[indexIt->second].samples;
 }
 
-double ResolvePeakRatio(const SystemSnapshot& snapshot, const std::string& metricRef, double fallbackRatio) {
+double ResolvePeakRatio(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    double fallbackRatio,
+    double telemetryScale = 0.0) {
     const auto* history = FindRetainedHistory(snapshot, metricRef);
     if (history == nullptr || history->empty()) {
         return ClampFinite(fallbackRatio, 0.0, 1.0);
     }
     double peak = 0.0;
     for (double value : *history) {
-        peak = std::max(peak, FiniteNonNegativeOr(value));
+        peak = std::max(peak, ResolveMetricRatio(definition, value, telemetryScale));
     }
     return ClampFinite(peak, 0.0, 1.0);
 }
@@ -225,13 +229,14 @@ DashboardMetricValue BuildResolvedMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
     std::string valueText,
-    double ratio) {
+    double ratio,
+    double telemetryScale = 0.0) {
     return DashboardMetricValue{definition.label,
         std::move(valueText),
         BuildMetricSampleValueText(definition, metricRef),
         definition.unit,
         ratio,
-        ResolvePeakRatio(snapshot, metricRef, ratio)};
+        ResolvePeakRatio(snapshot, definition, metricRef, ratio, telemetryScale)};
 }
 
 std::optional<DashboardMetricValue> ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
@@ -263,7 +268,7 @@ std::optional<DashboardMetricValue> ResolveMetricValue(
         const double percent = ClampFinite(snapshot.cpu.loadPercent, 0.0, 100.0);
         const double ratio = ResolveMetricRatio(*definition, percent, 100.0);
         return BuildResolvedMetric(
-            snapshot, *definition, metricRef, FormatMetricValueText(*definition, metricRef, percent), ratio);
+            snapshot, *definition, metricRef, FormatMetricValueText(*definition, metricRef, percent), ratio, 100.0);
     }
     if (metricRef == "cpu.clock") {
         const double value = FiniteNonNegativeOr(snapshot.cpu.clock.value.value_or(0.0));
@@ -282,13 +287,14 @@ std::optional<DashboardMetricValue> ResolveMetricValue(
             *definition,
             metricRef,
             FormatMetricValueText(*definition, metricRef, snapshot.cpu.memory.usedGb, snapshot.cpu.memory.totalGb),
-            ratio);
+            ratio,
+            total);
     }
     if (metricRef == "gpu.load") {
         const double percent = ClampFinite(snapshot.gpu.loadPercent, 0.0, 100.0);
         const double ratio = ResolveMetricRatio(*definition, percent, 100.0);
         return BuildResolvedMetric(
-            snapshot, *definition, metricRef, FormatMetricValueText(*definition, metricRef, percent), ratio);
+            snapshot, *definition, metricRef, FormatMetricValueText(*definition, metricRef, percent), ratio, 100.0);
     }
     if (metricRef == "gpu.temp") {
         const double value = FiniteNonNegativeOr(snapshot.gpu.temperature.value.value_or(0.0));
@@ -325,7 +331,8 @@ std::optional<DashboardMetricValue> ResolveMetricValue(
             *definition,
             metricRef,
             FormatMetricValueText(*definition, metricRef, snapshot.gpu.vram.usedGb, snapshot.gpu.vram.totalGb),
-            ratio);
+            ratio,
+            total);
     }
     if (metricRef.rfind("board.temp.", 0) == 0) {
         return ResolveBoardMetric(snapshot.boardTemperatures,

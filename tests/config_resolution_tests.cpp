@@ -78,6 +78,28 @@ TEST(ConfigResolution, SelectsRequestedLayoutAndFallsBackToFirstLayout) {
     EXPECT_EQ(config.layout.structure.cardsLayout.name, "rows");
 }
 
+TEST(ConfigResolution, ExtractTelemetrySettingsIncludesOnlyBoardAndSelectionInputs) {
+    AppConfig config;
+    config.network.adapterName = "Ethernet";
+    config.storage.drives = {"C", "D"};
+    config.board.requestedTemperatureNames = {"cpu"};
+    config.board.requestedFanNames = {"system"};
+    config.board.temperatureSensorNames["cpu"] = "CPU";
+    config.board.fanSensorNames["system"] = "SYS_FAN";
+    config.layout.gauge.labelBottom = 42;
+    config.metrics.definitions.push_back(
+        MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Core Temp"});
+
+    const TelemetrySettings settings = ExtractTelemetrySettings(config);
+
+    EXPECT_EQ(settings.selection.preferredAdapterName, "Ethernet");
+    EXPECT_EQ(settings.selection.configuredDrives, (std::vector<std::string>{"C", "D"}));
+    EXPECT_EQ(settings.board.requestedTemperatureNames, (std::vector<std::string>{"cpu"}));
+    EXPECT_EQ(settings.board.requestedFanNames, (std::vector<std::string>{"system"}));
+    EXPECT_EQ(settings.board.temperatureSensorNames.at("cpu"), "CPU");
+    EXPECT_EQ(settings.board.fanSensorNames.at("system"), "SYS_FAN");
+}
+
 TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingResolvedSelections) {
     AppConfig uiConfig;
     uiConfig.network.adapterName = "Configured Ethernet";
@@ -86,14 +108,11 @@ TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingReso
     uiConfig.metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Core Temp"});
 
-    AppConfig resolvedRuntimeConfig;
-    resolvedRuntimeConfig.network.adapterName = "Resolved Ethernet";
-    resolvedRuntimeConfig.storage.drives = {"C", "D"};
-    resolvedRuntimeConfig.layout.gauge.labelBottom = 7;
-    resolvedRuntimeConfig.metrics.definitions.push_back(
-        MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"});
+    ResolvedTelemetrySelections resolvedSelections;
+    resolvedSelections.adapterName = "Resolved Ethernet";
+    resolvedSelections.drives = {"C", "D"};
 
-    const AppConfig effectiveConfig = BuildEffectiveRuntimeConfig(uiConfig, resolvedRuntimeConfig);
+    const AppConfig effectiveConfig = BuildEffectiveRuntimeConfig(uiConfig, resolvedSelections);
     const MetricDefinitionConfig* metric = FindMetricDefinition(effectiveConfig.metrics, "gpu.temp");
 
     EXPECT_EQ(effectiveConfig.network.adapterName, "Resolved Ethernet");

@@ -185,7 +185,7 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
     AdapterSelectionInfo selectedInfo;
     std::vector<NetworkCandidateState> candidates;
     bool configuredCandidateAvailable = false;
-    if (!config_.network.adapterName.empty()) {
+    if (!settings_.selection.preferredAdapterName.empty()) {
         for (ULONG i = 0; i < table->NumEntries; ++i) {
             const auto& row = table->Table[i];
             if (row.Type == IF_TYPE_SOFTWARE_LOOPBACK || row.OperStatus != IfOperStatusUp) {
@@ -195,10 +195,10 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
             if (!info.hasIpv4) {
                 continue;
             }
-            if (EqualsInsensitive(row.Alias, config_.network.adapterName) ||
-                EqualsInsensitive(row.Description, config_.network.adapterName) ||
-                ContainsInsensitive(row.Alias, config_.network.adapterName) ||
-                ContainsInsensitive(row.Description, config_.network.adapterName)) {
+            if (EqualsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                EqualsInsensitive(row.Description, settings_.selection.preferredAdapterName) ||
+                ContainsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                ContainsInsensitive(row.Description, settings_.selection.preferredAdapterName)) {
                 configuredCandidateAvailable = true;
                 break;
             }
@@ -211,11 +211,13 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
         }
 
         const bool configuredExactMatch =
-            configuredCandidateAvailable && (EqualsInsensitive(row.Alias, config_.network.adapterName) ||
-                                                EqualsInsensitive(row.Description, config_.network.adapterName));
+            configuredCandidateAvailable && (EqualsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                                                EqualsInsensitive(
+                                                    row.Description, settings_.selection.preferredAdapterName));
         const bool configuredPartialMatch = configuredCandidateAvailable && !configuredExactMatch &&
-                                            (ContainsInsensitive(row.Alias, config_.network.adapterName) ||
-                                                ContainsInsensitive(row.Description, config_.network.adapterName));
+                                            (ContainsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                                                ContainsInsensitive(
+                                                    row.Description, settings_.selection.preferredAdapterName));
         if (configuredCandidateAvailable && !configuredExactMatch && !configuredPartialMatch) {
             continue;
         }
@@ -265,11 +267,11 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
             }
         } else if (selected == nullptr ||
                    (configuredExactMatch &&
-                       !(EqualsInsensitive(selected->Alias, config_.network.adapterName) ||
-                           EqualsInsensitive(selected->Description, config_.network.adapterName))) ||
+                       !(EqualsInsensitive(selected->Alias, settings_.selection.preferredAdapterName) ||
+                           EqualsInsensitive(selected->Description, settings_.selection.preferredAdapterName))) ||
                    (configuredExactMatch ==
-                           (EqualsInsensitive(selected->Alias, config_.network.adapterName) ||
-                               EqualsInsensitive(selected->Description, config_.network.adapterName)) &&
+                           (EqualsInsensitive(selected->Alias, settings_.selection.preferredAdapterName) ||
+                               EqualsInsensitive(selected->Description, settings_.selection.preferredAdapterName)) &&
                        (info.hasGateway || info.hasIpv4))) {
             selected = &row;
             selectedTraffic = traffic;
@@ -282,7 +284,7 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
 
     network_.adapterCandidates.clear();
     network_.adapterCandidates.reserve(candidates.size());
-    network_.resolvedAdapterName.clear();
+    resolvedSelections_.adapterName.clear();
     network_.resolvedIpAddress = "N/A";
     network_.selectedIndex = 0;
     network_.previousInOctets = 0;
@@ -307,7 +309,7 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
         snapshot_.network.adapterName =
             Utf8FromWide(selected->Alias[0] != L'\0' ? std::wstring_view(selected->Alias)
                                                      : std::wstring_view(selected->Description));
-        network_.resolvedAdapterName = snapshot_.network.adapterName;
+        resolvedSelections_.adapterName = snapshot_.network.adapterName;
         snapshot_.network.ipAddress = selectedInfo.ipAddress;
         network_.resolvedIpAddress = selectedInfo.ipAddress;
         network_.selectedIndex = selected->InterfaceIndex;
@@ -322,7 +324,8 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
             Trace(("telemetry:network_ip_missing interface=" + std::to_string(selected->InterfaceIndex)).c_str());
         }
     } else {
-        snapshot_.network.adapterName = config_.network.adapterName.empty() ? "Auto" : config_.network.adapterName;
+        snapshot_.network.adapterName =
+            settings_.selection.preferredAdapterName.empty() ? "Auto" : settings_.selection.preferredAdapterName;
         snapshot_.network.ipAddress = "N/A";
         Trace("telemetry:network_selected interface=none");
     }
@@ -373,7 +376,7 @@ void TelemetryCollector::Impl::CollectNetworkMetrics(bool initializeOnly) {
     }
 
     snapshot_.network.adapterName =
-        network_.resolvedAdapterName.empty() ? snapshot_.network.adapterName : network_.resolvedAdapterName;
+        resolvedSelections_.adapterName.empty() ? snapshot_.network.adapterName : resolvedSelections_.adapterName;
     snapshot_.network.ipAddress = network_.resolvedIpAddress;
     if (!initializeOnly && network_.previousTick.time_since_epoch().count() != 0) {
         const double seconds = std::chrono::duration<double>(now - network_.previousTick).count();

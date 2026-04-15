@@ -36,9 +36,9 @@ TEST(DashboardMetrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     snapshot.cpu.memory = MemoryMetric{18.5, 32.0};
     snapshot.gpu.vram = MemoryMetric{8.4, 16.0};
 
-    AddHistorySeries(snapshot, "cpu.load", {0.20, 0.91, 0.63});
-    AddHistorySeries(snapshot, "cpu.ram", {0.10, 0.30, 0.58});
-    AddHistorySeries(snapshot, "gpu.vram", {0.20, 0.52, 0.40});
+    AddHistorySeries(snapshot, "cpu.load", {20.0, 91.0, 63.0});
+    AddHistorySeries(snapshot, "cpu.ram", {3.2, 9.6, 18.5});
+    AddHistorySeries(snapshot, "gpu.vram", {3.2, 8.32, 6.4});
 
     DashboardMetricSource source(snapshot, metrics);
 
@@ -69,7 +69,7 @@ TEST(DashboardMetrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
-    AddHistorySeries(snapshot, "board.temp.cpu", {0.10, 0.55, 0.40});
+    AddHistorySeries(snapshot, "board.temp.cpu", {10.0, 55.0, 40.0});
 
     DashboardMetricSource source(snapshot, metrics);
 
@@ -78,6 +78,24 @@ TEST(DashboardMetrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
     EXPECT_EQ(metric.valueText, "55 C");
     EXPECT_DOUBLE_EQ(metric.ratio, 0.55);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.55);
+}
+
+TEST(DashboardMetrics, RenormalizesPeakGhostWhenMetricScaleChanges) {
+    MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
+    AddHistorySeries(snapshot, "board.temp.cpu", {10.0, 55.0, 40.0});
+
+    DashboardMetricSource defaultScaleSource(snapshot, metrics);
+    EXPECT_DOUBLE_EQ(defaultScaleSource.ResolveMetric("board.temp.cpu").peakRatio, 0.55);
+
+    MetricDefinitionConfig* definition = FindMetricDefinition(metrics, "board.temp.cpu");
+    ASSERT_NE(definition, nullptr);
+    definition->scale = 200.0;
+
+    DashboardMetricSource updatedScaleSource(snapshot, metrics);
+    EXPECT_DOUBLE_EQ(updatedScaleSource.ResolveMetric("board.temp.cpu").ratio, 0.275);
+    EXPECT_DOUBLE_EQ(updatedScaleSource.ResolveMetric("board.temp.cpu").peakRatio, 0.275);
 }
 
 TEST(DashboardMetrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {

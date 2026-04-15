@@ -46,12 +46,29 @@ MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std:
     return nullptr;
 }
 
-AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const AppConfig& resolvedRuntimeConfig) {
+TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& config) {
+    TelemetrySelectionSettings settings;
+    settings.preferredAdapterName = config.network.adapterName;
+    settings.configuredDrives = config.storage.drives;
+    return settings;
+}
+
+TelemetrySettings ExtractTelemetrySettings(const AppConfig& config) {
+    TelemetrySettings settings;
+    settings.board.requestedTemperatureNames = config.board.requestedTemperatureNames;
+    settings.board.requestedFanNames = config.board.requestedFanNames;
+    settings.board.temperatureSensorNames = config.board.temperatureSensorNames;
+    settings.board.fanSensorNames = config.board.fanSensorNames;
+    settings.selection = ExtractTelemetrySelectionSettings(config);
+    return settings;
+}
+
+AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections) {
     AppConfig config = uiConfig;
-    if (!resolvedRuntimeConfig.network.adapterName.empty()) {
-        config.network.adapterName = resolvedRuntimeConfig.network.adapterName;
+    if (!resolvedSelections.adapterName.empty()) {
+        config.network.adapterName = resolvedSelections.adapterName;
     }
-    config.storage.drives = resolvedRuntimeConfig.storage.drives;
+    config.storage.drives = resolvedSelections.drives;
     return config;
 }
 

@@ -67,7 +67,8 @@ struct TelemetryCollector::Impl {
     void Trace(const char* text) const;
     void Trace(const std::string& text) const;
 
-    AppConfig config_;
+    TelemetrySettings settings_;
+    ResolvedTelemetrySelections resolvedSelections_;
     SystemSnapshot snapshot_;
     StorageState storage_;
     NetworkState network_;
