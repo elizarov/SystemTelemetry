@@ -253,6 +253,7 @@ add_executable(SystemTelemetryTests
     src/render_types.cpp
     src/snapshot_dump.cpp
     src/telemetry_retained_history.cpp
+    src/utf8.cpp
   )
 target_include_directories(SystemTelemetryTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"

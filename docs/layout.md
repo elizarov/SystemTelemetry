@@ -328,7 +328,7 @@ Example:
 - `drives =`
 - `[metrics]`
 - `cpu.ram = memory,*,GB,RAM`
-- `board.temp.cpu = scalar,100,°C,Temp`
+- `board.temp.cpu = scalar,100,Â°C,Temp`
 - `board.fan.cpu = scalar,3000,RPM,CPU Fan`
 - `board.fan.system = scalar,3000,RPM,System Fan`
 - `drive.activity.read = label_only,*,,R`

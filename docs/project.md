@@ -44,6 +44,7 @@
 - All runtime text such as config values, telemetry names, diagnostics, monitor identifiers, and UI strings must be stored internally as UTF-8 `std::string`.
 - Convert between UTF-8 `std::string` and UTF-16 `std::wstring` only at Windows API boundaries.
 - Configuration file I/O must use standard C++ stream primitives and read/write UTF-8 text directly without introducing a BOM during saves.
+- Keep `resources/config.ini`, `resources/localization.ini`, and executable-side `config.ini` strictly UTF-8; do not add ANSI code-page fallbacks when decoding text.
 - Keep the embedded `resources/config.ini` template concise and mostly self-documenting; prefer short section-divider comments over long per-key comment blocks.
 - Keep localizable runtime strings in the embedded `resources/localization.ini` UTF-8 key=value catalog so string keys remain stable without assigning Win32 string-table ids and one file stays ready for translation work.
 - The executable-side `config.ini` overlays the embedded template on load, `Save Config` updates only changed live values in that file, and `Save Full Config To...` exports the full embedded-template-shaped text.

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "config_parser.h"
+#include "utf8.h"
 #include "widget.h"
 
 #include <fstream>
@@ -104,4 +105,20 @@ TEST(ConfigParser, IgnoresLegacyThreeFieldMetricDefinitions) {
     EXPECT_EQ(FindMetricDefinition(config.metrics, "cpu.load"), nullptr);
 
     std::filesystem::remove(path);
+}
+
+TEST(ConfigParser, CheckedInConfigTemplateUsesValidUtf8) {
+    const std::filesystem::path path = std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    std::ifstream input(path, std::ios::binary);
+    ASSERT_TRUE(input.is_open()) << "failed to open " << path.string();
+
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    std::string text = buffer.str();
+    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
+        static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
+        text.erase(0, 3);
+    }
+
+    EXPECT_TRUE(IsValidUtf8(text));
 }

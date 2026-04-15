@@ -9,6 +9,8 @@
 #include <sstream>
 #include <type_traits>
 
+#include "utf8.h"
+
 namespace {
 
 std::string Trim(const std::string& input) {
@@ -362,10 +364,17 @@ std::string ReadFileUtf8(const std::filesystem::path& path) {
         static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
     }
+    if (!IsValidUtf8(text)) {
+        return {};
+    }
     return text;
 }
 
 bool WriteFileUtf8(const std::filesystem::path& path, const std::string& text) {
+    if (!IsValidUtf8(text)) {
+        return false;
+    }
+
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     if (!output.is_open()) {
         return false;

@@ -19,6 +19,8 @@
 #include <sstream>
 #include <type_traits>
 
+#include "utf8.h"
+
 namespace {
 
 std::string Trim(const std::string& input) {
@@ -281,6 +283,9 @@ std::string ReadFileUtf8(const std::filesystem::path& path) {
         static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
     }
+    if (!IsValidUtf8(text)) {
+        return {};
+    }
     return text;
 }
 
@@ -314,6 +319,9 @@ std::string LoadUtf8Resource(WORD resourceId, const wchar_t* resourceType) {
     if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
         static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
+    }
+    if (!IsValidUtf8(text)) {
+        return {};
     }
     return text;
 }

@@ -7,6 +7,7 @@
 
 #include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
+#include "utf8.h"
 
 TEST(LocalizationCatalog, ParsesKeyValueLines) {
     const LocalizationCatalogMap catalog =
@@ -99,4 +100,21 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
         ASSERT_TRUE(it != catalog.end()) << "missing localization key: " << descriptor->configKey;
         EXPECT_FALSE(it->second.empty()) << "empty localization text for key: " << descriptor->configKey;
     }
+}
+
+TEST(LocalizationCatalog, CheckedInCatalogUsesValidUtf8) {
+    const std::filesystem::path catalogPath =
+        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    std::ifstream input(catalogPath, std::ios::binary);
+    ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
+
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    std::string text = buffer.str();
+    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
+        static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
+        text.erase(0, 3);
+    }
+
+    EXPECT_TRUE(IsValidUtf8(text));
 }

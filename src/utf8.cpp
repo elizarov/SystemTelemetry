@@ -11,6 +11,19 @@ template <typename CharT> int CheckedSize(size_t size) {
     return size > static_cast<size_t>(INT_MAX) ? -1 : static_cast<int>(size);
 }
 
+bool CanDecodeCodePage(std::string_view text, unsigned int codePage, DWORD flags) {
+    if (text.empty()) {
+        return true;
+    }
+
+    const int length = CheckedSize<char>(text.size());
+    if (length < 0) {
+        return false;
+    }
+
+    return MultiByteToWideChar(codePage, flags, text.data(), length, nullptr, 0) > 0;
+}
+
 std::wstring WideFromCodePage(std::string_view text, unsigned int codePage, DWORD flags) {
     if (text.empty()) {
         return {};
@@ -33,20 +46,15 @@ std::wstring WideFromCodePage(std::string_view text, unsigned int codePage, DWOR
 
 }  // namespace
 
+bool IsValidUtf8(std::string_view text) {
+    return CanDecodeCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
+}
+
 std::wstring WideFromUtf8(std::string_view text) {
-    std::wstring wide = WideFromCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
-    if (!wide.empty()) {
-        return wide;
+    if (!IsValidUtf8(text)) {
+        return {};
     }
-
-    // Some config/resource text still arrives through the active ANSI code page.
-    // Prefer strict UTF-8, but render those legacy bytes instead of dropping text entirely.
-    wide = WideFromCodePage(text, CP_ACP, 0);
-    if (!wide.empty()) {
-        return wide;
-    }
-
-    return {};
+    return WideFromCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
 }
 
 std::string Utf8FromWide(std::wstring_view text) {

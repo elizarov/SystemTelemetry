@@ -6,6 +6,8 @@
 
 #include "../resources/resource.h"
 
+#include "utf8.h"
+
 namespace {
 
 LocalizationCatalogMap g_localizationCatalog;
@@ -51,6 +53,9 @@ std::string LoadUtf8Resource(WORD resourceId, const wchar_t* resourceType) {
     if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
         static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
+    }
+    if (!IsValidUtf8(text)) {
+        return {};
     }
     return text;
 }
