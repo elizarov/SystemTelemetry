@@ -362,6 +362,8 @@ void DriveUsageListWidget::Draw(
                     textBaseId + 1,
                     renderer.Config().layout.fonts.label.size),
                 DashboardRenderer::LayoutEditParameter::ColorForeground);
+            renderer.RegisterDynamicTextAnchor(
+                percentLayout, renderer.MakeMetricTextBinding(widget, "drive.usage", textBaseId + 101));
             const DashboardRenderer::TextLayoutResult freeLayout = renderer.DrawTextBlock(columns.free,
                 drive.freeText,
                 TextStyleId::Small,
@@ -373,6 +375,8 @@ void DriveUsageListWidget::Draw(
                     textBaseId + 2,
                     renderer.Config().layout.fonts.smallText.size),
                 DashboardRenderer::LayoutEditParameter::ColorMutedText);
+            renderer.RegisterDynamicTextAnchor(
+                freeLayout, renderer.MakeMetricTextBinding(widget, "drive.free", textBaseId + 102));
         }
     }
 
@@ -394,6 +398,7 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
         1.0,
         true,
         true,
+        true,
         config.activitySegments);
     renderer.RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
@@ -404,6 +409,11 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
             0,
             renderer.Config().layout.fonts.smallText.size),
         DashboardRenderer::LayoutEditParameter::ColorMutedText);
+    renderer.RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
+        ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
+        TextStyleId::Small,
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
+        renderer.MakeMetricTextBinding(widget, "drive.activity.read", 100));
     renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
         TextStyleId::Small,
@@ -413,6 +423,11 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
             1,
             renderer.Config().layout.fonts.smallText.size),
         DashboardRenderer::LayoutEditParameter::ColorMutedText);
+    renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
+        ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
+        TextStyleId::Small,
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
+        renderer.MakeMetricTextBinding(widget, "drive.activity.write", 101));
     renderer.RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
         ResolveDriveMetricLabel(renderer, "drive.usage", "Usage"),
         TextStyleId::Small,
@@ -422,6 +437,11 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
             2,
             renderer.Config().layout.fonts.smallText.size),
         DashboardRenderer::LayoutEditParameter::ColorMutedText);
+    renderer.RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
+        ResolveDriveMetricLabel(renderer, "drive.usage", "Usage"),
+        TextStyleId::Small,
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
+        renderer.MakeMetricTextBinding(widget, "drive.usage", 102));
     renderer.RegisterStaticTextAnchor(layoutState_.headerColumns.free,
         ResolveDriveMetricLabel(renderer, "drive.free", "Free"),
         TextStyleId::Small,
@@ -431,6 +451,11 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
             3,
             renderer.Config().layout.fonts.smallText.size),
         DashboardRenderer::LayoutEditParameter::ColorMutedText);
+    renderer.RegisterStaticTextAnchor(layoutState_.headerColumns.free,
+        ResolveDriveMetricLabel(renderer, "drive.free", "Free"),
+        TextStyleId::Small,
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center),
+        renderer.MakeMetricTextBinding(widget, "drive.free", 103));
     for (int rowIndex = 0;
         rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.rowBarRects.size()) &&
         rowIndex < static_cast<int>(layoutState_.rowBarAnchorRects.size());
@@ -450,6 +475,7 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
             AnchorDragMode::AxisDelta,
             RenderPoint{anchorCenterX, anchorCenterY},
             1.0,
+            true,
             false,
             true,
             config.barHeight);

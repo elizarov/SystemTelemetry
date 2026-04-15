@@ -79,7 +79,7 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveGapAnchorValues) {
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveEditableAnchorValues) {
     LayoutEditAnchorRegion anchor;
     anchor.key.widget = {"card-a", "card-a", {0}};
-    anchor.key.parameter = LayoutEditParameter::FontLabel;
+    anchor.key.subject = LayoutEditParameter::FontLabel;
     anchor.anchorRect = RenderRect{100, 200, 109, 209};
     anchor.value = 17;
 
@@ -94,6 +94,23 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveEditableAnchorValues) {
     const auto focusKey = TooltipPayloadFocusKey(payload);
     ASSERT_TRUE(focusKey.has_value());
     EXPECT_EQ(std::get<LayoutEditParameter>(*focusKey), LayoutEditParameter::FontLabel);
+}
+
+TEST(LayoutEditTypes, TooltipPayloadHelpersResolveMetricEditableAnchorFocus) {
+    LayoutEditAnchorRegion anchor;
+    anchor.key.widget = {"card-a", "card-a", {0}};
+    anchor.key.subject = LayoutMetricEditKey{"gpu.temp"};
+    anchor.anchorRect = RenderRect{100, 200, 109, 209};
+
+    const TooltipPayload payload = anchor;
+
+    EXPECT_FALSE(TooltipPayloadParameter(payload).has_value());
+    EXPECT_FALSE(TooltipPayloadNumericValue(payload).has_value());
+    const auto focusKey = TooltipPayloadFocusKey(payload);
+    ASSERT_TRUE(focusKey.has_value());
+    const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey);
+    ASSERT_NE(metricKey, nullptr);
+    EXPECT_EQ(metricKey->metricId, "gpu.temp");
 }
 
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveColorRegions) {
@@ -119,11 +136,16 @@ TEST(LayoutEditTypes, MatchesFocusKeysByParameterOrWeightIdentity) {
     const LayoutEditFocusKey weightA = LayoutWeightEditKey{"cpu", {1, 2}, 0};
     const LayoutEditFocusKey weightB = LayoutWeightEditKey{"cpu", {1, 2}, 0};
     const LayoutEditFocusKey weightC = LayoutWeightEditKey{"cpu", {1, 2}, 1};
+    const LayoutEditFocusKey metricA = LayoutMetricEditKey{"gpu.temp"};
+    const LayoutEditFocusKey metricB = LayoutMetricEditKey{"gpu.temp"};
+    const LayoutEditFocusKey metricC = LayoutMetricEditKey{"cpu.load"};
 
     EXPECT_TRUE(MatchesLayoutEditFocusKey(parameterA, parameterB));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(weightA, weightB));
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(metricA, metricB));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(parameterA, weightA));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(weightA, weightC));
+    EXPECT_FALSE(MatchesLayoutEditFocusKey(metricA, metricC));
 }
 
 TEST(LayoutEditTypes, MatchesSelectedParameterFocusAgainstWidgetAndAnchorArtifacts) {
@@ -136,7 +158,7 @@ TEST(LayoutEditTypes, MatchesSelectedParameterFocusAgainstWidgetAndAnchorArtifac
     gapAnchorKey.parameter = LayoutEditParameter::FontLabel;
 
     LayoutEditAnchorKey editableAnchorKey;
-    editableAnchorKey.parameter = LayoutEditParameter::FontLabel;
+    editableAnchorKey.subject = LayoutEditParameter::FontLabel;
 
     EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, widgetGuide));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, gapAnchorKey));
@@ -157,9 +179,13 @@ TEST(LayoutEditTypes, MatchesSelectedWeightFocusAgainstLayoutGuidesOnly) {
     LayoutEditGapAnchorKey gapAnchorKey;
     gapAnchorKey.parameter = LayoutEditParameter::CardColumnGap;
 
+    LayoutEditAnchorKey editableAnchorKey;
+    editableAnchorKey.subject = LayoutMetricEditKey{"gpu.temp"};
+
     EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, guide));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(focusKey, widgetGuide));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(focusKey, gapAnchorKey));
+    EXPECT_FALSE(MatchesLayoutEditFocusKey(focusKey, editableAnchorKey));
 }
 
 TEST(LayoutEditTypes, MatchesSelectionHighlightAgainstLeafAndContainerArtifacts) {
@@ -175,12 +201,25 @@ TEST(LayoutEditTypes, MatchesSelectionHighlightAgainstLeafAndContainerArtifacts)
     widgetGuide.parameter = LayoutEditParameter::FontLabel;
 
     LayoutEditAnchorKey editableAnchorKey;
-    editableAnchorKey.parameter = LayoutEditParameter::FontLabel;
+    editableAnchorKey.subject = LayoutEditParameter::FontLabel;
 
     EXPECT_TRUE(MatchesLayoutEditSelectionHighlight(parameterHighlight, widgetGuide));
     EXPECT_TRUE(MatchesLayoutEditSelectionHighlight(parameterHighlight, editableAnchorKey));
     EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(containerHighlight, guide));
     EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(containerHighlight, widgetGuide));
+}
+
+TEST(LayoutEditTypes, MatchesMetricSelectionHighlightAgainstEditableAnchors) {
+    const LayoutEditSelectionHighlight metricHighlight = LayoutEditFocusKey{LayoutMetricEditKey{"gpu.temp"}};
+
+    LayoutEditAnchorKey metricAnchorKey;
+    metricAnchorKey.subject = LayoutMetricEditKey{"gpu.temp"};
+
+    LayoutEditAnchorKey otherAnchorKey;
+    otherAnchorKey.subject = LayoutMetricEditKey{"cpu.load"};
+
+    EXPECT_TRUE(MatchesLayoutEditSelectionHighlight(metricHighlight, metricAnchorKey));
+    EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(metricHighlight, otherAnchorKey));
 }
 
 TEST(LayoutEditTypes, MatchesCardChromeSelectionByEditedCardIdentity) {

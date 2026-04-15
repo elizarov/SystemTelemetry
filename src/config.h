@@ -318,5 +318,6 @@ CONFIG_EDITABLE_ROOT_BINDING_PATH(
 
 const MetricDefinitionConfig* FindMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id);
 MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std::string_view id);
+std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition);
 std::string_view MetricDisplayStyleName(MetricDisplayStyle style);
 bool ParseMetricDisplayStyle(std::string_view text, MetricDisplayStyle& style);

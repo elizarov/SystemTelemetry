@@ -94,6 +94,11 @@ void ExpectSpecialSelectionHighlight(
 AppConfig MakeBaseConfig() {
     AppConfig config;
     config.display.layout = "primary";
+    config.metrics.definitions = {
+        MetricDefinitionConfig{"cpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"},
+        MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"},
+        MetricDefinitionConfig{"drive.free", MetricDisplayStyle::SizeAuto, true, 0.0, "GB|TB", "Free"},
+    };
     config.layout.structure.cardsLayout =
         MakeContainerNode("columns", {MakeDashboardCardNode("alpha"), MakeDashboardCardNode("beta")});
     config.layout.cards.push_back(
@@ -109,7 +114,8 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
     const LayoutEditTreeModel model = BuildLayoutEditTreeModel(MakeBaseConfig(), ReadTemplateText());
 
     EXPECT_EQ(RootLabels(model),
-        (std::vector<std::string>{"metric_list",
+        (std::vector<std::string>{"metrics",
+            "metric_list",
             "drive_usage_list",
             "throughput",
             "gauge",
@@ -122,6 +128,12 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
             "layout.primary",
             "card.alpha",
             "card.beta"}));
+
+    const LayoutEditTreeNode* metrics = FindRootNode(model, "metrics");
+    ASSERT_NE(metrics, nullptr);
+    ASSERT_FALSE(metrics->children.empty());
+    EXPECT_EQ(metrics->children.front().label, "cpu.load");
+    EXPECT_EQ(metrics->children.back().label, "drive.free");
 
     const LayoutEditTreeNode* metricList = FindRootNode(model, "metric_list");
     ASSERT_NE(metricList, nullptr);
@@ -279,6 +291,11 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     EXPECT_EQ(weightLeaf->firstWeightName, "alpha");
     EXPECT_EQ(weightLeaf->secondWeightName, "beta");
     EXPECT_EQ(weightLeaf->weightAxis, LayoutGuideAxis::Vertical);
+
+    const LayoutEditTreeLeaf* metricLeaf = FindLayoutEditTreeLeaf(model, LayoutEditFocusKey{LayoutMetricEditKey{"gpu.temp"}});
+    ASSERT_NE(metricLeaf, nullptr);
+    EXPECT_EQ(metricLeaf->sectionName, "metrics");
+    EXPECT_EQ(metricLeaf->memberName, "gpu.temp");
 }
 
 TEST(LayoutEditTree, ShowsReachableCardSectionsForRuntimeStyleDashboardCardNodes) {

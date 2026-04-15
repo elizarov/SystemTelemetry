@@ -18,6 +18,7 @@ enum class AnchorShape {
     Circle,
     Diamond,
     Square,
+    Wedge,
 };
 
 enum class AnchorDragAxis {
@@ -50,6 +51,14 @@ struct LayoutEditParameterSubject {
     LayoutEditParameter parameter = LayoutEditParameter::MetricListBarHeight;
 };
 
+struct LayoutMetricEditKey {
+    std::string metricId;
+};
+
+inline bool operator==(const LayoutMetricEditKey& left, const LayoutMetricEditKey& right) {
+    return left.metricId == right.metricId;
+}
+
 struct LayoutEditLinearGeometry {
     RenderPoint drawStart{};
     RenderPoint drawEnd{};
@@ -71,7 +80,9 @@ struct LayoutEditGuide {
     std::vector<RenderRect> childRects;
 };
 
-struct LayoutEditAnchorKey : LayoutEditParameterSubject {
+struct LayoutEditAnchorKey {
+    LayoutEditWidgetIdentity widget;
+    std::variant<LayoutEditParameter, LayoutMetricEditKey> subject = LayoutEditParameter::MetricListBarHeight;
     int anchorId = 0;
 };
 
@@ -86,6 +97,7 @@ struct LayoutEditAnchorRegion {
     AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
     RenderPoint dragOrigin{};
     double dragScale = 1.0;
+    bool draggable = true;
     bool showWhenWidgetHovered = false;
     bool drawTargetOutline = true;
     int value = 0;
@@ -151,11 +163,12 @@ struct LayoutEditAnchorBinding {
     AnchorShape shape = AnchorShape::Circle;
     AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
     AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
+    bool draggable = true;
 };
 
 using TooltipPayload = std::
     variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion, LayoutEditColorRegion>;
-using LayoutEditFocusKey = std::variant<LayoutEditParameter, LayoutWeightEditKey>;
+using LayoutEditFocusKey = std::variant<LayoutEditParameter, LayoutWeightEditKey, LayoutMetricEditKey>;
 using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
     DashboardWidgetClass,
     LayoutContainerEditKey,
@@ -170,6 +183,7 @@ bool MatchesEditableAnchorKey(const LayoutEditAnchorKey& left, const LayoutEditA
 bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditWidgetGuide& right);
 bool MatchesLayoutContainerEditKey(const LayoutContainerEditKey& left, const LayoutContainerEditKey& right);
 bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWeightEditKey& right);
+bool MatchesLayoutMetricEditKey(const LayoutMetricEditKey& left, const LayoutMetricEditKey& right);
 bool MatchesCardChromeSelectionIdentity(
     const LayoutEditWidgetIdentity& selection, const LayoutEditWidgetIdentity& candidate);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right);
@@ -185,6 +199,9 @@ bool MatchesLayoutEditSelectionHighlight(
 bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditAnchorKey& key);
 bool MatchesLayoutEditSelectionHighlight(
     const LayoutEditSelectionHighlight& highlight, const LayoutEditColorRegion& region);
+std::optional<LayoutEditParameter> LayoutEditAnchorParameter(const LayoutEditAnchorKey& key);
+std::optional<LayoutMetricEditKey> LayoutEditAnchorMetricKey(const LayoutEditAnchorKey& key);
+int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key);
 bool IsLayoutGuidePayload(const TooltipPayload& payload);
 std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload& payload);
 std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload);

@@ -1,5 +1,7 @@
 #include "config.h"
 
+#include <sstream>
+
 namespace {
 
 struct MetricDisplayStyleEntry {
@@ -42,6 +44,18 @@ MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std:
         }
     }
     return nullptr;
+}
+
+std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
+    std::ostringstream stream;
+    stream << MetricDisplayStyleName(definition.style) << ",";
+    if (definition.telemetryScale) {
+        stream << "*";
+    } else {
+        stream << definition.scale;
+    }
+    stream << "," << definition.unit << "," << definition.label;
+    return stream.str();
 }
 
 std::string_view MetricDisplayStyleName(MetricDisplayStyle style) {

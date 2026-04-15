@@ -226,6 +226,7 @@ void ThroughputWidget::Draw(
                 1,
                 renderer.Config().layout.fonts.smallText.size),
             DashboardRenderer::LayoutEditParameter::ColorForeground);
+        renderer.RegisterDynamicTextAnchor(numberLayout, renderer.MakeMetricTextBinding(widget, metric_, 101));
     }
     const ThroughputGraphLayout& layout = layoutState_;
     DrawGraph(renderer,
@@ -256,6 +257,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         RenderPoint{layout.leaderAnchorCenterX, layout.leaderAnchorCenterY},
         2.0,
         true,
+        true,
         false,
         renderer.Config().layout.throughput.leaderDiameter);
 
@@ -270,6 +272,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         AnchorDragMode::RadialDistance,
         RenderPoint{layout.plotAnchorCenterX, layout.plotAnchorCenterY},
         2.0,
+        true,
         true,
         false,
         renderer.Config().layout.throughput.plotStrokeWidth);
@@ -286,6 +289,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         RenderPoint{layout.guideCenterX, layout.guideCenterY},
         2.0,
         true,
+        true,
         false,
         renderer.Config().layout.throughput.guideStrokeWidth);
 
@@ -300,6 +304,11 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
                 0,
                 renderer.Config().layout.fonts.smallText.size),
             DashboardRenderer::LayoutEditParameter::ColorMutedText);
+        renderer.RegisterStaticTextAnchor(layoutState_.valueRect,
+            definition->label,
+            TextStyleId::Small,
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
+            renderer.MakeMetricTextBinding(widget, metric_, 100));
     }
 }
 

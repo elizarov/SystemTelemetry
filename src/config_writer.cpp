@@ -37,18 +37,6 @@ std::string FormatFontSpec(const UiFontConfig& font) {
     return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
 }
 
-std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
-    std::ostringstream stream;
-    stream << MetricDisplayStyleName(definition.style) << ",";
-    if (definition.telemetryScale) {
-        stream << "*";
-    } else {
-        stream << definition.scale;
-    }
-    stream << "," << definition.unit << "," << definition.label;
-    return stream.str();
-}
-
 }  // namespace
 
 std::string FormatLayoutExpression(const LayoutNodeConfig& node) {

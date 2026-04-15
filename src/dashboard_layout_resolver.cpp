@@ -139,6 +139,7 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
             RenderPoint{card.rect.left + radiusScaled, card.rect.top},
             1.0,
             true,
+            true,
             false,
             radiusLogical);
 
@@ -157,6 +158,7 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
             RenderPoint{borderCenterX, borderCenterY},
             2.0,
             true,
+            true,
             false,
             renderer.Config().layout.cardStyle.cardBorderWidth);
 
@@ -172,6 +174,7 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 AnchorDragMode::AxisDelta,
                 RenderPoint{anchorCenterX, anchorCenterY},
                 1.0,
+                true,
                 false,
                 true,
                 renderer.Config().layout.cardStyle.headerIconSize);

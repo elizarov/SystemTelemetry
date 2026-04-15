@@ -101,6 +101,16 @@ std::wstring BuildLayoutGuideTooltipText(const AppConfig& config, const LayoutEd
     return text;
 }
 
+std::wstring BuildMetricTooltipText(const LayoutMetricEditKey& key, const MetricDefinitionConfig& definition) {
+    std::wstring text = WideFromUtf8("[metrics] " + key.metricId + " = " + FormatMetricDefinitionValue(definition));
+    const std::wstring description = WideFromUtf8(FindLocalizedText("layout_edit.metric_definition"));
+    if (!description.empty()) {
+        text += L"\r\n";
+        text += description;
+    }
+    return text;
+}
+
 }  // namespace
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
@@ -584,6 +594,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     }
 
     std::optional<LayoutEditTooltipDescriptor> descriptor;
+    std::optional<LayoutMetricEditKey> metricKey;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
     std::optional<unsigned int> colorValue;
@@ -591,29 +602,45 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     if (const auto* guide = std::get_if<LayoutEditGuide>(&target->payload)) {
         layoutEditTooltipText_ = BuildLayoutGuideTooltipText(controller_.State().config, *guide);
     } else {
+        if (const auto focusKey = TooltipPayloadFocusKey(target->payload);
+            focusKey.has_value() && std::holds_alternative<LayoutMetricEditKey>(*focusKey)) {
+            metricKey = std::get<LayoutMetricEditKey>(*focusKey);
+        }
         if (const auto parameter = TooltipPayloadParameter(target->payload); parameter.has_value()) {
             descriptor = FindLayoutEditTooltipDescriptor(*parameter);
             value = TooltipPayloadNumericValue(target->payload).value_or(0.0);
             if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target->payload)) {
-                if (const auto currentFont =
-                        FindLayoutEditTooltipFontValue(controller_.State().config, anchor->key.parameter);
-                    currentFont.has_value() && *currentFont != nullptr) {
-                    fontValue = **currentFont;
+                if (const auto anchorParameter = LayoutEditAnchorParameter(anchor->key);
+                    anchorParameter.has_value()) {
+                    if (const auto currentFont =
+                            FindLayoutEditTooltipFontValue(controller_.State().config, *anchorParameter);
+                        currentFont.has_value() && *currentFont != nullptr) {
+                        fontValue = **currentFont;
+                    }
                 }
             } else if (const auto currentColor =
                            FindLayoutEditParameterColorValue(controller_.State().config, *parameter);
                 currentColor.has_value()) {
                 colorValue = *currentColor;
             }
+        } else if (metricKey.has_value()) {
+            const MetricDefinitionConfig* definition =
+                FindMetricDefinition(controller_.State().config.metrics, metricKey->metricId);
+            if (definition != nullptr) {
+                layoutEditTooltipText_ = BuildMetricTooltipText(*metricKey, *definition);
+            } else {
+                HideLayoutEditTooltip();
+                return;
+            }
         }
     }
 
-    if (!IsLayoutGuidePayload(target->payload) && !descriptor.has_value()) {
+    if (!IsLayoutGuidePayload(target->payload) && !descriptor.has_value() && !metricKey.has_value()) {
         HideLayoutEditTooltip();
         return;
     }
 
-    if (!IsLayoutGuidePayload(target->payload)) {
+    if (!IsLayoutGuidePayload(target->payload) && !metricKey.has_value()) {
         const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
         if (descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()) {
             layoutEditTooltipText_ = BuildTooltipText(*descriptor, *fontValue, description);

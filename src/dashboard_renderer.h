@@ -172,6 +172,8 @@ public:
     bool DrawD2DPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke);
     LayoutEditAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
+    LayoutEditAnchorBinding MakeMetricTextBinding(
+        const DashboardWidgetLayout& widget, std::string_view metricId, int anchorId) const;
     void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,
@@ -180,6 +182,7 @@ public:
         AnchorDragMode dragMode,
         RenderPoint dragOrigin,
         double dragScale,
+        bool draggable,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
@@ -191,6 +194,7 @@ public:
         AnchorDragMode dragMode,
         RenderPoint dragOrigin,
         double dragScale,
+        bool draggable,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);
@@ -455,6 +459,7 @@ private:
         AnchorDragMode dragMode,
         RenderPoint dragOrigin,
         double dragScale,
+        bool draggable,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
         int value);

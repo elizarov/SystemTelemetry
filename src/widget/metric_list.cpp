@@ -129,6 +129,8 @@ void MetricListWidget::Draw(
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size),
                 DashboardRenderer::LayoutEditParameter::ColorForeground);
+            renderer.RegisterDynamicTextAnchor(
+                valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs_[rowIndex], rowIndex * 2 + 101));
         }
         const RenderRect& barRect = layoutState_.barRects[rowIndex];
         renderer.DrawPillBar(
@@ -166,6 +168,7 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
             AnchorDragMode::AxisDelta,
             RenderPoint{anchorCenterX, anchorCenterY},
             1.0,
+            true,
             false,
             true,
             config.barHeight);
@@ -181,6 +184,11 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
                     rowIndex * 2,
                     renderer.Config().layout.fonts.label.size),
                 DashboardRenderer::LayoutEditParameter::ColorMutedText);
+            renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
+                definition->label,
+                TextStyleId::Label,
+                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
+                renderer.MakeMetricTextBinding(widget, metricRefs_[rowIndex], rowIndex * 2 + 100));
         }
     }
 }

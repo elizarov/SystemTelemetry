@@ -315,7 +315,48 @@ std::optional<LayoutEditTreeNode> BuildStructureGroup(const std::string& section
     return groupNode;
 }
 
-std::optional<LayoutEditTreeNode> BuildStaticSectionNode(const TemplateSectionSlot& slot) {
+std::optional<LayoutEditTreeNode> BuildStaticSectionNode(const AppConfig& config, const TemplateSectionSlot& slot) {
+    if (slot.sectionName == "metrics") {
+        LayoutEditTreeNode sectionNode;
+        sectionNode.kind = LayoutEditTreeNodeKind::Section;
+        sectionNode.label = slot.sectionName;
+        sectionNode.locationText = SectionLocationText(slot.sectionName);
+        sectionNode.descriptionKey = SectionDescriptionKey(slot.sectionName);
+        sectionNode.initiallyExpanded = true;
+
+        std::vector<std::string> orderedMetricIds;
+        orderedMetricIds.reserve(slot.keys.size());
+        for (const auto& key : slot.keys) {
+            if (FindMetricDefinition(config.metrics, key) != nullptr) {
+                orderedMetricIds.push_back(key);
+            }
+        }
+        for (const auto& definition : config.metrics.definitions) {
+            if (std::find(orderedMetricIds.begin(), orderedMetricIds.end(), definition.id) == orderedMetricIds.end()) {
+                orderedMetricIds.push_back(definition.id);
+            }
+        }
+
+        for (const auto& metricId : orderedMetricIds) {
+            LayoutEditTreeNode leafNode;
+            leafNode.kind = LayoutEditTreeNodeKind::Leaf;
+            leafNode.label = metricId;
+            leafNode.locationText = MemberLocationText(slot.sectionName, metricId);
+            leafNode.descriptionKey = "layout_edit.metric_definition";
+            leafNode.leaf = LayoutEditTreeLeaf{
+                LayoutMetricEditKey{metricId},
+                slot.sectionName,
+                metricId,
+                "layout_edit.metric_definition",
+                configschema::ValueFormat::FloatingPoint,
+            };
+            leafNode.selectionHighlight = leafNode.leaf->focusKey;
+            sectionNode.children.push_back(std::move(leafNode));
+        }
+
+        return sectionNode.children.empty() ? std::nullopt : std::optional<LayoutEditTreeNode>(std::move(sectionNode));
+    }
+
     LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = slot.sectionName;
@@ -424,7 +465,7 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
     for (const auto& section : sections) {
         switch (section.kind) {
             case TemplateSectionKind::StaticSection:
-                if (const auto treeSection = BuildStaticSectionNode(section); treeSection.has_value()) {
+                if (const auto treeSection = BuildStaticSectionNode(config, section); treeSection.has_value()) {
                     model.roots.push_back(*treeSection);
                 }
                 break;

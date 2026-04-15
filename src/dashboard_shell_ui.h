@@ -38,6 +38,10 @@ public:
     bool ApplyParameterPreview(DashboardRenderer::LayoutEditParameter parameter, double value);
     bool ApplyFontPreview(DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value);
     bool ApplyColorPreview(DashboardRenderer::LayoutEditParameter parameter, unsigned int value);
+    bool ApplyMetricPreview(const LayoutMetricEditKey& key,
+        const std::optional<double>& scale,
+        const std::string& unit,
+        const std::string& label);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
     void SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
     void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const;

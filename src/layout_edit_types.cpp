@@ -22,7 +22,7 @@ bool MatchesGapEditAnchorKey(const LayoutEditGapAnchorKey& left, const LayoutEdi
 }
 
 bool MatchesEditableAnchorKey(const LayoutEditAnchorKey& left, const LayoutEditAnchorKey& right) {
-    return left.anchorId == right.anchorId && MatchesParameterSubject(left, right);
+    return left.anchorId == right.anchorId && left.subject == right.subject && MatchesWidgetIdentity(left.widget, right.widget);
 }
 
 bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditWidgetGuide& right) {
@@ -38,6 +38,10 @@ bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWei
            left.separatorIndex == right.separatorIndex;
 }
 
+bool MatchesLayoutMetricEditKey(const LayoutMetricEditKey& left, const LayoutMetricEditKey& right) {
+    return left == right;
+}
+
 bool MatchesCardChromeSelectionIdentity(
     const LayoutEditWidgetIdentity& selection, const LayoutEditWidgetIdentity& candidate) {
     return selection.kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
@@ -51,7 +55,10 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditF
     if (const auto* leftParameter = std::get_if<LayoutEditParameter>(&left)) {
         return *leftParameter == std::get<LayoutEditParameter>(right);
     }
-    return MatchesLayoutWeightEditKey(std::get<LayoutWeightEditKey>(left), std::get<LayoutWeightEditKey>(right));
+    if (const auto* leftWeight = std::get_if<LayoutWeightEditKey>(&left)) {
+        return MatchesLayoutWeightEditKey(*leftWeight, std::get<LayoutWeightEditKey>(right));
+    }
+    return MatchesLayoutMetricEditKey(std::get<LayoutMetricEditKey>(left), std::get<LayoutMetricEditKey>(right));
 }
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGuide& guide) {
@@ -71,8 +78,12 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
 }
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditAnchorKey& key) {
-    const auto* parameter = std::get_if<LayoutEditParameter>(&focusKey);
-    return parameter != nullptr && *parameter == key.parameter;
+    if (const auto* parameter = std::get_if<LayoutEditParameter>(&focusKey)) {
+        return key.subject.index() == 0 && *parameter == std::get<LayoutEditParameter>(key.subject);
+    }
+    const auto* metricKey = std::get_if<LayoutMetricEditKey>(&focusKey);
+    return metricKey != nullptr && key.subject.index() == 1 &&
+           MatchesLayoutMetricEditKey(*metricKey, std::get<LayoutMetricEditKey>(key.subject));
 }
 
 bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditGuide& guide) {
@@ -105,6 +116,23 @@ bool MatchesLayoutEditSelectionHighlight(
     return parameter != nullptr && *parameter == region.parameter;
 }
 
+std::optional<LayoutEditParameter> LayoutEditAnchorParameter(const LayoutEditAnchorKey& key) {
+    const auto* parameter = std::get_if<LayoutEditParameter>(&key.subject);
+    return parameter != nullptr ? std::optional<LayoutEditParameter>(*parameter) : std::nullopt;
+}
+
+std::optional<LayoutMetricEditKey> LayoutEditAnchorMetricKey(const LayoutEditAnchorKey& key) {
+    const auto* metricKey = std::get_if<LayoutMetricEditKey>(&key.subject);
+    return metricKey != nullptr ? std::optional<LayoutMetricEditKey>(*metricKey) : std::nullopt;
+}
+
+int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key) {
+    if (const auto parameter = LayoutEditAnchorParameter(key); parameter.has_value()) {
+        return GetLayoutEditParameterHitPriority(*parameter);
+    }
+    return 0;
+}
+
 bool IsLayoutGuidePayload(const TooltipPayload& payload) {
     return std::holds_alternative<LayoutEditGuide>(payload);
 }
@@ -119,6 +147,8 @@ std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload&
                 return value.parameter;
             } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
                 return value.parameter;
+            } else if constexpr (std::is_same_v<T, LayoutEditAnchorRegion>) {
+                return LayoutEditAnchorParameter(value.key);
             } else {
                 return value.key.parameter;
             }
@@ -135,7 +165,8 @@ std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload) 
             } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
                 return std::nullopt;
             } else if constexpr (std::is_same_v<T, LayoutEditAnchorRegion>) {
-                return static_cast<double>(value.value);
+                return LayoutEditAnchorParameter(value.key).has_value() ? std::optional<double>(static_cast<double>(value.value))
+                                                                       : std::nullopt;
             } else {
                 return value.value;
             }
@@ -191,6 +222,14 @@ std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& p
                 return value.parameter;
             } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
                 return value.parameter;
+            } else if constexpr (std::is_same_v<T, LayoutEditAnchorRegion>) {
+                if (const auto parameter = LayoutEditAnchorParameter(value.key); parameter.has_value()) {
+                    return LayoutEditFocusKey{*parameter};
+                }
+                if (const auto metricKey = LayoutEditAnchorMetricKey(value.key); metricKey.has_value()) {
+                    return LayoutEditFocusKey{*metricKey};
+                }
+                return std::nullopt;
             } else {
                 return value.key.parameter;
             }

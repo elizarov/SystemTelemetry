@@ -299,6 +299,7 @@ void GaugeWidget::Draw(
             renderer.MakeEditableTextBinding(
                 widget, DashboardRenderer::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size),
             DashboardRenderer::LayoutEditParameter::ColorForeground);
+        renderer.RegisterDynamicTextAnchor(valueLayout, renderer.MakeMetricTextBinding(widget, metric_, 100));
     }
     const RenderRect ringBounds{layoutState_.cx - layoutState_.outerRadius,
         layoutState_.cy - layoutState_.outerRadius,
@@ -332,6 +333,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         1.0,
         true,
         true,
+        true,
         renderer.Config().layout.gauge.segmentCount);
     renderer.RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -344,6 +346,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         AnchorDragMode::RadialDistance,
         RenderPoint{cx, cy},
         -1.0,
+        true,
         true,
         false,
         renderer.Config().layout.gauge.outerPadding);
@@ -359,6 +362,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         RenderPoint{cx, cy},
         -1.0,
         true,
+        true,
         false,
         renderer.Config().layout.gauge.ringThickness);
     const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().metrics, metric_);
@@ -372,6 +376,11 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
                 1,
                 renderer.Config().layout.fonts.smallText.size),
             DashboardRenderer::LayoutEditParameter::ColorMutedText);
+        renderer.RegisterStaticTextAnchor(layoutState_.labelRect,
+            definition->label,
+            TextStyleId::Small,
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
+            renderer.MakeMetricTextBinding(widget, metric_, 101));
     }
 }
 

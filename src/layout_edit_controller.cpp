@@ -58,7 +58,13 @@ std::string DescribeGapEditAnchor(const LayoutEditGapAnchor& anchor) {
 }
 
 std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
-    return "parameter=" + DescribeWidgetParameter(key.parameter) + " anchor_id=" + std::to_string(key.anchorId) +
+    const std::string subject =
+        LayoutEditAnchorParameter(key).has_value()
+            ? "parameter=" + DescribeWidgetParameter(*LayoutEditAnchorParameter(key))
+        : LayoutEditAnchorMetricKey(key).has_value()
+            ? "metric=" + LayoutEditAnchorMetricKey(key)->metricId
+            : "subject=unknown";
+    return subject + " anchor_id=" + std::to_string(key.anchorId) +
            (key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome
                    ? " card=" + key.widget.editCardId
                    : " path=" + FormatNodePath(key.widget.nodePath));
@@ -254,19 +260,29 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
     resolution.hoveredEditableCard = renderer.HitTestEditableCard(clientPoint);
 
     const std::optional<LayoutEditAnchorKey> anchorHandle = renderer.HitTestEditableAnchorHandle(clientPoint);
+    const std::optional<LayoutEditAnchorRegion> anchorRegion =
+        anchorHandle.has_value() ? renderer.FindEditableAnchorRegion(*anchorHandle) : std::nullopt;
+    const auto setHoveredAnchor = [&]() {
+        resolution.hoveredEditableAnchor = anchorHandle;
+        if (anchorHandle->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
+            resolution.hoveredEditableWidget = anchorHandle->widget;
+        }
+    };
+    const auto setActionableAnchor = [&]() {
+        setHoveredAnchor();
+        if (anchorRegion.has_value() && anchorRegion->draggable) {
+            resolution.actionableAnchorHandle = anchorHandle;
+        }
+    };
     size_t gapAnchorIndex = 0;
     const LayoutEditGapAnchor* gapAnchor = HitTestGapEditAnchor(clientPoint, &gapAnchorIndex);
     size_t widgetGuideIndex = 0;
     const LayoutEditWidgetGuide* widgetGuide = HitTestWidgetEditGuide(clientPoint, &widgetGuideIndex);
     if (anchorHandle.has_value() && gapAnchor != nullptr) {
-        const int anchorPriority = GetLayoutEditParameterHitPriority(anchorHandle->parameter);
+        const int anchorPriority = LayoutEditAnchorHitPriority(*anchorHandle);
         const int gapPriority = GetLayoutEditParameterHitPriority(gapAnchor->key.parameter);
         if (anchorPriority <= gapPriority) {
-            resolution.hoveredEditableAnchor = anchorHandle;
-            resolution.actionableAnchorHandle = anchorHandle;
-            if (anchorHandle->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
-                resolution.hoveredEditableWidget = anchorHandle->widget;
-            }
+            setActionableAnchor();
             return resolution;
         }
 
@@ -276,14 +292,10 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
         return resolution;
     }
     if (anchorHandle.has_value() && widgetGuide != nullptr) {
-        const int anchorPriority = GetLayoutEditParameterHitPriority(anchorHandle->parameter);
+        const int anchorPriority = LayoutEditAnchorHitPriority(*anchorHandle);
         const int guidePriority = GetLayoutEditParameterHitPriority(widgetGuide->parameter);
         if (anchorPriority <= guidePriority) {
-            resolution.hoveredEditableAnchor = anchorHandle;
-            resolution.actionableAnchorHandle = anchorHandle;
-            if (anchorHandle->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
-                resolution.hoveredEditableWidget = anchorHandle->widget;
-            }
+            setActionableAnchor();
             return resolution;
         }
 
@@ -312,11 +324,7 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
     }
 
     if (anchorHandle.has_value()) {
-        resolution.hoveredEditableAnchor = anchorHandle;
-        resolution.actionableAnchorHandle = anchorHandle;
-        if (anchorHandle->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
-            resolution.hoveredEditableWidget = anchorHandle->widget;
-        }
+        setActionableAnchor();
         return resolution;
     }
 
@@ -754,6 +762,13 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
         }
     }
 
+    if (resolution.hoveredEditableAnchor.has_value()) {
+        const auto region = renderer.FindEditableAnchorRegion(*resolution.hoveredEditableAnchor);
+        if (region.has_value() && !region->draggable) {
+            return TooltipTarget{lastClientPoint_, *region};
+        }
+    }
+
     if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
         const auto& guides = renderer.WidgetEditGuides();
         if (*resolution.hoveredWidgetEditGuideIndex < guides.size()) {
@@ -1036,6 +1051,10 @@ bool LayoutEditController::UpdateGapEditDrag(RenderPoint clientPoint) {
 
 bool LayoutEditController::UpdateAnchorEditDrag(RenderPoint clientPoint) {
     AnchorEditDragState& drag = *activeAnchorEditDrag_;
+    const auto parameter = LayoutEditAnchorParameter(drag.key);
+    if (!parameter.has_value()) {
+        return false;
+    }
     int logicalDelta = 0;
     if (drag.dragMode == AnchorDragMode::RadialDistance) {
         const double dx = static_cast<double>(clientPoint.x - drag.dragOrigin.x);
@@ -1060,7 +1079,7 @@ bool LayoutEditController::UpdateAnchorEditDrag(RenderPoint clientPoint) {
                                          (std::max)(0.1, host_.LayoutEditRenderer().RenderScale() * scaleDivisor)));
     }
     const int nextValue = (std::max)(1, drag.initialValue + logicalDelta);
-    const bool updated = host_.ApplyLayoutEditValue(drag.key.parameter, static_cast<double>(nextValue));
+    const bool updated = host_.ApplyLayoutEditValue(*parameter, static_cast<double>(nextValue));
     if (updated) {
         SyncRendererInteractionState();
     }
