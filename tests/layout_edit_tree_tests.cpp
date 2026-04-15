@@ -212,12 +212,25 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     ASSERT_NE(layoutRoot, nullptr);
     ASSERT_EQ(layoutRoot->children.size(), 1u);
     EXPECT_EQ(layoutRoot->children[0].label, "cards");
+    ASSERT_TRUE(layoutRoot->children[0].selectionHighlight.has_value());
+    ASSERT_TRUE(
+        std::holds_alternative<LayoutEditSelectionHighlightSpecial>(*layoutRoot->children[0].selectionHighlight));
+    EXPECT_EQ(std::get<LayoutEditSelectionHighlightSpecial>(*layoutRoot->children[0].selectionHighlight),
+        LayoutEditSelectionHighlightSpecial::DashboardBounds);
     EXPECT_EQ(ChildLabels(layoutRoot->children[0]), (std::vector<std::string>{"alpha, beta", "columns, gamma"}));
 
     const LayoutEditTreeNode* alphaRoot = FindRootNode(model, "card.alpha");
     ASSERT_NE(alphaRoot, nullptr);
     ASSERT_EQ(alphaRoot->children.size(), 1u);
     EXPECT_EQ(alphaRoot->children[0].label, "layout");
+    ASSERT_TRUE(alphaRoot->children[0].selectionHighlight.has_value());
+    ASSERT_TRUE(std::holds_alternative<LayoutEditWidgetIdentity>(*alphaRoot->children[0].selectionHighlight));
+    const auto& alphaRootHighlight = std::get<LayoutEditWidgetIdentity>(*alphaRoot->selectionHighlight);
+    const auto& alphaGroupHighlight = std::get<LayoutEditWidgetIdentity>(*alphaRoot->children[0].selectionHighlight);
+    EXPECT_EQ(alphaGroupHighlight.renderCardId, alphaRootHighlight.renderCardId);
+    EXPECT_EQ(alphaGroupHighlight.editCardId, alphaRootHighlight.editCardId);
+    EXPECT_EQ(alphaGroupHighlight.nodePath, alphaRootHighlight.nodePath);
+    EXPECT_EQ(alphaGroupHighlight.kind, alphaRootHighlight.kind);
     EXPECT_EQ(ChildLabels(alphaRoot->children[0]), (std::vector<std::string>{"columns", "columns, throughput"}));
 
     const LayoutEditTreeNode* alphaContainer = &alphaRoot->children[0].children[0];

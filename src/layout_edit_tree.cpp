@@ -292,6 +292,7 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
 std::optional<LayoutEditTreeNode> BuildStructureGroup(const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
+    const std::optional<LayoutEditSelectionHighlight>& selectionHighlight,
     const LayoutNodeConfig& node) {
     LayoutEditTreeNode groupNode;
     groupNode.kind = LayoutEditTreeNodeKind::Group;
@@ -299,6 +300,7 @@ std::optional<LayoutEditTreeNode> BuildStructureGroup(const std::string& section
     groupNode.locationText = MemberLocationText(sectionName, memberName);
     groupNode.descriptionKey = GroupDescriptionKey(memberName);
     groupNode.initiallyExpanded = false;
+    groupNode.selectionHighlight = selectionHighlight;
     if (const auto containerNode = BuildContainerNode(sectionName, memberName, editCardId, node, {});
         containerNode.has_value()) {
         if (containerNode->kind == LayoutEditTreeNodeKind::Container) {
@@ -364,7 +366,8 @@ std::optional<LayoutEditTreeNode> BuildActiveLayoutSectionNode(const AppConfig& 
     sectionNode.descriptionKey = SectionDescriptionKey(sectionNode.label);
     sectionNode.initiallyExpanded = true;
     sectionNode.selectionHighlight = LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
-    if (const auto groupNode = BuildStructureGroup(sectionNode.label, "cards", "", config.layout.structure.cardsLayout);
+    if (const auto groupNode = BuildStructureGroup(
+            sectionNode.label, "cards", "", sectionNode.selectionHighlight, config.layout.structure.cardsLayout);
         groupNode.has_value()) {
         sectionNode.children.push_back(*groupNode);
     }
@@ -383,7 +386,8 @@ std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& c
     sectionNode.initiallyExpanded = true;
     sectionNode.selectionHighlight = LayoutEditSelectionHighlight{
         LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome}};
-    if (const auto groupNode = BuildStructureGroup(sectionNode.label, "layout", card.id, card.layout);
+    if (const auto groupNode =
+            BuildStructureGroup(sectionNode.label, "layout", card.id, sectionNode.selectionHighlight, card.layout);
         groupNode.has_value()) {
         sectionNode.children.push_back(*groupNode);
     }
