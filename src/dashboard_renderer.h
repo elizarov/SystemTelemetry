@@ -67,7 +67,7 @@ public:
         std::optional<LayoutEditGapAnchorKey> activeGapEditAnchor;
         std::optional<LayoutEditAnchorKey> hoveredEditableAnchor;
         std::optional<LayoutEditAnchorKey> activeEditableAnchor;
-        std::optional<LayoutEditFocusKey> selectedTreeFocusKey;
+        std::optional<LayoutEditSelectionHighlight> selectedTreeHighlight;
         MoveOverlayState moveOverlay{};
     };
 
@@ -367,6 +367,7 @@ private:
     void ClearD2DCaches();
     void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const;
+    void DrawSelectedTreeNodeHighlight(const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
     void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
     void DrawGapEditAnchors(const EditOverlayState& overlayState) const;

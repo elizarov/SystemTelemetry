@@ -144,3 +144,24 @@ TEST(LayoutEditTypes, MatchesSelectedWeightFocusAgainstLayoutGuidesOnly) {
     EXPECT_FALSE(MatchesLayoutEditFocusKey(focusKey, widgetGuide));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(focusKey, gapAnchorKey));
 }
+
+TEST(LayoutEditTypes, MatchesSelectionHighlightAgainstLeafAndContainerArtifacts) {
+    const LayoutEditSelectionHighlight parameterHighlight = LayoutEditFocusKey{LayoutEditParameter::FontLabel};
+    const LayoutEditSelectionHighlight containerHighlight = LayoutContainerEditKey{"gpu", {0, 1}};
+
+    LayoutEditGuide guide;
+    guide.editCardId = "gpu";
+    guide.nodePath = {0, 1};
+    guide.separatorIndex = 2;
+
+    LayoutEditWidgetGuide widgetGuide;
+    widgetGuide.parameter = LayoutEditParameter::FontLabel;
+
+    LayoutEditAnchorKey editableAnchorKey;
+    editableAnchorKey.parameter = LayoutEditParameter::FontLabel;
+
+    EXPECT_TRUE(MatchesLayoutEditSelectionHighlight(parameterHighlight, widgetGuide));
+    EXPECT_TRUE(MatchesLayoutEditSelectionHighlight(parameterHighlight, editableAnchorKey));
+    EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(containerHighlight, guide));
+    EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(containerHighlight, widgetGuide));
+}

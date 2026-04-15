@@ -7,6 +7,7 @@
 
 #include "layout_edit_parameter.h"
 #include "render_types.h"
+#include "widget.h"
 
 enum class LayoutGuideAxis {
     Horizontal,
@@ -120,6 +121,17 @@ struct LayoutWeightEditKey {
     size_t separatorIndex = 0;
 };
 
+struct LayoutContainerEditKey {
+    std::string editCardId;
+    std::vector<size_t> nodePath;
+};
+
+enum class LayoutEditSelectionHighlightSpecial {
+    AllCards,
+    AllTexts,
+    DashboardBounds,
+};
+
 struct LayoutGuideSnapCandidate {
     LayoutEditWidgetIdentity widget;
     int targetExtent = 0;
@@ -139,6 +151,8 @@ struct LayoutEditAnchorBinding {
 using TooltipPayload =
     std::variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion>;
 using LayoutEditFocusKey = std::variant<LayoutEditParameter, LayoutWeightEditKey>;
+using LayoutEditSelectionHighlight =
+    std::variant<LayoutEditFocusKey, DashboardWidgetClass, LayoutContainerEditKey, LayoutEditSelectionHighlightSpecial>;
 
 bool MatchesWidgetIdentity(const LayoutEditWidgetIdentity& left, const LayoutEditWidgetIdentity& right);
 bool MatchesParameterSubject(const LayoutEditParameterSubject& left, const LayoutEditParameterSubject& right);
@@ -146,12 +160,19 @@ bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& 
 bool MatchesGapEditAnchorKey(const LayoutEditGapAnchorKey& left, const LayoutEditGapAnchorKey& right);
 bool MatchesEditableAnchorKey(const LayoutEditAnchorKey& left, const LayoutEditAnchorKey& right);
 bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditWidgetGuide& right);
+bool MatchesLayoutContainerEditKey(const LayoutContainerEditKey& left, const LayoutContainerEditKey& right);
 bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWeightEditKey& right);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGuide& guide);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditWidgetGuide& guide);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGapAnchorKey& key);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditAnchorKey& key);
+bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditGuide& guide);
+bool MatchesLayoutEditSelectionHighlight(
+    const LayoutEditSelectionHighlight& highlight, const LayoutEditWidgetGuide& guide);
+bool MatchesLayoutEditSelectionHighlight(
+    const LayoutEditSelectionHighlight& highlight, const LayoutEditGapAnchorKey& key);
+bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditAnchorKey& key);
 bool IsLayoutGuidePayload(const TooltipPayload& payload);
 std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload& payload);
 std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload);

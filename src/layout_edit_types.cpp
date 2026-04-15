@@ -29,6 +29,10 @@ bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditW
     return left.axis == right.axis && left.guideId == right.guideId && MatchesParameterSubject(left, right);
 }
 
+bool MatchesLayoutContainerEditKey(const LayoutContainerEditKey& left, const LayoutContainerEditKey& right) {
+    return left.editCardId == right.editCardId && left.nodePath == right.nodePath;
+}
+
 bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWeightEditKey& right) {
     return left.editCardId == right.editCardId && left.nodePath == right.nodePath &&
            left.separatorIndex == right.separatorIndex;
@@ -63,6 +67,29 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditAnchorKey& key) {
     const auto* parameter = std::get_if<LayoutEditParameter>(&focusKey);
     return parameter != nullptr && *parameter == key.parameter;
+}
+
+bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditGuide& guide) {
+    const auto* focusKey = std::get_if<LayoutEditFocusKey>(&highlight);
+    return focusKey != nullptr && MatchesLayoutEditFocusKey(*focusKey, guide);
+}
+
+bool MatchesLayoutEditSelectionHighlight(
+    const LayoutEditSelectionHighlight& highlight, const LayoutEditWidgetGuide& guide) {
+    const auto* focusKey = std::get_if<LayoutEditFocusKey>(&highlight);
+    return focusKey != nullptr && MatchesLayoutEditFocusKey(*focusKey, guide);
+}
+
+bool MatchesLayoutEditSelectionHighlight(
+    const LayoutEditSelectionHighlight& highlight, const LayoutEditGapAnchorKey& key) {
+    const auto* focusKey = std::get_if<LayoutEditFocusKey>(&highlight);
+    return focusKey != nullptr && MatchesLayoutEditFocusKey(*focusKey, key);
+}
+
+bool MatchesLayoutEditSelectionHighlight(
+    const LayoutEditSelectionHighlight& highlight, const LayoutEditAnchorKey& key) {
+    const auto* focusKey = std::get_if<LayoutEditFocusKey>(&highlight);
+    return focusKey != nullptr && MatchesLayoutEditFocusKey(*focusKey, key);
 }
 
 bool IsLayoutGuidePayload(const TooltipPayload& payload) {

@@ -31,6 +31,7 @@ struct LayoutEditTreeNode {
     LayoutEditTreeNodeKind kind = LayoutEditTreeNodeKind::Section;
     std::string label;
     bool initiallyExpanded = false;
+    std::optional<LayoutEditSelectionHighlight> selectionHighlight;
     std::optional<LayoutEditTreeLeaf> leaf;
     std::vector<LayoutEditTreeNode> children;
 };

@@ -487,12 +487,35 @@ void ExpandTreeAncestors(HWND tree, HTREEITEM item) {
     }
 }
 
+std::optional<LayoutEditSelectionHighlight> SelectionHighlightForTreeNode(const LayoutEditTreeNode* node) {
+    if (node == nullptr) {
+        return std::nullopt;
+    }
+    if (node->selectionHighlight.has_value()) {
+        return node->selectionHighlight;
+    }
+    if (node->kind != LayoutEditTreeNodeKind::Section) {
+        return std::nullopt;
+    }
+    if (node->label == "card_style") {
+        return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::AllCards};
+    }
+    if (node->label == "fonts") {
+        return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::AllTexts};
+    }
+    if (node->label == "dashboard") {
+        return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
+    }
+    if (const auto widgetClass = FindDashboardWidgetClass(node->label); widgetClass.has_value()) {
+        return LayoutEditSelectionHighlight{*widgetClass};
+    }
+    return std::nullopt;
+}
+
 void SelectLayoutEditTreeItem(LayoutEditDialogState* state, HWND hwnd, HTREEITEM item) {
     const LayoutEditTreeNode* node = TreeNodeFromItem(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE), item);
     state->selectedLeaf = node != nullptr && node->leaf.has_value() ? &(*node->leaf) : nullptr;
-    state->shellUi->SetLayoutEditTreeSelectionHighlight(
-        state->selectedLeaf != nullptr ? std::optional<LayoutEditFocusKey>(state->selectedLeaf->focusKey)
-                                       : std::nullopt);
+    state->shellUi->SetLayoutEditTreeSelectionHighlight(SelectionHighlightForTreeNode(node));
     PopulateLayoutEditSelection(state, hwnd);
 }
 
@@ -751,8 +774,9 @@ bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int fi
     return app_.ApplyLayoutGuideWeights(target, weights);
 }
 
-void DashboardShellUi::SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditFocusKey>& focusKey) {
-    app_.rendererEditOverlayState_.selectedTreeFocusKey = focusKey;
+void DashboardShellUi::SetLayoutEditTreeSelectionHighlight(
+    const std::optional<LayoutEditSelectionHighlight>& highlight) {
+    app_.rendererEditOverlayState_.selectedTreeHighlight = highlight;
     app_.InvalidateShell();
 }
 

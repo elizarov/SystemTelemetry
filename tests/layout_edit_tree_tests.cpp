@@ -96,10 +96,10 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
             "gauge",
             "text",
             "network_footer",
-            "layout.primary",
             "dashboard",
             "card_style",
             "fonts",
+            "layout.primary",
             "card.alpha",
             "card.beta"}));
 
@@ -110,6 +110,11 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
     EXPECT_EQ(FindRootNode(model, "display"), nullptr);
     EXPECT_EQ(FindRootNode(model, "colors"), nullptr);
     EXPECT_EQ(FindRootNode(model, "layout_editor"), nullptr);
+
+    EXPECT_NE(FindRootNode(model, "gauge"), nullptr);
+    EXPECT_NE(FindRootNode(model, "dashboard"), nullptr);
+    EXPECT_NE(FindRootNode(model, "card_style"), nullptr);
+    EXPECT_NE(FindRootNode(model, "fonts"), nullptr);
 }
 
 TEST(LayoutEditTree, IncludesOnlyTheActiveLayoutSection) {
@@ -156,7 +161,8 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
             MakeDashboardCardNode("gamma")});
     config.layout.cards.push_back(MakeCard("alpha",
         MakeContainerNode("rows",
-            {MakeContainerNode("columns", {MakeWidgetNode("metric_list"), MakeWidgetNode("gauge")}),
+            {MakeContainerNode(
+                 "columns", {MakeWidgetNode("metric_list"), MakeWidgetNode("gauge"), MakeWidgetNode("text")}),
                 MakeWidgetNode("throughput")})));
     config.layout.cards.push_back(
         MakeCard("beta", MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
@@ -175,8 +181,15 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     ASSERT_NE(alphaRoot, nullptr);
     ASSERT_EQ(alphaRoot->children.size(), 1u);
     EXPECT_EQ(alphaRoot->children[0].label, "layout");
-    EXPECT_EQ(
-        ChildLabels(alphaRoot->children[0]), (std::vector<std::string>{"metric_list, gauge", "columns, throughput"}));
+    EXPECT_EQ(ChildLabels(alphaRoot->children[0]), (std::vector<std::string>{"columns", "columns, throughput"}));
+
+    const LayoutEditTreeNode* alphaContainer = &alphaRoot->children[0].children[0];
+    ASSERT_TRUE(alphaContainer->selectionHighlight.has_value());
+    ASSERT_TRUE(std::holds_alternative<LayoutContainerEditKey>(*alphaContainer->selectionHighlight));
+    const auto& containerKey = std::get<LayoutContainerEditKey>(*alphaContainer->selectionHighlight);
+    EXPECT_EQ(containerKey.editCardId, "alpha");
+    EXPECT_EQ(containerKey.nodePath, (std::vector<size_t>{0}));
+    EXPECT_EQ(ChildLabels(*alphaContainer), (std::vector<std::string>{"metric_list, gauge", "gauge, text"}));
 }
 
 TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) {
