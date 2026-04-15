@@ -506,6 +506,14 @@ std::optional<LayoutEditSelectionHighlight> SelectionHighlightForTreeNode(const 
     if (node->label == "dashboard") {
         return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
     }
+    if (node->label.rfind("layout.", 0) == 0) {
+        return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
+    }
+    if (node->label.rfind("card.", 0) == 0) {
+        const std::string cardId = node->label.substr(5);
+        return LayoutEditSelectionHighlight{
+            LayoutEditWidgetIdentity{cardId, cardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome}};
+    }
     if (const auto widgetClass = FindDashboardWidgetClass(node->label); widgetClass.has_value()) {
         return LayoutEditSelectionHighlight{*widgetClass};
     }

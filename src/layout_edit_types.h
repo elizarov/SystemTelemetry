@@ -151,8 +151,11 @@ struct LayoutEditAnchorBinding {
 using TooltipPayload =
     std::variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion>;
 using LayoutEditFocusKey = std::variant<LayoutEditParameter, LayoutWeightEditKey>;
-using LayoutEditSelectionHighlight =
-    std::variant<LayoutEditFocusKey, DashboardWidgetClass, LayoutContainerEditKey, LayoutEditSelectionHighlightSpecial>;
+using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
+    DashboardWidgetClass,
+    LayoutContainerEditKey,
+    LayoutEditWidgetIdentity,
+    LayoutEditSelectionHighlightSpecial>;
 
 bool MatchesWidgetIdentity(const LayoutEditWidgetIdentity& left, const LayoutEditWidgetIdentity& right);
 bool MatchesParameterSubject(const LayoutEditParameterSubject& left, const LayoutEditParameterSubject& right);

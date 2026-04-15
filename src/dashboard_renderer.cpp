@@ -650,12 +650,32 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
         return;
     }
 
+    if (const auto* widgetIdentity = std::get_if<LayoutEditWidgetIdentity>(&*overlayState.selectedTreeHighlight)) {
+        if (widgetIdentity->kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
+            for (const auto& card : resolvedLayout_.cards) {
+                if (card.id == widgetIdentity->renderCardId && card.id == widgetIdentity->editCardId) {
+                    const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(card.rect, color, true);
+                }
+            }
+            return;
+        }
+    }
+
     if (const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight)) {
         if (*special == LayoutEditSelectionHighlightSpecial::AllCards) {
             for (const auto& card : resolvedLayout_.cards) {
                 const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(card.rect, color, true);
             }
             return;
+        }
+        if (*special == LayoutEditSelectionHighlightSpecial::AllTexts) {
+            for (const auto& card : resolvedLayout_.cards) {
+                for (const auto& widget : card.widgets) {
+                    if (widget.widget != nullptr && widget.widget->Class() == DashboardWidgetClass::Text) {
+                        const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(widget.rect, color, true);
+                    }
+                }
+            }
         }
         if (*special == LayoutEditSelectionHighlightSpecial::DashboardBounds) {
             const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(
