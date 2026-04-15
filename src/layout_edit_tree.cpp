@@ -243,7 +243,11 @@ std::optional<LayoutEditTreeNode> BuildStructureGroup(
     groupNode.initiallyExpanded = false;
     if (const auto containerNode = BuildContainerNode(sectionName, memberName, editCardId, node, {});
         containerNode.has_value()) {
-        groupNode.children.push_back(*containerNode);
+        if (containerNode->kind == LayoutEditTreeNodeKind::Container) {
+            groupNode.children = containerNode->children;
+        } else {
+            groupNode.children.push_back(*containerNode);
+        }
     }
     if (groupNode.children.empty()) {
         return std::nullopt;

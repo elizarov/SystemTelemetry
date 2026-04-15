@@ -168,17 +168,13 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     ASSERT_NE(layoutRoot, nullptr);
     ASSERT_EQ(layoutRoot->children.size(), 1u);
     EXPECT_EQ(layoutRoot->children[0].label, "cards");
-    ASSERT_EQ(layoutRoot->children[0].children.size(), 1u);
-    EXPECT_EQ(layoutRoot->children[0].children[0].label, "rows");
-    EXPECT_EQ(ChildLabels(layoutRoot->children[0].children[0]), (std::vector<std::string>{"alpha, beta", "columns, gamma"}));
+    EXPECT_EQ(ChildLabels(layoutRoot->children[0]), (std::vector<std::string>{"alpha, beta", "columns, gamma"}));
 
     const LayoutEditTreeNode* alphaRoot = FindRootNode(model, "card.alpha");
     ASSERT_NE(alphaRoot, nullptr);
     ASSERT_EQ(alphaRoot->children.size(), 1u);
     EXPECT_EQ(alphaRoot->children[0].label, "layout");
-    ASSERT_EQ(alphaRoot->children[0].children.size(), 1u);
-    EXPECT_EQ(alphaRoot->children[0].children[0].label, "rows");
-    EXPECT_EQ(ChildLabels(alphaRoot->children[0].children[0]), (std::vector<std::string>{"metric_list, gauge", "columns, throughput"}));
+    EXPECT_EQ(ChildLabels(alphaRoot->children[0]), (std::vector<std::string>{"metric_list, gauge", "columns, throughput"}));
 }
 
 TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) {
