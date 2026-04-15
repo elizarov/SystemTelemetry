@@ -19,6 +19,7 @@ struct LayoutEditConfigFieldMetadata {
     std::string_view parameterName;
     configschema::ValueFormat valueFormat = configschema::ValueFormat::Integer;
     bool isFont = false;
+    std::optional<double> (*numericValue)(const AppConfig& config) = nullptr;
     bool (*applyValue)(AppConfig& config, double value) = nullptr;
     bool (*applyFontValue)(AppConfig& config, const UiFontConfig& value) = nullptr;
     std::optional<const UiFontConfig*> (*fontValue)(const AppConfig& config) = nullptr;
@@ -36,6 +37,9 @@ const LayoutEditConfigFieldMetadata& GetLayoutEditConfigFieldMetadata(LayoutEdit
 int GetLayoutEditParameterHitPriority(LayoutEditParameter parameter);
 bool IsFontLayoutEditParameter(LayoutEditParameter parameter);
 std::string GetLayoutEditParameterDisplayName(LayoutEditParameter parameter);
+std::optional<LayoutEditParameter> FindLayoutEditParameterByConfigField(
+    std::string_view sectionName, std::string_view parameterName);
+std::optional<double> FindLayoutEditParameterNumericValue(const AppConfig& config, LayoutEditParameter parameter);
 std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(LayoutEditParameter parameter);
 std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(
     const AppConfig& config, LayoutEditParameter parameter);

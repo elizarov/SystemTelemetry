@@ -32,6 +32,18 @@ template <typename Meta> std::optional<const UiFontConfig*> FindFontFieldValue(c
     }
 }
 
+template <typename Meta> std::optional<double> FindNumericFieldValue(const AppConfig& config) {
+    if constexpr (std::is_same_v<typename Meta::value_type, int>) {
+        return static_cast<double>(Meta::RawGet(config));
+    } else if constexpr (std::is_same_v<typename Meta::value_type, double>) {
+        return Meta::RawGet(config);
+    } else if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
+        return static_cast<double>(Meta::RawGet(config).size);
+    } else {
+        return std::nullopt;
+    }
+}
+
 template <typename Meta> bool ApplyFontFieldEdit(AppConfig& config, const UiFontConfig& value) {
     if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
         Meta::Set(config, value);
@@ -64,6 +76,7 @@ template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata()
         Meta::parameter_name,
         Meta::traits_type::value_format,
         std::is_same_v<typename Meta::value_type, UiFontConfig>,
+        &FindNumericFieldValue<Meta>,
         &ApplyFieldEdit<Meta>,
         &ApplyFontFieldEdit<Meta>,
         &FindFontFieldValue<Meta>,
@@ -173,6 +186,22 @@ std::string GetLayoutEditParameterDisplayName(LayoutEditParameter parameter) {
         label += " font";
     }
     return label;
+}
+
+std::optional<LayoutEditParameter> FindLayoutEditParameterByConfigField(
+    std::string_view sectionName, std::string_view parameterName) {
+    for (size_t i = 0; i < kParameterInfoCount; ++i) {
+        const auto parameter = static_cast<LayoutEditParameter>(i);
+        const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
+        if (field.sectionName == sectionName && field.parameterName == parameterName) {
+            return parameter;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<double> FindLayoutEditParameterNumericValue(const AppConfig& config, LayoutEditParameter parameter) {
+    return GetLayoutEditConfigFieldMetadata(parameter).numericValue(config);
 }
 
 std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(LayoutEditParameter parameter) {

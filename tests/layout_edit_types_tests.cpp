@@ -15,6 +15,9 @@ TEST(LayoutEditTypes, MatchesWidgetIdentityUsingKindAndPath) {
 TEST(LayoutEditTypes, TooltipPayloadHelpersTreatLayoutGuideAsNonParameterPayload) {
     LayoutEditGuide guide;
     guide.axis = LayoutGuideAxis::Horizontal;
+    guide.editCardId = "cpu";
+    guide.nodePath = {1, 0};
+    guide.separatorIndex = 2;
     guide.lineRect = RenderRect{10, 20, 31, 24};
 
     const TooltipPayload payload = guide;
@@ -24,6 +27,13 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersTreatLayoutGuideAsNonParameterPayload
     EXPECT_FALSE(TooltipPayloadNumericValue(payload).has_value());
     EXPECT_EQ(TooltipPayloadAnchorPoint(payload).x, 20);
     EXPECT_EQ(TooltipPayloadAnchorPoint(payload).y, 22);
+    const auto focusKey = TooltipPayloadFocusKey(payload);
+    ASSERT_TRUE(focusKey.has_value());
+    const auto* focus = std::get_if<LayoutWeightEditKey>(&*focusKey);
+    ASSERT_NE(focus, nullptr);
+    EXPECT_EQ(focus->editCardId, "cpu");
+    EXPECT_EQ(focus->nodePath, (std::vector<size_t>{1, 0}));
+    EXPECT_EQ(focus->separatorIndex, 2u);
 }
 
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveWidgetGuideValues) {
@@ -41,6 +51,9 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveWidgetGuideValues) {
     EXPECT_DOUBLE_EQ(*TooltipPayloadNumericValue(payload), 18.0);
     EXPECT_EQ(TooltipPayloadAnchorPoint(payload).x, 70);
     EXPECT_EQ(TooltipPayloadAnchorPoint(payload).y, 90);
+    const auto focusKey = TooltipPayloadFocusKey(payload);
+    ASSERT_TRUE(focusKey.has_value());
+    EXPECT_EQ(std::get<LayoutEditParameter>(*focusKey), LayoutEditParameter::MetricListRowGap);
 }
 
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveGapAnchorValues) {
@@ -58,6 +71,9 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveGapAnchorValues) {
     EXPECT_DOUBLE_EQ(*TooltipPayloadNumericValue(payload), 12.0);
     EXPECT_EQ(TooltipPayloadAnchorPoint(payload).x, 45);
     EXPECT_EQ(TooltipPayloadAnchorPoint(payload).y, 15);
+    const auto focusKey = TooltipPayloadFocusKey(payload);
+    ASSERT_TRUE(focusKey.has_value());
+    EXPECT_EQ(std::get<LayoutEditParameter>(*focusKey), LayoutEditParameter::CardColumnGap);
 }
 
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveEditableAnchorValues) {
@@ -75,4 +91,20 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveEditableAnchorValues) {
     EXPECT_DOUBLE_EQ(*TooltipPayloadNumericValue(payload), 17.0);
     EXPECT_EQ(TooltipPayloadAnchorPoint(payload).x, 104);
     EXPECT_EQ(TooltipPayloadAnchorPoint(payload).y, 204);
+    const auto focusKey = TooltipPayloadFocusKey(payload);
+    ASSERT_TRUE(focusKey.has_value());
+    EXPECT_EQ(std::get<LayoutEditParameter>(*focusKey), LayoutEditParameter::FontLabel);
+}
+
+TEST(LayoutEditTypes, MatchesFocusKeysByParameterOrWeightIdentity) {
+    const LayoutEditFocusKey parameterA = LayoutEditParameter::FontLabel;
+    const LayoutEditFocusKey parameterB = LayoutEditParameter::FontLabel;
+    const LayoutEditFocusKey weightA = LayoutWeightEditKey{"cpu", {1, 2}, 0};
+    const LayoutEditFocusKey weightB = LayoutWeightEditKey{"cpu", {1, 2}, 0};
+    const LayoutEditFocusKey weightC = LayoutWeightEditKey{"cpu", {1, 2}, 1};
+
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(parameterA, parameterB));
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(weightA, weightB));
+    EXPECT_FALSE(MatchesLayoutEditFocusKey(parameterA, weightA));
+    EXPECT_FALSE(MatchesLayoutEditFocusKey(weightA, weightC));
 }

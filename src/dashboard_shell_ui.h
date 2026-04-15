@@ -33,6 +33,11 @@ public:
         std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
     void BeginLayoutEditModalUi();
     void EndLayoutEditModalUi();
+    const AppConfig& CurrentConfig() const;
+    void RestoreConfigSnapshot(const AppConfig& config);
+    bool ApplyParameterPreview(DashboardRenderer::LayoutEditParameter parameter, double value);
+    bool ApplyFontPreview(DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value);
+    bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
 
 private:
     UINT ResolveDefaultCommand(
@@ -42,15 +47,6 @@ private:
         std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
     std::optional<double> PromptCustomScale();
     bool PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target);
-    std::optional<double> PromptLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter,
-        const LayoutEditTooltipDescriptor& descriptor,
-        double initialValue,
-        const std::wstring& title);
-    std::optional<std::vector<int>> PromptLayoutGuideWeights(const LayoutEditGuide& guide, const std::wstring& title);
-    std::optional<UiFontConfig> PromptLayoutEditFont(DashboardRenderer::LayoutEditParameter parameter,
-        const LayoutEditTooltipDescriptor& descriptor,
-        const UiFontConfig& initialValue,
-        const std::wstring& title);
 
     DashboardApp& app_;
 };

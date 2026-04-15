@@ -29,6 +29,21 @@ bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditW
     return left.axis == right.axis && left.guideId == right.guideId && MatchesParameterSubject(left, right);
 }
 
+bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWeightEditKey& right) {
+    return left.editCardId == right.editCardId && left.nodePath == right.nodePath &&
+           left.separatorIndex == right.separatorIndex;
+}
+
+bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right) {
+    if (left.index() != right.index()) {
+        return false;
+    }
+    if (const auto* leftParameter = std::get_if<LayoutEditParameter>(&left)) {
+        return *leftParameter == std::get<LayoutEditParameter>(right);
+    }
+    return MatchesLayoutWeightEditKey(std::get<LayoutWeightEditKey>(left), std::get<LayoutWeightEditKey>(right));
+}
+
 bool IsLayoutGuidePayload(const TooltipPayload& payload) {
     return std::holds_alternative<LayoutEditGuide>(payload);
 }
@@ -81,6 +96,21 @@ RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload) {
                 return RenderPoint{
                     value.anchorRect.left + (std::max<LONG>(0, value.anchorRect.right - value.anchorRect.left) / 2),
                     value.anchorRect.top + (std::max<LONG>(0, value.anchorRect.bottom - value.anchorRect.top) / 2)};
+            }
+        },
+        payload);
+}
+
+std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& payload) {
+    return std::visit(
+        [](const auto& value) -> std::optional<LayoutEditFocusKey> {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, LayoutEditGuide>) {
+                return LayoutWeightEditKey{value.editCardId, value.nodePath, value.separatorIndex};
+            } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide>) {
+                return value.parameter;
+            } else {
+                return value.key.parameter;
             }
         },
         payload);

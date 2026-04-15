@@ -83,6 +83,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_controller.cpp
     src/layout_edit_trace_session.cpp
     src/layout_edit_types.cpp
+    src/layout_edit_tree.cpp
     src/layout_edit_parameter.cpp
     src/layout_edit_tooltip.cpp
     src/layout_edit_service.cpp
@@ -224,6 +225,7 @@ add_executable(SystemTelemetryTests
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
     tests/layout_edit_types_tests.cpp
+    tests/layout_edit_tree_tests.cpp
     tests/layout_edit_tooltip_tests.cpp
     tests/localization_catalog_tests.cpp
     tests/config_parser_tests.cpp
@@ -234,6 +236,7 @@ add_executable(SystemTelemetryTests
     src/config_writer.cpp
     src/config_resolution.cpp
     src/layout_edit_types.cpp
+    src/layout_edit_tree.cpp
     src/layout_edit_parameter.cpp
     src/layout_edit_tooltip.cpp
     src/localization_catalog.cpp

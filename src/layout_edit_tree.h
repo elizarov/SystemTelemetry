@@ -1,0 +1,45 @@
+#pragma once
+
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "config.h"
+#include "config_schema.h"
+#include "layout_edit_types.h"
+
+enum class LayoutEditTreeNodeKind {
+    Section,
+    Group,
+    Container,
+    Leaf,
+};
+
+struct LayoutEditTreeLeaf {
+    LayoutEditFocusKey focusKey;
+    std::string sectionName;
+    std::string memberName;
+    std::string descriptionKey;
+    configschema::ValueFormat valueFormat = configschema::ValueFormat::Integer;
+    LayoutGuideAxis weightAxis = LayoutGuideAxis::Horizontal;
+    std::string firstWeightName;
+    std::string secondWeightName;
+};
+
+struct LayoutEditTreeNode {
+    LayoutEditTreeNodeKind kind = LayoutEditTreeNodeKind::Section;
+    std::string label;
+    bool initiallyExpanded = false;
+    std::optional<LayoutEditTreeLeaf> leaf;
+    std::vector<LayoutEditTreeNode> children;
+};
+
+struct LayoutEditTreeModel {
+    std::vector<LayoutEditTreeNode> roots;
+};
+
+LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config);
+LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::string_view templateText);
+const LayoutEditTreeLeaf* FindLayoutEditTreeLeaf(
+    const LayoutEditTreeModel& model, const LayoutEditFocusKey& focusKey);

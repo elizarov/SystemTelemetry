@@ -114,6 +114,12 @@ struct LayoutEditGapAnchor : LayoutEditLinearGeometry {
     double value = 0.0;
 };
 
+struct LayoutWeightEditKey {
+    std::string editCardId;
+    std::vector<size_t> nodePath;
+    size_t separatorIndex = 0;
+};
+
 struct LayoutGuideSnapCandidate {
     LayoutEditWidgetIdentity widget;
     int targetExtent = 0;
@@ -132,6 +138,7 @@ struct LayoutEditAnchorBinding {
 
 using TooltipPayload =
     std::variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion>;
+using LayoutEditFocusKey = std::variant<LayoutEditParameter, LayoutWeightEditKey>;
 
 bool MatchesWidgetIdentity(const LayoutEditWidgetIdentity& left, const LayoutEditWidgetIdentity& right);
 bool MatchesParameterSubject(const LayoutEditParameterSubject& left, const LayoutEditParameterSubject& right);
@@ -139,7 +146,10 @@ bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& 
 bool MatchesGapEditAnchorKey(const LayoutEditGapAnchorKey& left, const LayoutEditGapAnchorKey& right);
 bool MatchesEditableAnchorKey(const LayoutEditAnchorKey& left, const LayoutEditAnchorKey& right);
 bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditWidgetGuide& right);
+bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWeightEditKey& right);
+bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right);
 bool IsLayoutGuidePayload(const TooltipPayload& payload);
 std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload& payload);
 std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload);
 RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload);
+std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& payload);

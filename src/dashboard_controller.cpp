@@ -419,6 +419,12 @@ bool DashboardController::ApplyLayoutEditFont(
     return true;
 }
 
+void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config) {
+    state_.config = config;
+    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    shell.InvalidateShell();
+}
+
 std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
     const LayoutEditHost::LayoutTarget& target,
     const std::vector<int>& weights,
