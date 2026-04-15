@@ -13,22 +13,18 @@
 struct ConfigColor {
     std::uint32_t rgb = 0;
 
-    static constexpr ConfigColor FromRgb(unsigned int value) {
-        return ConfigColor{static_cast<std::uint32_t>(value & 0xFFFFFFu)};
-    }
+    static ConfigColor FromRgb(unsigned int value);
 
-    constexpr unsigned int ToRgb() const {
-        return rgb & 0xFFFFFFu;
-    }
+    unsigned int ToRgb() const;
 
     constexpr bool operator==(const ConfigColor& other) const = default;
 };
 
-constexpr bool operator==(const ConfigColor& color, unsigned int value) {
+inline bool operator==(const ConfigColor& color, unsigned int value) {
     return color.ToRgb() == (value & 0xFFFFFFu);
 }
 
-constexpr bool operator==(unsigned int value, const ConfigColor& color) {
+inline bool operator==(unsigned int value, const ConfigColor& color) {
     return color == value;
 }
 
