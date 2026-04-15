@@ -77,6 +77,18 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
         LayoutEditParameter::DashboardOuterMargin,
         LayoutEditParameter::DashboardRowGap,
         LayoutEditParameter::DashboardColumnGap,
+        LayoutEditParameter::ColorBackground,
+        LayoutEditParameter::ColorForeground,
+        LayoutEditParameter::ColorAccent,
+        LayoutEditParameter::ColorLayoutGuide,
+        LayoutEditParameter::ColorActiveEdit,
+        LayoutEditParameter::ColorPanelBorder,
+        LayoutEditParameter::ColorMutedText,
+        LayoutEditParameter::ColorTrack,
+        LayoutEditParameter::ColorPanelFill,
+        LayoutEditParameter::ColorGraphBackground,
+        LayoutEditParameter::ColorGraphAxis,
+        LayoutEditParameter::ColorGraphMarker,
     };
 
     for (const auto parameter : parameters) {

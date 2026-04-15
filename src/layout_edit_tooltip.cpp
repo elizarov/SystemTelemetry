@@ -5,7 +5,7 @@
 #include <sstream>
 
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format) {
-    if (format == configschema::ValueFormat::FontSpec) {
+    if (format == configschema::ValueFormat::FontSpec || format == configschema::ValueFormat::ColorHex) {
         return {};
     }
     if (format == configschema::ValueFormat::Integer) {
@@ -27,6 +27,12 @@ std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat
     return text;
 }
 
+std::string FormatLayoutEditTooltipValue(unsigned int value) {
+    std::ostringstream stream;
+    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(6) << (value & 0xFFFFFFu);
+    return stream.str();
+}
+
 std::string FormatLayoutEditTooltipValue(const UiFontConfig& value) {
     return value.face + "," + std::to_string(value.size) + "," + std::to_string(value.weight);
 }
@@ -34,6 +40,10 @@ std::string FormatLayoutEditTooltipValue(const UiFontConfig& value) {
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, double value) {
     return "[" + descriptor.sectionName + "] " + descriptor.memberName + " = " +
            FormatLayoutEditTooltipValue(value, descriptor.valueFormat);
+}
+
+std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, unsigned int value) {
+    return "[" + descriptor.sectionName + "] " + descriptor.memberName + " = " + FormatLayoutEditTooltipValue(value);
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& value) {

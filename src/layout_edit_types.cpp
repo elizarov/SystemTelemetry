@@ -98,6 +98,13 @@ bool MatchesLayoutEditSelectionHighlight(
     return focusKey != nullptr && MatchesLayoutEditFocusKey(*focusKey, key);
 }
 
+bool MatchesLayoutEditSelectionHighlight(
+    const LayoutEditSelectionHighlight& highlight, const LayoutEditColorRegion& region) {
+    const auto* focusKey = std::get_if<LayoutEditFocusKey>(&highlight);
+    const auto* parameter = focusKey != nullptr ? std::get_if<LayoutEditParameter>(focusKey) : nullptr;
+    return parameter != nullptr && *parameter == region.parameter;
+}
+
 bool IsLayoutGuidePayload(const TooltipPayload& payload) {
     return std::holds_alternative<LayoutEditGuide>(payload);
 }
@@ -109,6 +116,8 @@ std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload&
             if constexpr (std::is_same_v<T, LayoutEditGuide>) {
                 return std::nullopt;
             } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide>) {
+                return value.parameter;
+            } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
                 return value.parameter;
             } else {
                 return value.key.parameter;
@@ -123,10 +132,25 @@ std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload) 
             using T = std::decay_t<decltype(value)>;
             if constexpr (std::is_same_v<T, LayoutEditGuide>) {
                 return std::nullopt;
+            } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
+                return std::nullopt;
             } else if constexpr (std::is_same_v<T, LayoutEditAnchorRegion>) {
                 return static_cast<double>(value.value);
             } else {
                 return value.value;
+            }
+        },
+        payload);
+}
+
+std::optional<unsigned int> TooltipPayloadColorValue(const TooltipPayload& payload) {
+    return std::visit(
+        [](const auto& value) -> std::optional<unsigned int> {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
+                return std::nullopt;
+            } else {
+                return std::nullopt;
             }
         },
         payload);
@@ -146,6 +170,8 @@ RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload) {
                     value.handleRect.top + (std::max<LONG>(0, value.handleRect.bottom - value.handleRect.top) / 2)};
             } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide>) {
                 return value.drawEnd;
+            } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
+                return value.targetRect.Center();
             } else {
                 return RenderPoint{
                     value.anchorRect.left + (std::max<LONG>(0, value.anchorRect.right - value.anchorRect.left) / 2),
@@ -162,6 +188,8 @@ std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& p
             if constexpr (std::is_same_v<T, LayoutEditGuide>) {
                 return LayoutWeightEditKey{value.editCardId, value.nodePath, value.separatorIndex};
             } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide>) {
+                return value.parameter;
+            } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
                 return value.parameter;
             } else {
                 return value.key.parameter;

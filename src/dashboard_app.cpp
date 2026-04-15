@@ -44,6 +44,16 @@ std::wstring BuildTooltipText(
     return text;
 }
 
+std::wstring BuildTooltipText(
+    const LayoutEditTooltipDescriptor& descriptor, unsigned int value, const std::wstring& descriptionText) {
+    std::wstring text = WideFromUtf8(BuildLayoutEditTooltipLine(descriptor, value));
+    if (!descriptionText.empty()) {
+        text += L"\r\n";
+        text += descriptionText;
+    }
+    return text;
+}
+
 std::string LayoutGuideTooltipSectionName(const AppConfig& config, const LayoutEditGuide& guide) {
     if (!guide.editCardId.empty()) {
         return "card." + guide.editCardId;
@@ -577,6 +587,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     std::optional<LayoutEditTooltipDescriptor> descriptor;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
+    std::optional<unsigned int> colorValue;
     const RenderPoint clientPoint = target->clientPoint.value_or(TooltipPayloadAnchorPoint(target->payload));
     if (const auto* guide = std::get_if<LayoutEditGuide>(&target->payload)) {
         layoutEditTooltipText_ = BuildLayoutGuideTooltipText(controller_.State().config, *guide);
@@ -590,6 +601,10 @@ void DashboardApp::UpdateLayoutEditTooltip() {
                     currentFont.has_value() && *currentFont != nullptr) {
                     fontValue = **currentFont;
                 }
+            } else if (const auto currentColor =
+                           FindLayoutEditParameterColorValue(controller_.State().config, *parameter);
+                currentColor.has_value()) {
+                colorValue = *currentColor;
             }
         }
     }
@@ -601,9 +616,13 @@ void DashboardApp::UpdateLayoutEditTooltip() {
 
     if (!IsLayoutGuidePayload(target->payload)) {
         const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
-        layoutEditTooltipText_ = descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()
-                                     ? BuildTooltipText(*descriptor, *fontValue, description)
-                                     : BuildTooltipText(*descriptor, value, description);
+        if (descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()) {
+            layoutEditTooltipText_ = BuildTooltipText(*descriptor, *fontValue, description);
+        } else if (descriptor->valueFormat == configschema::ValueFormat::ColorHex && colorValue.has_value()) {
+            layoutEditTooltipText_ = BuildTooltipText(*descriptor, *colorValue, description);
+        } else {
+            layoutEditTooltipText_ = BuildTooltipText(*descriptor, value, description);
+        }
     }
 
     const int tooltipRadius = ScaleLogicalToPhysical(10, CurrentWindowDpi());

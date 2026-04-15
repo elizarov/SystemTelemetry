@@ -1,7 +1,9 @@
 #include "dashboard_shell_ui.h"
 
 #include <cmath>
+#include <commdlg.h>
 #include <cwchar>
+#include <cwctype>
 #include <sstream>
 
 #include "app_diagnostics.h"
@@ -164,6 +166,36 @@ bool CaseInsensitiveEqual(const std::wstring& left, const std::wstring& right) {
     return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
 }
 
+std::wstring FormatDialogHexColor(unsigned int color) {
+    return WideFromUtf8(FormatLayoutEditTooltipValue(color));
+}
+
+std::optional<unsigned int> TryParseDialogHexColor(const wchar_t* text) {
+    if (text == nullptr) {
+        return std::nullopt;
+    }
+    std::wstring trimmed(text);
+    trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(), [](wchar_t ch) { return std::iswspace(ch) != 0; }),
+        trimmed.end());
+    if (!trimmed.empty() && trimmed.front() == L'#') {
+        trimmed.erase(trimmed.begin());
+    }
+    if (trimmed.size() != 6) {
+        return std::nullopt;
+    }
+    for (wchar_t ch : trimmed) {
+        if (!iswxdigit(ch)) {
+            return std::nullopt;
+        }
+    }
+    wchar_t* end = nullptr;
+    const unsigned long value = std::wcstoul(trimmed.c_str(), &end, 16);
+    if (end == nullptr || *end != L'\0') {
+        return std::nullopt;
+    }
+    return static_cast<unsigned int>(value & 0xFFFFFFu);
+}
+
 std::vector<std::wstring> EnumerateInstalledFontFamilies(HWND hwnd) {
     std::vector<std::wstring> families;
     HDC dc = GetDC(hwnd);
@@ -242,6 +274,7 @@ struct LayoutEditDialogState {
     const LayoutEditTreeNode* selectedNode = nullptr;
     const LayoutEditTreeLeaf* selectedLeaf = nullptr;
     std::vector<LayoutEditTreeItemBinding> treeItems;
+    COLORREF customColors[16]{};
     bool accepted = false;
     bool updatingControls = false;
 };
@@ -275,7 +308,7 @@ void ShowDialogControl(HWND hwnd, int controlId, bool show) {
     }
 }
 
-void ShowLayoutEditEditors(HWND hwnd, bool showNumeric, bool showFont, bool showWeights) {
+void ShowLayoutEditEditors(HWND hwnd, bool showNumeric, bool showFont, bool showColor, bool showWeights) {
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
 
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, showFont);
@@ -284,6 +317,10 @@ void ShowLayoutEditEditors(HWND hwnd, bool showNumeric, bool showFont, bool show
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, showFont);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL, showFont);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, showFont);
+
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LABEL, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK, showColor);
 
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL, showWeights);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT, showWeights);
@@ -318,7 +355,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     state->updatingControls = true;
     SetLayoutEditDescription(hwnd, state->selectedNode);
     if (state->selectedLeaf == nullptr) {
-        ShowLayoutEditEditors(hwnd, false, false, false);
+        ShowLayoutEditEditors(hwnd, false, false, false, false);
         state->updatingControls = false;
         return;
     }
@@ -333,14 +370,19 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             SetDlgItemTextW(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
                 font.has_value() && *font != nullptr ? WideFromUtf8(std::to_string((**font).weight)).c_str() : L"");
-            ShowLayoutEditEditors(hwnd, false, true, false);
+            ShowLayoutEditEditors(hwnd, false, true, false, false);
+        } else if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
+            const auto value = FindLayoutEditParameterColorValue(state->shellUi->CurrentConfig(), *parameter);
+            SetDlgItemTextW(
+                hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, value.has_value() ? FormatDialogHexColor(*value).c_str() : L"");
+            ShowLayoutEditEditors(hwnd, false, false, true, false);
         } else {
             const auto value = FindLayoutEditParameterNumericValue(state->shellUi->CurrentConfig(), *parameter);
             const std::wstring text =
                 value.has_value() ? WideFromUtf8(FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat))
                                   : L"";
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-            ShowLayoutEditEditors(hwnd, true, false, false);
+            ShowLayoutEditEditors(hwnd, true, false, false, false);
         }
     } else if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&state->selectedLeaf->focusKey)) {
         const auto values = FindWeightEditValues(state->shellUi->CurrentConfig(), *weightKey);
@@ -354,9 +396,9 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT,
             values.has_value() ? WideFromUtf8(std::to_string(values->second)).c_str() : L"");
-        ShowLayoutEditEditors(hwnd, false, false, true);
+        ShowLayoutEditEditors(hwnd, false, false, false, true);
     } else {
-        ShowLayoutEditEditors(hwnd, false, false, false);
+        ShowLayoutEditEditors(hwnd, false, false, false, false);
     }
 
     state->updatingControls = false;
@@ -367,7 +409,8 @@ bool PreviewSelectedNumeric(LayoutEditDialogState* state, HWND hwnd) {
         return false;
     }
     const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
-    if (parameter == nullptr || state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec) {
+    if (parameter == nullptr || state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec ||
+        state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
         return false;
     }
 
@@ -405,6 +448,21 @@ bool PreviewSelectedFont(LayoutEditDialogState* state, HWND hwnd, UINT notificat
     }
 
     return state->shellUi->ApplyFontPreview(*parameter, UiFontConfig{Utf8FromWide(faceText), *size, *weight});
+}
+
+bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd) {
+    if (state == nullptr || state->selectedLeaf == nullptr || state->updatingControls) {
+        return false;
+    }
+    const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
+    if (parameter == nullptr || state->selectedLeaf->valueFormat != configschema::ValueFormat::ColorHex) {
+        return false;
+    }
+
+    wchar_t buffer[64] = {};
+    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, buffer, ARRAYSIZE(buffer));
+    const auto color = TryParseDialogHexColor(buffer);
+    return color.has_value() && state->shellUi->ApplyColorPreview(*parameter, *color);
 }
 
 bool PreviewSelectedWeights(LayoutEditDialogState* state, HWND hwnd) {
@@ -535,6 +593,18 @@ bool ValidateActiveLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) 
             }
             return state->shellUi->ApplyFontPreview(*parameter, UiFontConfig{Utf8FromWide(faceText), *size, *weight});
         }
+        if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
+            wchar_t colorBuffer[64] = {};
+            GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, colorBuffer, ARRAYSIZE(colorBuffer));
+            const auto color = TryParseDialogHexColor(colorBuffer);
+            if (!color.has_value()) {
+                MessageBoxW(hwnd, L"Enter a color as #RRGGBB.", L"Edit Configuration", MB_ICONERROR);
+                SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT));
+                SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, EM_SETSEL, 0, -1);
+                return false;
+            }
+            return state->shellUi->ApplyColorPreview(*parameter, *color);
+        }
 
         wchar_t valueBuffer[128] = {};
         GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, valueBuffer, ARRAYSIZE(valueBuffer));
@@ -630,7 +700,7 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                 TreeView_EnsureVisible(tree, selectedItem);
                 SelectLayoutEditTreeItem(state, hwnd, selectedItem);
             } else {
-                ShowLayoutEditEditors(hwnd, false, false, false);
+                ShowLayoutEditEditors(hwnd, false, false, false, false);
                 SetLayoutEditDescription(hwnd, nullptr);
             }
             return TRUE;
@@ -657,6 +727,10 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                 PreviewSelectedFont(state, hwnd, HIWORD(wParam));
                 return TRUE;
             }
+            if (LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_EDIT && HIWORD(wParam) == EN_CHANGE) {
+                PreviewSelectedColor(state, hwnd);
+                return TRUE;
+            }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
@@ -664,6 +738,35 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                 return TRUE;
             }
             switch (LOWORD(wParam)) {
+                case IDC_LAYOUT_EDIT_COLOR_PICK: {
+                    if (state == nullptr || state->selectedLeaf == nullptr) {
+                        return TRUE;
+                    }
+                    const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
+                    if (parameter == nullptr ||
+                        state->selectedLeaf->valueFormat != configschema::ValueFormat::ColorHex) {
+                        return TRUE;
+                    }
+                    const unsigned int currentColor =
+                        FindLayoutEditParameterColorValue(state->shellUi->CurrentConfig(), *parameter).value_or(0);
+                    CHOOSECOLORW chooseColor{};
+                    chooseColor.lStructSize = sizeof(chooseColor);
+                    chooseColor.hwndOwner = hwnd;
+                    chooseColor.rgbResult =
+                        RGB((currentColor >> 16) & 0xFFu, (currentColor >> 8) & 0xFFu, currentColor & 0xFFu);
+                    chooseColor.lpCustColors = state->customColors;
+                    chooseColor.Flags = CC_FULLOPEN | CC_RGBINIT;
+                    if (ChooseColorW(&chooseColor) == TRUE) {
+                        const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 16) |
+                                                       (GetGValue(chooseColor.rgbResult) << 8) |
+                                                       GetBValue(chooseColor.rgbResult);
+                        state->updatingControls = true;
+                        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, FormatDialogHexColor(nextColor).c_str());
+                        state->updatingControls = false;
+                        state->shellUi->ApplyColorPreview(*parameter, nextColor);
+                    }
+                    return TRUE;
+                }
                 case IDOK:
                     if (!ValidateActiveLayoutEditSelection(state, hwnd)) {
                         return TRUE;
@@ -733,6 +836,10 @@ bool DashboardShellUi::ApplyParameterPreview(DashboardRenderer::LayoutEditParame
 
 bool DashboardShellUi::ApplyFontPreview(DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value) {
     return app_.controller_.ApplyLayoutEditFont(app_, parameter, value);
+}
+
+bool DashboardShellUi::ApplyColorPreview(DashboardRenderer::LayoutEditParameter parameter, unsigned int value) {
+    return app_.controller_.ApplyLayoutEditColor(app_, parameter, value);
 }
 
 bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) {

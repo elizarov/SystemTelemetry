@@ -129,6 +129,7 @@ public:
     std::optional<LayoutEditAnchorKey> HitTestEditableAnchorTarget(RenderPoint clientPoint) const;
     std::optional<LayoutEditAnchorKey> HitTestEditableAnchorHandle(RenderPoint clientPoint) const;
     std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const;
+    std::optional<LayoutEditColorRegion> HitTestEditableColorRegion(RenderPoint clientPoint) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -196,13 +197,19 @@ public:
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
-        const LayoutEditAnchorBinding& editable);
-    void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult, const LayoutEditAnchorBinding& editable);
+        const LayoutEditAnchorBinding& editable,
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt);
+    void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
+        const LayoutEditAnchorBinding& editable,
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt);
     void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
-        const LayoutEditAnchorBinding& editable);
+        const LayoutEditAnchorBinding& editable,
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt);
+    void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect);
+    void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect);
     std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable();
     std::vector<LayoutEditGapAnchor>& GapEditAnchorsMutable();
     int ScaleLogical(int value) const;
@@ -367,6 +374,7 @@ private:
     void ClearD2DCaches();
     void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const;
+    void DrawSelectedColorEditHighlights(const EditOverlayState& overlayState) const;
     void DrawSelectedTreeNodeHighlight(const EditOverlayState& overlayState) const;
     void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
     void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
@@ -475,6 +483,8 @@ private:
     std::vector<LayoutEditGapAnchor> gapEditAnchors_;
     std::vector<LayoutEditAnchorRegion> staticEditableAnchorRegions_;
     std::vector<LayoutEditAnchorRegion> dynamicEditableAnchorRegions_;
+    std::vector<LayoutEditColorRegion> staticColorEditRegions_;
+    std::vector<LayoutEditColorRegion> dynamicColorEditRegions_;
     bool dynamicAnchorRegistrationEnabled_ = false;
     mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textWidthCache_;

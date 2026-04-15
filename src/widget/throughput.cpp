@@ -114,7 +114,8 @@ void DrawGraph(DashboardRenderer& renderer,
             renderer.MutedTextColor(),
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
         if (maxLabelEditable.has_value()) {
-            renderer.RegisterDynamicTextAnchor(maxLabelLayout, *maxLabelEditable);
+            renderer.RegisterDynamicTextAnchor(
+                maxLabelLayout, *maxLabelEditable, DashboardRenderer::LayoutEditParameter::ColorMutedText);
         }
     }
 
@@ -227,6 +228,8 @@ void ThroughputWidget::Draw(
         TextStyleId::Small,
         renderer.MutedTextColor(),
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
+    renderer.RegisterDynamicColorEditRegion(
+        DashboardRenderer::LayoutEditParameter::ColorAccent, layoutState_.graphRect);
     RenderRect numberRect{(std::min)(layoutState_.valueRect.right,
                               labelLayout.textRect.right +
                                   (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
@@ -243,7 +246,8 @@ void ThroughputWidget::Draw(
             renderer.MakeEditableTextBinding(widget,
                 DashboardRenderer::LayoutEditParameter::FontSmall,
                 1,
-                renderer.Config().layout.fonts.smallText.size));
+                renderer.Config().layout.fonts.smallText.size),
+            DashboardRenderer::LayoutEditParameter::ColorForeground);
     }
     const ThroughputGraphLayout& layout = layoutState_;
     DrawGraph(renderer,
@@ -316,7 +320,8 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
             renderer.MakeEditableTextBinding(widget,
                 DashboardRenderer::LayoutEditParameter::FontSmall,
                 0,
-                renderer.Config().layout.fonts.smallText.size));
+                renderer.Config().layout.fonts.smallText.size),
+            DashboardRenderer::LayoutEditParameter::ColorMutedText);
     }
 }
 

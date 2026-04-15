@@ -295,8 +295,17 @@ void GaugeWidget::Draw(
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
         renderer.RegisterDynamicTextAnchor(valueLayout,
             renderer.MakeEditableTextBinding(
-                widget, DashboardRenderer::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size));
+                widget, DashboardRenderer::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size),
+            DashboardRenderer::LayoutEditParameter::ColorForeground);
     }
+    const RenderRect ringBounds{layoutState_.cx - layoutState_.outerRadius,
+        layoutState_.cy - layoutState_.outerRadius,
+        layoutState_.cx + layoutState_.outerRadius,
+        layoutState_.cy + layoutState_.outerRadius};
+    renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorAccent,
+        RenderRect{ringBounds.left, ringBounds.top, layoutState_.cx, ringBounds.bottom});
+    renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorTrack,
+        RenderRect{layoutState_.cx, ringBounds.top, ringBounds.right, ringBounds.bottom});
     renderer.DrawText(layoutState_.labelRect,
         "Load",
         TextStyleId::Small,
@@ -357,7 +366,8 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontSmall,
             1,
-            renderer.Config().layout.fonts.smallText.size));
+            renderer.Config().layout.fonts.smallText.size),
+        DashboardRenderer::LayoutEditParameter::ColorMutedText);
 }
 
 void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

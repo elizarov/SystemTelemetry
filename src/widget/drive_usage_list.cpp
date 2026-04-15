@@ -303,7 +303,8 @@ void DriveUsageListWidget::Draw(
             renderer.MakeEditableTextBinding(widget,
                 DashboardRenderer::LayoutEditParameter::FontLabel,
                 textBaseId,
-                renderer.Config().layout.fonts.label.size));
+                renderer.Config().layout.fonts.label.size),
+            DashboardRenderer::LayoutEditParameter::ColorForeground);
         DrawSegmentIndicator(renderer,
             readIndicatorRect,
             layoutState_.activitySegments,
@@ -322,6 +323,11 @@ void DriveUsageListWidget::Draw(
             drive.usedPercent / 100.0,
             std::nullopt,
             renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
+        const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
+        renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorAccent,
+            RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
+        renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorTrack,
+            RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
             char percent[16];
             sprintf_s(percent, "%.0f%%", drive.usedPercent);
@@ -334,7 +340,8 @@ void DriveUsageListWidget::Draw(
                 renderer.MakeEditableTextBinding(widget,
                     DashboardRenderer::LayoutEditParameter::FontLabel,
                     textBaseId + 1,
-                    renderer.Config().layout.fonts.label.size));
+                    renderer.Config().layout.fonts.label.size),
+                DashboardRenderer::LayoutEditParameter::ColorForeground);
             const DashboardRenderer::TextLayoutResult freeLayout = renderer.DrawTextBlock(columns.free,
                 drive.freeText,
                 TextStyleId::Small,
@@ -344,7 +351,8 @@ void DriveUsageListWidget::Draw(
                 renderer.MakeEditableTextBinding(widget,
                     DashboardRenderer::LayoutEditParameter::FontSmall,
                     textBaseId + 2,
-                    renderer.Config().layout.fonts.smallText.size));
+                    renderer.Config().layout.fonts.smallText.size),
+                DashboardRenderer::LayoutEditParameter::ColorMutedText);
         }
     }
 
@@ -374,7 +382,8 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontSmall,
             0,
-            renderer.Config().layout.fonts.smallText.size));
+            renderer.Config().layout.fonts.smallText.size),
+        DashboardRenderer::LayoutEditParameter::ColorMutedText);
     renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
         "W",
         TextStyleId::Small,
@@ -382,7 +391,8 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontSmall,
             1,
-            renderer.Config().layout.fonts.smallText.size));
+            renderer.Config().layout.fonts.smallText.size),
+        DashboardRenderer::LayoutEditParameter::ColorMutedText);
     renderer.RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
         "Usage",
         TextStyleId::Small,
@@ -390,7 +400,8 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontSmall,
             2,
-            renderer.Config().layout.fonts.smallText.size));
+            renderer.Config().layout.fonts.smallText.size),
+        DashboardRenderer::LayoutEditParameter::ColorMutedText);
     renderer.RegisterStaticTextAnchor(layoutState_.headerColumns.free,
         "Free",
         TextStyleId::Small,
@@ -398,7 +409,8 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontSmall,
             3,
-            renderer.Config().layout.fonts.smallText.size));
+            renderer.Config().layout.fonts.smallText.size),
+        DashboardRenderer::LayoutEditParameter::ColorMutedText);
     for (int rowIndex = 0;
         rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.rowBarRects.size()) &&
         rowIndex < static_cast<int>(layoutState_.rowBarAnchorRects.size());

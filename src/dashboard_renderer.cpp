@@ -139,6 +139,11 @@ bool IsFontEditParameter(LayoutEditParameter parameter) {
     return descriptor.has_value() && descriptor->valueFormat == configschema::ValueFormat::FontSpec;
 }
 
+bool IsColorEditParameter(LayoutEditParameter parameter) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
+    return descriptor.has_value() && descriptor->valueFormat == configschema::ValueFormat::ColorHex;
+}
+
 UINT GetPanelIconResourceId(const std::string& iconName) {
     if (iconName == "cpu")
         return IDR_PANEL_ICON_CPU;
@@ -646,6 +651,39 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
     }
 }
 
+void DashboardRenderer::DrawSelectedColorEditHighlights(const EditOverlayState& overlayState) const {
+    if (!overlayState.showLayoutEditGuides || !overlayState.selectedTreeHighlight.has_value()) {
+        return;
+    }
+
+    std::vector<RenderRect> highlightedRects;
+    const auto appendRect = [&](const RenderRect& rect) {
+        if (rect.IsEmpty()) {
+            return;
+        }
+        const auto existing =
+            std::find_if(highlightedRects.begin(), highlightedRects.end(), [&](const RenderRect& candidate) {
+                return candidate.left == rect.left && candidate.top == rect.top && candidate.right == rect.right &&
+                       candidate.bottom == rect.bottom;
+            });
+        if (existing == highlightedRects.end()) {
+            highlightedRects.push_back(rect);
+        }
+    };
+    const auto collect = [&](const std::vector<LayoutEditColorRegion>& regions) {
+        for (const auto& region : regions) {
+            if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region)) {
+                appendRect(region.targetRect);
+            }
+        }
+    };
+    collect(staticColorEditRegions_);
+    collect(dynamicColorEditRegions_);
+    for (const auto& rect : highlightedRects) {
+        const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(rect, ActiveEditColor(), true);
+    }
+}
+
 void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides || !overlayState.selectedTreeHighlight.has_value()) {
         return;
@@ -1133,27 +1171,53 @@ void DashboardRenderer::RegisterStaticTextAnchor(const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     const TextLayoutOptions& options,
-    const LayoutEditAnchorBinding& editable) {
+    const LayoutEditAnchorBinding& editable,
+    std::optional<LayoutEditParameter> colorParameter) {
     RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, style, options, editable);
+    if (colorParameter.has_value()) {
+        RegisterStaticColorEditRegion(*colorParameter, MeasureTextBlock(rect, text, style, options).textRect);
+    }
 }
 
-void DashboardRenderer::RegisterDynamicTextAnchor(
-    const TextLayoutResult& layoutResult, const LayoutEditAnchorBinding& editable) {
+void DashboardRenderer::RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
+    const LayoutEditAnchorBinding& editable,
+    std::optional<LayoutEditParameter> colorParameter) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
     RegisterTextAnchor(dynamicEditableAnchorRegions_, layoutResult, editable);
+    if (colorParameter.has_value()) {
+        RegisterDynamicColorEditRegion(*colorParameter, layoutResult.textRect);
+    }
 }
 
 void DashboardRenderer::RegisterDynamicTextAnchor(const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     const TextLayoutOptions& options,
-    const LayoutEditAnchorBinding& editable) {
+    const LayoutEditAnchorBinding& editable,
+    std::optional<LayoutEditParameter> colorParameter) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
     RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, style, options, editable);
+    if (colorParameter.has_value()) {
+        RegisterDynamicColorEditRegion(*colorParameter, MeasureTextBlock(rect, text, style, options).textRect);
+    }
+}
+
+void DashboardRenderer::RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) {
+    if (!IsColorEditParameter(parameter) || targetRect.IsEmpty()) {
+        return;
+    }
+    staticColorEditRegions_.push_back(LayoutEditColorRegion{parameter, targetRect});
+}
+
+void DashboardRenderer::RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) {
+    if (!dynamicAnchorRegistrationEnabled_ || !IsColorEditParameter(parameter) || targetRect.IsEmpty()) {
+        return;
+    }
+    dynamicColorEditRegions_.push_back(LayoutEditColorRegion{parameter, targetRect});
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const {
@@ -1614,6 +1678,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     }
 
     dynamicEditableAnchorRegions_.clear();
+    dynamicColorEditRegions_.clear();
     dynamicAnchorRegistrationEnabled_ =
         overlayState.showLayoutEditGuides && !overlayState.activeLayoutEditGuide.has_value();
     const DashboardMetricSource& metrics = ResolveMetrics(snapshot);
@@ -1624,6 +1689,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
             DrawResolvedWidget(widget, metrics);
         }
     }
+    DrawSelectedColorEditHighlights(overlayState);
     DrawSelectedTreeNodeHighlight(overlayState);
     DrawHoveredWidgetHighlight(overlayState);
     DrawHoveredEditableAnchorHighlight(overlayState);
@@ -2003,6 +2069,23 @@ std::optional<LayoutEditAnchorRegion> DashboardRenderer::FindEditableAnchorRegio
     return findIn(dynamicEditableAnchorRegions_);
 }
 
+std::optional<LayoutEditColorRegion> DashboardRenderer::HitTestEditableColorRegion(RenderPoint clientPoint) const {
+    std::vector<const LayoutEditColorRegion*> regions;
+    regions.reserve(staticColorEditRegions_.size() + dynamicColorEditRegions_.size());
+    for (const auto& region : staticColorEditRegions_) {
+        regions.push_back(&region);
+    }
+    for (const auto& region : dynamicColorEditRegions_) {
+        regions.push_back(&region);
+    }
+    for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
+        if ((*it)->targetRect.Contains(clientPoint)) {
+            return *(*it);
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(const LayoutEditGapAnchorKey& key) const {
     const auto it = std::find_if(gapEditAnchors_.begin(),
         gapEditAnchors_.end(),
@@ -2056,6 +2139,8 @@ void DashboardRenderer::Shutdown() {
     textWidthCache_.clear();
     staticEditableAnchorRegions_.clear();
     dynamicEditableAnchorRegions_.clear();
+    staticColorEditRegions_.clear();
+    dynamicColorEditRegions_.clear();
     dynamicAnchorRegistrationEnabled_ = false;
     d2dFirstDrawWarmupPending_ = false;
     ClearD2DCaches();

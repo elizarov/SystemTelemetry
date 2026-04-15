@@ -37,5 +37,6 @@ void ClockDateWidget::Draw(
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontClockDate,
             0,
-            renderer.Config().layout.fonts.clockDate.size));
+            renderer.Config().layout.fonts.clockDate.size),
+        DashboardRenderer::LayoutEditParameter::ColorMutedText);
 }

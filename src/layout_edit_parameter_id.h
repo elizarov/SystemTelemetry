@@ -67,5 +67,19 @@ enum class LayoutEditParameter {
     GaugeSegmentGapDegrees,
     GaugeOuterPadding,
     GaugeRingThickness,
+
+    // Colors
+    ColorBackground,
+    ColorForeground,
+    ColorAccent,
+    ColorLayoutGuide,
+    ColorActiveEdit,
+    ColorPanelBorder,
+    ColorMutedText,
+    ColorTrack,
+    ColorPanelFill,
+    ColorGraphBackground,
+    ColorGraphAxis,
+    ColorGraphMarker,
     Count,
 };

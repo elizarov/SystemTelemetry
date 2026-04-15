@@ -49,6 +49,7 @@ struct BoardSectionCodec {};
 enum class ValueFormat {
     Integer,
     FloatingPoint,
+    ColorHex,
     FontSpec,
 };
 
@@ -61,6 +62,8 @@ struct NonNegativeIntPolicy {};
 struct FontSizePolicy {};
 
 struct DegreesPolicy {};
+
+struct FreeValuePolicy {};
 
 struct NoLayoutEditFieldTraits {
     using policy_tag = NoLayoutEditPolicy;
@@ -124,6 +127,10 @@ template <> struct LayoutEditTraitsForPolicy<DegreesPolicy> {
     using type = LayoutEditFieldTraits<DegreesPolicy, ValueFormat::FloatingPoint>;
 };
 
+template <> struct LayoutEditTraitsForPolicy<FreeValuePolicy> {
+    using type = LayoutEditFieldTraits<FreeValuePolicy, ValueFormat::ColorHex>;
+};
+
 template <typename T> struct DefaultLayoutEditTraits {
     using type = NoLayoutEditFieldTraits;
 };
@@ -158,6 +165,10 @@ template <typename T>
     requires std::is_same_v<typename DefaultCodec<T>::codec_type, FontSpecCodec>
 struct DefaultLayoutEditTraits<T> {
     using type = typename LayoutEditTraitsForPolicy<FontSizePolicy>::type;
+};
+
+template <> struct DefaultLayoutEditTraits<unsigned int> {
+    using type = typename LayoutEditTraitsForPolicy<FreeValuePolicy>::type;
 };
 
 template <typename Owner,

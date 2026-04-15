@@ -123,6 +123,7 @@ void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer)
 
 void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& renderer) {
     renderer.staticEditableAnchorRegions_.clear();
+    renderer.staticColorEditRegions_.clear();
     for (const auto& card : renderer.resolvedLayout_.cards) {
         const LayoutEditWidgetIdentity cardIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
         const int squareAnchorSize = (std::max)(4, renderer.ScaleLogical(6));
@@ -462,6 +463,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     renderer.gapEditAnchors_.clear();
     renderer.staticEditableAnchorRegions_.clear();
     renderer.dynamicEditableAnchorRegions_.clear();
+    renderer.staticColorEditRegions_.clear();
+    renderer.dynamicColorEditRegions_.clear();
     renderer.parsedWidgetInfoCache_.clear();
     renderer.resolvedLayout_.windowWidth = renderer.WindowWidth();
     renderer.resolvedLayout_.windowHeight = renderer.WindowHeight();
@@ -644,6 +647,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         if (renderer.layoutGuideDragActive_) {
             renderer.widgetEditGuides_.clear();
             renderer.staticEditableAnchorRegions_.clear();
+            renderer.staticColorEditRegions_.clear();
         } else {
             BuildWidgetEditGuides(renderer);
             BuildStaticEditableAnchors(renderer);

@@ -96,6 +96,23 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveEditableAnchorValues) {
     EXPECT_EQ(std::get<LayoutEditParameter>(*focusKey), LayoutEditParameter::FontLabel);
 }
 
+TEST(LayoutEditTypes, TooltipPayloadHelpersResolveColorRegions) {
+    LayoutEditColorRegion region;
+    region.parameter = LayoutEditParameter::ColorAccent;
+    region.targetRect = RenderRect{10, 20, 50, 60};
+
+    const TooltipPayload payload = region;
+
+    ASSERT_TRUE(TooltipPayloadParameter(payload).has_value());
+    EXPECT_EQ(*TooltipPayloadParameter(payload), LayoutEditParameter::ColorAccent);
+    EXPECT_FALSE(TooltipPayloadNumericValue(payload).has_value());
+    EXPECT_EQ(TooltipPayloadAnchorPoint(payload).x, 30);
+    EXPECT_EQ(TooltipPayloadAnchorPoint(payload).y, 40);
+    const auto focusKey = TooltipPayloadFocusKey(payload);
+    ASSERT_TRUE(focusKey.has_value());
+    EXPECT_EQ(std::get<LayoutEditParameter>(*focusKey), LayoutEditParameter::ColorAccent);
+}
+
 TEST(LayoutEditTypes, MatchesFocusKeysByParameterOrWeightIdentity) {
     const LayoutEditFocusKey parameterA = LayoutEditParameter::FontLabel;
     const LayoutEditFocusKey parameterB = LayoutEditParameter::FontLabel;

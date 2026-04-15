@@ -172,3 +172,13 @@ TEST(LayoutEditParameterApply, LeavesDriveUsageActivitySegmentGapAsNonNegativeCo
 
     EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 99);
 }
+
+TEST(LayoutEditParameterApply, UpdatesColorFieldsThroughCommands) {
+    AppConfig config;
+
+    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorForeground, 0xABCDEFu));
+    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorTrack, 0x102030u));
+
+    EXPECT_EQ(config.layout.colors.foregroundColor, 0xABCDEFu);
+    EXPECT_EQ(config.layout.colors.trackColor, 0x102030u);
+}

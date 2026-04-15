@@ -37,5 +37,6 @@ void ClockTimeWidget::Draw(
         renderer.MakeEditableTextBinding(widget,
             DashboardRenderer::LayoutEditParameter::FontClockTime,
             0,
-            renderer.Config().layout.fonts.clockTime.size));
+            renderer.Config().layout.fonts.clockTime.size),
+        DashboardRenderer::LayoutEditParameter::ColorForeground);
 }

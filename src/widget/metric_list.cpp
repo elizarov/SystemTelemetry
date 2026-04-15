@@ -174,11 +174,17 @@ void MetricListWidget::Draw(
                 renderer.MakeEditableTextBinding(widget,
                     DashboardRenderer::LayoutEditParameter::FontValue,
                     rowIndex * 2 + 1,
-                    renderer.Config().layout.fonts.value.size));
+                    renderer.Config().layout.fonts.value.size),
+                DashboardRenderer::LayoutEditParameter::ColorForeground);
         }
         const RenderRect& barRect = layoutState_.barRects[rowIndex];
         renderer.DrawPillBar(
             barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
+        const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
+        renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorAccent,
+            RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
+        renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorTrack,
+            RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
 
         ++rowIndex;
     }
@@ -219,7 +225,8 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
                 renderer.MakeEditableTextBinding(widget,
                     DashboardRenderer::LayoutEditParameter::FontLabel,
                     rowIndex * 2,
-                    renderer.Config().layout.fonts.label.size));
+                    renderer.Config().layout.fonts.label.size),
+                DashboardRenderer::LayoutEditParameter::ColorMutedText);
         }
     }
 }

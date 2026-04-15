@@ -419,6 +419,16 @@ bool DashboardController::ApplyLayoutEditFont(
     return true;
 }
 
+bool DashboardController::ApplyLayoutEditColor(
+    DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, unsigned int value) {
+    if (!ApplyLayoutEditParameterColorValue(state_.config, parameter, value)) {
+        return false;
+    }
+    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    shell.InvalidateShell();
+    return true;
+}
+
 void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config) {
     state_.config = config;
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);

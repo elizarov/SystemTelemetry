@@ -37,6 +37,7 @@ public:
     void RestoreConfigSnapshot(const AppConfig& config);
     bool ApplyParameterPreview(DashboardRenderer::LayoutEditParameter parameter, double value);
     bool ApplyFontPreview(DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value);
+    bool ApplyColorPreview(DashboardRenderer::LayoutEditParameter parameter, unsigned int value);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
     void SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
 

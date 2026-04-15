@@ -6,6 +6,8 @@
 #include "layout_edit_parameter.h"
 
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format);
+std::string FormatLayoutEditTooltipValue(unsigned int value);
 std::string FormatLayoutEditTooltipValue(const UiFontConfig& value);
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, double value);
+std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, unsigned int value);
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& value);

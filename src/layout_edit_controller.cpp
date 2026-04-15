@@ -768,6 +768,10 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
         }
     }
 
+    if (const auto colorRegion = renderer.HitTestEditableColorRegion(lastClientPoint_); colorRegion.has_value()) {
+        return TooltipTarget{lastClientPoint_, *colorRegion};
+    }
+
     return std::nullopt;
 }
 
@@ -847,6 +851,11 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
         const auto& guides = host_.LayoutEditRenderer().LayoutEditGuides();
         const LayoutEditGuide& layoutGuide = guides[*resolution.hoveredLayoutGuideIndex];
         SetCursor(LoadCursorW(nullptr, layoutGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+        return;
+    }
+
+    if (host_.LayoutEditRenderer().HitTestEditableColorRegion(clientPoint).has_value()) {
+        SetCursor(LoadCursorW(nullptr, IDC_HAND));
         return;
     }
 

@@ -62,10 +62,11 @@ void TextWidget::Draw(
                 cachedStaticText_,
                 TextStyleId::Text,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true),
-                binding);
+                binding,
+                DashboardRenderer::LayoutEditParameter::ColorForeground);
             staticAnchorRegistered_ = true;
         }
         return;
     }
-    renderer.RegisterDynamicTextAnchor(textLayout, binding);
+    renderer.RegisterDynamicTextAnchor(textLayout, binding, DashboardRenderer::LayoutEditParameter::ColorForeground);
 }

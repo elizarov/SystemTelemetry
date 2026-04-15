@@ -57,6 +57,10 @@ TEST(LayoutEditTooltip, FormatsFloatingPointValuesWithoutTrailingZeros) {
     EXPECT_EQ(FormatLayoutEditTooltipValue(262.0, configschema::ValueFormat::FloatingPoint), "262");
 }
 
+TEST(LayoutEditTooltip, FormatsColorValuesAsUppercaseHex) {
+    EXPECT_EQ(FormatLayoutEditTooltipValue(0x12ab34u), "#12AB34");
+}
+
 TEST(LayoutEditTooltip, BuildsTooltipFirstLine) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::GaugeSegmentCount);
 
@@ -70,6 +74,13 @@ TEST(LayoutEditTooltip, BuildsFontTooltipFirstLine) {
     ASSERT_TRUE(descriptor.has_value());
     const UiFontConfig font{"Segoe UI Semibold", 40, 700};
     EXPECT_EQ(BuildLayoutEditTooltipLine(*descriptor, font), "[fonts] clock_time = Segoe UI Semibold,40,700");
+}
+
+TEST(LayoutEditTooltip, BuildsColorTooltipFirstLine) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::ColorAccent);
+
+    ASSERT_TRUE(descriptor.has_value());
+    EXPECT_EQ(BuildLayoutEditTooltipLine(*descriptor, 0x00BFFFu), "[colors] accent_color = #00BFFF");
 }
 
 TEST(LayoutEditTooltip, ResolvesFontValueThroughParameterMetadata) {
@@ -95,6 +106,11 @@ TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {
     EXPECT_EQ(fontField.sectionName, "fonts");
     EXPECT_EQ(fontField.parameterName, "label");
     EXPECT_EQ(fontField.valueFormat, configschema::ValueFormat::FontSpec);
+
+    const auto& colorField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::ColorAccent);
+    EXPECT_EQ(colorField.sectionName, "colors");
+    EXPECT_EQ(colorField.parameterName, "accent_color");
+    EXPECT_EQ(colorField.valueFormat, configschema::ValueFormat::ColorHex);
 }
 
 TEST(LayoutEditParameter, RootLensAppliesIntoNestedConfig) {
@@ -116,6 +132,17 @@ TEST(LayoutEditParameter, RootLensReturnsUnderlyingFontField) {
     EXPECT_EQ(*font, &config.layout.fonts.label);
 }
 
+TEST(LayoutEditParameter, AppliesAndReadsBackColorFieldsThroughMetadata) {
+    AppConfig config;
+
+    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorAccent, 0x123456u));
+    const auto color = FindLayoutEditParameterColorValue(config, LayoutEditParameter::ColorAccent);
+
+    ASSERT_TRUE(color.has_value());
+    EXPECT_EQ(*color, 0x123456u);
+    EXPECT_EQ(config.layout.colors.accentColor, 0x123456u);
+}
+
 TEST(LayoutEditParameter, BuildsDisplayNamesForMenuActions) {
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::MetricListLabelWidth), "label width");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::GaugeSegmentCount), "segment count");
@@ -123,6 +150,7 @@ TEST(LayoutEditParameter, BuildsDisplayNamesForMenuActions) {
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::CardHeaderContentGap), "header content gap");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::CardRowGap), "row gap");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::DashboardColumnGap), "column gap");
+    EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::ColorGraphMarker), "graph marker color");
 }
 
 TEST(LayoutEditParameter, AppliesFullFontValueThroughMetadata) {

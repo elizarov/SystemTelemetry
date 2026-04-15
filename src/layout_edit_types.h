@@ -115,6 +115,11 @@ struct LayoutEditGapAnchor : LayoutEditLinearGeometry {
     double value = 0.0;
 };
 
+struct LayoutEditColorRegion {
+    LayoutEditParameter parameter = LayoutEditParameter::ColorForeground;
+    RenderRect targetRect{};
+};
+
 struct LayoutWeightEditKey {
     std::string editCardId;
     std::vector<size_t> nodePath;
@@ -148,8 +153,8 @@ struct LayoutEditAnchorBinding {
     AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
 };
 
-using TooltipPayload =
-    std::variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion>;
+using TooltipPayload = std::
+    variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion, LayoutEditColorRegion>;
 using LayoutEditFocusKey = std::variant<LayoutEditParameter, LayoutWeightEditKey>;
 using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
     DashboardWidgetClass,
@@ -178,8 +183,11 @@ bool MatchesLayoutEditSelectionHighlight(
 bool MatchesLayoutEditSelectionHighlight(
     const LayoutEditSelectionHighlight& highlight, const LayoutEditGapAnchorKey& key);
 bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditAnchorKey& key);
+bool MatchesLayoutEditSelectionHighlight(
+    const LayoutEditSelectionHighlight& highlight, const LayoutEditColorRegion& region);
 bool IsLayoutGuidePayload(const TooltipPayload& payload);
 std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload& payload);
 std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload);
+std::optional<unsigned int> TooltipPayloadColorValue(const TooltipPayload& payload);
 RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload);
 std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& payload);

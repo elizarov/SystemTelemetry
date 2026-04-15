@@ -117,6 +117,7 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
             "network_footer",
             "dashboard",
             "card_style",
+            "colors",
             "fonts",
             "layout.primary",
             "card.alpha",
@@ -127,7 +128,7 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
     EXPECT_EQ(ChildLabels(*metricList), (std::vector<std::string>{"label_width", "bar_height", "row_gap"}));
 
     EXPECT_EQ(FindRootNode(model, "display"), nullptr);
-    EXPECT_EQ(FindRootNode(model, "colors"), nullptr);
+    EXPECT_NE(FindRootNode(model, "colors"), nullptr);
     EXPECT_EQ(FindRootNode(model, "layout_editor"), nullptr);
 
     const LayoutEditTreeNode* gaugeRoot = FindRootNode(model, "gauge");

@@ -80,6 +80,8 @@ public:
         DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, double value);
     bool ApplyLayoutEditFont(
         DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value);
+    bool ApplyLayoutEditColor(
+        DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, unsigned int value);
     void ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config);
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
         const LayoutEditHost::LayoutTarget& target,

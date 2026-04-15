@@ -44,9 +44,28 @@ template <typename Meta> std::optional<double> FindNumericFieldValue(const AppCo
     }
 }
 
+template <typename Meta> std::optional<unsigned int> FindColorFieldValue(const AppConfig& config) {
+    if constexpr (std::is_same_v<typename Meta::value_type, unsigned int>) {
+        return Meta::RawGet(config);
+    } else {
+        return std::nullopt;
+    }
+}
+
 template <typename Meta> bool ApplyFontFieldEdit(AppConfig& config, const UiFontConfig& value) {
     if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
         Meta::Set(config, value);
+        return true;
+    } else {
+        (void)config;
+        (void)value;
+        return false;
+    }
+}
+
+template <typename Meta> bool ApplyColorFieldEdit(AppConfig& config, unsigned int value) {
+    if constexpr (std::is_same_v<typename Meta::value_type, unsigned int>) {
+        Meta::Set(config, value & 0xFFFFFFu);
         return true;
     } else {
         (void)config;
@@ -77,7 +96,9 @@ template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata()
         Meta::traits_type::value_format,
         std::is_same_v<typename Meta::value_type, UiFontConfig>,
         &FindNumericFieldValue<Meta>,
+        &FindColorFieldValue<Meta>,
         &ApplyFieldEdit<Meta>,
+        &ApplyColorFieldEdit<Meta>,
         &ApplyFontFieldEdit<Meta>,
         &FindFontFieldValue<Meta>,
     };
@@ -156,6 +177,19 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::GaugeSegmentGapDegrees, &GetFieldMetadata<GaugeWidgetConfig::segmentGapDegreesMeta>(), true, false},
     {Parameter::GaugeOuterPadding, &GetFieldMetadata<GaugeWidgetConfig::outerPaddingMeta>(), true, true},
     {Parameter::GaugeRingThickness, &GetFieldMetadata<GaugeWidgetConfig::ringThicknessMeta>(), true, true},
+
+    {Parameter::ColorBackground, &GetFieldMetadata<ColorConfig::backgroundColorMeta>(), false, false},
+    {Parameter::ColorForeground, &GetFieldMetadata<ColorConfig::foregroundColorMeta>(), false, false},
+    {Parameter::ColorAccent, &GetFieldMetadata<ColorConfig::accentColorMeta>(), false, false},
+    {Parameter::ColorLayoutGuide, &GetFieldMetadata<ColorConfig::layoutGuideColorMeta>(), false, false},
+    {Parameter::ColorActiveEdit, &GetFieldMetadata<ColorConfig::activeEditColorMeta>(), false, false},
+    {Parameter::ColorPanelBorder, &GetFieldMetadata<ColorConfig::panelBorderColorMeta>(), false, false},
+    {Parameter::ColorMutedText, &GetFieldMetadata<ColorConfig::mutedTextColorMeta>(), false, false},
+    {Parameter::ColorTrack, &GetFieldMetadata<ColorConfig::trackColorMeta>(), false, false},
+    {Parameter::ColorPanelFill, &GetFieldMetadata<ColorConfig::panelFillColorMeta>(), false, false},
+    {Parameter::ColorGraphBackground, &GetFieldMetadata<ColorConfig::graphBackgroundColorMeta>(), false, false},
+    {Parameter::ColorGraphAxis, &GetFieldMetadata<ColorConfig::graphAxisColorMeta>(), false, false},
+    {Parameter::ColorGraphMarker, &GetFieldMetadata<ColorConfig::graphMarkerColorMeta>(), false, false},
 };
 
 constexpr size_t kParameterInfoCount = sizeof(kParameterInfo) / sizeof(kParameterInfo[0]);
@@ -204,6 +238,10 @@ std::optional<double> FindLayoutEditParameterNumericValue(const AppConfig& confi
     return GetLayoutEditConfigFieldMetadata(parameter).numericValue(config);
 }
 
+std::optional<unsigned int> FindLayoutEditParameterColorValue(const AppConfig& config, LayoutEditParameter parameter) {
+    return GetLayoutEditConfigFieldMetadata(parameter).colorValue(config);
+}
+
 std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(LayoutEditParameter parameter) {
     const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
     LayoutEditTooltipDescriptor descriptor;
@@ -221,6 +259,11 @@ std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(
 
 bool ApplyLayoutEditParameterValue(AppConfig& config, LayoutEditParameter parameter, double value) {
     return GetLayoutEditConfigFieldMetadata(parameter).applyValue(config, value);
+}
+
+bool ApplyLayoutEditParameterColorValue(AppConfig& config, LayoutEditParameter parameter, unsigned int value) {
+    const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
+    return field.applyColorValue != nullptr ? field.applyColorValue(config, value) : false;
 }
 
 bool ApplyLayoutEditParameterFontValue(AppConfig& config, LayoutEditParameter parameter, const UiFontConfig& value) {
