@@ -292,7 +292,8 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     EXPECT_EQ(weightLeaf->secondWeightName, "beta");
     EXPECT_EQ(weightLeaf->weightAxis, LayoutGuideAxis::Vertical);
 
-    const LayoutEditTreeLeaf* metricLeaf = FindLayoutEditTreeLeaf(model, LayoutEditFocusKey{LayoutMetricEditKey{"gpu.temp"}});
+    const LayoutEditTreeLeaf* metricLeaf =
+        FindLayoutEditTreeLeaf(model, LayoutEditFocusKey{LayoutMetricEditKey{"gpu.temp"}});
     ASSERT_NE(metricLeaf, nullptr);
     EXPECT_EQ(metricLeaf->sectionName, "metrics");
     EXPECT_EQ(metricLeaf->memberName, "gpu.temp");

@@ -97,6 +97,7 @@ TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {
 
     const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
 
-    EXPECT_THAT(output, testing::HasSubstr("gpu.temp = scalar,100,\xC2\xB0"
-                                           "C,Core Temp\r\n"));
+    EXPECT_THAT(output,
+        testing::HasSubstr("gpu.temp = scalar,100,\xC2\xB0"
+                           "C,Core Temp\r\n"));
 }

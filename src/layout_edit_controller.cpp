@@ -58,12 +58,11 @@ std::string DescribeGapEditAnchor(const LayoutEditGapAnchor& anchor) {
 }
 
 std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
-    const std::string subject =
-        LayoutEditAnchorParameter(key).has_value()
-            ? "parameter=" + DescribeWidgetParameter(*LayoutEditAnchorParameter(key))
-        : LayoutEditAnchorMetricKey(key).has_value()
-            ? "metric=" + LayoutEditAnchorMetricKey(key)->metricId
-            : "subject=unknown";
+    const std::string subject = LayoutEditAnchorParameter(key).has_value()
+                                    ? "parameter=" + DescribeWidgetParameter(*LayoutEditAnchorParameter(key))
+                                : LayoutEditAnchorMetricKey(key).has_value()
+                                    ? "metric=" + LayoutEditAnchorMetricKey(key)->metricId
+                                    : "subject=unknown";
     return subject + " anchor_id=" + std::to_string(key.anchorId) +
            (key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome
                    ? " card=" + key.widget.editCardId

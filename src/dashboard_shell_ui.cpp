@@ -681,16 +681,18 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         const bool unitEditable = definition != nullptr && definition->style != MetricDisplayStyle::LabelOnly;
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT,
-            definition == nullptr                     ? L""
-            : definition->telemetryScale             ? L"*"
+            definition == nullptr        ? L""
+            : definition->telemetryScale ? L"*"
             : definition->style == MetricDisplayStyle::LabelOnly
                 ? L""
-                : WideFromUtf8(FormatLayoutEditTooltipValue(definition->scale, configschema::ValueFormat::FloatingPoint))
+                : WideFromUtf8(
+                      FormatLayoutEditTooltipValue(definition->scale, configschema::ValueFormat::FloatingPoint))
                       .c_str());
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT,
-            definition != nullptr && definition->style != MetricDisplayStyle::LabelOnly ? WideFromUtf8(definition->unit).c_str()
-                                                                                        : L"");
+            definition != nullptr && definition->style != MetricDisplayStyle::LabelOnly
+                ? WideFromUtf8(definition->unit).c_str()
+                : L"");
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT,
             definition != nullptr ? WideFromUtf8(definition->label).c_str() : L"");
@@ -858,7 +860,8 @@ bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd) {
         return false;
     }
 
-    const MetricDefinitionConfig* definition = FindMetricDefinition(state->shellUi->CurrentConfig().metrics, key->metricId);
+    const MetricDefinitionConfig* definition =
+        FindMetricDefinition(state->shellUi->CurrentConfig().metrics, key->metricId);
     if (definition == nullptr) {
         return false;
     }
@@ -882,10 +885,10 @@ bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd) {
     const std::string label = Utf8FromWide(labelBuffer);
     const bool applied = state->shellUi->ApplyMetricPreview(*key, scale, unit, label);
     std::ostringstream trace;
-    trace << BuildTraceNodeText(state->selectedNode) << BuildMetricDialogTraceValues(hwnd)
-          << " parsed_scale="
-          << QuoteTraceText(scale.has_value() ? FormatLayoutEditTooltipValue(*scale, configschema::ValueFormat::FloatingPoint)
-                                             : "disabled")
+    trace << BuildTraceNodeText(state->selectedNode) << BuildMetricDialogTraceValues(hwnd) << " parsed_scale="
+          << QuoteTraceText(scale.has_value()
+                                ? FormatLayoutEditTooltipValue(*scale, configschema::ValueFormat::FloatingPoint)
+                                : "disabled")
           << " applied=" << QuoteTraceText(applied ? "true" : "false");
     state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_metric", trace.str());
     return applied;
@@ -1331,8 +1334,10 @@ bool DashboardShellUi::ApplyColorPreview(DashboardRenderer::LayoutEditParameter 
     return app_.controller_.ApplyLayoutEditColor(app_, parameter, value);
 }
 
-bool DashboardShellUi::ApplyMetricPreview(
-    const LayoutMetricEditKey& key, const std::optional<double>& scale, const std::string& unit, const std::string& label) {
+bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
+    const std::optional<double>& scale,
+    const std::string& unit,
+    const std::string& label) {
     AppConfig updatedConfig = CurrentConfig();
     MetricDefinitionConfig* definition = FindMetricDefinition(updatedConfig.metrics, key.metricId);
     if (definition == nullptr) {

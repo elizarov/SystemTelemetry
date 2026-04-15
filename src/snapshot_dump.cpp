@@ -161,8 +161,9 @@ bool ParseDumpScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit) {
         unit = ScalarMetricUnit::None;
         return true;
     }
-    if (text == "C" || text == "\xC2\xB0"
-                              "C" ||
+    if (text == "C" ||
+        text == "\xC2\xB0"
+                "C" ||
         text == "\xE2\x84\x83" ||
         text == "\xD0\x92\xC2\xB0"
                 "C") {

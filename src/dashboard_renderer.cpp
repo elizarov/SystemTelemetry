@@ -637,7 +637,8 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         existing->second = existing->second || active;
     };
     const auto sameRect = [](const RenderRect& left, const RenderRect& right) {
-        return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
+        return left.left == right.left && left.top == right.top && left.right == right.right &&
+               left.bottom == right.bottom;
     };
     const auto appendRelatedHighlights = [&](const LayoutEditAnchorRegion& source, bool active) {
         const auto collect = [&](const std::vector<LayoutEditAnchorRegion>& regions) {

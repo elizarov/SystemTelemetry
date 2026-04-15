@@ -610,8 +610,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
             descriptor = FindLayoutEditTooltipDescriptor(*parameter);
             value = TooltipPayloadNumericValue(target->payload).value_or(0.0);
             if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target->payload)) {
-                if (const auto anchorParameter = LayoutEditAnchorParameter(anchor->key);
-                    anchorParameter.has_value()) {
+                if (const auto anchorParameter = LayoutEditAnchorParameter(anchor->key); anchorParameter.has_value()) {
                     if (const auto currentFont =
                             FindLayoutEditTooltipFontValue(controller_.State().config, *anchorParameter);
                         currentFont.has_value() && *currentFont != nullptr) {

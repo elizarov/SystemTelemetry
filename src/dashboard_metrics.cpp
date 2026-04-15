@@ -194,7 +194,8 @@ std::string FormatMetricValueText(const MetricDefinitionConfig& definition,
                        ? FormatMemoryValue(*primaryValue, *secondaryValue, definition.unit)
                        : std::string("N/A");
         case MetricDisplayStyle::Throughput:
-            return primaryValue.has_value() ? FormatThroughputValue(*primaryValue, definition.unit) : std::string("N/A");
+            return primaryValue.has_value() ? FormatThroughputValue(*primaryValue, definition.unit)
+                                            : std::string("N/A");
         case MetricDisplayStyle::SizeAuto:
             return primaryValue.has_value() ? FormatSizeAutoValue(*primaryValue, definition.unit) : std::string("N/A");
         case MetricDisplayStyle::LabelOnly:
@@ -209,8 +210,7 @@ std::string BuildMetricSampleValueText(const MetricDefinitionConfig& definition,
             return FormatPercentValue(
                 std::optional<double>{definition.telemetryScale ? 100.0 : definition.scale}, definition.unit, 0);
         case MetricDisplayStyle::Scalar:
-            return FormatScalarValue(
-                std::optional<double>{definition.telemetryScale ? 100.0 : definition.scale},
+            return FormatScalarValue(std::optional<double>{definition.telemetryScale ? 100.0 : definition.scale},
                 definition.unit,
                 ResolveScalarPrecision(metricRef));
         case MetricDisplayStyle::Memory:

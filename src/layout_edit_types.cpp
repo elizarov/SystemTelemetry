@@ -22,7 +22,8 @@ bool MatchesGapEditAnchorKey(const LayoutEditGapAnchorKey& left, const LayoutEdi
 }
 
 bool MatchesEditableAnchorKey(const LayoutEditAnchorKey& left, const LayoutEditAnchorKey& right) {
-    return left.anchorId == right.anchorId && left.subject == right.subject && MatchesWidgetIdentity(left.widget, right.widget);
+    return left.anchorId == right.anchorId && left.subject == right.subject &&
+           MatchesWidgetIdentity(left.widget, right.widget);
 }
 
 bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditWidgetGuide& right) {
@@ -165,8 +166,9 @@ std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload) 
             } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
                 return std::nullopt;
             } else if constexpr (std::is_same_v<T, LayoutEditAnchorRegion>) {
-                return LayoutEditAnchorParameter(value.key).has_value() ? std::optional<double>(static_cast<double>(value.value))
-                                                                       : std::nullopt;
+                return LayoutEditAnchorParameter(value.key).has_value()
+                           ? std::optional<double>(static_cast<double>(value.value))
+                           : std::nullopt;
             } else {
                 return value.value;
             }

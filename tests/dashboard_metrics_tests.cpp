@@ -7,14 +7,22 @@ namespace {
 
 MetricsSectionConfig BuildMetricsConfig() {
     MetricsSectionConfig metrics;
-    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.clock", MetricDisplayStyle::Scalar, false, 5.0, "GHz", "Clock"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.ram", MetricDisplayStyle::Memory, true, 0.0, "GB", "RAM"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"gpu.vram", MetricDisplayStyle::Memory, true, 0.0, "GB", "VRAM"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"board.temp.cpu", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"network.upload", MetricDisplayStyle::Throughput, true, 0.0, "MB/s", "Up"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"drive.usage", MetricDisplayStyle::Percent, false, 100.0, "%", "Usage"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"drive.free", MetricDisplayStyle::SizeAuto, true, 0.0, "GB|TB", "Free"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"cpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"cpu.clock", MetricDisplayStyle::Scalar, false, 5.0, "GHz", "Clock"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"cpu.ram", MetricDisplayStyle::Memory, true, 0.0, "GB", "RAM"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"gpu.vram", MetricDisplayStyle::Memory, true, 0.0, "GB", "VRAM"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"board.temp.cpu", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"network.upload", MetricDisplayStyle::Throughput, true, 0.0, "MB/s", "Up"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"drive.usage", MetricDisplayStyle::Percent, false, 100.0, "%", "Usage"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"drive.free", MetricDisplayStyle::SizeAuto, true, 0.0, "GB|TB", "Free"});
     return metrics;
 }
 

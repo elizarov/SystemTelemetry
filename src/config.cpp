@@ -63,7 +63,8 @@ TelemetrySettings ExtractTelemetrySettings(const AppConfig& config) {
     return settings;
 }
 
-AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections) {
+AppConfig BuildEffectiveRuntimeConfig(
+    const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections) {
     AppConfig config = uiConfig;
     if (!resolvedSelections.adapterName.empty()) {
         config.network.adapterName = resolvedSelections.adapterName;

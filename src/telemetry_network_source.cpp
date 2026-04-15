@@ -211,13 +211,13 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
         }
 
         const bool configuredExactMatch =
-            configuredCandidateAvailable && (EqualsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
-                                                EqualsInsensitive(
-                                                    row.Description, settings_.selection.preferredAdapterName));
-        const bool configuredPartialMatch = configuredCandidateAvailable && !configuredExactMatch &&
-                                            (ContainsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
-                                                ContainsInsensitive(
-                                                    row.Description, settings_.selection.preferredAdapterName));
+            configuredCandidateAvailable &&
+            (EqualsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                EqualsInsensitive(row.Description, settings_.selection.preferredAdapterName));
+        const bool configuredPartialMatch =
+            configuredCandidateAvailable && !configuredExactMatch &&
+            (ContainsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                ContainsInsensitive(row.Description, settings_.selection.preferredAdapterName));
         if (configuredCandidateAvailable && !configuredExactMatch && !configuredPartialMatch) {
             continue;
         }
