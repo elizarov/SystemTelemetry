@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include "layout_edit_tree.h"
+#include "localization_catalog.h"
 
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <functional>
 #include <vector>
 
 namespace {
@@ -15,6 +17,15 @@ std::string ReadTemplateText() {
     std::ostringstream buffer;
     buffer << input.rdbuf();
     return buffer.str();
+}
+
+LocalizationCatalogMap ReadLocalizationCatalog() {
+    const std::filesystem::path path =
+        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    std::ifstream input(path, std::ios::binary);
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return ParseLocalizationCatalog(buffer.str());
 }
 
 LayoutNodeConfig MakeWidgetNode(const std::string& name) {
@@ -265,4 +276,24 @@ TEST(LayoutEditTree, CollapsesSingleChildContainerPathsInCardTrees) {
     ASSERT_EQ(gpuRoot->children[0].children.size(), 1u);
     EXPECT_EQ(gpuRoot->children[0].children[0].label, "gauge, metric_list");
     EXPECT_TRUE(gpuRoot->children[0].children[0].leaf.has_value());
+}
+
+TEST(LayoutEditTree, EveryBuiltNodeHasLocalizedDescriptionAndLocationText) {
+    const LayoutEditTreeModel model = BuildLayoutEditTreeModel(MakeBaseConfig(), ReadTemplateText());
+    const LocalizationCatalogMap catalog = ReadLocalizationCatalog();
+
+    std::function<void(const LayoutEditTreeNode&)> verifyNode = [&](const LayoutEditTreeNode& node) {
+        EXPECT_FALSE(node.locationText.empty()) << node.label;
+        EXPECT_FALSE(node.descriptionKey.empty()) << node.label;
+        const auto it = catalog.find(node.descriptionKey);
+        ASSERT_TRUE(it != catalog.end()) << "missing localization key: " << node.descriptionKey;
+        EXPECT_FALSE(it->second.empty()) << "empty localization text for key: " << node.descriptionKey;
+        for (const auto& child : node.children) {
+            verifyNode(child);
+        }
+    };
+
+    for (const auto& root : model.roots) {
+        verifyNode(root);
+    }
 }

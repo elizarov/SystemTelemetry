@@ -239,6 +239,7 @@ struct LayoutEditDialogState {
     AppConfig originalConfig;
     LayoutEditTreeModel treeModel;
     std::optional<LayoutEditFocusKey> initialFocus;
+    const LayoutEditTreeNode* selectedNode = nullptr;
     const LayoutEditTreeLeaf* selectedLeaf = nullptr;
     std::vector<LayoutEditTreeItemBinding> treeItems;
     bool accepted = false;
@@ -296,15 +297,15 @@ void RestoreLayoutEditDialog(LayoutEditDialogState* state) {
     }
 }
 
-void SetLayoutEditDescription(HWND hwnd, const LayoutEditTreeLeaf* leaf) {
-    if (leaf == nullptr) {
+void SetLayoutEditDescription(HWND hwnd, const LayoutEditTreeNode* node) {
+    if (node == nullptr) {
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_LOCATION, L"");
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, L"");
         return;
     }
 
-    const std::wstring location = WideFromUtf8("[" + leaf->sectionName + "] " + leaf->memberName);
-    const std::wstring description = WideFromUtf8(FindLocalizedText(leaf->descriptionKey));
+    const std::wstring location = WideFromUtf8(node->locationText);
+    const std::wstring description = WideFromUtf8(FindLocalizedText(node->descriptionKey));
     SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_LOCATION, location.c_str());
     SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, description.c_str());
 }
@@ -315,7 +316,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     }
 
     state->updatingControls = true;
-    SetLayoutEditDescription(hwnd, state->selectedLeaf);
+    SetLayoutEditDescription(hwnd, state->selectedNode);
     if (state->selectedLeaf == nullptr) {
         ShowLayoutEditEditors(hwnd, false, false, false);
         state->updatingControls = false;
@@ -493,6 +494,7 @@ std::optional<LayoutEditSelectionHighlight> SelectionHighlightForTreeNode(const 
 
 void SelectLayoutEditTreeItem(LayoutEditDialogState* state, HWND hwnd, HTREEITEM item) {
     const LayoutEditTreeNode* node = TreeNodeFromItem(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE), item);
+    state->selectedNode = node;
     state->selectedLeaf = node != nullptr && node->leaf.has_value() ? &(*node->leaf) : nullptr;
     state->shellUi->SetLayoutEditTreeSelectionHighlight(SelectionHighlightForTreeNode(node));
     PopulateLayoutEditSelection(state, hwnd);

@@ -87,6 +87,19 @@ std::string ChildDisplayName(const LayoutNodeConfig& node) {
     return node.name.empty() ? "unknown" : node.name;
 }
 
+std::string SectionLocationText(std::string_view sectionName) {
+    return "[" + std::string(sectionName) + "]";
+}
+
+std::string MemberLocationText(std::string_view sectionName, std::string_view memberName) {
+    return SectionLocationText(sectionName) + " " + std::string(memberName);
+}
+
+std::string ContainerLocationText(
+    std::string_view sectionName, std::string_view memberName, std::string_view containerName) {
+    return MemberLocationText(sectionName, memberName) + " " + std::string(containerName) + "(...)";
+}
+
 std::optional<LayoutEditSelectionHighlight> SectionSelectionHighlight(std::string_view sectionName) {
     if (sectionName == "card_style") {
         return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::AllCards};
@@ -102,6 +115,24 @@ std::optional<LayoutEditSelectionHighlight> SectionSelectionHighlight(std::strin
         return std::nullopt;
     }
     return LayoutEditSelectionHighlight{*widgetClass};
+}
+
+std::string SectionDescriptionKey(std::string_view sectionName) {
+    if (sectionName.rfind("layout.", 0) == 0) {
+        return "layout_edit.section.layout";
+    }
+    if (sectionName.rfind("card.", 0) == 0) {
+        return "layout_edit.section.card";
+    }
+    return "layout_edit.section." + std::string(sectionName);
+}
+
+std::string GroupDescriptionKey(std::string_view memberName) {
+    return "layout_edit.group." + std::string(memberName);
+}
+
+std::string ContainerDescriptionKey(std::string_view containerName) {
+    return "layout_edit.container." + std::string(containerName);
 }
 
 bool IsFixedHeightRowChild(const LayoutNodeConfig& node) {
@@ -214,6 +245,8 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
     LayoutEditTreeNode treeNode;
     treeNode.kind = LayoutEditTreeNodeKind::Container;
     treeNode.label = node.name;
+    treeNode.locationText = ContainerLocationText(sectionName, memberName, node.name);
+    treeNode.descriptionKey = ContainerDescriptionKey(node.name);
     treeNode.initiallyExpanded = false;
     treeNode.selectionHighlight = LayoutContainerEditKey{editCardId, nodePath};
 
@@ -230,6 +263,8 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
             LayoutEditTreeNode leafNode;
             leafNode.kind = LayoutEditTreeNodeKind::Leaf;
             leafNode.label = ChildDisplayName(node.children[i]) + ", " + ChildDisplayName(node.children[i + 1]);
+            leafNode.locationText = MemberLocationText(sectionName, memberName);
+            leafNode.descriptionKey = "layout_edit.layout_guide";
             leafNode.leaf = LayoutEditTreeLeaf{
                 LayoutWeightEditKey{editCardId, nodePath, i},
                 sectionName,
@@ -261,6 +296,8 @@ std::optional<LayoutEditTreeNode> BuildStructureGroup(const std::string& section
     LayoutEditTreeNode groupNode;
     groupNode.kind = LayoutEditTreeNodeKind::Group;
     groupNode.label = memberName;
+    groupNode.locationText = MemberLocationText(sectionName, memberName);
+    groupNode.descriptionKey = GroupDescriptionKey(memberName);
     groupNode.initiallyExpanded = false;
     if (const auto containerNode = BuildContainerNode(sectionName, memberName, editCardId, node, {});
         containerNode.has_value()) {
@@ -280,6 +317,8 @@ std::optional<LayoutEditTreeNode> BuildStaticSectionNode(const TemplateSectionSl
     LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = slot.sectionName;
+    sectionNode.locationText = SectionLocationText(slot.sectionName);
+    sectionNode.descriptionKey = SectionDescriptionKey(slot.sectionName);
     sectionNode.initiallyExpanded = true;
     if (const auto selectionHighlight = SectionSelectionHighlight(slot.sectionName); selectionHighlight.has_value()) {
         sectionNode.selectionHighlight = *selectionHighlight;
@@ -296,6 +335,8 @@ std::optional<LayoutEditTreeNode> BuildStaticSectionNode(const TemplateSectionSl
         LayoutEditTreeNode leafNode;
         leafNode.kind = LayoutEditTreeNodeKind::Leaf;
         leafNode.label = key;
+        leafNode.locationText = MemberLocationText(descriptor->sectionName, descriptor->memberName);
+        leafNode.descriptionKey = descriptor->configKey;
         leafNode.leaf = LayoutEditTreeLeaf{
             *parameter,
             descriptor->sectionName,
@@ -319,6 +360,8 @@ std::optional<LayoutEditTreeNode> BuildActiveLayoutSectionNode(const AppConfig& 
     LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "layout." + config.display.layout;
+    sectionNode.locationText = SectionLocationText(sectionNode.label);
+    sectionNode.descriptionKey = SectionDescriptionKey(sectionNode.label);
     sectionNode.initiallyExpanded = true;
     sectionNode.selectionHighlight = LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
     if (const auto groupNode = BuildStructureGroup(sectionNode.label, "cards", "", config.layout.structure.cardsLayout);
@@ -335,6 +378,8 @@ std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& c
     LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "card." + card.id;
+    sectionNode.locationText = SectionLocationText(sectionNode.label);
+    sectionNode.descriptionKey = SectionDescriptionKey(sectionNode.label);
     sectionNode.initiallyExpanded = true;
     sectionNode.selectionHighlight = LayoutEditSelectionHighlight{
         LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome}};
