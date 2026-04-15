@@ -165,3 +165,21 @@ TEST(LayoutEditTypes, MatchesSelectionHighlightAgainstLeafAndContainerArtifacts)
     EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(containerHighlight, guide));
     EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(containerHighlight, widgetGuide));
 }
+
+TEST(LayoutEditTypes, MatchesCardChromeSelectionByEditedCardIdentity) {
+    const LayoutEditWidgetIdentity selection{
+        "storage_throughput", "storage_throughput", {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+    const LayoutEditWidgetIdentity topLevelCandidate{
+        "storage_throughput", "storage_throughput", {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+    const LayoutEditWidgetIdentity embeddedCandidate{
+        "storage", "storage_throughput", {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+    const LayoutEditWidgetIdentity wrongCardCandidate{
+        "storage", "storage", {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+    const LayoutEditWidgetIdentity widgetCandidate{
+        "storage", "storage_throughput", {}, LayoutEditWidgetIdentity::Kind::Widget};
+
+    EXPECT_TRUE(MatchesCardChromeSelectionIdentity(selection, topLevelCandidate));
+    EXPECT_TRUE(MatchesCardChromeSelectionIdentity(selection, embeddedCandidate));
+    EXPECT_FALSE(MatchesCardChromeSelectionIdentity(selection, wrongCardCandidate));
+    EXPECT_FALSE(MatchesCardChromeSelectionIdentity(selection, widgetCandidate));
+}

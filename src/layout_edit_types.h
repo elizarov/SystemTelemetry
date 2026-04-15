@@ -165,6 +165,8 @@ bool MatchesEditableAnchorKey(const LayoutEditAnchorKey& left, const LayoutEditA
 bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditWidgetGuide& right);
 bool MatchesLayoutContainerEditKey(const LayoutContainerEditKey& left, const LayoutContainerEditKey& right);
 bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWeightEditKey& right);
+bool MatchesCardChromeSelectionIdentity(
+    const LayoutEditWidgetIdentity& selection, const LayoutEditWidgetIdentity& candidate);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGuide& guide);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditWidgetGuide& guide);

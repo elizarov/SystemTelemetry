@@ -121,6 +121,19 @@ bool FontSetConfigEquals(const UiFontSetConfig& left, const UiFontSetConfig& rig
            FontConfigEquals(left.clockDate, right.clockDate);
 }
 
+RenderRect UnionRect(const RenderRect& left, const RenderRect& right) {
+    if (left.IsEmpty()) {
+        return right;
+    }
+    if (right.IsEmpty()) {
+        return left;
+    }
+    return RenderRect{(std::min)(left.left, right.left),
+        (std::min)(left.top, right.top),
+        (std::max)(left.right, right.right),
+        (std::max)(left.bottom, right.bottom)};
+}
+
 bool IsFontEditParameter(LayoutEditParameter parameter) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
     return descriptor.has_value() && descriptor->valueFormat == configschema::ValueFormat::FontSpec;
@@ -652,10 +665,53 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
 
     if (const auto* widgetIdentity = std::get_if<LayoutEditWidgetIdentity>(&*overlayState.selectedTreeHighlight)) {
         if (widgetIdentity->kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
+            std::vector<RenderRect> embeddedInstanceRects;
+            const auto appendEmbeddedRect = [&](const RenderRect& rect) {
+                if (rect.IsEmpty()) {
+                    return;
+                }
+                const auto existing = std::find_if(
+                    embeddedInstanceRects.begin(), embeddedInstanceRects.end(), [&](const RenderRect& candidate) {
+                        return candidate.left == rect.left && candidate.top == rect.top &&
+                               candidate.right == rect.right && candidate.bottom == rect.bottom;
+                    });
+                if (existing == embeddedInstanceRects.end()) {
+                    embeddedInstanceRects.push_back(rect);
+                }
+            };
             for (const auto& card : resolvedLayout_.cards) {
-                if (card.id == widgetIdentity->renderCardId && card.id == widgetIdentity->editCardId) {
+                const LayoutEditWidgetIdentity cardIdentity{
+                    card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+                if (MatchesCardChromeSelectionIdentity(*widgetIdentity, cardIdentity)) {
                     const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(card.rect, color, true);
                 }
+            }
+            for (const auto& guide : layoutEditGuides_) {
+                const LayoutEditWidgetIdentity cardIdentity{
+                    guide.renderCardId, guide.editCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+                if (guide.renderCardId.empty() || guide.renderCardId == guide.editCardId || !guide.nodePath.empty() ||
+                    !MatchesCardChromeSelectionIdentity(*widgetIdentity, cardIdentity)) {
+                    continue;
+                }
+                appendEmbeddedRect(guide.containerRect);
+            }
+            if (embeddedInstanceRects.empty()) {
+                for (const auto& card : resolvedLayout_.cards) {
+                    RenderRect embeddedBounds{};
+                    for (const auto& widget : card.widgets) {
+                        const LayoutEditWidgetIdentity cardIdentity{
+                            widget.cardId, widget.editCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+                        if (widget.cardId == widget.editCardId ||
+                            !MatchesCardChromeSelectionIdentity(*widgetIdentity, cardIdentity)) {
+                            continue;
+                        }
+                        embeddedBounds = UnionRect(embeddedBounds, widget.rect);
+                    }
+                    appendEmbeddedRect(embeddedBounds);
+                }
+            }
+            for (const auto& rect : embeddedInstanceRects) {
+                const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(rect, color, true);
             }
             return;
         }

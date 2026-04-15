@@ -38,6 +38,12 @@ bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWei
            left.separatorIndex == right.separatorIndex;
 }
 
+bool MatchesCardChromeSelectionIdentity(
+    const LayoutEditWidgetIdentity& selection, const LayoutEditWidgetIdentity& candidate) {
+    return selection.kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
+           candidate.kind == LayoutEditWidgetIdentity::Kind::CardChrome && selection.editCardId == candidate.editCardId;
+}
+
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right) {
     if (left.index() != right.index()) {
         return false;
