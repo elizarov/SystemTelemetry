@@ -1,10 +1,10 @@
 #include "config.h"
 
-ConfigColor ConfigColor::FromRgb(unsigned int value) {
-    return ConfigColor{static_cast<std::uint32_t>(value & 0xFFFFFFu)};
+ColorConfig ColorConfig::FromRgb(unsigned int value) {
+    return ColorConfig{static_cast<std::uint32_t>(value & 0xFFFFFFu)};
 }
 
-unsigned int ConfigColor::ToRgb() const {
+unsigned int ColorConfig::ToRgb() const {
     return rgb & 0xFFFFFFu;
 }
 

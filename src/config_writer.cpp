@@ -21,7 +21,7 @@ std::string Trim(const std::string& input) {
     return std::string(first, last);
 }
 
-std::string FormatHexColor(ConfigColor color) {
+std::string FormatHexColor(ColorConfig color) {
     std::ostringstream stream;
     stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(6) << color.ToRgb();
     return stream.str();
@@ -96,7 +96,7 @@ std::string EncodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>
     return FormatLogicalSize(value);
 }
 
-template <> std::string EncodeConfigValue<configschema::HexColorCodec, ConfigColor>(const ConfigColor& value) {
+template <> std::string EncodeConfigValue<configschema::HexColorCodec, ColorConfig>(const ColorConfig& value) {
     return FormatHexColor(value);
 }
 

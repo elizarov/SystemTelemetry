@@ -10,27 +10,27 @@
 #include <utility>
 #include <vector>
 
-struct ConfigColor {
+struct ColorConfig {
     std::uint32_t rgb = 0;
 
-    static ConfigColor FromRgb(unsigned int value);
+    static ColorConfig FromRgb(unsigned int value);
 
     unsigned int ToRgb() const;
 
-    constexpr bool operator==(const ConfigColor& other) const = default;
+    constexpr bool operator==(const ColorConfig& other) const = default;
 };
 
-inline bool operator==(const ConfigColor& color, unsigned int value) {
+inline bool operator==(const ColorConfig& color, unsigned int value) {
     return color.ToRgb() == (value & 0xFFFFFFu);
 }
 
-inline bool operator==(unsigned int value, const ConfigColor& color) {
+inline bool operator==(unsigned int value, const ColorConfig& color) {
     return color == value;
 }
 
-CONFIG_CODEC(ConfigColor, configschema::HexColorCodec);
+CONFIG_CODEC(ColorConfig, configschema::HexColorCodec);
 
-template <> struct configschema::DefaultLayoutEditTraits<ConfigColor> {
+template <> struct configschema::DefaultLayoutEditTraits<ColorConfig> {
     using type = typename configschema::LayoutEditTraitsForPolicy<configschema::FreeValuePolicy>::type;
 };
 
@@ -129,21 +129,21 @@ struct CardStyleConfig {
     CONFIG_SECTION("card_style");
 };
 
-struct ColorConfig {
-    CONFIG_REFLECTED_STRUCT(ColorConfig)
-    CONFIG_EDITABLE_VALUE(ConfigColor, backgroundColor, "background_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, foregroundColor, "foreground_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, iconColor, "icon_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, accentColor, "accent_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, layoutGuideColor, "layout_guide_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, activeEditColor, "active_edit_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, panelBorderColor, "panel_border_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, mutedTextColor, "muted_text_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, trackColor, "track_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, panelFillColor, "panel_fill_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, graphBackgroundColor, "graph_background_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, graphAxisColor, "graph_axis_color");
-    CONFIG_EDITABLE_VALUE(ConfigColor, graphMarkerColor, "graph_marker_color");
+struct ColorsConfig {
+    CONFIG_REFLECTED_STRUCT(ColorsConfig)
+    CONFIG_EDITABLE_VALUE(ColorConfig, backgroundColor, "background_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, foregroundColor, "foreground_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, iconColor, "icon_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, accentColor, "accent_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideColor, "layout_guide_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, activeEditColor, "active_edit_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, panelBorderColor, "panel_border_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, mutedTextColor, "muted_text_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, trackColor, "track_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, panelFillColor, "panel_fill_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, graphBackgroundColor, "graph_background_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, graphAxisColor, "graph_axis_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, graphMarkerColor, "graph_marker_color");
     CONFIG_SECTION("colors");
 };
 
@@ -260,7 +260,7 @@ struct LayoutEditorConfig {
 
 struct LayoutConfig {
     CONFIG_REFLECTED_BINDINGS(LayoutConfig)
-    CONFIG_SECTION_VALUE(ColorConfig, colors);
+    CONFIG_SECTION_VALUE(ColorsConfig, colors);
     CONFIG_SECTION_VALUE(DashboardSectionConfig, dashboard);
     CONFIG_SECTION_VALUE(CardStyleConfig, cardStyle);
     CONFIG_SECTION_VALUE(MetricListWidgetConfig, metricList);
@@ -294,7 +294,7 @@ CONFIG_EDITABLE_ROOT_BINDING_PATH(UiFontSetConfig, AppConfig, AppConfig::layoutB
 CONFIG_EDITABLE_ROOT_BINDING_PATH(
     DashboardSectionConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::dashboardBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(CardStyleConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::cardStyleBinding);
-CONFIG_EDITABLE_ROOT_BINDING_PATH(ColorConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::colorsBinding);
+CONFIG_EDITABLE_ROOT_BINDING_PATH(ColorsConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::colorsBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(
     MetricListWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::metricListBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(

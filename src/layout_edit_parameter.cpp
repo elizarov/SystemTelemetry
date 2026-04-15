@@ -45,7 +45,7 @@ template <typename Meta> std::optional<double> FindNumericFieldValue(const AppCo
 }
 
 template <typename Meta> std::optional<unsigned int> FindColorFieldValue(const AppConfig& config) {
-    if constexpr (std::is_same_v<typename Meta::value_type, ConfigColor>) {
+    if constexpr (std::is_same_v<typename Meta::value_type, ColorConfig>) {
         return Meta::RawGet(config).ToRgb();
     } else {
         return std::nullopt;
@@ -73,8 +73,8 @@ template <typename Meta> bool ApplyFontFieldEdit(AppConfig& config, const UiFont
 }
 
 template <typename Meta> bool ApplyColorFieldEdit(AppConfig& config, unsigned int value) {
-    if constexpr (std::is_same_v<typename Meta::value_type, ConfigColor>) {
-        Meta::Set(config, ConfigColor::FromRgb(value));
+    if constexpr (std::is_same_v<typename Meta::value_type, ColorConfig>) {
+        Meta::Set(config, ColorConfig::FromRgb(value));
         return true;
     } else {
         (void)config;
@@ -187,19 +187,19 @@ const LayoutEditParameterInfo kParameterInfo[] = {
     {Parameter::GaugeOuterPadding, &GetFieldMetadata<GaugeWidgetConfig::outerPaddingMeta>(), true, true},
     {Parameter::GaugeRingThickness, &GetFieldMetadata<GaugeWidgetConfig::ringThicknessMeta>(), true, true},
 
-    {Parameter::ColorBackground, &GetFieldMetadata<ColorConfig::backgroundColorMeta>(), false, false},
-    {Parameter::ColorForeground, &GetFieldMetadata<ColorConfig::foregroundColorMeta>(), false, false},
-    {Parameter::ColorIcon, &GetFieldMetadata<ColorConfig::iconColorMeta>(), false, false},
-    {Parameter::ColorAccent, &GetFieldMetadata<ColorConfig::accentColorMeta>(), false, false},
-    {Parameter::ColorLayoutGuide, &GetFieldMetadata<ColorConfig::layoutGuideColorMeta>(), false, false},
-    {Parameter::ColorActiveEdit, &GetFieldMetadata<ColorConfig::activeEditColorMeta>(), false, false},
-    {Parameter::ColorPanelBorder, &GetFieldMetadata<ColorConfig::panelBorderColorMeta>(), false, false},
-    {Parameter::ColorMutedText, &GetFieldMetadata<ColorConfig::mutedTextColorMeta>(), false, false},
-    {Parameter::ColorTrack, &GetFieldMetadata<ColorConfig::trackColorMeta>(), false, false},
-    {Parameter::ColorPanelFill, &GetFieldMetadata<ColorConfig::panelFillColorMeta>(), false, false},
-    {Parameter::ColorGraphBackground, &GetFieldMetadata<ColorConfig::graphBackgroundColorMeta>(), false, false},
-    {Parameter::ColorGraphAxis, &GetFieldMetadata<ColorConfig::graphAxisColorMeta>(), false, false},
-    {Parameter::ColorGraphMarker, &GetFieldMetadata<ColorConfig::graphMarkerColorMeta>(), false, false},
+    {Parameter::ColorBackground, &GetFieldMetadata<ColorsConfig::backgroundColorMeta>(), false, false},
+    {Parameter::ColorForeground, &GetFieldMetadata<ColorsConfig::foregroundColorMeta>(), false, false},
+    {Parameter::ColorIcon, &GetFieldMetadata<ColorsConfig::iconColorMeta>(), false, false},
+    {Parameter::ColorAccent, &GetFieldMetadata<ColorsConfig::accentColorMeta>(), false, false},
+    {Parameter::ColorLayoutGuide, &GetFieldMetadata<ColorsConfig::layoutGuideColorMeta>(), false, false},
+    {Parameter::ColorActiveEdit, &GetFieldMetadata<ColorsConfig::activeEditColorMeta>(), false, false},
+    {Parameter::ColorPanelBorder, &GetFieldMetadata<ColorsConfig::panelBorderColorMeta>(), false, false},
+    {Parameter::ColorMutedText, &GetFieldMetadata<ColorsConfig::mutedTextColorMeta>(), false, false},
+    {Parameter::ColorTrack, &GetFieldMetadata<ColorsConfig::trackColorMeta>(), false, false},
+    {Parameter::ColorPanelFill, &GetFieldMetadata<ColorsConfig::panelFillColorMeta>(), false, false},
+    {Parameter::ColorGraphBackground, &GetFieldMetadata<ColorsConfig::graphBackgroundColorMeta>(), false, false},
+    {Parameter::ColorGraphAxis, &GetFieldMetadata<ColorsConfig::graphAxisColorMeta>(), false, false},
+    {Parameter::ColorGraphMarker, &GetFieldMetadata<ColorsConfig::graphMarkerColorMeta>(), false, false},
 };
 
 constexpr size_t kParameterInfoCount = sizeof(kParameterInfo) / sizeof(kParameterInfo[0]);
