@@ -225,6 +225,7 @@ find_package(GTest CONFIG REQUIRED)
 
 add_executable(SystemTelemetryTests
     tests/dashboard_metrics_tests.cpp
+    tests/snapshot_dump_tests.cpp
     tests/dashboard_widget_class_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
@@ -250,8 +251,9 @@ add_executable(SystemTelemetryTests
     src/dashboard_metrics.cpp
     src/dashboard_widget_class.cpp
     src/render_types.cpp
+    src/snapshot_dump.cpp
     src/telemetry_retained_history.cpp
-)
+  )
 target_include_directories(SystemTelemetryTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
 )

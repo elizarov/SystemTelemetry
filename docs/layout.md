@@ -71,8 +71,11 @@ The language has ten levels:
 
 `[metrics]` owns the metric ids that `metric_list(...)` and `gauge(...)` bind:
 
-- `metric.id = <scale>,<unit>,<label>`
+- `metric.id = <style>,<scale>,<unit>,<label>`
 - `*` as the scale means the renderer normalizes that metric against telemetry-provided scale data such as load percent or total RAM/VRAM capacity
+- Supported metric styles are `percent`, `scalar`, `memory`, `throughput`, `size_auto`, and `label_only`
+- `percent` owns percent text formatting, `memory` owns `used / total <unit>`, `throughput` owns `<value> <unit>`, `size_auto` owns the drive-free `GB|TB` switch, and `label_only` reserves only configured label text
+- `throughput(...)` reads its displayed label and value unit text from the matching `[metrics]` entry, and `drive_usage_list` reads its `R`, `W`, `Usage`, `Free`, percent text, and free-space units from dedicated `[metrics]` entries
 
 ## Widget sections
 
@@ -310,6 +313,10 @@ Supported metric references include:
 - `network.download`
 - `storage.read`
 - `storage.write`
+- `drive.activity.read`
+- `drive.activity.write`
+- `drive.usage`
+- `drive.free`
 
 ## Drive and sensor selection
 
@@ -320,10 +327,14 @@ Example:
 - `[storage]`
 - `drives =`
 - `[metrics]`
-- `cpu.ram = *,GB,RAM`
-- `board.temp.cpu = 100,Â°C,Temp`
-- `board.fan.cpu = 3000,RPM,CPU Fan`
-- `board.fan.system = 3000,RPM,System Fan`
+- `cpu.ram = memory,*,GB,RAM`
+- `board.temp.cpu = scalar,100,°C,Temp`
+- `board.fan.cpu = scalar,3000,RPM,CPU Fan`
+- `board.fan.system = scalar,3000,RPM,System Fan`
+- `drive.activity.read = label_only,*,,R`
+- `drive.activity.write = label_only,*,,W`
+- `drive.usage = percent,100,%,Usage`
+- `drive.free = size_auto,*,GB|TB,Free`
 - `metric_list(cpu.ram,board.temp.cpu,board.fan.cpu,board.fan.system)`
 
 - `[storage] drives` defines the vertical drive-usage list contents and order.

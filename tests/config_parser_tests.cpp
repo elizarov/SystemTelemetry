@@ -72,23 +72,36 @@ TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
 
 TEST(ConfigParser, ParsesMetricsSectionEntries) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
-                                                       "cpu.load = *,%,Processor Load\n"
-                                                       "gpu.temp = 110,C,GPU Temp\n");
+                                                       "cpu.load = percent,*,%,Processor Load\n"
+                                                       "gpu.temp = scalar,110,C,GPU Temp\n");
 
     const AppConfig config = LoadConfig(path, true);
 
     const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.metrics, "cpu.load");
     ASSERT_NE(loadMetric, nullptr);
+    EXPECT_EQ(loadMetric->style, MetricDisplayStyle::Percent);
     EXPECT_TRUE(loadMetric->telemetryScale);
     EXPECT_EQ(loadMetric->unit, "%");
     EXPECT_EQ(loadMetric->label, "Processor Load");
 
     const MetricDefinitionConfig* gpuTemp = FindMetricDefinition(config.metrics, "gpu.temp");
     ASSERT_NE(gpuTemp, nullptr);
+    EXPECT_EQ(gpuTemp->style, MetricDisplayStyle::Scalar);
     EXPECT_FALSE(gpuTemp->telemetryScale);
     EXPECT_DOUBLE_EQ(gpuTemp->scale, 110.0);
     EXPECT_EQ(gpuTemp->unit, "C");
     EXPECT_EQ(gpuTemp->label, "GPU Temp");
+
+    std::filesystem::remove(path);
+}
+
+TEST(ConfigParser, IgnoresLegacyThreeFieldMetricDefinitions) {
+    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
+                                                       "cpu.load = *,%,Processor Load\n");
+
+    const AppConfig config = LoadConfig(path, true);
+
+    EXPECT_EQ(FindMetricDefinition(config.metrics, "cpu.load"), nullptr);
 
     std::filesystem::remove(path);
 }

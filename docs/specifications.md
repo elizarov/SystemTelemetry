@@ -58,7 +58,8 @@ Examples include:
 - When `Save Config` creates `config.ini` beside the executable for the first time, it must write only the keys whose live in-memory values differ from the embedded defaults.
 - `Save Full Config To...` must export a complete config file by starting from the embedded `resources/config.ini` template text and updating every maintained config key with the live in-memory values so the exported file keeps the shipped line structure and comments.
 - The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
-- The `[metrics]` section must define every metric id that `metric_list(...)` and `gauge(...)` may bind, storing each metric as `<scale>,<unit>,<label>` where `*` means the renderer normalizes that metric against telemetry-provided scale data.
+- The `[metrics]` section must define every metric id that `metric_list(...)`, `gauge(...)`, `throughput(...)`, and `drive_usage_list` presentation may bind, storing each metric as `<style>,<scale>,<unit>,<label>` where `*` means the renderer normalizes that metric against telemetry-provided scale data.
+- The shipped `[metrics]` set must include throughput display ids for `network.upload`, `network.download`, `storage.read`, and `storage.write`, plus drive-list display ids for `drive.activity.read`, `drive.activity.write`, `drive.usage`, and `drive.free`.
 - The `[display]` section must select the active dashboard layout by name through `display.layout`, and named dashboard size-and-card-placement definitions must live in `[layout.<name>]` sections with aspect-ratio names plus an optional `description` popup label suffix.
 - The `[display]` section must store the dashboard render scale through `display.scale` as a fractional multiplier where `0` means the runtime uses the current monitor DPI scale.
 - The shipped config template must define `5x3` as the default active layout, also include an experimental `3x5` portrait layout for the same panel resolution, and expose human-readable layout descriptions such as `5" 800x480 screen` for the layout popup.
@@ -95,6 +96,7 @@ Examples include:
 - Each published telemetry snapshot must advance a snapshot revision when its rendered content changes so renderer-side metric caches can be reused only across unchanged snapshots.
 - Live telemetry, retained histories, and derived widget ratios must treat non-finite sampled values as unavailable or empty so resume-time provider glitches cannot propagate NaN or infinity into rendering math.
 - Metric-list rows, gauge fill, and their retained recent-peak history series must use the same `[metrics]`-driven normalization scale for each bound metric so fill and peak rendering stay aligned.
+- Dashboard display labels and units must come from `[metrics]` instead of hard-coded widget strings, with metric display formatting driven by the configured metric style.
 - The renderer must support a blank rendering mode that preserves panel chrome, card titles, card icons, CPU and GPU names, drive labels, and empty chart or bar tracks while omitting dynamic metric text, time, date, plot lines, chart leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 
 ### Runtime actions tied to config
@@ -267,7 +269,7 @@ While moving, show an overlay in the top-left corner with:
 - The application must provide a `Save Config` action that writes the display identifier and relative X/Y placement back to the config file while preserving all other settings and unchanged explicit overrides.
 - The `Save full config to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_full_config.ini`, and export the full embedded-template-shaped config with current live values.
 - The `Save dump to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_dump.txt`, and write the same text dump format used by diagnostics output.
-- The dump format contains only the snapshot fields that `/fake` loads and the dashboard renders; provider-debug details remain trace-only diagnostics data.
+- The dump format contains only the snapshot fields that `/fake` loads and the dashboard renders, and keeps the internal scalar-unit tokens used by the snapshot model for round-tripping; provider-debug details remain trace-only diagnostics data.
 - The `Save screenshot to...` action must open a standard Windows Save dialog, default to the current working directory, default the file name to `telemetry_screenshot.png`, and write the same PNG output format used by diagnostics output.
 
 ## Tray behavior
@@ -487,7 +489,5 @@ While moving, show an overlay in the top-left corner with:
 
 ### Units
 
-- CPU: `GHz`
-- Memory: `GB`
-- Network: `MB/s`
-- Storage: `GB/TB`
+- Dashboard labels and units are defined in `[metrics]`.
+- Internal snapshot dump unit tokens remain `C`, `GHz`, `MHz`, and `RPM`.

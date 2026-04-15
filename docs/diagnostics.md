@@ -66,6 +66,7 @@ This document is the single maintained source of truth for diagnostics command b
 
 - The dump includes only the runtime snapshot model that `/fake` loads and the dashboard renders, including retained histories, configured drive rows with per-drive read and write MB/s, and the full local date and time down to milliseconds.
 - The dump schema reflects the runtime snapshot model directly and includes only fields that the runtime loads and renders.
+- Dump scalar-unit fields keep the snapshot model's internal tokens such as `C`, `GHz`, `MHz`, and `RPM`, even when the live dashboard displays different unit strings from `[metrics]`.
 - Provider diagnostics and provider-specific debug details stay in trace output instead of being duplicated into the dump schema.
 
 ## Single-instance behavior

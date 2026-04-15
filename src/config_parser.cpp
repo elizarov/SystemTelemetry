@@ -119,16 +119,19 @@ bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
 
 bool ParseMetricDefinition(const std::string& value, MetricDefinitionConfig& definition) {
     const std::vector<std::string> parts = SplitPreservingEmpty(value, ',');
-    if (parts.size() != 3) {
+    if (parts.size() != 4) {
         return false;
     }
 
     MetricDefinitionConfig parsed = definition;
-    if (parts[0] == "*") {
+    if (!ParseMetricDisplayStyle(parts[0], parsed.style)) {
+        return false;
+    }
+    if (parts[1] == "*") {
         parsed.telemetryScale = true;
         parsed.scale = 0.0;
     } else {
-        const double parsedScale = ParseDoubleOrDefault(parts[0], 0.0);
+        const double parsedScale = ParseDoubleOrDefault(parts[1], 0.0);
         if (!(parsedScale > 0.0)) {
             return false;
         }
@@ -136,8 +139,8 @@ bool ParseMetricDefinition(const std::string& value, MetricDefinitionConfig& def
         parsed.scale = parsedScale;
     }
 
-    parsed.unit = parts[1];
-    parsed.label = parts[2];
+    parsed.unit = parts[2];
+    parsed.label = parts[3];
     definition = std::move(parsed);
     return true;
 }

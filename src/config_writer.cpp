@@ -37,6 +37,7 @@ std::string FormatFontSpec(const UiFontConfig& font) {
 
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
     std::ostringstream stream;
+    stream << MetricDisplayStyleName(definition.style) << ",";
     if (definition.telemetryScale) {
         stream << "*";
     } else {

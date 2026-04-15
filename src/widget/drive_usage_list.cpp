@@ -8,10 +8,27 @@
 
 namespace {
 
+std::string ResolveDriveMetricLabel(
+    const DashboardRenderer& renderer, std::string_view metricRef, std::string_view fallback) {
+    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().metrics, metricRef);
+    if (definition != nullptr && !definition->label.empty()) {
+        return definition->label;
+    }
+    return std::string(fallback);
+}
+
+std::string ResolveDriveMetricSampleValue(
+    const DashboardRenderer& renderer, std::string_view metricRef, std::string_view fallback) {
+    const std::string sample = ResolveMetricSampleValueText(renderer.Config().metrics, std::string(metricRef));
+    return sample.empty() ? std::string(fallback) : sample;
+}
+
 DriveUsageListWidget::MeasuredColumnWidths MeasureColumnWidths(const DashboardRenderer& renderer) {
+    const std::string writeLabel = ResolveDriveMetricLabel(renderer, "drive.activity.write", "W");
+    const std::string usageSample = ResolveDriveMetricSampleValue(renderer, "drive.usage", "100%");
     return DriveUsageListWidget::MeasuredColumnWidths{
-        std::max(1, renderer.MeasureTextWidth(TextStyleId::Label, "W:")),
-        std::max(1, renderer.MeasureTextWidth(TextStyleId::Label, "100%")),
+        std::max(1, renderer.MeasureTextWidth(TextStyleId::Label, writeLabel + ":")),
+        std::max(1, renderer.MeasureTextWidth(TextStyleId::Label, usageSample)),
     };
 }
 
@@ -263,24 +280,29 @@ void DriveUsageListWidget::ResolveLayoutState(const DashboardRenderer& renderer,
 
 void DriveUsageListWidget::Draw(
     DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    const std::string readLabel = ResolveDriveMetricLabel(renderer, "drive.activity.read", "R");
+    const std::string writeLabel = ResolveDriveMetricLabel(renderer, "drive.activity.write", "W");
+    const std::string usageLabel = ResolveDriveMetricLabel(renderer, "drive.usage", "Usage");
+    const std::string freeLabel = ResolveDriveMetricLabel(renderer, "drive.free", "Free");
+
     renderer.PushClipRect(widget.rect);
     renderer.DrawText(layoutState_.headerReadLabelRect,
-        "R",
+        readLabel,
         TextStyleId::Small,
         renderer.MutedTextColor(),
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false));
     renderer.DrawText(layoutState_.headerWriteLabelRect,
-        "W",
+        writeLabel,
         TextStyleId::Small,
         renderer.MutedTextColor(),
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false));
     renderer.DrawText(layoutState_.usageHeaderRect,
-        "Usage",
+        usageLabel,
         TextStyleId::Small,
         renderer.MutedTextColor(),
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
     renderer.DrawText(layoutState_.headerColumns.free,
-        "Free",
+        freeLabel,
         TextStyleId::Small,
         renderer.MutedTextColor(),
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
@@ -329,10 +351,8 @@ void DriveUsageListWidget::Draw(
         renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorTrack,
             RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-            char percent[16];
-            sprintf_s(percent, "%.0f%%", drive.usedPercent);
             const DashboardRenderer::TextLayoutResult percentLayout = renderer.DrawTextBlock(columns.percent,
-                percent,
+                drive.usedText,
                 TextStyleId::Label,
                 renderer.ForegroundColor(),
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
@@ -376,7 +396,7 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
         true,
         config.activitySegments);
     renderer.RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
-        "R",
+        ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
         renderer.MakeEditableTextBinding(widget,
@@ -385,7 +405,7 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
             renderer.Config().layout.fonts.smallText.size),
         DashboardRenderer::LayoutEditParameter::ColorMutedText);
     renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
-        "W",
+        ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
         renderer.MakeEditableTextBinding(widget,
@@ -394,7 +414,7 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
             renderer.Config().layout.fonts.smallText.size),
         DashboardRenderer::LayoutEditParameter::ColorMutedText);
     renderer.RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
-        "Usage",
+        ResolveDriveMetricLabel(renderer, "drive.usage", "Usage"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
         renderer.MakeEditableTextBinding(widget,
@@ -403,7 +423,7 @@ void DriveUsageListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const
             renderer.Config().layout.fonts.smallText.size),
         DashboardRenderer::LayoutEditParameter::ColorMutedText);
     renderer.RegisterStaticTextAnchor(layoutState_.headerColumns.free,
-        "Free",
+        ResolveDriveMetricLabel(renderer, "drive.free", "Free"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center),
         renderer.MakeEditableTextBinding(widget,

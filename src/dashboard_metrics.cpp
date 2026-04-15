@@ -4,27 +4,36 @@
 #include <cmath>
 #include <cstdio>
 #include <sstream>
+#include <string_view>
+#include <utility>
 
 #include "numeric_safety.h"
 
 namespace {
 
-std::string FormatScalarValue(std::optional<double> value, const std::string& unit, int precision) {
+std::string FormatScalarValue(std::optional<double> value, std::string_view unit, int precision) {
     if (!value.has_value() || !IsFiniteDouble(*value)) {
         return "N/A";
     }
     char buffer[64];
-    if (unit == "%") {
-        sprintf_s(buffer, "%.*f%%", precision, *value);
-    } else if (unit.empty()) {
+    if (unit.empty()) {
         sprintf_s(buffer, "%.*f", precision, *value);
     } else {
-        sprintf_s(buffer, "%.*f %s", precision, *value, unit.c_str());
+        sprintf_s(buffer, "%.*f %s", precision, *value, std::string(unit).c_str());
     }
     return buffer;
 }
 
-std::string FormatMemory(double usedGb, double totalGb, const std::string& unit) {
+std::string FormatPercentValue(std::optional<double> value, int precision) {
+    if (!value.has_value() || !IsFiniteDouble(*value)) {
+        return "N/A";
+    }
+    char buffer[64];
+    sprintf_s(buffer, "%.*f%%", precision, *value);
+    return buffer;
+}
+
+std::string FormatMemoryValue(double usedGb, double totalGb, std::string_view unit) {
     if (!IsFiniteDouble(usedGb) || !IsFiniteDouble(totalGb) || totalGb <= 0.0) {
         return "N/A";
     }
@@ -32,20 +41,48 @@ std::string FormatMemory(double usedGb, double totalGb, const std::string& unit)
     if (unit.empty()) {
         sprintf_s(buffer, "%.1f / %.0f", usedGb, totalGb);
     } else {
-        sprintf_s(buffer, "%.1f / %.0f %s", usedGb, totalGb, unit.c_str());
+        sprintf_s(buffer, "%.1f / %.0f %s", usedGb, totalGb, std::string(unit).c_str());
     }
     return buffer;
 }
 
-std::string FormatDriveFree(double freeGb) {
-    if (!IsFiniteDouble(freeGb) || freeGb < 0.0) {
+std::string FormatThroughputValue(double valueMbps, std::string_view unit) {
+    if (!IsFiniteDouble(valueMbps) || valueMbps < 0.0) {
         return "N/A";
     }
     char buffer[64];
-    if (freeGb >= 1024.0) {
-        sprintf_s(buffer, "%.1f TB", freeGb / 1024.0);
+    if (unit.empty()) {
+        sprintf_s(buffer, valueMbps >= 100.0 ? "%.0f" : "%.1f", valueMbps);
     } else {
-        sprintf_s(buffer, "%.0f GB", freeGb);
+        sprintf_s(buffer, valueMbps >= 100.0 ? "%.0f %s" : "%.1f %s", valueMbps, std::string(unit).c_str());
+    }
+    return buffer;
+}
+
+std::pair<std::string_view, std::string_view> SplitSizeUnits(std::string_view units) {
+    const size_t separator = units.find('|');
+    if (separator == std::string_view::npos) {
+        return {units, units};
+    }
+    return {units.substr(0, separator), units.substr(separator + 1)};
+}
+
+std::string FormatSizeAutoValue(double valueGb, std::string_view units) {
+    if (!IsFiniteDouble(valueGb) || valueGb < 0.0) {
+        return "N/A";
+    }
+    const auto [smallUnit, largeUnit] = SplitSizeUnits(units);
+    char buffer[64];
+    if (valueGb >= 1024.0) {
+        if (largeUnit.empty()) {
+            sprintf_s(buffer, "%.1f", valueGb / 1024.0);
+        } else {
+            sprintf_s(buffer, "%.1f %s", valueGb / 1024.0, std::string(largeUnit).c_str());
+        }
+    } else if (smallUnit.empty()) {
+        sprintf_s(buffer, "%.0f", valueGb);
+    } else {
+        sprintf_s(buffer, "%.0f %s", valueGb, std::string(smallUnit).c_str());
     }
     return buffer;
 }
@@ -133,17 +170,61 @@ std::vector<double> ResolveRetainedHistorySamples(const SystemSnapshot& snapshot
     return history != nullptr ? *history : std::vector<double>{};
 }
 
+std::string FormatMetricValueText(const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::optional<double> primaryValue,
+    std::optional<double> secondaryValue = std::nullopt) {
+    switch (definition.style) {
+        case MetricDisplayStyle::Percent:
+            return FormatPercentValue(primaryValue, 0);
+        case MetricDisplayStyle::Scalar:
+            return FormatScalarValue(primaryValue, definition.unit, ResolveScalarPrecision(metricRef));
+        case MetricDisplayStyle::Memory:
+            return primaryValue.has_value() && secondaryValue.has_value()
+                       ? FormatMemoryValue(*primaryValue, *secondaryValue, definition.unit)
+                       : std::string("N/A");
+        case MetricDisplayStyle::Throughput:
+            return primaryValue.has_value() ? FormatThroughputValue(*primaryValue, definition.unit) : std::string("N/A");
+        case MetricDisplayStyle::SizeAuto:
+            return primaryValue.has_value() ? FormatSizeAutoValue(*primaryValue, definition.unit) : std::string("N/A");
+        case MetricDisplayStyle::LabelOnly:
+            return {};
+    }
+    return "N/A";
+}
+
 std::string BuildMetricSampleValueText(const MetricDefinitionConfig& definition, const std::string& metricRef) {
-    if (metricRef == "cpu.ram" || metricRef == "gpu.vram") {
-        return FormatMemory(999.9, 1000.0, definition.unit);
+    switch (definition.style) {
+        case MetricDisplayStyle::Percent:
+            return FormatPercentValue(std::optional<double>{definition.telemetryScale ? 100.0 : definition.scale}, 0);
+        case MetricDisplayStyle::Scalar:
+            return FormatScalarValue(
+                std::optional<double>{definition.telemetryScale ? 100.0 : definition.scale},
+                definition.unit,
+                ResolveScalarPrecision(metricRef));
+        case MetricDisplayStyle::Memory:
+            return FormatMemoryValue(999.9, 1000.0, definition.unit);
+        case MetricDisplayStyle::Throughput:
+            return FormatThroughputValue(999.9, definition.unit);
+        case MetricDisplayStyle::SizeAuto:
+            return FormatSizeAutoValue(2048.0, definition.unit);
+        case MetricDisplayStyle::LabelOnly:
+            return {};
     }
-    if (definition.telemetryScale) {
-        const int precision =
-            metricRef == "cpu.load" || metricRef == "gpu.load" ? 0 : ResolveScalarPrecision(metricRef);
-        return FormatScalarValue(std::optional<double>{100.0}, definition.unit, precision);
-    }
-    return FormatScalarValue(
-        std::optional<double>{definition.scale}, definition.unit, ResolveScalarPrecision(metricRef));
+    return {};
+}
+
+DashboardMetricValue BuildResolvedMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string valueText,
+    double ratio) {
+    return DashboardMetricValue{definition.label,
+        std::move(valueText),
+        BuildMetricSampleValueText(definition, metricRef),
+        definition.unit,
+        ratio,
+        ResolvePeakRatio(snapshot, metricRef, ratio)};
 }
 
 std::optional<DashboardMetricValue> ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
@@ -157,20 +238,11 @@ std::optional<DashboardMetricValue> ResolveBoardMetric(const std::vector<NamedSc
         }
         const double numericValue = FiniteNonNegativeOr(metric.metric.value.value_or(0.0));
         const double ratio = ResolveMetricRatio(definition, numericValue);
-        return DashboardMetricValue{definition.label,
-            FormatScalarValue(metric.metric.value, definition.unit, 0),
-            BuildMetricSampleValueText(definition, metricRef),
-            definition.unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(
+            snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, metric.metric.value), ratio);
     }
 
-    return DashboardMetricValue{definition.label,
-        "N/A",
-        BuildMetricSampleValueText(definition, metricRef),
-        definition.unit,
-        0.0,
-        ResolvePeakRatio(snapshot, metricRef, 0.0)};
+    return BuildResolvedMetric(snapshot, definition, metricRef, "N/A", 0.0);
 }
 
 std::optional<DashboardMetricValue> ResolveMetricValue(
@@ -183,84 +255,70 @@ std::optional<DashboardMetricValue> ResolveMetricValue(
     if (metricRef == "cpu.load") {
         const double percent = ClampFinite(snapshot.cpu.loadPercent, 0.0, 100.0);
         const double ratio = ResolveMetricRatio(*definition, percent, 100.0);
-        return DashboardMetricValue{definition->label,
-            FormatScalarValue(std::optional<double>{percent}, definition->unit, 0),
-            BuildMetricSampleValueText(*definition, metricRef),
-            definition->unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(
+            snapshot, *definition, metricRef, FormatMetricValueText(*definition, metricRef, percent), ratio);
     }
     if (metricRef == "cpu.clock") {
         const double value = FiniteNonNegativeOr(snapshot.cpu.clock.value.value_or(0.0));
         const double ratio = ResolveMetricRatio(*definition, value);
-        return DashboardMetricValue{definition->label,
-            FormatScalarValue(snapshot.cpu.clock.value, definition->unit, 2),
-            BuildMetricSampleValueText(*definition, metricRef),
-            definition->unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(snapshot,
+            *definition,
+            metricRef,
+            FormatMetricValueText(*definition, metricRef, snapshot.cpu.clock.value),
+            ratio);
     }
     if (metricRef == "cpu.ram") {
         const double total = FiniteNonNegativeOr(snapshot.cpu.memory.totalGb);
         const double used = FiniteNonNegativeOr(snapshot.cpu.memory.usedGb);
         const double ratio = ResolveMetricRatio(*definition, used, total);
-        return DashboardMetricValue{definition->label,
-            FormatMemory(snapshot.cpu.memory.usedGb, snapshot.cpu.memory.totalGb, definition->unit),
-            BuildMetricSampleValueText(*definition, metricRef),
-            definition->unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(snapshot,
+            *definition,
+            metricRef,
+            FormatMetricValueText(*definition, metricRef, snapshot.cpu.memory.usedGb, snapshot.cpu.memory.totalGb),
+            ratio);
     }
     if (metricRef == "gpu.load") {
         const double percent = ClampFinite(snapshot.gpu.loadPercent, 0.0, 100.0);
         const double ratio = ResolveMetricRatio(*definition, percent, 100.0);
-        return DashboardMetricValue{definition->label,
-            FormatScalarValue(std::optional<double>{percent}, definition->unit, 0),
-            BuildMetricSampleValueText(*definition, metricRef),
-            definition->unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(
+            snapshot, *definition, metricRef, FormatMetricValueText(*definition, metricRef, percent), ratio);
     }
     if (metricRef == "gpu.temp") {
         const double value = FiniteNonNegativeOr(snapshot.gpu.temperature.value.value_or(0.0));
         const double ratio = ResolveMetricRatio(*definition, value);
-        return DashboardMetricValue{definition->label,
-            FormatScalarValue(snapshot.gpu.temperature.value, definition->unit, 0),
-            BuildMetricSampleValueText(*definition, metricRef),
-            definition->unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(snapshot,
+            *definition,
+            metricRef,
+            FormatMetricValueText(*definition, metricRef, snapshot.gpu.temperature.value),
+            ratio);
     }
     if (metricRef == "gpu.clock") {
         const double value = FiniteNonNegativeOr(snapshot.gpu.clock.value.value_or(0.0));
         const double ratio = ResolveMetricRatio(*definition, value);
-        return DashboardMetricValue{definition->label,
-            FormatScalarValue(snapshot.gpu.clock.value, definition->unit, 0),
-            BuildMetricSampleValueText(*definition, metricRef),
-            definition->unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(snapshot,
+            *definition,
+            metricRef,
+            FormatMetricValueText(*definition, metricRef, snapshot.gpu.clock.value),
+            ratio);
     }
     if (metricRef == "gpu.fan") {
         const double value = FiniteNonNegativeOr(snapshot.gpu.fan.value.value_or(0.0));
         const double ratio = ResolveMetricRatio(*definition, value);
-        return DashboardMetricValue{definition->label,
-            FormatScalarValue(snapshot.gpu.fan.value, definition->unit, 0),
-            BuildMetricSampleValueText(*definition, metricRef),
-            definition->unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(snapshot,
+            *definition,
+            metricRef,
+            FormatMetricValueText(*definition, metricRef, snapshot.gpu.fan.value),
+            ratio);
     }
     if (metricRef == "gpu.vram") {
         const double total = FiniteNonNegativeOr(snapshot.gpu.vram.totalGb);
         const double used = FiniteNonNegativeOr(snapshot.gpu.vram.usedGb);
         const double ratio = ResolveMetricRatio(*definition, used, total);
-        return DashboardMetricValue{definition->label,
-            FormatMemory(snapshot.gpu.vram.usedGb, snapshot.gpu.vram.totalGb, definition->unit),
-            BuildMetricSampleValueText(*definition, metricRef),
-            definition->unit,
-            ratio,
-            ResolvePeakRatio(snapshot, metricRef, ratio)};
+        return BuildResolvedMetric(snapshot,
+            *definition,
+            metricRef,
+            FormatMetricValueText(*definition, metricRef, snapshot.gpu.vram.usedGb, snapshot.gpu.vram.totalGb),
+            ratio);
     }
     if (metricRef.rfind("board.temp.", 0) == 0) {
         return ResolveBoardMetric(snapshot.boardTemperatures,
@@ -360,40 +418,38 @@ const DashboardThroughputMetric& DashboardMetricSource::ResolveThroughput(const 
         throughputSharedState_->timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot_.now);
     }
 
+    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics_, metricRef);
     DashboardThroughputMetric metric;
     if (metricRef == "network.upload") {
-        metric = DashboardThroughputMetric{"Up",
-            ResolveDisplayedThroughputValue(snapshot_.network.uploadMbps, throughputSharedState_->networkUploadHistory),
-            throughputSharedState_->networkUploadHistory,
-            throughputSharedState_->networkMaxGraph,
-            5.0,
-            throughputSharedState_->timeMarkerOffsetSamples,
-            20.0};
+        metric.valueMbps =
+            ResolveDisplayedThroughputValue(snapshot_.network.uploadMbps, throughputSharedState_->networkUploadHistory);
+        metric.history = throughputSharedState_->networkUploadHistory;
+        metric.maxGraph = throughputSharedState_->networkMaxGraph;
+        metric.guideStepMbps = 5.0;
     } else if (metricRef == "network.download") {
-        metric = DashboardThroughputMetric{"Down",
-            ResolveDisplayedThroughputValue(
-                snapshot_.network.downloadMbps, throughputSharedState_->networkDownloadHistory),
-            throughputSharedState_->networkDownloadHistory,
-            throughputSharedState_->networkMaxGraph,
-            5.0,
-            throughputSharedState_->timeMarkerOffsetSamples,
-            20.0};
+        metric.valueMbps = ResolveDisplayedThroughputValue(
+            snapshot_.network.downloadMbps, throughputSharedState_->networkDownloadHistory);
+        metric.history = throughputSharedState_->networkDownloadHistory;
+        metric.maxGraph = throughputSharedState_->networkMaxGraph;
+        metric.guideStepMbps = 5.0;
     } else if (metricRef == "storage.read") {
-        metric = DashboardThroughputMetric{"Read",
-            ResolveDisplayedThroughputValue(snapshot_.storage.readMbps, throughputSharedState_->storageReadHistory),
-            throughputSharedState_->storageReadHistory,
-            throughputSharedState_->storageMaxGraph,
-            GetStorageGuideStep(throughputSharedState_->storageMaxGraph),
-            throughputSharedState_->timeMarkerOffsetSamples,
-            20.0};
+        metric.valueMbps =
+            ResolveDisplayedThroughputValue(snapshot_.storage.readMbps, throughputSharedState_->storageReadHistory);
+        metric.history = throughputSharedState_->storageReadHistory;
+        metric.maxGraph = throughputSharedState_->storageMaxGraph;
+        metric.guideStepMbps = GetStorageGuideStep(throughputSharedState_->storageMaxGraph);
     } else if (metricRef == "storage.write") {
-        metric = DashboardThroughputMetric{"Write",
-            ResolveDisplayedThroughputValue(snapshot_.storage.writeMbps, throughputSharedState_->storageWriteHistory),
-            throughputSharedState_->storageWriteHistory,
-            throughputSharedState_->storageMaxGraph,
-            GetStorageGuideStep(throughputSharedState_->storageMaxGraph),
-            throughputSharedState_->timeMarkerOffsetSamples,
-            20.0};
+        metric.valueMbps =
+            ResolveDisplayedThroughputValue(snapshot_.storage.writeMbps, throughputSharedState_->storageWriteHistory);
+        metric.history = throughputSharedState_->storageWriteHistory;
+        metric.maxGraph = throughputSharedState_->storageMaxGraph;
+        metric.guideStepMbps = GetStorageGuideStep(throughputSharedState_->storageMaxGraph);
+    }
+    metric.timeMarkerOffsetSamples = throughputSharedState_->timeMarkerOffsetSamples;
+    metric.timeMarkerIntervalSamples = 20.0;
+    if (definition != nullptr) {
+        metric.label = definition->label;
+        metric.valueText = FormatMetricValueText(*definition, metricRef, metric.valueMbps);
     }
     return throughputCache_.emplace(metricRef, ThroughputCacheEntry{metric}).first->second.metric;
 }
@@ -411,6 +467,9 @@ const std::string& DashboardMetricSource::ResolveNetworkFooter() const {
 
 const std::vector<DashboardDriveRow>& DashboardMetricSource::ResolveDriveRows() const {
     if (!driveRowsCache_.has_value()) {
+        const MetricDefinitionConfig* usageDefinition = FindMetricDefinition(metrics_, "drive.usage");
+        const MetricDefinitionConfig* freeDefinition = FindMetricDefinition(metrics_, "drive.free");
+
         driveRowsCache_ = std::vector<DashboardDriveRow>{};
         driveRowsCache_->reserve(snapshot_.drives.size());
         double totalReadMbps = 0.0;
@@ -429,7 +488,10 @@ const std::vector<DashboardDriveRow>& DashboardMetricSource::ResolveDriveRows() 
                 readActivity,
                 writeActivity,
                 ClampFinite(drive.usedPercent, 0.0, 100.0),
-                FormatDriveFree(drive.freeGb)});
+                usageDefinition != nullptr ? FormatMetricValueText(*usageDefinition, "drive.usage", drive.usedPercent)
+                                           : std::string{},
+                freeDefinition != nullptr ? FormatMetricValueText(*freeDefinition, "drive.free", drive.freeGb)
+                                          : std::string{}});
         }
     }
     return *driveRowsCache_;

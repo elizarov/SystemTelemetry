@@ -12,7 +12,7 @@ namespace {
 
 constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v7";
 
-std::string TrimAsciiWhitespace(const std::string& value) {
+std::string TrimDumpWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");
     if (begin == std::string::npos) {
         return "";
@@ -140,6 +140,54 @@ void WriteDoubleArray(std::ostream& output, const std::string& key, const std::v
     output << "]\n";
 }
 
+std::string_view ScalarMetricUnitDumpText(ScalarMetricUnit unit) {
+    switch (unit) {
+        case ScalarMetricUnit::None:
+            return "";
+        case ScalarMetricUnit::Celsius:
+            return "C";
+        case ScalarMetricUnit::Gigahertz:
+            return "GHz";
+        case ScalarMetricUnit::Megahertz:
+            return "MHz";
+        case ScalarMetricUnit::Rpm:
+            return "RPM";
+    }
+    return "";
+}
+
+bool ParseDumpScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit) {
+    if (text == "") {
+        unit = ScalarMetricUnit::None;
+        return true;
+    }
+    if (text == "C" || text == "\xC2\xB0"
+                              "C" ||
+        text == "\xE2\x84\x83" ||
+        text == "\xD0\x92\xC2\xB0"
+                "C") {
+        unit = ScalarMetricUnit::Celsius;
+        return true;
+    }
+    if (text == "GHz") {
+        unit = ScalarMetricUnit::Gigahertz;
+        return true;
+    }
+    if (text == "MHz") {
+        unit = ScalarMetricUnit::Megahertz;
+        return true;
+    }
+    if (text == "RPM") {
+        unit = ScalarMetricUnit::Rpm;
+        return true;
+    }
+    return false;
+}
+
+void WriteScalarMetricUnit(std::ostream& output, const std::string& key, ScalarMetricUnit unit) {
+    WriteString(output, key, std::string(ScalarMetricUnitDumpText(unit)));
+}
+
 void WriteNamedScalarMetrics(
     std::ostream& output, const std::string& prefix, const std::vector<NamedScalarMetric>& metrics) {
     WriteInteger(output, prefix + ".count", metrics.size());
@@ -147,7 +195,7 @@ void WriteNamedScalarMetrics(
         const std::string metricPrefix = prefix + "." + std::to_string(i);
         WriteString(output, metricPrefix + ".name", metrics[i].name);
         WriteOptionalDouble(output, metricPrefix + ".value", metrics[i].metric.value, 6);
-        WriteString(output, metricPrefix + ".unit", metrics[i].metric.unit);
+        WriteScalarMetricUnit(output, metricPrefix + ".unit", metrics[i].metric.unit);
     }
 }
 
@@ -188,7 +236,7 @@ bool ParseDoubleArray(const std::string& text, std::vector<double>& values) {
         return false;
     }
     values.clear();
-    const std::string body = TrimAsciiWhitespace(text.substr(1, text.size() - 2));
+    const std::string body = TrimDumpWhitespace(text.substr(1, text.size() - 2));
     if (body.empty()) {
         return true;
     }
@@ -197,7 +245,7 @@ bool ParseDoubleArray(const std::string& text, std::vector<double>& values) {
     while (start < body.size()) {
         size_t comma = body.find(',', start);
         std::string token =
-            TrimAsciiWhitespace(body.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+            TrimDumpWhitespace(body.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
         double value = 0.0;
         if (!ParseStrictDouble(token, value)) {
             return false;
@@ -292,6 +340,24 @@ bool LoadOptionalDouble(const std::map<std::string, std::string>& values,
     return true;
 }
 
+bool LoadScalarMetricUnit(const std::map<std::string, std::string>& values,
+    const std::string& key,
+    ScalarMetricUnit& field,
+    std::string* error) {
+    std::string text;
+    if (!TryGetValue(values, key, text)) {
+        return true;
+    }
+    std::string parsed;
+    if (!UnescapeQuotedString(text, parsed) || !ParseDumpScalarMetricUnit(parsed, field)) {
+        if (error != nullptr) {
+            *error = "Invalid scalar unit for key: " + key;
+        }
+        return false;
+    }
+    return true;
+}
+
 template <typename T>
 bool LoadOptionalUnsigned(const std::map<std::string, std::string>& values,
     const std::string& key,
@@ -350,7 +416,7 @@ bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values,
         const std::string metricPrefix = prefix + "." + std::to_string(i);
         if (!LoadString(values, metricPrefix + ".name", metric.name, error) ||
             !LoadOptionalDouble(values, metricPrefix + ".value", metric.metric.value, error) ||
-            !LoadString(values, metricPrefix + ".unit", metric.metric.unit, error)) {
+            !LoadScalarMetricUnit(values, metricPrefix + ".unit", metric.metric.unit, error)) {
             return false;
         }
         field.push_back(std::move(metric));
@@ -389,7 +455,7 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteString(output, "cpu.name", dump.snapshot.cpu.name);
     WriteDouble(output, "cpu.load_percent", dump.snapshot.cpu.loadPercent, 6);
     WriteOptionalDouble(output, "cpu.clock.value", dump.snapshot.cpu.clock.value, 6);
-    WriteString(output, "cpu.clock.unit", dump.snapshot.cpu.clock.unit);
+    WriteScalarMetricUnit(output, "cpu.clock.unit", dump.snapshot.cpu.clock.unit);
     WriteDouble(output, "cpu.memory.used_gb", dump.snapshot.cpu.memory.usedGb, 6);
     WriteDouble(output, "cpu.memory.total_gb", dump.snapshot.cpu.memory.totalGb, 6);
     WriteNamedScalarMetrics(output, "board.temperatures", dump.snapshot.boardTemperatures);
@@ -399,11 +465,11 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteString(output, "gpu.name", dump.snapshot.gpu.name);
     WriteDouble(output, "gpu.load_percent", dump.snapshot.gpu.loadPercent, 6);
     WriteOptionalDouble(output, "gpu.temperature.value", dump.snapshot.gpu.temperature.value, 6);
-    WriteString(output, "gpu.temperature.unit", dump.snapshot.gpu.temperature.unit);
+    WriteScalarMetricUnit(output, "gpu.temperature.unit", dump.snapshot.gpu.temperature.unit);
     WriteOptionalDouble(output, "gpu.clock.value", dump.snapshot.gpu.clock.value, 6);
-    WriteString(output, "gpu.clock.unit", dump.snapshot.gpu.clock.unit);
+    WriteScalarMetricUnit(output, "gpu.clock.unit", dump.snapshot.gpu.clock.unit);
     WriteOptionalDouble(output, "gpu.fan.value", dump.snapshot.gpu.fan.value, 6);
-    WriteString(output, "gpu.fan.unit", dump.snapshot.gpu.fan.unit);
+    WriteScalarMetricUnit(output, "gpu.fan.unit", dump.snapshot.gpu.fan.unit);
     WriteDouble(output, "gpu.vram.used_gb", dump.snapshot.gpu.vram.usedGb, 6);
     WriteDouble(output, "gpu.vram.total_gb", dump.snapshot.gpu.vram.totalGb, 6);
 
@@ -446,7 +512,7 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
-        const std::string trimmed = TrimAsciiWhitespace(line);
+        const std::string trimmed = TrimDumpWhitespace(line);
         if (trimmed.empty() || trimmed[0] == '#') {
             continue;
         }
@@ -457,7 +523,7 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
             }
             return false;
         }
-        values[TrimAsciiWhitespace(trimmed.substr(0, equals))] = TrimAsciiWhitespace(trimmed.substr(equals + 1));
+        values[TrimDumpWhitespace(trimmed.substr(0, equals))] = TrimDumpWhitespace(trimmed.substr(equals + 1));
     }
 
     std::string format;
@@ -471,7 +537,7 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
     if (!LoadString(values, "cpu.name", parsed.snapshot.cpu.name, error) ||
         !LoadDouble(values, "cpu.load_percent", parsed.snapshot.cpu.loadPercent, error) ||
         !LoadOptionalDouble(values, "cpu.clock.value", parsed.snapshot.cpu.clock.value, error) ||
-        !LoadString(values, "cpu.clock.unit", parsed.snapshot.cpu.clock.unit, error) ||
+        !LoadScalarMetricUnit(values, "cpu.clock.unit", parsed.snapshot.cpu.clock.unit, error) ||
         !LoadDouble(values, "cpu.memory.used_gb", parsed.snapshot.cpu.memory.usedGb, error) ||
         !LoadDouble(values, "cpu.memory.total_gb", parsed.snapshot.cpu.memory.totalGb, error) ||
         !LoadNamedScalarMetrics(values, "board.temperatures", parsed.snapshot.boardTemperatures, error) ||
@@ -480,11 +546,11 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadString(values, "gpu.name", parsed.snapshot.gpu.name, error) ||
         !LoadDouble(values, "gpu.load_percent", parsed.snapshot.gpu.loadPercent, error) ||
         !LoadOptionalDouble(values, "gpu.temperature.value", parsed.snapshot.gpu.temperature.value, error) ||
-        !LoadString(values, "gpu.temperature.unit", parsed.snapshot.gpu.temperature.unit, error) ||
+        !LoadScalarMetricUnit(values, "gpu.temperature.unit", parsed.snapshot.gpu.temperature.unit, error) ||
         !LoadOptionalDouble(values, "gpu.clock.value", parsed.snapshot.gpu.clock.value, error) ||
-        !LoadString(values, "gpu.clock.unit", parsed.snapshot.gpu.clock.unit, error) ||
+        !LoadScalarMetricUnit(values, "gpu.clock.unit", parsed.snapshot.gpu.clock.unit, error) ||
         !LoadOptionalDouble(values, "gpu.fan.value", parsed.snapshot.gpu.fan.value, error) ||
-        !LoadString(values, "gpu.fan.unit", parsed.snapshot.gpu.fan.unit, error) ||
+        !LoadScalarMetricUnit(values, "gpu.fan.unit", parsed.snapshot.gpu.fan.unit, error) ||
         !LoadDouble(values, "gpu.vram.used_gb", parsed.snapshot.gpu.vram.usedGb, error) ||
         !LoadDouble(values, "gpu.vram.total_gb", parsed.snapshot.gpu.vram.totalGb, error) ||
         !LoadString(values, "network.adapter_name", parsed.snapshot.network.adapterName, error) ||

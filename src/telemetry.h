@@ -46,16 +46,16 @@ struct RetainedHistorySeries {
 struct ProcessorTelemetry {
     std::string name = "CPU";
     double loadPercent = 0.0;
-    ScalarMetric clock{std::nullopt, "GHz"};
+    ScalarMetric clock{std::nullopt, ScalarMetricUnit::Gigahertz};
     MemoryMetric memory;
 };
 
 struct GpuTelemetry {
     std::string name = "GPU";
     double loadPercent = 0.0;
-    ScalarMetric temperature{std::nullopt, "°C"};
-    ScalarMetric clock{std::nullopt, "MHz"};
-    ScalarMetric fan{std::nullopt, "RPM"};
+    ScalarMetric temperature{std::nullopt, ScalarMetricUnit::Celsius};
+    ScalarMetric clock{std::nullopt, ScalarMetricUnit::Megahertz};
+    ScalarMetric fan{std::nullopt, ScalarMetricUnit::Rpm};
     MemoryMetric vram;
 };
 

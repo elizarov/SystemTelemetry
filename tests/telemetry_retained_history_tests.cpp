@@ -21,11 +21,13 @@ TEST(TelemetryRetainedHistory, PushBoardMetricSamplesUsesConfiguredScales) {
     RetainedHistoryStore store;
     SystemSnapshot snapshot;
     MetricsSectionConfig metrics;
-    metrics.definitions.push_back(MetricDefinitionConfig{"board.temp.cpu", false, 100.0, "C", "CPU Temp"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"board.fan.system", false, 2000.0, "RPM", "System Fan"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"board.temp.cpu", MetricDisplayStyle::Scalar, false, 100.0, "C", "CPU Temp"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"board.fan.system", MetricDisplayStyle::Scalar, false, 2000.0, "RPM", "System Fan"});
 
-    snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, "C"}});
-    snapshot.boardFans.push_back({"system", ScalarMetric{1200.0, "RPM"}});
+    snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
+    snapshot.boardFans.push_back({"system", ScalarMetric{1200.0, ScalarMetricUnit::Rpm}});
 
     store.PushBoardMetricSamples(snapshot, metrics);
 

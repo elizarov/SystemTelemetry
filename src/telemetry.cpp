@@ -67,10 +67,9 @@ TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept
 bool TelemetryCollector::Initialize(const AppConfig& config, std::ostream* traceStream) {
     impl_->config_ = config;
     impl_->trace_.SetOutput(traceStream);
-    impl_->snapshot_.boardTemperatures = CreateRequestedBoardMetrics(config.board.requestedTemperatureNames,
-        "\xC2\xB0"
-        "C");
-    impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(config.board.requestedFanNames, "RPM");
+    impl_->snapshot_.boardTemperatures =
+        CreateRequestedBoardMetrics(config.board.requestedTemperatureNames, ScalarMetricUnit::Celsius);
+    impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(config.board.requestedFanNames, ScalarMetricUnit::Rpm);
     impl_->retainedHistoryStore_.Reset(impl_->snapshot_);
     if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {
         impl_->snapshot_.cpu.name = cpuName;
@@ -327,7 +326,7 @@ void TelemetryCollector::Impl::UpdateCpu() {
         (clockStatus = PdhGetFormattedCounterValue(cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value)) ==
             ERROR_SUCCESS) {
         snapshot_.cpu.clock.value = FiniteOptional(value.doubleValue / 1000.0);
-        snapshot_.cpu.clock.unit = "GHz";
+        snapshot_.cpu.clock.unit = ScalarMetricUnit::Gigahertz;
     }
     Trace(("telemetry:cpu_clock " + tracing::Trace::FormatPdhStatus("status", clockStatus) + " value=" +
            (snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(snapshot_.cpu.clock, 2) : std::string("N/A")))
@@ -462,9 +461,11 @@ void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySamp
         snapshot_.gpu.name = *sample.name;
     }
     snapshot_.gpu.temperature.value = FiniteOptional(sample.temperatureC);
+    snapshot_.gpu.temperature.unit = ScalarMetricUnit::Celsius;
     snapshot_.gpu.clock.value = FiniteOptional(sample.coreClockMhz);
-    snapshot_.gpu.clock.unit = "MHz";
+    snapshot_.gpu.clock.unit = ScalarMetricUnit::Megahertz;
     snapshot_.gpu.fan.value = FiniteOptional(sample.fanRpm);
+    snapshot_.gpu.fan.unit = ScalarMetricUnit::Rpm;
     if (sample.totalVramGb.has_value()) {
         const double totalVramGb = FiniteNonNegativeOr(*sample.totalVramGb);
         if (totalVramGb > 0.0) {

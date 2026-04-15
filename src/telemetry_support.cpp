@@ -15,6 +15,74 @@
 #include "telemetry_support.h"
 #include "utf8.h"
 
+namespace {
+
+struct ScalarMetricUnitEntry {
+    ScalarMetricUnit unit;
+    std::string_view text;
+};
+
+constexpr ScalarMetricUnitEntry kScalarMetricUnitTable[] = {
+    {ScalarMetricUnit::None, ""},
+    {ScalarMetricUnit::Celsius, "C"},
+    {ScalarMetricUnit::Gigahertz, "GHz"},
+    {ScalarMetricUnit::Megahertz, "MHz"},
+    {ScalarMetricUnit::Rpm, "RPM"},
+};
+
+std::string DetectCpuNameFromCpuid() {
+    int maxExtendedLeaf[4]{};
+    __cpuid(maxExtendedLeaf, 0x80000000);
+    if (static_cast<unsigned int>(maxExtendedLeaf[0]) < 0x80000004) {
+        return "";
+    }
+
+    std::array<int, 12> brandWords{};
+    for (int i = 0; i < 3; ++i) {
+        int leafData[4]{};
+        __cpuid(leafData, 0x80000002 + i);
+        for (int j = 0; j < 4; ++j) {
+            brandWords[static_cast<size_t>(i) * 4 + static_cast<size_t>(j)] = leafData[j];
+        }
+    }
+
+    std::string brand(reinterpret_cast<const char*>(brandWords.data()), brandWords.size() * sizeof(int));
+    const size_t terminator = brand.find('\0');
+    if (terminator != std::string::npos) {
+        brand.resize(terminator);
+    }
+    return CollapseAsciiWhitespace(TrimAsciiWhitespace(brand));
+}
+
+}  // namespace
+
+std::string_view ScalarMetricUnitText(ScalarMetricUnit unit) {
+    for (const auto& entry : kScalarMetricUnitTable) {
+        if (entry.unit == unit) {
+            return entry.text;
+        }
+    }
+    return {};
+}
+
+bool ParseScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit) {
+    for (const auto& entry : kScalarMetricUnitTable) {
+        if (entry.text == text) {
+            unit = entry.unit;
+            return true;
+        }
+    }
+    if (text == "\xC2\xB0"
+                "C" ||
+        text == "\xE2\x84\x83" ||
+        text == "\xD0\x92\xC2\xB0"
+                "C") {
+        unit = ScalarMetricUnit::Celsius;
+        return true;
+    }
+    return false;
+}
+
 std::string ToLowerAscii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -27,11 +95,17 @@ std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
         return "N/A";
     }
     char buffer[64];
-    sprintf_s(buffer, "%.*f %s", precision, *metric.value, metric.unit.c_str());
+    const std::string_view unit = ScalarMetricUnitText(metric.unit);
+    if (unit.empty()) {
+        sprintf_s(buffer, "%.*f", precision, *metric.value);
+    } else {
+        sprintf_s(buffer, "%.*f %s", precision, *metric.value, std::string(unit).c_str());
+    }
     return buffer;
 }
 
-std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(const std::vector<std::string>& names, const char* unit) {
+std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(
+    const std::vector<std::string>& names, ScalarMetricUnit unit) {
     std::vector<NamedScalarMetric> metrics;
     metrics.reserve(names.size());
     for (const auto& name : names) {
@@ -132,34 +206,6 @@ std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, 
     }
     return Utf8FromWide(*value);
 }
-
-namespace {
-
-std::string DetectCpuNameFromCpuid() {
-    int maxExtendedLeaf[4]{};
-    __cpuid(maxExtendedLeaf, 0x80000000);
-    if (static_cast<unsigned int>(maxExtendedLeaf[0]) < 0x80000004) {
-        return "";
-    }
-
-    std::array<int, 12> brandWords{};
-    for (int i = 0; i < 3; ++i) {
-        int leafData[4]{};
-        __cpuid(leafData, 0x80000002 + i);
-        for (int j = 0; j < 4; ++j) {
-            brandWords[static_cast<size_t>(i) * 4 + static_cast<size_t>(j)] = leafData[j];
-        }
-    }
-
-    std::string brand(reinterpret_cast<const char*>(brandWords.data()), brandWords.size() * sizeof(int));
-    const size_t terminator = brand.find('\0');
-    if (terminator != std::string::npos) {
-        brand.resize(terminator);
-    }
-    return CollapseAsciiWhitespace(TrimAsciiWhitespace(brand));
-}
-
-}  // namespace
 
 std::string DetectCpuName() {
     const std::string cpuidName = DetectCpuNameFromCpuid();

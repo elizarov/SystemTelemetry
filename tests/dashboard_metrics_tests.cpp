@@ -7,11 +7,14 @@ namespace {
 
 MetricsSectionConfig BuildMetricsConfig() {
     MetricsSectionConfig metrics;
-    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.load", true, 0.0, "%", "Load"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.clock", false, 5.0, "GHz", "Clock"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.ram", true, 0.0, "GB", "RAM"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"gpu.vram", true, 0.0, "GB", "VRAM"});
-    metrics.definitions.push_back(MetricDefinitionConfig{"board.temp.cpu", false, 100.0, "C", "Temp"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.clock", MetricDisplayStyle::Scalar, false, 5.0, "GHz", "Clock"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"cpu.ram", MetricDisplayStyle::Memory, true, 0.0, "GB", "RAM"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"gpu.vram", MetricDisplayStyle::Memory, true, 0.0, "GB", "VRAM"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"board.temp.cpu", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"network.upload", MetricDisplayStyle::Throughput, true, 0.0, "MB/s", "Up"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"drive.usage", MetricDisplayStyle::Percent, false, 100.0, "%", "Usage"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"drive.free", MetricDisplayStyle::SizeAuto, true, 0.0, "GB|TB", "Free"});
     return metrics;
 }
 
@@ -29,7 +32,7 @@ TEST(DashboardMetrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.cpu.loadPercent = 63.0;
-    snapshot.cpu.clock = ScalarMetric{4.25, "GHz"};
+    snapshot.cpu.clock = ScalarMetric{4.25, ScalarMetricUnit::Gigahertz};
     snapshot.cpu.memory = MemoryMetric{18.5, 32.0};
     snapshot.gpu.vram = MemoryMetric{8.4, 16.0};
 
@@ -65,7 +68,7 @@ TEST(DashboardMetrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
 TEST(DashboardMetrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
-    snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, "ignored"}});
+    snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
     AddHistorySeries(snapshot, "board.temp.cpu", {0.10, 0.55, 0.40});
 
     DashboardMetricSource source(snapshot, metrics);
@@ -75,4 +78,32 @@ TEST(DashboardMetrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
     EXPECT_EQ(metric.valueText, "55 C");
     EXPECT_DOUBLE_EQ(metric.ratio, 0.55);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.55);
+}
+
+TEST(DashboardMetrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.network.uploadMbps = 78.4;
+    snapshot.now.wSecond = 12;
+    snapshot.now.wMilliseconds = 0;
+    DriveInfo drive;
+    drive.label = "C:";
+    drive.usedPercent = 42.0;
+    drive.freeGb = 1500.0;
+    drive.readMbps = 15.0;
+    drive.writeMbps = 5.0;
+    snapshot.drives.push_back(drive);
+
+    AddHistorySeries(snapshot, "network.upload", {55.0, 70.0, 78.4});
+
+    DashboardMetricSource source(snapshot, metrics);
+
+    const DashboardThroughputMetric& throughput = source.ResolveThroughput("network.upload");
+    EXPECT_EQ(throughput.label, "Up");
+    EXPECT_EQ(throughput.valueText, "74.2 MB/s");
+
+    const std::vector<DashboardDriveRow>& rows = source.ResolveDriveRows();
+    ASSERT_EQ(rows.size(), 1u);
+    EXPECT_EQ(rows[0].usedText, "42%");
+    EXPECT_EQ(rows[0].freeText, "1.5 TB");
 }

@@ -11,9 +11,7 @@ template <typename CharT> int CheckedSize(size_t size) {
     return size > static_cast<size_t>(INT_MAX) ? -1 : static_cast<int>(size);
 }
 
-}  // namespace
-
-std::wstring WideFromUtf8(std::string_view text) {
+std::wstring WideFromCodePage(std::string_view text, unsigned int codePage, DWORD flags) {
     if (text.empty()) {
         return {};
     }
@@ -23,14 +21,32 @@ std::wstring WideFromUtf8(std::string_view text) {
         return {};
     }
 
-    const int required = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), length, nullptr, 0);
+    const int required = MultiByteToWideChar(codePage, flags, text.data(), length, nullptr, 0);
     if (required <= 0) {
         return {};
     }
 
     std::wstring result(static_cast<size_t>(required), L'\0');
-    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), length, result.data(), required);
+    MultiByteToWideChar(codePage, flags, text.data(), length, result.data(), required);
     return result;
+}
+
+}  // namespace
+
+std::wstring WideFromUtf8(std::string_view text) {
+    std::wstring wide = WideFromCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
+    if (!wide.empty()) {
+        return wide;
+    }
+
+    // Some config/resource text still arrives through the active ANSI code page.
+    // Prefer strict UTF-8, but render those legacy bytes instead of dropping text entirely.
+    wide = WideFromCodePage(text, CP_ACP, 0);
+    if (!wide.empty()) {
+        return wide;
+    }
+
+    return {};
 }
 
 std::string Utf8FromWide(std::wstring_view text) {

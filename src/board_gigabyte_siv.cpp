@@ -430,9 +430,8 @@ private:
     }
 
     std::vector<NamedScalarMetric> BuildRequestedTemperatures() const {
-        std::vector<NamedScalarMetric> metrics = CreateRequestedBoardMetrics(config_.board.requestedTemperatureNames,
-            "\xC2\xB0"
-            "C");
+        std::vector<NamedScalarMetric> metrics =
+            CreateRequestedBoardMetrics(config_.board.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         for (auto& metric : metrics) {
             if (const TemperatureReading* reading =
                     FindReadingByName(tempReadings_, ResolveTemperatureSensorName(metric.name));
@@ -444,7 +443,8 @@ private:
     }
 
     std::vector<NamedScalarMetric> BuildRequestedFans() const {
-        std::vector<NamedScalarMetric> metrics = CreateRequestedBoardMetrics(config_.board.requestedFanNames, "RPM");
+        std::vector<NamedScalarMetric> metrics =
+            CreateRequestedBoardMetrics(config_.board.requestedFanNames, ScalarMetricUnit::Rpm);
         for (auto& metric : metrics) {
             if (const FanReading* reading = FindReadingByName(fanReadings_, ResolveFanSensorName(metric.name));
                 reading != nullptr) {

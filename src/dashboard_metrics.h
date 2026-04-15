@@ -25,6 +25,7 @@ struct DashboardMetricValue {
 
 struct DashboardThroughputMetric {
     std::string label;
+    std::string valueText;
     double valueMbps = 0.0;
     std::vector<double> history;
     double maxGraph = 10.0;
@@ -38,6 +39,7 @@ struct DashboardDriveRow {
     double readActivity = 0.0;
     double writeActivity = 0.0;
     double usedPercent = 0.0;
+    std::string usedText;
     std::string freeText;
 };
 

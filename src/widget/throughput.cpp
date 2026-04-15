@@ -152,22 +152,6 @@ int EffectiveThroughputPreferredHeight(const DashboardRenderer& renderer) {
            graphLabelHeight;
 }
 
-std::string ResolveThroughputLabel(const std::string& metricRef) {
-    if (metricRef == "network.upload") {
-        return "Up";
-    }
-    if (metricRef == "network.download") {
-        return "Down";
-    }
-    if (metricRef == "storage.read") {
-        return "Read";
-    }
-    if (metricRef == "storage.write") {
-        return "Write";
-    }
-    return {};
-}
-
 }  // namespace
 
 DashboardWidgetClass ThroughputWidget::Class() const {
@@ -217,12 +201,6 @@ void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
 void ThroughputWidget::Draw(
     DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
     const DashboardThroughputMetric& metric = metrics.ResolveThroughput(metric_);
-    char buffer[64];
-    if (metric.valueMbps >= 100.0) {
-        sprintf_s(buffer, "%.0f MB/s", metric.valueMbps);
-    } else {
-        sprintf_s(buffer, "%.1f MB/s", metric.valueMbps);
-    }
     const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(layoutState_.valueRect,
         metric.label,
         TextStyleId::Small,
@@ -238,7 +216,7 @@ void ThroughputWidget::Draw(
         layoutState_.valueRect.bottom};
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         const DashboardRenderer::TextLayoutResult numberLayout = renderer.DrawTextBlock(numberRect,
-            buffer,
+            metric.valueText,
             TextStyleId::Small,
             renderer.ForegroundColor(),
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
@@ -311,10 +289,10 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         false,
         renderer.Config().layout.throughput.guideStrokeWidth);
 
-    const std::string label = ResolveThroughputLabel(metric_);
-    if (!label.empty()) {
+    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().metrics, metric_);
+    if (definition != nullptr && !definition->label.empty()) {
         renderer.RegisterStaticTextAnchor(layoutState_.valueRect,
-            label,
+            definition->label,
             TextStyleId::Small,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
             renderer.MakeEditableTextBinding(widget,
