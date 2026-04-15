@@ -170,9 +170,7 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     EXPECT_EQ(layoutRoot->children[0].label, "cards");
     ASSERT_EQ(layoutRoot->children[0].children.size(), 1u);
     EXPECT_EQ(layoutRoot->children[0].children[0].label, "rows");
-    EXPECT_EQ(ChildLabels(layoutRoot->children[0].children[0]), (std::vector<std::string>{"columns", "columns, gamma"}));
-    ASSERT_EQ(layoutRoot->children[0].children[0].children[0].children.size(), 1u);
-    EXPECT_EQ(layoutRoot->children[0].children[0].children[0].children[0].label, "alpha, beta");
+    EXPECT_EQ(ChildLabels(layoutRoot->children[0].children[0]), (std::vector<std::string>{"alpha, beta", "columns, gamma"}));
 
     const LayoutEditTreeNode* alphaRoot = FindRootNode(model, "card.alpha");
     ASSERT_NE(alphaRoot, nullptr);
@@ -180,9 +178,7 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     EXPECT_EQ(alphaRoot->children[0].label, "layout");
     ASSERT_EQ(alphaRoot->children[0].children.size(), 1u);
     EXPECT_EQ(alphaRoot->children[0].children[0].label, "rows");
-    EXPECT_EQ(ChildLabels(alphaRoot->children[0].children[0]), (std::vector<std::string>{"columns", "columns, throughput"}));
-    ASSERT_EQ(alphaRoot->children[0].children[0].children[0].children.size(), 1u);
-    EXPECT_EQ(alphaRoot->children[0].children[0].children[0].children[0].label, "metric_list, gauge");
+    EXPECT_EQ(ChildLabels(alphaRoot->children[0].children[0]), (std::vector<std::string>{"metric_list, gauge", "columns, throughput"}));
 }
 
 TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) {
@@ -212,4 +208,22 @@ TEST(LayoutEditTree, ShowsReachableCardSectionsForRuntimeStyleDashboardCardNodes
 
     EXPECT_NE(FindRootNode(model, "card.alpha"), nullptr);
     EXPECT_NE(FindRootNode(model, "card.beta"), nullptr);
+}
+
+TEST(LayoutEditTree, CollapsesSingleChildContainerPathsInCardTrees) {
+    AppConfig config;
+    config.display.layout = "primary";
+    config.layout.structure.cardsLayout = MakeContainerNode("columns", {MakeDashboardCardNode("gpu")});
+    config.layout.cards.push_back(MakeCard("gpu",
+        MakeContainerNode("rows", {MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})})));
+
+    const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
+
+    const LayoutEditTreeNode* gpuRoot = FindRootNode(model, "card.gpu");
+    ASSERT_NE(gpuRoot, nullptr);
+    ASSERT_EQ(gpuRoot->children.size(), 1u);
+    EXPECT_EQ(gpuRoot->children[0].label, "layout");
+    ASSERT_EQ(gpuRoot->children[0].children.size(), 1u);
+    EXPECT_EQ(gpuRoot->children[0].children[0].label, "gauge, metric_list");
+    EXPECT_TRUE(gpuRoot->children[0].children[0].leaf.has_value());
 }

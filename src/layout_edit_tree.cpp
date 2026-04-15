@@ -229,6 +229,9 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
     if (treeNode.children.empty()) {
         return std::nullopt;
     }
+    if (treeNode.children.size() == 1) {
+        return treeNode.children.front();
+    }
     return treeNode;
 }
 
