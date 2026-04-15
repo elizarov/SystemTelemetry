@@ -166,34 +166,122 @@ bool CaseInsensitiveEqual(const std::wstring& left, const std::wstring& right) {
     return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
 }
 
-std::wstring FormatDialogHexColor(unsigned int color) {
-    return WideFromUtf8(FormatLayoutEditTooltipValue(color));
-}
-
-std::optional<unsigned int> TryParseDialogHexColor(const wchar_t* text) {
-    if (text == nullptr) {
-        return std::nullopt;
-    }
-    std::wstring trimmed(text);
-    trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(), [](wchar_t ch) { return std::iswspace(ch) != 0; }),
-        trimmed.end());
-    if (!trimmed.empty() && trimmed.front() == L'#') {
-        trimmed.erase(trimmed.begin());
-    }
-    if (trimmed.size() != 6) {
-        return std::nullopt;
-    }
-    for (wchar_t ch : trimmed) {
-        if (!iswxdigit(ch)) {
-            return std::nullopt;
+std::string EscapeTraceText(std::string_view text) {
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (const char ch : text) {
+        switch (ch) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            default:
+                escaped.push_back(ch);
+                break;
         }
     }
-    wchar_t* end = nullptr;
-    const unsigned long value = std::wcstoul(trimmed.c_str(), &end, 16);
-    if (end == nullptr || *end != L'\0') {
-        return std::nullopt;
+    return escaped;
+}
+
+std::string QuoteTraceText(std::string_view text) {
+    return "\"" + EscapeTraceText(text) + "\"";
+}
+
+std::string FormatTraceColorHex(unsigned int color) {
+    char buffer[16] = {};
+    sprintf_s(buffer, "#%06X", color & 0xFFFFFFu);
+    return buffer;
+}
+
+std::string ReadDialogControlTextUtf8(HWND hwnd, int controlId) {
+    wchar_t buffer[256] = {};
+    GetDlgItemTextW(hwnd, controlId, buffer, ARRAYSIZE(buffer));
+    return Utf8FromWide(buffer);
+}
+
+const char* TreeNodeKindTraceName(LayoutEditTreeNodeKind kind) {
+    switch (kind) {
+        case LayoutEditTreeNodeKind::Section:
+            return "section";
+        case LayoutEditTreeNodeKind::Group:
+            return "group";
+        case LayoutEditTreeNodeKind::Container:
+            return "container";
+        case LayoutEditTreeNodeKind::Leaf:
+            return "leaf";
     }
-    return static_cast<unsigned int>(value & 0xFFFFFFu);
+    return "unknown";
+}
+
+const char* ValueFormatTraceName(configschema::ValueFormat format) {
+    switch (format) {
+        case configschema::ValueFormat::Integer:
+            return "integer";
+        case configschema::ValueFormat::FloatingPoint:
+            return "float";
+        case configschema::ValueFormat::FontSpec:
+            return "font";
+        case configschema::ValueFormat::ColorHex:
+            return "color";
+    }
+    return "unknown";
+}
+
+std::string JoinNodePath(const std::vector<size_t>& path) {
+    std::ostringstream stream;
+    for (size_t i = 0; i < path.size(); ++i) {
+        if (i != 0) {
+            stream << '.';
+        }
+        stream << path[i];
+    }
+    return stream.str();
+}
+
+std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
+    if (leaf == nullptr) {
+        return "focus=\"none\"";
+    }
+    if (const auto* parameter = std::get_if<LayoutEditParameter>(&leaf->focusKey)) {
+        const auto descriptor = FindLayoutEditTooltipDescriptor(*parameter);
+        if (descriptor.has_value()) {
+            return "focus=" + QuoteTraceText(descriptor->configKey);
+        }
+        return "focus=" + QuoteTraceText(GetLayoutEditParameterDisplayName(*parameter));
+    }
+    if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&leaf->focusKey)) {
+        std::ostringstream stream;
+        stream << "focus=" << QuoteTraceText(leaf->sectionName.empty() ? "weight" : leaf->sectionName + ".layout");
+        stream << " edit_card=" << QuoteTraceText(weightKey->editCardId);
+        stream << " node_path=" << QuoteTraceText(JoinNodePath(weightKey->nodePath));
+        stream << " separator=" << weightKey->separatorIndex;
+        return stream.str();
+    }
+    return "focus=\"unknown\"";
+}
+
+std::string BuildTraceNodeText(const LayoutEditTreeNode* node) {
+    if (node == nullptr) {
+        return "node=\"none\"";
+    }
+
+    std::ostringstream stream;
+    stream << "node_kind=" << QuoteTraceText(TreeNodeKindTraceName(node->kind));
+    stream << " label=" << QuoteTraceText(node->label);
+    stream << " location=" << QuoteTraceText(node->locationText);
+    if (node->leaf.has_value()) {
+        stream << " " << BuildTraceFocusKeyText(&*node->leaf);
+        stream << " value_format=" << QuoteTraceText(ValueFormatTraceName(node->leaf->valueFormat));
+    }
+    return stream.str();
 }
 
 std::vector<std::wstring> EnumerateInstalledFontFamilies(HWND hwnd) {
@@ -279,6 +367,82 @@ struct LayoutEditDialogState {
     bool updatingControls = false;
 };
 
+struct ColorDialogControls {
+    int labelId = 0;
+    int editId = 0;
+    int sliderId = 0;
+    const char* channelName = "";
+};
+
+constexpr ColorDialogControls kColorDialogControls[] = {
+    {IDC_LAYOUT_EDIT_COLOR_RED_LABEL, IDC_LAYOUT_EDIT_COLOR_RED_EDIT, IDC_LAYOUT_EDIT_COLOR_RED_SLIDER, "red"},
+    {IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL,
+        IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER,
+        "green"},
+    {IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT, IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER, "blue"},
+};
+
+void ConfigureColorSliders(HWND hwnd) {
+    for (const auto& channel : kColorDialogControls) {
+        SendDlgItemMessageW(hwnd, channel.sliderId, TBM_SETRANGEMIN, TRUE, 0);
+        SendDlgItemMessageW(hwnd, channel.sliderId, TBM_SETRANGEMAX, TRUE, 255);
+        SendDlgItemMessageW(hwnd, channel.sliderId, TBM_SETPAGESIZE, 0, 16);
+        SendDlgItemMessageW(hwnd, channel.sliderId, TBM_SETLINESIZE, 0, 1);
+    }
+}
+
+void SetColorDialogChannel(HWND hwnd, const ColorDialogControls& channel, unsigned int value) {
+    SetDlgItemTextW(hwnd, channel.editId, WideFromUtf8(std::to_string(value)).c_str());
+    SendDlgItemMessageW(hwnd, channel.sliderId, TBM_SETPOS, TRUE, value);
+}
+
+std::optional<unsigned int> ParseColorDialogChannel(HWND hwnd, int editId) {
+    wchar_t buffer[64] = {};
+    GetDlgItemTextW(hwnd, editId, buffer, ARRAYSIZE(buffer));
+    const auto value = TryParseDialogInteger(buffer);
+    if (!value.has_value() || *value < 0 || *value > 255) {
+        return std::nullopt;
+    }
+    return static_cast<unsigned int>(*value);
+}
+
+std::optional<unsigned int> ReadColorDialogValue(HWND hwnd) {
+    const auto red = ParseColorDialogChannel(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT);
+    const auto green = ParseColorDialogChannel(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT);
+    const auto blue = ParseColorDialogChannel(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT);
+    if (!red.has_value() || !green.has_value() || !blue.has_value()) {
+        return std::nullopt;
+    }
+    return (*red << 16) | (*green << 8) | *blue;
+}
+
+std::string BuildColorDialogTraceValues(HWND hwnd) {
+    std::ostringstream trace;
+    trace << " red=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT))
+          << " green=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT))
+          << " blue=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT));
+    return trace.str();
+}
+
+const ColorDialogControls* FindColorDialogControlsByEditId(int editId) {
+    for (const auto& channel : kColorDialogControls) {
+        if (channel.editId == editId) {
+            return &channel;
+        }
+    }
+    return nullptr;
+}
+
+const ColorDialogControls* FindColorDialogControlsBySliderId(int sliderId) {
+    for (const auto& channel : kColorDialogControls) {
+        if (channel.sliderId == sliderId) {
+            return &channel;
+        }
+    }
+    return nullptr;
+}
+
 const LayoutNodeConfig* FindWeightEditNode(const AppConfig& config, const LayoutWeightEditKey& key) {
     LayoutEditHost::LayoutTarget target;
     target.editCardId = key.editCardId;
@@ -318,8 +482,15 @@ void ShowLayoutEditEditors(HWND hwnd, bool showNumeric, bool showFont, bool show
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL, showFont);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, showFont);
 
-    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LABEL, showColor);
-    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_LABEL, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_SLIDER, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT, showColor);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER, showColor);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK, showColor);
 
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL, showWeights);
@@ -357,6 +528,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     if (state->selectedLeaf == nullptr) {
         ShowLayoutEditEditors(hwnd, false, false, false, false);
         state->updatingControls = false;
+        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
+            BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
         return;
     }
 
@@ -371,11 +544,24 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
                 font.has_value() && *font != nullptr ? WideFromUtf8(std::to_string((**font).weight)).c_str() : L"");
             ShowLayoutEditEditors(hwnd, false, true, false, false);
+            std::ostringstream trace;
+            trace << BuildTraceNodeText(state->selectedNode) << " editor=\"font\""
+                  << " face=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT))
+                  << " size=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT))
+                  << " weight=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT));
+            state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
         } else if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
             const auto value = FindLayoutEditParameterColorValue(state->shellUi->CurrentConfig(), *parameter);
-            SetDlgItemTextW(
-                hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, value.has_value() ? FormatDialogHexColor(*value).c_str() : L"");
+            const unsigned int color = value.value_or(0);
+            SetColorDialogChannel(hwnd, kColorDialogControls[0], (color >> 16) & 0xFFu);
+            SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 8) & 0xFFu);
+            SetColorDialogChannel(hwnd, kColorDialogControls[2], color & 0xFFu);
             ShowLayoutEditEditors(hwnd, false, false, true, false);
+            std::ostringstream trace;
+            trace << BuildTraceNodeText(state->selectedNode) << " editor=\"color\""
+                  << BuildColorDialogTraceValues(hwnd)
+                  << " config_value=" << QuoteTraceText(value.has_value() ? FormatTraceColorHex(*value) : "none");
+            state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
         } else {
             const auto value = FindLayoutEditParameterNumericValue(state->shellUi->CurrentConfig(), *parameter);
             const std::wstring text =
@@ -383,6 +569,10 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                                   : L"";
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
             ShowLayoutEditEditors(hwnd, true, false, false, false);
+            std::ostringstream trace;
+            trace << BuildTraceNodeText(state->selectedNode) << " editor=\"numeric\""
+                  << " text=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
+            state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
         }
     } else if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&state->selectedLeaf->focusKey)) {
         const auto values = FindWeightEditValues(state->shellUi->CurrentConfig(), *weightKey);
@@ -397,8 +587,15 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT,
             values.has_value() ? WideFromUtf8(std::to_string(values->second)).c_str() : L"");
         ShowLayoutEditEditors(hwnd, false, false, false, true);
+        std::ostringstream trace;
+        trace << BuildTraceNodeText(state->selectedNode) << " editor=\"weights\""
+              << " first=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT))
+              << " second=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT));
+        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
     } else {
         ShowLayoutEditEditors(hwnd, false, false, false, false);
+        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
+            BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
     }
 
     state->updatingControls = false;
@@ -424,7 +621,15 @@ bool PreviewSelectedNumeric(LayoutEditDialogState* state, HWND hwnd) {
     } else {
         value = TryParseDialogDouble(buffer);
     }
-    return value.has_value() && state->shellUi->ApplyParameterPreview(*parameter, *value);
+    const bool applied = value.has_value() && state->shellUi->ApplyParameterPreview(*parameter, *value);
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << " raw=" << QuoteTraceText(Utf8FromWide(buffer))
+          << " parsed=" << QuoteTraceText(value.has_value() ? FormatLayoutEditTooltipValue(*value,
+                                                                     state->selectedLeaf->valueFormat)
+                                                             : "invalid")
+          << " applied=" << QuoteTraceText(applied ? "true" : "false");
+    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_numeric", trace.str());
+    return applied;
 }
 
 bool PreviewSelectedFont(LayoutEditDialogState* state, HWND hwnd, UINT notificationCode = 0) {
@@ -447,7 +652,15 @@ bool PreviewSelectedFont(LayoutEditDialogState* state, HWND hwnd, UINT notificat
         return false;
     }
 
-    return state->shellUi->ApplyFontPreview(*parameter, UiFontConfig{Utf8FromWide(faceText), *size, *weight});
+    const UiFontConfig font{Utf8FromWide(faceText), *size, *weight};
+    const bool applied = state->shellUi->ApplyFontPreview(*parameter, font);
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << " face=" << QuoteTraceText(font.face)
+          << " size=" << QuoteTraceText(std::to_string(font.size))
+          << " weight=" << QuoteTraceText(std::to_string(font.weight))
+          << " applied=" << QuoteTraceText(applied ? "true" : "false");
+    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_font", trace.str());
+    return applied;
 }
 
 bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd) {
@@ -459,10 +672,14 @@ bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd) {
         return false;
     }
 
-    wchar_t buffer[64] = {};
-    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, buffer, ARRAYSIZE(buffer));
-    const auto color = TryParseDialogHexColor(buffer);
-    return color.has_value() && state->shellUi->ApplyColorPreview(*parameter, *color);
+    const auto color = ReadColorDialogValue(hwnd);
+    const bool applied = color.has_value() && state->shellUi->ApplyColorPreview(*parameter, *color);
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << BuildColorDialogTraceValues(hwnd)
+          << " parsed=" << QuoteTraceText(color.has_value() ? FormatTraceColorHex(*color) : "invalid")
+          << " applied=" << QuoteTraceText(applied ? "true" : "false");
+    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_color", trace.str());
+    return applied;
 }
 
 bool SetSelectedDialogColor(LayoutEditDialogState* state, HWND hwnd, unsigned int color) {
@@ -474,10 +691,24 @@ bool SetSelectedDialogColor(LayoutEditDialogState* state, HWND hwnd, unsigned in
         return false;
     }
 
-    state->updatingControls = true;
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, FormatDialogHexColor(color).c_str());
-    state->updatingControls = false;
-    return state->shellUi->ApplyColorPreview(*parameter, color);
+    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_apply_begin",
+        BuildTraceNodeText(state->selectedNode) + " picked=" + QuoteTraceText(FormatTraceColorHex(color)));
+    const bool applied = state->shellUi->ApplyColorPreview(*parameter, color);
+    if (!applied) {
+        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_apply_end",
+            BuildTraceNodeText(state->selectedNode) + " applied=\"false\"");
+        return false;
+    }
+
+    PopulateLayoutEditSelection(state, hwnd);
+    SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT));
+    SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT, EM_SETSEL, 0, -1);
+    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_apply_end",
+        BuildTraceNodeText(state->selectedNode) + " applied=\"true\"" + BuildColorDialogTraceValues(hwnd) +
+            " config_value=" +
+            QuoteTraceText(FormatTraceColorHex(
+                FindLayoutEditParameterColorValue(state->shellUi->CurrentConfig(), *parameter).value_or(0))));
+    return true;
 }
 
 bool PreviewSelectedWeights(LayoutEditDialogState* state, HWND hwnd) {
@@ -499,7 +730,13 @@ bool PreviewSelectedWeights(LayoutEditDialogState* state, HWND hwnd) {
         return false;
     }
 
-    return state->shellUi->ApplyWeightPreview(*key, *first, *second);
+    const bool applied = state->shellUi->ApplyWeightPreview(*key, *first, *second);
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << " first=" << QuoteTraceText(std::to_string(*first))
+          << " second=" << QuoteTraceText(std::to_string(*second))
+          << " applied=" << QuoteTraceText(applied ? "true" : "false");
+    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_weights", trace.str());
+    return applied;
 }
 
 void InsertLayoutEditTreeNodes(
@@ -570,6 +807,7 @@ void SelectLayoutEditTreeItem(LayoutEditDialogState* state, HWND hwnd, HTREEITEM
     state->selectedNode = node;
     state->selectedLeaf = node != nullptr && node->leaf.has_value() ? &(*node->leaf) : nullptr;
     state->shellUi->SetLayoutEditTreeSelectionHighlight(SelectionHighlightForTreeNode(node));
+    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:tree_select", BuildTraceNodeText(node));
     PopulateLayoutEditSelection(state, hwnd);
 }
 
@@ -609,13 +847,14 @@ bool ValidateActiveLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) 
             return state->shellUi->ApplyFontPreview(*parameter, UiFontConfig{Utf8FromWide(faceText), *size, *weight});
         }
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
-            wchar_t colorBuffer[64] = {};
-            GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, colorBuffer, ARRAYSIZE(colorBuffer));
-            const auto color = TryParseDialogHexColor(colorBuffer);
+            const auto color = ReadColorDialogValue(hwnd);
             if (!color.has_value()) {
-                MessageBoxW(hwnd, L"Enter a color as #RRGGBB.", L"Edit Configuration", MB_ICONERROR);
-                SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT));
-                SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, EM_SETSEL, 0, -1);
+                MessageBoxW(hwnd,
+                    L"Enter each RGB channel as a whole number between 0 and 255.",
+                    L"Edit Configuration",
+                    MB_ICONERROR);
+                SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT));
+                SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT, EM_SETSEL, 0, -1);
                 return false;
             }
             return state->shellUi->ApplyColorPreview(*parameter, *color);
@@ -702,6 +941,7 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
             SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
             SetWindowTextW(hwnd, L"Edit Configuration");
             state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
+            ConfigureColorSliders(hwnd);
             HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE);
             InsertLayoutEditTreeNodes(state, tree, state->treeModel.roots, TVI_ROOT);
             HTREEITEM selectedItem =
@@ -742,7 +982,16 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                 PreviewSelectedFont(state, hwnd, HIWORD(wParam));
                 return TRUE;
             }
-            if (LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_EDIT && HIWORD(wParam) == EN_CHANGE) {
+            if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_RED_EDIT || LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT) &&
+                HIWORD(wParam) == EN_CHANGE) {
+                if (const auto* channel = FindColorDialogControlsByEditId(LOWORD(wParam)); channel != nullptr &&
+                    state != nullptr && !state->updatingControls) {
+                    const auto value = ParseColorDialogChannel(hwnd, channel->editId);
+                    if (value.has_value()) {
+                        SendDlgItemMessageW(hwnd, channel->sliderId, TBM_SETPOS, TRUE, *value);
+                    }
+                }
                 PreviewSelectedColor(state, hwnd);
                 return TRUE;
             }
@@ -771,11 +1020,21 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                         RGB((currentColor >> 16) & 0xFFu, (currentColor >> 8) & 0xFFu, currentColor & 0xFFu);
                     chooseColor.lpCustColors = state->customColors;
                     chooseColor.Flags = CC_FULLOPEN | CC_RGBINIT;
+                    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_open",
+                        BuildTraceNodeText(state->selectedNode) + " current=" +
+                            QuoteTraceText(FormatTraceColorHex(currentColor)));
                     if (ChooseColorW(&chooseColor) == TRUE) {
                         const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 16) |
                                                        (GetGValue(chooseColor.rgbResult) << 8) |
                                                        GetBValue(chooseColor.rgbResult);
+                        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_return",
+                            BuildTraceNodeText(state->selectedNode) + " accepted=\"true\" chosen=" +
+                                QuoteTraceText(FormatTraceColorHex(nextColor)));
                         SetSelectedDialogColor(state, hwnd, nextColor);
+                    } else {
+                        state->shellUi->TraceLayoutEditDialogEvent(
+                            "layout_edit_dialog:picker_return",
+                            BuildTraceNodeText(state->selectedNode) + " accepted=\"false\"");
                     }
                     return TRUE;
                 }
@@ -794,6 +1053,21 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                     return TRUE;
             }
             break;
+        case WM_HSCROLL:
+            if (state != nullptr) {
+                const int sliderId = GetDlgCtrlID(reinterpret_cast<HWND>(lParam));
+                if (const auto* channel = FindColorDialogControlsBySliderId(sliderId); channel != nullptr) {
+                    if (!state->updatingControls) {
+                        const LRESULT position = SendDlgItemMessageW(hwnd, channel->sliderId, TBM_GETPOS, 0, 0);
+                        state->updatingControls = true;
+                        SetDlgItemTextW(hwnd, channel->editId, WideFromUtf8(std::to_string(position)).c_str());
+                        state->updatingControls = false;
+                        PreviewSelectedColor(state, hwnd);
+                    }
+                    return TRUE;
+                }
+            }
+            break;
         case WM_CLOSE:
             state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
             RestoreLayoutEditDialog(state);
@@ -808,6 +1082,19 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
 DashboardShellUi::DashboardShellUi(DashboardApp& app) : app_(app) {}
 
 DashboardShellUi::~DashboardShellUi() = default;
+
+void DashboardShellUi::TraceLayoutEditDialogEvent(const std::string& event, const std::string& details) const {
+    const auto& state = app_.controller_.State();
+    if (state.diagnostics == nullptr) {
+        return;
+    }
+
+    if (details.empty()) {
+        state.diagnostics->WriteTraceMarker(event);
+    } else {
+        state.diagnostics->WriteTraceMarker(event + " " + details);
+    }
+}
 
 bool DashboardShellUi::IsLayoutEditModalUiActive() const {
     return app_.layoutEditModalUiDepth_ > 0;
@@ -891,6 +1178,13 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
     state.originalConfig = app_.controller_.State().config;
     state.treeModel = BuildLayoutEditTreeModel(app_.controller_.State().config);
     state.initialFocus = focusKey;
+    TraceLayoutEditDialogEvent("layout_edit_dialog:open",
+        "initial_focus=" +
+            QuoteTraceText(std::holds_alternative<LayoutEditParameter>(*focusKey)
+                               ? FindLayoutEditTooltipDescriptor(std::get<LayoutEditParameter>(*focusKey))
+                                     .value_or(LayoutEditTooltipDescriptor{})
+                                     .configKey
+                               : "weight"));
 
     DashboardShellUiModalScope scopedModalUi(*this);
     const INT_PTR result = DialogBoxParamW(app_.instance_,
@@ -899,6 +1193,8 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
         LayoutEditDialogProc,
         reinterpret_cast<LPARAM>(&state));
     SetLayoutEditTreeSelectionHighlight(std::nullopt);
+    TraceLayoutEditDialogEvent(
+        "layout_edit_dialog:close", std::string("accepted=") + QuoteTraceText(result == IDOK ? "true" : "false"));
     return result == IDOK;
 }
 

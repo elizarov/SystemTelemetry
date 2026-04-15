@@ -182,3 +182,39 @@ TEST(LayoutEditParameterApply, UpdatesColorFieldsThroughCommands) {
     EXPECT_EQ(config.layout.colors.foregroundColor, 0xABCDEFu);
     EXPECT_EQ(config.layout.colors.trackColor, 0x102030u);
 }
+
+TEST(LayoutEditParameterApply, AppliesColorFieldsViaMetadata) {
+    struct TestCase {
+        LayoutEditParameter parameter;
+        unsigned int value;
+    };
+
+    const TestCase cases[] = {
+        {LayoutEditParameter::ColorBackground, 0x112233u},
+        {LayoutEditParameter::ColorForeground, 0x445566u},
+        {LayoutEditParameter::ColorAccent, 0x778899u},
+        {LayoutEditParameter::ColorLayoutGuide, 0xAABBCCu},
+        {LayoutEditParameter::ColorActiveEdit, 0xDDEEFFu},
+        {LayoutEditParameter::ColorPanelBorder, 0x123456u},
+        {LayoutEditParameter::ColorMutedText, 0x234567u},
+        {LayoutEditParameter::ColorTrack, 0x345678u},
+        {LayoutEditParameter::ColorPanelFill, 0x456789u},
+        {LayoutEditParameter::ColorGraphBackground, 0x56789Au},
+        {LayoutEditParameter::ColorGraphAxis, 0x6789ABu},
+        {LayoutEditParameter::ColorGraphMarker, 0x789ABCu},
+    };
+
+    AppConfig config;
+    for (const auto& testCase : cases) {
+        const auto& field = GetLayoutEditConfigFieldMetadata(testCase.parameter);
+        ASSERT_EQ(field.valueFormat, configschema::ValueFormat::ColorHex);
+        ASSERT_NE(field.applyColorValue, nullptr);
+        ASSERT_NE(field.colorValue, nullptr);
+
+        ASSERT_TRUE(field.applyColorValue(config, testCase.value));
+        ASSERT_TRUE(field.colorValue(config).has_value());
+        EXPECT_EQ(*field.colorValue(config), testCase.value);
+        ASSERT_TRUE(FindLayoutEditParameterColorValue(config, testCase.parameter).has_value());
+        EXPECT_EQ(*FindLayoutEditParameterColorValue(config, testCase.parameter), testCase.value);
+    }
+}

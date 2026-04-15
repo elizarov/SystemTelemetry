@@ -40,6 +40,7 @@ public:
     bool ApplyColorPreview(DashboardRenderer::LayoutEditParameter parameter, unsigned int value);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
     void SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
+    void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const;
 
 private:
     UINT ResolveDefaultCommand(
