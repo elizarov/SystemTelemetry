@@ -1,17 +1,6 @@
 #include "telemetry_runtime.h"
 
 namespace {
-
-AppConfig BuildUiOverlayConfigFromResolvedTelemetry(const AppConfig& uiConfig, const TelemetryCollector& telemetry) {
-    AppConfig config = telemetry.EffectiveConfig();
-    config.display = uiConfig.display;
-    config.layouts = uiConfig.layouts;
-    config.layout = uiConfig.layout;
-    return config;
-}
-
-}  // namespace
-
 class RealTelemetryRuntime : public TelemetryRuntime {
 public:
     bool Initialize(const AppConfig& config, std::ostream* traceStream) override {
@@ -33,7 +22,7 @@ public:
     }
 
     AppConfig EffectiveConfig() const override {
-        return BuildUiOverlayConfigFromResolvedTelemetry(effectiveConfig_, telemetry_);
+        return BuildEffectiveRuntimeConfig(effectiveConfig_, telemetry_.EffectiveConfig());
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
@@ -77,6 +66,8 @@ private:
     std::vector<NetworkAdapterCandidate> networkAdapters_{};
     std::vector<StorageDriveCandidate> storageDrives_{};
 };
+
+}  // namespace
 
 std::unique_ptr<TelemetryRuntime> CreateRealTelemetryRuntime() {
     return std::make_unique<RealTelemetryRuntime>();

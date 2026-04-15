@@ -444,7 +444,10 @@ std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(Das
 }
 
 AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {
-    AppConfig config = state_.telemetry != nullptr ? state_.telemetry->EffectiveConfig() : state_.config;
+    AppConfig config = state_.config;
+    if (state_.telemetry != nullptr) {
+        config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->EffectiveConfig());
+    }
     const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
     config.display.monitorName =
         !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;

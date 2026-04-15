@@ -50,12 +50,10 @@ public:
     }
 
     AppConfig EffectiveConfig() const override {
-        AppConfig config = effectiveConfig_;
-        if (!resolvedNetwork_.adapterName.empty()) {
-            config.network.adapterName = resolvedNetwork_.adapterName;
-        }
-        config.storage.drives = resolvedStorageDrives_;
-        return config;
+        AppConfig resolvedConfig = effectiveConfig_;
+        resolvedConfig.network.adapterName = resolvedNetwork_.adapterName;
+        resolvedConfig.storage.drives = resolvedStorageDrives_;
+        return BuildEffectiveRuntimeConfig(effectiveConfig_, resolvedConfig);
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {

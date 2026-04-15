@@ -77,3 +77,28 @@ TEST(ConfigResolution, SelectsRequestedLayoutAndFallsBackToFirstLayout) {
     EXPECT_EQ(config.layout.structure.window.height, 480);
     EXPECT_EQ(config.layout.structure.cardsLayout.name, "rows");
 }
+
+TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingResolvedSelections) {
+    AppConfig uiConfig;
+    uiConfig.network.adapterName = "Configured Ethernet";
+    uiConfig.storage.drives = {"Z"};
+    uiConfig.layout.gauge.labelBottom = 42;
+    uiConfig.metrics.definitions.push_back(
+        MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Core Temp"});
+
+    AppConfig resolvedRuntimeConfig;
+    resolvedRuntimeConfig.network.adapterName = "Resolved Ethernet";
+    resolvedRuntimeConfig.storage.drives = {"C", "D"};
+    resolvedRuntimeConfig.layout.gauge.labelBottom = 7;
+    resolvedRuntimeConfig.metrics.definitions.push_back(
+        MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"});
+
+    const AppConfig effectiveConfig = BuildEffectiveRuntimeConfig(uiConfig, resolvedRuntimeConfig);
+    const MetricDefinitionConfig* metric = FindMetricDefinition(effectiveConfig.metrics, "gpu.temp");
+
+    EXPECT_EQ(effectiveConfig.network.adapterName, "Resolved Ethernet");
+    EXPECT_EQ(effectiveConfig.storage.drives, (std::vector<std::string>{"C", "D"}));
+    EXPECT_EQ(effectiveConfig.layout.gauge.labelBottom, 42);
+    ASSERT_NE(metric, nullptr);
+    EXPECT_EQ(metric->label, "Core Temp");
+}

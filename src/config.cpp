@@ -46,6 +46,15 @@ MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std:
     return nullptr;
 }
 
+AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const AppConfig& resolvedRuntimeConfig) {
+    AppConfig config = uiConfig;
+    if (!resolvedRuntimeConfig.network.adapterName.empty()) {
+        config.network.adapterName = resolvedRuntimeConfig.network.adapterName;
+    }
+    config.storage.drives = resolvedRuntimeConfig.storage.drives;
+    return config;
+}
+
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
     std::ostringstream stream;
     stream << MetricDisplayStyleName(definition.style) << ",";
