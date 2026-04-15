@@ -8,30 +8,15 @@
 #endif
 
 #include <memory>
-#include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "config.h"
+#include "dashboard_widget_class.h"
 #include "render_types.h"
 
 class DashboardMetricSource;
 class DashboardRenderer;
-
-enum class DashboardWidgetClass {
-    Unknown,
-    Text,
-    Gauge,
-    MetricList,
-    Throughput,
-    NetworkFooter,
-    VerticalSpacer,
-    VerticalSpring,
-    DriveUsageList,
-    ClockTime,
-    ClockDate,
-};
 
 class DashboardWidget {
 public:
@@ -62,7 +47,5 @@ struct DashboardWidgetLayout {
     std::unique_ptr<DashboardWidget> widget;
 };
 
-std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view name);
-std::string_view DashboardWidgetClassName(DashboardWidgetClass widgetClass);
 std::unique_ptr<DashboardWidget> CreateDashboardWidget(DashboardWidgetClass widgetClass);
 std::unique_ptr<DashboardWidget> CreateDashboardWidget(std::string_view name);
