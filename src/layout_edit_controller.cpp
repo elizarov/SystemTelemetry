@@ -435,6 +435,11 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     const std::optional<size_t>& nextLayoutGuideIndex = resolution.hoveredLayoutGuideIndex;
     if (hoveredLayoutGuideIndex_ != nextLayoutGuideIndex) {
         hoveredLayoutGuideIndex_ = nextLayoutGuideIndex;
+        host_.LayoutEditOverlayState().hoveredLayoutEditGuide =
+            hoveredLayoutGuideIndex_.has_value()
+                ? std::optional<LayoutEditGuide>(
+                      host_.LayoutEditRenderer().LayoutEditGuides()[*hoveredLayoutGuideIndex_])
+                : std::nullopt;
         hoverChanged = true;
     }
 
@@ -768,6 +773,10 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
 
 void LayoutEditController::SyncRendererInteractionState() {
     DashboardRenderer::EditOverlayState& overlayState = host_.LayoutEditOverlayState();
+    overlayState.hoveredLayoutEditGuide =
+        hoveredLayoutGuideIndex_.has_value()
+            ? std::optional<LayoutEditGuide>(host_.LayoutEditRenderer().LayoutEditGuides()[*hoveredLayoutGuideIndex_])
+            : std::nullopt;
     overlayState.hoveredLayoutCard = hoveredLayoutCard_;
     overlayState.hoveredEditableCard = hoveredEditableCard_;
     overlayState.hoveredEditableWidget = hoveredEditableWidget_;

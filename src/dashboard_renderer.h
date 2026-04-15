@@ -58,6 +58,7 @@ public:
         bool showLayoutEditGuides = false;
         SimilarityIndicatorMode similarityIndicatorMode = SimilarityIndicatorMode::ActiveGuide;
         std::optional<LayoutEditGuide> activeLayoutEditGuide;
+        std::optional<LayoutEditGuide> hoveredLayoutEditGuide;
         std::optional<LayoutEditWidgetIdentity> hoveredLayoutCard;
         std::optional<LayoutEditWidgetIdentity> hoveredEditableCard;
         std::optional<LayoutEditWidgetIdentity> hoveredEditableWidget;
@@ -369,6 +370,7 @@ private:
     void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
     void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
     void DrawGapEditAnchors(const EditOverlayState& overlayState) const;
+    void DrawDottedHighlightRect(const RenderRect& rect, RenderColor color, bool active) const;
     void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
     void DrawMoveOverlay(const MoveOverlayState& overlayState);
     void DrawPanel(const ResolvedCardLayout& card);

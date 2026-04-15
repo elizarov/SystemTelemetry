@@ -607,16 +607,13 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
     }
     for (const auto& [highlighted, active] : highlights) {
         const RenderColor outlineColor = active ? ActiveEditColor() : LayoutGuideColor();
-        const float outlineWidth =
-            static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
         if (highlighted.drawTargetOutline && !highlighted.targetRect.IsEmpty()) {
-            const RenderRect outlineRect =
-                highlighted.targetRect.Inflate(std::max(1, ScaleLogical(1)), std::max(1, ScaleLogical(1)));
-            const_cast<DashboardRenderer*>(this)->DrawSolidRect(
-                outlineRect, RenderStroke::Dotted(outlineColor, outlineWidth));
+            const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(highlighted.targetRect, outlineColor, active);
         }
 
         if (highlighted.shape == AnchorShape::Circle) {
+            const float outlineWidth =
+                static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
             const_cast<DashboardRenderer*>(this)->DrawSolidEllipse(
                 highlighted.anchorRect, RenderStroke::Solid(outlineColor, outlineWidth));
         } else if (highlighted.shape == AnchorShape::Diamond) {
@@ -630,6 +627,41 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
 void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides || layoutEditGuides_.empty()) {
         return;
+    }
+
+    std::vector<std::pair<RenderRect, bool>> containerHighlights;
+    const auto appendContainerHighlight = [&](const RenderRect& rect, bool active) {
+        if (rect.IsEmpty()) {
+            return;
+        }
+        const auto existing =
+            std::find_if(containerHighlights.begin(), containerHighlights.end(), [&](const auto& entry) {
+                return entry.first.left == rect.left && entry.first.top == rect.top &&
+                       entry.first.right == rect.right && entry.first.bottom == rect.bottom;
+            });
+        if (existing == containerHighlights.end()) {
+            containerHighlights.push_back({rect, active});
+            return;
+        }
+        existing->second = existing->second || active;
+    };
+    if (overlayState.hoveredLayoutEditGuide.has_value()) {
+        appendContainerHighlight(overlayState.hoveredLayoutEditGuide->containerRect, false);
+    }
+    if (overlayState.activeLayoutEditGuide.has_value()) {
+        appendContainerHighlight(overlayState.activeLayoutEditGuide->containerRect, true);
+    }
+    if (overlayState.selectedTreeFocusKey.has_value()) {
+        for (const auto& guide : layoutEditGuides_) {
+            if (MatchesLayoutEditFocusKey(*overlayState.selectedTreeFocusKey, guide)) {
+                appendContainerHighlight(guide.containerRect, true);
+            }
+        }
+    }
+
+    for (const auto& [rect, active] : containerHighlights) {
+        const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
+        const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(rect, color, active);
     }
 
     const int lineWidth = (std::max)(1, ScaleLogical(1));
@@ -771,6 +803,16 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
                 anchor.handleRect, RenderStroke::Solid(color, static_cast<float>(handleOutline)));
         }
     }
+}
+
+void DashboardRenderer::DrawDottedHighlightRect(const RenderRect& rect, RenderColor color, bool active) const {
+    if (rect.IsEmpty()) {
+        return;
+    }
+    const RenderRect outlineRect = rect.Inflate(std::max(1, ScaleLogical(1)), std::max(1, ScaleLogical(1)));
+    const float outlineWidth =
+        static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
+    const_cast<DashboardRenderer*>(this)->DrawSolidRect(outlineRect, RenderStroke::Dotted(color, outlineWidth));
 }
 
 int DashboardRenderer::WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {
