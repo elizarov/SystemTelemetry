@@ -30,10 +30,11 @@
 
 namespace {
 
-RenderColor ToRenderColor(unsigned int color, std::uint8_t alpha = 255) {
-    return RenderColor{static_cast<std::uint8_t>((color >> 16) & 0xFFu),
-        static_cast<std::uint8_t>((color >> 8) & 0xFFu),
-        static_cast<std::uint8_t>(color & 0xFFu),
+RenderColor ToRenderColor(ConfigColor color, std::uint8_t alpha = 255) {
+    const unsigned int rgb = color.ToRgb();
+    return RenderColor{static_cast<std::uint8_t>((rgb >> 16) & 0xFFu),
+        static_cast<std::uint8_t>((rgb >> 8) & 0xFFu),
+        static_cast<std::uint8_t>(rgb & 0xFFu),
         alpha};
 }
 

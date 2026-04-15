@@ -45,10 +45,19 @@ template <typename Meta> std::optional<double> FindNumericFieldValue(const AppCo
 }
 
 template <typename Meta> std::optional<unsigned int> FindColorFieldValue(const AppConfig& config) {
-    if constexpr (std::is_same_v<typename Meta::value_type, unsigned int>) {
-        return Meta::RawGet(config);
+    if constexpr (std::is_same_v<typename Meta::value_type, ConfigColor>) {
+        return Meta::RawGet(config).ToRgb();
     } else {
         return std::nullopt;
+    }
+}
+
+template <typename Meta> constexpr auto NumericApplyFieldEditFn() {
+    if constexpr (std::is_same_v<typename Meta::value_type, int> || std::is_same_v<typename Meta::value_type, double> ||
+                  std::is_same_v<typename Meta::value_type, UiFontConfig>) {
+        return &ApplyFieldEdit<Meta>;
+    } else {
+        return static_cast<bool (*)(AppConfig&, double)>(nullptr);
     }
 }
 
@@ -64,8 +73,8 @@ template <typename Meta> bool ApplyFontFieldEdit(AppConfig& config, const UiFont
 }
 
 template <typename Meta> bool ApplyColorFieldEdit(AppConfig& config, unsigned int value) {
-    if constexpr (std::is_same_v<typename Meta::value_type, unsigned int>) {
-        Meta::Set(config, value & 0xFFFFFFu);
+    if constexpr (std::is_same_v<typename Meta::value_type, ConfigColor>) {
+        Meta::Set(config, ConfigColor::FromRgb(value));
         return true;
     } else {
         (void)config;
@@ -97,7 +106,7 @@ template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata()
         std::is_same_v<typename Meta::value_type, UiFontConfig>,
         &FindNumericFieldValue<Meta>,
         &FindColorFieldValue<Meta>,
-        &ApplyFieldEdit<Meta>,
+        NumericApplyFieldEditFn<Meta>(),
         &ApplyColorFieldEdit<Meta>,
         &ApplyFontFieldEdit<Meta>,
         &FindFontFieldValue<Meta>,

@@ -64,7 +64,7 @@ double ParseDoubleOrDefault(const std::string& value, double fallback) {
     }
 }
 
-unsigned int ParseHexColorOrDefault(const std::string& value, unsigned int fallback) {
+ConfigColor ParseHexColorOrDefault(const std::string& value, ConfigColor fallback) {
     std::string text = Trim(value);
     if (!text.empty() && text.front() == '#') {
         text.erase(text.begin());
@@ -78,7 +78,7 @@ unsigned int ParseHexColorOrDefault(const std::string& value, unsigned int fallb
         }
     }
     try {
-        return static_cast<unsigned int>(std::stoul(text, nullptr, 16));
+        return ConfigColor::FromRgb(static_cast<unsigned int>(std::stoul(text, nullptr, 16)));
     } catch (...) {
         return fallback;
     }
@@ -140,7 +140,7 @@ void DecodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(
 }
 
 template <>
-void DecodeConfigValue<configschema::HexColorCodec, unsigned int>(unsigned int& target, const std::string& value) {
+void DecodeConfigValue<configschema::HexColorCodec, ConfigColor>(ConfigColor& target, const std::string& value) {
     target = ParseHexColorOrDefault(value, target);
 }
 

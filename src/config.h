@@ -2,11 +2,39 @@
 
 #include "config_schema.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+struct ConfigColor {
+    std::uint32_t rgb = 0;
+
+    static constexpr ConfigColor FromRgb(unsigned int value) {
+        return ConfigColor{static_cast<std::uint32_t>(value & 0xFFFFFFu)};
+    }
+
+    constexpr unsigned int ToRgb() const {
+        return rgb & 0xFFFFFFu;
+    }
+
+    constexpr bool operator==(const ConfigColor& other) const = default;
+};
+
+constexpr bool operator==(const ConfigColor& color, unsigned int value) {
+    return color.ToRgb() == (value & 0xFFFFFFu);
+}
+
+constexpr bool operator==(unsigned int value, const ConfigColor& color) {
+    return color == value;
+}
+
+CONFIG_CODEC(ConfigColor, configschema::HexColorCodec);
+template <> struct configschema::DefaultLayoutEditTraits<ConfigColor> {
+    using type = typename configschema::LayoutEditTraitsForPolicy<configschema::FreeValuePolicy>::type;
+};
 
 struct UiFontConfig {
     std::string face;
@@ -105,19 +133,19 @@ struct CardStyleConfig {
 
 struct ColorConfig {
     CONFIG_REFLECTED_STRUCT(ColorConfig)
-    CONFIG_EDITABLE_VALUE(unsigned int, backgroundColor, "background_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, foregroundColor, "foreground_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, iconColor, "icon_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, accentColor, "accent_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, layoutGuideColor, "layout_guide_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, activeEditColor, "active_edit_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, panelBorderColor, "panel_border_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, mutedTextColor, "muted_text_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, trackColor, "track_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, panelFillColor, "panel_fill_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, graphBackgroundColor, "graph_background_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, graphAxisColor, "graph_axis_color");
-    CONFIG_EDITABLE_VALUE(unsigned int, graphMarkerColor, "graph_marker_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, backgroundColor, "background_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, foregroundColor, "foreground_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, iconColor, "icon_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, accentColor, "accent_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, layoutGuideColor, "layout_guide_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, activeEditColor, "active_edit_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, panelBorderColor, "panel_border_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, mutedTextColor, "muted_text_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, trackColor, "track_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, panelFillColor, "panel_fill_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, graphBackgroundColor, "graph_background_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, graphAxisColor, "graph_axis_color");
+    CONFIG_EDITABLE_VALUE(ConfigColor, graphMarkerColor, "graph_marker_color");
     CONFIG_SECTION("colors");
 };
 
