@@ -762,8 +762,8 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
         }
     }
 
-    if (resolution.hoveredEditableAnchor.has_value()) {
-        const auto region = renderer.FindEditableAnchorRegion(*resolution.hoveredEditableAnchor);
+    if (const auto anchorHandle = renderer.HitTestEditableAnchorHandle(lastClientPoint_); anchorHandle.has_value()) {
+        const auto region = renderer.FindEditableAnchorRegion(*anchorHandle);
         if (region.has_value() && !region->draggable) {
             return TooltipTarget{lastClientPoint_, *region};
         }

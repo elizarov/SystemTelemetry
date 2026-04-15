@@ -149,7 +149,10 @@ RenderRect TextAnchorRectForShape(const DashboardRenderer& renderer, const Rende
     const int anchorSize = std::max(4, renderer.ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     if (shape == AnchorShape::Wedge) {
-        return RenderRect{textRect.left, textRect.top, textRect.left + anchorSize, textRect.top + anchorSize};
+        return RenderRect{textRect.left - anchorHalf,
+            textRect.top - anchorHalf,
+            textRect.left - anchorHalf + anchorSize,
+            textRect.top - anchorHalf + anchorSize};
     }
 
     const int anchorCenterX = textRect.right;
@@ -633,13 +636,33 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         }
         existing->second = existing->second || active;
     };
+    const auto sameRect = [](const RenderRect& left, const RenderRect& right) {
+        return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
+    };
+    const auto appendRelatedHighlights = [&](const LayoutEditAnchorRegion& source, bool active) {
+        const auto collect = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
+            for (const auto& region : regions) {
+                if (!::MatchesWidgetIdentity(region.key.widget, source.key.widget) ||
+                    !sameRect(region.targetRect, source.targetRect)) {
+                    continue;
+                }
+                LayoutEditAnchorRegion highlightedRegion = region;
+                if (!MatchesEditableAnchorKey(region.key, source.key)) {
+                    highlightedRegion.drawTargetOutline = false;
+                }
+                appendHighlight(highlightedRegion, active && MatchesEditableAnchorKey(region.key, source.key));
+            }
+        };
+        collect(staticEditableAnchorRegions_);
+        collect(dynamicEditableAnchorRegions_);
+    };
     const auto appendByKey = [&](const std::optional<LayoutEditAnchorKey>& key, bool active) {
         if (!key.has_value()) {
             return;
         }
         const auto region = FindEditableAnchorRegion(*key);
         if (region.has_value()) {
-            appendHighlight(*region, active);
+            appendRelatedHighlights(*region, active);
         }
     };
     if (overlayState.selectedTreeHighlight.has_value()) {
@@ -712,13 +735,13 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         } else if (highlighted.shape == AnchorShape::Wedge) {
             const float outlineWidth =
                 static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
-            const RenderPoint topLeft{highlighted.anchorRect.left, highlighted.anchorRect.top};
             const RenderPoint topRight{highlighted.anchorRect.right, highlighted.anchorRect.top};
             const RenderPoint bottomLeft{highlighted.anchorRect.left, highlighted.anchorRect.bottom};
+            const RenderPoint bottomRight{highlighted.anchorRect.right, highlighted.anchorRect.bottom};
             const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                topLeft, topRight, RenderStroke::Solid(outlineColor, outlineWidth));
+                bottomLeft, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
             const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                topLeft, bottomLeft, RenderStroke::Solid(outlineColor, outlineWidth));
+                topRight, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
         } else {
             const_cast<DashboardRenderer*>(this)->FillSolidRect(highlighted.anchorRect, outlineColor);
         }
@@ -1127,7 +1150,7 @@ void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<LayoutEditAncho
     region.targetRect = targetRect;
     region.anchorRect = anchorRect;
     region.shape = shape;
-    const int anchorHitInset = std::max(3, ScaleLogical(4));
+    const int anchorHitInset = shape == AnchorShape::Wedge ? 0 : std::max(3, ScaleLogical(4));
     region.anchorHitPadding = anchorHitInset;
     region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
         region.anchorRect.top - anchorHitInset,
