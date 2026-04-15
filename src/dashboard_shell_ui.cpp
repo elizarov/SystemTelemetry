@@ -465,6 +465,21 @@ bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd) {
     return color.has_value() && state->shellUi->ApplyColorPreview(*parameter, *color);
 }
 
+bool SetSelectedDialogColor(LayoutEditDialogState* state, HWND hwnd, unsigned int color) {
+    if (state == nullptr || state->selectedLeaf == nullptr) {
+        return false;
+    }
+    const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
+    if (parameter == nullptr || state->selectedLeaf->valueFormat != configschema::ValueFormat::ColorHex) {
+        return false;
+    }
+
+    state->updatingControls = true;
+    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, FormatDialogHexColor(color).c_str());
+    state->updatingControls = false;
+    return state->shellUi->ApplyColorPreview(*parameter, color);
+}
+
 bool PreviewSelectedWeights(LayoutEditDialogState* state, HWND hwnd) {
     if (state == nullptr || state->selectedLeaf == nullptr || state->updatingControls) {
         return false;
@@ -742,13 +757,13 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                     if (state == nullptr || state->selectedLeaf == nullptr) {
                         return TRUE;
                     }
-                    const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
-                    if (parameter == nullptr ||
+                    if (!std::holds_alternative<LayoutEditParameter>(state->selectedLeaf->focusKey) ||
                         state->selectedLeaf->valueFormat != configschema::ValueFormat::ColorHex) {
                         return TRUE;
                     }
+                    const auto parameter = std::get<LayoutEditParameter>(state->selectedLeaf->focusKey);
                     const unsigned int currentColor =
-                        FindLayoutEditParameterColorValue(state->shellUi->CurrentConfig(), *parameter).value_or(0);
+                        FindLayoutEditParameterColorValue(state->shellUi->CurrentConfig(), parameter).value_or(0);
                     CHOOSECOLORW chooseColor{};
                     chooseColor.lStructSize = sizeof(chooseColor);
                     chooseColor.hwndOwner = hwnd;
@@ -760,10 +775,7 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                         const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 16) |
                                                        (GetGValue(chooseColor.rgbResult) << 8) |
                                                        GetBValue(chooseColor.rgbResult);
-                        state->updatingControls = true;
-                        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_EDIT, FormatDialogHexColor(nextColor).c_str());
-                        state->updatingControls = false;
-                        state->shellUi->ApplyColorPreview(*parameter, nextColor);
+                        SetSelectedDialogColor(state, hwnd, nextColor);
                     }
                     return TRUE;
                 }

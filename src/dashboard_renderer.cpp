@@ -1577,11 +1577,12 @@ void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
         DrawPanelIcon(card.iconName, card.iconRect);
     }
     if (!card.title.empty()) {
-        DrawText(card.titleRect,
+        const TextLayoutResult titleLayout = DrawTextBlock(card.titleRect,
             card.title,
             TextStyleId::Title,
             ForegroundColor(),
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
+        RegisterDynamicColorEditRegion(LayoutEditParameter::ColorForeground, titleLayout.textRect);
     }
 }
 
