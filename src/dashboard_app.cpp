@@ -12,7 +12,7 @@
 namespace {
 
 constexpr UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
-constexpr UINT kLayoutEditTooltipFlags = TTF_SUBCLASS | TTF_TRANSPARENT;
+constexpr UINT kLayoutEditTooltipFlags = TTF_TRACK | TTF_ABSOLUTE | TTF_TRANSPARENT;
 
 RECT RectFromPoint(RenderPoint point, int radius) {
     return RECT{point.x - radius, point.y - radius, point.x + radius + 1, point.y + radius + 1};
@@ -565,8 +565,7 @@ void DashboardApp::HideLayoutEditTooltip() {
     toolInfo.hwnd = hwnd_;
     toolInfo.uFlags = kLayoutEditTooltipFlags;
     toolInfo.uId = 1;
-    toolInfo.rect = layoutEditTooltipRect_;
-    SendMessageW(layoutEditTooltipHwnd_, TTM_POP, 0, 0);
+    SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKACTIVATE, FALSE, reinterpret_cast<LPARAM>(&toolInfo));
     layoutEditTooltipVisible_ = false;
     layoutEditTooltipRectValid_ = false;
 }
@@ -627,9 +626,8 @@ void DashboardApp::UpdateLayoutEditTooltip() {
 
     const int tooltipOffsetX = ScaleLogicalToPhysical(28, CurrentWindowDpi());
     const int tooltipOffsetY = ScaleLogicalToPhysical(24, CurrentWindowDpi());
-    const int tooltipRadius = ScaleLogicalToPhysical(12, CurrentWindowDpi());
-    const RenderPoint tooltipAnchor{clientPoint.x + tooltipOffsetX, clientPoint.y + tooltipOffsetY};
-    layoutEditTooltipRect_ = RectFromPoint(tooltipAnchor, tooltipRadius);
+    const int tooltipRadius = ScaleLogicalToPhysical(10, CurrentWindowDpi());
+    layoutEditTooltipRect_ = RectFromPoint(clientPoint, tooltipRadius);
     layoutEditTooltipRectValid_ = true;
 
     TOOLINFOW toolInfo{};
@@ -643,6 +641,10 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     SendMessageW(layoutEditTooltipHwnd_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     SendMessageW(layoutEditTooltipHwnd_, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     SendMessageW(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
+    POINT screenPoint{clientPoint.x + tooltipOffsetX, clientPoint.y + tooltipOffsetY};
+    ClientToScreen(hwnd_, &screenPoint);
+    SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKPOSITION, 0, MAKELPARAM(screenPoint.x, screenPoint.y));
+    SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKACTIVATE, TRUE, reinterpret_cast<LPARAM>(&toolInfo));
 
     MSG msg{};
     msg.hwnd = hwnd_;
