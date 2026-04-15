@@ -66,6 +66,7 @@ public:
         std::optional<LayoutEditGapAnchorKey> activeGapEditAnchor;
         std::optional<LayoutEditAnchorKey> hoveredEditableAnchor;
         std::optional<LayoutEditAnchorKey> activeEditableAnchor;
+        std::optional<LayoutEditFocusKey> selectedTreeFocusKey;
         MoveOverlayState moveOverlay{};
     };
 

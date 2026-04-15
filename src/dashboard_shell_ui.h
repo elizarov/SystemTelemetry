@@ -38,6 +38,7 @@ public:
     bool ApplyParameterPreview(DashboardRenderer::LayoutEditParameter parameter, double value);
     bool ApplyFontPreview(DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
+    void SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditFocusKey>& focusKey);
 
 private:
     UINT ResolveDefaultCommand(

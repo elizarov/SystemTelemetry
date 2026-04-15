@@ -44,6 +44,27 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditF
     return MatchesLayoutWeightEditKey(std::get<LayoutWeightEditKey>(left), std::get<LayoutWeightEditKey>(right));
 }
 
+bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGuide& guide) {
+    const auto* weightKey = std::get_if<LayoutWeightEditKey>(&focusKey);
+    return weightKey != nullptr && MatchesLayoutWeightEditKey(*weightKey,
+                                       LayoutWeightEditKey{guide.editCardId, guide.nodePath, guide.separatorIndex});
+}
+
+bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditWidgetGuide& guide) {
+    const auto* parameter = std::get_if<LayoutEditParameter>(&focusKey);
+    return parameter != nullptr && *parameter == guide.parameter;
+}
+
+bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGapAnchorKey& key) {
+    const auto* parameter = std::get_if<LayoutEditParameter>(&focusKey);
+    return parameter != nullptr && *parameter == key.parameter;
+}
+
+bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditAnchorKey& key) {
+    const auto* parameter = std::get_if<LayoutEditParameter>(&focusKey);
+    return parameter != nullptr && *parameter == key.parameter;
+}
+
 bool IsLayoutGuidePayload(const TooltipPayload& payload) {
     return std::holds_alternative<LayoutEditGuide>(payload);
 }

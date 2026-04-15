@@ -257,8 +257,8 @@ std::optional<std::pair<int, int>> FindWeightEditValues(const AppConfig& config,
     if (node == nullptr || key.separatorIndex + 1 >= node->children.size()) {
         return std::nullopt;
     }
-    return std::make_pair(
-        std::max(1, node->children[key.separatorIndex].weight), std::max(1, node->children[key.separatorIndex + 1].weight));
+    return std::make_pair(std::max(1, node->children[key.separatorIndex].weight),
+        std::max(1, node->children[key.separatorIndex + 1].weight));
 }
 
 std::wstring BuildWeightEditorLabel(const LayoutEditTreeLeaf& leaf, bool first) {
@@ -335,15 +335,16 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             ShowLayoutEditEditors(hwnd, false, true, false);
         } else {
             const auto value = FindLayoutEditParameterNumericValue(state->shellUi->CurrentConfig(), *parameter);
-            const std::wstring text = value.has_value()
-                                          ? WideFromUtf8(FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat))
-                                          : L"";
+            const std::wstring text =
+                value.has_value() ? WideFromUtf8(FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat))
+                                  : L"";
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
             ShowLayoutEditEditors(hwnd, true, false, false);
         }
     } else if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&state->selectedLeaf->focusKey)) {
         const auto values = FindWeightEditValues(state->shellUi->CurrentConfig(), *weightKey);
-        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL, BuildWeightEditorLabel(*state->selectedLeaf, true).c_str());
+        SetDlgItemTextW(
+            hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL, BuildWeightEditorLabel(*state->selectedLeaf, true).c_str());
         SetDlgItemTextW(
             hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_LABEL, BuildWeightEditorLabel(*state->selectedLeaf, false).c_str());
         SetDlgItemTextW(hwnd,
@@ -489,6 +490,9 @@ void ExpandTreeAncestors(HWND tree, HTREEITEM item) {
 void SelectLayoutEditTreeItem(LayoutEditDialogState* state, HWND hwnd, HTREEITEM item) {
     const LayoutEditTreeNode* node = TreeNodeFromItem(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE), item);
     state->selectedLeaf = node != nullptr && node->leaf.has_value() ? &(*node->leaf) : nullptr;
+    state->shellUi->SetLayoutEditTreeSelectionHighlight(
+        state->selectedLeaf != nullptr ? std::optional<LayoutEditFocusKey>(state->selectedLeaf->focusKey)
+                                       : std::nullopt);
     PopulateLayoutEditSelection(state, hwnd);
 }
 
@@ -558,7 +562,8 @@ bool ValidateActiveLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) 
     const std::optional<int> first = TryParseDialogInteger(firstBuffer);
     const std::optional<int> second = TryParseDialogInteger(secondBuffer);
     if (!first.has_value() || !second.has_value() || *first < 1 || *second < 1) {
-        MessageBoxW(hwnd, L"Enter positive integer weights for both neighboring items.", L"Edit Configuration", MB_ICONERROR);
+        MessageBoxW(
+            hwnd, L"Enter positive integer weights for both neighboring items.", L"Edit Configuration", MB_ICONERROR);
         return false;
     }
     return PreviewSelectedWeights(state, hwnd);
@@ -607,6 +612,7 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
             state = reinterpret_cast<LayoutEditDialogState*>(lParam);
             SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
             SetWindowTextW(hwnd, L"Edit Configuration");
+            state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
             HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE);
             InsertLayoutEditTreeNodes(state, tree, state->treeModel.roots, TVI_ROOT);
             HTREEITEM selectedItem =
@@ -658,16 +664,19 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                     if (!ValidateActiveLayoutEditSelection(state, hwnd)) {
                         return TRUE;
                     }
+                    state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
                     state->accepted = true;
                     EndDialog(hwnd, IDOK);
                     return TRUE;
                 case IDCANCEL:
+                    state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
                     RestoreLayoutEditDialog(state);
                     EndDialog(hwnd, IDCANCEL);
                     return TRUE;
             }
             break;
         case WM_CLOSE:
+            state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
             RestoreLayoutEditDialog(state);
             EndDialog(hwnd, IDCANCEL);
             return TRUE;
@@ -742,6 +751,11 @@ bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int fi
     return app_.ApplyLayoutGuideWeights(target, weights);
 }
 
+void DashboardShellUi::SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditFocusKey>& focusKey) {
+    app_.rendererEditOverlayState_.selectedTreeFocusKey = focusKey;
+    app_.InvalidateShell();
+}
+
 bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target) {
     const auto focusKey = TooltipPayloadFocusKey(target.payload);
     if (!focusKey.has_value()) {
@@ -755,11 +769,13 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
     state.initialFocus = focusKey;
 
     DashboardShellUiModalScope scopedModalUi(*this);
-    return DialogBoxParamW(app_.instance_,
-               MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_CONFIGURATION),
-               app_.hwnd_,
-               LayoutEditDialogProc,
-               reinterpret_cast<LPARAM>(&state)) == IDOK;
+    const INT_PTR result = DialogBoxParamW(app_.instance_,
+        MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_CONFIGURATION),
+        app_.hwnd_,
+        LayoutEditDialogProc,
+        reinterpret_cast<LPARAM>(&state));
+    SetLayoutEditTreeSelectionHighlight(std::nullopt);
+    return result == IDOK;
 }
 
 std::optional<double> DashboardShellUi::PromptCustomScale() {

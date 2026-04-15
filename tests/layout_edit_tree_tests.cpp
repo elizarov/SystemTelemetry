@@ -10,8 +10,7 @@
 namespace {
 
 std::string ReadTemplateText() {
-    const std::filesystem::path path =
-        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    const std::filesystem::path path = std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
     std::ifstream input(path, std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
@@ -52,9 +51,8 @@ LayoutCardConfig MakeCard(const std::string& id, const LayoutNodeConfig& layout)
 }
 
 const LayoutEditTreeNode* FindRootNode(const LayoutEditTreeModel& model, const std::string& label) {
-    const auto it = std::find_if(model.roots.begin(), model.roots.end(), [&](const LayoutEditTreeNode& node) {
-        return node.label == label;
-    });
+    const auto it = std::find_if(
+        model.roots.begin(), model.roots.end(), [&](const LayoutEditTreeNode& node) { return node.label == label; });
     return it != model.roots.end() ? &(*it) : nullptr;
 }
 
@@ -79,8 +77,10 @@ AppConfig MakeBaseConfig() {
     config.display.layout = "primary";
     config.layout.structure.cardsLayout =
         MakeContainerNode("columns", {MakeDashboardCardNode("alpha"), MakeDashboardCardNode("beta")});
-    config.layout.cards.push_back(MakeCard("alpha", MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
-    config.layout.cards.push_back(MakeCard("beta", MakeContainerNode("rows", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
+    config.layout.cards.push_back(
+        MakeCard("alpha", MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
+    config.layout.cards.push_back(
+        MakeCard("beta", MakeContainerNode("rows", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
     return config;
 }
 
@@ -151,12 +151,13 @@ TEST(LayoutEditTree, IncludesOnlyReachableCardsInEncounterOrderAndSkipsCycles) {
 TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     AppConfig config;
     config.display.layout = "primary";
-    config.layout.structure.cardsLayout =
-        MakeContainerNode("rows", {MakeContainerNode("columns", {MakeDashboardCardNode("alpha"), MakeDashboardCardNode("beta")}),
-                                      MakeDashboardCardNode("gamma")});
+    config.layout.structure.cardsLayout = MakeContainerNode("rows",
+        {MakeContainerNode("columns", {MakeDashboardCardNode("alpha"), MakeDashboardCardNode("beta")}),
+            MakeDashboardCardNode("gamma")});
     config.layout.cards.push_back(MakeCard("alpha",
-        MakeContainerNode("rows", {MakeContainerNode("columns", {MakeWidgetNode("metric_list"), MakeWidgetNode("gauge")}),
-                                      MakeWidgetNode("throughput")})));
+        MakeContainerNode("rows",
+            {MakeContainerNode("columns", {MakeWidgetNode("metric_list"), MakeWidgetNode("gauge")}),
+                MakeWidgetNode("throughput")})));
     config.layout.cards.push_back(
         MakeCard("beta", MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
     config.layout.cards.push_back(
@@ -174,7 +175,8 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     ASSERT_NE(alphaRoot, nullptr);
     ASSERT_EQ(alphaRoot->children.size(), 1u);
     EXPECT_EQ(alphaRoot->children[0].label, "layout");
-    EXPECT_EQ(ChildLabels(alphaRoot->children[0]), (std::vector<std::string>{"metric_list, gauge", "columns, throughput"}));
+    EXPECT_EQ(
+        ChildLabels(alphaRoot->children[0]), (std::vector<std::string>{"metric_list, gauge", "columns, throughput"}));
 }
 
 TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) {
@@ -182,7 +184,8 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
 
     const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
 
-    const LayoutEditTreeLeaf* parameterLeaf = FindLayoutEditTreeLeaf(model, LayoutEditFocusKey{LayoutEditParameter::GaugeRingThickness});
+    const LayoutEditTreeLeaf* parameterLeaf =
+        FindLayoutEditTreeLeaf(model, LayoutEditFocusKey{LayoutEditParameter::GaugeRingThickness});
     ASSERT_NE(parameterLeaf, nullptr);
     EXPECT_EQ(parameterLeaf->sectionName, "gauge");
     EXPECT_EQ(parameterLeaf->memberName, "ring_thickness");
@@ -211,7 +214,8 @@ TEST(LayoutEditTree, CollapsesSingleChildContainerPathsInCardTrees) {
     config.display.layout = "primary";
     config.layout.structure.cardsLayout = MakeContainerNode("columns", {MakeDashboardCardNode("gpu")});
     config.layout.cards.push_back(MakeCard("gpu",
-        MakeContainerNode("rows", {MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})})));
+        MakeContainerNode(
+            "rows", {MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})})));
 
     const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
 

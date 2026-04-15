@@ -103,15 +103,15 @@ bool SeparatorIsEditable(const LayoutNodeConfig& node, size_t separatorIndex) {
     if (node.name != "rows") {
         return true;
     }
-    return !IsFixedHeightRowChild(node.children[separatorIndex]) && !IsVerticalSpringRowChild(node.children[separatorIndex]) &&
+    return !IsFixedHeightRowChild(node.children[separatorIndex]) &&
+           !IsVerticalSpringRowChild(node.children[separatorIndex]) &&
            !IsFixedHeightRowChild(node.children[separatorIndex + 1]) &&
            !IsVerticalSpringRowChild(node.children[separatorIndex + 1]);
 }
 
 const LayoutCardConfig* FindCardConfig(const LayoutConfig& layout, std::string_view cardId) {
-    const auto it = std::find_if(layout.cards.begin(), layout.cards.end(), [&](const LayoutCardConfig& card) {
-        return card.id == cardId;
-    });
+    const auto it = std::find_if(
+        layout.cards.begin(), layout.cards.end(), [&](const LayoutCardConfig& card) { return card.id == cardId; });
     return it != layout.cards.end() ? &(*it) : nullptr;
 }
 
@@ -235,8 +235,10 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
     return treeNode;
 }
 
-std::optional<LayoutEditTreeNode> BuildStructureGroup(
-    const std::string& sectionName, const std::string& memberName, const std::string& editCardId, const LayoutNodeConfig& node) {
+std::optional<LayoutEditTreeNode> BuildStructureGroup(const std::string& sectionName,
+    const std::string& memberName,
+    const std::string& editCardId,
+    const LayoutNodeConfig& node) {
     LayoutEditTreeNode groupNode;
     groupNode.kind = LayoutEditTreeNodeKind::Group;
     groupNode.label = memberName;
@@ -295,8 +297,7 @@ std::optional<LayoutEditTreeNode> BuildActiveLayoutSectionNode(const AppConfig& 
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "layout." + config.display.layout;
     sectionNode.initiallyExpanded = true;
-    if (const auto groupNode =
-            BuildStructureGroup(sectionNode.label, "cards", "", config.layout.structure.cardsLayout);
+    if (const auto groupNode = BuildStructureGroup(sectionNode.label, "cards", "", config.layout.structure.cardsLayout);
         groupNode.has_value()) {
         sectionNode.children.push_back(*groupNode);
     }

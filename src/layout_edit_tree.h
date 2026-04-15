@@ -41,5 +41,4 @@ struct LayoutEditTreeModel {
 
 LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config);
 LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::string_view templateText);
-const LayoutEditTreeLeaf* FindLayoutEditTreeLeaf(
-    const LayoutEditTreeModel& model, const LayoutEditFocusKey& focusKey);
+const LayoutEditTreeLeaf* FindLayoutEditTreeLeaf(const LayoutEditTreeModel& model, const LayoutEditFocusKey& focusKey);

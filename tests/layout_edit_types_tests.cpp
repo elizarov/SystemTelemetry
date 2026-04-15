@@ -108,3 +108,39 @@ TEST(LayoutEditTypes, MatchesFocusKeysByParameterOrWeightIdentity) {
     EXPECT_FALSE(MatchesLayoutEditFocusKey(parameterA, weightA));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(weightA, weightC));
 }
+
+TEST(LayoutEditTypes, MatchesSelectedParameterFocusAgainstWidgetAndAnchorArtifacts) {
+    const LayoutEditFocusKey focusKey = LayoutEditParameter::FontLabel;
+
+    LayoutEditWidgetGuide widgetGuide;
+    widgetGuide.parameter = LayoutEditParameter::FontLabel;
+
+    LayoutEditGapAnchorKey gapAnchorKey;
+    gapAnchorKey.parameter = LayoutEditParameter::FontLabel;
+
+    LayoutEditAnchorKey editableAnchorKey;
+    editableAnchorKey.parameter = LayoutEditParameter::FontLabel;
+
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, widgetGuide));
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, gapAnchorKey));
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, editableAnchorKey));
+}
+
+TEST(LayoutEditTypes, MatchesSelectedWeightFocusAgainstLayoutGuidesOnly) {
+    const LayoutEditFocusKey focusKey = LayoutWeightEditKey{"gpu", {0, 1}, 2};
+
+    LayoutEditGuide guide;
+    guide.editCardId = "gpu";
+    guide.nodePath = {0, 1};
+    guide.separatorIndex = 2;
+
+    LayoutEditWidgetGuide widgetGuide;
+    widgetGuide.parameter = LayoutEditParameter::FontLabel;
+
+    LayoutEditGapAnchorKey gapAnchorKey;
+    gapAnchorKey.parameter = LayoutEditParameter::CardColumnGap;
+
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, guide));
+    EXPECT_FALSE(MatchesLayoutEditFocusKey(focusKey, widgetGuide));
+    EXPECT_FALSE(MatchesLayoutEditFocusKey(focusKey, gapAnchorKey));
+}
