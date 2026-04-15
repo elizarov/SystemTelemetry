@@ -625,8 +625,11 @@ void DashboardApp::UpdateLayoutEditTooltip() {
         }
     }
 
-    const int tooltipRadius = ScaleLogicalToPhysical(10, CurrentWindowDpi());
-    layoutEditTooltipRect_ = RectFromPoint(clientPoint, tooltipRadius);
+    const int tooltipOffsetX = ScaleLogicalToPhysical(28, CurrentWindowDpi());
+    const int tooltipOffsetY = ScaleLogicalToPhysical(24, CurrentWindowDpi());
+    const int tooltipRadius = ScaleLogicalToPhysical(12, CurrentWindowDpi());
+    const RenderPoint tooltipAnchor{clientPoint.x + tooltipOffsetX, clientPoint.y + tooltipOffsetY};
+    layoutEditTooltipRect_ = RectFromPoint(tooltipAnchor, tooltipRadius);
     layoutEditTooltipRectValid_ = true;
 
     TOOLINFOW toolInfo{};

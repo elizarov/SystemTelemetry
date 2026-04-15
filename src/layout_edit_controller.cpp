@@ -855,7 +855,7 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
     }
 
     if (host_.LayoutEditRenderer().HitTestEditableColorRegion(clientPoint).has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_HAND));
+        SetCursor(LoadCursorW(nullptr, IDC_CROSS));
         return;
     }
 
