@@ -107,6 +107,7 @@ struct ColorConfig {
     CONFIG_REFLECTED_STRUCT(ColorConfig)
     CONFIG_EDITABLE_VALUE(unsigned int, backgroundColor, "background_color");
     CONFIG_EDITABLE_VALUE(unsigned int, foregroundColor, "foreground_color");
+    CONFIG_EDITABLE_VALUE(unsigned int, iconColor, "icon_color");
     CONFIG_EDITABLE_VALUE(unsigned int, accentColor, "accent_color");
     CONFIG_EDITABLE_VALUE(unsigned int, layoutGuideColor, "layout_guide_color");
     CONFIG_EDITABLE_VALUE(unsigned int, activeEditColor, "active_edit_color");

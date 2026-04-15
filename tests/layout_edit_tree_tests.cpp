@@ -127,6 +127,23 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
     ASSERT_NE(metricList, nullptr);
     EXPECT_EQ(ChildLabels(*metricList), (std::vector<std::string>{"label_width", "bar_height", "row_gap"}));
 
+    const LayoutEditTreeNode* colors = FindRootNode(model, "colors");
+    ASSERT_NE(colors, nullptr);
+    EXPECT_EQ(ChildLabels(*colors),
+        (std::vector<std::string>{"background_color",
+            "foreground_color",
+            "icon_color",
+            "accent_color",
+            "layout_guide_color",
+            "active_edit_color",
+            "panel_border_color",
+            "muted_text_color",
+            "track_color",
+            "panel_fill_color",
+            "graph_background_color",
+            "graph_axis_color",
+            "graph_marker_color"}));
+
     EXPECT_EQ(FindRootNode(model, "display"), nullptr);
     EXPECT_NE(FindRootNode(model, "colors"), nullptr);
     EXPECT_EQ(FindRootNode(model, "layout_editor"), nullptr);

@@ -177,9 +177,11 @@ TEST(LayoutEditParameterApply, UpdatesColorFieldsThroughCommands) {
     AppConfig config;
 
     ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorForeground, 0xABCDEFu));
+    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorIcon, 0xFEDCBAu));
     ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorTrack, 0x102030u));
 
     EXPECT_EQ(config.layout.colors.foregroundColor, 0xABCDEFu);
+    EXPECT_EQ(config.layout.colors.iconColor, 0xFEDCBAu);
     EXPECT_EQ(config.layout.colors.trackColor, 0x102030u);
 }
 
@@ -192,6 +194,7 @@ TEST(LayoutEditParameterApply, AppliesColorFieldsViaMetadata) {
     const TestCase cases[] = {
         {LayoutEditParameter::ColorBackground, 0x112233u},
         {LayoutEditParameter::ColorForeground, 0x445566u},
+        {LayoutEditParameter::ColorIcon, 0x556677u},
         {LayoutEditParameter::ColorAccent, 0x778899u},
         {LayoutEditParameter::ColorLayoutGuide, 0xAABBCCu},
         {LayoutEditParameter::ColorActiveEdit, 0xDDEEFFu},

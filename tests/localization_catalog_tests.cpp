@@ -79,6 +79,7 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
         LayoutEditParameter::DashboardColumnGap,
         LayoutEditParameter::ColorBackground,
         LayoutEditParameter::ColorForeground,
+        LayoutEditParameter::ColorIcon,
         LayoutEditParameter::ColorAccent,
         LayoutEditParameter::ColorLayoutGuide,
         LayoutEditParameter::ColorActiveEdit,

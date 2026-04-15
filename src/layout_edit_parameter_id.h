@@ -71,6 +71,7 @@ enum class LayoutEditParameter {
     // Colors
     ColorBackground,
     ColorForeground,
+    ColorIcon,
     ColorAccent,
     ColorLayoutGuide,
     ColorActiveEdit,

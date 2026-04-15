@@ -104,6 +104,7 @@ public:
 
     RenderColor BackgroundColor() const;
     RenderColor ForegroundColor() const;
+    RenderColor IconColor() const;
     RenderColor AccentColor() const;
     RenderColor LayoutGuideColor() const;
     RenderColor ActiveEditColor() const;
@@ -359,6 +360,7 @@ private:
     struct Palette {
         RenderColor background{};
         RenderColor foreground{};
+        RenderColor icon{};
         RenderColor accent{};
         RenderColor mutedText{};
         RenderColor track{};

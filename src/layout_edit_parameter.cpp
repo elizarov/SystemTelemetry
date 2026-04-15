@@ -180,6 +180,7 @@ const LayoutEditParameterInfo kParameterInfo[] = {
 
     {Parameter::ColorBackground, &GetFieldMetadata<ColorConfig::backgroundColorMeta>(), false, false},
     {Parameter::ColorForeground, &GetFieldMetadata<ColorConfig::foregroundColorMeta>(), false, false},
+    {Parameter::ColorIcon, &GetFieldMetadata<ColorConfig::iconColorMeta>(), false, false},
     {Parameter::ColorAccent, &GetFieldMetadata<ColorConfig::accentColorMeta>(), false, false},
     {Parameter::ColorLayoutGuide, &GetFieldMetadata<ColorConfig::layoutGuideColorMeta>(), false, false},
     {Parameter::ColorActiveEdit, &GetFieldMetadata<ColorConfig::activeEditColorMeta>(), false, false},

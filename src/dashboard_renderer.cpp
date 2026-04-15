@@ -258,6 +258,45 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactor
     return bitmapSource;
 }
 
+Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
+    IWICImagingFactory* wicFactory, IWICBitmapSource* source, RenderColor color) {
+    Microsoft::WRL::ComPtr<IWICBitmapSource> tintedBitmap;
+    if (wicFactory == nullptr || source == nullptr) {
+        return tintedBitmap;
+    }
+
+    UINT width = 0;
+    UINT height = 0;
+    if (FAILED(source->GetSize(&width, &height)) || width == 0 || height == 0) {
+        return tintedBitmap;
+    }
+
+    const UINT stride = width * 4;
+    std::vector<BYTE> pixels(static_cast<size_t>(stride) * static_cast<size_t>(height));
+    if (FAILED(source->CopyPixels(nullptr, stride, static_cast<UINT>(pixels.size()), pixels.data()))) {
+        return tintedBitmap;
+    }
+
+    for (size_t offset = 0; offset + 3 < pixels.size(); offset += 4) {
+        const BYTE alpha = pixels[offset + 3];
+        pixels[offset + 0] = static_cast<BYTE>((static_cast<unsigned int>(color.b) * alpha) / 255u);
+        pixels[offset + 1] = static_cast<BYTE>((static_cast<unsigned int>(color.g) * alpha) / 255u);
+        pixels[offset + 2] = static_cast<BYTE>((static_cast<unsigned int>(color.r) * alpha) / 255u);
+        pixels[offset + 3] = alpha;
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+    if (FAILED(wicFactory->CreateBitmapFromMemory(
+            width, height, GUID_WICPixelFormat32bppPBGRA, stride, static_cast<UINT>(pixels.size()), pixels.data(),
+            bitmap.GetAddressOf())) ||
+        bitmap == nullptr) {
+        return tintedBitmap;
+    }
+
+    tintedBitmap = bitmap;
+    return tintedBitmap;
+}
+
 }  // namespace
 
 DashboardRenderer::DashboardRenderer() = default;
@@ -271,7 +310,7 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     config_ = config;
     RebuildPalette();
     if (dwriteFactory_ != nullptr) {
-        if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
+        if (!LoadPanelIcons() || !RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:reconfigure_failed" : lastError_;
         } else {
             d2dFirstDrawWarmupPending_ = true;
@@ -381,6 +420,10 @@ RenderColor DashboardRenderer::BackgroundColor() const {
 
 RenderColor DashboardRenderer::ForegroundColor() const {
     return palette_.foreground;
+}
+
+RenderColor DashboardRenderer::IconColor() const {
+    return palette_.icon;
 }
 
 RenderColor DashboardRenderer::AccentColor() const {
@@ -1575,6 +1618,7 @@ void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
     }
     if (!card.iconName.empty()) {
         DrawPanelIcon(card.iconName, card.iconRect);
+        RegisterDynamicColorEditRegion(LayoutEditParameter::ColorIcon, card.iconRect);
     }
     if (!card.title.empty()) {
         const TextLayoutResult titleLayout = DrawTextBlock(card.titleRect,
@@ -2638,6 +2682,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlockD2D(const
 void DashboardRenderer::RebuildPalette() {
     palette_.background = ToRenderColor(config_.layout.colors.backgroundColor);
     palette_.foreground = ToRenderColor(config_.layout.colors.foregroundColor);
+    palette_.icon = ToRenderColor(config_.layout.colors.iconColor);
     palette_.accent = ToRenderColor(config_.layout.colors.accentColor);
     palette_.mutedText = ToRenderColor(config_.layout.colors.mutedTextColor);
     palette_.track = ToRenderColor(config_.layout.colors.trackColor);
@@ -2679,7 +2724,13 @@ bool DashboardRenderer::LoadPanelIcons() {
             ReleasePanelIcons();
             return false;
         }
-        panelIcons_.push_back({iconName, std::move(bitmap)});
+        auto tintedBitmap = TintMonochromeBitmapSource(wicFactory_.Get(), bitmap.Get(), IconColor());
+        if (tintedBitmap == nullptr) {
+            lastError_ = "renderer:icon_tint_failed name=\"" + iconName + "\" resource=" + std::to_string(resourceId);
+            ReleasePanelIcons();
+            return false;
+        }
+        panelIcons_.push_back({iconName, std::move(tintedBitmap)});
     }
     return true;
 }
