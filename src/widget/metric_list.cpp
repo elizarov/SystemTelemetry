@@ -19,56 +19,11 @@ std::string Trim(std::string value) {
     return std::string(first, last);
 }
 
-MetricListWidget::Entry ParseMetricListEntry(std::string item) {
-    MetricListWidget::Entry entry;
-    const size_t equals = item.find('=');
-    if (equals == std::string::npos) {
-        entry.metricRef = Trim(item);
-        return entry;
-    }
-    entry.metricRef = Trim(item.substr(0, equals));
-    entry.labelOverride = Trim(item.substr(equals + 1));
-    return entry;
-}
-
 int EffectiveMetricRowHeight(const DashboardRenderer& renderer) {
     const int valueHeight = renderer.TextMetrics().value;
     const int barHeight = std::max(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
     const int rowGap = std::max(0, renderer.ScaleLogical(renderer.Config().layout.metricList.rowGap));
     return valueHeight + rowGap + barHeight;
-}
-
-std::string ResolveMetricListLabel(const MetricListWidget::Entry& entry) {
-    if (!entry.labelOverride.empty()) {
-        return entry.labelOverride;
-    }
-    if (entry.metricRef == "cpu.clock") {
-        return "Clock";
-    }
-    if (entry.metricRef == "cpu.ram") {
-        return "RAM";
-    }
-    if (entry.metricRef == "gpu.temp") {
-        return "Temp";
-    }
-    if (entry.metricRef == "gpu.clock") {
-        return "Clock";
-    }
-    if (entry.metricRef == "gpu.fan") {
-        return "Fan";
-    }
-    if (entry.metricRef == "gpu.vram") {
-        return "VRAM";
-    }
-    if (entry.metricRef.rfind("board.temp.", 0) == 0) {
-        const std::string name = entry.metricRef.substr(std::string("board.temp.").size());
-        return name.empty() ? "Temp" : name + " Temp";
-    }
-    if (entry.metricRef.rfind("board.fan.", 0) == 0) {
-        const std::string name = entry.metricRef.substr(std::string("board.fan.").size());
-        return name.empty() ? "Fan" : name + " Fan";
-    }
-    return {};
 }
 
 }  // namespace
@@ -82,21 +37,19 @@ std::unique_ptr<DashboardWidget> MetricListWidget::Clone() const {
 }
 
 void MetricListWidget::Initialize(const LayoutNodeConfig& node) {
-    entries_.clear();
     metricRefs_.clear();
     std::stringstream stream(node.parameter);
     std::string item;
     while (std::getline(stream, item, ',')) {
-        Entry entry = ParseMetricListEntry(item);
-        if (!entry.metricRef.empty()) {
-            metricRefs_.push_back(DashboardMetricListEntry{entry.metricRef, entry.labelOverride});
-            entries_.push_back(std::move(entry));
+        const std::string metricRef = Trim(item);
+        if (!metricRef.empty()) {
+            metricRefs_.push_back(metricRef);
         }
     }
 }
 
 int MetricListWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return static_cast<int>(entries_.size()) * EffectiveMetricRowHeight(renderer);
+    return static_cast<int>(metricRefs_.size()) * EffectiveMetricRowHeight(renderer);
 }
 
 void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) {
@@ -111,7 +64,7 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
         layoutState_.rowHeight > 0
             ? std::clamp(((std::max)(0, rect.bottom - rect.top) + layoutState_.rowHeight - 1) / layoutState_.rowHeight,
                   0,
-                  static_cast<int>(entries_.size()))
+                  static_cast<int>(metricRefs_.size()))
             : 0;
     layoutState_.rowRects.clear();
     layoutState_.labelRects.clear();
@@ -196,7 +149,7 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
     for (int rowIndex = 0;
         rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.barRects.size()) &&
         rowIndex < static_cast<int>(layoutState_.barAnchorRects.size()) &&
-        rowIndex < static_cast<int>(layoutState_.labelRects.size()) && rowIndex < static_cast<int>(entries_.size());
+        rowIndex < static_cast<int>(layoutState_.labelRects.size()) && rowIndex < static_cast<int>(metricRefs_.size());
         ++rowIndex) {
         const RenderRect& barRect = layoutState_.barRects[rowIndex];
         const RenderRect& anchorRect = layoutState_.barAnchorRects[rowIndex];
@@ -216,10 +169,11 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
             false,
             true,
             config.barHeight);
-        const std::string label = ResolveMetricListLabel(entries_[rowIndex]);
-        if (!label.empty()) {
+        const MetricDefinitionConfig* definition =
+            FindMetricDefinition(renderer.Config().metrics, metricRefs_[rowIndex]);
+        if (definition != nullptr && !definition->label.empty()) {
             renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
-                label,
+                definition->label,
                 TextStyleId::Label,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
                 renderer.MakeEditableTextBinding(widget,

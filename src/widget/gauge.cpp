@@ -151,16 +151,21 @@ int GaugeOuterRadiusForRect(const DashboardRenderer& renderer, const RenderRect&
     return (std::max)(1, ((std::min)(width, height) / 2) - outerPadding);
 }
 
-int GaugeTextHalfWidth(const DashboardRenderer& renderer) {
-    const int valueWidth = renderer.MeasureTextWidth(TextStyleId::Big, "100%");
-    const int labelWidth = renderer.MeasureTextWidth(TextStyleId::Small, "Load");
+int GaugeTextHalfWidth(const DashboardRenderer& renderer, const std::string& metricRef) {
+    const std::string sampleValueText = ResolveMetricSampleValueText(renderer.Config().metrics, metricRef);
+    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().metrics, metricRef);
+    const std::string_view valueText =
+        sampleValueText.empty() ? std::string_view("100%") : std::string_view(sampleValueText);
+    const int valueWidth = renderer.MeasureTextWidth(TextStyleId::Big, valueText);
+    const std::string_view labelText = definition != nullptr ? std::string_view(definition->label) : std::string_view{};
+    const int labelWidth = renderer.MeasureTextWidth(TextStyleId::Small, labelText);
     return (std::max)(1, (((std::max)(valueWidth, labelWidth) + 1) / 2));
 }
 
-int EffectiveGaugePreferredRadius(const DashboardRenderer& renderer) {
+int EffectiveGaugePreferredRadius(const DashboardRenderer& renderer, const std::string& metricRef) {
     const int outerPadding = (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.gauge.outerPadding));
     const int ringThickness = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
-    const int halfWidth = GaugeTextHalfWidth(renderer);
+    const int halfWidth = GaugeTextHalfWidth(renderer, metricRef);
     const int valueHalfHeight = (std::max)(1, (renderer.TextMetrics().big + 1) / 2);
     const int labelHalfHeight = (std::max)(1, (renderer.TextMetrics().smallText + 1) / 2);
     const int innerRadius = (std::max)(halfWidth, (std::max)(valueHalfHeight, labelHalfHeight));
@@ -184,7 +189,7 @@ void GaugeWidget::Initialize(const LayoutNodeConfig& node) {
 }
 
 int GaugeWidget::PreferredHeight(const DashboardRenderer& renderer) const {
-    return EffectiveGaugePreferredRadius(renderer) * 2;
+    return EffectiveGaugePreferredRadius(renderer, metric_) * 2;
 }
 
 void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) {
@@ -202,7 +207,7 @@ void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const Re
     layoutState_.anchorPadding = (std::max)(1, renderer.ScaleLogical(1));
     layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
     layoutState_.anchorHalf = layoutState_.anchorSize / 2;
-    layoutState_.halfWidth = GaugeTextHalfWidth(renderer);
+    layoutState_.halfWidth = GaugeTextHalfWidth(renderer, metric_);
     layoutState_.valueBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom);
     layoutState_.valueHeight = renderer.TextMetrics().big;
     layoutState_.labelBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom);
@@ -246,14 +251,13 @@ void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const Re
 
 void GaugeWidget::Draw(
     DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
-    const DashboardGaugeMetric& metric = metrics.ResolveGauge(metric_);
+    const DashboardMetricValue& metric = metrics.ResolveMetric(metric_);
     const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
-    const double clampedPercent = ClampFinite(metric.percent, 0.0, 100.0);
+    const double clampedRatio = ClampFinite(metric.ratio, 0.0, 1.0);
     const int filledSegments =
-        clampedPercent <= 0.0
+        clampedRatio <= 0.0
             ? 0
-            : std::clamp(
-                  static_cast<int>(std::ceil(clampedPercent * static_cast<double>(gaugeLayout.segmentCount) / 100.0)),
+            : std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(gaugeLayout.segmentCount))),
                   1,
                   gaugeLayout.segmentCount);
     const double clampedPeakRatio = ClampFinite(metric.peakRatio, 0.0, 1.0);
@@ -286,10 +290,8 @@ void GaugeWidget::Draw(
     }
 
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
-        char number[16];
-        sprintf_s(number, "%.0f%%", clampedPercent);
         const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(layoutState_.valueRect,
-            number,
+            metric.valueText,
             TextStyleId::Big,
             renderer.ForegroundColor(),
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
@@ -307,7 +309,7 @@ void GaugeWidget::Draw(
     renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorTrack,
         RenderRect{layoutState_.cx, ringBounds.top, ringBounds.right, ringBounds.bottom});
     renderer.DrawText(layoutState_.labelRect,
-        "Load",
+        metric.label,
         TextStyleId::Small,
         renderer.MutedTextColor(),
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
@@ -359,15 +361,18 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         true,
         false,
         renderer.Config().layout.gauge.ringThickness);
-    renderer.RegisterStaticTextAnchor(layoutState_.labelRect,
-        "Load",
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
-        renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::LayoutEditParameter::FontSmall,
-            1,
-            renderer.Config().layout.fonts.smallText.size),
-        DashboardRenderer::LayoutEditParameter::ColorMutedText);
+    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().metrics, metric_);
+    if (definition != nullptr && !definition->label.empty()) {
+        renderer.RegisterStaticTextAnchor(layoutState_.labelRect,
+            definition->label,
+            TextStyleId::Small,
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
+            renderer.MakeEditableTextBinding(widget,
+                DashboardRenderer::LayoutEditParameter::FontSmall,
+                1,
+                renderer.Config().layout.fonts.smallText.size),
+            DashboardRenderer::LayoutEditParameter::ColorMutedText);
+    }
 }
 
 void GaugeWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {

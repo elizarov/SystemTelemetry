@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -32,6 +33,7 @@ constexpr bool operator==(unsigned int value, const ConfigColor& color) {
 }
 
 CONFIG_CODEC(ConfigColor, configschema::HexColorCodec);
+
 template <> struct configschema::DefaultLayoutEditTraits<ConfigColor> {
     using type = typename configschema::LayoutEditTraitsForPolicy<configschema::FreeValuePolicy>::type;
 };
@@ -179,16 +181,22 @@ struct LayoutCardConfig {
     CONFIG_DYNAMIC_SECTION("card.");
 };
 
-struct MetricScaleConfig {
-    CONFIG_REFLECTED_STRUCT(MetricScaleConfig)
-    CONFIG_VALUE(double, cpuClockGHz, "cpu_clock_ghz");
-    CONFIG_VALUE(double, gpuTemperatureC, "gpu_temperature_c");
-    CONFIG_VALUE(double, gpuClockMHz, "gpu_clock_mhz");
-    CONFIG_VALUE(double, gpuFanRpm, "gpu_fan_rpm");
-    CONFIG_VALUE(double, boardTemperatureC, "board_temperature_c");
-    CONFIG_VALUE(double, boardFanRpm, "board_fan_rpm");
-    CONFIG_SECTION("metric_scales");
+struct MetricDefinitionConfig {
+    std::string id;
+    bool telemetryScale = false;
+    double scale = 0.0;
+    std::string unit;
+    std::string label;
 };
+
+struct MetricsSectionConfig {
+    CONFIG_REFLECTED_STRUCT(MetricsSectionConfig)
+    CONFIG_SECTION("metrics");
+
+    std::vector<MetricDefinitionConfig> definitions;
+};
+
+CONFIG_SECTION_CODEC(MetricsSectionConfig, configschema::MetricsSectionCodec);
 
 struct MetricListWidgetConfig {
     CONFIG_REFLECTED_STRUCT(MetricListWidgetConfig)
@@ -280,7 +288,7 @@ struct AppConfig {
     CONFIG_SECTION_VALUE(NetworkConfig, network);
     CONFIG_SECTION_VALUE(StorageConfig, storage);
     CONFIG_SECTION_VALUE(BoardConfig, board);
-    CONFIG_SECTION_VALUE(MetricScaleConfig, metricScales);
+    CONFIG_SECTION_VALUE(MetricsSectionConfig, metrics);
     CONFIG_DYNAMIC_SECTION_VALUE(LayoutSectionConfig, layouts, name);
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
@@ -301,3 +309,6 @@ CONFIG_EDITABLE_ROOT_BINDING_PATH(GaugeWidgetConfig, AppConfig, AppConfig::layou
 CONFIG_EDITABLE_ROOT_BINDING_PATH(TextWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::textBinding);
 CONFIG_EDITABLE_ROOT_BINDING_PATH(
     NetworkFooterWidgetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::networkFooterBinding);
+
+const MetricDefinitionConfig* FindMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id);
+MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std::string_view id);

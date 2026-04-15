@@ -9,21 +9,31 @@
 
 namespace {
 
-std::string FormatScalarValue(const ScalarMetric& metric, int precision) {
-    if (!metric.value.has_value() || !IsFiniteDouble(*metric.value)) {
+std::string FormatScalarValue(std::optional<double> value, const std::string& unit, int precision) {
+    if (!value.has_value() || !IsFiniteDouble(*value)) {
         return "N/A";
     }
     char buffer[64];
-    sprintf_s(buffer, "%.*f %s", precision, *metric.value, metric.unit.c_str());
+    if (unit == "%") {
+        sprintf_s(buffer, "%.*f%%", precision, *value);
+    } else if (unit.empty()) {
+        sprintf_s(buffer, "%.*f", precision, *value);
+    } else {
+        sprintf_s(buffer, "%.*f %s", precision, *value, unit.c_str());
+    }
     return buffer;
 }
 
-std::string FormatMemory(double usedGb, double totalGb) {
+std::string FormatMemory(double usedGb, double totalGb, const std::string& unit) {
     if (!IsFiniteDouble(usedGb) || !IsFiniteDouble(totalGb) || totalGb <= 0.0) {
         return "N/A";
     }
     char buffer[64];
-    sprintf_s(buffer, "%.1f / %.0f GB", usedGb, totalGb);
+    if (unit.empty()) {
+        sprintf_s(buffer, "%.1f / %.0f", usedGb, totalGb);
+    } else {
+        sprintf_s(buffer, "%.1f / %.0f %s", usedGb, totalGb, unit.c_str());
+    }
     return buffer;
 }
 
@@ -83,18 +93,19 @@ double GetTimeMarkerOffsetSamples(const SYSTEMTIME& now) {
     return secondsIntoTenSecondWindow / 0.5;
 }
 
-std::string BuildBoardMetricLabel(const std::string& name, const char* suffix) {
-    if (name.empty()) {
-        return suffix;
-    }
-    return name + " " + suffix;
-}
-
-double ResolveScaleRatio(double value, double scale) {
+double ResolveMetricRatio(const MetricDefinitionConfig& definition, double value, double telemetryScale = 0.0) {
+    const double scale = definition.telemetryScale ? telemetryScale : definition.scale;
     if (!IsFiniteDouble(value) || !IsFiniteDouble(scale) || scale <= 0.0) {
         return 0.0;
     }
-    return value / scale;
+    return ClampFinite(value / scale, 0.0, 1.0);
+}
+
+int ResolveScalarPrecision(const std::string& metricRef) {
+    if (metricRef == "cpu.clock") {
+        return 2;
+    }
+    return 0;
 }
 
 const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, const std::string& seriesRef) {
@@ -122,102 +133,158 @@ std::vector<double> ResolveRetainedHistorySamples(const SystemSnapshot& snapshot
     return history != nullptr ? *history : std::vector<double>{};
 }
 
-std::optional<DashboardMetricRow> ResolveNamedBoardMetric(const std::vector<NamedScalarMetric>& metrics,
-    const SystemSnapshot& snapshot,
-    const std::string& metricHistoryRef,
-    const std::string& name,
-    const char* suffix,
-    double scale) {
-    for (const auto& metric : metrics) {
-        if (metric.name != name) {
-            continue;
-        }
-        const double ratio = ResolveScaleRatio(metric.metric.value.value_or(0.0), scale);
-        return DashboardMetricRow{BuildBoardMetricLabel(metric.name, suffix),
-            FormatScalarValue(metric.metric, 0),
-            ratio,
-            ResolvePeakRatio(snapshot, metricHistoryRef, ratio)};
+std::string BuildMetricSampleValueText(const MetricDefinitionConfig& definition, const std::string& metricRef) {
+    if (metricRef == "cpu.ram" || metricRef == "gpu.vram") {
+        return FormatMemory(999.9, 1000.0, definition.unit);
     }
-
-    ScalarMetric unavailable{std::nullopt, std::string(suffix) == "Temp" ? "°C" : "RPM"};
-    return DashboardMetricRow{BuildBoardMetricLabel(name, suffix),
-        FormatScalarValue(unavailable, 0),
-        0.0,
-        ResolvePeakRatio(snapshot, metricHistoryRef, 0.0)};
+    if (definition.telemetryScale) {
+        const int precision =
+            metricRef == "cpu.load" || metricRef == "gpu.load" ? 0 : ResolveScalarPrecision(metricRef);
+        return FormatScalarValue(std::optional<double>{100.0}, definition.unit, precision);
+    }
+    return FormatScalarValue(
+        std::optional<double>{definition.scale}, definition.unit, ResolveScalarPrecision(metricRef));
 }
 
-std::optional<DashboardMetricRow> ResolveMetricRow(
-    const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales, const std::string& metricRef) {
+std::optional<DashboardMetricValue> ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
+    const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view logicalName) {
+    for (const auto& metric : metrics) {
+        if (metric.name != logicalName) {
+            continue;
+        }
+        const double numericValue = FiniteNonNegativeOr(metric.metric.value.value_or(0.0));
+        const double ratio = ResolveMetricRatio(definition, numericValue);
+        return DashboardMetricValue{definition.label,
+            FormatScalarValue(metric.metric.value, definition.unit, 0),
+            BuildMetricSampleValueText(definition, metricRef),
+            definition.unit,
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
+    }
+
+    return DashboardMetricValue{definition.label,
+        "N/A",
+        BuildMetricSampleValueText(definition, metricRef),
+        definition.unit,
+        0.0,
+        ResolvePeakRatio(snapshot, metricRef, 0.0)};
+}
+
+std::optional<DashboardMetricValue> ResolveMetricValue(
+    const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics, const std::string& metricRef) {
+    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
+    if (definition == nullptr) {
+        return std::nullopt;
+    }
+
+    if (metricRef == "cpu.load") {
+        const double percent = ClampFinite(snapshot.cpu.loadPercent, 0.0, 100.0);
+        const double ratio = ResolveMetricRatio(*definition, percent, 100.0);
+        return DashboardMetricValue{definition->label,
+            FormatScalarValue(std::optional<double>{percent}, definition->unit, 0),
+            BuildMetricSampleValueText(*definition, metricRef),
+            definition->unit,
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
+    }
     if (metricRef == "cpu.clock") {
-        const double ratio = ResolveScaleRatio(snapshot.cpu.clock.value.value_or(0.0), metricScales.cpuClockGHz);
-        return DashboardMetricRow{
-            "Clock", FormatScalarValue(snapshot.cpu.clock, 2), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        const double value = FiniteNonNegativeOr(snapshot.cpu.clock.value.value_or(0.0));
+        const double ratio = ResolveMetricRatio(*definition, value);
+        return DashboardMetricValue{definition->label,
+            FormatScalarValue(snapshot.cpu.clock.value, definition->unit, 2),
+            BuildMetricSampleValueText(*definition, metricRef),
+            definition->unit,
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "cpu.ram") {
-        const double rawTotal = snapshot.cpu.memory.totalGb;
-        const double rawUsed = snapshot.cpu.memory.usedGb;
-        const double total = FiniteNonNegativeOr(rawTotal);
-        const double used = FiniteNonNegativeOr(rawUsed);
-        const double ratio = total > 0.0 ? used / total : 0.0;
-        return DashboardMetricRow{
-            "RAM", FormatMemory(rawUsed, rawTotal), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        const double total = FiniteNonNegativeOr(snapshot.cpu.memory.totalGb);
+        const double used = FiniteNonNegativeOr(snapshot.cpu.memory.usedGb);
+        const double ratio = ResolveMetricRatio(*definition, used, total);
+        return DashboardMetricValue{definition->label,
+            FormatMemory(snapshot.cpu.memory.usedGb, snapshot.cpu.memory.totalGb, definition->unit),
+            BuildMetricSampleValueText(*definition, metricRef),
+            definition->unit,
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
+    }
+    if (metricRef == "gpu.load") {
+        const double percent = ClampFinite(snapshot.gpu.loadPercent, 0.0, 100.0);
+        const double ratio = ResolveMetricRatio(*definition, percent, 100.0);
+        return DashboardMetricValue{definition->label,
+            FormatScalarValue(std::optional<double>{percent}, definition->unit, 0),
+            BuildMetricSampleValueText(*definition, metricRef),
+            definition->unit,
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.temp") {
-        const double ratio =
-            ResolveScaleRatio(snapshot.gpu.temperature.value.value_or(0.0), metricScales.gpuTemperatureC);
-        return DashboardMetricRow{"Temp",
-            FormatScalarValue(snapshot.gpu.temperature, 0),
+        const double value = FiniteNonNegativeOr(snapshot.gpu.temperature.value.value_or(0.0));
+        const double ratio = ResolveMetricRatio(*definition, value);
+        return DashboardMetricValue{definition->label,
+            FormatScalarValue(snapshot.gpu.temperature.value, definition->unit, 0),
+            BuildMetricSampleValueText(*definition, metricRef),
+            definition->unit,
             ratio,
             ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.clock") {
-        const double ratio = ResolveScaleRatio(snapshot.gpu.clock.value.value_or(0.0), metricScales.gpuClockMHz);
-        return DashboardMetricRow{
-            "Clock", FormatScalarValue(snapshot.gpu.clock, 0), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        const double value = FiniteNonNegativeOr(snapshot.gpu.clock.value.value_or(0.0));
+        const double ratio = ResolveMetricRatio(*definition, value);
+        return DashboardMetricValue{definition->label,
+            FormatScalarValue(snapshot.gpu.clock.value, definition->unit, 0),
+            BuildMetricSampleValueText(*definition, metricRef),
+            definition->unit,
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.fan") {
-        const double ratio = ResolveScaleRatio(snapshot.gpu.fan.value.value_or(0.0), metricScales.gpuFanRpm);
-        return DashboardMetricRow{
-            "Fan", FormatScalarValue(snapshot.gpu.fan, 0), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        const double value = FiniteNonNegativeOr(snapshot.gpu.fan.value.value_or(0.0));
+        const double ratio = ResolveMetricRatio(*definition, value);
+        return DashboardMetricValue{definition->label,
+            FormatScalarValue(snapshot.gpu.fan.value, definition->unit, 0),
+            BuildMetricSampleValueText(*definition, metricRef),
+            definition->unit,
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef == "gpu.vram") {
-        const double rawTotalCapacity = snapshot.gpu.vram.totalGb;
-        const double rawUsed = snapshot.gpu.vram.usedGb;
-        const double totalCapacity = FiniteNonNegativeOr(rawTotalCapacity);
-        const double used = FiniteNonNegativeOr(rawUsed);
-        const double ratio = totalCapacity > 0.0 ? used / totalCapacity : 0.0;
-        return DashboardMetricRow{
-            "VRAM", FormatMemory(rawUsed, rawTotalCapacity), ratio, ResolvePeakRatio(snapshot, metricRef, ratio)};
+        const double total = FiniteNonNegativeOr(snapshot.gpu.vram.totalGb);
+        const double used = FiniteNonNegativeOr(snapshot.gpu.vram.usedGb);
+        const double ratio = ResolveMetricRatio(*definition, used, total);
+        return DashboardMetricValue{definition->label,
+            FormatMemory(snapshot.gpu.vram.usedGb, snapshot.gpu.vram.totalGb, definition->unit),
+            BuildMetricSampleValueText(*definition, metricRef),
+            definition->unit,
+            ratio,
+            ResolvePeakRatio(snapshot, metricRef, ratio)};
     }
     if (metricRef.rfind("board.temp.", 0) == 0) {
-        return ResolveNamedBoardMetric(snapshot.boardTemperatures,
+        return ResolveBoardMetric(snapshot.boardTemperatures,
             snapshot,
+            *definition,
             metricRef,
-            metricRef.substr(std::string("board.temp.").size()),
-            "Temp",
-            metricScales.boardTemperatureC);
+            metricRef.substr(std::string("board.temp.").size()));
     }
     if (metricRef.rfind("board.fan.", 0) == 0) {
-        return ResolveNamedBoardMetric(snapshot.boardFans,
-            snapshot,
-            metricRef,
-            metricRef.substr(std::string("board.fan.").size()),
-            "Fan",
-            metricScales.boardFanRpm);
+        return ResolveBoardMetric(
+            snapshot.boardFans, snapshot, *definition, metricRef, metricRef.substr(std::string("board.fan.").size()));
     }
     return std::nullopt;
 }
 
-void ApplyMetricLabelOverride(DashboardMetricRow& row, const std::string& labelOverride) {
-    if (!labelOverride.empty()) {
-        row.label = labelOverride;
-    }
-}
-
 }  // namespace
 
-DashboardMetricSource::DashboardMetricSource(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales)
-    : snapshot_(snapshot), metricScales_(metricScales) {}
+std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef) {
+    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
+    return definition != nullptr ? BuildMetricSampleValueText(*definition, metricRef) : std::string{};
+}
+
+DashboardMetricSource::DashboardMetricSource(const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics)
+    : snapshot_(snapshot), metrics_(metrics) {}
 
 const std::string& DashboardMetricSource::ResolveText(const std::string& metricRef) const {
     const auto cached = textCache_.find(metricRef);
@@ -234,28 +301,24 @@ const std::string& DashboardMetricSource::ResolveText(const std::string& metricR
     return textCache_.emplace(metricRef, std::move(resolved)).first->second;
 }
 
-const DashboardGaugeMetric& DashboardMetricSource::ResolveGauge(const std::string& metricRef) const {
-    const auto cached = gaugeCache_.find(metricRef);
-    if (cached != gaugeCache_.end()) {
+const DashboardMetricValue& DashboardMetricSource::ResolveMetric(const std::string& metricRef) const {
+    const auto cached = metricCache_.find(metricRef);
+    if (cached != metricCache_.end()) {
         return cached->second;
     }
 
-    DashboardGaugeMetric metric;
-    if (metricRef == "cpu.load") {
-        const double percent = ClampFinite(snapshot_.cpu.loadPercent, 0.0, 100.0);
-        metric = DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "cpu.load", percent / 100.0)};
-    } else if (metricRef == "gpu.load") {
-        const double percent = ClampFinite(snapshot_.gpu.loadPercent, 0.0, 100.0);
-        metric = DashboardGaugeMetric{percent, ResolvePeakRatio(snapshot_, "gpu.load", percent / 100.0)};
+    DashboardMetricValue metric;
+    if (auto resolved = ResolveMetricValue(snapshot_, metrics_, metricRef); resolved.has_value()) {
+        metric = std::move(*resolved);
     }
-    return gaugeCache_.emplace(metricRef, metric).first->second;
+    return metricCache_.emplace(metricRef, std::move(metric)).first->second;
 }
 
-const std::vector<DashboardMetricRow>& DashboardMetricSource::ResolveMetricList(
-    const std::vector<DashboardMetricListEntry>& metricRefs) const {
+const std::vector<DashboardMetricValue>& DashboardMetricSource::ResolveMetricList(
+    const std::vector<std::string>& metricRefs) const {
     std::ostringstream cacheKey;
     for (const auto& metricRef : metricRefs) {
-        cacheKey << metricRef.metricRef << "=" << metricRef.labelOverride << '\n';
+        cacheKey << metricRef << '\n';
     }
 
     const std::string key = cacheKey.str();
@@ -264,11 +327,10 @@ const std::vector<DashboardMetricRow>& DashboardMetricSource::ResolveMetricList(
         return cached->second;
     }
 
-    std::vector<DashboardMetricRow> rows;
+    std::vector<DashboardMetricValue> rows;
     rows.reserve(metricRefs.size());
     for (const auto& metricRef : metricRefs) {
-        if (auto row = ResolveMetricRow(snapshot_, metricScales_, metricRef.metricRef); row.has_value()) {
-            ApplyMetricLabelOverride(*row, metricRef.labelOverride);
+        if (auto row = ResolveMetricValue(snapshot_, metrics_, metricRef); row.has_value()) {
             rows.push_back(*row);
         }
     }

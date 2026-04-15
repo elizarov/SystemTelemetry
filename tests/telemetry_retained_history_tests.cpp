@@ -20,14 +20,14 @@ TEST(TelemetryRetainedHistory, PushSampleCreatesSeriesAndKeepsRollingWindow) {
 TEST(TelemetryRetainedHistory, PushBoardMetricSamplesUsesConfiguredScales) {
     RetainedHistoryStore store;
     SystemSnapshot snapshot;
-    MetricScaleConfig scales;
-    scales.boardTemperatureC = 100.0;
-    scales.boardFanRpm = 2000.0;
+    MetricsSectionConfig metrics;
+    metrics.definitions.push_back(MetricDefinitionConfig{"board.temp.cpu", false, 100.0, "C", "CPU Temp"});
+    metrics.definitions.push_back(MetricDefinitionConfig{"board.fan.system", false, 2000.0, "RPM", "System Fan"});
 
     snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, "C"}});
     snapshot.boardFans.push_back({"system", ScalarMetric{1200.0, "RPM"}});
 
-    store.PushBoardMetricSamples(snapshot, scales);
+    store.PushBoardMetricSamples(snapshot, metrics);
 
     ASSERT_EQ(snapshot.retainedHistories.size(), 2u);
     EXPECT_EQ(snapshot.retainedHistories[0].seriesRef, "board.temp.cpu");

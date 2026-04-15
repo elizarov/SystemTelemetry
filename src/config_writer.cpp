@@ -35,6 +35,17 @@ std::string FormatFontSpec(const UiFontConfig& font) {
     return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
 }
 
+std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
+    std::ostringstream stream;
+    if (definition.telemetryScale) {
+        stream << "*";
+    } else {
+        stream << definition.scale;
+    }
+    stream << "," << definition.unit << "," << definition.label;
+    return stream.str();
+}
+
 }  // namespace
 
 std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
@@ -171,6 +182,35 @@ template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardCo
                 }
             }
             saveBoardKey("board.fan." + logicalName, currentValue, compareValue);
+        }
+    }
+};
+
+template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, MetricsSectionConfig> {
+    template <typename UpdateKeyFn> static void Save(const MetricsSectionConfig& metrics, UpdateKeyFn&& updateKey) {
+        for (const auto& definition : metrics.definitions) {
+            if (definition.id.empty()) {
+                continue;
+            }
+            updateKey("[metrics]", definition.id, FormatMetricDefinitionValue(definition));
+        }
+    }
+
+    template <typename UpdateKeyFn>
+    static void SaveDifferences(
+        const MetricsSectionConfig& metrics, const MetricsSectionConfig* compareMetrics, UpdateKeyFn&& updateKey) {
+        for (const auto& definition : metrics.definitions) {
+            if (definition.id.empty()) {
+                continue;
+            }
+            const MetricDefinitionConfig* compareDefinition =
+                compareMetrics != nullptr ? FindMetricDefinition(*compareMetrics, definition.id) : nullptr;
+            const std::string currentValue = FormatMetricDefinitionValue(definition);
+            const std::string compareValue =
+                compareDefinition != nullptr ? FormatMetricDefinitionValue(*compareDefinition) : std::string{};
+            if (compareDefinition == nullptr || currentValue != compareValue) {
+                updateKey("[metrics]", definition.id, currentValue);
+            }
         }
     }
 };
@@ -478,9 +518,10 @@ std::string BuildSavedConfigText(
 
     const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape](
                                const std::string& sectionName, const std::string& key, const std::string& value) {
-        size_t sectionStart = sectionName == "[storage]" ? ensureSectionAfter(sectionName, "[network]")
-                              : sectionName == "[board]" ? ensureSectionAfter(sectionName, "[storage]")
-                                                         : ensureSection(sectionName);
+        size_t sectionStart = sectionName == "[storage]"   ? ensureSectionAfter(sectionName, "[network]")
+                              : sectionName == "[board]"   ? ensureSectionAfter(sectionName, "[storage]")
+                              : sectionName == "[metrics]" ? ensureSectionAfter(sectionName, "[board]")
+                                                           : ensureSection(sectionName);
         if (sectionStart >= lines.size()) {
             return;
         }

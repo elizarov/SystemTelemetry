@@ -376,10 +376,7 @@ struct ColorDialogControls {
 
 constexpr ColorDialogControls kColorDialogControls[] = {
     {IDC_LAYOUT_EDIT_COLOR_RED_LABEL, IDC_LAYOUT_EDIT_COLOR_RED_EDIT, IDC_LAYOUT_EDIT_COLOR_RED_SLIDER, "red"},
-    {IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL,
-        IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT,
-        IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER,
-        "green"},
+    {IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT, IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER, "green"},
     {IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT, IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER, "blue"},
 };
 
@@ -509,13 +506,8 @@ void CenterDialogLabelToControl(HWND hwnd, int labelId, int controlId) {
     const int height = labelRect->bottom - labelRect->top;
     const int centerY = (controlRect->top + controlRect->bottom) / 2;
     const int top = centerY - (height / 2);
-    SetWindowPos(GetDlgItem(hwnd, labelId),
-        nullptr,
-        labelRect->left,
-        top,
-        width,
-        height,
-        SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(
+        GetDlgItem(hwnd, labelId), nullptr, labelRect->left, top, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void AlignFontEditorControls(HWND hwnd) {
@@ -589,8 +581,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     if (state->selectedLeaf == nullptr) {
         ShowLayoutEditEditors(hwnd, false, false, false, false);
         state->updatingControls = false;
-        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-            BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
+        state->shellUi->TraceLayoutEditDialogEvent(
+            "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
         return;
     }
 
@@ -619,8 +611,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             SetColorDialogChannel(hwnd, kColorDialogControls[2], color & 0xFFu);
             ShowLayoutEditEditors(hwnd, false, false, true, false);
             std::ostringstream trace;
-            trace << BuildTraceNodeText(state->selectedNode) << " editor=\"color\""
-                  << BuildColorDialogTraceValues(hwnd)
+            trace << BuildTraceNodeText(state->selectedNode) << " editor=\"color\"" << BuildColorDialogTraceValues(hwnd)
                   << " config_value=" << QuoteTraceText(value.has_value() ? FormatTraceColorHex(*value) : "none");
             state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
         } else {
@@ -655,8 +646,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
     } else {
         ShowLayoutEditEditors(hwnd, false, false, false, false);
-        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-            BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
+        state->shellUi->TraceLayoutEditDialogEvent(
+            "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
     }
 
     state->updatingControls = false;
@@ -684,10 +675,9 @@ bool PreviewSelectedNumeric(LayoutEditDialogState* state, HWND hwnd) {
     }
     const bool applied = value.has_value() && state->shellUi->ApplyParameterPreview(*parameter, *value);
     std::ostringstream trace;
-    trace << BuildTraceNodeText(state->selectedNode) << " raw=" << QuoteTraceText(Utf8FromWide(buffer))
-          << " parsed=" << QuoteTraceText(value.has_value() ? FormatLayoutEditTooltipValue(*value,
-                                                                     state->selectedLeaf->valueFormat)
-                                                             : "invalid")
+    trace << BuildTraceNodeText(state->selectedNode) << " raw=" << QuoteTraceText(Utf8FromWide(buffer)) << " parsed="
+          << QuoteTraceText(
+                 value.has_value() ? FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat) : "invalid")
           << " applied=" << QuoteTraceText(applied ? "true" : "false");
     state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_numeric", trace.str());
     return applied;
@@ -756,8 +746,8 @@ bool SetSelectedDialogColor(LayoutEditDialogState* state, HWND hwnd, unsigned in
         BuildTraceNodeText(state->selectedNode) + " picked=" + QuoteTraceText(FormatTraceColorHex(color)));
     const bool applied = state->shellUi->ApplyColorPreview(*parameter, color);
     if (!applied) {
-        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_apply_end",
-            BuildTraceNodeText(state->selectedNode) + " applied=\"false\"");
+        state->shellUi->TraceLayoutEditDialogEvent(
+            "layout_edit_dialog:picker_apply_end", BuildTraceNodeText(state->selectedNode) + " applied=\"false\"");
         return false;
     }
 
@@ -1044,11 +1034,12 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                 PreviewSelectedFont(state, hwnd, HIWORD(wParam));
                 return TRUE;
             }
-            if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_RED_EDIT || LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT ||
+            if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_RED_EDIT ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
-                if (const auto* channel = FindColorDialogControlsByEditId(LOWORD(wParam)); channel != nullptr &&
-                    state != nullptr && !state->updatingControls) {
+                if (const auto* channel = FindColorDialogControlsByEditId(LOWORD(wParam));
+                    channel != nullptr && state != nullptr && !state->updatingControls) {
                     const auto value = ParseColorDialogChannel(hwnd, channel->editId);
                     if (value.has_value()) {
                         SendDlgItemMessageW(hwnd, channel->sliderId, TBM_SETPOS, TRUE, *value);
@@ -1083,19 +1074,18 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                     chooseColor.lpCustColors = state->customColors;
                     chooseColor.Flags = CC_FULLOPEN | CC_RGBINIT;
                     state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_open",
-                        BuildTraceNodeText(state->selectedNode) + " current=" +
-                            QuoteTraceText(FormatTraceColorHex(currentColor)));
+                        BuildTraceNodeText(state->selectedNode) +
+                            " current=" + QuoteTraceText(FormatTraceColorHex(currentColor)));
                     if (ChooseColorW(&chooseColor) == TRUE) {
                         const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 16) |
                                                        (GetGValue(chooseColor.rgbResult) << 8) |
                                                        GetBValue(chooseColor.rgbResult);
                         state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_return",
-                            BuildTraceNodeText(state->selectedNode) + " accepted=\"true\" chosen=" +
-                                QuoteTraceText(FormatTraceColorHex(nextColor)));
+                            BuildTraceNodeText(state->selectedNode) +
+                                " accepted=\"true\" chosen=" + QuoteTraceText(FormatTraceColorHex(nextColor)));
                         SetSelectedDialogColor(state, hwnd, nextColor);
                     } else {
-                        state->shellUi->TraceLayoutEditDialogEvent(
-                            "layout_edit_dialog:picker_return",
+                        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:picker_return",
                             BuildTraceNodeText(state->selectedNode) + " accepted=\"false\"");
                     }
                     return TRUE;

@@ -28,23 +28,24 @@ The language is centered around the dashboard shape:
 - layout containers are written as `kind(...)`
 - size pairs are written as `x,y`
 - font specs are written as `face,size,weight`
-- widget parameters are written inline as `widget(key=value)` or `widget(metric.ref)`
+- widget parameters are written inline as `widget(metric.ref)`
 - omitted weights default to `1`
 - whitespace around commas is ignored
 
 ## Structure
 
-The language has nine levels:
+The language has ten levels:
 
 1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, and `[network_footer]`
 2. Runtime selection sections such as `[display]`, `[network]`, and `[storage]`
 3. Board sensor mapping in `[board]`
-4. Named dashboard structure sections in `[layout.<name>]`
-5. Shared dashboard outer spacing in `[dashboard]`
-6. Shared card chrome and inner spacing in `[card_style]`
-7. Shared dashboard palette in `[colors]`
-8. Shared dashboard fonts in `[fonts]`
-9. Card-local title, icon, and content composition in `[card.<id>]`
+4. Metric presentation and normalization definitions in `[metrics]`
+5. Named dashboard structure sections in `[layout.<name>]`
+6. Shared dashboard outer spacing in `[dashboard]`
+7. Shared card chrome and inner spacing in `[card_style]`
+8. Shared dashboard palette in `[colors]`
+9. Shared dashboard fonts in `[fonts]`
+10. Card-local title, icon, and content composition in `[card.<id>]`
 
 ## Runtime selection sections
 
@@ -67,6 +68,11 @@ The language has nine levels:
 
 - `board.temp.<name> = sensor title`
 - `board.fan.<name> = sensor title`
+
+`[metrics]` owns the metric ids that `metric_list(...)` and `gauge(...)` bind:
+
+- `metric.id = <scale>,<unit>,<label>`
+- `*` as the scale means the renderer normalizes that metric against telemetry-provided scale data such as load percent or total RAM/VRAM capacity
 
 ## Widget sections
 
@@ -271,13 +277,13 @@ Mixed-case widget or container spellings such as `Throughput(...)` or `Columns(.
 
 - Widgets may bind data inline.
 - For widgets that accept a list, the plain comma-separated body is passed through as that widget's parameter string.
-- `metric_list(...)` items may append `=Label` to override the rendered row label for that metric.
+- `metric_list(...)` and `gauge(...)` bind metric ids declared in `[metrics]`.
 
 Examples:
 
 - `text(cpu.name)`
 - `gauge(gpu.load)`
-- `metric_list(cpu.ram,board.temp.cpu=Temp,cpu.clock,board.fan.cpu,board.fan.system=System Fan)`
+- `metric_list(cpu.ram,board.temp.cpu,cpu.clock,board.fan.cpu,board.fan.system)`
 - `throughput(network.upload)`
 - `drive_usage_list`
 - `vertical_spacer(network_footer)`
@@ -313,7 +319,12 @@ Example:
 
 - `[storage]`
 - `drives =`
-- `metric_list(cpu.ram=RAM,board.temp.cpu=Temp,board.fan.cpu=Fan,board.fan.system=System Fan)`
+- `[metrics]`
+- `cpu.ram = *,GB,RAM`
+- `board.temp.cpu = 100,°C,Temp`
+- `board.fan.cpu = 3000,RPM,CPU Fan`
+- `board.fan.system = 3000,RPM,System Fan`
+- `metric_list(cpu.ram,board.temp.cpu,board.fan.cpu,board.fan.system)`
 
 - `[storage] drives` defines the vertical drive-usage list contents and order.
 - An empty `[storage] drives` value means the storage telemetry selection flow auto-selects all currently available fixed drives.

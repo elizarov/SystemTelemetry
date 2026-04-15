@@ -20,6 +20,14 @@ double ResolveScaleRatio(double value, double scale) {
     return value / scale;
 }
 
+double ResolveMetricScaleRatio(const MetricsSectionConfig& metrics, std::string_view metricRef, double value) {
+    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
+    if (definition == nullptr || definition->telemetryScale || definition->scale <= 0.0) {
+        return 0.0;
+    }
+    return ResolveScaleRatio(value, definition->scale);
+}
+
 void PushHistorySample(std::vector<double>& history, double value) {
     if (history.empty()) {
         return;
@@ -54,15 +62,15 @@ void RetainedHistoryStore::PushSample(SystemSnapshot& snapshot, const std::strin
     PushHistorySample(snapshot.retainedHistories[it->second].samples, value);
 }
 
-void RetainedHistoryStore::PushBoardMetricSamples(SystemSnapshot& snapshot, const MetricScaleConfig& scales) const {
+void RetainedHistoryStore::PushBoardMetricSamples(SystemSnapshot& snapshot, const MetricsSectionConfig& metrics) const {
     for (const auto& metric : snapshot.boardTemperatures) {
         PushSample(snapshot,
             "board.temp." + metric.name,
-            ResolveScaleRatio(metric.metric.value.value_or(0.0), scales.boardTemperatureC));
+            ResolveMetricScaleRatio(metrics, "board.temp." + metric.name, metric.metric.value.value_or(0.0)));
     }
     for (const auto& metric : snapshot.boardFans) {
         PushSample(snapshot,
             "board.fan." + metric.name,
-            ResolveScaleRatio(metric.metric.value.value_or(0.0), scales.boardFanRpm));
+            ResolveMetricScaleRatio(metrics, "board.fan." + metric.name, metric.metric.value.value_or(0.0)));
     }
 }

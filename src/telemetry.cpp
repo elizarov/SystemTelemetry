@@ -28,6 +28,18 @@
 #include "trace.h"
 #include "utf8.h"
 
+namespace {
+
+double ResolveConfiguredMetricRatio(const MetricsSectionConfig& metrics, std::string_view metricRef, double value) {
+    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
+    if (definition == nullptr || definition->telemetryScale || definition->scale <= 0.0) {
+        return 0.0;
+    }
+    return value / definition->scale;
+}
+
+}  // namespace
+
 TelemetryCollector::Impl::~Impl() {
     if (cpuQuery_ != nullptr) {
         PdhCloseQuery(cpuQuery_);
@@ -328,10 +340,8 @@ void TelemetryCollector::Impl::UpdateCpu() {
     }
     retainedHistoryStore_.PushSample(snapshot_,
         "cpu.clock",
-        config_.metricScales.cpuClockGHz > 0.0
-            ? snapshot_.cpu.clock.value.value_or(0.0) / config_.metricScales.cpuClockGHz
-            : 0.0);
-    retainedHistoryStore_.PushBoardMetricSamples(snapshot_, config_.metricScales);
+        ResolveConfiguredMetricRatio(config_.metrics, "cpu.clock", snapshot_.cpu.clock.value.value_or(0.0)));
+    retainedHistoryStore_.PushBoardMetricSamples(snapshot_, config_.metrics);
 }
 
 void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
@@ -508,18 +518,13 @@ void TelemetryCollector::Impl::UpdateGpu() {
     }
     retainedHistoryStore_.PushSample(snapshot_,
         "gpu.temp",
-        config_.metricScales.gpuTemperatureC > 0.0
-            ? snapshot_.gpu.temperature.value.value_or(0.0) / config_.metricScales.gpuTemperatureC
-            : 0.0);
+        ResolveConfiguredMetricRatio(config_.metrics, "gpu.temp", snapshot_.gpu.temperature.value.value_or(0.0)));
     retainedHistoryStore_.PushSample(snapshot_,
         "gpu.clock",
-        config_.metricScales.gpuClockMHz > 0.0
-            ? snapshot_.gpu.clock.value.value_or(0.0) / config_.metricScales.gpuClockMHz
-            : 0.0);
+        ResolveConfiguredMetricRatio(config_.metrics, "gpu.clock", snapshot_.gpu.clock.value.value_or(0.0)));
     retainedHistoryStore_.PushSample(snapshot_,
         "gpu.fan",
-        config_.metricScales.gpuFanRpm > 0.0 ? snapshot_.gpu.fan.value.value_or(0.0) / config_.metricScales.gpuFanRpm
-                                             : 0.0);
+        ResolveConfiguredMetricRatio(config_.metrics, "gpu.fan", snapshot_.gpu.fan.value.value_or(0.0)));
     const double totalVram = snapshot_.gpu.vram.totalGb;
     retainedHistoryStore_.PushSample(
         snapshot_, "gpu.vram", totalVram > 0.0 ? snapshot_.gpu.vram.usedGb / totalVram : 0.0);

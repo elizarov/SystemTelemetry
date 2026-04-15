@@ -20,11 +20,6 @@ public:
         std::vector<RenderRect> barAnchorRects;
     };
 
-    struct Entry {
-        std::string metricRef;
-        std::string labelOverride;
-    };
-
     DashboardWidgetClass Class() const override;
     std::unique_ptr<DashboardWidget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
@@ -37,7 +32,6 @@ public:
     void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
 
 private:
-    std::vector<Entry> entries_;
-    std::vector<DashboardMetricListEntry> metricRefs_;
+    std::vector<std::string> metricRefs_;
     LayoutState layoutState_{};
 };

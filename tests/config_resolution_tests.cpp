@@ -34,11 +34,12 @@ TEST(ConfigResolution, CollectsUniqueBoardBindingsFromNestedCardLayouts) {
     LayoutCardConfig card;
     card.id = "cpu";
     card.layout = MakeContainerNode("rows",
-        {MakeWidgetNode("metric_list", "board.temp.cpu=CPU, gpu.load=GPU, board.fan.system=System"),
+        {MakeWidgetNode("metric_list", "board.temp.cpu, gpu.load, board.fan.system"),
             MakeContainerNode("columns",
-                {MakeWidgetNode("text", "board.temp.cpu"),
+                {MakeWidgetNode("gauge", "board.temp.cpu"),
                     MakeWidgetNode("text", "board.fan.system"),
-                    MakeWidgetNode("text", "board.temp.vrm")})});
+                    MakeWidgetNode("text", "board.temp.vrm"),
+                    MakeWidgetNode("metric_list", "board.temp.cpu=CPU Legacy")})});
     layout.cards.push_back(card);
 
     const LayoutBindingSelection selection = CollectLayoutBindings(layout);

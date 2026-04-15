@@ -18,6 +18,10 @@ std::string ReadConfigTemplateFromSourceTree() {
     return buffer.str();
 }
 
+std::filesystem::path SourceConfigPath() {
+    return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+}
+
 }  // namespace
 
 TEST(ConfigWriter, FullExportDoesNotInventEmptyHeaderKeysForHeaderlessCards) {
@@ -66,4 +70,30 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceCo
     const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
 
     EXPECT_THAT(output, testing::HasSubstr("[network]\r\nadapter_name = Ethernet\r\n"));
+}
+
+TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
+    AppConfig config = LoadConfig(SourceConfigPath(), true);
+
+    const MetricDefinitionConfig* cpuLoad = FindMetricDefinition(config.metrics, "cpu.load");
+    ASSERT_NE(cpuLoad, nullptr);
+
+    const std::string output = BuildSavedConfigText(
+        ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
+
+    EXPECT_THAT(output, testing::HasSubstr("[metrics]\r\ncpu.load = *,%,Load\r\n"));
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("[metric_scales]")));
+}
+
+TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {
+    AppConfig compareConfig = LoadConfig(SourceConfigPath(), true);
+    AppConfig currentConfig = compareConfig;
+
+    MetricDefinitionConfig* gpuTemp = FindMetricDefinition(currentConfig.metrics, "gpu.temp");
+    ASSERT_NE(gpuTemp, nullptr);
+    gpuTemp->label = "Core Temp";
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::HasSubstr("gpu.temp = 100,°C,Core Temp\r\n"));
 }

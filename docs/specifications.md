@@ -58,6 +58,7 @@ Examples include:
 - When `Save Config` creates `config.ini` beside the executable for the first time, it must write only the keys whose live in-memory values differ from the embedded defaults.
 - `Save Full Config To...` must export a complete config file by starting from the embedded `resources/config.ini` template text and updating every maintained config key with the live in-memory values so the exported file keeps the shipped line structure and comments.
 - The runtime must rely on the embedded `resources/config.ini` template for shipped layout defaults.
+- The `[metrics]` section must define every metric id that `metric_list(...)` and `gauge(...)` may bind, storing each metric as `<scale>,<unit>,<label>` where `*` means the renderer normalizes that metric against telemetry-provided scale data.
 - The `[display]` section must select the active dashboard layout by name through `display.layout`, and named dashboard size-and-card-placement definitions must live in `[layout.<name>]` sections with aspect-ratio names plus an optional `description` popup label suffix.
 - The `[display]` section must store the dashboard render scale through `display.scale` as a fractional multiplier where `0` means the runtime uses the current monitor DPI scale.
 - The shipped config template must define `5x3` as the default active layout, also include an experimental `3x5` portrait layout for the same panel resolution, and expose human-readable layout descriptions such as `5" 800x480 screen` for the layout popup.
@@ -90,10 +91,10 @@ Examples include:
 - The layout language must use `vertical_spring` as an explicit flexible filler that absorbs the remaining height inside `rows(...)`, splits that height among multiple springs by weight, and lets layouts such as `rows(drive_usage_list, vertical_spring)` top-pack their content without a separate vertical-container kind.
 - In a vertical `rows(...)` container, any resolved fixed-height direct child must keep its preferred configured height and any remaining height reduction must be absorbed by flexible non-spring siblings such as throughput plots when no `vertical_spring` is present.
 - The shipped `vertical_spacer(network_footer)` layout pattern must reserve the same fixed preferred height as `network_footer` while drawing nothing.
-- The renderer must obtain widget data through a separate metric-source abstraction that can provide text, gauge percentages, metric rows, throughput series, and drive rows by metric name.
+- The renderer must obtain widget data through a separate metric-source abstraction that can provide text, unified resolved metrics for both `gauge(...)` and `metric_list(...)`, throughput series, and drive rows by metric name.
 - Each published telemetry snapshot must advance a snapshot revision when its rendered content changes so renderer-side metric caches can be reused only across unchanged snapshots.
 - Live telemetry, retained histories, and derived widget ratios must treat non-finite sampled values as unavailable or empty so resume-time provider glitches cannot propagate NaN or infinity into rendering math.
-- Metric-list rows and their retained recent-peak history series must use the same config-driven normalization ceilings so the fill bar and peak ghost stay aligned.
+- Metric-list rows, gauge fill, and their retained recent-peak history series must use the same `[metrics]`-driven normalization scale for each bound metric so fill and peak rendering stay aligned.
 - The renderer must support a blank rendering mode that preserves panel chrome, card titles, card icons, CPU and GPU names, drive labels, and empty chart or bar tracks while omitting dynamic metric text, time, date, plot lines, chart leaders, peak ghosts, gauge fill, and drive activity or usage fill.
 
 ### Runtime actions tied to config
@@ -126,7 +127,7 @@ Examples include:
 - When `network.adapter_name` is set to a saved adapter name such as `Ethernet`, adapter selection should prefer an exact case-insensitive alias or description match and only fall back to substring matching when no exact match exists.
 - When `network.adapter_name` is set but does not match any current non-loopback, up adapter with an IPv4 address, runtime selection must fall back to the same auto-selection logic used when the setting is empty.
 - The layout bindings `board.temp.<name>` and `board.fan.<name>` must be the only source of truth for which logical named board metrics are requested at runtime.
-- The board provider must receive the set of requested logical board temperature and fan names by scanning all layout metric references that begin with `board.temp.` or `board.fan.`.
+- The board provider must receive the set of requested logical board temperature and fan names by scanning all `gauge(...)`, `metric_list(...)`, and text metric references that begin with `board.temp.` or `board.fan.`.
 - The `[board]` section must map each requested logical `board.temp.*` or `board.fan.*` metric name to the board-specific sensor title that the active board provider uses for lookup.
 - The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
 - The `Save Config` action must also persist the current `[storage] drives` selection.
@@ -324,6 +325,7 @@ While moving, show an overlay in the top-left corner with:
 - Clean, minimal headers
 - CPU and GPU load gauges must use the same fill color for their used arc as storage and other occupancy/usage bars use for their filled portion.
 - CPU and GPU load gauges must render as a segmented ring that follows the `[gauge]` config geometry, with the shipped default using a 262 degree clockwise sweep split into 33 segments with 32 shared inter-segment gaps, a bottom-centered opening derived from that total sweep, and no trailing gap after the final segment, filling clockwise from the lower-left toward the lower-right.
+- Gauges must render the bound metric's configured label and unified formatted metric text instead of hard-coded load-only text, while still using the same segmented ring geometry and fill rules.
 - Gauge and drive-usage segment layout resolution must keep every configured segment drawable even if a saved or indirectly derived gap would otherwise consume all remaining extent, reducing the visible segment to a hairline at worst instead of dropping it entirely.
 - Gauge fill must quantize to whole pills only; any usage above 0 percent lights the first pill, additional pills round up from the usage percentage, and partially filled pills must not be drawn.
 - CPU and GPU load gauges must also overlay a small translucent max-ghost on the single segmented pill that corresponds to the highest retained load ratio seen in the shared recent 30 second history window.

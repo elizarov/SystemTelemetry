@@ -287,8 +287,12 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
     }
 
     Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
-    if (FAILED(wicFactory->CreateBitmapFromMemory(
-            width, height, GUID_WICPixelFormat32bppPBGRA, stride, static_cast<UINT>(pixels.size()), pixels.data(),
+    if (FAILED(wicFactory->CreateBitmapFromMemory(width,
+            height,
+            GUID_WICPixelFormat32bppPBGRA,
+            stride,
+            static_cast<UINT>(pixels.size()),
+            pixels.data(),
             bitmap.GetAddressOf())) ||
         bitmap == nullptr) {
         return tintedBitmap;
@@ -2197,7 +2201,7 @@ void DashboardRenderer::Shutdown() {
 const DashboardMetricSource& DashboardRenderer::ResolveMetrics(const SystemSnapshot& snapshot) {
     if (cachedMetricSource_ == nullptr || cachedMetricSnapshot_ != &snapshot ||
         cachedMetricSnapshotRevision_ != snapshot.revision) {
-        cachedMetricSource_ = std::make_unique<DashboardMetricSource>(snapshot, config_.metricScales);
+        cachedMetricSource_ = std::make_unique<DashboardMetricSource>(snapshot, config_.metrics);
         cachedMetricSnapshot_ = &snapshot;
         cachedMetricSnapshotRevision_ = snapshot.revision;
     }

@@ -14,20 +14,12 @@
 
 #include "telemetry.h"
 
-struct DashboardMetricRow {
+struct DashboardMetricValue {
     std::string label;
     std::string valueText;
+    std::string sampleValueText;
+    std::string unit;
     double ratio = 0.0;
-    double peakRatio = 0.0;
-};
-
-struct DashboardMetricListEntry {
-    std::string metricRef;
-    std::string labelOverride;
-};
-
-struct DashboardGaugeMetric {
-    double percent = 0.0;
     double peakRatio = 0.0;
 };
 
@@ -49,14 +41,15 @@ struct DashboardDriveRow {
     std::string freeText;
 };
 
+std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef);
+
 class DashboardMetricSource {
 public:
-    DashboardMetricSource(const SystemSnapshot& snapshot, const MetricScaleConfig& metricScales);
+    DashboardMetricSource(const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics);
 
     const std::string& ResolveText(const std::string& metricRef) const;
-    const DashboardGaugeMetric& ResolveGauge(const std::string& metricRef) const;
-    const std::vector<DashboardMetricRow>& ResolveMetricList(
-        const std::vector<DashboardMetricListEntry>& metricRefs) const;
+    const DashboardMetricValue& ResolveMetric(const std::string& metricRef) const;
+    const std::vector<DashboardMetricValue>& ResolveMetricList(const std::vector<std::string>& metricRefs) const;
     const DashboardThroughputMetric& ResolveThroughput(const std::string& metricRef) const;
     const std::string& ResolveNetworkFooter() const;
     const std::vector<DashboardDriveRow>& ResolveDriveRows() const;
@@ -79,10 +72,10 @@ private:
     };
 
     const SystemSnapshot& snapshot_;
-    const MetricScaleConfig& metricScales_;
+    const MetricsSectionConfig& metrics_;
     mutable std::unordered_map<std::string, std::string> textCache_;
-    mutable std::unordered_map<std::string, DashboardGaugeMetric> gaugeCache_;
-    mutable std::unordered_map<std::string, std::vector<DashboardMetricRow>> metricListCache_;
+    mutable std::unordered_map<std::string, DashboardMetricValue> metricCache_;
+    mutable std::unordered_map<std::string, std::vector<DashboardMetricValue>> metricListCache_;
     mutable std::unordered_map<std::string, ThroughputCacheEntry> throughputCache_;
     mutable std::optional<ThroughputSharedState> throughputSharedState_;
     mutable std::optional<std::string> networkFooterCache_;

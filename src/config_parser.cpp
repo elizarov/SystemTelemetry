@@ -44,6 +44,21 @@ std::vector<std::string> Split(const std::string& input, char delimiter) {
     return parts;
 }
 
+std::vector<std::string> SplitPreservingEmpty(const std::string& input, char delimiter) {
+    std::vector<std::string> parts;
+    std::string current;
+    for (const char ch : input) {
+        if (ch == delimiter) {
+            parts.push_back(Trim(current));
+            current.clear();
+            continue;
+        }
+        current.push_back(ch);
+    }
+    parts.push_back(Trim(current));
+    return parts;
+}
+
 int ParseIntOrDefault(const std::string& value, int fallback) {
     try {
         size_t consumed = 0;
@@ -100,6 +115,31 @@ bool ParseLogicalPoint(const std::string& value, LogicalPointConfig& point) {
 
 bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
     return ParseIntPair(value, size.width, size.height);
+}
+
+bool ParseMetricDefinition(const std::string& value, MetricDefinitionConfig& definition) {
+    const std::vector<std::string> parts = SplitPreservingEmpty(value, ',');
+    if (parts.size() != 3) {
+        return false;
+    }
+
+    MetricDefinitionConfig parsed = definition;
+    if (parts[0] == "*") {
+        parsed.telemetryScale = true;
+        parsed.scale = 0.0;
+    } else {
+        const double parsedScale = ParseDoubleOrDefault(parts[0], 0.0);
+        if (!(parsedScale > 0.0)) {
+            return false;
+        }
+        parsed.telemetryScale = false;
+        parsed.scale = parsedScale;
+    }
+
+    parsed.unit = parts[1];
+    parsed.label = parts[2];
+    definition = std::move(parsed);
+    return true;
 }
 
 void ParseFontSpec(UiFontConfig& font, const std::string& value) {
@@ -473,6 +513,26 @@ template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardCo
             return true;
         }
         return false;
+    }
+};
+
+template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, MetricsSectionConfig> {
+    static bool Apply(MetricsSectionConfig& metrics, const std::string& key, const std::string& value) {
+        if (key.empty()) {
+            return false;
+        }
+
+        MetricDefinitionConfig* definition = FindMetricDefinition(metrics, key);
+        MetricDefinitionConfig candidate = definition != nullptr ? *definition : MetricDefinitionConfig{.id = key};
+        if (!ParseMetricDefinition(value, candidate)) {
+            return false;
+        }
+        if (definition != nullptr) {
+            *definition = std::move(candidate);
+        } else {
+            metrics.definitions.push_back(std::move(candidate));
+        }
+        return true;
     }
 };
 

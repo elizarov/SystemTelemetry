@@ -46,6 +46,8 @@ struct StructuredSectionCodec {};
 
 struct BoardSectionCodec {};
 
+struct MetricsSectionCodec {};
+
 enum class ValueFormat {
     Integer,
     FloatingPoint,

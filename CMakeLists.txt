@@ -223,6 +223,7 @@ endif()
 find_package(GTest CONFIG REQUIRED)
 
 add_executable(SystemTelemetryTests
+    tests/dashboard_metrics_tests.cpp
     tests/dashboard_widget_class_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
@@ -244,6 +245,7 @@ add_executable(SystemTelemetryTests
     src/localization_catalog.cpp
     src/layout_snap_solver.cpp
     src/numeric_safety.cpp
+    src/dashboard_metrics.cpp
     src/dashboard_widget_class.cpp
     src/render_types.cpp
     src/telemetry_retained_history.cpp

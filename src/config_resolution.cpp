@@ -37,6 +37,19 @@ std::vector<std::string> Split(const std::string& input, char delimiter) {
     return parts;
 }
 
+bool IsValidMetricId(std::string_view metricId) {
+    if (metricId.empty()) {
+        return false;
+    }
+    for (const unsigned char ch : metricId) {
+        if (std::isalnum(ch) != 0 || ch == '.' || ch == '_' || ch == '-') {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
 void AddUniqueValue(std::vector<std::string>& values, const std::string& value) {
     if (value.empty()) {
         return;
@@ -46,15 +59,13 @@ void AddUniqueValue(std::vector<std::string>& values, const std::string& value) 
     }
 }
 
-std::string ExtractMetricReference(const std::string& token) {
-    const size_t equals = token.find('=');
-    return Trim(token.substr(0, equals));
-}
-
 void CollectLayoutBindingsRecursive(
     const LayoutNodeConfig& node, std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
     for (const std::string& token : Split(node.parameter, ',')) {
-        const std::string metricRef = ExtractMetricReference(token);
+        const std::string metricRef = Trim(token);
+        if (!IsValidMetricId(metricRef)) {
+            continue;
+        }
         if (metricRef.rfind("board.temp.", 0) == 0) {
             AddUniqueValue(boardTemperatures, metricRef.substr(std::string("board.temp.").size()));
         } else if (metricRef.rfind("board.fan.", 0) == 0) {
@@ -81,6 +92,24 @@ std::string NormalizeConfiguredDriveLetter(const std::string& drive) {
 }
 
 }  // namespace
+
+const MetricDefinitionConfig* FindMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id) {
+    for (const auto& definition : metrics.definitions) {
+        if (definition.id == id) {
+            return &definition;
+        }
+    }
+    return nullptr;
+}
+
+MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std::string_view id) {
+    for (auto& definition : metrics.definitions) {
+        if (definition.id == id) {
+            return &definition;
+        }
+    }
+    return nullptr;
+}
 
 LayoutBindingSelection CollectLayoutBindings(const LayoutConfig& layout) {
     LayoutBindingSelection result;
