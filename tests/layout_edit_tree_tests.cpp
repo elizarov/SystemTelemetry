@@ -24,6 +24,12 @@ LayoutNodeConfig MakeWidgetNode(const std::string& name) {
     return node;
 }
 
+LayoutNodeConfig MakeDashboardCardNode(const std::string& id) {
+    LayoutNodeConfig node;
+    node.name = id;
+    return node;
+}
+
 LayoutNodeConfig MakeCardRefNode(const std::string& id) {
     LayoutNodeConfig node;
     node.name = id;
@@ -71,7 +77,8 @@ std::vector<std::string> ChildLabels(const LayoutEditTreeNode& node) {
 AppConfig MakeBaseConfig() {
     AppConfig config;
     config.display.layout = "primary";
-    config.layout.structure.cardsLayout = MakeContainerNode("columns", {MakeCardRefNode("alpha"), MakeCardRefNode("beta")});
+    config.layout.structure.cardsLayout =
+        MakeContainerNode("columns", {MakeDashboardCardNode("alpha"), MakeDashboardCardNode("beta")});
     config.layout.cards.push_back(MakeCard("alpha", MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
     config.layout.cards.push_back(MakeCard("beta", MakeContainerNode("rows", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
     return config;
@@ -118,7 +125,8 @@ TEST(LayoutEditTree, IncludesOnlyTheActiveLayoutSection) {
 TEST(LayoutEditTree, IncludesOnlyReachableCardsInEncounterOrderAndSkipsCycles) {
     AppConfig config;
     config.display.layout = "primary";
-    config.layout.structure.cardsLayout = MakeContainerNode("columns", {MakeCardRefNode("alpha"), MakeCardRefNode("gamma")});
+    config.layout.structure.cardsLayout =
+        MakeContainerNode("columns", {MakeDashboardCardNode("alpha"), MakeDashboardCardNode("gamma")});
     config.layout.cards.push_back(
         MakeCard("alpha", MakeContainerNode("columns", {MakeCardRefNode("beta"), MakeWidgetNode("metric_list")})));
     config.layout.cards.push_back(
@@ -144,8 +152,8 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     AppConfig config;
     config.display.layout = "primary";
     config.layout.structure.cardsLayout =
-        MakeContainerNode("rows", {MakeContainerNode("columns", {MakeCardRefNode("alpha"), MakeCardRefNode("beta")}),
-                                      MakeCardRefNode("gamma")});
+        MakeContainerNode("rows", {MakeContainerNode("columns", {MakeDashboardCardNode("alpha"), MakeDashboardCardNode("beta")}),
+                                      MakeDashboardCardNode("gamma")});
     config.layout.cards.push_back(MakeCard("alpha",
         MakeContainerNode("rows", {MakeContainerNode("columns", {MakeWidgetNode("metric_list"), MakeWidgetNode("gauge")}),
                                       MakeWidgetNode("throughput")})));
@@ -195,4 +203,13 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     EXPECT_EQ(weightLeaf->firstWeightName, "alpha");
     EXPECT_EQ(weightLeaf->secondWeightName, "beta");
     EXPECT_EQ(weightLeaf->weightAxis, LayoutGuideAxis::Vertical);
+}
+
+TEST(LayoutEditTree, ShowsReachableCardSectionsForRuntimeStyleDashboardCardNodes) {
+    AppConfig config = MakeBaseConfig();
+
+    const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
+
+    EXPECT_NE(FindRootNode(model, "card.alpha"), nullptr);
+    EXPECT_NE(FindRootNode(model, "card.beta"), nullptr);
 }

@@ -115,31 +115,64 @@ const LayoutCardConfig* FindCardConfig(const LayoutConfig& layout, std::string_v
     return it != layout.cards.end() ? &(*it) : nullptr;
 }
 
-void CollectReachableCards(const LayoutConfig& layout,
+void CollectReachableCardLayoutCards(const LayoutConfig& layout,
+    const LayoutNodeConfig& node,
+    std::vector<std::string>& orderedCards,
+    std::vector<std::string>& recursionStack,
+    std::unordered_map<std::string, bool>& seenCards);
+
+void CollectReachableCardById(const LayoutConfig& layout,
+    const std::string& cardId,
+    std::vector<std::string>& orderedCards,
+    std::vector<std::string>& recursionStack,
+    std::unordered_map<std::string, bool>& seenCards) {
+    if (std::find(recursionStack.begin(), recursionStack.end(), cardId) != recursionStack.end()) {
+        return;
+    }
+    if (!seenCards.contains(cardId)) {
+        orderedCards.push_back(cardId);
+        seenCards.emplace(cardId, true);
+    }
+
+    const LayoutCardConfig* card = FindCardConfig(layout, cardId);
+    if (card == nullptr) {
+        return;
+    }
+
+    recursionStack.push_back(cardId);
+    CollectReachableCardLayoutCards(layout, card->layout, orderedCards, recursionStack, seenCards);
+    recursionStack.pop_back();
+}
+
+void CollectReachableDashboardCards(const LayoutConfig& layout,
+    const LayoutNodeConfig& node,
+    std::vector<std::string>& orderedCards,
+    std::vector<std::string>& recursionStack,
+    std::unordered_map<std::string, bool>& seenCards) {
+    if (node.name == "rows" || node.name == "columns") {
+        for (const auto& child : node.children) {
+            CollectReachableDashboardCards(layout, child, orderedCards, recursionStack, seenCards);
+        }
+        return;
+    }
+
+    if (!node.name.empty()) {
+        CollectReachableCardById(layout, node.name, orderedCards, recursionStack, seenCards);
+    }
+}
+
+void CollectReachableCardLayoutCards(const LayoutConfig& layout,
     const LayoutNodeConfig& node,
     std::vector<std::string>& orderedCards,
     std::vector<std::string>& recursionStack,
     std::unordered_map<std::string, bool>& seenCards) {
     if (node.cardReference) {
-        if (std::find(recursionStack.begin(), recursionStack.end(), node.name) != recursionStack.end()) {
-            return;
-        }
-        if (!seenCards.contains(node.name)) {
-            orderedCards.push_back(node.name);
-            seenCards.emplace(node.name, true);
-        }
-        const LayoutCardConfig* card = FindCardConfig(layout, node.name);
-        if (card == nullptr) {
-            return;
-        }
-        recursionStack.push_back(node.name);
-        CollectReachableCards(layout, card->layout, orderedCards, recursionStack, seenCards);
-        recursionStack.pop_back();
+        CollectReachableCardById(layout, node.name, orderedCards, recursionStack, seenCards);
         return;
     }
 
     for (const auto& child : node.children) {
-        CollectReachableCards(layout, child, orderedCards, recursionStack, seenCards);
+        CollectReachableCardLayoutCards(layout, child, orderedCards, recursionStack, seenCards);
     }
 }
 
@@ -147,7 +180,7 @@ std::vector<std::string> CollectReachableCards(const AppConfig& config) {
     std::vector<std::string> orderedCards;
     std::vector<std::string> recursionStack;
     std::unordered_map<std::string, bool> seenCards;
-    CollectReachableCards(
+    CollectReachableDashboardCards(
         config.layout, config.layout.structure.cardsLayout, orderedCards, recursionStack, seenCards);
     return orderedCards;
 }
