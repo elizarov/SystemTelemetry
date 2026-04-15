@@ -472,6 +472,67 @@ void ShowDialogControl(HWND hwnd, int controlId, bool show) {
     }
 }
 
+std::optional<RECT> DialogControlRect(HWND hwnd, int controlId) {
+    HWND control = GetDlgItem(hwnd, controlId);
+    if (control == nullptr) {
+        return std::nullopt;
+    }
+    RECT rect{};
+    if (!GetWindowRect(control, &rect)) {
+        return std::nullopt;
+    }
+    MapWindowPoints(nullptr, hwnd, reinterpret_cast<POINT*>(&rect), 2);
+    return rect;
+}
+
+void ResizeDialogControlPreservingCenter(HWND hwnd, int controlId, int targetHeight) {
+    const auto rect = DialogControlRect(hwnd, controlId);
+    if (!rect.has_value()) {
+        return;
+    }
+
+    const int width = rect->right - rect->left;
+    const int centerY = (rect->top + rect->bottom) / 2;
+    const int top = centerY - (targetHeight / 2);
+    SetWindowPos(
+        GetDlgItem(hwnd, controlId), nullptr, rect->left, top, width, targetHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void CenterDialogLabelToControl(HWND hwnd, int labelId, int controlId) {
+    const auto labelRect = DialogControlRect(hwnd, labelId);
+    const auto controlRect = DialogControlRect(hwnd, controlId);
+    if (!labelRect.has_value() || !controlRect.has_value()) {
+        return;
+    }
+
+    const int width = labelRect->right - labelRect->left;
+    const int height = labelRect->bottom - labelRect->top;
+    const int centerY = (controlRect->top + controlRect->bottom) / 2;
+    const int top = centerY - (height / 2);
+    SetWindowPos(GetDlgItem(hwnd, labelId),
+        nullptr,
+        labelRect->left,
+        top,
+        width,
+        height,
+        SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void AlignFontEditorControls(HWND hwnd) {
+    const auto comboRect = DialogControlRect(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
+    if (!comboRect.has_value()) {
+        return;
+    }
+
+    const int comboHeight = comboRect->bottom - comboRect->top;
+    ResizeDialogControlPreservingCenter(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, comboHeight);
+    ResizeDialogControlPreservingCenter(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, comboHeight);
+
+    CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
+    CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT);
+    CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT);
+}
+
 void ShowLayoutEditEditors(HWND hwnd, bool showNumeric, bool showFont, bool showColor, bool showWeights) {
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
 
@@ -942,6 +1003,7 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
             SetWindowTextW(hwnd, L"Edit Configuration");
             state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
             ConfigureColorSliders(hwnd);
+            AlignFontEditorControls(hwnd);
             HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE);
             InsertLayoutEditTreeNodes(state, tree, state->treeModel.roots, TVI_ROOT);
             HTREEITEM selectedItem =
