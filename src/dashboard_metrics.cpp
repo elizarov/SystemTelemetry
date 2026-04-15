@@ -24,12 +24,18 @@ std::string FormatScalarValue(std::optional<double> value, std::string_view unit
     return buffer;
 }
 
-std::string FormatPercentValue(std::optional<double> value, int precision) {
+std::string FormatPercentValue(std::optional<double> value, std::string_view unit, int precision) {
     if (!value.has_value() || !IsFiniteDouble(*value)) {
         return "N/A";
     }
     char buffer[64];
-    sprintf_s(buffer, "%.*f%%", precision, *value);
+    if (unit.empty()) {
+        sprintf_s(buffer, "%.*f", precision, *value);
+    } else if (unit == "%") {
+        sprintf_s(buffer, "%.*f%%", precision, *value);
+    } else {
+        sprintf_s(buffer, "%.*f %s", precision, *value, std::string(unit).c_str());
+    }
     return buffer;
 }
 
@@ -176,7 +182,7 @@ std::string FormatMetricValueText(const MetricDefinitionConfig& definition,
     std::optional<double> secondaryValue = std::nullopt) {
     switch (definition.style) {
         case MetricDisplayStyle::Percent:
-            return FormatPercentValue(primaryValue, 0);
+            return FormatPercentValue(primaryValue, definition.unit, 0);
         case MetricDisplayStyle::Scalar:
             return FormatScalarValue(primaryValue, definition.unit, ResolveScalarPrecision(metricRef));
         case MetricDisplayStyle::Memory:
@@ -196,7 +202,8 @@ std::string FormatMetricValueText(const MetricDefinitionConfig& definition,
 std::string BuildMetricSampleValueText(const MetricDefinitionConfig& definition, const std::string& metricRef) {
     switch (definition.style) {
         case MetricDisplayStyle::Percent:
-            return FormatPercentValue(std::optional<double>{definition.telemetryScale ? 100.0 : definition.scale}, 0);
+            return FormatPercentValue(
+                std::optional<double>{definition.telemetryScale ? 100.0 : definition.scale}, definition.unit, 0);
         case MetricDisplayStyle::Scalar:
             return FormatScalarValue(
                 std::optional<double>{definition.telemetryScale ? 100.0 : definition.scale},

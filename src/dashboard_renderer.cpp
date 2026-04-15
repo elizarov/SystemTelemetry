@@ -2190,12 +2190,25 @@ std::optional<LayoutEditColorRegion> DashboardRenderer::HitTestEditableColorRegi
     for (const auto& region : dynamicColorEditRegions_) {
         regions.push_back(&region);
     }
+    const LayoutEditColorRegion* bestRegion = nullptr;
+    int bestPriority = (std::numeric_limits<int>::max)();
+    long long bestArea = (std::numeric_limits<long long>::max)();
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
-        if ((*it)->targetRect.Contains(clientPoint)) {
-            return *(*it);
+        if (!(*it)->targetRect.Contains(clientPoint)) {
+            continue;
+        }
+
+        const int priority = GetLayoutEditParameterHitPriority((*it)->parameter);
+        const long long width = (std::max<LONG>)(0, (*it)->targetRect.right - (*it)->targetRect.left);
+        const long long height = (std::max<LONG>)(0, (*it)->targetRect.bottom - (*it)->targetRect.top);
+        const long long area = width * height;
+        if (bestRegion == nullptr || priority < bestPriority || (priority == bestPriority && area < bestArea)) {
+            bestRegion = *it;
+            bestPriority = priority;
+            bestArea = area;
         }
     }
-    return std::nullopt;
+    return bestRegion != nullptr ? std::optional<LayoutEditColorRegion>(*bestRegion) : std::nullopt;
 }
 
 std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(const LayoutEditGapAnchorKey& key) const {
