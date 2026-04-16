@@ -30,8 +30,6 @@ struct LayoutEditConfigFieldMetadata {
 struct LayoutEditParameterInfo {
     LayoutEditParameter parameter = LayoutEditParameter::MetricListLabelWidth;
     const LayoutEditConfigFieldMetadata* field = nullptr;
-    bool supportsWidgetGuide = false;
-    bool supportsAnchor = false;
 };
 
 const LayoutEditParameterInfo& GetLayoutEditParameterInfo(LayoutEditParameter parameter);

@@ -114,93 +114,12 @@ template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata()
     return metadata;
 }
 
+#define SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_INFO(name, meta) {Parameter::name, &GetFieldMetadata<meta>()},
+
 const LayoutEditParameterInfo kParameterInfo[] = {
-    {Parameter::FontTitle, &GetFieldMetadata<UiFontSetConfig::titleMeta>(), false, true},
-    {Parameter::FontBig, &GetFieldMetadata<UiFontSetConfig::bigMeta>(), false, true},
-    {Parameter::FontValue, &GetFieldMetadata<UiFontSetConfig::valueMeta>(), false, true},
-    {Parameter::FontLabel, &GetFieldMetadata<UiFontSetConfig::labelMeta>(), false, true},
-    {Parameter::FontText, &GetFieldMetadata<UiFontSetConfig::textMeta>(), false, true},
-    {Parameter::FontSmall, &GetFieldMetadata<UiFontSetConfig::smallTextMeta>(), false, true},
-    {Parameter::FontFooter, &GetFieldMetadata<UiFontSetConfig::footerMeta>(), false, true},
-    {Parameter::FontClockTime, &GetFieldMetadata<UiFontSetConfig::clockTimeMeta>(), false, true},
-    {Parameter::FontClockDate, &GetFieldMetadata<UiFontSetConfig::clockDateMeta>(), false, true},
+    SYSTEM_TELEMETRY_LAYOUT_EDIT_PARAMETER_ITEMS(SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_INFO)};
 
-    {Parameter::CardRadius, &GetFieldMetadata<CardStyleConfig::cardRadiusMeta>(), false, true},
-    {Parameter::CardBorder, &GetFieldMetadata<CardStyleConfig::cardBorderWidthMeta>(), false, true},
-    {Parameter::CardHeaderIconSize, &GetFieldMetadata<CardStyleConfig::headerIconSizeMeta>(), false, true},
-
-    {Parameter::CardPadding, &GetFieldMetadata<CardStyleConfig::cardPaddingMeta>(), true, false},
-    {Parameter::CardHeaderIconGap, &GetFieldMetadata<CardStyleConfig::headerIconGapMeta>(), true, false},
-    {Parameter::CardHeaderContentGap, &GetFieldMetadata<CardStyleConfig::headerContentGapMeta>(), true, false},
-    {Parameter::CardRowGap, &GetFieldMetadata<CardStyleConfig::rowGapMeta>(), true, false},
-    {Parameter::CardColumnGap, &GetFieldMetadata<CardStyleConfig::columnGapMeta>(), true, false},
-
-    {Parameter::DashboardOuterMargin, &GetFieldMetadata<DashboardSectionConfig::outerMarginMeta>(), true, false},
-    {Parameter::DashboardRowGap, &GetFieldMetadata<DashboardSectionConfig::rowGapMeta>(), true, false},
-    {Parameter::DashboardColumnGap, &GetFieldMetadata<DashboardSectionConfig::columnGapMeta>(), true, false},
-
-    {Parameter::TextBottomGap, &GetFieldMetadata<TextWidgetConfig::bottomGapMeta>(), true, false},
-    {Parameter::NetworkFooterBottomGap, &GetFieldMetadata<NetworkFooterWidgetConfig::bottomGapMeta>(), true, false},
-
-    {Parameter::MetricListBarHeight, &GetFieldMetadata<MetricListWidgetConfig::barHeightMeta>(), false, true},
-    {Parameter::MetricListLabelWidth, &GetFieldMetadata<MetricListWidgetConfig::labelWidthMeta>(), true, false},
-    {Parameter::MetricListRowGap, &GetFieldMetadata<MetricListWidgetConfig::rowGapMeta>(), true, false},
-
-    {Parameter::DriveUsageActivitySegments,
-        &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentsMeta>(),
-        false,
-        true},
-    {Parameter::DriveUsageBarHeight, &GetFieldMetadata<DriveUsageListWidgetConfig::barHeightMeta>(), false, true},
-    {Parameter::DriveUsageLabelGap, &GetFieldMetadata<DriveUsageListWidgetConfig::labelGapMeta>(), true, false},
-    {Parameter::DriveUsageBarGap, &GetFieldMetadata<DriveUsageListWidgetConfig::barGapMeta>(), true, false},
-    {Parameter::DriveUsageRwGap, &GetFieldMetadata<DriveUsageListWidgetConfig::rwGapMeta>(), true, false},
-    {Parameter::DriveUsagePercentGap, &GetFieldMetadata<DriveUsageListWidgetConfig::percentGapMeta>(), true, false},
-    {Parameter::DriveUsageActivityWidth,
-        &GetFieldMetadata<DriveUsageListWidgetConfig::activityWidthMeta>(),
-        true,
-        false},
-    {Parameter::DriveUsageFreeWidth, &GetFieldMetadata<DriveUsageListWidgetConfig::freeWidthMeta>(), true, false},
-    {Parameter::DriveUsageActivitySegmentGap,
-        &GetFieldMetadata<DriveUsageListWidgetConfig::activitySegmentGapMeta>(),
-        true,
-        false},
-    {Parameter::DriveUsageHeaderGap, &GetFieldMetadata<DriveUsageListWidgetConfig::headerGapMeta>(), true, false},
-    {Parameter::DriveUsageRowGap, &GetFieldMetadata<DriveUsageListWidgetConfig::rowGapMeta>(), true, false},
-
-    {Parameter::ThroughputGuideStrokeWidth,
-        &GetFieldMetadata<ThroughputWidgetConfig::guideStrokeWidthMeta>(),
-        true,
-        true},
-    {Parameter::ThroughputPlotStrokeWidth,
-        &GetFieldMetadata<ThroughputWidgetConfig::plotStrokeWidthMeta>(),
-        true,
-        true},
-    {Parameter::ThroughputLeaderDiameter, &GetFieldMetadata<ThroughputWidgetConfig::leaderDiameterMeta>(), true, true},
-    {Parameter::ThroughputAxisPadding, &GetFieldMetadata<ThroughputWidgetConfig::axisPaddingMeta>(), true, false},
-    {Parameter::ThroughputHeaderGap, &GetFieldMetadata<ThroughputWidgetConfig::headerGapMeta>(), true, false},
-
-    {Parameter::GaugeSegmentCount, &GetFieldMetadata<GaugeWidgetConfig::segmentCountMeta>(), false, true},
-    {Parameter::GaugeValueBottom, &GetFieldMetadata<GaugeWidgetConfig::valueBottomMeta>(), true, false},
-    {Parameter::GaugeLabelBottom, &GetFieldMetadata<GaugeWidgetConfig::labelBottomMeta>(), true, false},
-    {Parameter::GaugeSweepDegrees, &GetFieldMetadata<GaugeWidgetConfig::sweepDegreesMeta>(), true, false},
-    {Parameter::GaugeSegmentGapDegrees, &GetFieldMetadata<GaugeWidgetConfig::segmentGapDegreesMeta>(), true, false},
-    {Parameter::GaugeOuterPadding, &GetFieldMetadata<GaugeWidgetConfig::outerPaddingMeta>(), true, true},
-    {Parameter::GaugeRingThickness, &GetFieldMetadata<GaugeWidgetConfig::ringThicknessMeta>(), true, true},
-
-    {Parameter::ColorBackground, &GetFieldMetadata<ColorsConfig::backgroundColorMeta>(), false, false},
-    {Parameter::ColorForeground, &GetFieldMetadata<ColorsConfig::foregroundColorMeta>(), false, false},
-    {Parameter::ColorIcon, &GetFieldMetadata<ColorsConfig::iconColorMeta>(), false, false},
-    {Parameter::ColorAccent, &GetFieldMetadata<ColorsConfig::accentColorMeta>(), false, false},
-    {Parameter::ColorLayoutGuide, &GetFieldMetadata<ColorsConfig::layoutGuideColorMeta>(), false, false},
-    {Parameter::ColorActiveEdit, &GetFieldMetadata<ColorsConfig::activeEditColorMeta>(), false, false},
-    {Parameter::ColorPanelBorder, &GetFieldMetadata<ColorsConfig::panelBorderColorMeta>(), false, false},
-    {Parameter::ColorMutedText, &GetFieldMetadata<ColorsConfig::mutedTextColorMeta>(), false, false},
-    {Parameter::ColorTrack, &GetFieldMetadata<ColorsConfig::trackColorMeta>(), false, false},
-    {Parameter::ColorPanelFill, &GetFieldMetadata<ColorsConfig::panelFillColorMeta>(), false, false},
-    {Parameter::ColorGraphBackground, &GetFieldMetadata<ColorsConfig::graphBackgroundColorMeta>(), false, false},
-    {Parameter::ColorGraphAxis, &GetFieldMetadata<ColorsConfig::graphAxisColorMeta>(), false, false},
-    {Parameter::ColorGraphMarker, &GetFieldMetadata<ColorsConfig::graphMarkerColorMeta>(), false, false},
-};
+#undef SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_INFO
 
 constexpr size_t kParameterInfoCount = sizeof(kParameterInfo) / sizeof(kParameterInfo[0]);
 static_assert(kParameterInfoCount == static_cast<size_t>(Parameter::Count));
