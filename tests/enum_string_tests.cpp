@@ -2,9 +2,9 @@
 
 #include "enum_string.h"
 
-#define SYSTEM_TELEMETRY_TEST_ENUM_ITEMS(X) \
-    X(Zero, "zero") \
-    X(One, "one") \
+#define SYSTEM_TELEMETRY_TEST_ENUM_ITEMS(X)                                                                            \
+    X(Zero, "zero")                                                                                                    \
+    X(One, "one")                                                                                                      \
     X(Two, "two")
 
 ENUM_STRING_DECLARE(TestEnumStringValue, SYSTEM_TELEMETRY_TEST_ENUM_ITEMS);

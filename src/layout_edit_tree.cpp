@@ -519,7 +519,8 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
                     }
                     const bool includeTitleLeaf =
                         std::find(topLevelCards.begin(), topLevelCards.end(), cardId) != topLevelCards.end();
-                    if (const auto cardSection = BuildCardSectionNode(*card, includeTitleLeaf); cardSection.has_value()) {
+                    if (const auto cardSection = BuildCardSectionNode(*card, includeTitleLeaf);
+                        cardSection.has_value()) {
                         model.roots.push_back(*cardSection);
                     }
                 }

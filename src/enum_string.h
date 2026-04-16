@@ -87,12 +87,10 @@ template <typename Enum> bool TryEnumFromString(std::string_view text, Enum& val
 #define ENUM_STRING_DECLARE_ENUMERATOR(name, text) name,
 #define ENUM_STRING_DECLARE_NAME(name, text) text,
 
-#define ENUM_STRING_DECLARE(EnumType, ItemsMacro)                                                                    \
-    enum class EnumType {                                                                                           \
-        ItemsMacro(ENUM_STRING_DECLARE_ENUMERATOR)                                                                  \
-    };                                                                                                              \
-                                                                                                                    \
-    template <> struct EnumStringTraits<EnumType> {                                                                 \
-        static constexpr auto names = std::to_array<std::string_view>({ItemsMacro(ENUM_STRING_DECLARE_NAME)});     \
-        static_assert(enum_string_detail::ValidateCanonicalNames(names));                                           \
+#define ENUM_STRING_DECLARE(EnumType, ItemsMacro)                                                                      \
+    enum class EnumType { ItemsMacro(ENUM_STRING_DECLARE_ENUMERATOR) };                                                \
+                                                                                                                       \
+    template <> struct EnumStringTraits<EnumType> {                                                                    \
+        static constexpr auto names = std::to_array<std::string_view>({ItemsMacro(ENUM_STRING_DECLARE_NAME)});         \
+        static_assert(enum_string_detail::ValidateCanonicalNames(names));                                              \
     }

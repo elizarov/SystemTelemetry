@@ -5,11 +5,11 @@
 #include <optional>
 #include <string>
 
-#define SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS(X) \
-    X(None, "") \
-    X(Celsius, "C") \
-    X(Gigahertz, "GHz") \
-    X(Megahertz, "MHz") \
+#define SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS(X)                                                                   \
+    X(None, "")                                                                                                        \
+    X(Celsius, "C")                                                                                                    \
+    X(Gigahertz, "GHz")                                                                                                \
+    X(Megahertz, "MHz")                                                                                                \
     X(Rpm, "RPM")
 
 ENUM_STRING_DECLARE(ScalarMetricUnit, SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS);
