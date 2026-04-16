@@ -34,6 +34,15 @@ std::string Trim(std::string_view value) {
     return std::string(value.substr(first, last - first));
 }
 
+std::string LowercaseAscii(std::string_view value) {
+    std::string lower;
+    lower.reserve(value.size());
+    for (const unsigned char ch : value) {
+        lower.push_back(static_cast<char>(std::tolower(ch)));
+    }
+    return lower;
+}
+
 std::vector<TemplateSectionSlot> ParseTemplateSections(std::string_view text) {
     std::vector<TemplateSectionSlot> sections;
     TemplateSectionSlot* currentStaticSection = nullptr;
@@ -487,6 +496,36 @@ const LayoutEditTreeLeaf* FindLayoutEditTreeLeafRecursive(
     return nullptr;
 }
 
+bool NodeMatchesFilter(const LayoutEditTreeNode& node, std::string_view loweredQuery) {
+    if (loweredQuery.empty()) {
+        return true;
+    }
+    const std::string loweredLabel = LowercaseAscii(node.label);
+    if (loweredLabel.find(loweredQuery) != std::string::npos) {
+        return true;
+    }
+    const std::string loweredLocation = LowercaseAscii(node.locationText);
+    return loweredLocation.find(loweredQuery) != std::string::npos;
+}
+
+std::vector<LayoutEditTreeNode> FilterNodes(
+    const std::vector<LayoutEditTreeNode>& nodes, std::string_view loweredQuery, bool forceExpand) {
+    std::vector<LayoutEditTreeNode> filtered;
+    for (const auto& node : nodes) {
+        LayoutEditTreeNode candidate = node;
+        candidate.children = FilterNodes(node.children, loweredQuery, true);
+        const bool selfMatches = NodeMatchesFilter(node, loweredQuery);
+        if (!selfMatches && candidate.children.empty()) {
+            continue;
+        }
+        if (forceExpand && !candidate.children.empty()) {
+            candidate.initiallyExpanded = true;
+        }
+        filtered.push_back(std::move(candidate));
+    }
+    return filtered;
+}
+
 }  // namespace
 
 LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config) {
@@ -529,6 +568,17 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
     }
 
     return model;
+}
+
+LayoutEditTreeModel FilterLayoutEditTreeModel(const LayoutEditTreeModel& model, std::string_view query) {
+    const std::string loweredQuery = LowercaseAscii(Trim(query));
+    if (loweredQuery.empty()) {
+        return model;
+    }
+
+    LayoutEditTreeModel filtered;
+    filtered.roots = FilterNodes(model.roots, loweredQuery, true);
+    return filtered;
 }
 
 const LayoutEditTreeLeaf* FindLayoutEditTreeLeaf(const LayoutEditTreeModel& model, const LayoutEditFocusKey& focusKey) {

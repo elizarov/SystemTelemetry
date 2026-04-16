@@ -371,3 +371,31 @@ TEST(LayoutEditTree, EveryBuiltNodeHasLocalizedDescriptionAndLocationText) {
         verifyNode(root);
     }
 }
+
+TEST(LayoutEditTree, FilterKeepsMatchingAncestorsAndUsesLocationText) {
+    const LayoutEditTreeModel model = BuildLayoutEditTreeModel(MakeBaseConfig(), ReadTemplateText());
+
+    const LayoutEditTreeModel mutedFilter = FilterLayoutEditTreeModel(model, "muted_text_color");
+    ASSERT_EQ(mutedFilter.roots.size(), 1u);
+    EXPECT_EQ(mutedFilter.roots[0].label, "colors");
+    ASSERT_EQ(mutedFilter.roots[0].children.size(), 1u);
+    EXPECT_EQ(mutedFilter.roots[0].children[0].label, "muted_text_color");
+    EXPECT_TRUE(mutedFilter.roots[0].initiallyExpanded);
+
+    const LayoutEditTreeModel cardTitleFilter = FilterLayoutEditTreeModel(model, "[card.alpha] title");
+    ASSERT_EQ(cardTitleFilter.roots.size(), 1u);
+    EXPECT_EQ(cardTitleFilter.roots[0].label, "card.alpha");
+    ASSERT_EQ(cardTitleFilter.roots[0].children.size(), 1u);
+    EXPECT_EQ(cardTitleFilter.roots[0].children[0].label, "title");
+}
+
+TEST(LayoutEditTree, EmptyFilterReturnsOriginalOrdering) {
+    const LayoutEditTreeModel model = BuildLayoutEditTreeModel(MakeBaseConfig(), ReadTemplateText());
+    const LayoutEditTreeModel filtered = FilterLayoutEditTreeModel(model, "   ");
+
+    EXPECT_EQ(RootLabels(filtered), RootLabels(model));
+    ASSERT_EQ(filtered.roots.size(), model.roots.size());
+    for (size_t i = 0; i < model.roots.size(); ++i) {
+        EXPECT_EQ(ChildLabels(filtered.roots[i]), ChildLabels(model.roots[i]));
+    }
+}
