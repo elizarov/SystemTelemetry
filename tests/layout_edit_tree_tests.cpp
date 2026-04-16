@@ -219,6 +219,18 @@ TEST(LayoutEditTree, IncludesOnlyReachableCardsInEncounterOrderAndSkipsCycles) {
     }
 
     EXPECT_EQ(cardRoots, (std::vector<std::string>{"card.alpha", "card.beta", "card.gamma"}));
+
+    const LayoutEditTreeNode* alphaRoot = FindRootNode(model, "card.alpha");
+    ASSERT_NE(alphaRoot, nullptr);
+    EXPECT_EQ(ChildLabels(*alphaRoot), (std::vector<std::string>{"title", "layout"}));
+
+    const LayoutEditTreeNode* betaRoot = FindRootNode(model, "card.beta");
+    ASSERT_NE(betaRoot, nullptr);
+    EXPECT_EQ(ChildLabels(*betaRoot), (std::vector<std::string>{"layout"}));
+
+    const LayoutEditTreeNode* gammaRoot = FindRootNode(model, "card.gamma");
+    ASSERT_NE(gammaRoot, nullptr);
+    EXPECT_EQ(ChildLabels(*gammaRoot), (std::vector<std::string>{"title", "layout"}));
 }
 
 TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {

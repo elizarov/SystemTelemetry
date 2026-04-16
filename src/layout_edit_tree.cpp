@@ -237,6 +237,25 @@ std::vector<std::string> CollectReachableCards(const AppConfig& config) {
     return orderedCards;
 }
 
+std::vector<std::string> CollectTopLevelCards(const AppConfig& config) {
+    std::vector<std::string> orderedCards;
+    std::unordered_map<std::string, bool> seenCards;
+    const std::function<void(const LayoutNodeConfig&)> collectNode = [&](const LayoutNodeConfig& node) {
+        if (node.name == "rows" || node.name == "columns") {
+            for (const auto& child : node.children) {
+                collectNode(child);
+            }
+            return;
+        }
+        if (!node.name.empty() && !seenCards.contains(node.name)) {
+            orderedCards.push_back(node.name);
+            seenCards.emplace(node.name, true);
+        }
+    };
+    collectNode(config.layout.structure.cardsLayout);
+    return orderedCards;
+}
+
 std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
@@ -422,7 +441,7 @@ std::optional<LayoutEditTreeNode> BuildActiveLayoutSectionNode(const AppConfig& 
     return sectionNode;
 }
 
-std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& card) {
+std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& card, bool includeTitleLeaf) {
     LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "card." + card.id;
@@ -431,20 +450,22 @@ std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& c
     sectionNode.initiallyExpanded = true;
     sectionNode.selectionHighlight = LayoutEditSelectionHighlight{
         LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome}};
-    LayoutEditTreeNode titleLeaf;
-    titleLeaf.kind = LayoutEditTreeNodeKind::Leaf;
-    titleLeaf.label = "title";
-    titleLeaf.locationText = MemberLocationText(sectionNode.label, "title");
-    titleLeaf.descriptionKey = CardMemberDescriptionKey("title");
-    titleLeaf.leaf = LayoutEditTreeLeaf{
-        LayoutCardTitleEditKey{card.id},
-        sectionNode.label,
-        "title",
-        titleLeaf.descriptionKey,
-        configschema::ValueFormat::String,
-    };
-    titleLeaf.selectionHighlight = titleLeaf.leaf->focusKey;
-    sectionNode.children.push_back(std::move(titleLeaf));
+    if (includeTitleLeaf) {
+        LayoutEditTreeNode titleLeaf;
+        titleLeaf.kind = LayoutEditTreeNodeKind::Leaf;
+        titleLeaf.label = "title";
+        titleLeaf.locationText = MemberLocationText(sectionNode.label, "title");
+        titleLeaf.descriptionKey = CardMemberDescriptionKey("title");
+        titleLeaf.leaf = LayoutEditTreeLeaf{
+            LayoutCardTitleEditKey{card.id},
+            sectionNode.label,
+            "title",
+            titleLeaf.descriptionKey,
+            configschema::ValueFormat::String,
+        };
+        titleLeaf.selectionHighlight = titleLeaf.leaf->focusKey;
+        sectionNode.children.push_back(std::move(titleLeaf));
+    }
     if (const auto groupNode =
             BuildStructureGroup(sectionNode.label, "layout", card.id, sectionNode.selectionHighlight, card.layout);
         groupNode.has_value()) {
@@ -476,6 +497,7 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
     LayoutEditTreeModel model;
     const std::vector<TemplateSectionSlot> sections = ParseTemplateSections(templateText);
     const std::vector<std::string> reachableCards = CollectReachableCards(config);
+    const std::vector<std::string> topLevelCards = CollectTopLevelCards(config);
 
     for (const auto& section : sections) {
         switch (section.kind) {
@@ -495,7 +517,9 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
                     if (card == nullptr) {
                         continue;
                     }
-                    if (const auto cardSection = BuildCardSectionNode(*card); cardSection.has_value()) {
+                    const bool includeTitleLeaf =
+                        std::find(topLevelCards.begin(), topLevelCards.end(), cardId) != topLevelCards.end();
+                    if (const auto cardSection = BuildCardSectionNode(*card, includeTitleLeaf); cardSection.has_value()) {
                         model.roots.push_back(*cardSection);
                     }
                 }
