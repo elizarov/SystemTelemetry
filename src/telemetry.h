@@ -119,6 +119,7 @@ public:
     const ResolvedTelemetrySelections& ResolvedSelections() const;
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const;
     const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const;
+    void ApplySettings(const TelemetrySettings& settings);
     void SetPreferredNetworkAdapterName(std::string adapterName);
     void SetSelectedStorageDrives(std::vector<std::string> driveLetters);
     void RefreshSelections();

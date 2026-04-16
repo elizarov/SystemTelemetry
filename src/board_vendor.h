@@ -18,6 +18,8 @@ struct BoardVendorTelemetrySample {
     std::string driverLibrary;
     std::vector<std::string> requestedFanNames;
     std::vector<std::string> requestedTemperatureNames;
+    std::vector<std::string> availableFanNames;
+    std::vector<std::string> availableTemperatureNames;
     std::vector<NamedScalarMetric> fans;
     std::vector<NamedScalarMetric> temperatures;
     std::string providerName = "None";

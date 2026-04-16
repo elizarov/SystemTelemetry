@@ -32,6 +32,12 @@ public:
         return storageDrives_;
     }
 
+    void ApplySettings(const TelemetrySettings& settings) override {
+        telemetry_.ApplySettings(settings);
+        networkAdapters_ = telemetry_.NetworkAdapterCandidates();
+        storageDrives_ = telemetry_.StorageDriveCandidates();
+    }
+
     void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
         telemetry_.SetPreferredNetworkAdapterName(adapterName);
         networkAdapters_ = telemetry_.NetworkAdapterCandidates();

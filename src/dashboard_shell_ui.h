@@ -44,11 +44,13 @@ public:
     bool ApplyMetricPreview(const LayoutMetricEditKey& key,
         const std::optional<double>& scale,
         const std::string& unit,
-        const std::string& label);
+        const std::string& label,
+        const std::optional<std::string>& binding);
     bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
     void SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
     void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const;
+    std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const;
 
 private:
     enum class UnsavedLayoutEditAction {

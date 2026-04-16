@@ -61,6 +61,11 @@ public:
         return storageDrives_;
     }
 
+    void ApplySettings(const TelemetrySettings& settings) override {
+        selectionSettings_ = settings.selection;
+        RefreshSelectionsAndSnapshot();
+    }
+
     void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
         selectionSettings_.preferredAdapterName = adapterName;
         RefreshNetworkSelection();

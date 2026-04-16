@@ -14,6 +14,7 @@ public:
     virtual const ResolvedTelemetrySelections& ResolvedSelections() const = 0;
     virtual const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const = 0;
     virtual const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const = 0;
+    virtual void ApplySettings(const TelemetrySettings& settings) = 0;
     virtual void SetPreferredNetworkAdapterName(const std::string& adapterName) = 0;
     virtual void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) = 0;
     virtual void RefreshSelectionsAndSnapshot() = 0;

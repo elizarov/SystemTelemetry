@@ -498,7 +498,17 @@ bool DashboardController::ApplyLayoutEditColor(
 }
 
 void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config) {
+    const AppConfig previousConfig = state_.config;
     state_.config = config;
+    if (state_.telemetry != nullptr) {
+        const TelemetrySettings previousSettings = ExtractTelemetrySettings(previousConfig);
+        const TelemetrySettings nextSettings = ExtractTelemetrySettings(state_.config);
+        if (previousSettings != nextSettings) {
+            state_.telemetry->ApplySettings(nextSettings);
+            state_.telemetry->UpdateSnapshot();
+            state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+        }
+    }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
     RefreshLayoutEditSessionDirtyFlag();

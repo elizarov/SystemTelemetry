@@ -64,10 +64,11 @@ The language has ten levels:
 
 - `drives =`
 
-`[board]` owns the mapping from logical layout metric names to board-specific sensor titles:
+`[board]` owns the mapping from logical layout metric names to board-specific sensor names:
 
-- `board.temp.<name> = sensor title`
-- `board.fan.<name> = sensor title`
+- `board.temp.<name> = sensor name`
+- `board.fan.<name> = sensor name`
+- In the unified layout-edit metric editor, `board.temp.*` and `board.fan.*` metric leaves also expose a `Binding` dropdown that edits this `[board]` mapping by listing the currently available board sensor names for the matching family.
 
 `[metrics]` owns the metric ids that `metric_list(...)` and `gauge(...)` bind:
 
@@ -341,7 +342,7 @@ Example:
 - `[storage] drives` defines the vertical drive-usage list contents and order.
 - An empty `[storage] drives` value means the storage telemetry selection flow auto-selects all currently available fixed drives.
 - Layout metric references define which logical board temperature and fan metrics are requested from the board provider.
-- The `[board]` section maps those logical metric names to the board-specific sensor titles that the provider looks up.
+- The `[board]` section maps those logical metric names to the board-specific sensor names that the provider looks up.
 
 ## Consistency rules
 

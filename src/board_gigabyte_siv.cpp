@@ -342,6 +342,17 @@ std::string ResolveMappedSensorName(
     return logicalName;
 }
 
+template <typename Reading> std::vector<std::string> ExtractSensorNames(const std::vector<Reading>& readings) {
+    std::vector<std::string> names;
+    names.reserve(readings.size());
+    for (const auto& reading : readings) {
+        if (!reading.title.empty()) {
+            names.push_back(reading.title);
+        }
+    }
+    return names;
+}
+
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
     explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace)
@@ -379,6 +390,8 @@ public:
         sample.providerName = "Gigabyte";
         sample.requestedFanNames = settings_.requestedFanNames;
         sample.requestedTemperatureNames = settings_.requestedTemperatureNames;
+        sample.availableFanNames = ExtractSensorNames(fanReadings_);
+        sample.availableTemperatureNames = ExtractSensorNames(tempReadings_);
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
         sample.driverLibrary = loadedLibrary_;
@@ -402,6 +415,8 @@ public:
         diagnostics_ = snapshot.diagnostics;
         fanReadings_ = std::move(snapshot.fans);
         tempReadings_ = std::move(snapshot.temperatures);
+        sample.availableFanNames = ExtractSensorNames(fanReadings_);
+        sample.availableTemperatureNames = ExtractSensorNames(tempReadings_);
 
         sample.temperatures = BuildRequestedTemperatures();
         sample.fans = BuildRequestedFans();

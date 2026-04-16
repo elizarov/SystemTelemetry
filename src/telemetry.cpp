@@ -232,6 +232,31 @@ const std::vector<StorageDriveCandidate>& TelemetryCollector::StorageDriveCandid
     return impl_->storage_.driveCandidates;
 }
 
+void TelemetryCollector::ApplySettings(const TelemetrySettings& settings) {
+    const bool boardChanged = impl_->settings_.board != settings.board;
+    const bool selectionChanged = impl_->settings_.selection != settings.selection;
+    impl_->settings_ = settings;
+
+    if (selectionChanged) {
+        SetPreferredNetworkAdapterName(settings.selection.preferredAdapterName);
+        SetSelectedStorageDrives(settings.selection.configuredDrives);
+    }
+
+    if (boardChanged && impl_->boardProvider_ != nullptr) {
+        impl_->trace_.Write("telemetry:board_provider_reconfigure_begin");
+        if (impl_->boardProvider_->Initialize(settings.board)) {
+            impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
+            impl_->trace_.Write("telemetry:board_provider_reconfigure_done provider=" + impl_->boardProviderName_ +
+                                " available=" + tracing::Trace::BoolText(impl_->boardProviderAvailable_) +
+                                " diagnostics=\"" + impl_->boardProviderDiagnostics_ + "\"");
+        } else {
+            impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
+            impl_->trace_.Write("telemetry:board_provider_reconfigure_failed provider=" + impl_->boardProviderName_ +
+                                " diagnostics=\"" + impl_->boardProviderDiagnostics_ + "\"");
+        }
+    }
+}
+
 void TelemetryCollector::SetPreferredNetworkAdapterName(std::string adapterName) {
     impl_->settings_.selection.preferredAdapterName = std::move(adapterName);
     impl_->ResolveNetworkSelection();

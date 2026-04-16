@@ -1,5 +1,6 @@
 #include "dashboard_shell_ui.h"
 
+#include <algorithm>
 #include <cmath>
 #include <commdlg.h>
 #include <cwchar>
@@ -7,6 +8,7 @@
 #include <sstream>
 
 #include "app_diagnostics.h"
+#include "app_strings.h"
 #include "dashboard_app.h"
 #include "layout_edit_tree.h"
 #include "layout_edit_service.h"
@@ -36,6 +38,49 @@ constexpr int kUnsavedLayoutEditButtonKeepEditing = 20002;
 constexpr int kUnsavedLayoutEditButtonDiscard = 20003;
 constexpr int kUnsavedLayoutEditButtonExitWithoutSaving = 20004;
 constexpr int kUnsavedLayoutEditButtonReloadWithoutSaving = 20005;
+constexpr std::string_view kBoardTemperatureMetricPrefix = "board.temp.";
+constexpr std::string_view kBoardFanMetricPrefix = "board.fan.";
+
+enum class BoardMetricBindingKind {
+    Temperature,
+    Fan,
+};
+
+struct BoardMetricBindingTarget {
+    BoardMetricBindingKind kind = BoardMetricBindingKind::Temperature;
+    std::string logicalName;
+};
+
+std::optional<BoardMetricBindingTarget> ParseBoardMetricBindingTarget(std::string_view metricId) {
+    if (metricId.rfind(kBoardTemperatureMetricPrefix, 0) == 0) {
+        return BoardMetricBindingTarget{
+            BoardMetricBindingKind::Temperature,
+            std::string(metricId.substr(kBoardTemperatureMetricPrefix.size())),
+        };
+    }
+    if (metricId.rfind(kBoardFanMetricPrefix, 0) == 0) {
+        return BoardMetricBindingTarget{
+            BoardMetricBindingKind::Fan,
+            std::string(metricId.substr(kBoardFanMetricPrefix.size())),
+        };
+    }
+    return std::nullopt;
+}
+
+std::string FindConfiguredBoardMetricBinding(const AppConfig& config, const LayoutMetricEditKey& key) {
+    const auto target = ParseBoardMetricBindingTarget(key.metricId);
+    if (!target.has_value()) {
+        return {};
+    }
+
+    const auto& bindings = target->kind == BoardMetricBindingKind::Temperature ? config.board.temperatureSensorNames
+                                                                               : config.board.fanSensorNames;
+    const auto it = bindings.find(target->logicalName);
+    if (it != bindings.end() && !it->second.empty()) {
+        return it->second;
+    }
+    return target->logicalName;
+}
 
 bool AreScalesEqual(double left, double right) {
     return std::abs(left - right) < kScaleEpsilon;
@@ -395,6 +440,34 @@ std::wstring ReadFontDialogFaceText(HWND hwnd, UINT notificationCode) {
     return faceBuffer;
 }
 
+void PopulateMetricBindingComboBox(HWND hwnd,
+    const std::vector<std::string>& options,
+    std::string_view selectedBinding,
+    bool enableSelection) {
+    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
+    if (combo == nullptr) {
+        return;
+    }
+
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    int selectedIndex = CB_ERR;
+    for (const auto& option : options) {
+        const std::wstring wideOption = WideFromUtf8(option);
+        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideOption.c_str()));
+        if (index != CB_ERR && selectedIndex == CB_ERR && option == selectedBinding) {
+            selectedIndex = static_cast<int>(index);
+        }
+    }
+
+    if (selectedIndex != CB_ERR) {
+        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
+    } else {
+        SetWindowTextW(combo, WideFromUtf8(std::string(selectedBinding)).c_str());
+    }
+
+    EnableWindow(combo, enableSelection ? TRUE : FALSE);
+}
+
 struct CustomScaleDialogState {
     double initialScale = 1.0;
     std::optional<double> result;
@@ -595,10 +668,11 @@ void AlignMetricEditorControls(HWND hwnd) {
     CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_LABEL, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT);
     CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_LABEL, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT);
     CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_LABEL, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT);
+    CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_LABEL, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
 }
 
 void ShowLayoutEditEditors(
-    HWND hwnd, bool showNumeric, bool showFont, bool showColor, bool showWeights, bool showMetric) {
+    HWND hwnd, bool showNumeric, bool showFont, bool showColor, bool showWeights, bool showMetric, bool showBinding) {
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
 
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, showFont);
@@ -632,6 +706,8 @@ void ShowLayoutEditEditors(
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT, showMetric);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_LABEL, showMetric);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT, showMetric);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_LABEL, showMetric && showBinding);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT, showMetric && showBinding);
 }
 
 std::string BuildMetricDialogTraceValues(HWND hwnd) {
@@ -639,7 +715,8 @@ std::string BuildMetricDialogTraceValues(HWND hwnd) {
     trace << " style=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE))
           << " scale=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT))
           << " unit=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT))
-          << " label=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT));
+          << " label=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT))
+          << " binding=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT));
     return trace.str();
 }
 
@@ -670,7 +747,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     state->updatingControls = true;
     SetLayoutEditDescription(hwnd, state->selectedNode);
     if (state->selectedLeaf == nullptr) {
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false);
+        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false);
         state->updatingControls = false;
         state->shellUi->TraceLayoutEditDialogEvent(
             "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
@@ -687,7 +764,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             SetDlgItemTextW(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
                 font.has_value() && *font != nullptr ? WideFromUtf8(std::to_string((**font).weight)).c_str() : L"");
-            ShowLayoutEditEditors(hwnd, false, true, false, false, false);
+            ShowLayoutEditEditors(hwnd, false, true, false, false, false, false);
             std::ostringstream trace;
             trace << BuildTraceNodeText(state->selectedNode) << " editor=\"font\""
                   << " face=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT))
@@ -700,7 +777,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             SetColorDialogChannel(hwnd, kColorDialogControls[0], (color >> 16) & 0xFFu);
             SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 8) & 0xFFu);
             SetColorDialogChannel(hwnd, kColorDialogControls[2], color & 0xFFu);
-            ShowLayoutEditEditors(hwnd, false, false, true, false, false);
+            ShowLayoutEditEditors(hwnd, false, false, true, false, false, false);
             std::ostringstream trace;
             trace << BuildTraceNodeText(state->selectedNode) << " editor=\"color\"" << BuildColorDialogTraceValues(hwnd)
                   << " config_value=" << QuoteTraceText(value.has_value() ? FormatTraceColorHex(*value) : "none");
@@ -711,7 +788,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                 value.has_value() ? WideFromUtf8(FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat))
                                   : L"";
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-            ShowLayoutEditEditors(hwnd, true, false, false, false, false);
+            ShowLayoutEditEditors(hwnd, true, false, false, false, false, false);
             std::ostringstream trace;
             trace << BuildTraceNodeText(state->selectedNode) << " editor=\"numeric\""
                   << " text=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
@@ -729,7 +806,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT,
             values.has_value() ? WideFromUtf8(std::to_string(values->second)).c_str() : L"");
-        ShowLayoutEditEditors(hwnd, false, false, false, true, false);
+        ShowLayoutEditEditors(hwnd, false, false, false, true, false, false);
         std::ostringstream trace;
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"weights\""
               << " first=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT))
@@ -739,7 +816,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         const std::wstring text =
             WideFromUtf8(FindCardTitleValue(state->shellUi->CurrentConfig(), *cardTitleKey).value_or(""));
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-        ShowLayoutEditEditors(hwnd, true, false, false, false, false);
+        ShowLayoutEditEditors(hwnd, true, false, false, false, false, false);
         std::ostringstream trace;
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"text\""
               << " text=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
@@ -770,17 +847,32 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT,
             definition != nullptr ? WideFromUtf8(definition->label).c_str() : L"");
+        const auto bindingTarget = ParseBoardMetricBindingTarget(metricKey->metricId);
+        const bool showBinding = bindingTarget.has_value();
+        const std::string selectedBinding =
+            showBinding ? FindConfiguredBoardMetricBinding(state->shellUi->CurrentConfig(), *metricKey) : std::string();
+        std::vector<std::string> bindingOptions =
+            showBinding ? state->shellUi->AvailableBoardMetricSensorBindings(*metricKey) : std::vector<std::string>{};
+        if (!selectedBinding.empty() &&
+            std::find(bindingOptions.begin(), bindingOptions.end(), selectedBinding) == bindingOptions.end()) {
+            bindingOptions.push_back(selectedBinding);
+        }
+        std::sort(bindingOptions.begin(), bindingOptions.end());
+        bindingOptions.erase(std::unique(bindingOptions.begin(), bindingOptions.end()), bindingOptions.end());
+        PopulateMetricBindingComboBox(hwnd, bindingOptions, selectedBinding, showBinding);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT), scaleEditable ? TRUE : FALSE);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT), unitEditable ? TRUE : FALSE);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT), definition != nullptr ? TRUE : FALSE);
-        ShowLayoutEditEditors(hwnd, false, false, false, false, true);
+        ShowLayoutEditEditors(hwnd, false, false, false, false, true, showBinding);
         std::ostringstream trace;
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"metric\"" << BuildMetricDialogTraceValues(hwnd)
               << " scale_editable=" << QuoteTraceText(scaleEditable ? "true" : "false")
-              << " unit_editable=" << QuoteTraceText(unitEditable ? "true" : "false");
+              << " unit_editable=" << QuoteTraceText(unitEditable ? "true" : "false")
+              << " binding_visible=" << QuoteTraceText(showBinding ? "true" : "false")
+              << " binding_options=" << QuoteTraceText(std::to_string(bindingOptions.size()));
         state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
     } else {
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false);
+        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false);
         state->shellUi->TraceLayoutEditDialogEvent(
             "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
     }
@@ -972,7 +1064,12 @@ bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd) {
     const std::string unit =
         definition->style == MetricDisplayStyle::LabelOnly ? std::string() : Utf8FromWide(unitBuffer);
     const std::string label = Utf8FromWide(labelBuffer);
-    const bool applied = state->shellUi->ApplyMetricPreview(*key, scale, unit, label);
+    const auto bindingTarget = ParseBoardMetricBindingTarget(key->metricId);
+    const std::optional<std::string> binding =
+        bindingTarget.has_value() ? std::optional<std::string>(Trim(ReadDialogControlTextUtf8(
+                                      hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT)))
+                                  : std::nullopt;
+    const bool applied = state->shellUi->ApplyMetricPreview(*key, scale, unit, label, binding);
     std::ostringstream trace;
     trace << BuildTraceNodeText(state->selectedNode) << BuildMetricDialogTraceValues(hwnd) << " parsed_scale="
           << QuoteTraceText(scale.has_value()
@@ -1160,7 +1257,12 @@ bool ValidateActiveLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) 
         const std::string unit =
             definition->style == MetricDisplayStyle::LabelOnly ? std::string() : Utf8FromWide(unitBuffer);
         const std::string label = Utf8FromWide(labelBuffer);
-        return state->shellUi->ApplyMetricPreview(*metricKey, scale, unit, label);
+        const auto bindingTarget = ParseBoardMetricBindingTarget(metricKey->metricId);
+        const std::optional<std::string> binding =
+            bindingTarget.has_value() ? std::optional<std::string>(Trim(ReadDialogControlTextUtf8(
+                                          hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT)))
+                                      : std::nullopt;
+        return state->shellUi->ApplyMetricPreview(*metricKey, scale, unit, label, binding);
     }
 
     wchar_t firstBuffer[64] = {};
@@ -1237,7 +1339,7 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                 TreeView_EnsureVisible(tree, selectedItem);
                 SelectLayoutEditTreeItem(state, hwnd, selectedItem);
             } else {
-                ShowLayoutEditEditors(hwnd, false, false, false, false, false);
+                ShowLayoutEditEditors(hwnd, false, false, false, false, false, false);
                 SetLayoutEditDescription(hwnd, nullptr);
             }
             return TRUE;
@@ -1288,6 +1390,11 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
+                PreviewSelectedMetric(state, hwnd);
+                return TRUE;
+            }
+            if (LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT &&
+                (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) {
                 PreviewSelectedMetric(state, hwnd);
                 return TRUE;
             }
@@ -1602,6 +1709,22 @@ const AppConfig& DashboardShellUi::CurrentConfig() const {
     return app_.controller_.State().config;
 }
 
+std::vector<std::string> DashboardShellUi::AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const {
+    const auto target = ParseBoardMetricBindingTarget(key.metricId);
+    if (!target.has_value()) {
+        return {};
+    }
+
+    const auto& state = app_.controller_.State();
+    if (state.telemetry == nullptr) {
+        return {};
+    }
+
+    const BoardVendorTelemetrySample sample = state.telemetry->Dump().boardProvider;
+    return target->kind == BoardMetricBindingKind::Temperature ? sample.availableTemperatureNames
+                                                               : sample.availableFanNames;
+}
+
 void DashboardShellUi::RestoreConfigSnapshot(const AppConfig& config) {
     app_.controller_.ApplyConfigSnapshot(app_, config);
 }
@@ -1621,7 +1744,8 @@ bool DashboardShellUi::ApplyColorPreview(DashboardRenderer::LayoutEditParameter 
 bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
     const std::optional<double>& scale,
     const std::string& unit,
-    const std::string& label) {
+    const std::string& label,
+    const std::optional<std::string>& binding) {
     AppConfig updatedConfig = CurrentConfig();
     MetricDefinitionConfig* definition = FindMetricDefinition(updatedConfig.metrics, key.metricId);
     if (definition == nullptr) {
@@ -1635,6 +1759,15 @@ bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
         definition->unit = unit;
     }
     definition->label = label;
+    if (const auto target = ParseBoardMetricBindingTarget(key.metricId); target.has_value() && binding.has_value()) {
+        auto& bindings = target->kind == BoardMetricBindingKind::Temperature ? updatedConfig.board.temperatureSensorNames
+                                                                             : updatedConfig.board.fanSensorNames;
+        if (binding->empty()) {
+            bindings.erase(target->logicalName);
+        } else {
+            bindings[target->logicalName] = *binding;
+        }
+    }
     RestoreConfigSnapshot(updatedConfig);
     return true;
 }

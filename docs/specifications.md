@@ -136,7 +136,7 @@ Examples include:
 - When `network.adapter_name` is set but does not match any current non-loopback, up adapter with an IPv4 address, runtime selection must fall back to the same auto-selection logic used when the setting is empty.
 - The layout bindings `board.temp.<name>` and `board.fan.<name>` must be the only source of truth for which logical named board metrics are requested at runtime.
 - The board provider must receive the set of requested logical board temperature and fan names by scanning all `gauge(...)`, `metric_list(...)`, and text metric references that begin with `board.temp.` or `board.fan.`.
-- The `[board]` section must map each requested logical `board.temp.*` or `board.fan.*` metric name to the board-specific sensor title that the active board provider uses for lookup.
+- The `[board]` section must map each requested logical `board.temp.*` or `board.fan.*` metric name to the board-specific sensor name that the active board provider uses for lookup.
 - The `Save Config` action must persist the current auto-selected network adapter name alongside the display placement without adding any separate board-sensor selection state.
 - The `Save Config` action must also persist the current `[storage] drives` selection.
 - The `Save Config` action must also persist any in-memory layout weight edits made through interactive layout editing.
@@ -158,6 +158,7 @@ Examples include:
 - Each `card.<id>` root whose card id appears in the top-level dashboard `cards` layout must include one top-level `title` leaf ahead of the `layout` subtree, while reachable embedded-only card sections must omit that `title` leaf, and selecting a shown title leaf must highlight every matching card-title wedge anchor on screen without turning on hovered-widget outlines.
 - The unified layout-edit tree must include the editable `[metrics]` section in embedded-template order, and selecting a metric leaf must focus every matching metric-text wedge anchor on screen without turning on hovered-widget outlines.
 - Metric leaves in the unified layout-edit editor must show display style read-only from the built-in metric metadata, label always editable, unit editable except for `label_only`, and scale editable only when the metric does not use telemetry-provided `*` scale and the style is not `label_only`.
+- Metric leaves whose id begins with `board.temp.` or `board.fan.` must also show a `Binding` dropdown that edits the corresponding `[board]` sensor-name mapping for that logical metric name, lists the board provider's currently available temperature or fan sensor names, and live-updates the rendered board metric preview in the open editor session.
 - While that popup menu or unified configuration editor dialog is open, layout-edit hover hit-testing, tooltip refresh, cursor-shape overrides, and any layout-edit press or drag handling must stay suspended, and any already-active layout-edit interaction must cancel immediately, so the menu or dialog keeps the normal topmost input behavior instead of reflecting or continuing dashboard edits underneath.
 - Diamond-shaped segment-count anchors must use a tight hit region that stays at the rendered diamond bounds instead of inheriting the larger padded hit area used by circular anchors.
 - While any layout-edit guide or edit anchor drag is active, the renderer must switch only that actively dragged guide or anchor highlight to the configured `[colors].active_edit_color` and draw its visible guide or outline with a heavier stroke than the idle highlight.
@@ -235,7 +236,7 @@ GPU telemetry must provide:
 - Storage throughput should come from system-wide disk I/O counters, not only from the subset of configured drive letters shown in the storage usage list.
 - Per-drive storage activity indicators should come from per-drive logical-disk I/O counters for the configured `[storage] drives` letters.
 - Gigabyte motherboard board-metric telemetry should keep working when the Gigabyte board-specific provider is unavailable by leaving the requested `board.temp.*` and `board.fan.*` metrics unavailable.
-- The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested logical `board.temp.*` and `board.fan.*` names through the configured `[board]` sensor-title mapping.
+- The Gigabyte motherboard telemetry path should identify Gigabyte boards, discover the installed SIV location from the Windows registry, load the required Gigabyte SIV .NET assemblies in-process from native C++ code, initialize the vendor hardware-monitor module against the `HwRegister` source through reflection, collect the available fan RPM and temperature readings directly from those loaded assemblies, and match requested logical `board.temp.*` and `board.fan.*` names through the configured `[board]` sensor-name mapping.
 
 ## Size and placement
 
