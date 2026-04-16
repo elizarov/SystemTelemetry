@@ -551,6 +551,13 @@ void AlignFontEditorControls(HWND hwnd) {
     CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT);
 }
 
+void AlignMetricEditorControls(HWND hwnd) {
+    CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL, IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE);
+    CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_LABEL, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT);
+    CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_LABEL, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT);
+    CenterDialogLabelToControl(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_LABEL, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT);
+}
+
 void ShowLayoutEditEditors(
     HWND hwnd, bool showNumeric, bool showFont, bool showColor, bool showWeights, bool showMetric) {
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
@@ -1177,6 +1184,7 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
             state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
             ConfigureColorSliders(hwnd);
             AlignFontEditorControls(hwnd);
+            AlignMetricEditorControls(hwnd);
             HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE);
             InsertLayoutEditTreeNodes(state, tree, state->treeModel.roots, TVI_ROOT);
             HTREEITEM selectedItem =
