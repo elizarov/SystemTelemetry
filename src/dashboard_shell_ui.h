@@ -42,6 +42,7 @@ public:
         const std::optional<double>& scale,
         const std::string& unit,
         const std::string& label);
+    bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
     void SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
     void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const;

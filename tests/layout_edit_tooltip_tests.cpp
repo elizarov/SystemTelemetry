@@ -83,6 +83,15 @@ TEST(LayoutEditTooltip, BuildsColorTooltipFirstLine) {
     EXPECT_EQ(BuildLayoutEditTooltipLine(*descriptor, 0x00BFFFu), "[colors] accent_color = #00BFFF");
 }
 
+TEST(LayoutEditTooltip, BuildsStringTooltipFirstLine) {
+    LayoutEditTooltipDescriptor descriptor;
+    descriptor.sectionName = "card.cpu";
+    descriptor.memberName = "title";
+    descriptor.valueFormat = configschema::ValueFormat::String;
+
+    EXPECT_EQ(BuildLayoutEditTooltipLine(descriptor, "CPU"), "[card.cpu] title = CPU");
+}
+
 TEST(LayoutEditTooltip, ResolvesFontValueThroughParameterMetadata) {
     AppConfig config;
     config.layout.fonts.label = UiFontConfig{"Segoe UI", 17, 600};

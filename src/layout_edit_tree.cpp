@@ -131,6 +131,10 @@ std::string GroupDescriptionKey(std::string_view memberName) {
     return "layout_edit.group." + std::string(memberName);
 }
 
+std::string CardMemberDescriptionKey(std::string_view memberName) {
+    return "config.card." + std::string(memberName);
+}
+
 std::string ContainerDescriptionKey(std::string_view containerName) {
     return "layout_edit.container." + std::string(containerName);
 }
@@ -427,13 +431,24 @@ std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& c
     sectionNode.initiallyExpanded = true;
     sectionNode.selectionHighlight = LayoutEditSelectionHighlight{
         LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome}};
+    LayoutEditTreeNode titleLeaf;
+    titleLeaf.kind = LayoutEditTreeNodeKind::Leaf;
+    titleLeaf.label = "title";
+    titleLeaf.locationText = MemberLocationText(sectionNode.label, "title");
+    titleLeaf.descriptionKey = CardMemberDescriptionKey("title");
+    titleLeaf.leaf = LayoutEditTreeLeaf{
+        LayoutCardTitleEditKey{card.id},
+        sectionNode.label,
+        "title",
+        titleLeaf.descriptionKey,
+        configschema::ValueFormat::String,
+    };
+    titleLeaf.selectionHighlight = titleLeaf.leaf->focusKey;
+    sectionNode.children.push_back(std::move(titleLeaf));
     if (const auto groupNode =
             BuildStructureGroup(sectionNode.label, "layout", card.id, sectionNode.selectionHighlight, card.layout);
         groupNode.has_value()) {
         sectionNode.children.push_back(*groupNode);
-    }
-    if (sectionNode.children.empty()) {
-        return std::nullopt;
     }
     return sectionNode;
 }

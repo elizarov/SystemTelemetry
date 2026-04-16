@@ -194,6 +194,22 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                     AnchorDragAxis::Vertical,
                     AnchorDragMode::AxisDelta,
                 });
+            renderer.RegisterStaticTextAnchor(card.titleRect,
+                card.title,
+                TextStyleId::Title,
+                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
+                LayoutEditAnchorBinding{
+                    LayoutEditAnchorKey{
+                        LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome},
+                        LayoutCardTitleEditKey{card.id},
+                        1,
+                    },
+                    0,
+                    AnchorShape::Wedge,
+                    AnchorDragAxis::Vertical,
+                    AnchorDragMode::AxisDelta,
+                    false,
+                });
         }
         for (const auto& widget : card.widgets) {
             if (widget.widget != nullptr) {

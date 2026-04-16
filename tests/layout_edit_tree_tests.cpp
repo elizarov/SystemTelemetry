@@ -182,6 +182,7 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
     EXPECT_EQ(alphaHighlight.editCardId, "alpha");
     EXPECT_TRUE(alphaHighlight.nodePath.empty());
     EXPECT_EQ(alphaHighlight.kind, LayoutEditWidgetIdentity::Kind::CardChrome);
+    EXPECT_EQ(ChildLabels(*alphaRoot), (std::vector<std::string>{"title", "layout"}));
 }
 
 TEST(LayoutEditTree, IncludesOnlyTheActiveLayoutSection) {
@@ -251,19 +252,23 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
 
     const LayoutEditTreeNode* alphaRoot = FindRootNode(model, "card.alpha");
     ASSERT_NE(alphaRoot, nullptr);
-    ASSERT_EQ(alphaRoot->children.size(), 1u);
-    EXPECT_EQ(alphaRoot->children[0].label, "layout");
-    ASSERT_TRUE(alphaRoot->children[0].selectionHighlight.has_value());
-    ASSERT_TRUE(std::holds_alternative<LayoutEditWidgetIdentity>(*alphaRoot->children[0].selectionHighlight));
+    ASSERT_EQ(alphaRoot->children.size(), 2u);
+    EXPECT_EQ(alphaRoot->children[0].label, "title");
+    ASSERT_TRUE(alphaRoot->children[0].leaf.has_value());
+    EXPECT_TRUE(std::holds_alternative<LayoutCardTitleEditKey>(alphaRoot->children[0].leaf->focusKey));
+    EXPECT_EQ(std::get<LayoutCardTitleEditKey>(alphaRoot->children[0].leaf->focusKey).cardId, "alpha");
+    EXPECT_EQ(alphaRoot->children[1].label, "layout");
+    ASSERT_TRUE(alphaRoot->children[1].selectionHighlight.has_value());
+    ASSERT_TRUE(std::holds_alternative<LayoutEditWidgetIdentity>(*alphaRoot->children[1].selectionHighlight));
     const auto& alphaRootHighlight = std::get<LayoutEditWidgetIdentity>(*alphaRoot->selectionHighlight);
-    const auto& alphaGroupHighlight = std::get<LayoutEditWidgetIdentity>(*alphaRoot->children[0].selectionHighlight);
+    const auto& alphaGroupHighlight = std::get<LayoutEditWidgetIdentity>(*alphaRoot->children[1].selectionHighlight);
     EXPECT_EQ(alphaGroupHighlight.renderCardId, alphaRootHighlight.renderCardId);
     EXPECT_EQ(alphaGroupHighlight.editCardId, alphaRootHighlight.editCardId);
     EXPECT_EQ(alphaGroupHighlight.nodePath, alphaRootHighlight.nodePath);
     EXPECT_EQ(alphaGroupHighlight.kind, alphaRootHighlight.kind);
-    EXPECT_EQ(ChildLabels(alphaRoot->children[0]), (std::vector<std::string>{"columns", "columns, throughput"}));
+    EXPECT_EQ(ChildLabels(alphaRoot->children[1]), (std::vector<std::string>{"columns", "columns, throughput"}));
 
-    const LayoutEditTreeNode* alphaContainer = &alphaRoot->children[0].children[0];
+    const LayoutEditTreeNode* alphaContainer = &alphaRoot->children[1].children[0];
     ASSERT_TRUE(alphaContainer->selectionHighlight.has_value());
     ASSERT_TRUE(std::holds_alternative<LayoutContainerEditKey>(*alphaContainer->selectionHighlight));
     const auto& containerKey = std::get<LayoutContainerEditKey>(*alphaContainer->selectionHighlight);
@@ -297,6 +302,13 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     ASSERT_NE(metricLeaf, nullptr);
     EXPECT_EQ(metricLeaf->sectionName, "metrics");
     EXPECT_EQ(metricLeaf->memberName, "gpu.temp");
+
+    const LayoutEditTreeLeaf* titleLeaf =
+        FindLayoutEditTreeLeaf(model, LayoutEditFocusKey{LayoutCardTitleEditKey{"alpha"}});
+    ASSERT_NE(titleLeaf, nullptr);
+    EXPECT_EQ(titleLeaf->sectionName, "card.alpha");
+    EXPECT_EQ(titleLeaf->memberName, "title");
+    EXPECT_EQ(titleLeaf->valueFormat, configschema::ValueFormat::String);
 }
 
 TEST(LayoutEditTree, ShowsReachableCardSectionsForRuntimeStyleDashboardCardNodes) {
@@ -320,11 +332,12 @@ TEST(LayoutEditTree, CollapsesSingleChildContainerPathsInCardTrees) {
 
     const LayoutEditTreeNode* gpuRoot = FindRootNode(model, "card.gpu");
     ASSERT_NE(gpuRoot, nullptr);
-    ASSERT_EQ(gpuRoot->children.size(), 1u);
-    EXPECT_EQ(gpuRoot->children[0].label, "layout");
-    ASSERT_EQ(gpuRoot->children[0].children.size(), 1u);
-    EXPECT_EQ(gpuRoot->children[0].children[0].label, "gauge, metric_list");
-    EXPECT_TRUE(gpuRoot->children[0].children[0].leaf.has_value());
+    ASSERT_EQ(gpuRoot->children.size(), 2u);
+    EXPECT_EQ(gpuRoot->children[0].label, "title");
+    EXPECT_EQ(gpuRoot->children[1].label, "layout");
+    ASSERT_EQ(gpuRoot->children[1].children.size(), 1u);
+    EXPECT_EQ(gpuRoot->children[1].children[0].label, "gauge, metric_list");
+    EXPECT_TRUE(gpuRoot->children[1].children[0].leaf.has_value());
 }
 
 TEST(LayoutEditTree, EveryBuiltNodeHasLocalizedDescriptionAndLocationText) {

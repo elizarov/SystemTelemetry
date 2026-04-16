@@ -1100,34 +1100,30 @@ bool DashboardRenderer::MatchesWidgetIdentity(
 
 LayoutEditAnchorBinding DashboardRenderer::MakeEditableTextBinding(
     const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const {
-    return LayoutEditAnchorBinding{
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            std::variant<LayoutEditParameter, LayoutMetricEditKey>{parameter},
-            anchorId,
-        },
-        value,
-        AnchorShape::Circle,
-        AnchorDragAxis::Vertical,
-        AnchorDragMode::AxisDelta,
-        true,
-    };
+    LayoutEditAnchorBinding binding;
+    binding.key.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    binding.key.subject = parameter;
+    binding.key.anchorId = anchorId;
+    binding.value = value;
+    binding.shape = AnchorShape::Circle;
+    binding.dragAxis = AnchorDragAxis::Vertical;
+    binding.dragMode = AnchorDragMode::AxisDelta;
+    binding.draggable = true;
+    return binding;
 }
 
 LayoutEditAnchorBinding DashboardRenderer::MakeMetricTextBinding(
     const DashboardWidgetLayout& widget, std::string_view metricId, int anchorId) const {
-    return LayoutEditAnchorBinding{
-        LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            std::variant<LayoutEditParameter, LayoutMetricEditKey>{LayoutMetricEditKey{std::string(metricId)}},
-            anchorId,
-        },
-        0,
-        AnchorShape::Wedge,
-        AnchorDragAxis::Vertical,
-        AnchorDragMode::AxisDelta,
-        false,
-    };
+    LayoutEditAnchorBinding binding;
+    binding.key.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+    binding.key.subject = LayoutMetricEditKey{std::string(metricId)};
+    binding.key.anchorId = anchorId;
+    binding.value = 0;
+    binding.shape = AnchorShape::Wedge;
+    binding.dragAxis = AnchorDragAxis::Vertical;
+    binding.dragMode = AnchorDragMode::AxisDelta;
+    binding.draggable = false;
+    return binding;
 }
 
 void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,

@@ -54,6 +54,16 @@ std::wstring BuildTooltipText(
     return text;
 }
 
+std::wstring BuildTooltipText(
+    const LayoutEditTooltipDescriptor& descriptor, std::string_view value, const std::wstring& descriptionText) {
+    std::wstring text = WideFromUtf8(BuildLayoutEditTooltipLine(descriptor, value));
+    if (!descriptionText.empty()) {
+        text += L"\r\n";
+        text += descriptionText;
+    }
+    return text;
+}
+
 std::string LayoutGuideTooltipSectionName(const AppConfig& config, const LayoutEditGuide& guide) {
     if (!guide.editCardId.empty()) {
         return "card." + guide.editCardId;
@@ -66,6 +76,21 @@ std::string LayoutGuideTooltipSectionName(const AppConfig& config, const LayoutE
 
 std::string LayoutGuideTooltipConfigMember(const LayoutEditGuide& guide) {
     return guide.editCardId.empty() ? "cards" : "layout";
+}
+
+const LayoutCardConfig* FindCardById(const AppConfig& config, std::string_view cardId) {
+    const auto it = std::find_if(
+        config.layout.cards.begin(), config.layout.cards.end(), [&](const auto& card) { return card.id == cardId; });
+    return it != config.layout.cards.end() ? &(*it) : nullptr;
+}
+
+LayoutEditTooltipDescriptor CardTitleTooltipDescriptor(const LayoutCardTitleEditKey& key) {
+    LayoutEditTooltipDescriptor descriptor;
+    descriptor.configKey = "config.card.title";
+    descriptor.sectionName = "card." + key.cardId;
+    descriptor.memberName = "title";
+    descriptor.valueFormat = configschema::ValueFormat::String;
+    return descriptor;
 }
 
 const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const LayoutEditGuide& guide) {
@@ -595,9 +620,11 @@ void DashboardApp::UpdateLayoutEditTooltip() {
 
     std::optional<LayoutEditTooltipDescriptor> descriptor;
     std::optional<LayoutMetricEditKey> metricKey;
+    std::optional<LayoutCardTitleEditKey> cardTitleKey;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
     std::optional<unsigned int> colorValue;
+    std::optional<std::string> stringValue;
     const RenderPoint clientPoint = target->clientPoint.value_or(TooltipPayloadAnchorPoint(target->payload));
     if (const auto* guide = std::get_if<LayoutEditGuide>(&target->payload)) {
         layoutEditTooltipText_ = BuildLayoutGuideTooltipText(controller_.State().config, *guide);
@@ -605,6 +632,8 @@ void DashboardApp::UpdateLayoutEditTooltip() {
         if (const auto focusKey = TooltipPayloadFocusKey(target->payload);
             focusKey.has_value() && std::holds_alternative<LayoutMetricEditKey>(*focusKey)) {
             metricKey = std::get<LayoutMetricEditKey>(*focusKey);
+        } else if (focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
+            cardTitleKey = std::get<LayoutCardTitleEditKey>(*focusKey);
         }
         if (const auto parameter = TooltipPayloadParameter(target->payload); parameter.has_value()) {
             descriptor = FindLayoutEditTooltipDescriptor(*parameter);
@@ -631,17 +660,28 @@ void DashboardApp::UpdateLayoutEditTooltip() {
                 HideLayoutEditTooltip();
                 return;
             }
+        } else if (cardTitleKey.has_value()) {
+            descriptor = CardTitleTooltipDescriptor(*cardTitleKey);
+            const LayoutCardConfig* card = FindCardById(controller_.State().config, cardTitleKey->cardId);
+            if (card == nullptr) {
+                HideLayoutEditTooltip();
+                return;
+            }
+            stringValue = card->title;
         }
     }
 
-    if (!IsLayoutGuidePayload(target->payload) && !descriptor.has_value() && !metricKey.has_value()) {
+    if (!IsLayoutGuidePayload(target->payload) && !descriptor.has_value() && !metricKey.has_value() &&
+        !cardTitleKey.has_value()) {
         HideLayoutEditTooltip();
         return;
     }
 
     if (!IsLayoutGuidePayload(target->payload) && !metricKey.has_value()) {
         const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
-        if (descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()) {
+        if (descriptor->valueFormat == configschema::ValueFormat::String && stringValue.has_value()) {
+            layoutEditTooltipText_ = BuildTooltipText(*descriptor, *stringValue, description);
+        } else if (descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()) {
             layoutEditTooltipText_ = BuildTooltipText(*descriptor, *fontValue, description);
         } else if (descriptor->valueFormat == configschema::ValueFormat::ColorHex && colorValue.has_value()) {
             layoutEditTooltipText_ = BuildTooltipText(*descriptor, *colorValue, description);

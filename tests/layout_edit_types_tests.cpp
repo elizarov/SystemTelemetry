@@ -113,6 +113,23 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveMetricEditableAnchorFocus) {
     EXPECT_EQ(metricKey->metricId, "gpu.temp");
 }
 
+TEST(LayoutEditTypes, TooltipPayloadHelpersResolveCardTitleEditableAnchorFocus) {
+    LayoutEditAnchorRegion anchor;
+    anchor.key.widget = {"card-a", "card-a", {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+    anchor.key.subject = LayoutCardTitleEditKey{"card-a"};
+    anchor.anchorRect = RenderRect{100, 200, 109, 209};
+
+    const TooltipPayload payload = anchor;
+
+    EXPECT_FALSE(TooltipPayloadParameter(payload).has_value());
+    EXPECT_FALSE(TooltipPayloadNumericValue(payload).has_value());
+    const auto focusKey = TooltipPayloadFocusKey(payload);
+    ASSERT_TRUE(focusKey.has_value());
+    const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey);
+    ASSERT_NE(cardTitleKey, nullptr);
+    EXPECT_EQ(cardTitleKey->cardId, "card-a");
+}
+
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveColorRegions) {
     LayoutEditColorRegion region;
     region.parameter = LayoutEditParameter::ColorAccent;
@@ -139,13 +156,18 @@ TEST(LayoutEditTypes, MatchesFocusKeysByParameterOrWeightIdentity) {
     const LayoutEditFocusKey metricA = LayoutMetricEditKey{"gpu.temp"};
     const LayoutEditFocusKey metricB = LayoutMetricEditKey{"gpu.temp"};
     const LayoutEditFocusKey metricC = LayoutMetricEditKey{"cpu.load"};
+    const LayoutEditFocusKey cardTitleA = LayoutCardTitleEditKey{"gpu"};
+    const LayoutEditFocusKey cardTitleB = LayoutCardTitleEditKey{"gpu"};
+    const LayoutEditFocusKey cardTitleC = LayoutCardTitleEditKey{"cpu"};
 
     EXPECT_TRUE(MatchesLayoutEditFocusKey(parameterA, parameterB));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(weightA, weightB));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(metricA, metricB));
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(cardTitleA, cardTitleB));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(parameterA, weightA));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(weightA, weightC));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(metricA, metricC));
+    EXPECT_FALSE(MatchesLayoutEditFocusKey(cardTitleA, cardTitleC));
 }
 
 TEST(LayoutEditTypes, MatchesSelectedParameterFocusAgainstWidgetAndAnchorArtifacts) {
@@ -220,6 +242,19 @@ TEST(LayoutEditTypes, MatchesMetricSelectionHighlightAgainstEditableAnchors) {
 
     EXPECT_TRUE(MatchesLayoutEditSelectionHighlight(metricHighlight, metricAnchorKey));
     EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(metricHighlight, otherAnchorKey));
+}
+
+TEST(LayoutEditTypes, MatchesCardTitleSelectionHighlightAgainstEditableAnchors) {
+    const LayoutEditSelectionHighlight cardTitleHighlight = LayoutEditFocusKey{LayoutCardTitleEditKey{"gpu"}};
+
+    LayoutEditAnchorKey titleAnchorKey;
+    titleAnchorKey.subject = LayoutCardTitleEditKey{"gpu"};
+
+    LayoutEditAnchorKey otherAnchorKey;
+    otherAnchorKey.subject = LayoutCardTitleEditKey{"cpu"};
+
+    EXPECT_TRUE(MatchesLayoutEditSelectionHighlight(cardTitleHighlight, titleAnchorKey));
+    EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(cardTitleHighlight, otherAnchorKey));
 }
 
 TEST(LayoutEditTypes, MatchesCardChromeSelectionByEditedCardIdentity) {

@@ -223,6 +223,8 @@ const char* TreeNodeKindTraceName(LayoutEditTreeNodeKind kind) {
 
 const char* ValueFormatTraceName(configschema::ValueFormat format) {
     switch (format) {
+        case configschema::ValueFormat::String:
+            return "string";
         case configschema::ValueFormat::Integer:
             return "integer";
         case configschema::ValueFormat::FloatingPoint:
@@ -267,6 +269,9 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
     }
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&leaf->focusKey)) {
         return "focus=" + QuoteTraceText("[metrics] " + metricKey->metricId);
+    }
+    if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&leaf->focusKey)) {
+        return "focus=" + QuoteTraceText("[card." + cardTitleKey->cardId + "] title");
     }
     return "focus=\"unknown\"";
 }
@@ -452,6 +457,20 @@ const LayoutNodeConfig* FindWeightEditNode(const AppConfig& config, const Layout
     target.editCardId = key.editCardId;
     target.nodePath = key.nodePath;
     return FindGuideNode(config, target);
+}
+
+const LayoutCardConfig* FindCardById(const AppConfig& config, std::string_view cardId) {
+    const auto it = std::find_if(
+        config.layout.cards.begin(), config.layout.cards.end(), [&](const auto& card) { return card.id == cardId; });
+    return it != config.layout.cards.end() ? &(*it) : nullptr;
+}
+
+std::optional<std::string> FindCardTitleValue(const AppConfig& config, const LayoutCardTitleEditKey& key) {
+    const LayoutCardConfig* card = FindCardById(config, key.cardId);
+    if (card == nullptr) {
+        return std::nullopt;
+    }
+    return card->title;
 }
 
 std::optional<std::pair<int, int>> FindWeightEditValues(const AppConfig& config, const LayoutWeightEditKey& key) {
@@ -670,6 +689,15 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
               << " first=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT))
               << " second=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT));
         state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
+    } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&state->selectedLeaf->focusKey)) {
+        const std::wstring text =
+            WideFromUtf8(FindCardTitleValue(state->shellUi->CurrentConfig(), *cardTitleKey).value_or(""));
+        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
+        ShowLayoutEditEditors(hwnd, true, false, false, false, false);
+        std::ostringstream trace;
+        trace << BuildTraceNodeText(state->selectedNode) << " editor=\"text\""
+              << " text=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
+        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
     } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey)) {
         const MetricDefinitionConfig* definition =
             FindMetricDefinition(state->shellUi->CurrentConfig().metrics, metricKey->metricId);
@@ -714,18 +742,33 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     state->updatingControls = false;
 }
 
-bool PreviewSelectedNumeric(LayoutEditDialogState* state, HWND hwnd) {
+bool PreviewSelectedValue(LayoutEditDialogState* state, HWND hwnd) {
     if (state == nullptr || state->selectedLeaf == nullptr || state->updatingControls) {
         return false;
     }
     const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
-    if (parameter == nullptr || state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec ||
-        state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
+    const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&state->selectedLeaf->focusKey);
+    if (parameter == nullptr && cardTitleKey == nullptr) {
         return false;
     }
 
-    wchar_t buffer[128] = {};
+    wchar_t buffer[256] = {};
     GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, buffer, ARRAYSIZE(buffer));
+    if (cardTitleKey != nullptr) {
+        const std::string title = Utf8FromWide(buffer);
+        const bool applied = state->shellUi->ApplyCardTitlePreview(*cardTitleKey, title);
+        std::ostringstream trace;
+        trace << BuildTraceNodeText(state->selectedNode) << " raw=" << QuoteTraceText(title)
+              << " parsed=" << QuoteTraceText(title) << " applied=" << QuoteTraceText(applied ? "true" : "false");
+        state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_value", trace.str());
+        return applied;
+    }
+    if (state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec ||
+        state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex ||
+        state->selectedLeaf->valueFormat == configschema::ValueFormat::String) {
+        return false;
+    }
+
     std::optional<double> value;
     if (state->selectedLeaf->valueFormat == configschema::ValueFormat::Integer) {
         if (const auto parsed = TryParseDialogInteger(buffer); parsed.has_value()) {
@@ -740,7 +783,7 @@ bool PreviewSelectedNumeric(LayoutEditDialogState* state, HWND hwnd) {
           << QuoteTraceText(
                  value.has_value() ? FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat) : "invalid")
           << " applied=" << QuoteTraceText(applied ? "true" : "false");
-    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_numeric", trace.str());
+    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:preview_value", trace.str());
     return applied;
 }
 
@@ -1038,6 +1081,12 @@ bool ValidateActiveLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) 
         return state->shellUi->ApplyParameterPreview(*parameter, *value);
     }
 
+    if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&state->selectedLeaf->focusKey)) {
+        wchar_t titleBuffer[256] = {};
+        GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, titleBuffer, ARRAYSIZE(titleBuffer));
+        return state->shellUi->ApplyCardTitlePreview(*cardTitleKey, Utf8FromWide(titleBuffer));
+    }
+
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey)) {
         const MetricDefinitionConfig* definition =
             FindMetricDefinition(state->shellUi->CurrentConfig().metrics, metricKey->metricId);
@@ -1157,7 +1206,7 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
         }
         case WM_COMMAND:
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_VALUE_EDIT && HIWORD(wParam) == EN_CHANGE) {
-                PreviewSelectedNumeric(state, hwnd);
+                PreviewSelectedValue(state, hwnd);
                 return TRUE;
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT &&
@@ -1355,6 +1404,19 @@ bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
     return true;
 }
 
+bool DashboardShellUi::ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title) {
+    AppConfig updatedConfig = CurrentConfig();
+    const auto it = std::find_if(updatedConfig.layout.cards.begin(),
+        updatedConfig.layout.cards.end(),
+        [&](const LayoutCardConfig& card) { return card.id == key.cardId; });
+    if (it == updatedConfig.layout.cards.end()) {
+        return false;
+    }
+    it->title = title;
+    RestoreConfigSnapshot(updatedConfig);
+    return true;
+}
+
 bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) {
     const LayoutNodeConfig* node = FindWeightEditNode(CurrentConfig(), key);
     if (node == nullptr || key.separatorIndex + 1 >= node->children.size()) {
@@ -1393,6 +1455,8 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
             FindLayoutEditTooltipDescriptor(*parameter).value_or(LayoutEditTooltipDescriptor{}).configKey;
     } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey)) {
         initialFocusTrace = "[metrics] " + metricKey->metricId;
+    } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
+        initialFocusTrace = "[card." + cardTitleKey->cardId + "] title";
     }
 
     LayoutEditDialogState state;
@@ -1686,6 +1750,8 @@ void DashboardShellUi::ShowContextMenu(
             if (focusKey.has_value() && std::holds_alternative<LayoutMetricEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(
                     WideFromUtf8(std::get<LayoutMetricEditKey>(*focusKey).metricId + " metric"));
+            } else if (focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
+                label = BuildLayoutEditMenuLabel(L"card title");
             } else {
                 const auto parameter = TooltipPayloadParameter(layoutEditTarget->payload);
                 if (parameter.has_value()) {
