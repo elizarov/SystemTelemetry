@@ -49,13 +49,8 @@ public:
     explicit LayoutEditDialog(LayoutEditDialogHost& host);
     ~LayoutEditDialog();
 
-    LayoutEditDialogHost& Host() {
-        return host_;
-    }
-
-    const LayoutEditDialogHost& Host() const {
-        return host_;
-    }
+    LayoutEditDialogHost& Host();
+    const LayoutEditDialogHost& Host() const;
 
     bool HandleDialogMessage(MSG* msg) const;
     bool Ensure(const std::optional<LayoutEditFocusKey>& focusKey = std::nullopt, bool bringToFront = false);

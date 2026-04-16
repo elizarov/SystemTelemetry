@@ -9,6 +9,10 @@ echo Running architecture checks...
 python tools\check_architecture.py
 if errorlevel 1 set "failed=1"
 
+echo Running include style checks...
+python tools\check_includes.py
+if errorlevel 1 set "failed=1"
+
 if /I "%~1"=="tidy" (
     shift
     call :run_clang_tidy %*

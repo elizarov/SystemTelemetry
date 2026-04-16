@@ -20,6 +20,14 @@ LayoutEditDialog::~LayoutEditDialog() {
     Close();
 }
 
+LayoutEditDialogHost& LayoutEditDialog::Host() {
+    return host_;
+}
+
+const LayoutEditDialogHost& LayoutEditDialog::Host() const {
+    return host_;
+}
+
 bool LayoutEditDialog::HandleDialogMessage(MSG* msg) const {
     return msg != nullptr && hwnd_ != nullptr && IsWindow(hwnd_) && IsDialogMessageW(hwnd_, msg) != FALSE;
 }

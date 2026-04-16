@@ -17,7 +17,7 @@
 - Keep the repo-level `.clang-format` as the single maintained source of truth for C++ formatting rules.
 - Keep the repo-level `.clangd` as the maintained source of truth for the project compilation-database path used by `clangd` clients.
 - Use the top-level `format.cmd` script as the maintained entry point for formatting non-vendored C++ sources; run `format` to check and `format fix` to apply the repo style, and keep it targeting the current tracked-plus-untracked C++ file set while skipping deleted paths so rename-heavy refactors do not break the formatter pass.
-- Use the top-level `lint.cmd` script as the maintained entry point for header-to-implementation ownership checks and header-body checks; `lint` runs the architectural policy checks and `lint tidy` runs the optional whole-repo `clang-tidy` sweep.
+- Use the top-level `lint.cmd` script as the maintained entry point for header-to-implementation ownership checks, project include-path style checks, and header-body checks; `lint` runs the architectural policy and include-style checks and `lint tidy` runs the optional whole-repo `clang-tidy` sweep.
 - Keep `CMakeLists.txt` as the single maintained source of truth for native source lists, link libraries, and output-directory rules instead of duplicating that build graph in parallel scripts.
 - Keep the focused layout-edit performance benchmark in the native build as `SystemTelemetryBenchmarks` so drag-path regressions can be measured against the real controller, config-apply, snap-evaluation, and renderer paint flow instead of against a synthetic relayout-only loop.
 - Keep the `Release` benchmark link configured to emit `build\SystemTelemetryBenchmarks.pdb` so Windows Performance Toolkit exports can resolve benchmark CPU samples to project function names.
@@ -38,6 +38,7 @@
 
 - Keep the checked-in config template at `resources/config.ini` so it can be embedded into the executable as the default configuration resource.
 - Keep `resources/SystemTelemetry.rc` explicitly dependent on embedded payload files such as `resources/config.ini` and `resources/localization.ini` so incremental builds refresh the executable resources when those UTF-8 source files change.
+- Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories, so headers under nested source folders are included as `layout_edit_dialog/editors.h` or `widget/gauge.h` instead of through relative paths or local-shorthand names.
 - Treat `resources/config.ini` as the single maintained source of truth for config-file entry documentation instead of duplicating that format documentation elsewhere in the repo.
 - Do not add C++-side synthesized fallback layout/card/widget defaults that duplicate the embedded config template; shipped defaults must come only from `resources/config.ini`.
 - Do not keep code-side fallback fonts, colors, or layout-size defaults in the config structs; shipped UI styling defaults must come only from `resources/config.ini`.

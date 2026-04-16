@@ -52,6 +52,4 @@ struct LayoutEditDialogState {
     bool updatingControls = false;
 };
 
-inline LayoutEditDialogState* DialogStateFromWindow(HWND hwnd) {
-    return reinterpret_cast<LayoutEditDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
-}
+LayoutEditDialogState* DialogStateFromWindow(HWND hwnd);

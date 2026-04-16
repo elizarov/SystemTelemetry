@@ -84,6 +84,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_dialog/dialog_proc.cpp
     src/layout_edit_dialog/editors.cpp
     src/layout_edit_dialog/pane.cpp
+    src/layout_edit_dialog/state.cpp
     src/layout_edit_dialog/trace.cpp
     src/layout_edit_dialog/tree.cpp
     src/layout_edit_dialog/util.cpp
