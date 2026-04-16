@@ -737,8 +737,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     SendMessageW(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
     POINT tooltipScreenPoint{clientPoint.x + tooltipOffsetX, clientPoint.y + tooltipOffsetY};
     ClientToScreen(hwnd_, &tooltipScreenPoint);
-    SendMessageW(
-        layoutEditTooltipHwnd_, TTM_TRACKPOSITION, 0, MAKELPARAM(tooltipScreenPoint.x, tooltipScreenPoint.y));
+    SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKPOSITION, 0, MAKELPARAM(tooltipScreenPoint.x, tooltipScreenPoint.y));
     SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKACTIVATE, TRUE, reinterpret_cast<LPARAM>(&toolInfo));
 
     MSG msg{};

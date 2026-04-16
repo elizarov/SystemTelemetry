@@ -1,0 +1,84 @@
+#pragma once
+
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+
+#include "config.h"
+#include "layout_edit_controller.h"
+#include "layout_edit_parameter.h"
+
+struct LayoutEditConfigDialogState;
+
+class LayoutEditConfigDialogHost {
+public:
+    virtual ~LayoutEditConfigDialogHost() = default;
+
+    virtual HINSTANCE LayoutEditDialogInstance() const = 0;
+    virtual HWND LayoutEditDialogAnchorWindow() const = 0;
+    virtual UINT LayoutEditDialogAnchorDpi() const = 0;
+
+    virtual AppConfig BuildLayoutEditOriginalConfig() const = 0;
+    virtual const AppConfig& CurrentConfig() const = 0;
+
+    virtual bool ApplyParameterPreview(LayoutEditParameter parameter, double value) = 0;
+    virtual bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value) = 0;
+    virtual bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) = 0;
+    virtual bool ApplyMetricPreview(const LayoutMetricEditKey& key,
+        const std::optional<double>& scale,
+        const std::string& unit,
+        const std::string& label,
+        const std::optional<std::string>& binding) = 0;
+    virtual bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title) = 0;
+    virtual bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) = 0;
+
+    virtual std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const = 0;
+    virtual void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) = 0;
+    virtual void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const = 0;
+    virtual void OnLayoutEditDialogCloseRequested() = 0;
+};
+
+class LayoutEditConfigDialog {
+public:
+    explicit LayoutEditConfigDialog(LayoutEditConfigDialogHost& host);
+    ~LayoutEditConfigDialog();
+
+    LayoutEditConfigDialogHost& Host() {
+        return host_;
+    }
+
+    const LayoutEditConfigDialogHost& Host() const {
+        return host_;
+    }
+
+    bool HandleDialogMessage(MSG* msg) const;
+    bool Ensure(const std::optional<LayoutEditFocusKey>& focusKey = std::nullopt, bool bringToFront = false);
+    void Refresh(const std::optional<LayoutEditFocusKey>& preferredFocus = std::nullopt);
+    void RefreshSelection();
+    bool SyncSelection(const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
+    bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
+    void SetSelectionHighlightVisible(bool visible);
+    void UpdateSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
+    void Close();
+
+private:
+    static INT_PTR CALLBACK DialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+    bool IsForegroundWindow() const;
+    void BringToFront();
+    void PositionWindow(HWND hwnd) const;
+    void ApplySelectionHighlightVisibility();
+    void HandleDestroyed(HWND hwnd);
+
+    LayoutEditConfigDialogHost& host_;
+    HWND hwnd_ = nullptr;
+    std::unique_ptr<LayoutEditConfigDialogState> state_;
+    std::optional<LayoutEditSelectionHighlight> selectionHighlight_;
+    bool selectionHighlightVisible_ = false;
+};

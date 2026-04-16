@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -15,6 +16,8 @@
 #include "layout_edit_parameter.h"
 
 class DashboardApp;
+class DashboardShellUiDialogHost;
+class LayoutEditConfigDialog;
 
 class DashboardShellUi {
 public:
@@ -38,29 +41,14 @@ public:
     void EndLayoutEditModalUi();
     bool HandleDialogMessage(MSG* msg) const;
     bool HandleEditLayoutToggle();
-    void PositionLayoutEditDialogWindow(HWND hwnd) const;
-    void OnLayoutEditDialogDestroyed(HWND hwnd);
     bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
     void SetLayoutEditTreeSelectionHighlightVisible(bool visible);
     void SyncLayoutEditDialogSelection(
         const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
-    const AppConfig& CurrentConfig() const;
-    void RestoreConfigSnapshot(const AppConfig& config);
-    bool ApplyParameterPreview(DashboardRenderer::LayoutEditParameter parameter, double value);
-    bool ApplyFontPreview(DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value);
-    bool ApplyColorPreview(DashboardRenderer::LayoutEditParameter parameter, unsigned int value);
-    bool ApplyMetricPreview(const LayoutMetricEditKey& key,
-        const std::optional<double>& scale,
-        const std::string& unit,
-        const std::string& label,
-        const std::optional<std::string>& binding);
-    bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title);
-    bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
-    void SetLayoutEditTreeSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
-    void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const;
-    std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const;
 
 private:
+    friend class DashboardShellUiDialogHost;
+
     enum class UnsavedLayoutEditAction {
         Save,
         Discard,
@@ -82,8 +70,23 @@ private:
     void RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus = std::nullopt);
     void RefreshLayoutEditDialogSelection();
     void DestroyLayoutEditDialogWindow();
-    bool IsLayoutEditDialogForegroundWindow() const;
-    void ApplyLayoutEditTreeSelectionHighlightVisibility();
+    HINSTANCE DialogInstance() const;
+    AppConfig BuildLayoutEditOriginalConfigSnapshot() const;
+    const AppConfig& CurrentConfig() const;
+    void RestoreConfigSnapshot(const AppConfig& config);
+    bool ApplyParameterPreview(LayoutEditParameter parameter, double value);
+    bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value);
+    bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value);
+    bool ApplyMetricPreview(const LayoutMetricEditKey& key,
+        const std::optional<double>& scale,
+        const std::string& unit,
+        const std::string& label,
+        const std::optional<std::string>& binding);
+    bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title);
+    bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
+    void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
+    void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const;
+    std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const;
     UINT ResolveDefaultCommand(
         MenuSource source, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) const;
     void ExecuteCommand(UINT selected,
@@ -93,7 +96,6 @@ private:
     bool PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target);
 
     DashboardApp& app_;
-    HWND layoutEditDialogHwnd_ = nullptr;
-    std::optional<LayoutEditSelectionHighlight> layoutEditTreeSelectionHighlight_;
-    bool layoutEditTreeSelectionHighlightVisible_ = false;
+    std::unique_ptr<DashboardShellUiDialogHost> layoutEditDialogHost_;
+    std::unique_ptr<LayoutEditConfigDialog> layoutEditDialog_;
 };

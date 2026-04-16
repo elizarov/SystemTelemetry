@@ -27,8 +27,8 @@ enum class ThroughputGraphGroup {
 };
 
 using TextResolverFn = std::string (*)(const SystemSnapshot&, std::string_view);
-using MetricResolverFn =
-    DashboardMetricValue (*)(const SystemSnapshot&, const MetricDefinitionConfig&, const std::string&, std::string_view);
+using MetricResolverFn = DashboardMetricValue (*)(
+    const SystemSnapshot&, const MetricDefinitionConfig&, const std::string&, std::string_view);
 using ThroughputValueResolverFn = double (*)(const SystemSnapshot&);
 using ThroughputGuideStepResolverFn = double (*)(double);
 using DashboardMetricPayloadMask = unsigned int;
@@ -63,13 +63,11 @@ struct DashboardMetricBinding {
         return DashboardMetricBinding{key, false, style, kValuePayload, false, nullptr, resolveMetric};
     }
 
-    static constexpr DashboardMetricBinding ExactThroughput(
-        std::string_view key,
+    static constexpr DashboardMetricBinding ExactThroughput(std::string_view key,
         ThroughputValueResolverFn resolveThroughputValue,
         ThroughputGraphGroup throughputGroup,
         ThroughputGuideStepResolverFn resolveGuideStep) {
-        return DashboardMetricBinding{
-            key,
+        return DashboardMetricBinding{key,
             false,
             MetricDisplayStyle::Throughput,
             kThroughputPayload,
@@ -509,7 +507,8 @@ const DashboardMetricBinding kExactBindings[] = {
 };
 
 const DashboardMetricBinding kPrefixBindings[] = {
-    DashboardMetricBinding::PrefixValue(kBoardTemperaturePrefix, MetricDisplayStyle::Scalar, &ResolveBoardTemperatureMetric),
+    DashboardMetricBinding::PrefixValue(
+        kBoardTemperaturePrefix, MetricDisplayStyle::Scalar, &ResolveBoardTemperatureMetric),
     DashboardMetricBinding::PrefixValue(kBoardFanPrefix, MetricDisplayStyle::Scalar, &ResolveBoardFanMetric),
 };
 
@@ -580,8 +579,8 @@ void InitializeThroughputSharedState(
         if (!BindingSupportsPayload(binding, DashboardMetricPayloadKind::Throughput)) {
             continue;
         }
-        auto [it, inserted] = state.historyByMetricRef.emplace(
-            std::string(binding.key), SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot, std::string(binding.key))));
+        auto [it, inserted] = state.historyByMetricRef.emplace(std::string(binding.key),
+            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot, std::string(binding.key))));
         (void)inserted;
         const auto* history = &it->second;
         if (binding.throughputGroup == ThroughputGraphGroup::Network) {
@@ -615,8 +614,7 @@ std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, co
     }
 
     const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
-    if (match.binding != nullptr &&
-        !BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Value) &&
+    if (match.binding != nullptr && !BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Value) &&
         !BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Throughput)) {
         return {};
     }

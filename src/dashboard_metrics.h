@@ -74,7 +74,6 @@ public:
     const std::string& ResolveClockDate() const;
 
 private:
-
     const SystemSnapshot& snapshot_;
     const MetricsSectionConfig& metrics_;
     mutable std::unordered_map<std::string, std::string> textCache_;
