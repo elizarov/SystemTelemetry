@@ -67,6 +67,35 @@ const DashboardSessionState& DashboardController::State() const {
     return state_;
 }
 
+void DashboardController::BeginLayoutEditSessionTracking() {
+    state_.layoutEditSessionSavedConfig = state_.config;
+    state_.hasLayoutEditSessionSavedConfig = true;
+    state_.hasUnsavedLayoutEditChanges = false;
+}
+
+void DashboardController::ClearLayoutEditSessionTracking() {
+    state_.hasLayoutEditSessionSavedConfig = false;
+    state_.hasUnsavedLayoutEditChanges = false;
+    state_.layoutEditSessionSavedConfig = AppConfig{};
+}
+
+void DashboardController::RefreshLayoutEditSessionDirtyFlag() {
+    if (!state_.isEditingLayout || !state_.hasLayoutEditSessionSavedConfig) {
+        state_.hasUnsavedLayoutEditChanges = false;
+        return;
+    }
+    state_.hasUnsavedLayoutEditChanges = state_.config != state_.layoutEditSessionSavedConfig;
+}
+
+void DashboardController::MarkLayoutEditSessionSaved() {
+    if (!state_.isEditingLayout) {
+        return;
+    }
+    state_.layoutEditSessionSavedConfig = state_.config;
+    state_.hasLayoutEditSessionSavedConfig = true;
+    state_.hasUnsavedLayoutEditChanges = false;
+}
+
 void DashboardController::SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides) {
     shell.Renderer().SetConfig(state_.config);
     shell.RendererEditOverlayState().showLayoutEditGuides = showLayoutEditGuides;
@@ -116,6 +145,9 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
     SyncRenderer(shell, diagnosticsOptions.editLayout);
     state_.isEditingLayout = diagnosticsOptions.editLayout;
+    if (state_.isEditingLayout) {
+        BeginLayoutEditSessionTracking();
+    }
     ApplyConfiguredWallpaper();
     return true;
 }
@@ -149,7 +181,7 @@ bool DashboardController::WriteDiagnosticsOutputs() {
 
 bool DashboardController::ReloadConfigFromDisk(
     DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller) {
-    StopLayoutEditMode(shell, controller, diagnosticsOptions.editLayout);
+    (void)controller;
     if (!ReloadTelemetryRuntimeFromDisk(
             GetRuntimeConfigPath(), state_.config, state_.telemetry, diagnosticsOptions, state_.diagnostics.get())) {
         shell.ReleaseFonts();
@@ -157,7 +189,7 @@ bool DashboardController::ReloadConfigFromDisk(
         return false;
     }
     shell.ReleaseFonts();
-    SyncRenderer(shell, diagnosticsOptions.editLayout);
+    SyncRenderer(shell, state_.isEditingLayout || diagnosticsOptions.editLayout);
     shell.Renderer().SetTraceOutput(state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr);
     if (!shell.InitializeFonts()) {
         if (state_.diagnostics != nullptr) {
@@ -169,6 +201,9 @@ bool DashboardController::ReloadConfigFromDisk(
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.InvalidateShell();
+    if (state_.isEditingLayout) {
+        MarkLayoutEditSessionSaved();
+    }
     return true;
 }
 
@@ -276,7 +311,7 @@ bool DashboardController::SwitchLayout(DashboardShellHost& shell,
     const std::string& layoutName,
     LayoutEditController& controller,
     bool diagnosticsEditLayout) {
-    StopLayoutEditMode(shell, controller, diagnosticsEditLayout);
+    (void)controller;
     AppConfig updatedConfig = state_.config;
     if (!SelectLayout(updatedConfig, layoutName)) {
         return false;
@@ -285,10 +320,10 @@ bool DashboardController::SwitchLayout(DashboardShellHost& shell,
     const AppConfig previousConfig = state_.config;
     shell.ReleaseFonts();
     state_.config = updatedConfig;
-    SyncRenderer(shell, diagnosticsEditLayout);
+    SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
     if (!shell.InitializeFonts()) {
         state_.config = previousConfig;
-        SyncRuntimeAndRenderer(shell, diagnosticsEditLayout);
+        SyncRuntimeAndRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
         shell.InitializeFonts();
         return false;
     }
@@ -296,6 +331,7 @@ bool DashboardController::SwitchLayout(DashboardShellHost& shell,
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
     return true;
 }
 
@@ -313,6 +349,7 @@ bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scal
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
     return true;
 }
 
@@ -326,6 +363,7 @@ void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const 
     SyncRenderer(shell, state_.isEditingLayout);
     state_.telemetry->UpdateSnapshot();
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
 }
 
 void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option) {
@@ -346,6 +384,7 @@ void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const St
     SyncRenderer(shell, state_.isEditingLayout);
     state_.telemetry->UpdateSnapshot();
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
 }
 
 void DashboardController::RefreshTelemetrySelections(DashboardShellHost& shell) {
@@ -356,6 +395,9 @@ void DashboardController::RefreshTelemetrySelections(DashboardShellHost& shell) 
     state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
     SyncRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
+    if (state_.isEditingLayout && !state_.hasUnsavedLayoutEditChanges) {
+        MarkLayoutEditSessionSaved();
+    }
 }
 
 void DashboardController::StartLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller) {
@@ -363,6 +405,7 @@ void DashboardController::StartLayoutEditMode(DashboardShellHost& shell, LayoutE
         return;
     }
     state_.isEditingLayout = true;
+    BeginLayoutEditSessionTracking();
     shell.RendererEditOverlayState().showLayoutEditGuides = true;
     controller.StartSession();
     shell.InvalidateShell();
@@ -374,8 +417,34 @@ void DashboardController::StopLayoutEditMode(
         return;
     }
     state_.isEditingLayout = false;
+    ClearLayoutEditSessionTracking();
     controller.StopSession(diagnosticsEditLayout);
     shell.RendererEditOverlayState().showLayoutEditGuides = diagnosticsEditLayout;
+}
+
+bool DashboardController::HasUnsavedLayoutEditChanges() const {
+    return state_.isEditingLayout && state_.hasLayoutEditSessionSavedConfig && state_.hasUnsavedLayoutEditChanges;
+}
+
+bool DashboardController::RestoreLayoutEditSessionSavedConfig(DashboardShellHost& shell) {
+    if (!state_.hasLayoutEditSessionSavedConfig) {
+        return false;
+    }
+
+    state_.config = state_.layoutEditSessionSavedConfig;
+    if (state_.telemetry != nullptr) {
+        state_.telemetry->SetPreferredNetworkAdapterName(state_.config.network.adapterName);
+        state_.telemetry->SetSelectedStorageDrives(state_.config.storage.drives);
+        state_.telemetry->RefreshSelectionsAndSnapshot();
+        state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+    }
+    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    ApplyConfiguredWallpaper();
+    state_.placementWatchActive = true;
+    shell.ApplyConfigPlacement();
+    shell.InvalidateShell();
+    MarkLayoutEditSessionSaved();
+    return true;
 }
 
 bool DashboardController::ApplyLayoutGuideWeights(
@@ -385,6 +454,7 @@ bool DashboardController::ApplyLayoutGuideWeights(
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
     return true;
 }
 
@@ -401,6 +471,7 @@ bool DashboardController::ApplyLayoutEditValue(
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
     return true;
 }
 
@@ -411,6 +482,7 @@ bool DashboardController::ApplyLayoutEditFont(
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
     return true;
 }
 
@@ -421,6 +493,7 @@ bool DashboardController::ApplyLayoutEditColor(
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
     return true;
 }
 
@@ -428,6 +501,7 @@ void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const A
     state_.config = config;
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
 }
 
 std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
@@ -451,13 +525,17 @@ AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& s
     return config;
 }
 
-void DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& shell) {
+bool DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& shell) {
     const std::filesystem::path configPath = GetRuntimeConfigPath();
     AppConfig config = BuildCurrentConfigForSaving(shell);
     if (!SaveRuntimeConfig(configPath, config, shell.WindowHandle())) {
         shell.ShowError(WideFromUtf8("Failed to save " + Utf8FromWide(configPath.wstring()) + "."));
-        return;
+        return false;
     }
     state_.config = config;
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    if (state_.isEditingLayout) {
+        MarkLayoutEditSessionSaved();
+    }
+    return true;
 }

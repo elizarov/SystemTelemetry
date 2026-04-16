@@ -31,9 +31,48 @@ private:
 
 constexpr double kPredefinedDisplayScales[] = {1.0, 1.5, 2.0, 2.5, 3.0};
 constexpr double kScaleEpsilon = 0.0001;
+constexpr int kUnsavedLayoutEditButtonSave = 20001;
+constexpr int kUnsavedLayoutEditButtonKeepEditing = 20002;
+constexpr int kUnsavedLayoutEditButtonDiscard = 20003;
+constexpr int kUnsavedLayoutEditButtonExitWithoutSaving = 20004;
+constexpr int kUnsavedLayoutEditButtonReloadWithoutSaving = 20005;
 
 bool AreScalesEqual(double left, double right) {
     return std::abs(left - right) < kScaleEpsilon;
+}
+
+int ShowTaskDialog(HWND owner,
+    const wchar_t* mainInstruction,
+    const wchar_t* content,
+    const TASKDIALOG_BUTTON* buttons,
+    size_t buttonCount,
+    int defaultButton) {
+    using TaskDialogIndirectFn = HRESULT(WINAPI*)(
+        const TASKDIALOGCONFIG*, int*, int*, BOOL*);
+    const HMODULE comctl = GetModuleHandleW(L"comctl32.dll");
+    const auto taskDialogIndirect = comctl != nullptr
+                                        ? reinterpret_cast<TaskDialogIndirectFn>(
+                                              GetProcAddress(comctl, "TaskDialogIndirect"))
+                                        : nullptr;
+    if (taskDialogIndirect == nullptr) {
+        return 0;
+    }
+
+    TASKDIALOGCONFIG config{};
+    config.cbSize = sizeof(config);
+    config.hwndParent = owner;
+    config.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
+    config.dwCommonButtons = 0;
+    config.pszWindowTitle = L"System Telemetry";
+    config.pszMainInstruction = mainInstruction;
+    config.pszContent = content;
+    config.pszMainIcon = TD_WARNING_ICON;
+    config.cButtons = static_cast<UINT>(buttonCount);
+    config.pButtons = buttons;
+    config.nDefaultButton = defaultButton;
+    int pressedButton = IDCANCEL;
+    taskDialogIndirect(&config, &pressedButton, nullptr, nullptr);
+    return pressedButton;
 }
 
 bool IsPredefinedDisplayScale(double scale) {
@@ -1333,6 +1372,194 @@ DashboardShellUi::DashboardShellUi(DashboardApp& app) : app_(app) {}
 
 DashboardShellUi::~DashboardShellUi() = default;
 
+std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::PromptForUnsavedLayoutEditChanges(
+    UnsavedLayoutEditPrompt prompt) const {
+    DashboardShellUiModalScope scopedModalUi(const_cast<DashboardShellUi&>(*this));
+    switch (prompt) {
+        case UnsavedLayoutEditPrompt::StopEditing: {
+            const TASKDIALOG_BUTTON buttons[] = {
+                {kUnsavedLayoutEditButtonSave, L"Save Changes"},
+                {kUnsavedLayoutEditButtonKeepEditing, L"Keep Editing"},
+                {kUnsavedLayoutEditButtonDiscard, L"Discard Changes"},
+            };
+            const int selected = ShowTaskDialog(app_.hwnd_,
+                L"Save modified changes before turning off layout edit mode?",
+                L"You have unsaved changes made while editing the layout.",
+                buttons,
+                _countof(buttons),
+                kUnsavedLayoutEditButtonSave);
+            if (selected == 0) {
+                const int fallback = MessageBoxW(app_.hwnd_,
+                    L"You have unsaved changes made while editing the layout.\n\n"
+                    L"Yes = Save Changes\n"
+                    L"No = Discard Changes\n"
+                    L"Cancel = Keep Editing",
+                    L"System Telemetry",
+                    MB_ICONWARNING | MB_YESNOCANCEL);
+                if (fallback == IDYES) {
+                    return UnsavedLayoutEditAction::Save;
+                }
+                if (fallback == IDNO) {
+                    return UnsavedLayoutEditAction::Discard;
+                }
+                return UnsavedLayoutEditAction::Cancel;
+            }
+            if (selected == kUnsavedLayoutEditButtonSave) {
+                return UnsavedLayoutEditAction::Save;
+            }
+            if (selected == kUnsavedLayoutEditButtonDiscard) {
+                return UnsavedLayoutEditAction::Discard;
+            }
+            return UnsavedLayoutEditAction::Cancel;
+        }
+        case UnsavedLayoutEditPrompt::ExitApplication: {
+            const TASKDIALOG_BUTTON buttons[] = {
+                {kUnsavedLayoutEditButtonSave, L"Save Changes"},
+                {kUnsavedLayoutEditButtonExitWithoutSaving, L"Exit Without Saving"},
+                {kUnsavedLayoutEditButtonKeepEditing, L"Cancel"},
+            };
+            const int selected = ShowTaskDialog(app_.hwnd_,
+                L"Save modified changes before exiting?",
+                L"Unsaved changes made while editing the layout will be discarded if you exit without saving.",
+                buttons,
+                _countof(buttons),
+                kUnsavedLayoutEditButtonSave);
+            if (selected == 0) {
+                const int fallback = MessageBoxW(app_.hwnd_,
+                    L"Unsaved changes made while editing the layout will be discarded if you exit without saving.\n\n"
+                    L"Yes = Save Changes\n"
+                    L"No = Exit Without Saving\n"
+                    L"Cancel = Cancel",
+                    L"System Telemetry",
+                    MB_ICONWARNING | MB_YESNOCANCEL);
+                if (fallback == IDYES) {
+                    return UnsavedLayoutEditAction::Save;
+                }
+                if (fallback == IDNO) {
+                    return UnsavedLayoutEditAction::Discard;
+                }
+                return UnsavedLayoutEditAction::Cancel;
+            }
+            if (selected == kUnsavedLayoutEditButtonSave) {
+                return UnsavedLayoutEditAction::Save;
+            }
+            if (selected == kUnsavedLayoutEditButtonExitWithoutSaving) {
+                return UnsavedLayoutEditAction::Discard;
+            }
+            return UnsavedLayoutEditAction::Cancel;
+        }
+        case UnsavedLayoutEditPrompt::ReloadConfig: {
+            const TASKDIALOG_BUTTON buttons[] = {
+                {kUnsavedLayoutEditButtonSave, L"Save Changes"},
+                {kUnsavedLayoutEditButtonReloadWithoutSaving, L"Reload Without Saving"},
+                {kUnsavedLayoutEditButtonKeepEditing, L"Cancel"},
+            };
+            const int selected = ShowTaskDialog(app_.hwnd_,
+                L"Save modified changes before reloading the config?",
+                L"Unsaved changes made while editing the layout will be discarded if you reload without saving.",
+                buttons,
+                _countof(buttons),
+                kUnsavedLayoutEditButtonSave);
+            if (selected == 0) {
+                const int fallback = MessageBoxW(app_.hwnd_,
+                    L"Unsaved changes made while editing the layout will be discarded if you reload without saving.\n\n"
+                    L"Yes = Save Changes\n"
+                    L"No = Reload Without Saving\n"
+                    L"Cancel = Cancel",
+                    L"System Telemetry",
+                    MB_ICONWARNING | MB_YESNOCANCEL);
+                if (fallback == IDYES) {
+                    return UnsavedLayoutEditAction::Save;
+                }
+                if (fallback == IDNO) {
+                    return UnsavedLayoutEditAction::Discard;
+                }
+                return UnsavedLayoutEditAction::Cancel;
+            }
+            if (selected == kUnsavedLayoutEditButtonSave) {
+                return UnsavedLayoutEditAction::Save;
+            }
+            if (selected == kUnsavedLayoutEditButtonReloadWithoutSaving) {
+                return UnsavedLayoutEditAction::Discard;
+            }
+            return UnsavedLayoutEditAction::Cancel;
+        }
+    }
+    return std::nullopt;
+}
+
+bool DashboardShellUi::HandleEditLayoutToggle() {
+    DashboardSessionState& state = app_.controller_.State();
+    if (!state.isEditingLayout) {
+        app_.controller_.StartLayoutEditMode(app_, app_.layoutEditController_);
+        return true;
+    }
+
+    if (!app_.controller_.HasUnsavedLayoutEditChanges()) {
+        app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
+        return true;
+    }
+
+    const auto action = PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt::StopEditing);
+    if (!action.has_value() || *action == UnsavedLayoutEditAction::Cancel) {
+        return false;
+    }
+    if (*action == UnsavedLayoutEditAction::Save) {
+        if (!app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+            return false;
+        }
+    } else if (!app_.controller_.RestoreLayoutEditSessionSavedConfig(app_)) {
+        MessageBoxW(app_.hwnd_, L"Failed to restore the saved layout edit state.", L"System Telemetry", MB_ICONERROR);
+        return false;
+    }
+
+    app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
+    return true;
+}
+
+bool DashboardShellUi::HandleReloadConfig() {
+    if (app_.controller_.State().isEditingLayout && app_.controller_.HasUnsavedLayoutEditChanges()) {
+        const auto action = PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt::ReloadConfig);
+        if (!action.has_value() || *action == UnsavedLayoutEditAction::Cancel) {
+            return false;
+        }
+        if (*action == UnsavedLayoutEditAction::Save && !app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+            return false;
+        }
+    }
+
+    if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_, app_.layoutEditController_)) {
+        MessageBoxW(app_.hwnd_, L"Failed to reload config.ini.", L"System Telemetry", MB_ICONERROR);
+        return false;
+    }
+    return true;
+}
+
+bool DashboardShellUi::HandleConfigureDisplay(const DisplayMenuOption& option) {
+    const bool wasEditingLayout = app_.controller_.State().isEditingLayout;
+    if (!app_.controller_.ConfigureDisplay(app_, option)) {
+        return false;
+    }
+    if (wasEditingLayout) {
+        app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
+        app_.HideLayoutEditTooltip();
+    }
+    return true;
+}
+
+void DashboardShellUi::HandleExitRequest() {
+    if (app_.controller_.State().isEditingLayout && app_.controller_.HasUnsavedLayoutEditChanges()) {
+        const auto action = PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt::ExitApplication);
+        if (!action.has_value() || *action == UnsavedLayoutEditAction::Cancel) {
+            return;
+        }
+        if (*action == UnsavedLayoutEditAction::Save && !app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+            return;
+        }
+    }
+    DestroyWindow(app_.hwnd_);
+}
+
 void DashboardShellUi::TraceLayoutEditDialogEvent(const std::string& event, const std::string& details) const {
     const auto& state = app_.controller_.State();
     if (state.diagnostics == nullptr) {
@@ -1519,12 +1746,7 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
             app_.StartMoveMode(cursorAnchorClientPoint);
             break;
         case kCommandEditLayout:
-            if (state.isEditingLayout) {
-                app_.controller_.StopLayoutEditMode(
-                    app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
-            } else {
-                app_.controller_.StartLayoutEditMode(app_, app_.layoutEditController_);
-            }
+            HandleEditLayoutToggle();
             app_.UpdateLayoutEditTooltip();
             break;
         case kCommandEditLayoutTarget:
@@ -1537,9 +1759,7 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
             app_.BringOnTop();
             break;
         case kCommandReloadConfig:
-            if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_, app_.layoutEditController_)) {
-                MessageBoxW(app_.hwnd_, L"Failed to reload config.ini.", L"System Telemetry", MB_ICONERROR);
-            }
+            HandleReloadConfig();
             break;
         case kCommandSaveConfig:
             app_.controller_.UpdateConfigFromCurrentPlacement(app_);
@@ -1562,7 +1782,7 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
             }
             break;
         case kCommandExit:
-            DestroyWindow(app_.hwnd_);
+            HandleExitRequest();
             break;
         default:
             if (selected >= kCommandLayoutBase && selected <= kCommandLayoutMax) {
@@ -1599,7 +1819,7 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
                     state.configDisplayOptions.end(),
                     [selected](const DisplayMenuOption& option) { return option.commandId == selected; });
                 if (it != state.configDisplayOptions.end()) {
-                    app_.controller_.ConfigureDisplay(app_, *it);
+                    HandleConfigureDisplay(*it);
                 }
                 break;
             }

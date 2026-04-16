@@ -442,7 +442,7 @@ void DashboardApp::RemoveTrayIcon() {
 
 void DashboardApp::StartMoveMode(std::optional<POINT> cursorAnchorClientPoint) {
     if (controller_.State().isEditingLayout) {
-        controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
+        layoutEditController_.CancelInteraction();
     }
     HideLayoutEditTooltip();
     moveCursorAnchorClientPoint_ = cursorAnchorClientPoint;
@@ -840,7 +840,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             return 0;
         }
         case WM_LBUTTONDOWN:
-            if (state.isEditingLayout && !shellUi_->IsLayoutEditModalUiActive()) {
+            if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 if (layoutEditController_.HandleLButtonDown(hwnd_, clientPoint)) {
                     UpdateLayoutEditTooltip();
@@ -867,7 +867,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             return 0;
         }
         case WM_MOUSEMOVE:
-            if (state.isEditingLayout && !shellUi_->IsLayoutEditModalUiActive()) {
+            if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 UpdateLayoutEditMouseTracking();
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 layoutEditController_.HandleMouseMove(clientPoint);
@@ -877,7 +877,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             break;
         case WM_MOUSELEAVE:
             layoutEditMouseTracking_ = false;
-            if (state.isEditingLayout && !shellUi_->IsLayoutEditModalUiActive()) {
+            if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 POINT screenPoint{};
                 if (GetCursorPos(&screenPoint)) {
                     POINT clientPointWin32 = screenPoint;
@@ -898,7 +898,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             break;
         case WM_LBUTTONUP:
-            if (state.isEditingLayout && !shellUi_->IsLayoutEditModalUiActive()) {
+            if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                 if (layoutEditController_.HandleLButtonUp(clientPoint)) {
                     UpdateLayoutEditTooltip();
@@ -916,30 +916,34 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             break;
         case WM_KEYDOWN:
             if (wParam == VK_ESCAPE) {
-                if (state.isEditingLayout) {
-                    controller_.StopLayoutEditMode(*this, layoutEditController_, diagnosticsOptions_.editLayout);
-                    HideLayoutEditTooltip();
-                    return 0;
-                }
                 if (state.isMoving) {
                     StopMoveMode();
+                    return 0;
+                }
+                if (state.isEditingLayout) {
+                    layoutEditController_.CancelInteraction();
+                    HideLayoutEditTooltip();
                     return 0;
                 }
             }
             break;
         case WM_CAPTURECHANGED:
-            if (state.isEditingLayout && !shellUi_->IsLayoutEditModalUiActive() &&
+            if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive() &&
                 layoutEditController_.HandleCaptureChanged(hwnd_, reinterpret_cast<HWND>(lParam))) {
                 UpdateLayoutEditTooltip();
                 return 0;
             }
             break;
         case WM_SETCURSOR:
-            if (LOWORD(lParam) == HTCLIENT && state.isEditingLayout && !shellUi_->IsLayoutEditModalUiActive()) {
+            if (LOWORD(lParam) == HTCLIENT && state.isEditingLayout && !state.isMoving &&
+                !shellUi_->IsLayoutEditModalUiActive()) {
                 layoutEditController_.HandleSetCursor(hwnd_);
                 return TRUE;
             }
             break;
+        case WM_CLOSE:
+            shellUi_->HandleExitRequest();
+            return 0;
         case kTrayMessage:
             if (lParam == WM_RBUTTONUP || lParam == WM_CONTEXTMENU) {
                 POINT point{};

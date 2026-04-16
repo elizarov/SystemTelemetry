@@ -57,6 +57,19 @@ AppConfig BuildEffectiveRuntimeConfig(
     return config;
 }
 
+bool LayoutConfig::operator==(const LayoutConfig& other) const {
+    return colors == other.colors && dashboard == other.dashboard && cardStyle == other.cardStyle &&
+           metricList == other.metricList && driveUsageList == other.driveUsageList &&
+           throughput == other.throughput && gauge == other.gauge && text == other.text &&
+           networkFooter == other.networkFooter && layoutEditor == other.layoutEditor && fonts == other.fonts &&
+           cards == other.cards && structure == other.structure && cardsLayout == other.cardsLayout;
+}
+
+bool AppConfig::operator==(const AppConfig& other) const {
+    return display == other.display && network == other.network && storage == other.storage && board == other.board &&
+           metrics == other.metrics && layouts == other.layouts && layout == other.layout;
+}
+
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
     std::ostringstream stream;
     if (definition.telemetryScale) {

@@ -20,6 +20,9 @@ struct DashboardSessionState {
     bool placementWatchActive = false;
     bool isMoving = false;
     bool isEditingLayout = false;
+    bool hasLayoutEditSessionSavedConfig = false;
+    bool hasUnsavedLayoutEditChanges = false;
+    AppConfig layoutEditSessionSavedConfig;
     std::vector<DisplayMenuOption> configDisplayOptions;
     std::vector<LayoutMenuOption> layoutMenuOptions;
     std::vector<NetworkMenuOption> networkMenuOptions;
@@ -74,6 +77,8 @@ public:
     void RefreshTelemetrySelections(DashboardShellHost& shell);
     void StartLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller);
     void StopLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller, bool diagnosticsEditLayout);
+    bool HasUnsavedLayoutEditChanges() const;
+    bool RestoreLayoutEditSessionSavedConfig(DashboardShellHost& shell);
     bool ApplyLayoutGuideWeights(
         DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
     bool ApplyLayoutEditValue(
@@ -89,9 +94,13 @@ public:
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis);
     AppConfig BuildCurrentConfigForSaving(DashboardShellHost& shell) const;
-    void UpdateConfigFromCurrentPlacement(DashboardShellHost& shell);
+    bool UpdateConfigFromCurrentPlacement(DashboardShellHost& shell);
 
 private:
+    void BeginLayoutEditSessionTracking();
+    void ClearLayoutEditSessionTracking();
+    void RefreshLayoutEditSessionDirtyFlag();
+    void MarkLayoutEditSessionSaved();
     void SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides);
     void SyncRuntimeAndRenderer(DashboardShellHost& shell, bool showLayoutEditGuides);
     bool ApplyConfiguredWallpaper();

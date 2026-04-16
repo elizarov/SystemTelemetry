@@ -40,6 +40,8 @@ struct UiFontConfig {
     std::string face;
     int size = 0;
     int weight = 0;
+
+    bool operator==(const UiFontConfig& other) const = default;
 };
 
 CONFIG_CODEC(UiFontConfig, configschema::FontSpecCodec);
@@ -60,11 +62,15 @@ struct UiFontSetConfig {
     CONFIG_EDITABLE_VALUE(UiFontConfig, clockTime, "clock_time");
     CONFIG_EDITABLE_VALUE(UiFontConfig, clockDate, "clock_date");
     CONFIG_SECTION("fonts");
+
+    bool operator==(const UiFontSetConfig& other) const = default;
 };
 
 struct LogicalPointConfig {
     int x = 0;
     int y = 0;
+
+    bool operator==(const LogicalPointConfig& other) const = default;
 };
 
 CONFIG_CODEC(LogicalPointConfig, configschema::LogicalPointCodec);
@@ -72,6 +78,8 @@ CONFIG_CODEC(LogicalPointConfig, configschema::LogicalPointCodec);
 struct LogicalSizeConfig {
     int width = 0;
     int height = 0;
+
+    bool operator==(const LogicalSizeConfig& other) const = default;
 };
 
 CONFIG_CODEC(LogicalSizeConfig, configschema::LogicalSizeCodec);
@@ -84,18 +92,24 @@ struct DisplayConfig {
     CONFIG_VALUE(LogicalPointConfig, position, "position");
     CONFIG_VALUE(double, scale, "scale");
     CONFIG_SECTION("display");
+
+    bool operator==(const DisplayConfig& other) const = default;
 };
 
 struct NetworkConfig {
     CONFIG_REFLECTED_STRUCT(NetworkConfig)
     CONFIG_VALUE(std::string, adapterName, "adapter_name");
     CONFIG_SECTION("network");
+
+    bool operator==(const NetworkConfig& other) const = default;
 };
 
 struct StorageConfig {
     CONFIG_REFLECTED_STRUCT(StorageConfig)
     CONFIG_VALUE(std::vector<std::string>, drives, "drives");
     CONFIG_SECTION("storage");
+
+    bool operator==(const StorageConfig& other) const = default;
 };
 
 struct BoardConfig {
@@ -106,6 +120,8 @@ struct BoardConfig {
     std::vector<std::string> requestedFanNames;
     std::unordered_map<std::string, std::string> temperatureSensorNames;
     std::unordered_map<std::string, std::string> fanSensorNames;
+
+    bool operator==(const BoardConfig& other) const = default;
 };
 
 CONFIG_SECTION_CODEC(BoardConfig, configschema::BoardSectionCodec);
@@ -116,6 +132,8 @@ struct DashboardSectionConfig {
     CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE_WITH(int, columnGap, "column_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("dashboard");
+
+    bool operator==(const DashboardSectionConfig& other) const = default;
 };
 
 struct CardStyleConfig {
@@ -129,6 +147,8 @@ struct CardStyleConfig {
     CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
     CONFIG_EDITABLE_VALUE_WITH(int, columnGap, "column_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("card_style");
+
+    bool operator==(const CardStyleConfig& other) const = default;
 };
 
 struct ColorsConfig {
@@ -147,6 +167,8 @@ struct ColorsConfig {
     CONFIG_EDITABLE_VALUE(ColorConfig, graphAxisColor, "graph_axis_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, graphMarkerColor, "graph_marker_color");
     CONFIG_SECTION("colors");
+
+    bool operator==(const ColorsConfig& other) const = default;
 };
 
 struct LayoutNodeConfig {
@@ -155,6 +177,8 @@ struct LayoutNodeConfig {
     std::string parameter;
     bool cardReference = false;
     std::vector<LayoutNodeConfig> children;
+
+    bool operator==(const LayoutNodeConfig& other) const = default;
 };
 
 CONFIG_CODEC(LayoutNodeConfig, configschema::LayoutExpressionCodec);
@@ -167,6 +191,8 @@ struct LayoutSectionConfig {
     CONFIG_VALUE(LogicalSizeConfig, window, "window");
     CONFIG_VALUE(LayoutNodeConfig, cardsLayout, "cards");
     CONFIG_DYNAMIC_SECTION("layout.");
+
+    bool operator==(const LayoutSectionConfig& other) const = default;
 };
 
 struct LayoutCardConfig {
@@ -177,6 +203,8 @@ struct LayoutCardConfig {
     CONFIG_VALUE(std::string, icon, "icon");
     CONFIG_VALUE(LayoutNodeConfig, layout, "layout");
     CONFIG_DYNAMIC_SECTION("card.");
+
+    bool operator==(const LayoutCardConfig& other) const = default;
 };
 
 struct MetricDefinitionConfig {
@@ -186,6 +214,8 @@ struct MetricDefinitionConfig {
     double scale = 0.0;
     std::string unit;
     std::string label;
+
+    bool operator==(const MetricDefinitionConfig& other) const = default;
 };
 
 struct MetricsSectionConfig {
@@ -193,6 +223,8 @@ struct MetricsSectionConfig {
     CONFIG_SECTION("metrics");
 
     std::vector<MetricDefinitionConfig> definitions;
+
+    bool operator==(const MetricsSectionConfig& other) const = default;
 };
 
 CONFIG_SECTION_CODEC(MetricsSectionConfig, configschema::MetricsSectionCodec);
@@ -203,6 +235,8 @@ struct MetricListWidgetConfig {
     CONFIG_EDITABLE_VALUE(int, barHeight, "bar_height");
     CONFIG_EDITABLE_VALUE_WITH(int, rowGap, "row_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("metric_list");
+
+    bool operator==(const MetricListWidgetConfig& other) const = default;
 };
 
 struct DriveUsageListWidgetConfig {
@@ -219,6 +253,8 @@ struct DriveUsageListWidgetConfig {
     CONFIG_EDITABLE_VALUE(int, activitySegments, "activity_segments");
     CONFIG_EDITABLE_VALUE_WITH(int, activitySegmentGap, "activity_segment_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("drive_usage_list");
+
+    bool operator==(const DriveUsageListWidgetConfig& other) const = default;
 };
 
 struct ThroughputWidgetConfig {
@@ -229,6 +265,8 @@ struct ThroughputWidgetConfig {
     CONFIG_EDITABLE_VALUE(int, plotStrokeWidth, "plot_stroke_width");
     CONFIG_EDITABLE_VALUE(int, leaderDiameter, "leader_diameter");
     CONFIG_SECTION("throughput");
+
+    bool operator==(const ThroughputWidgetConfig& other) const = default;
 };
 
 struct GaugeWidgetConfig {
@@ -241,24 +279,32 @@ struct GaugeWidgetConfig {
     CONFIG_EDITABLE_VALUE(int, valueBottom, "value_bottom");
     CONFIG_EDITABLE_VALUE(int, labelBottom, "label_bottom");
     CONFIG_SECTION("gauge");
+
+    bool operator==(const GaugeWidgetConfig& other) const = default;
 };
 
 struct TextWidgetConfig {
     CONFIG_REFLECTED_STRUCT(TextWidgetConfig)
     CONFIG_EDITABLE_VALUE_WITH(int, bottomGap, "bottom_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("text");
+
+    bool operator==(const TextWidgetConfig& other) const = default;
 };
 
 struct NetworkFooterWidgetConfig {
     CONFIG_REFLECTED_STRUCT(NetworkFooterWidgetConfig)
     CONFIG_EDITABLE_VALUE_WITH(int, bottomGap, "bottom_gap", configschema::NonNegativeIntPolicy);
     CONFIG_SECTION("network_footer");
+
+    bool operator==(const NetworkFooterWidgetConfig& other) const = default;
 };
 
 struct LayoutEditorConfig {
     CONFIG_REFLECTED_STRUCT(LayoutEditorConfig)
     CONFIG_VALUE(int, sizeSimilarityThreshold, "size_similarity_threshold");
     CONFIG_SECTION("layout_editor");
+
+    bool operator==(const LayoutEditorConfig& other) const = default;
 };
 
 struct LayoutConfig {
@@ -279,6 +325,8 @@ struct LayoutConfig {
 
     LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
+
+    bool operator==(const LayoutConfig& other) const;
 };
 
 struct AppConfig {
@@ -291,6 +339,8 @@ struct AppConfig {
     CONFIG_DYNAMIC_SECTION_VALUE(LayoutSectionConfig, layouts, name);
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
+
+    bool operator==(const AppConfig& other) const;
 };
 
 CONFIG_EDITABLE_ROOT_BINDING_PATH(UiFontSetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::fontsBinding);

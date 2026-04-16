@@ -105,6 +105,7 @@ Examples include:
 
 - The popup menu must provide `Reload Config` before `Save Config` and immediately apply reloaded `config.ini` changes to the live dashboard so UI experiments can round-trip without restarting the app.
 - The popup menu must provide an `Edit layout` toggle that switches the dashboard into interactive layout-edit mode, shows that item checked while the mode is active, and lets the same menu item turn the mode back off.
+- Layout-edit mode must stay active when the user enters `Move`, switches layouts, changes scale, reloads config, or changes runtime network or storage selections, and it must turn off only when the user explicitly clicks `Edit layout` again or when `Config To Display` completes successfully.
 - Double-clicking the dashboard window must invoke the popup menu's default action, using `Edit ...` when layout-edit mode is active and the pointer is over an actionable guide or anchor and otherwise using `Move`, and the dashboard-window popup menu must show that same default item in bold.
 - When that dashboard-window default action enters `Move`, the cursor must stay glued to the exact dashboard point that was double-clicked, while choosing `Move` from the popup menu must keep the existing centered follow behavior.
 - The command line must accept `/edit-layout` to start the dashboard with layout-edit guides already enabled, and that same switch must make diagnostics screenshots render the guides.
@@ -123,6 +124,9 @@ Examples include:
 - Each `Storage drives` submenu item must show `drive letter | volume label | size`, omitting only the label text when the volume has no label.
 - Clicking a `Storage drives` submenu item must add or remove that drive letter in `[storage] drives`, keep the saved drive list sorted by drive letter, and refresh the storage usage list immediately without restarting the app.
 - The popup menu must provide a `Config To Display` submenu that lists every enumerable display by friendly name plus physical resolution, enables displays whose physical resolution matches the active layout's aspect ratio, and on selection must set `display.monitor_name`, set `display.position` to `0,0`, set `display.scale` to the fitted fractional scale that makes the active layout fill that display exactly, render a blank dashboard image to `telemetry_blank.png` beside the executable using that fitted scale, set `display.wallpaper` to `telemetry_blank.png`, save the updated `config.ini`, and immediately apply that wallpaper to the selected display.
+- Turning off layout-edit mode while it has unsaved changes must show a warning dialog that offers `Save Changes`, `Keep Editing`, and `Discard Changes`, in that order, where `Save Changes` persists the current live config and then exits layout-edit mode and `Discard Changes` restores the last saved edit-session config before exiting layout-edit mode.
+- Exiting the application while layout-edit mode has unsaved changes must show a warning dialog that offers `Save Changes`, `Exit Without Saving`, and `Cancel`, and that dialog must explicitly state that exiting without saving discards the unsaved changes.
+- Reloading config while layout-edit mode has unsaved changes must show a warning dialog that offers `Save Changes`, `Reload Without Saving`, and `Cancel`, and reloading without saving must discard the unsaved edit-session changes while leaving layout-edit mode active after the reload.
 - The config reload path must tear down the active telemetry runtime before reinitializing vendor-backed telemetry providers so AMD GPU metrics continue working after save/reload round-trips.
 - When `Reload Config` reapplies saved placement onto a monitor with a different DPI scale, it must preserve the configured logical window size without double-scaling the restored physical window bounds.
 - The popup menu must expose an `Auto-start on user logon` toggle that shows a check mark only when the machine-wide `HKLM\Software\Microsoft\Windows\CurrentVersion\Run\SystemTelemetry` entry points to the running executable path, removes that entry when clicked while checked, and otherwise writes the running executable path there when clicked.
@@ -196,7 +200,7 @@ Examples include:
 - When multiple same-type widgets in one vertical or horizontal stack share the same dragged-axis extent by construction, the measurement ruler for that type and extent must draw only on the first widget in that stack, both for the widgets being edited and for matching widgets elsewhere in the active layout.
 - When same-type widgets match exactly on the dragged axis, the measurement ruler must show centered notch markers, with the notch count coming from that exact-match type's active drag ordinal where a type is the widget type plus the matched dragged-axis extent.
 - Holding `Alt` during a layout-edit drag must temporarily disable same-size snapping while keeping the free-drag weight adjustment active.
-- Pressing `Esc` must exit either move mode or layout-edit mode.
+- Pressing `Esc` must exit move mode, and while layout-edit mode is active it must only cancel any active layout-edit interaction without turning layout-edit mode off.
 
 Diagnostics requirements live in `docs/diagnostics.md`.
 

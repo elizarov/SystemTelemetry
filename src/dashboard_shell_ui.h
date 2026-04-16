@@ -9,6 +9,8 @@
 #endif
 #include <windows.h>
 
+#include "app_monitor.h"
+#include "dashboard_menu_types.h"
 #include "layout_edit_controller.h"
 #include "layout_edit_parameter.h"
 
@@ -31,6 +33,7 @@ public:
     void InvokeDefaultAction(MenuSource source,
         const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
         std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
+    void HandleExitRequest();
     void BeginLayoutEditModalUi();
     void EndLayoutEditModalUi();
     const AppConfig& CurrentConfig() const;
@@ -48,6 +51,22 @@ public:
     void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const;
 
 private:
+    enum class UnsavedLayoutEditAction {
+        Save,
+        Discard,
+        Cancel,
+    };
+
+    enum class UnsavedLayoutEditPrompt {
+        StopEditing,
+        ExitApplication,
+        ReloadConfig,
+    };
+
+    std::optional<UnsavedLayoutEditAction> PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt prompt) const;
+    bool HandleEditLayoutToggle();
+    bool HandleReloadConfig();
+    bool HandleConfigureDisplay(const DisplayMenuOption& option);
     UINT ResolveDefaultCommand(
         MenuSource source, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) const;
     void ExecuteCommand(UINT selected,
