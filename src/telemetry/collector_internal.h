@@ -20,7 +20,7 @@
 #include "board_vendor.h"
 #include "gpu_vendor.h"
 #include "telemetry.h"
-#include "telemetry_retained_history.h"
+#include "telemetry/retained_history.h"
 #include "trace.h"
 
 struct DriveCounterState {
@@ -28,6 +28,8 @@ struct DriveCounterState {
     PDH_HCOUNTER readCounter = nullptr;
     PDH_HCOUNTER writeCounter = nullptr;
 };
+
+std::string NormalizeStorageDriveLetter(const std::string& drive);
 
 struct TelemetryCollector::Impl {
     struct StorageState {

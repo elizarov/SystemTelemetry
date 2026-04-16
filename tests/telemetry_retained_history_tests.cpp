@@ -2,7 +2,7 @@
 
 #include <limits>
 
-#include "telemetry_retained_history.h"
+#include "telemetry/retained_history.h"
 
 TEST(TelemetryRetainedHistory, PushSampleCreatesSeriesAndKeepsRollingWindow) {
     RetainedHistoryStore store;

@@ -3,7 +3,18 @@
 #include <sstream>
 
 #include "snapshot_dump.h"
-#include "telemetry_retained_history.h"
+
+namespace {
+
+void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
+    snapshot.retainedHistoryIndexByRef.clear();
+    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
+    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
+        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
+    }
+}
+
+}  // namespace
 
 TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     TelemetryDump dump;

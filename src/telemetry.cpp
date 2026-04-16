@@ -21,10 +21,10 @@
 #include "gpu_vendor.h"
 #include "numeric_safety.h"
 #include "snapshot_dump.h"
+#include "system_info_support.h"
 #include "telemetry.h"
-#include "telemetry_internal.h"
-#include "telemetry_storage_source.h"
-#include "telemetry_support.h"
+#include "telemetry/collector_internal.h"
+#include "telemetry/collector_support.h"
 #include "trace.h"
 #include "utf8.h"
 

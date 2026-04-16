@@ -102,11 +102,12 @@ add_executable(SystemTelemetry WIN32
     src/localization_catalog.cpp
     src/layout_snap_solver.cpp
     src/numeric_safety.cpp
+    src/system_info_support.cpp
     src/telemetry.cpp
-    src/telemetry_support.cpp
-    src/telemetry_retained_history.cpp
-    src/telemetry_storage_source.cpp
-    src/telemetry_network_source.cpp
+    src/telemetry/collector_support.cpp
+    src/telemetry/retained_history.cpp
+    src/telemetry/collector_storage.cpp
+    src/telemetry/collector_network.cpp
     src/telemetry_runtime.cpp
     src/telemetry_runtime_fake.cpp
     src/telemetry_runtime_factory.cpp
@@ -261,7 +262,7 @@ add_executable(SystemTelemetryTests
     src/dashboard_metrics.cpp
     src/render_types.cpp
     src/snapshot_dump.cpp
-    src/telemetry_retained_history.cpp
+    src/telemetry/retained_history.cpp
     src/utf8.cpp
   )
 target_include_directories(SystemTelemetryTests PRIVATE

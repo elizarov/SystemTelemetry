@@ -21,7 +21,7 @@
 
 #include "app_strings.h"
 #include "board_vendor.h"
-#include "telemetry_support.h"
+#include "system_info_support.h"
 #include "trace.h"
 #include "utf8.h"
 

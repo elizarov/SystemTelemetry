@@ -1,5 +1,4 @@
 #include "snapshot_dump.h"
-#include "telemetry_retained_history.h"
 
 #include <cerrno>
 #include <cstdio>
@@ -409,6 +408,14 @@ bool LoadRetainedHistories(const std::map<std::string, std::string>& values,
         field.push_back(std::move(history));
     }
     return true;
+}
+
+void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
+    snapshot.retainedHistoryIndexByRef.clear();
+    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
+    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
+        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
+    }
 }
 
 }  // namespace

@@ -1,11 +1,11 @@
-#include "telemetry_internal.h"
-#include "telemetry_storage_source.h"
-#include "telemetry_support.h"
+#include "telemetry/collector_internal.h"
 
 #include <algorithm>
+#include <cctype>
 #include <vector>
 
 #include "numeric_safety.h"
+#include "telemetry/collector_support.h"
 #include "utf8.h"
 
 namespace {
@@ -19,6 +19,10 @@ std::string ReadVolumeLabel(const std::wstring& root) {
     return Utf8FromWide(volumeName);
 }
 
+bool IsSelectableStorageDriveType(UINT driveType) {
+    return driveType == DRIVE_FIXED || driveType == DRIVE_REMOVABLE;
+}
+
 std::vector<std::string> SelectFixedDriveLetters(const std::vector<StorageDriveCandidate>& availableDrives) {
     std::vector<std::string> drives;
     for (const auto& drive : availableDrives) {
@@ -30,23 +34,6 @@ std::vector<std::string> SelectFixedDriveLetters(const std::vector<StorageDriveC
         }
     }
     return drives;
-}
-
-}  // namespace
-
-std::string NormalizeStorageDriveLetter(const std::string& drive) {
-    if (drive.empty()) {
-        return {};
-    }
-    const unsigned char ch = static_cast<unsigned char>(drive.front());
-    if (!std::isalpha(ch)) {
-        return {};
-    }
-    return std::string(1, static_cast<char>(std::toupper(ch)));
-}
-
-bool IsSelectableStorageDriveType(UINT driveType) {
-    return driveType == DRIVE_FIXED || driveType == DRIVE_REMOVABLE;
 }
 
 std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
@@ -92,31 +79,6 @@ std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
     return candidates;
 }
 
-std::vector<StorageDriveCandidate> EnumerateSnapshotStorageDriveCandidates(const SystemSnapshot& snapshot) {
-    std::vector<StorageDriveCandidate> candidates;
-    candidates.reserve(snapshot.drives.size());
-    for (const auto& drive : snapshot.drives) {
-        if (!IsSelectableStorageDriveType(drive.driveType)) {
-            continue;
-        }
-
-        StorageDriveCandidate candidate;
-        candidate.letter = NormalizeStorageDriveLetter(drive.label);
-        if (candidate.letter.empty()) {
-            continue;
-        }
-        candidate.volumeLabel = drive.volumeLabel;
-        candidate.totalGb = drive.totalGb;
-        candidate.driveType = drive.driveType;
-        candidates.push_back(std::move(candidate));
-    }
-
-    std::sort(candidates.begin(),
-        candidates.end(),
-        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
-    return candidates;
-}
-
 std::vector<std::string> ResolveConfiguredStorageDrives(
     const std::vector<std::string>& configuredDrives, const std::vector<StorageDriveCandidate>& availableDrives) {
     std::vector<std::string> resolvedDrives;
@@ -142,6 +104,19 @@ void MarkSelectedStorageDriveCandidates(
         candidate.selected =
             std::find(selectedDrives.begin(), selectedDrives.end(), candidate.letter) != selectedDrives.end();
     }
+}
+
+}  // namespace
+
+std::string NormalizeStorageDriveLetter(const std::string& drive) {
+    if (drive.empty()) {
+        return {};
+    }
+    const unsigned char ch = static_cast<unsigned char>(drive.front());
+    if (!std::isalpha(ch)) {
+        return {};
+    }
+    return std::string(1, static_cast<char>(std::toupper(ch)));
 }
 
 void TelemetryCollector::Impl::ResolveStorageSelection() {

@@ -1,9 +1,16 @@
 #include <gtest/gtest.h>
 
 #include "dashboard_metrics.h"
-#include "telemetry_retained_history.h"
 
 namespace {
+
+void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
+    snapshot.retainedHistoryIndexByRef.clear();
+    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
+    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
+        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
+    }
+}
 
 MetricsSectionConfig BuildMetricsConfig() {
     MetricsSectionConfig metrics;

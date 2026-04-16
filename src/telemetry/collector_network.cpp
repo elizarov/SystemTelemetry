@@ -1,11 +1,10 @@
-#include "telemetry_internal.h"
-#include "telemetry_network_source.h"
-#include "telemetry_support.h"
+#include "telemetry/collector_internal.h"
 
 #include <algorithm>
-#include <cctype>
+#include <cstring>
 #include <vector>
 
+#include "app_strings.h"
 #include "numeric_safety.h"
 #include "utf8.h"
 
@@ -22,6 +21,14 @@ struct NetworkCandidateState {
     NetworkAdapterCandidate candidate;
     ULONG interfaceIndex = 0;
 };
+
+bool EqualsWideAndUtf8Insensitive(const wchar_t* value, const std::string& needle) {
+    return value != nullptr && EqualsInsensitive(Utf8FromWide(value), needle);
+}
+
+bool ContainsWideAndUtf8Insensitive(const wchar_t* value, const std::string& needle) {
+    return value != nullptr && ContainsInsensitive(Utf8FromWide(value), needle);
+}
 
 bool AdapterMatchesRow(const IP_ADAPTER_ADDRESSES& adapter, const MIB_IF_ROW2& row) {
     return adapter.Luid.Value == row.InterfaceLuid.Value || adapter.IfIndex == row.InterfaceIndex ||
@@ -85,65 +92,6 @@ AdapterSelectionInfo BuildAdapterSelectionInfo(const MIB_IF_ROW2& row, const IP_
 
 }  // namespace
 
-std::vector<NetworkAdapterCandidate> EnumerateSnapshotNetworkCandidates(const SystemSnapshot& snapshot) {
-    std::vector<NetworkAdapterCandidate> candidates;
-    if (snapshot.network.adapterName.empty() || snapshot.network.adapterName == "Auto") {
-        return candidates;
-    }
-
-    NetworkAdapterCandidate candidate;
-    candidate.adapterName = snapshot.network.adapterName;
-    candidate.ipAddress = snapshot.network.ipAddress.empty() ? "N/A" : snapshot.network.ipAddress;
-    candidates.push_back(std::move(candidate));
-    return candidates;
-}
-
-ResolvedNetworkCandidate ResolveConfiguredNetworkCandidate(
-    const std::string& configuredAdapterName, const std::vector<NetworkAdapterCandidate>& availableCandidates) {
-    ResolvedNetworkCandidate resolved;
-    if (availableCandidates.empty()) {
-        return resolved;
-    }
-
-    const std::string configuredLower = ToLowerAscii(configuredAdapterName);
-    const auto exactIt =
-        std::find_if(availableCandidates.begin(), availableCandidates.end(), [&](const auto& candidate) {
-            return !configuredLower.empty() && ToLowerAscii(candidate.adapterName) == configuredLower;
-        });
-    if (exactIt != availableCandidates.end()) {
-        resolved.adapterName = exactIt->adapterName;
-        resolved.ipAddress = exactIt->ipAddress;
-        return resolved;
-    }
-
-    const auto partialIt =
-        std::find_if(availableCandidates.begin(), availableCandidates.end(), [&](const auto& candidate) {
-            return !configuredLower.empty() &&
-                   ToLowerAscii(candidate.adapterName).find(configuredLower) != std::string::npos;
-        });
-    if (partialIt != availableCandidates.end()) {
-        resolved.adapterName = partialIt->adapterName;
-        resolved.ipAddress = partialIt->ipAddress;
-        return resolved;
-    }
-
-    resolved.adapterName = availableCandidates.front().adapterName;
-    resolved.ipAddress = availableCandidates.front().ipAddress;
-    return resolved;
-}
-
-void MarkSelectedNetworkAdapterCandidates(
-    std::vector<NetworkAdapterCandidate>& candidates, const ResolvedNetworkCandidate& selectedCandidate) {
-    bool selected = false;
-    for (auto& candidate : candidates) {
-        const bool sameName = candidate.adapterName == selectedCandidate.adapterName;
-        const bool sameIp = selectedCandidate.ipAddress.empty() || selectedCandidate.ipAddress == "N/A" ||
-                            candidate.ipAddress == selectedCandidate.ipAddress;
-        candidate.selected = !selected && sameName && sameIp;
-        selected = selected || candidate.selected;
-    }
-}
-
 void TelemetryCollector::Impl::ResolveNetworkSelection() {
     PMIB_IF_TABLE2 table = nullptr;
     const DWORD tableStatus = GetIfTable2(&table);
@@ -195,10 +143,10 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
             if (!info.hasIpv4) {
                 continue;
             }
-            if (EqualsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
-                EqualsInsensitive(row.Description, settings_.selection.preferredAdapterName) ||
-                ContainsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
-                ContainsInsensitive(row.Description, settings_.selection.preferredAdapterName)) {
+            if (EqualsWideAndUtf8Insensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                EqualsWideAndUtf8Insensitive(row.Description, settings_.selection.preferredAdapterName) ||
+                ContainsWideAndUtf8Insensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                ContainsWideAndUtf8Insensitive(row.Description, settings_.selection.preferredAdapterName)) {
                 configuredCandidateAvailable = true;
                 break;
             }
@@ -210,14 +158,18 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
             continue;
         }
 
+        const bool selectedIsExactMatch =
+            selected != nullptr &&
+            (EqualsWideAndUtf8Insensitive(selected->Alias, settings_.selection.preferredAdapterName) ||
+                EqualsWideAndUtf8Insensitive(selected->Description, settings_.selection.preferredAdapterName));
         const bool configuredExactMatch =
             configuredCandidateAvailable &&
-            (EqualsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
-                EqualsInsensitive(row.Description, settings_.selection.preferredAdapterName));
+            (EqualsWideAndUtf8Insensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                EqualsWideAndUtf8Insensitive(row.Description, settings_.selection.preferredAdapterName));
         const bool configuredPartialMatch =
             configuredCandidateAvailable && !configuredExactMatch &&
-            (ContainsInsensitive(row.Alias, settings_.selection.preferredAdapterName) ||
-                ContainsInsensitive(row.Description, settings_.selection.preferredAdapterName));
+            (ContainsWideAndUtf8Insensitive(row.Alias, settings_.selection.preferredAdapterName) ||
+                ContainsWideAndUtf8Insensitive(row.Description, settings_.selection.preferredAdapterName));
         if (configuredCandidateAvailable && !configuredExactMatch && !configuredPartialMatch) {
             continue;
         }
@@ -265,14 +217,8 @@ void TelemetryCollector::Impl::ResolveNetworkSelection() {
                 selectedTraffic = traffic;
                 selectedInfo = info;
             }
-        } else if (selected == nullptr ||
-                   (configuredExactMatch &&
-                       !(EqualsInsensitive(selected->Alias, settings_.selection.preferredAdapterName) ||
-                           EqualsInsensitive(selected->Description, settings_.selection.preferredAdapterName))) ||
-                   (configuredExactMatch ==
-                           (EqualsInsensitive(selected->Alias, settings_.selection.preferredAdapterName) ||
-                               EqualsInsensitive(selected->Description, settings_.selection.preferredAdapterName)) &&
-                       (info.hasGateway || info.hasIpv4))) {
+        } else if (selected == nullptr || (configuredExactMatch && !selectedIsExactMatch) ||
+                   (configuredExactMatch == selectedIsExactMatch && (info.hasGateway || info.hasIpv4))) {
             selected = &row;
             selectedTraffic = traffic;
             selectedInfo = info;
