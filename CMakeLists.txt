@@ -104,6 +104,7 @@ add_executable(SystemTelemetry WIN32
     src/numeric_safety.cpp
     src/system_info_support.cpp
     src/telemetry.cpp
+    src/telemetry/collector_state.cpp
     src/telemetry/collector_support.cpp
     src/telemetry/retained_history.cpp
     src/telemetry/collector_storage.cpp

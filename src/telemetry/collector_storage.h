@@ -2,7 +2,8 @@
 
 #include <string>
 
-// Private storage collector module contract. The TelemetryCollector::Impl member
-// declarations stay in collector_internal.h; this header owns the cross-file
-// free helper that telemetry.cpp also uses.
+struct TelemetryCollectorState;
+
 std::string NormalizeStorageDriveLetter(const std::string& drive);
+void ResolveStorageSelection(TelemetryCollectorState& state);
+void CollectStorageMetrics(TelemetryCollectorState& state, bool initializeOnly);

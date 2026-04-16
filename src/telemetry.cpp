@@ -23,29 +23,34 @@
 #include "snapshot_dump.h"
 #include "system_info_support.h"
 #include "telemetry.h"
-#include "telemetry/collector_internal.h"
+#include "telemetry/collector_state.h"
+#include "telemetry/collector_network.h"
 #include "telemetry/collector_storage.h"
 #include "telemetry/collector_support.h"
 #include "trace.h"
 #include "utf8.h"
 
-TelemetryCollector::Impl::~Impl() {
-    if (cpuQuery_ != nullptr) {
-        PdhCloseQuery(cpuQuery_);
-    }
-    if (gpuQuery_ != nullptr) {
-        PdhCloseQuery(gpuQuery_);
-    }
-    if (gpuMemoryQuery_ != nullptr) {
-        PdhCloseQuery(gpuMemoryQuery_);
-    }
-    if (storage_.query != nullptr) {
-        PdhCloseQuery(storage_.query);
-    }
-    WSACleanup();
+namespace {
+
+void Trace(const TelemetryCollectorState& state, const char* text) {
+    state.trace_.Write(text);
 }
 
-TelemetryCollector::TelemetryCollector() : impl_(std::make_unique<Impl>()) {}
+void Trace(const TelemetryCollectorState& state, const std::string& text) {
+    state.trace_.Write(text);
+}
+
+double SumCounterArray(TelemetryCollectorState& state, PDH_HCOUNTER counter, bool require3d);
+void ApplyGpuVendorSample(TelemetryCollectorState& state, const GpuVendorTelemetrySample& sample);
+void ApplyBoardVendorSample(TelemetryCollectorState& state, const BoardVendorTelemetrySample& sample);
+void UpdateCpu(TelemetryCollectorState& state);
+void InitializeGpuAdapterInfo(TelemetryCollectorState& state);
+void UpdateGpu(TelemetryCollectorState& state);
+void UpdateMemory(TelemetryCollectorState& state);
+
+}
+
+TelemetryCollector::TelemetryCollector() : state_(std::make_unique<TelemetryCollectorState>()) {}
 
 TelemetryCollector::~TelemetryCollector() = default;
 
@@ -54,20 +59,20 @@ TelemetryCollector::TelemetryCollector(TelemetryCollector&&) noexcept = default;
 TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept = default;
 
 bool TelemetryCollector::Initialize(const TelemetrySettings& settings, std::ostream* traceStream) {
-    impl_->settings_ = settings;
-    impl_->trace_.SetOutput(traceStream);
-    impl_->snapshot_.boardTemperatures =
+    state_->settings_ = settings;
+    state_->trace_.SetOutput(traceStream);
+    state_->snapshot_.boardTemperatures =
         CreateRequestedBoardMetrics(settings.board.requestedTemperatureNames, ScalarMetricUnit::Celsius);
-    impl_->snapshot_.boardFans = CreateRequestedBoardMetrics(settings.board.requestedFanNames, ScalarMetricUnit::Rpm);
-    impl_->retainedHistoryStore_.Reset(impl_->snapshot_);
+    state_->snapshot_.boardFans = CreateRequestedBoardMetrics(settings.board.requestedFanNames, ScalarMetricUnit::Rpm);
+    state_->retainedHistoryStore_.Reset(state_->snapshot_);
     if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {
-        impl_->snapshot_.cpu.name = cpuName;
+        state_->snapshot_.cpu.name = cpuName;
     }
 
     WSADATA wsaData{};
     const int wsaStartupResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-    impl_->trace_.Write("telemetry:initialize_begin");
+    state_->trace_.Write("telemetry:initialize_begin");
     {
         char buffer[128];
         sprintf_s(buffer,
@@ -75,193 +80,186 @@ bool TelemetryCollector::Initialize(const TelemetrySettings& settings, std::ostr
             wsaStartupResult,
             LOBYTE(wsaData.wVersion),
             HIBYTE(wsaData.wVersion));
-        impl_->trace_.Write(buffer);
+        state_->trace_.Write(buffer);
     }
-    impl_->trace_.Write("telemetry:cpu_name value=\"" + impl_->snapshot_.cpu.name + "\"");
-    impl_->gpuProvider_ = CreateGpuVendorTelemetryProvider(&impl_->trace_);
-    impl_->boardProvider_ = CreateBoardVendorTelemetryProvider(&impl_->trace_);
-    if (impl_->gpuProvider_ != nullptr) {
-        impl_->trace_.Write("telemetry:gpu_provider_initialize_begin");
-        if (impl_->gpuProvider_->Initialize()) {
-            impl_->ApplyGpuVendorSample(impl_->gpuProvider_->Sample());
-            impl_->trace_.Write("telemetry:gpu_provider_initialize_done provider=" + impl_->gpuProviderName_ +
-                                " available=" + tracing::Trace::BoolText(impl_->gpuProviderAvailable_) +
-                                " diagnostics=\"" + impl_->gpuProviderDiagnostics_ + "\"");
+    state_->trace_.Write("telemetry:cpu_name value=\"" + state_->snapshot_.cpu.name + "\"");
+    state_->gpuProvider_ = CreateGpuVendorTelemetryProvider(&state_->trace_);
+    state_->boardProvider_ = CreateBoardVendorTelemetryProvider(&state_->trace_);
+    if (state_->gpuProvider_ != nullptr) {
+        state_->trace_.Write("telemetry:gpu_provider_initialize_begin");
+        if (state_->gpuProvider_->Initialize()) {
+            ApplyGpuVendorSample(*state_, state_->gpuProvider_->Sample());
+            state_->trace_.Write("telemetry:gpu_provider_initialize_done provider=" + state_->gpuProviderName_ +
+                                 " available=" + tracing::Trace::BoolText(state_->gpuProviderAvailable_) +
+                                 " diagnostics=\"" + state_->gpuProviderDiagnostics_ + "\"");
         } else {
-            impl_->gpuProviderName_ = "AMD ADLX";
-            impl_->gpuProviderDiagnostics_ = "Provider initialization failed.";
-            impl_->trace_.Write("telemetry:gpu_provider_initialize_failed provider=" + impl_->gpuProviderName_ +
-                                " diagnostics=\"" + impl_->gpuProviderDiagnostics_ + "\"");
+            state_->gpuProviderName_ = "AMD ADLX";
+            state_->gpuProviderDiagnostics_ = "Provider initialization failed.";
+            state_->trace_.Write("telemetry:gpu_provider_initialize_failed provider=" + state_->gpuProviderName_ +
+                                 " diagnostics=\"" + state_->gpuProviderDiagnostics_ + "\"");
         }
     } else {
-        impl_->trace_.Write("telemetry:gpu_provider_create result=null");
+        state_->trace_.Write("telemetry:gpu_provider_create result=null");
     }
-    if (impl_->boardProvider_ != nullptr) {
-        impl_->trace_.Write("telemetry:board_provider_initialize_begin");
-        if (impl_->boardProvider_->Initialize(settings.board)) {
-            impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
-            impl_->trace_.Write("telemetry:board_provider_initialize_done provider=" + impl_->boardProviderName_ +
-                                " available=" + tracing::Trace::BoolText(impl_->boardProviderAvailable_) +
-                                " diagnostics=\"" + impl_->boardProviderDiagnostics_ + "\"");
+    if (state_->boardProvider_ != nullptr) {
+        state_->trace_.Write("telemetry:board_provider_initialize_begin");
+        if (state_->boardProvider_->Initialize(settings.board)) {
+            ApplyBoardVendorSample(*state_, state_->boardProvider_->Sample());
+            state_->trace_.Write("telemetry:board_provider_initialize_done provider=" + state_->boardProviderName_ +
+                                 " available=" + tracing::Trace::BoolText(state_->boardProviderAvailable_) +
+                                 " diagnostics=\"" + state_->boardProviderDiagnostics_ + "\"");
         } else {
-            impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
-            impl_->trace_.Write("telemetry:board_provider_initialize_failed provider=" + impl_->boardProviderName_ +
-                                " diagnostics=\"" + impl_->boardProviderDiagnostics_ + "\"");
+            ApplyBoardVendorSample(*state_, state_->boardProvider_->Sample());
+            state_->trace_.Write("telemetry:board_provider_initialize_failed provider=" + state_->boardProviderName_ +
+                                 " diagnostics=\"" + state_->boardProviderDiagnostics_ + "\"");
         }
     } else {
-        impl_->trace_.Write("telemetry:board_provider_create result=null");
+        state_->trace_.Write("telemetry:board_provider_create result=null");
     }
 
-    const PDH_STATUS cpuQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->cpuQuery_);
-    impl_->trace_.Write(
+    const PDH_STATUS cpuQueryStatus = PdhOpenQueryW(nullptr, 0, &state_->cpuQuery_);
+    state_->trace_.Write(
         ("telemetry:pdh_open cpu_query " + tracing::Trace::FormatPdhStatus("status", cpuQueryStatus)).c_str());
     const PDH_STATUS cpuLoadStatus = AddCounterCompat(
-        impl_->cpuQuery_, L"\\Processor Information(_Total)\\% Processor Utility", &impl_->cpuLoadCounter_);
-    impl_->trace_.Write(
+        state_->cpuQuery_, L"\\Processor Information(_Total)\\% Processor Utility", &state_->cpuLoadCounter_);
+    state_->trace_.Write(
         ("telemetry:pdh_add cpu_load path=\"\\\\Processor Information(_Total)\\\\% Processor Utility\" " +
             tracing::Trace::FormatPdhStatus("status", cpuLoadStatus))
             .c_str());
-    if (impl_->cpuLoadCounter_ == nullptr) {
+    if (state_->cpuLoadCounter_ == nullptr) {
         const PDH_STATUS cpuLoadFallbackStatus =
-            AddCounterCompat(impl_->cpuQuery_, L"\\Processor(_Total)\\% Processor Time", &impl_->cpuLoadCounter_);
-        impl_->trace_.Write(("telemetry:pdh_add cpu_load_fallback path=\"\\\\Processor(_Total)\\\\% Processor Time\" " +
-                             tracing::Trace::FormatPdhStatus("status", cpuLoadFallbackStatus))
+            AddCounterCompat(state_->cpuQuery_, L"\\Processor(_Total)\\% Processor Time", &state_->cpuLoadCounter_);
+        state_->trace_.Write(
+            ("telemetry:pdh_add cpu_load_fallback path=\"\\\\Processor(_Total)\\\\% Processor Time\" " +
+                tracing::Trace::FormatPdhStatus("status", cpuLoadFallbackStatus))
                 .c_str());
     }
     const PDH_STATUS cpuFreqStatus = AddCounterCompat(
-        impl_->cpuQuery_, L"\\Processor Information(_Total)\\Processor Frequency", &impl_->cpuFrequencyCounter_);
-    impl_->trace_.Write(
+        state_->cpuQuery_, L"\\Processor Information(_Total)\\Processor Frequency", &state_->cpuFrequencyCounter_);
+    state_->trace_.Write(
         ("telemetry:pdh_add cpu_frequency path=\"\\\\Processor Information(_Total)\\\\Processor Frequency\" " +
             tracing::Trace::FormatPdhStatus("status", cpuFreqStatus))
             .c_str());
-    const PDH_STATUS cpuCollectStatus = PdhCollectQueryData(impl_->cpuQuery_);
-    impl_->trace_.Write(
+    const PDH_STATUS cpuCollectStatus = PdhCollectQueryData(state_->cpuQuery_);
+    state_->trace_.Write(
         ("telemetry:pdh_collect cpu_query " + tracing::Trace::FormatPdhStatus("status", cpuCollectStatus)).c_str());
 
-    const PDH_STATUS gpuQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->gpuQuery_);
-    impl_->trace_.Write(
+    const PDH_STATUS gpuQueryStatus = PdhOpenQueryW(nullptr, 0, &state_->gpuQuery_);
+    state_->trace_.Write(
         ("telemetry:pdh_open gpu_query " + tracing::Trace::FormatPdhStatus("status", gpuQueryStatus)).c_str());
     const PDH_STATUS gpuLoadStatus =
-        AddCounterCompat(impl_->gpuQuery_, L"\\GPU Engine(*)\\Utilization Percentage", &impl_->gpuLoadCounter_);
-    impl_->trace_.Write(("telemetry:pdh_add gpu_load path=\"\\\\GPU Engine(*)\\\\Utilization Percentage\" " +
-                         tracing::Trace::FormatPdhStatus("status", gpuLoadStatus))
-            .c_str());
-    const PDH_STATUS gpuCollectStatus = PdhCollectQueryData(impl_->gpuQuery_);
-    impl_->trace_.Write(
+        AddCounterCompat(state_->gpuQuery_, L"\\GPU Engine(*)\\Utilization Percentage", &state_->gpuLoadCounter_);
+    state_->trace_.Write(("telemetry:pdh_add gpu_load path=\"\\\\GPU Engine(*)\\\\Utilization Percentage\" " +
+                          tracing::Trace::FormatPdhStatus("status", gpuLoadStatus))
+                             .c_str());
+    const PDH_STATUS gpuCollectStatus = PdhCollectQueryData(state_->gpuQuery_);
+    state_->trace_.Write(
         ("telemetry:pdh_collect gpu_query " + tracing::Trace::FormatPdhStatus("status", gpuCollectStatus)).c_str());
 
-    const PDH_STATUS gpuMemoryQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->gpuMemoryQuery_);
-    impl_->trace_.Write(
+    const PDH_STATUS gpuMemoryQueryStatus = PdhOpenQueryW(nullptr, 0, &state_->gpuMemoryQuery_);
+    state_->trace_.Write(
         ("telemetry:pdh_open gpu_memory_query " + tracing::Trace::FormatPdhStatus("status", gpuMemoryQueryStatus))
             .c_str());
     const PDH_STATUS gpuMemoryCounterStatus = AddCounterCompat(
-        impl_->gpuMemoryQuery_, L"\\GPU Adapter Memory(*)\\Dedicated Usage", &impl_->gpuDedicatedCounter_);
-    impl_->trace_.Write(("telemetry:pdh_add gpu_memory path=\"\\\\GPU Adapter Memory(*)\\\\Dedicated Usage\" " +
-                         tracing::Trace::FormatPdhStatus("status", gpuMemoryCounterStatus))
-            .c_str());
-    const PDH_STATUS gpuMemoryCollectStatus = PdhCollectQueryData(impl_->gpuMemoryQuery_);
-    impl_->trace_.Write(
+        state_->gpuMemoryQuery_, L"\\GPU Adapter Memory(*)\\Dedicated Usage", &state_->gpuDedicatedCounter_);
+    state_->trace_.Write(("telemetry:pdh_add gpu_memory path=\"\\\\GPU Adapter Memory(*)\\\\Dedicated Usage\" " +
+                          tracing::Trace::FormatPdhStatus("status", gpuMemoryCounterStatus))
+                             .c_str());
+    const PDH_STATUS gpuMemoryCollectStatus = PdhCollectQueryData(state_->gpuMemoryQuery_);
+    state_->trace_.Write(
         ("telemetry:pdh_collect gpu_memory_query " + tracing::Trace::FormatPdhStatus("status", gpuMemoryCollectStatus))
             .c_str());
 
-    const PDH_STATUS storageQueryStatus = PdhOpenQueryW(nullptr, 0, &impl_->storage_.query);
-    impl_->trace_.Write(
+    const PDH_STATUS storageQueryStatus = PdhOpenQueryW(nullptr, 0, &state_->storage_.query);
+    state_->trace_.Write(
         ("telemetry:pdh_open storage_query " + tracing::Trace::FormatPdhStatus("status", storageQueryStatus)).c_str());
     const PDH_STATUS storageReadStatus = AddCounterCompat(
-        impl_->storage_.query, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &impl_->storage_.readCounter);
-    impl_->trace_.Write(("telemetry:pdh_add storage_read path=\"\\\\PhysicalDisk(_Total)\\\\Disk Read Bytes/sec\" " +
-                         tracing::Trace::FormatPdhStatus("status", storageReadStatus))
-            .c_str());
+        state_->storage_.query, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &state_->storage_.readCounter);
+    state_->trace_.Write(("telemetry:pdh_add storage_read path=\"\\\\PhysicalDisk(_Total)\\\\Disk Read Bytes/sec\" " +
+                          tracing::Trace::FormatPdhStatus("status", storageReadStatus))
+                             .c_str());
     const PDH_STATUS storageWriteStatus = AddCounterCompat(
-        impl_->storage_.query, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &impl_->storage_.writeCounter);
-    impl_->trace_.Write(("telemetry:pdh_add storage_write path=\"\\\\PhysicalDisk(_Total)\\\\Disk Write Bytes/sec\" " +
-                         tracing::Trace::FormatPdhStatus("status", storageWriteStatus))
-            .c_str());
-    const PDH_STATUS storageCollectStatus = PdhCollectQueryData(impl_->storage_.query);
-    impl_->trace_.Write(
+        state_->storage_.query, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &state_->storage_.writeCounter);
+    state_->trace_.Write(("telemetry:pdh_add storage_write path=\"\\\\PhysicalDisk(_Total)\\\\Disk Write Bytes/sec\" " +
+                          tracing::Trace::FormatPdhStatus("status", storageWriteStatus))
+                             .c_str());
+    const PDH_STATUS storageCollectStatus = PdhCollectQueryData(state_->storage_.query);
+    state_->trace_.Write(
         ("telemetry:pdh_collect storage_query " + tracing::Trace::FormatPdhStatus("status", storageCollectStatus))
             .c_str());
 
-    impl_->ResolveStorageSelection();
-    impl_->InitializeGpuAdapterInfo();
-    impl_->ResolveNetworkSelection();
-    impl_->CollectNetworkMetrics(true);
-    impl_->CollectStorageMetrics(true);
-    impl_->UpdateMemory();
-    impl_->UpdateCpu();
-    impl_->UpdateGpu();
-    GetLocalTime(&impl_->snapshot_.now);
-    ++impl_->snapshot_.revision;
-    impl_->trace_.Write("telemetry:initialize_done");
+    ResolveStorageSelection(*state_);
+    InitializeGpuAdapterInfo(*state_);
+    ResolveNetworkSelection(*state_);
+    CollectNetworkMetrics(*state_, true);
+    CollectStorageMetrics(*state_, true);
+    UpdateMemory(*state_);
+    UpdateCpu(*state_);
+    UpdateGpu(*state_);
+    GetLocalTime(&state_->snapshot_.now);
+    ++state_->snapshot_.revision;
+    state_->trace_.Write("telemetry:initialize_done");
     return true;
 }
 
-void TelemetryCollector::Impl::Trace(const char* text) const {
-    trace_.Write(text);
-}
-
-void TelemetryCollector::Impl::Trace(const std::string& text) const {
-    trace_.Write(text);
-}
-
 const SystemSnapshot& TelemetryCollector::Snapshot() const {
-    return impl_->snapshot_;
+    return state_->snapshot_;
 }
 
 TelemetryDump TelemetryCollector::Dump() const {
     TelemetryDump dump;
-    dump.snapshot = impl_->snapshot_;
-    dump.gpuProvider.providerName = impl_->gpuProviderName_;
-    dump.gpuProvider.diagnostics = impl_->gpuProviderDiagnostics_;
-    dump.gpuProvider.available = impl_->gpuProviderAvailable_;
-    dump.boardProvider = impl_->boardProviderSample_;
-    dump.boardProvider.providerName = impl_->boardProviderName_;
-    dump.boardProvider.diagnostics = impl_->boardProviderDiagnostics_;
-    dump.boardProvider.available = impl_->boardProviderAvailable_;
+    dump.snapshot = state_->snapshot_;
+    dump.gpuProvider.providerName = state_->gpuProviderName_;
+    dump.gpuProvider.diagnostics = state_->gpuProviderDiagnostics_;
+    dump.gpuProvider.available = state_->gpuProviderAvailable_;
+    dump.boardProvider = state_->boardProviderSample_;
+    dump.boardProvider.providerName = state_->boardProviderName_;
+    dump.boardProvider.diagnostics = state_->boardProviderDiagnostics_;
+    dump.boardProvider.available = state_->boardProviderAvailable_;
     return dump;
 }
 
 const ResolvedTelemetrySelections& TelemetryCollector::ResolvedSelections() const {
-    return impl_->resolvedSelections_;
+    return state_->resolvedSelections_;
 }
 
 const std::vector<NetworkAdapterCandidate>& TelemetryCollector::NetworkAdapterCandidates() const {
-    return impl_->network_.adapterCandidates;
+    return state_->network_.adapterCandidates;
 }
 
 const std::vector<StorageDriveCandidate>& TelemetryCollector::StorageDriveCandidates() const {
-    return impl_->storage_.driveCandidates;
+    return state_->storage_.driveCandidates;
 }
 
 void TelemetryCollector::ApplySettings(const TelemetrySettings& settings) {
-    const bool boardChanged = impl_->settings_.board != settings.board;
-    const bool selectionChanged = impl_->settings_.selection != settings.selection;
-    impl_->settings_ = settings;
+    const bool boardChanged = state_->settings_.board != settings.board;
+    const bool selectionChanged = state_->settings_.selection != settings.selection;
+    state_->settings_ = settings;
 
     if (selectionChanged) {
         SetPreferredNetworkAdapterName(settings.selection.preferredAdapterName);
         SetSelectedStorageDrives(settings.selection.configuredDrives);
     }
 
-    if (boardChanged && impl_->boardProvider_ != nullptr) {
-        impl_->trace_.Write("telemetry:board_provider_reconfigure_begin");
-        if (impl_->boardProvider_->Initialize(settings.board)) {
-            impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
-            impl_->trace_.Write("telemetry:board_provider_reconfigure_done provider=" + impl_->boardProviderName_ +
-                                " available=" + tracing::Trace::BoolText(impl_->boardProviderAvailable_) +
-                                " diagnostics=\"" + impl_->boardProviderDiagnostics_ + "\"");
+    if (boardChanged && state_->boardProvider_ != nullptr) {
+        state_->trace_.Write("telemetry:board_provider_reconfigure_begin");
+        if (state_->boardProvider_->Initialize(settings.board)) {
+            ApplyBoardVendorSample(*state_, state_->boardProvider_->Sample());
+            state_->trace_.Write("telemetry:board_provider_reconfigure_done provider=" + state_->boardProviderName_ +
+                                 " available=" + tracing::Trace::BoolText(state_->boardProviderAvailable_) +
+                                 " diagnostics=\"" + state_->boardProviderDiagnostics_ + "\"");
         } else {
-            impl_->ApplyBoardVendorSample(impl_->boardProvider_->Sample());
-            impl_->trace_.Write("telemetry:board_provider_reconfigure_failed provider=" + impl_->boardProviderName_ +
-                                " diagnostics=\"" + impl_->boardProviderDiagnostics_ + "\"");
+            ApplyBoardVendorSample(*state_, state_->boardProvider_->Sample());
+            state_->trace_.Write("telemetry:board_provider_reconfigure_failed provider=" + state_->boardProviderName_ +
+                                 " diagnostics=\"" + state_->boardProviderDiagnostics_ + "\"");
         }
     }
 }
 
 void TelemetryCollector::SetPreferredNetworkAdapterName(std::string adapterName) {
-    impl_->settings_.selection.preferredAdapterName = std::move(adapterName);
-    impl_->ResolveNetworkSelection();
-    ++impl_->snapshot_.revision;
+    state_->settings_.selection.preferredAdapterName = std::move(adapterName);
+    ResolveNetworkSelection(*state_);
+    ++state_->snapshot_.revision;
 }
 
 void TelemetryCollector::SetSelectedStorageDrives(std::vector<std::string> driveLetters) {
@@ -277,78 +275,84 @@ void TelemetryCollector::SetSelectedStorageDrives(std::vector<std::string> drive
         }
     }
     std::sort(normalized.begin(), normalized.end());
-    impl_->settings_.selection.configuredDrives = std::move(normalized);
-    impl_->ResolveStorageSelection();
-    ++impl_->snapshot_.revision;
+    state_->settings_.selection.configuredDrives = std::move(normalized);
+    ResolveStorageSelection(*state_);
+    ++state_->snapshot_.revision;
 }
 
 void TelemetryCollector::RefreshSelections() {
-    impl_->ResolveNetworkSelection();
-    impl_->ResolveStorageSelection();
-    ++impl_->snapshot_.revision;
+    ResolveNetworkSelection(*state_);
+    ResolveStorageSelection(*state_);
+    ++state_->snapshot_.revision;
 }
 
 void TelemetryCollector::UpdateSnapshot() {
-    impl_->trace_.Write("telemetry:update_snapshot_begin");
-    impl_->UpdateCpu();
-    impl_->UpdateGpu();
-    impl_->CollectNetworkMetrics(false);
-    impl_->CollectStorageMetrics(false);
-    impl_->UpdateMemory();
-    GetLocalTime(&impl_->snapshot_.now);
-    ++impl_->snapshot_.revision;
-    impl_->trace_.Write("telemetry:update_snapshot_done");
+    state_->trace_.Write("telemetry:update_snapshot_begin");
+    UpdateCpu(*state_);
+    UpdateGpu(*state_);
+    CollectNetworkMetrics(*state_, false);
+    CollectStorageMetrics(*state_, false);
+    UpdateMemory(*state_);
+    GetLocalTime(&state_->snapshot_.now);
+    ++state_->snapshot_.revision;
+    state_->trace_.Write("telemetry:update_snapshot_done");
 }
 
 void TelemetryCollector::WriteDump(std::ostream& output) const {
     WriteTelemetryDump(output, Dump());
 }
 
-void TelemetryCollector::Impl::UpdateCpu() {
-    if (cpuQuery_ == nullptr) {
-        Trace("telemetry:cpu_update skipped=no_query");
+namespace {
+
+void UpdateCpu(TelemetryCollectorState& state) {
+    if (state.cpuQuery_ == nullptr) {
+        Trace(state, "telemetry:cpu_update skipped=no_query");
         return;
     }
-    const PDH_STATUS collectStatus = PdhCollectQueryData(cpuQuery_);
-    Trace(("telemetry:cpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
+    const PDH_STATUS collectStatus = PdhCollectQueryData(state.cpuQuery_);
+    Trace(state, "telemetry:cpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus));
 
     PDH_FMT_COUNTERVALUE value{};
     PDH_STATUS loadStatus = PDH_INVALID_DATA;
-    if (cpuLoadCounter_ != nullptr &&
-        (loadStatus = PdhGetFormattedCounterValue(cpuLoadCounter_, PDH_FMT_DOUBLE, nullptr, &value)) == ERROR_SUCCESS) {
-        snapshot_.cpu.loadPercent = ClampFinite(value.doubleValue, 0.0, 100.0);
-    }
-    Trace(("telemetry:cpu_load " + tracing::Trace::FormatPdhStatus("status", loadStatus) + " " +
-           tracing::Trace::FormatValueDouble("value", snapshot_.cpu.loadPercent, 2))
-            .c_str());
-    retainedHistoryStore_.PushSample(snapshot_, "cpu.load", snapshot_.cpu.loadPercent);
-    PDH_STATUS clockStatus = PDH_INVALID_DATA;
-    if (cpuFrequencyCounter_ != nullptr &&
-        (clockStatus = PdhGetFormattedCounterValue(cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value)) ==
+    if (state.cpuLoadCounter_ != nullptr &&
+        (loadStatus = PdhGetFormattedCounterValue(state.cpuLoadCounter_, PDH_FMT_DOUBLE, nullptr, &value)) ==
             ERROR_SUCCESS) {
-        snapshot_.cpu.clock.value = FiniteOptional(value.doubleValue / 1000.0);
-        snapshot_.cpu.clock.unit = ScalarMetricUnit::Gigahertz;
+        state.snapshot_.cpu.loadPercent = ClampFinite(value.doubleValue, 0.0, 100.0);
     }
-    Trace(("telemetry:cpu_clock " + tracing::Trace::FormatPdhStatus("status", clockStatus) + " value=" +
-           (snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(snapshot_.cpu.clock, 2) : std::string("N/A")))
-            .c_str());
-    if (boardProvider_ != nullptr) {
-        ApplyBoardVendorSample(boardProvider_->Sample());
-        Trace(("telemetry:board_vendor_sample provider=" + boardProviderName_ + " available=" +
-               tracing::Trace::BoolText(boardProviderAvailable_) + " diagnostics=\"" + boardProviderDiagnostics_ + "\"")
-                .c_str());
+    Trace(state,
+        "telemetry:cpu_load " + tracing::Trace::FormatPdhStatus("status", loadStatus) + " " +
+            tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.loadPercent, 2));
+    state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.load", state.snapshot_.cpu.loadPercent);
+    PDH_STATUS clockStatus = PDH_INVALID_DATA;
+    if (state.cpuFrequencyCounter_ != nullptr &&
+        (clockStatus = PdhGetFormattedCounterValue(state.cpuFrequencyCounter_, PDH_FMT_DOUBLE, nullptr, &value)) ==
+            ERROR_SUCCESS) {
+        state.snapshot_.cpu.clock.value = FiniteOptional(value.doubleValue / 1000.0);
+        state.snapshot_.cpu.clock.unit = ScalarMetricUnit::Gigahertz;
     }
-    retainedHistoryStore_.PushSample(snapshot_, "cpu.clock", snapshot_.cpu.clock.value.value_or(0.0));
-    retainedHistoryStore_.PushBoardMetricSamples(snapshot_);
+    Trace(state,
+        "telemetry:cpu_clock " + tracing::Trace::FormatPdhStatus("status", clockStatus) + " value=" +
+            (state.snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(state.snapshot_.cpu.clock, 2)
+                                                         : std::string("N/A")));
+    if (state.boardProvider_ != nullptr) {
+        ApplyBoardVendorSample(state, state.boardProvider_->Sample());
+        Trace(state,
+            "telemetry:board_vendor_sample provider=" + state.boardProviderName_ + " available=" +
+                tracing::Trace::BoolText(state.boardProviderAvailable_) + " diagnostics=\"" +
+                state.boardProviderDiagnostics_ + "\"");
+    }
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, "cpu.clock", state.snapshot_.cpu.clock.value.value_or(0.0));
+    state.retainedHistoryStore_.PushBoardMetricSamples(state.snapshot_);
 }
 
-void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
+void InitializeGpuAdapterInfo(TelemetryCollectorState& state) {
     IDXGIFactory1* factory = nullptr;
     const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
     if (FAILED(factoryHr) || factory == nullptr) {
         char buffer[128];
         sprintf_s(buffer, "telemetry:gpu_adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
-        Trace(buffer);
+        Trace(state, buffer);
         return;
     }
 
@@ -356,7 +360,7 @@ void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
         IDXGIAdapter1* adapter = nullptr;
         const HRESULT enumHr = factory->EnumAdapters1(adapterIndex, &adapter);
         if (enumHr == DXGI_ERROR_NOT_FOUND) {
-            Trace("telemetry:gpu_adapter_enum done");
+            Trace(state, "telemetry:gpu_adapter_enum done");
             break;
         }
         if (FAILED(enumHr) || adapter == nullptr) {
@@ -365,7 +369,7 @@ void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
                 "telemetry:gpu_adapter_enum index=%u hr=0x%08X",
                 adapterIndex,
                 static_cast<unsigned int>(enumHr));
-            Trace(buffer);
+            Trace(state, buffer);
             break;
         }
 
@@ -373,9 +377,10 @@ void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
         const HRESULT descHr = adapter->GetDesc1(&desc);
         if (SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0) {
             const std::string adapterName = Utf8FromWide(desc.Description);
-            snapshot_.gpu.vram.totalGb = static_cast<double>(desc.DedicatedVideoMemory) / (1024.0 * 1024.0 * 1024.0);
-            if (snapshot_.gpu.name == "GPU" && !adapterName.empty()) {
-                snapshot_.gpu.name = adapterName;
+            state.snapshot_.gpu.vram.totalGb =
+                static_cast<double>(desc.DedicatedVideoMemory) / (1024.0 * 1024.0 * 1024.0);
+            if (state.snapshot_.gpu.name == "GPU" && !adapterName.empty()) {
+                state.snapshot_.gpu.name = adapterName;
             }
 
             char buffer[256];
@@ -384,9 +389,9 @@ void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
                 adapterIndex,
                 static_cast<unsigned int>(descHr),
                 static_cast<unsigned long long>(desc.DedicatedVideoMemory),
-                snapshot_.gpu.vram.totalGb,
+                state.snapshot_.gpu.vram.totalGb,
                 adapterName.c_str());
-            Trace(buffer);
+            Trace(state, buffer);
             adapter->Release();
             break;
         }
@@ -400,7 +405,7 @@ void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
                 static_cast<unsigned int>(descHr),
                 tracing::Trace::BoolText(SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0).c_str(),
                 adapterName.c_str());
-            Trace(buffer);
+            Trace(state, buffer);
         }
         adapter->Release();
     }
@@ -408,7 +413,7 @@ void TelemetryCollector::Impl::InitializeGpuAdapterInfo() {
     factory->Release();
 }
 
-double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool require3d) {
+double SumCounterArray(TelemetryCollectorState& state, PDH_HCOUNTER counter, bool require3d) {
     if (counter == nullptr) {
         return 0.0;
     }
@@ -416,18 +421,18 @@ double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool requ
     DWORD itemCount = 0;
     PDH_STATUS status = PdhGetFormattedCounterArrayW(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, nullptr);
     if (status != PDH_MORE_DATA) {
-        Trace(("telemetry:pdh_array_prepare " + tracing::Trace::FormatPdhStatus("status", status) +
-               " require3d=" + tracing::Trace::BoolText(require3d))
-                .c_str());
+        Trace(state,
+            "telemetry:pdh_array_prepare " + tracing::Trace::FormatPdhStatus("status", status) +
+                " require3d=" + tracing::Trace::BoolText(require3d));
         return 0.0;
     }
     std::vector<BYTE> buffer(bufferSize);
     auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W*>(buffer.data());
     status = PdhGetFormattedCounterArrayW(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, items);
     if (status != ERROR_SUCCESS) {
-        Trace(("telemetry:pdh_array_fetch " + tracing::Trace::FormatPdhStatus("status", status) +
-               " count=" + std::to_string(itemCount) + " require3d=" + tracing::Trace::BoolText(require3d))
-                .c_str());
+        Trace(state,
+            "telemetry:pdh_array_fetch " + tracing::Trace::FormatPdhStatus("status", status) +
+                " count=" + std::to_string(itemCount) + " require3d=" + tracing::Trace::BoolText(require3d));
         return 0.0;
     }
     double total = 0.0;
@@ -444,95 +449,102 @@ double TelemetryCollector::Impl::SumCounterArray(PDH_HCOUNTER counter, bool requ
         }
         total += items[i].FmtValue.doubleValue;
     }
-    Trace(("telemetry:pdh_array_done " + tracing::Trace::FormatPdhStatus("status", status) +
-           " count=" + std::to_string(itemCount) + " require3d=" + tracing::Trace::BoolText(require3d) + " " +
-           tracing::Trace::FormatValueDouble("total", total, 2))
-            .c_str());
+    Trace(state,
+        "telemetry:pdh_array_done " + tracing::Trace::FormatPdhStatus("status", status) +
+            " count=" + std::to_string(itemCount) + " require3d=" + tracing::Trace::BoolText(require3d) + " " +
+            tracing::Trace::FormatValueDouble("total", total, 2));
     return FiniteNonNegativeOr(total);
 }
 
-void TelemetryCollector::Impl::ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample) {
-    gpuProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
-    gpuProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
-    gpuProviderAvailable_ = sample.available;
+void ApplyGpuVendorSample(TelemetryCollectorState& state, const GpuVendorTelemetrySample& sample) {
+    state.gpuProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
+    state.gpuProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
+    state.gpuProviderAvailable_ = sample.available;
 
     if (sample.name.has_value() && !sample.name->empty()) {
-        snapshot_.gpu.name = *sample.name;
+        state.snapshot_.gpu.name = *sample.name;
     }
-    snapshot_.gpu.temperature.value = FiniteOptional(sample.temperatureC);
-    snapshot_.gpu.temperature.unit = ScalarMetricUnit::Celsius;
-    snapshot_.gpu.clock.value = FiniteOptional(sample.coreClockMhz);
-    snapshot_.gpu.clock.unit = ScalarMetricUnit::Megahertz;
-    snapshot_.gpu.fan.value = FiniteOptional(sample.fanRpm);
-    snapshot_.gpu.fan.unit = ScalarMetricUnit::Rpm;
+    state.snapshot_.gpu.temperature.value = FiniteOptional(sample.temperatureC);
+    state.snapshot_.gpu.temperature.unit = ScalarMetricUnit::Celsius;
+    state.snapshot_.gpu.clock.value = FiniteOptional(sample.coreClockMhz);
+    state.snapshot_.gpu.clock.unit = ScalarMetricUnit::Megahertz;
+    state.snapshot_.gpu.fan.value = FiniteOptional(sample.fanRpm);
+    state.snapshot_.gpu.fan.unit = ScalarMetricUnit::Rpm;
     if (sample.totalVramGb.has_value()) {
         const double totalVramGb = FiniteNonNegativeOr(*sample.totalVramGb);
         if (totalVramGb > 0.0) {
-            snapshot_.gpu.vram.totalGb = totalVramGb;
+            state.snapshot_.gpu.vram.totalGb = totalVramGb;
         }
     }
 }
 
-void TelemetryCollector::Impl::ApplyBoardVendorSample(const BoardVendorTelemetrySample& sample) {
-    boardProviderSample_ = sample;
-    boardProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
-    boardProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
-    boardProviderAvailable_ = sample.available;
-    snapshot_.boardTemperatures = sample.temperatures;
-    for (auto& metric : snapshot_.boardTemperatures) {
+void ApplyBoardVendorSample(TelemetryCollectorState& state, const BoardVendorTelemetrySample& sample) {
+    state.boardProviderSample_ = sample;
+    state.boardProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
+    state.boardProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
+    state.boardProviderAvailable_ = sample.available;
+    state.snapshot_.boardTemperatures = sample.temperatures;
+    for (auto& metric : state.snapshot_.boardTemperatures) {
         metric.metric.value = FiniteOptional(metric.metric.value);
     }
-    snapshot_.boardFans = sample.fans;
-    for (auto& metric : snapshot_.boardFans) {
+    state.snapshot_.boardFans = sample.fans;
+    for (auto& metric : state.snapshot_.boardFans) {
         metric.metric.value = FiniteOptional(metric.metric.value);
     }
 }
 
-void TelemetryCollector::Impl::UpdateGpu() {
-    if (gpuQuery_ != nullptr) {
-        const PDH_STATUS collectStatus = PdhCollectQueryData(gpuQuery_);
-        Trace(("telemetry:gpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
-        const double load3d = SumCounterArray(gpuLoadCounter_, true);
-        const double loadAll = SumCounterArray(gpuLoadCounter_, false);
-        snapshot_.gpu.loadPercent = ClampFinite(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
-        Trace(("telemetry:gpu_load load3d=" + tracing::Trace::FormatValueDouble("value", load3d, 2) +
-               " loadAll=" + tracing::Trace::FormatValueDouble("value", loadAll, 2) +
-               " selected=" + tracing::Trace::FormatValueDouble("value", snapshot_.gpu.loadPercent, 2))
-                .c_str());
+void UpdateGpu(TelemetryCollectorState& state) {
+    if (state.gpuQuery_ != nullptr) {
+        const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpuQuery_);
+        Trace(state, "telemetry:gpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus));
+        const double load3d = SumCounterArray(state, state.gpuLoadCounter_, true);
+        const double loadAll = SumCounterArray(state, state.gpuLoadCounter_, false);
+        state.snapshot_.gpu.loadPercent = ClampFinite(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
+        Trace(state,
+            "telemetry:gpu_load load3d=" + tracing::Trace::FormatValueDouble("value", load3d, 2) +
+                " loadAll=" + tracing::Trace::FormatValueDouble("value", loadAll, 2) +
+                " selected=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.gpu.loadPercent, 2));
     }
-    retainedHistoryStore_.PushSample(snapshot_, "gpu.load", snapshot_.gpu.loadPercent);
-    if (gpuMemoryQuery_ != nullptr) {
-        const PDH_STATUS collectStatus = PdhCollectQueryData(gpuMemoryQuery_);
-        Trace(("telemetry:gpu_memory_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
-        const double bytes = SumCounterArray(gpuDedicatedCounter_, false);
-        snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(bytes / (1024.0 * 1024.0 * 1024.0));
-        Trace(("telemetry:gpu_memory bytes=" + tracing::Trace::FormatValueDouble("value", bytes, 0) +
-               " used_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.gpu.vram.usedGb, 2))
-                .c_str());
+    state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.load", state.snapshot_.gpu.loadPercent);
+    if (state.gpuMemoryQuery_ != nullptr) {
+        const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpuMemoryQuery_);
+        Trace(state, "telemetry:gpu_memory_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus));
+        const double bytes = SumCounterArray(state, state.gpuDedicatedCounter_, false);
+        state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(bytes / (1024.0 * 1024.0 * 1024.0));
+        Trace(state,
+            "telemetry:gpu_memory bytes=" + tracing::Trace::FormatValueDouble("value", bytes, 0) +
+                " used_gb=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.gpu.vram.usedGb, 2));
     }
-    if (gpuProvider_ != nullptr) {
-        ApplyGpuVendorSample(gpuProvider_->Sample());
-        Trace(("telemetry:gpu_vendor_sample provider=" + gpuProviderName_ + " available=" +
-               tracing::Trace::BoolText(gpuProviderAvailable_) + " diagnostics=\"" + gpuProviderDiagnostics_ + "\"")
-                .c_str());
+    if (state.gpuProvider_ != nullptr) {
+        ApplyGpuVendorSample(state, state.gpuProvider_->Sample());
+        Trace(state,
+            "telemetry:gpu_vendor_sample provider=" + state.gpuProviderName_ + " available=" +
+                tracing::Trace::BoolText(state.gpuProviderAvailable_) + " diagnostics=\"" +
+                state.gpuProviderDiagnostics_ + "\"");
     }
-    retainedHistoryStore_.PushSample(snapshot_, "gpu.temp", snapshot_.gpu.temperature.value.value_or(0.0));
-    retainedHistoryStore_.PushSample(snapshot_, "gpu.clock", snapshot_.gpu.clock.value.value_or(0.0));
-    retainedHistoryStore_.PushSample(snapshot_, "gpu.fan", snapshot_.gpu.fan.value.value_or(0.0));
-    retainedHistoryStore_.PushSample(snapshot_, "gpu.vram", snapshot_.gpu.vram.usedGb);
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, "gpu.temp", state.snapshot_.gpu.temperature.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, "gpu.clock", state.snapshot_.gpu.clock.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, "gpu.fan", state.snapshot_.gpu.fan.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.vram", state.snapshot_.gpu.vram.usedGb);
 }
 
-void TelemetryCollector::Impl::UpdateMemory() {
+void UpdateMemory(TelemetryCollectorState& state) {
     MEMORYSTATUSEX memory{};
     memory.dwLength = sizeof(memory);
     const BOOL ok = GlobalMemoryStatusEx(&memory);
     if (ok) {
-        snapshot_.cpu.memory.totalGb = memory.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
-        snapshot_.cpu.memory.usedGb = (memory.ullTotalPhys - memory.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
+        state.snapshot_.cpu.memory.totalGb = memory.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
+        state.snapshot_.cpu.memory.usedGb =
+            (memory.ullTotalPhys - memory.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
     }
-    Trace(("telemetry:memory_status ok=" + tracing::Trace::BoolText(ok != FALSE) +
-           " total_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.totalGb, 2) +
-           " used_gb=" + tracing::Trace::FormatValueDouble("value", snapshot_.cpu.memory.usedGb, 2))
-            .c_str());
-    retainedHistoryStore_.PushSample(snapshot_, "cpu.ram", snapshot_.cpu.memory.usedGb);
+    Trace(state,
+        "telemetry:memory_status ok=" + tracing::Trace::BoolText(ok != FALSE) +
+            " total_gb=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.totalGb, 2) +
+            " used_gb=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.usedGb, 2));
+    state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.ram", state.snapshot_.cpu.memory.usedGb);
 }
+
+}  // namespace

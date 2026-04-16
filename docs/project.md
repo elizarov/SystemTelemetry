@@ -39,6 +39,7 @@
 - Keep the checked-in config template at `resources/config.ini` so it can be embedded into the executable as the default configuration resource.
 - Keep `resources/SystemTelemetry.rc` explicitly dependent on embedded payload files such as `resources/config.ini` and `resources/localization.ini` so incremental builds refresh the executable resources when those UTF-8 source files change.
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories, so headers under nested source folders are included as `layout_edit_dialog/editors.h` or `widget/gauge.h` instead of through relative paths or local-shorthand names.
+- Keep each non-allowlisted project `.cpp` paired with a matching header, and keep its out-of-line declarations owned by that header; the architecture lint matches fully qualified owners to the header that defines the owning class or function instead of to forward declarations.
 - Treat `resources/config.ini` as the single maintained source of truth for config-file entry documentation instead of duplicating that format documentation elsewhere in the repo.
 - Do not add C++-side synthesized fallback layout/card/widget defaults that duplicate the embedded config template; shipped defaults must come only from `resources/config.ini`.
 - Do not keep code-side fallback fonts, colors, or layout-size defaults in the config structs; shipped UI styling defaults must come only from `resources/config.ini`.
@@ -50,3 +51,4 @@
 - Keep localizable runtime strings in the embedded `resources/localization.ini` UTF-8 key=value catalog so string keys remain stable without assigning Win32 string-table ids and one file stays ready for translation work.
 - The executable-side `config.ini` overlays the embedded template on load, `Save Config` updates only changed live values in that file, and `Save Full Config To...` exports the full embedded-template-shaped text.
 - Keep one full-fidelity widget draw path as the only maintained renderer behavior for both ordinary repaints and layout-edit drag repaints; do not add drag-preview-specific draw shortcuts that change which visual work is executed during active drags.
+- When a private module needs shared mutable collector data across multiple `.cpp` files, expose that data as a dedicated state type plus module-owned free functions instead of spreading one header-owned nested-class method surface across several implementation files.

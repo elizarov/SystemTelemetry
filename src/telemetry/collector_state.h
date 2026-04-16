@@ -29,7 +29,7 @@ struct DriveCounterState {
     PDH_HCOUNTER writeCounter = nullptr;
 };
 
-struct TelemetryCollector::Impl {
+struct TelemetryCollectorState {
     struct StorageState {
         std::vector<std::string> resolvedDriveLetters;
         std::vector<StorageDriveCandidate> driveCandidates;
@@ -49,23 +49,7 @@ struct TelemetryCollector::Impl {
         std::chrono::steady_clock::time_point previousTick{};
     };
 
-    ~Impl();
-
-    void UpdateCpu();
-    void UpdateGpu();
-    void InitializeGpuAdapterInfo();
-    void UpdateMemory();
-    void ApplyBoardVendorSample(const BoardVendorTelemetrySample& sample);
-    void ApplyGpuVendorSample(const GpuVendorTelemetrySample& sample);
-    void ResolveStorageSelection();
-    void CollectStorageMetrics(bool initializeOnly);
-    void UpdateStorageThroughput(bool initializeOnly);
-    void RefreshDriveUsage();
-    void ResolveNetworkSelection();
-    void CollectNetworkMetrics(bool initializeOnly);
-    double SumCounterArray(PDH_HCOUNTER counter, bool require3d);
-    void Trace(const char* text) const;
-    void Trace(const std::string& text) const;
+    ~TelemetryCollectorState();
 
     TelemetrySettings settings_;
     ResolvedTelemetrySelections resolvedSelections_;

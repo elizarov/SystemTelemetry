@@ -103,6 +103,8 @@ struct TelemetryDump {
     BoardVendorTelemetrySample boardProvider;
 };
 
+struct TelemetryCollectorState;
+
 class TelemetryCollector {
 public:
     TelemetryCollector();
@@ -127,6 +129,5 @@ public:
     void WriteDump(std::ostream& output) const;
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::unique_ptr<TelemetryCollectorState> state_;
 };
