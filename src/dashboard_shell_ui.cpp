@@ -876,6 +876,54 @@ int DialogControlVisibleHeight(HWND hwnd, int controlId) {
     return DialogControlHeight(hwnd, controlId);
 }
 
+bool DialogControlHasClass(HWND hwnd, int controlId, const wchar_t* expectedClassName) {
+    HWND control = GetDlgItem(hwnd, controlId);
+    if (control == nullptr) {
+        return false;
+    }
+
+    wchar_t className[32] = {};
+    GetClassNameW(control, className, ARRAYSIZE(className));
+    return _wcsicmp(className, expectedClassName) == 0;
+}
+
+bool IsDialogComboBoxControl(HWND hwnd, int controlId) {
+    return DialogControlHasClass(hwnd, controlId, WC_COMBOBOXW) || DialogControlHasClass(hwnd, controlId, L"ComboBox");
+}
+
+bool IsDialogEditControl(HWND hwnd, int controlId) {
+    return DialogControlHasClass(hwnd, controlId, WC_EDITW) || DialogControlHasClass(hwnd, controlId, L"Edit");
+}
+
+bool UsesSingleLineFieldFrame(HWND hwnd, int controlId) {
+    return IsDialogComboBoxControl(hwnd, controlId) || IsDialogEditControl(hwnd, controlId);
+}
+
+int DialogControlLayoutHeightForVisibleHeight(HWND hwnd, int controlId, int desiredVisibleHeight) {
+    const int currentHeight = DialogControlHeight(hwnd, controlId);
+    const int currentVisibleHeight = DialogControlVisibleHeight(hwnd, controlId);
+    if (currentHeight <= 0 || currentVisibleHeight <= 0) {
+        return std::max(1, desiredVisibleHeight);
+    }
+    return std::max(1, currentHeight + (desiredVisibleHeight - currentVisibleHeight));
+}
+
+int MeasureSingleLineFieldVisibleHeight(HWND hwnd) {
+    const int comboIds[] = {
+        IDC_LAYOUT_EDIT_FONT_FACE_EDIT,
+        IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT,
+    };
+
+    int height = 0;
+    for (const int comboId : comboIds) {
+        height = std::max(height, DialogControlVisibleHeight(hwnd, comboId));
+    }
+    if (height > 0) {
+        return height;
+    }
+    return std::max(1, DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
+}
+
 void SetDialogControlBounds(HWND hwnd, int controlId, int left, int top, int width, int height) {
     if (HWND control = GetDlgItem(hwnd, controlId); control != nullptr) {
         SetWindowPos(control, nullptr, left, top, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -1188,14 +1236,21 @@ int LayoutLabeledControlRow(HWND hwnd,
     int gap,
     int controlWidth,
     int forcedRowHeight = 0) {
-    const int controlHeight = DialogControlHeight(hwnd, controlId);
     const int visibleControlHeight = DialogControlVisibleHeight(hwnd, controlId);
+    const int desiredVisibleControlHeight =
+        forcedRowHeight > 0 && UsesSingleLineFieldFrame(hwnd, controlId) ? forcedRowHeight : visibleControlHeight;
+    const int controlHeight = DialogControlLayoutHeightForVisibleHeight(hwnd, controlId, desiredVisibleControlHeight);
     const int labelHeight = MeasureTextHeightForControl(
         hwnd, labelId, ReadDialogControlTextWide(hwnd, labelId), std::max(1, labelWidth), true);
     const int controlLeft = left + labelWidth + gap;
-    const int rowHeight = std::max(forcedRowHeight, std::max(visibleControlHeight, labelHeight));
+    const int rowHeight = std::max(forcedRowHeight, std::max(desiredVisibleControlHeight, labelHeight));
     SetDialogControlBounds(
-        hwnd, controlId, controlLeft, top + ((rowHeight - visibleControlHeight) / 2), controlWidth, controlHeight);
+        hwnd,
+        controlId,
+        controlLeft,
+        top + ((rowHeight - desiredVisibleControlHeight) / 2),
+        controlWidth,
+        controlHeight);
     SetDialogControlBounds(hwnd, labelId, left, top + ((rowHeight - labelHeight) / 2), labelWidth, labelHeight);
     return rowHeight;
 }
@@ -1292,6 +1347,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
 
     const LayoutEditEditorKind kind = CurrentLayoutEditEditorKind(state);
     const bool showBinding = CurrentLayoutEditShowsMetricBinding(state);
+    const int singleLineFieldHeight = MeasureSingleLineFieldVisibleHeight(hwnd);
     const int labelColumnWidth = ActiveEditorLabelControls(kind, showBinding).empty()
                                      ? 0
                                      : MeasureLabelColumnWidth(hwnd, ActiveEditorLabelControls(kind, showBinding)) + 8;
@@ -1308,9 +1364,10 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             break;
         }
         case LayoutEditEditorKind::Numeric: {
-            const int editHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT);
+            const int editHeight =
+                DialogControlLayoutHeightForVisibleHeight(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, singleLineFieldHeight);
             SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, innerLeft, cursorY, innerWidth, editHeight);
-            cursorY += editHeight + metrics.hintGap;
+            cursorY += singleLineFieldHeight + metrics.hintGap;
             const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
             const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
             SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_HINT, innerLeft, cursorY, innerWidth, hintHeight);
@@ -1325,11 +1382,13 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 cursorY,
                 labelColumnWidth,
                 metrics.labelGap,
-                innerWidth - labelColumnWidth - metrics.labelGap);
+                innerWidth - labelColumnWidth - metrics.labelGap,
+                singleLineFieldHeight);
             cursorY += faceRowHeight + metrics.rowGap;
 
             const int sizeEditWidth = 56;
-            const int sizeEditHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT);
+            const int sizeEditHeight = DialogControlLayoutHeightForVisibleHeight(
+                hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, singleLineFieldHeight);
             const int sizeControlLeft = innerLeft + labelColumnWidth + metrics.labelGap;
             const int sizeLabelHeight = MeasureTextHeightForControl(hwnd,
                 IDC_LAYOUT_EDIT_FONT_SIZE_LABEL,
@@ -1339,7 +1398,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             SetDialogControlBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_SIZE_LABEL,
                 innerLeft,
-                cursorY + ((sizeEditHeight - sizeLabelHeight) / 2),
+                cursorY + ((singleLineFieldHeight - sizeLabelHeight) / 2),
                 labelColumnWidth,
                 sizeLabelHeight);
             SetDialogControlBounds(
@@ -1352,7 +1411,8 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int weightLabelLeft = sizeControlLeft + sizeEditWidth + metrics.inlineGap;
             const int weightEditLeft = weightLabelLeft + weightLabelWidth + metrics.labelGap;
             const int weightEditWidth = std::max(60, innerRight - weightEditLeft);
-            const int weightEditHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT);
+            const int weightEditHeight = DialogControlLayoutHeightForVisibleHeight(
+                hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, singleLineFieldHeight);
             const int weightLabelHeight = MeasureTextHeightForControl(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
                 ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL),
@@ -1361,13 +1421,13 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             SetDialogControlBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
                 weightLabelLeft,
-                cursorY + ((weightEditHeight - weightLabelHeight) / 2),
+                cursorY + ((singleLineFieldHeight - weightLabelHeight) / 2),
                 weightLabelWidth,
                 weightLabelHeight);
             SetDialogControlBounds(
                 hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, weightEditLeft, cursorY, weightEditWidth, weightEditHeight);
 
-            cursorY += std::max(sizeEditHeight, weightEditHeight) + metrics.sampleGap;
+            cursorY += singleLineFieldHeight + metrics.sampleGap;
             const int sampleHeight = std::max(28, DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_FONT_SAMPLE));
             SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_FONT_SAMPLE, innerLeft, cursorY, innerWidth, sampleHeight);
             cursorY += sampleHeight + metrics.hintGap;
@@ -1387,20 +1447,27 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                                           IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
                                           ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)) +
                                       8;
-            const int hexEditHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT);
+            const int hexEditHeight = DialogControlLayoutHeightForVisibleHeight(
+                hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, singleLineFieldHeight);
             const int pickLeft = innerRight - pickWidth;
             const int hexLabelLeft = innerLeft + swatchSize + metrics.inlineGap;
             const int hexEditLeft = hexLabelLeft + hexLabelWidth + metrics.labelGap;
             const int hexEditWidth = std::max(60, pickLeft - metrics.inlineGap - hexEditLeft);
-            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_COLOR_SWATCH, innerLeft, cursorY, swatchSize, swatchSize);
+            const int firstRowHeight = std::max(std::max(swatchSize, singleLineFieldHeight), pickHeight);
+            SetDialogControlBounds(hwnd,
+                IDC_LAYOUT_EDIT_COLOR_SWATCH,
+                innerLeft,
+                cursorY + ((firstRowHeight - swatchSize) / 2),
+                swatchSize,
+                swatchSize);
             SetDialogControlBounds(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
                 hexLabelLeft,
-                cursorY + ((hexEditHeight - MeasureTextHeightForControl(hwnd,
-                                                IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
-                                                ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL),
-                                                hexLabelWidth,
-                                                true)) /
+                cursorY + ((firstRowHeight - MeasureTextHeightForControl(hwnd,
+                                                        IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
+                                                        ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL),
+                                                        hexLabelWidth,
+                                                        true)) /
                               2),
                 hexLabelWidth,
                 MeasureTextHeightForControl(hwnd,
@@ -1409,9 +1476,19 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     hexLabelWidth,
                     true));
             SetDialogControlBounds(
-                hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, hexEditLeft, cursorY, hexEditWidth, hexEditHeight);
-            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK, pickLeft, cursorY, pickWidth, pickHeight);
-            cursorY += std::max(std::max(swatchSize, hexEditHeight), pickHeight) + metrics.sampleGap;
+                hwnd,
+                IDC_LAYOUT_EDIT_COLOR_HEX_EDIT,
+                hexEditLeft,
+                cursorY + ((firstRowHeight - singleLineFieldHeight) / 2),
+                hexEditWidth,
+                hexEditHeight);
+            SetDialogControlBounds(hwnd,
+                IDC_LAYOUT_EDIT_COLOR_PICK,
+                pickLeft,
+                cursorY + ((firstRowHeight - pickHeight) / 2),
+                pickWidth,
+                pickHeight);
+            cursorY += firstRowHeight + metrics.sampleGap;
 
             const int sampleHeight = MeasureTextHeightForControl(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_SAMPLE,
@@ -1440,9 +1517,10 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER,
             };
             for (int i = 0; i < 3; ++i) {
-                const int editHeight = DialogControlHeight(hwnd, rgbEditIds[i]);
+                const int editHeight =
+                    DialogControlLayoutHeightForVisibleHeight(hwnd, rgbEditIds[i], singleLineFieldHeight);
                 const int sliderHeight = DialogControlHeight(hwnd, rgbSliderIds[i]);
-                const int rowHeight = std::max(editHeight, sliderHeight);
+                const int rowHeight = std::max(singleLineFieldHeight, sliderHeight);
                 const int labelHeight = MeasureTextHeightForControl(
                     hwnd, rgbLabelIds[i], ReadDialogControlTextWide(hwnd, rgbLabelIds[i]), labelColumnWidth, true);
                 SetDialogControlBounds(hwnd,
@@ -1454,7 +1532,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 SetDialogControlBounds(hwnd,
                     rgbEditIds[i],
                     innerLeft + labelColumnWidth + metrics.labelGap,
-                    cursorY,
+                    cursorY + ((rowHeight - singleLineFieldHeight) / 2),
                     valueEditWidth,
                     editHeight);
                 SetDialogControlBounds(hwnd,
@@ -1481,7 +1559,8 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 cursorY,
                 labelColumnWidth,
                 metrics.labelGap,
-                editWidth);
+                editWidth,
+                singleLineFieldHeight);
             cursorY += firstRowHeight + metrics.rowGap;
             const int secondRowHeight = LayoutLabeledControlRow(hwnd,
                 IDC_LAYOUT_EDIT_WEIGHT_SECOND_LABEL,
@@ -1490,7 +1569,8 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 cursorY,
                 labelColumnWidth,
                 metrics.labelGap,
-                editWidth);
+                editWidth,
+                singleLineFieldHeight);
             cursorY += secondRowHeight + metrics.hintGap;
             const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
             const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
@@ -1500,13 +1580,8 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
         }
         case LayoutEditEditorKind::Metric: {
             const int controlWidth = innerWidth - labelColumnWidth - metrics.labelGap;
-            const int metricRowHeight = std::max({
-                DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE),
-                DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT),
-                DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT),
-                DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT),
-                showBinding ? DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT) : 0,
-            });
+            const int metricRowHeight =
+                std::max(DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE), singleLineFieldHeight);
             const int styleRowHeight = LayoutLabeledControlRow(hwnd,
                 IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL,
                 IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE,
