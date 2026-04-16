@@ -499,11 +499,22 @@ const DashboardMetricBinding kPrefixBindings[] = {
     {kBoardFanPrefix, true, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveBoardFanMetric},
 };
 
-DashboardMetricBindingMatch FindDashboardMetricBinding(std::string_view metricRef) {
-    for (const auto& binding : kExactBindings) {
-        if (binding.key == metricRef) {
-            return DashboardMetricBindingMatch{&binding, {}};
+const std::unordered_map<std::string_view, const DashboardMetricBinding*>& ExactDashboardMetricBindingIndex() {
+    static const auto index = [] {
+        std::unordered_map<std::string_view, const DashboardMetricBinding*> bindings;
+        bindings.reserve(std::size(kExactBindings));
+        for (const auto& binding : kExactBindings) {
+            bindings.emplace(binding.key, &binding);
         }
+        return bindings;
+    }();
+    return index;
+}
+
+DashboardMetricBindingMatch FindDashboardMetricBinding(std::string_view metricRef) {
+    const auto exactIt = ExactDashboardMetricBindingIndex().find(metricRef);
+    if (exactIt != ExactDashboardMetricBindingIndex().end()) {
+        return DashboardMetricBindingMatch{exactIt->second, {}};
     }
     for (const auto& binding : kPrefixBindings) {
         if (metricRef.rfind(binding.key, 0) == 0) {
