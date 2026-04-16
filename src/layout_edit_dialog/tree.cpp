@@ -1,11 +1,11 @@
-#include "tree.h"
+#include "layout_edit_dialog/tree.h"
 
 #include <commctrl.h>
 
-#include "../../resources/resource.h"
-#include "editors.h"
-#include "pane.h"
-#include "trace.h"
+#include "resource.h"
+#include "layout_edit_dialog/editors.h"
+#include "layout_edit_dialog/pane.h"
+#include "layout_edit_dialog/trace.h"
 #include "utf8.h"
 
 namespace {

@@ -23,7 +23,7 @@
 #include <dwrite.h>
 #include <wincodec.h>
 
-#include "../resources/resource.h"
+#include "resource.h"
 #include "numeric_safety.h"
 #include "trace.h"
 #include "utf8.h"

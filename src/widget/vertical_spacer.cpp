@@ -1,6 +1,6 @@
-#include "vertical_spacer.h"
+#include "widget/vertical_spacer.h"
 
-#include "../dashboard_renderer.h"
+#include "dashboard_renderer.h"
 
 DashboardWidgetClass VerticalSpacerWidget::Class() const {
     return DashboardWidgetClass::VerticalSpacer;

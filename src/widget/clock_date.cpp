@@ -1,7 +1,7 @@
-#include "clock_date.h"
+#include "widget/clock_date.h"
 
-#include "../dashboard_metrics.h"
-#include "../dashboard_renderer.h"
+#include "dashboard_metrics.h"
+#include "dashboard_renderer.h"
 
 DashboardWidgetClass ClockDateWidget::Class() const {
     return DashboardWidgetClass::ClockDate;

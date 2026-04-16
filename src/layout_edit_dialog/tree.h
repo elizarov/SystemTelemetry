@@ -1,6 +1,6 @@
 #pragma once
 
-#include "state.h"
+#include "layout_edit_dialog/state.h"
 
 void RebuildLayoutEditTree(
     LayoutEditDialogState* state, HWND hwnd, const std::optional<LayoutEditFocusKey>& preferredFocus = std::nullopt);

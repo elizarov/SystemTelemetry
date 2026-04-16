@@ -1,11 +1,11 @@
-#include "metric_list.h"
+#include "widget/metric_list.h"
 
 #include <algorithm>
 #include <cctype>
 #include <sstream>
 
-#include "../dashboard_metrics.h"
-#include "../dashboard_renderer.h"
+#include "dashboard_metrics.h"
+#include "dashboard_renderer.h"
 
 namespace {
 

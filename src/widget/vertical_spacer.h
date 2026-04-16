@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../widget.h"
+#include "widget.h"
 
 class VerticalSpacerWidget final : public DashboardWidget {
 public:

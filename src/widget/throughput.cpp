@@ -1,12 +1,12 @@
-#include "throughput.h"
+#include "widget/throughput.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 
-#include "../dashboard_metrics.h"
-#include "../dashboard_renderer.h"
-#include "../numeric_safety.h"
+#include "dashboard_metrics.h"
+#include "dashboard_renderer.h"
+#include "numeric_safety.h"
 
 namespace {
 

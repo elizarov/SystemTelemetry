@@ -149,6 +149,7 @@ set_target_properties(SystemTelemetryGigabyte PROPERTIES
 
 target_include_directories(SystemTelemetryGigabyte PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/resources"
 )
 
 target_compile_definitions(SystemTelemetryGigabyte PRIVATE
@@ -170,6 +171,7 @@ target_sources(SystemTelemetry PRIVATE
 
 target_include_directories(SystemTelemetry PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/resources"
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
 )
 
@@ -263,6 +265,7 @@ add_executable(SystemTelemetryTests
   )
 target_include_directories(SystemTelemetryTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/resources"
 )
 target_compile_definitions(SystemTelemetryTests PRIVATE
     UNICODE
@@ -330,6 +333,7 @@ add_executable(SystemTelemetryBenchmarks
 )
 target_include_directories(SystemTelemetryBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/resources"
 )
 target_compile_definitions(SystemTelemetryBenchmarks PRIVATE
     UNICODE

@@ -1,9 +1,9 @@
-#include "text.h"
+#include "widget/text.h"
 
 #include <algorithm>
 
-#include "../dashboard_metrics.h"
-#include "../dashboard_renderer.h"
+#include "dashboard_metrics.h"
+#include "dashboard_renderer.h"
 
 DashboardWidgetClass TextWidget::Class() const {
     return DashboardWidgetClass::Text;

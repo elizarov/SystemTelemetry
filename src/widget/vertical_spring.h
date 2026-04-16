@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../widget.h"
+#include "widget.h"
 
 class VerticalSpringWidget final : public DashboardWidget {
 public:

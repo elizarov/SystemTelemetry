@@ -1,14 +1,14 @@
-#include "dialog_proc.h"
+#include "layout_edit_dialog/dialog_proc.h"
 
 #include <commctrl.h>
 #include <commdlg.h>
 
-#include "../../resources/resource.h"
-#include "editors.h"
-#include "pane.h"
-#include "trace.h"
-#include "tree.h"
-#include "util.h"
+#include "resource.h"
+#include "layout_edit_dialog/editors.h"
+#include "layout_edit_dialog/pane.h"
+#include "layout_edit_dialog/trace.h"
+#include "layout_edit_dialog/tree.h"
+#include "layout_edit_dialog/util.h"
 #include "utf8.h"
 
 std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {

@@ -1,4 +1,4 @@
-#include "util.h"
+#include "layout_edit_dialog/util.h"
 
 #include <algorithm>
 #include <cmath>
@@ -6,7 +6,7 @@
 #include <cwchar>
 #include <cwctype>
 
-#include "../../resources/resource.h"
+#include "resource.h"
 #include "app_strings.h"
 #include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"

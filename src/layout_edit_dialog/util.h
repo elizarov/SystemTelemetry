@@ -12,7 +12,7 @@
 #endif
 #include <windows.h>
 
-#include "../../resources/resource.h"
+#include "resource.h"
 #include "config.h"
 #include "layout_edit_tree.h"
 

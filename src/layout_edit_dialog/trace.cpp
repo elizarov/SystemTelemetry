@@ -1,10 +1,10 @@
-#include "trace.h"
+#include "layout_edit_dialog/trace.h"
 
 #include <cstdio>
 #include <sstream>
 
 #include "layout_edit_tooltip.h"
-#include "util.h"
+#include "layout_edit_dialog/util.h"
 
 namespace {
 

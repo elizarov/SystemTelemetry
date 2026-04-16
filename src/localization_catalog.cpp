@@ -4,7 +4,7 @@
 
 #include <windows.h>
 
-#include "../resources/resource.h"
+#include "resource.h"
 
 #include "utf8.h"
 

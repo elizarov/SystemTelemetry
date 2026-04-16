@@ -1,10 +1,10 @@
-#include "drive_usage_list.h"
+#include "widget/drive_usage_list.h"
 
 #include <cmath>
 #include <limits>
 
-#include "../dashboard_metrics.h"
-#include "../dashboard_renderer.h"
+#include "dashboard_metrics.h"
+#include "dashboard_renderer.h"
 
 namespace {
 

@@ -1,4 +1,4 @@
-#include "vertical_spring.h"
+#include "widget/vertical_spring.h"
 
 DashboardWidgetClass VerticalSpringWidget::Class() const {
     return DashboardWidgetClass::VerticalSpring;

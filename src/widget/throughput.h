@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../widget.h"
+#include "widget.h"
 
 class ThroughputWidget final : public DashboardWidget {
 public:

@@ -1,13 +1,13 @@
-#include "gauge.h"
+#include "widget/gauge.h"
 
 #include <algorithm>
 #include <cmath>
 
 #include <objidl.h>
 
-#include "../dashboard_metrics.h"
-#include "../dashboard_renderer.h"
-#include "../numeric_safety.h"
+#include "dashboard_metrics.h"
+#include "dashboard_renderer.h"
+#include "numeric_safety.h"
 
 struct GaugeSharedLayout {
     int radius = 0;

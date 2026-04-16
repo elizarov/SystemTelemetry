@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "../layout_edit_dialog.h"
+#include "layout_edit_dialog.h"
 #include <commctrl.h>
 #include "layout_edit_tree.h"
 

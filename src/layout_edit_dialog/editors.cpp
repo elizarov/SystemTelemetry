@@ -1,13 +1,13 @@
-#include "editors.h"
+#include "layout_edit_dialog/editors.h"
 
 #include <algorithm>
 #include <sstream>
 
 #include "app_strings.h"
 #include "layout_edit_tooltip.h"
-#include "pane.h"
-#include "trace.h"
-#include "util.h"
+#include "layout_edit_dialog/pane.h"
+#include "layout_edit_dialog/trace.h"
+#include "layout_edit_dialog/util.h"
 #include "utf8.h"
 
 LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* state) {

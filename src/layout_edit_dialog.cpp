@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <commctrl.h>
 
-#include "../resources/resource.h"
+#include "resource.h"
 #include "app_monitor.h"
 #include "layout_edit_dialog/dialog_proc.h"
 #include "layout_edit_dialog/pane.h"

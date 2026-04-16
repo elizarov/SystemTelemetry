@@ -1,7 +1,7 @@
-#include "network_footer.h"
+#include "widget/network_footer.h"
 
-#include "../dashboard_metrics.h"
-#include "../dashboard_renderer.h"
+#include "dashboard_metrics.h"
+#include "dashboard_renderer.h"
 
 DashboardWidgetClass NetworkFooterWidget::Class() const {
     return DashboardWidgetClass::NetworkFooter;

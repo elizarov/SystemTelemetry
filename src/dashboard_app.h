@@ -17,7 +17,7 @@
 #include <optional>
 #include <string>
 
-#include "../resources/resource.h"
+#include "resource.h"
 #include "app_autostart.h"
 #include "app_command_line.h"
 #include "app_constants.h"
