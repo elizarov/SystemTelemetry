@@ -12,27 +12,7 @@
     X(Megahertz, "MHz") \
     X(Rpm, "RPM")
 
-enum class ScalarMetricUnit {
-#define SYSTEM_TELEMETRY_ENUM_ITEM(name, text) name,
-    SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS(SYSTEM_TELEMETRY_ENUM_ITEM)
-#undef SYSTEM_TELEMETRY_ENUM_ITEM
-};
-
-template <> struct EnumStringTraits<ScalarMetricUnit> {
-    static constexpr auto values = std::to_array<ScalarMetricUnit>({
-#define SYSTEM_TELEMETRY_ENUM_ITEM(name, text) ScalarMetricUnit::name,
-        SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS(SYSTEM_TELEMETRY_ENUM_ITEM)
-#undef SYSTEM_TELEMETRY_ENUM_ITEM
-    });
-
-    static constexpr auto names = std::to_array<std::string_view>({
-#define SYSTEM_TELEMETRY_ENUM_ITEM(name, text) text,
-        SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS(SYSTEM_TELEMETRY_ENUM_ITEM)
-#undef SYSTEM_TELEMETRY_ENUM_ITEM
-    });
-
-    static_assert(enum_string_detail::ValidateCanonicalMappings(values, names));
-};
+ENUM_STRING_DECLARE(ScalarMetricUnit, SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS);
 
 #undef SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS
 

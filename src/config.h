@@ -187,27 +187,7 @@ struct LayoutCardConfig {
     X(SizeAuto, "size_auto") \
     X(LabelOnly, "label_only")
 
-enum class MetricDisplayStyle {
-#define SYSTEM_TELEMETRY_ENUM_ITEM(name, text) name,
-    SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS(SYSTEM_TELEMETRY_ENUM_ITEM)
-#undef SYSTEM_TELEMETRY_ENUM_ITEM
-};
-
-template <> struct EnumStringTraits<MetricDisplayStyle> {
-    static constexpr auto values = std::to_array<MetricDisplayStyle>({
-#define SYSTEM_TELEMETRY_ENUM_ITEM(name, text) MetricDisplayStyle::name,
-        SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS(SYSTEM_TELEMETRY_ENUM_ITEM)
-#undef SYSTEM_TELEMETRY_ENUM_ITEM
-    });
-
-    static constexpr auto names = std::to_array<std::string_view>({
-#define SYSTEM_TELEMETRY_ENUM_ITEM(name, text) text,
-        SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS(SYSTEM_TELEMETRY_ENUM_ITEM)
-#undef SYSTEM_TELEMETRY_ENUM_ITEM
-    });
-
-    static_assert(enum_string_detail::ValidateCanonicalMappings(values, names));
-};
+ENUM_STRING_DECLARE(MetricDisplayStyle, SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS);
 
 #undef SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS
 

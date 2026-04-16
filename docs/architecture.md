@@ -38,7 +38,7 @@
   - Uses 5 MB/s horizontal guide spacing through an averaged graph max of 50 MB/s and 50 MB/s above that range for storage plots.
   - Converts per-drive MB/s samples into per-column read and write activity shares for the drive-usage indicator stack, while drive usage percent text and free-space text come from the dedicated drive display metric ids in `[metrics]`.
 - `src/enum_string.h` + `src/metric_types.h` + `src/telemetry_support.cpp` + `src/snapshot_dump.cpp`: shared enum-string mapping utility plus scalar-metric model and unit serialization helpers.
-  - Keeps canonical enum/string mappings beside the mapped enum declarations through header-local item lists and generic `EnumToString`, `EnumFromString`, and `TryEnumFromString` helpers instead of per-enum hand-maintained lookup tables.
+  - Keeps canonical enum/string mappings beside the mapped enum declarations through header-local item lists and the shared `ENUM_STRING_DECLARE` macro, while generic `EnumToString`, `EnumFromString`, and `TryEnumFromString` helpers replace per-enum hand-maintained lookup tables.
 - `src/metric_types.h` + `src/telemetry_support.cpp` + `src/snapshot_dump.cpp`: shared scalar-metric model plus unit serialization helpers.
   - Stores internal scalar units as `ScalarMetricUnit` enum values instead of free-form snapshot strings.
   - Keeps diagnostics dump text and `/fake` round-tripping stable by translating those enum values to and from only the canonical dump tokens: the empty string plus `C`, `GHz`, `MHz`, and `RPM`.
