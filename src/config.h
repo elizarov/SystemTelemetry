@@ -323,9 +323,9 @@ struct LayoutConfig {
     CONFIG_SECTION_VALUE(BoardConfig, board);
     CONFIG_SECTION_VALUE(MetricsSectionConfig, metrics);
     CONFIG_DYNAMIC_SECTION_VALUE(LayoutCardConfig, cards, id);
+    CONFIG_DYNAMIC_SECTION_VALUE(LayoutSectionConfig, layouts, name);
     CONFIG_BINDING_LIST();
 
-    std::vector<LayoutSectionConfig> layouts;
     LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
 

@@ -96,6 +96,30 @@ TEST(ConfigParser, ParsesMetricsSectionEntries) {
     std::filesystem::remove(path);
 }
 
+TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
+    const std::filesystem::path path = WriteTestConfig("[display]\n"
+                                                       "layout = portrait\n"
+                                                       "\n"
+                                                       "[layout.portrait]\n"
+                                                       "description = Portrait Mode\n"
+                                                       "window = 480,800\n"
+                                                       "cards = columns(cpu,gpu)\n");
+
+    const AppConfig config = LoadConfig(path, true);
+
+    ASSERT_EQ(config.layout.layouts.size(), 1u);
+    EXPECT_EQ(config.layout.layouts[0].name, "portrait");
+    EXPECT_EQ(config.layout.layouts[0].description, "Portrait Mode");
+    EXPECT_EQ(config.layout.layouts[0].window.width, 480);
+    EXPECT_EQ(config.layout.layouts[0].window.height, 800);
+    EXPECT_EQ(config.layout.layouts[0].cardsLayout.name, "columns");
+    ASSERT_EQ(config.layout.layouts[0].cardsLayout.children.size(), 2u);
+    EXPECT_EQ(config.layout.layouts[0].cardsLayout.children[0].name, "cpu");
+    EXPECT_EQ(config.layout.layouts[0].cardsLayout.children[1].name, "gpu");
+
+    std::filesystem::remove(path);
+}
+
 TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
                                                        "cpu.load = *,%,Processor Load\n");

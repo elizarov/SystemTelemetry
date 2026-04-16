@@ -118,3 +118,27 @@ TEST(ConfigWriter, SerializedMetricStyleComesFromMetadataInsteadOfStructValue) {
     EXPECT_THAT(output, testing::Not(testing::HasSubstr("gpu.temp = percent,100,")));
     EXPECT_THAT(output, testing::Not(testing::HasSubstr("gpu.temp = scalar,100,")));
 }
+
+TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughReflectedDynamicBindings) {
+    AppConfig compareConfig = LoadConfig(SourceConfigPath(), true);
+    AppConfig currentConfig = compareConfig;
+
+    const auto it = std::find_if(currentConfig.layout.layouts.begin(),
+        currentConfig.layout.layouts.end(),
+        [](const LayoutSectionConfig& layout) { return layout.name == "3x5"; });
+    ASSERT_NE(it, currentConfig.layout.layouts.end());
+    it->description = "Portrait Test";
+    it->window = {.width = 600, .height = 900};
+    it->cardsLayout.name = "columns";
+    it->cardsLayout.children.clear();
+    it->cardsLayout.children.push_back(LayoutNodeConfig{.name = "cpu"});
+    it->cardsLayout.children.push_back(LayoutNodeConfig{.name = "gpu"});
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output,
+        testing::HasSubstr("[layout.3x5]\r\n"
+                           "description = Portrait Test\r\n"
+                           "window = 600,900\r\n"
+                           "cards = columns(cpu,gpu)\r\n"));
+}

@@ -240,8 +240,7 @@ bool ApplySectionValue(typename Section::owner_type& owner, const std::string& k
 }
 
 template <typename BindingList, typename Owner, typename Fn> void ForEachKnownBinding(Owner&& owner, Fn&& fn) {
-    std::apply(
-        [&](auto... binding) { (..., fn(std::remove_cvref_t<decltype(binding)>{}, owner)); }, BindingList::bindings);
+    BindingList::ForEach([&](auto binding) { fn(std::remove_cvref_t<decltype(binding)>{}, owner); });
 }
 
 template <typename BindingList, typename Owner>
@@ -271,20 +270,6 @@ bool DispatchKnownBindingSection(
         }
     });
     return handled;
-}
-
-LayoutSectionConfig& EnsureNamedLayoutSection(AppConfig& config, std::string_view suffix) {
-    const auto it = std::find_if(config.layout.layouts.begin(),
-        config.layout.layouts.end(),
-        [suffix](const LayoutSectionConfig& layout) { return layout.name == suffix; });
-    if (it != config.layout.layouts.end()) {
-        return const_cast<LayoutSectionConfig&>(*it);
-    }
-
-    LayoutSectionConfig layout;
-    layout.name = std::string(suffix);
-    config.layout.layouts.push_back(layout);
-    return config.layout.layouts.back();
 }
 
 std::string ReadFileUtf8(const std::filesystem::path& path) {
@@ -591,12 +576,6 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
 
         const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
-
-        if (LayoutSectionConfig::Section::Matches(section)) {
-            ApplySectionValue<LayoutSectionConfig::Section>(
-                EnsureNamedLayoutSection(config, LayoutSectionConfig::Section::Suffix(section)), key, value);
-            continue;
-        }
 
         DispatchKnownBindingSection<AppConfig::BindingList>(config, section, key, value);
     }

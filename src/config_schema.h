@@ -362,8 +362,9 @@ template <typename Owner, size_t... Index> consteval auto MakeReflectedFieldTupl
     return std::tuple{reflect_field(FieldTag<Owner, Index>{})...};
 }
 
-template <typename Owner, size_t... Index> consteval auto MakeReflectedBindingTuple(std::index_sequence<Index...>) {
-    return std::tuple{reflect_binding(BindingTag<Owner, Index>{})...};
+template <typename Owner, typename Fn, size_t... Index>
+constexpr void ForEachReflectedBinding(std::index_sequence<Index...>, Fn&& fn) {
+    (..., fn(ReflectedBinding<Owner, Index>{}));
 }
 
 template <FixedString Name, typename Owner> struct AutoSectionDescriptor {
@@ -398,9 +399,11 @@ template <FixedString Prefix, typename Owner> struct AutoDynamicSectionDescripto
 
 template <typename Owner> struct AutoStructuredBindingListDescriptor {
     using owner_type = Owner;
+    static constexpr size_t count = CountReflectedBindings<Owner>();
 
-    static constexpr auto bindings =
-        MakeReflectedBindingTuple<Owner>(std::make_index_sequence<CountReflectedBindings<Owner>()>{});
+    template <typename Fn> static constexpr void ForEach(Fn&& fn) {
+        ForEachReflectedBinding<Owner>(std::make_index_sequence<count>{}, std::forward<Fn>(fn));
+    }
 };
 
 template <typename Lens> struct LensValueProxy {
