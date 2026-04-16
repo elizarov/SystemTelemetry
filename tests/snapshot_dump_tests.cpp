@@ -37,7 +37,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     EXPECT_EQ(loaded.snapshot.boardFans[0].metric.unit, ScalarMetricUnit::Rpm);
 }
 
-TEST(SnapshotDump, AcceptsLegacyCelsiusSpellingsOnLoad) {
+TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {
     std::istringstream input("format=system_telemetry_snapshot_v8\n"
                              "cpu.name=\"CPU\"\n"
                              "cpu.load_percent=0\n"
@@ -78,10 +78,8 @@ TEST(SnapshotDump, AcceptsLegacyCelsiusSpellingsOnLoad) {
 
     TelemetryDump loaded;
     std::string error;
-    ASSERT_TRUE(LoadTelemetryDump(input, loaded, &error)) << error;
-    EXPECT_EQ(loaded.snapshot.gpu.temperature.unit, ScalarMetricUnit::Celsius);
-    ASSERT_EQ(loaded.snapshot.boardTemperatures.size(), 1u);
-    EXPECT_EQ(loaded.snapshot.boardTemperatures[0].metric.unit, ScalarMetricUnit::Celsius);
+    EXPECT_FALSE(LoadTelemetryDump(input, loaded, &error));
+    EXPECT_EQ(error, "Invalid scalar unit for key: board.temperatures.0.unit");
 }
 
 TEST(SnapshotDump, RoundTripsRawRetainedHistorySamples) {

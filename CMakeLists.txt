@@ -224,6 +224,7 @@ endif()
 find_package(GTest CONFIG REQUIRED)
 
 add_executable(SystemTelemetryTests
+    tests/enum_string_tests.cpp
     tests/dashboard_metrics_tests.cpp
     tests/snapshot_dump_tests.cpp
     tests/dashboard_widget_class_tests.cpp

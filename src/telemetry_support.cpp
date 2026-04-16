@@ -17,19 +17,6 @@
 
 namespace {
 
-struct ScalarMetricUnitEntry {
-    ScalarMetricUnit unit;
-    std::string_view text;
-};
-
-constexpr ScalarMetricUnitEntry kScalarMetricUnitTable[] = {
-    {ScalarMetricUnit::None, ""},
-    {ScalarMetricUnit::Celsius, "C"},
-    {ScalarMetricUnit::Gigahertz, "GHz"},
-    {ScalarMetricUnit::Megahertz, "MHz"},
-    {ScalarMetricUnit::Rpm, "RPM"},
-};
-
 std::string DetectCpuNameFromCpuid() {
     int maxExtendedLeaf[4]{};
     __cpuid(maxExtendedLeaf, 0x80000000);
@@ -57,30 +44,11 @@ std::string DetectCpuNameFromCpuid() {
 }  // namespace
 
 std::string_view ScalarMetricUnitText(ScalarMetricUnit unit) {
-    for (const auto& entry : kScalarMetricUnitTable) {
-        if (entry.unit == unit) {
-            return entry.text;
-        }
-    }
-    return {};
+    return EnumToString(unit);
 }
 
 bool ParseScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit) {
-    for (const auto& entry : kScalarMetricUnitTable) {
-        if (entry.text == text) {
-            unit = entry.unit;
-            return true;
-        }
-    }
-    if (text == "\xC2\xB0"
-                "C" ||
-        text == "\xE2\x84\x83" ||
-        text == "\xD0\x92\xC2\xB0"
-                "C") {
-        unit = ScalarMetricUnit::Celsius;
-        return true;
-    }
-    return false;
+    return TryEnumFromString(text, unit);
 }
 
 std::string ToLowerAscii(std::string value) {

@@ -141,48 +141,11 @@ void WriteDoubleArray(std::ostream& output, const std::string& key, const std::v
 }
 
 std::string_view ScalarMetricUnitDumpText(ScalarMetricUnit unit) {
-    switch (unit) {
-        case ScalarMetricUnit::None:
-            return "";
-        case ScalarMetricUnit::Celsius:
-            return "C";
-        case ScalarMetricUnit::Gigahertz:
-            return "GHz";
-        case ScalarMetricUnit::Megahertz:
-            return "MHz";
-        case ScalarMetricUnit::Rpm:
-            return "RPM";
-    }
-    return "";
+    return EnumToString(unit);
 }
 
 bool ParseDumpScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit) {
-    if (text == "") {
-        unit = ScalarMetricUnit::None;
-        return true;
-    }
-    if (text == "C" ||
-        text == "\xC2\xB0"
-                "C" ||
-        text == "\xE2\x84\x83" ||
-        text == "\xD0\x92\xC2\xB0"
-                "C") {
-        unit = ScalarMetricUnit::Celsius;
-        return true;
-    }
-    if (text == "GHz") {
-        unit = ScalarMetricUnit::Gigahertz;
-        return true;
-    }
-    if (text == "MHz") {
-        unit = ScalarMetricUnit::Megahertz;
-        return true;
-    }
-    if (text == "RPM") {
-        unit = ScalarMetricUnit::Rpm;
-        return true;
-    }
-    return false;
+    return TryEnumFromString(text, unit);
 }
 
 void WriteScalarMetricUnit(std::ostream& output, const std::string& key, ScalarMetricUnit unit) {
