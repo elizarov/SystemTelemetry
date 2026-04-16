@@ -2221,7 +2221,8 @@ std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(const La
 std::optional<LayoutEditWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
     const std::string& widgetTypeName) const {
     const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
-    const auto widgetClass = FindDashboardWidgetClass(normalizedName);
+    const auto widgetClass =
+        normalizedName.empty() ? std::nullopt : EnumFromString<DashboardWidgetClass>(normalizedName);
     if (!widgetClass.has_value()) {
         return std::nullopt;
     }
@@ -2986,7 +2987,7 @@ const DashboardRenderer::ParsedWidgetInfo* DashboardRenderer::FindParsedWidgetIn
         return &it->second;
     }
 
-    if (!FindDashboardWidgetClass(node.name).has_value()) {
+    if (node.name.empty() || !EnumFromString<DashboardWidgetClass>(node.name).has_value()) {
         return nullptr;
     }
 

@@ -327,5 +327,3 @@ TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& co
 TelemetrySettings ExtractTelemetrySettings(const AppConfig& config);
 AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections);
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition);
-std::string_view MetricDisplayStyleName(MetricDisplayStyle style);
-bool ParseMetricDisplayStyle(std::string_view text, MetricDisplayStyle& style);

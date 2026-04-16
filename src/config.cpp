@@ -57,7 +57,7 @@ AppConfig BuildEffectiveRuntimeConfig(
 
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
     std::ostringstream stream;
-    stream << MetricDisplayStyleName(definition.style) << ",";
+    stream << EnumToString(definition.style) << ",";
     if (definition.telemetryScale) {
         stream << "*";
     } else {
@@ -65,12 +65,4 @@ std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition
     }
     stream << "," << definition.unit << "," << definition.label;
     return stream.str();
-}
-
-std::string_view MetricDisplayStyleName(MetricDisplayStyle style) {
-    return EnumToString(style);
-}
-
-bool ParseMetricDisplayStyle(std::string_view text, MetricDisplayStyle& style) {
-    return TryEnumFromString(text, style);
 }

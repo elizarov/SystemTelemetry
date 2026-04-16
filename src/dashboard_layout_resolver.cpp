@@ -359,7 +359,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         widget.editCardId = editCardId;
         widget.nodePath = nodePath;
         const std::string widgetTypeName =
-            widget.widget != nullptr ? std::string(DashboardWidgetClassName(widget.widget->Class())) : std::string();
+            widget.widget != nullptr ? std::string(EnumToString(widget.widget->Class())) : std::string();
         renderer.WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " + FormatRect(widget.rect) +
                             (widgetTypeName.empty() ? "" : " type=\"" + widgetTypeName + "\""));
         widgets.push_back(std::move(widget));

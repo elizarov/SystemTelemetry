@@ -710,7 +710,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             FindMetricDefinition(state->shellUi->CurrentConfig().metrics, metricKey->metricId);
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE,
-            definition != nullptr ? WideFromUtf8(std::string(MetricDisplayStyleName(definition->style))).c_str() : L"");
+            definition != nullptr ? WideFromUtf8(std::string(EnumToString(definition->style))).c_str() : L"");
         const bool scaleEditable =
             definition != nullptr && !definition->telemetryScale && definition->style != MetricDisplayStyle::LabelOnly;
         const bool unitEditable = definition != nullptr && definition->style != MetricDisplayStyle::LabelOnly;

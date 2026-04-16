@@ -43,14 +43,6 @@ std::string DetectCpuNameFromCpuid() {
 
 }  // namespace
 
-std::string_view ScalarMetricUnitText(ScalarMetricUnit unit) {
-    return EnumToString(unit);
-}
-
-bool ParseScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit) {
-    return TryEnumFromString(text, unit);
-}
-
 std::string ToLowerAscii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -63,7 +55,7 @@ std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
         return "N/A";
     }
     char buffer[64];
-    const std::string_view unit = ScalarMetricUnitText(metric.unit);
+    const std::string_view unit = EnumToString(metric.unit);
     if (unit.empty()) {
         sprintf_s(buffer, "%.*f", precision, *metric.value);
     } else {

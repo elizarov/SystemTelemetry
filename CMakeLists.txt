@@ -107,7 +107,6 @@ add_executable(SystemTelemetry WIN32
     src/gpu_amd_adl.cpp
     src/board_vendor.cpp
     src/dashboard_metrics.cpp
-    src/dashboard_widget_class.cpp
     src/render_types.cpp
     src/widget.cpp
     src/widget/text.cpp
@@ -250,7 +249,6 @@ add_executable(SystemTelemetryTests
     src/layout_snap_solver.cpp
     src/numeric_safety.cpp
     src/dashboard_metrics.cpp
-    src/dashboard_widget_class.cpp
     src/render_types.cpp
     src/snapshot_dump.cpp
     src/telemetry_retained_history.cpp
@@ -306,7 +304,6 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_snap_solver.cpp
     src/numeric_safety.cpp
     src/dashboard_metrics.cpp
-    src/dashboard_widget_class.cpp
     src/render_types.cpp
     src/widget.cpp
     src/widget/text.cpp

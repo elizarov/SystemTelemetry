@@ -13,8 +13,6 @@
 
 std::string ToLowerAscii(std::string value);
 std::string FormatScalarMetric(const ScalarMetric& metric, int precision);
-std::string_view ScalarMetricUnitText(ScalarMetricUnit unit);
-bool ParseScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit);
 std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(
     const std::vector<std::string>& names, ScalarMetricUnit unit);
 bool HasAvailableMetricValue(const std::vector<NamedScalarMetric>& metrics);

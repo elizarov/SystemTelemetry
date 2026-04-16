@@ -62,7 +62,7 @@ std::unique_ptr<DashboardWidget> CreateDashboardWidget(DashboardWidgetClass widg
 }
 
 std::unique_ptr<DashboardWidget> CreateDashboardWidget(std::string_view name) {
-    const auto widgetClass = FindDashboardWidgetClass(name);
+    const auto widgetClass = name.empty() ? std::nullopt : EnumFromString<DashboardWidgetClass>(name);
     if (!widgetClass.has_value()) {
         return nullptr;
     }

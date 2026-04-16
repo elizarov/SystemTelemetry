@@ -6,7 +6,7 @@
 #include <set>
 #include <string>
 
-TEST(DashboardWidgetClass, PublicLookupMethodsStayUniqueAndRoundTrip) {
+TEST(DashboardWidgetClass, EnumStringMappingsStayUniqueAndRoundTrip) {
     constexpr std::array<DashboardWidgetClass, 10> kKnownClasses{
         DashboardWidgetClass::Text,
         DashboardWidgetClass::Gauge,
@@ -22,18 +22,22 @@ TEST(DashboardWidgetClass, PublicLookupMethodsStayUniqueAndRoundTrip) {
 
     std::set<std::string> seenNames;
     for (const auto widgetClass : kKnownClasses) {
-        const std::string_view name = DashboardWidgetClassName(widgetClass);
+        const std::string_view name = EnumToString(widgetClass);
         EXPECT_FALSE(name.empty());
 
         EXPECT_TRUE(seenNames.insert(std::string(name)).second);
 
-        const auto resolvedClass = FindDashboardWidgetClass(name);
+        const auto resolvedClass = EnumFromString<DashboardWidgetClass>(name);
         ASSERT_TRUE(resolvedClass.has_value());
         EXPECT_EQ(*resolvedClass, widgetClass);
     }
 
     EXPECT_EQ(seenNames.size(), kKnownClasses.size());
-    EXPECT_EQ(DashboardWidgetClassName(DashboardWidgetClass::Unknown), "");
-    EXPECT_FALSE(FindDashboardWidgetClass("").has_value());
-    EXPECT_FALSE(FindDashboardWidgetClass("unknown_widget").has_value());
+    EXPECT_EQ(EnumToString(DashboardWidgetClass::Unknown), "");
+
+    const auto unknownClass = EnumFromString<DashboardWidgetClass>("");
+    ASSERT_TRUE(unknownClass.has_value());
+    EXPECT_EQ(*unknownClass, DashboardWidgetClass::Unknown);
+
+    EXPECT_FALSE(EnumFromString<DashboardWidgetClass>("unknown_widget").has_value());
 }

@@ -21,6 +21,3 @@
 ENUM_STRING_DECLARE(DashboardWidgetClass, SYSTEM_TELEMETRY_DASHBOARD_WIDGET_CLASS_ITEMS);
 
 #undef SYSTEM_TELEMETRY_DASHBOARD_WIDGET_CLASS_ITEMS
-
-std::optional<DashboardWidgetClass> FindDashboardWidgetClass(std::string_view name);
-std::string_view DashboardWidgetClassName(DashboardWidgetClass widgetClass);

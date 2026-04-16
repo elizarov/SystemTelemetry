@@ -126,7 +126,7 @@ bool ParseMetricDefinition(const std::string& value, MetricDefinitionConfig& def
     }
 
     MetricDefinitionConfig parsed = definition;
-    if (!ParseMetricDisplayStyle(parts[0], parsed.style)) {
+    if (!TryEnumFromString(parts[0], parsed.style)) {
         return false;
     }
     if (parts[1] == "*") {
@@ -478,7 +478,7 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
 namespace {
 
 bool IsWidgetOrContainerNodeName(const std::string& name) {
-    return name == "rows" || name == "columns" || FindDashboardWidgetClass(name).has_value();
+    return name == "rows" || name == "columns" || (!name.empty() && EnumFromString<DashboardWidgetClass>(name).has_value());
 }
 
 void MarkCardReferencesRecursive(LayoutNodeConfig& node, const std::set<std::string>& cardIds) {
