@@ -1,5 +1,6 @@
 #include "config_parser.h"
 #include "config_resolution.h"
+#include "dashboard_metrics.h"
 #include "dashboard_widget_class.h"
 
 #ifndef NOMINMAX
@@ -121,19 +122,21 @@ bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
 
 bool ParseMetricDefinition(const std::string& value, MetricDefinitionConfig& definition) {
     const std::vector<std::string> parts = SplitPreservingEmpty(value, ',');
-    if (parts.size() != 4) {
+    const std::optional<MetricDisplayStyle> metadataStyle = FindDashboardMetricDisplayStyle(definition.id);
+    if (!metadataStyle.has_value()) {
+        return false;
+    }
+    if (parts.size() != 3) {
         return false;
     }
 
     MetricDefinitionConfig parsed = definition;
-    if (!TryEnumFromString(parts[0], parsed.style)) {
-        return false;
-    }
-    if (parts[1] == "*") {
+    parsed.style = *metadataStyle;
+    if (parts[0] == "*") {
         parsed.telemetryScale = true;
         parsed.scale = 0.0;
     } else {
-        const double parsedScale = ParseDoubleOrDefault(parts[1], 0.0);
+        const double parsedScale = ParseDoubleOrDefault(parts[0], 0.0);
         if (!(parsedScale > 0.0)) {
             return false;
         }
@@ -141,8 +144,8 @@ bool ParseMetricDefinition(const std::string& value, MetricDefinitionConfig& def
         parsed.scale = parsedScale;
     }
 
-    parsed.unit = parts[2];
-    parsed.label = parts[3];
+    parsed.unit = parts[1];
+    parsed.label = parts[2];
     definition = std::move(parsed);
     return true;
 }
@@ -535,7 +538,11 @@ template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, Metri
         }
 
         MetricDefinitionConfig* definition = FindMetricDefinition(metrics, key);
-        MetricDefinitionConfig candidate = definition != nullptr ? *definition : MetricDefinitionConfig{.id = key};
+        MetricDefinitionConfig candidate = definition != nullptr ? *definition : MetricDefinitionConfig{};
+        candidate.id = key;
+        if (const auto style = FindDashboardMetricDisplayStyle(key); style.has_value()) {
+            candidate.style = *style;
+        }
         if (!ParseMetricDefinition(value, candidate)) {
             return false;
         }

@@ -35,6 +35,7 @@ using ThroughputGuideStepResolverFn = double (*)(double);
 struct DashboardMetricBinding {
     std::string_view key;
     bool prefixMatch = false;
+    std::optional<MetricDisplayStyle> metricStyle;
     unsigned int payloadKinds = 0;
     bool staticText = false;
     TextResolverFn resolveText = nullptr;
@@ -441,18 +442,67 @@ double ResolveFiveMbpsGuideStep(double) {
 }
 
 const DashboardMetricBinding kExactBindings[] = {
-    {"cpu.name", false, PayloadMask(DashboardMetricPayloadKind::Text), true, &ResolveCpuNameText},
-    {"gpu.name", false, PayloadMask(DashboardMetricPayloadKind::Text), true, &ResolveGpuNameText},
-    {"cpu.load", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveCpuLoadMetric},
-    {"cpu.clock", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveCpuClockMetric},
-    {"cpu.ram", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveCpuMemoryMetric},
-    {"gpu.load", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuLoadMetric},
-    {"gpu.temp", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuTemperatureMetric},
-    {"gpu.clock", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuClockMetric},
-    {"gpu.fan", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuFanMetric},
-    {"gpu.vram", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuMemoryMetric},
+    {"cpu.name", false, std::nullopt, PayloadMask(DashboardMetricPayloadKind::Text), true, &ResolveCpuNameText},
+    {"gpu.name", false, std::nullopt, PayloadMask(DashboardMetricPayloadKind::Text), true, &ResolveGpuNameText},
+    {"cpu.load",
+        false,
+        MetricDisplayStyle::Percent,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveCpuLoadMetric},
+    {"cpu.clock",
+        false,
+        MetricDisplayStyle::Scalar,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveCpuClockMetric},
+    {"cpu.ram",
+        false,
+        MetricDisplayStyle::Memory,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveCpuMemoryMetric},
+    {"gpu.load",
+        false,
+        MetricDisplayStyle::Percent,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveGpuLoadMetric},
+    {"gpu.temp",
+        false,
+        MetricDisplayStyle::Scalar,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveGpuTemperatureMetric},
+    {"gpu.clock",
+        false,
+        MetricDisplayStyle::Scalar,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveGpuClockMetric},
+    {"gpu.fan",
+        false,
+        MetricDisplayStyle::Scalar,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveGpuFanMetric},
+    {"gpu.vram",
+        false,
+        MetricDisplayStyle::Memory,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveGpuMemoryMetric},
     {"network.upload",
         false,
+        MetricDisplayStyle::Throughput,
         PayloadMask(DashboardMetricPayloadKind::Throughput),
         false,
         nullptr,
@@ -462,6 +512,7 @@ const DashboardMetricBinding kExactBindings[] = {
         &ResolveFiveMbpsGuideStep},
     {"network.download",
         false,
+        MetricDisplayStyle::Throughput,
         PayloadMask(DashboardMetricPayloadKind::Throughput),
         false,
         nullptr,
@@ -471,6 +522,7 @@ const DashboardMetricBinding kExactBindings[] = {
         &ResolveFiveMbpsGuideStep},
     {"storage.read",
         false,
+        MetricDisplayStyle::Throughput,
         PayloadMask(DashboardMetricPayloadKind::Throughput),
         false,
         nullptr,
@@ -480,6 +532,7 @@ const DashboardMetricBinding kExactBindings[] = {
         &GetStorageGuideStep},
     {"storage.write",
         false,
+        MetricDisplayStyle::Throughput,
         PayloadMask(DashboardMetricPayloadKind::Throughput),
         false,
         nullptr,
@@ -487,16 +540,27 @@ const DashboardMetricBinding kExactBindings[] = {
         &ResolveStorageWriteValue,
         ThroughputGraphGroup::Storage,
         &GetStorageGuideStep},
+    {"drive.activity.read", false, MetricDisplayStyle::LabelOnly, 0},
+    {"drive.activity.write", false, MetricDisplayStyle::LabelOnly, 0},
+    {"drive.usage", false, MetricDisplayStyle::Percent, 0},
+    {"drive.free", false, MetricDisplayStyle::SizeAuto, 0},
 };
 
 const DashboardMetricBinding kPrefixBindings[] = {
     {kBoardTemperaturePrefix,
         true,
+        MetricDisplayStyle::Scalar,
         PayloadMask(DashboardMetricPayloadKind::Value),
         false,
         nullptr,
         &ResolveBoardTemperatureMetric},
-    {kBoardFanPrefix, true, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveBoardFanMetric},
+    {kBoardFanPrefix,
+        true,
+        MetricDisplayStyle::Scalar,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveBoardFanMetric},
 };
 
 const std::unordered_map<std::string_view, const DashboardMetricBinding*>& ExactDashboardMetricBindingIndex() {
@@ -587,6 +651,11 @@ bool IsStaticDashboardTextMetric(std::string_view metricRef) {
     const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
     return match.binding != nullptr && match.binding->staticText &&
            BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Text);
+}
+
+std::optional<MetricDisplayStyle> FindDashboardMetricDisplayStyle(std::string_view metricRef) {
+    const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
+    return match.binding != nullptr ? match.binding->metricStyle : std::nullopt;
 }
 
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef) {

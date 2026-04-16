@@ -73,8 +73,8 @@ TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
 
 TEST(ConfigParser, ParsesMetricsSectionEntries) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
-                                                       "cpu.load = percent,*,%,Processor Load\n"
-                                                       "gpu.temp = scalar,110,C,GPU Temp\n");
+                                                       "cpu.load = *,%,Processor Load\n"
+                                                       "gpu.temp = 110,C,GPU Temp\n");
 
     const AppConfig config = LoadConfig(path, true);
 
@@ -96,13 +96,40 @@ TEST(ConfigParser, ParsesMetricsSectionEntries) {
     std::filesystem::remove(path);
 }
 
-TEST(ConfigParser, IgnoresLegacyThreeFieldMetricDefinitions) {
+TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
                                                        "cpu.load = *,%,Processor Load\n");
 
     const AppConfig config = LoadConfig(path, true);
 
+    const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.metrics, "cpu.load");
+    ASSERT_NE(loadMetric, nullptr);
+    EXPECT_EQ(loadMetric->style, MetricDisplayStyle::Percent);
+    EXPECT_TRUE(loadMetric->telemetryScale);
+    EXPECT_EQ(loadMetric->unit, "%");
+    EXPECT_EQ(loadMetric->label, "Processor Load");
+
+    std::filesystem::remove(path);
+}
+
+TEST(ConfigParser, RejectsSerializedMetricStyleTokensInMetricsSection) {
+    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
+                                                       "cpu.load = percent,*,%,Processor Load\n");
+
+    const AppConfig config = LoadConfig(path, true);
+
     EXPECT_EQ(FindMetricDefinition(config.metrics, "cpu.load"), nullptr);
+
+    std::filesystem::remove(path);
+}
+
+TEST(ConfigParser, RejectsUnknownMetricIdsWithoutMetadataStyle) {
+    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
+                                                       "custom.metric = 100,U,Custom\n");
+
+    const AppConfig config = LoadConfig(path, true);
+
+    EXPECT_EQ(FindMetricDefinition(config.metrics, "custom.metric"), nullptr);
 
     std::filesystem::remove(path);
 }

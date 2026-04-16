@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config_schema.h"
-#include "enum_string.h"
+#include "metric_display_style.h"
 #include "telemetry_settings.h"
 
 #include <cstdint>
@@ -178,18 +178,6 @@ struct LayoutCardConfig {
     CONFIG_VALUE(LayoutNodeConfig, layout, "layout");
     CONFIG_DYNAMIC_SECTION("card.");
 };
-
-#define SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS(X)                                                                 \
-    X(Scalar, "scalar")                                                                                                \
-    X(Percent, "percent")                                                                                              \
-    X(Memory, "memory")                                                                                                \
-    X(Throughput, "throughput")                                                                                        \
-    X(SizeAuto, "size_auto")                                                                                           \
-    X(LabelOnly, "label_only")
-
-ENUM_STRING_DECLARE(MetricDisplayStyle, SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS);
-
-#undef SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS
 
 struct MetricDefinitionConfig {
     std::string id;

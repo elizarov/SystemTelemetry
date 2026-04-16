@@ -1,5 +1,7 @@
 #include "config.h"
 
+#include "dashboard_metrics.h"
+
 #include <sstream>
 
 ColorConfig ColorConfig::FromRgb(unsigned int value) {
@@ -57,7 +59,6 @@ AppConfig BuildEffectiveRuntimeConfig(
 
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
     std::ostringstream stream;
-    stream << EnumToString(definition.style) << ",";
     if (definition.telemetryScale) {
         stream << "*";
     } else {

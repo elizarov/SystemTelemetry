@@ -81,9 +81,9 @@ TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
     const std::string output = BuildSavedConfigText(
         ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
 
-    EXPECT_THAT(output, testing::HasSubstr("[metrics]\r\ncpu.load = percent,*,%,Load\r\n"));
-    EXPECT_THAT(output, testing::HasSubstr("network.upload = throughput,*,MB/s,Up\r\n"));
-    EXPECT_THAT(output, testing::HasSubstr("drive.free = size_auto,*,GB|TB,Free\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("[metrics]\r\ncpu.load = *,%,Load\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("network.upload = *,MB/s,Up\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("drive.free = *,GB|TB,Free\r\n"));
     EXPECT_THAT(output, testing::Not(testing::HasSubstr("[metric_scales]")));
 }
 
@@ -98,6 +98,23 @@ TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {
     const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
 
     EXPECT_THAT(output,
-        testing::HasSubstr("gpu.temp = scalar,100,\xC2\xB0"
+        testing::HasSubstr("gpu.temp = 100,\xC2\xB0"
                            "C,Core Temp\r\n"));
+}
+
+TEST(ConfigWriter, SerializedMetricStyleComesFromMetadataInsteadOfStructValue) {
+    AppConfig config = LoadConfig(SourceConfigPath(), true);
+
+    MetricDefinitionConfig* gpuTemp = FindMetricDefinition(config.metrics, "gpu.temp");
+    ASSERT_NE(gpuTemp, nullptr);
+    gpuTemp->style = MetricDisplayStyle::Percent;
+
+    const std::string output = BuildSavedConfigText(
+        ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
+
+    EXPECT_THAT(output,
+        testing::HasSubstr("gpu.temp = 100,\xC2\xB0"
+                           "C,Temp\r\n"));
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("gpu.temp = percent,100,")));
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("gpu.temp = scalar,100,")));
 }
