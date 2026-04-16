@@ -115,13 +115,11 @@ int ShowTaskDialog(HWND owner,
     const TASKDIALOG_BUTTON* buttons,
     size_t buttonCount,
     int defaultButton) {
-    using TaskDialogIndirectFn = HRESULT(WINAPI*)(
-        const TASKDIALOGCONFIG*, int*, int*, BOOL*);
+    using TaskDialogIndirectFn = HRESULT(WINAPI*)(const TASKDIALOGCONFIG*, int*, int*, BOOL*);
     const HMODULE comctl = GetModuleHandleW(L"comctl32.dll");
-    const auto taskDialogIndirect = comctl != nullptr
-                                        ? reinterpret_cast<TaskDialogIndirectFn>(
-                                              GetProcAddress(comctl, "TaskDialogIndirect"))
-                                        : nullptr;
+    const auto taskDialogIndirect =
+        comctl != nullptr ? reinterpret_cast<TaskDialogIndirectFn>(GetProcAddress(comctl, "TaskDialogIndirect"))
+                          : nullptr;
     if (taskDialogIndirect == nullptr) {
         return 0;
     }
@@ -463,10 +461,8 @@ std::wstring ReadFontDialogFaceText(HWND hwnd, UINT notificationCode) {
     return faceBuffer;
 }
 
-void PopulateMetricBindingComboBox(HWND hwnd,
-    const std::vector<std::string>& options,
-    std::string_view selectedBinding,
-    bool enableSelection) {
+void PopulateMetricBindingComboBox(
+    HWND hwnd, const std::vector<std::string>& options, std::string_view selectedBinding, bool enableSelection) {
     HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
     if (combo == nullptr) {
         return;
@@ -518,7 +514,6 @@ struct LayoutEditDialogState {
     bool statusIsError = false;
     bool activeSelectionValid = true;
     COLORREF previewColor = RGB(255, 255, 255);
-    bool accepted = false;
     bool updatingControls = false;
 };
 
@@ -733,23 +728,23 @@ std::wstring BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
     if (node == nullptr) {
         return L"Select a setting";
     }
-    if (const auto* parameterLeaf = node->leaf.has_value() ? std::get_if<LayoutEditParameter>(&node->leaf->focusKey)
-                                                           : nullptr;
+    if (const auto* parameterLeaf =
+            node->leaf.has_value() ? std::get_if<LayoutEditParameter>(&node->leaf->focusKey) : nullptr;
         parameterLeaf != nullptr) {
         return TitleCaseWords(GetLayoutEditParameterDisplayName(*parameterLeaf));
     }
-    if (const auto* metricLeaf = node->leaf.has_value() ? std::get_if<LayoutMetricEditKey>(&node->leaf->focusKey)
-                                                        : nullptr;
+    if (const auto* metricLeaf =
+            node->leaf.has_value() ? std::get_if<LayoutMetricEditKey>(&node->leaf->focusKey) : nullptr;
         metricLeaf != nullptr) {
         return L"Metric: " + WideFromUtf8(metricLeaf->metricId);
     }
-    if (const auto* titleLeaf = node->leaf.has_value() ? std::get_if<LayoutCardTitleEditKey>(&node->leaf->focusKey)
-                                                       : nullptr;
+    if (const auto* titleLeaf =
+            node->leaf.has_value() ? std::get_if<LayoutCardTitleEditKey>(&node->leaf->focusKey) : nullptr;
         titleLeaf != nullptr) {
         return L"Card Title";
     }
-    if (const auto* weightLeaf = node->leaf.has_value() ? std::get_if<LayoutWeightEditKey>(&node->leaf->focusKey)
-                                                        : nullptr;
+    if (const auto* weightLeaf =
+            node->leaf.has_value() ? std::get_if<LayoutWeightEditKey>(&node->leaf->focusKey) : nullptr;
         weightLeaf != nullptr) {
         return weightLeaf->editCardId.empty() ? L"Dashboard Split Weights" : L"Card Split Weights";
     }
@@ -1058,8 +1053,8 @@ HFONT CreatePreviewFontToFit(HWND hwnd, int controlId, const UiFontConfig& font,
 
         HFONT previous = reinterpret_cast<HFONT>(SelectObject(dc, candidate));
         SIZE sampleSize{};
-        const BOOL measured = GetTextExtentPoint32W(
-            dc, sampleText.data(), static_cast<int>(sampleText.size()), &sampleSize);
+        const BOOL measured =
+            GetTextExtentPoint32W(dc, sampleText.data(), static_cast<int>(sampleText.size()), &sampleSize);
         SelectObject(dc, previous);
         if (measured == TRUE && sampleSize.cx <= availableWidth && sampleSize.cy <= availableHeight) {
             fittedFont = candidate;
@@ -1137,9 +1132,11 @@ bool CurrentLayoutEditShowsMetricBinding(const LayoutEditDialogState* state) {
 std::vector<int> ActiveEditorLabelControls(LayoutEditEditorKind kind, bool showBinding) {
     switch (kind) {
         case LayoutEditEditorKind::Font:
-            return {IDC_LAYOUT_EDIT_FONT_FACE_LABEL, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL};
+            return {
+                IDC_LAYOUT_EDIT_FONT_FACE_LABEL, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL};
         case LayoutEditEditorKind::Color:
-            return {IDC_LAYOUT_EDIT_COLOR_RED_LABEL, IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL, IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL};
+            return {
+                IDC_LAYOUT_EDIT_COLOR_RED_LABEL, IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL, IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL};
         case LayoutEditEditorKind::Weights:
             return {IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL, IDC_LAYOUT_EDIT_WEIGHT_SECOND_LABEL};
         case LayoutEditEditorKind::Metric: {
@@ -1169,8 +1166,15 @@ int MeasureLabelColumnWidth(HWND hwnd, const std::vector<int>& labelIds) {
     return width;
 }
 
-int LayoutLabeledControlRow(
-    HWND hwnd, int labelId, int controlId, int left, int top, int labelWidth, int gap, int controlWidth, int forcedRowHeight = 0) {
+int LayoutLabeledControlRow(HWND hwnd,
+    int labelId,
+    int controlId,
+    int left,
+    int top,
+    int labelWidth,
+    int gap,
+    int controlWidth,
+    int forcedRowHeight = 0) {
     const int controlHeight = DialogControlHeight(hwnd, controlId);
     const int visibleControlHeight = DialogControlVisibleHeight(hwnd, controlId);
     const int labelHeight = MeasureTextHeightForControl(
@@ -1200,25 +1204,26 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
 
     const int outerEdgeMargin = static_cast<int>(treeRect->left);
     const int dividerGap = std::max(0, static_cast<int>(dividerRect->left - treeRect->right));
+    const int leftPaneBottom = clientRect.bottom - outerEdgeMargin;
+    SetDialogControlBounds(hwnd,
+        IDC_LAYOUT_EDIT_TREE,
+        static_cast<int>(treeRect->left),
+        static_cast<int>(treeRect->top),
+        static_cast<int>(treeRect->right - treeRect->left),
+        std::max(1, leftPaneBottom - static_cast<int>(treeRect->top)));
+    SetDialogControlBounds(hwnd,
+        IDC_LAYOUT_EDIT_DIVIDER,
+        static_cast<int>(dividerRect->left),
+        static_cast<int>(dividerRect->top),
+        static_cast<int>(dividerRect->right - dividerRect->left),
+        std::max(1, leftPaneBottom - static_cast<int>(dividerRect->top)));
     const int paneLeft = static_cast<int>(dividerRect->right) + dividerGap;
     const int paneRight = clientRect.right - outerEdgeMargin;
     const int paneWidth = std::max(1, paneRight - paneLeft);
 
-    const int okWidth = DialogControlWidth(hwnd, IDOK);
-    const int okHeight = DialogControlHeight(hwnd, IDOK);
-    const int cancelWidth = DialogControlWidth(hwnd, IDCANCEL);
-    const int cancelHeight = DialogControlHeight(hwnd, IDCANCEL);
-    const int buttonsHeight = std::max(okHeight, cancelHeight);
-    const int buttonsTop = clientRect.bottom - outerEdgeMargin - buttonsHeight;
-    const int cancelLeft = paneRight - cancelWidth;
-    const int okLeft = cancelLeft - metrics.buttonGap - okWidth;
-    SetDialogControlBounds(hwnd, IDOK, okLeft, buttonsTop + ((buttonsHeight - okHeight) / 2), okWidth, okHeight);
-    SetDialogControlBounds(
-        hwnd, IDCANCEL, cancelLeft, buttonsTop + ((buttonsHeight - cancelHeight) / 2), cancelWidth, cancelHeight);
-
     const std::wstring footerText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_FOOTER_HINT);
     const int footerHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_FOOTER_HINT, footerText, paneWidth);
-    const int footerBottom = treeRect->bottom;
+    const int footerBottom = leftPaneBottom;
     const int footerTop = footerBottom - footerHeight;
     SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_FOOTER_HINT, paneLeft, footerTop, paneWidth, footerHeight);
 
@@ -1229,8 +1234,12 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
         MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_STATUS_TEXT, state->statusText, statusWidth);
     const int statusRowHeight = std::max(statusHeight, revertHeight);
     const int statusTop = footerTop - metrics.statusToFooterGap - statusRowHeight;
-    SetDialogControlBounds(
-        hwnd, IDC_LAYOUT_EDIT_STATUS_TEXT, paneLeft, statusTop + ((statusRowHeight - statusHeight) / 2), statusWidth, statusHeight);
+    SetDialogControlBounds(hwnd,
+        IDC_LAYOUT_EDIT_STATUS_TEXT,
+        paneLeft,
+        statusTop + ((statusRowHeight - statusHeight) / 2),
+        statusWidth,
+        statusHeight);
     SetDialogControlBounds(hwnd,
         IDC_LAYOUT_EDIT_REVERT,
         paneRight - revertWidth,
@@ -1253,9 +1262,9 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const std::wstring descriptionText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION);
     const int descriptionSingleLineHeight =
         MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, L"Ag", paneWidth, true);
-    const int descriptionHeight = std::max(MeasureTextHeightForControl(
-                                               hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, descriptionText, paneWidth),
-        descriptionSingleLineHeight * 2);
+    const int descriptionHeight =
+        std::max(MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, descriptionText, paneWidth),
+            descriptionSingleLineHeight * 2);
     SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, paneLeft, y, paneWidth, descriptionHeight);
     y += descriptionHeight + metrics.headerToGroupGap;
 
@@ -1270,9 +1279,9 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
 
     const LayoutEditEditorKind kind = CurrentLayoutEditEditorKind(state);
     const bool showBinding = CurrentLayoutEditShowsMetricBinding(state);
-    const int labelColumnWidth =
-        ActiveEditorLabelControls(kind, showBinding).empty() ? 0
-                                                             : MeasureLabelColumnWidth(hwnd, ActiveEditorLabelControls(kind, showBinding)) + 8;
+    const int labelColumnWidth = ActiveEditorLabelControls(kind, showBinding).empty()
+                                     ? 0
+                                     : MeasureLabelColumnWidth(hwnd, ActiveEditorLabelControls(kind, showBinding)) + 8;
 
     int cursorY = innerTop;
     int contentBottom = innerTop;
@@ -1314,11 +1323,19 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL),
                 labelColumnWidth,
                 true);
-            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL, innerLeft, cursorY + ((sizeEditHeight - sizeLabelHeight) / 2), labelColumnWidth, sizeLabelHeight);
-            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, sizeControlLeft, cursorY, sizeEditWidth, sizeEditHeight);
+            SetDialogControlBounds(hwnd,
+                IDC_LAYOUT_EDIT_FONT_SIZE_LABEL,
+                innerLeft,
+                cursorY + ((sizeEditHeight - sizeLabelHeight) / 2),
+                labelColumnWidth,
+                sizeLabelHeight);
+            SetDialogControlBounds(
+                hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, sizeControlLeft, cursorY, sizeEditWidth, sizeEditHeight);
 
-            const int weightLabelWidth =
-                MeasureTextWidthForControl(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL, ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL)) + 8;
+            const int weightLabelWidth = MeasureTextWidthForControl(hwnd,
+                                             IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
+                                             ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL)) +
+                                         8;
             const int weightLabelLeft = sizeControlLeft + sizeEditWidth + metrics.inlineGap;
             const int weightEditLeft = weightLabelLeft + weightLabelWidth + metrics.labelGap;
             const int weightEditWidth = std::max(60, innerRight - weightEditLeft);
@@ -1353,8 +1370,10 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT) + 4);
             const int pickWidth = DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK);
             const int pickHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK);
-            const int hexLabelWidth =
-                MeasureTextWidthForControl(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL, ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)) + 8;
+            const int hexLabelWidth = MeasureTextWidthForControl(hwnd,
+                                          IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
+                                          ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)) +
+                                      8;
             const int hexEditHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT);
             const int pickLeft = innerRight - pickWidth;
             const int hexLabelLeft = innerLeft + swatchSize + metrics.inlineGap;
@@ -1365,20 +1384,27 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
                 hexLabelLeft,
                 cursorY + ((hexEditHeight - MeasureTextHeightForControl(hwnd,
-                                         IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
-                                         ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL),
-                                         hexLabelWidth,
-                                         true)) /
-                               2),
+                                                IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
+                                                ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL),
+                                                hexLabelWidth,
+                                                true)) /
+                              2),
                 hexLabelWidth,
-                MeasureTextHeightForControl(
-                    hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL, ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL), hexLabelWidth, true));
-            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, hexEditLeft, cursorY, hexEditWidth, hexEditHeight);
+                MeasureTextHeightForControl(hwnd,
+                    IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
+                    ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL),
+                    hexLabelWidth,
+                    true));
+            SetDialogControlBounds(
+                hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, hexEditLeft, cursorY, hexEditWidth, hexEditHeight);
             SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK, pickLeft, cursorY, pickWidth, pickHeight);
             cursorY += std::max(std::max(swatchSize, hexEditHeight), pickHeight) + metrics.sampleGap;
 
-            const int sampleHeight = MeasureTextHeightForControl(
-                hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE), innerWidth, true);
+            const int sampleHeight = MeasureTextHeightForControl(hwnd,
+                IDC_LAYOUT_EDIT_COLOR_SAMPLE,
+                ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE),
+                innerWidth,
+                true);
             SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, innerLeft, cursorY, innerWidth, sampleHeight);
             cursorY += sampleHeight + metrics.sampleGap;
 
@@ -1406,11 +1432,24 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 const int rowHeight = std::max(editHeight, sliderHeight);
                 const int labelHeight = MeasureTextHeightForControl(
                     hwnd, rgbLabelIds[i], ReadDialogControlTextWide(hwnd, rgbLabelIds[i]), labelColumnWidth, true);
-                SetDialogControlBounds(hwnd, rgbLabelIds[i], innerLeft, cursorY + ((rowHeight - labelHeight) / 2), labelColumnWidth, labelHeight);
-                SetDialogControlBounds(
-                    hwnd, rgbEditIds[i], innerLeft + labelColumnWidth + metrics.labelGap, cursorY, valueEditWidth, editHeight);
-                SetDialogControlBounds(
-                    hwnd, rgbSliderIds[i], sliderLeft, cursorY + ((rowHeight - sliderHeight) / 2), sliderWidth, sliderHeight);
+                SetDialogControlBounds(hwnd,
+                    rgbLabelIds[i],
+                    innerLeft,
+                    cursorY + ((rowHeight - labelHeight) / 2),
+                    labelColumnWidth,
+                    labelHeight);
+                SetDialogControlBounds(hwnd,
+                    rgbEditIds[i],
+                    innerLeft + labelColumnWidth + metrics.labelGap,
+                    cursorY,
+                    valueEditWidth,
+                    editHeight);
+                SetDialogControlBounds(hwnd,
+                    rgbSliderIds[i],
+                    sliderLeft,
+                    cursorY + ((rowHeight - sliderHeight) / 2),
+                    sliderWidth,
+                    sliderHeight);
                 cursorY += rowHeight + metrics.rowGap;
             }
 
@@ -1538,7 +1577,8 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
 void ShowLayoutEditEditors(
     HWND hwnd, bool showNumeric, bool showFont, bool showColor, bool showWeights, bool showMetric, bool showBinding) {
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
-    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_SUMMARY, !(showNumeric || showFont || showColor || showWeights || showMetric));
+    ShowDialogControl(
+        hwnd, IDC_LAYOUT_EDIT_SUMMARY, !(showNumeric || showFont || showColor || showWeights || showMetric));
 
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, showFont);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, showFont);
@@ -1591,17 +1631,49 @@ std::string BuildMetricDialogTraceValues(HWND hwnd) {
     return trace.str();
 }
 
-void RestoreLayoutEditDialog(LayoutEditDialogState* state) {
-    if (state != nullptr && !state->accepted && state->shellUi != nullptr) {
-        state->shellUi->RestoreConfigSnapshot(state->originalConfig);
+LayoutEditDialogState* LayoutEditDialogStateFromWindow(HWND hwnd) {
+    return reinterpret_cast<LayoutEditDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
+}
+
+void PositionLayoutEditDialogNearDashboard(HWND anchorHwnd, UINT dpi, HWND hwnd) {
+    if (anchorHwnd == nullptr || hwnd == nullptr) {
+        return;
     }
+
+    RECT anchorRect{};
+    RECT windowRect{};
+    if (!GetWindowRect(anchorHwnd, &anchorRect) || !GetWindowRect(hwnd, &windowRect)) {
+        return;
+    }
+
+    MONITORINFO monitorInfo{};
+    monitorInfo.cbSize = sizeof(monitorInfo);
+    const HMONITOR monitor = MonitorFromWindow(anchorHwnd, MONITOR_DEFAULTTONEAREST);
+    if (!GetMonitorInfoW(monitor, &monitorInfo)) {
+        return;
+    }
+
+    const int width = windowRect.right - windowRect.left;
+    const int height = windowRect.bottom - windowRect.top;
+    const int gap = ScaleLogicalToPhysical(16, dpi);
+    int left = anchorRect.right + gap;
+    if (left + width > monitorInfo.rcWork.right) {
+        left = anchorRect.left - gap - width;
+    }
+    int top = anchorRect.top;
+
+    const int minLeft = static_cast<int>(monitorInfo.rcWork.left);
+    const int maxLeft = std::max(minLeft, static_cast<int>(monitorInfo.rcWork.right) - width);
+    const int minTop = static_cast<int>(monitorInfo.rcWork.top);
+    const int maxTop = std::max(minTop, static_cast<int>(monitorInfo.rcWork.bottom) - height);
+    left = std::clamp(left, minLeft, maxLeft);
+    top = std::clamp(top, minTop, maxTop);
+    SetWindowPos(hwnd, nullptr, left, top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd) {
     const bool canRevert = state != nullptr && state->selectedLeaf != nullptr;
-    const bool okEnabled = state == nullptr || state->selectedLeaf == nullptr || state->activeSelectionValid;
     EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_REVERT), canRevert ? TRUE : FALSE);
-    EnableWindow(GetDlgItem(hwnd, IDOK), okEnabled ? TRUE : FALSE);
 }
 
 void SetLayoutEditDescription(HWND hwnd, const LayoutEditTreeNode* node) {
@@ -1792,7 +1864,8 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         return {true, L""};
     }
 
-    if (const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey); parameter != nullptr) {
+    if (const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
+        parameter != nullptr) {
         (void)parameter;
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec) {
             wchar_t faceBuffer[256] = {};
@@ -1832,18 +1905,21 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         wchar_t valueBuffer[128] = {};
         GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, valueBuffer, ARRAYSIZE(valueBuffer));
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::Integer) {
-            return TryParseDialogInteger(valueBuffer).has_value() ? LayoutEditValidationResult{true, L""}
-                                                                  : LayoutEditValidationResult{false, L"Enter a whole number."};
+            return TryParseDialogInteger(valueBuffer).has_value()
+                       ? LayoutEditValidationResult{true, L""}
+                       : LayoutEditValidationResult{false, L"Enter a whole number."};
         }
-        return TryParseDialogDouble(valueBuffer).has_value() ? LayoutEditValidationResult{true, L""}
-                                                             : LayoutEditValidationResult{false, L"Enter a valid number."};
+        return TryParseDialogDouble(valueBuffer).has_value()
+                   ? LayoutEditValidationResult{true, L""}
+                   : LayoutEditValidationResult{false, L"Enter a valid number."};
     }
 
     if (std::holds_alternative<LayoutCardTitleEditKey>(state->selectedLeaf->focusKey)) {
         return {true, L""};
     }
 
-    if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey); metricKey != nullptr) {
+    if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey);
+        metricKey != nullptr) {
         const MetricDefinitionConfig* definition =
             FindMetricDefinition(state->shellUi->CurrentConfig().metrics, metricKey->metricId);
         if (definition == nullptr) {
@@ -2081,9 +2157,9 @@ bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd) {
     const std::string label = Utf8FromWide(labelBuffer);
     const auto bindingTarget = ParseBoardMetricBindingTarget(key->metricId);
     const std::optional<std::string> binding =
-        bindingTarget.has_value() ? std::optional<std::string>(Trim(ReadDialogControlTextUtf8(
-                                      hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT)))
-                                  : std::nullopt;
+        bindingTarget.has_value()
+            ? std::optional<std::string>(Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT)))
+            : std::nullopt;
     const bool applied = state->shellUi->ApplyMetricPreview(*key, scale, unit, label, binding);
     std::ostringstream trace;
     trace << BuildTraceNodeText(state->selectedNode) << BuildMetricDialogTraceValues(hwnd) << " parsed_scale="
@@ -2183,7 +2259,8 @@ void RebuildLayoutEditTree(
 
     std::string preferredLocation;
     if (preferredFocus.has_value()) {
-        if (const LayoutEditTreeLeaf* leaf = FindLayoutEditTreeLeaf(state->treeModel, *preferredFocus); leaf != nullptr) {
+        if (const LayoutEditTreeLeaf* leaf = FindLayoutEditTreeLeaf(state->treeModel, *preferredFocus);
+            leaf != nullptr) {
             preferredLocation = "[" + leaf->sectionName + "] " + leaf->memberName;
         }
     } else if (state->selectedNode != nullptr) {
@@ -2234,107 +2311,34 @@ void SelectLayoutEditTreeItem(LayoutEditDialogState* state, HWND hwnd, HTREEITEM
     RefreshLayoutEditValidationState(state, hwnd);
 }
 
-bool ValidateActiveLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
-    if (state == nullptr || state->selectedLeaf == nullptr) {
-        return true;
+void RefreshLayoutEditDialogControls(LayoutEditDialogState* state,
+    HWND hwnd,
+    const std::optional<LayoutEditFocusKey>& preferredFocus,
+    bool rebuildTree) {
+    if (state == nullptr || hwnd == nullptr) {
+        return;
     }
 
-    const LayoutEditValidationResult validation = ValidateCurrentSelectionInput(state, hwnd);
-    if (!validation.valid) {
-        MessageBoxW(hwnd, validation.message.c_str(), L"Edit Configuration", MB_ICONERROR);
-        if (const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey); parameter != nullptr) {
-            if (state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec) {
-                SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT));
-                return false;
+    DialogRedrawScope redrawScope(hwnd);
+    if (rebuildTree) {
+        RebuildLayoutEditTree(state, hwnd, preferredFocus);
+        return;
+    }
+
+    if (preferredFocus.has_value()) {
+        if (HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE); tree != nullptr) {
+            if (HTREEITEM item = FindTreeItemByFocusKey(state, *preferredFocus); item != nullptr) {
+                ExpandTreeAncestors(tree, item);
+                TreeView_SelectItem(tree, item);
+                TreeView_EnsureVisible(tree, item);
+                SelectLayoutEditTreeItem(state, hwnd, item);
+                return;
             }
-            if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
-                SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT));
-                SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, EM_SETSEL, 0, -1);
-                return false;
-            }
-            SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
-            SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, EM_SETSEL, 0, -1);
-            return false;
         }
-        if (std::holds_alternative<LayoutMetricEditKey>(state->selectedLeaf->focusKey)) {
-            SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT));
-            SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT, EM_SETSEL, 0, -1);
-        } else if (std::holds_alternative<LayoutWeightEditKey>(state->selectedLeaf->focusKey)) {
-            SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT));
-            SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT, EM_SETSEL, 0, -1);
-        }
-        return false;
     }
 
-    if (const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey)) {
-        if (state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec) {
-            wchar_t faceBuffer[256] = {};
-            wchar_t sizeBuffer[64] = {};
-            wchar_t weightBuffer[64] = {};
-            GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, faceBuffer, ARRAYSIZE(faceBuffer));
-            GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, sizeBuffer, ARRAYSIZE(sizeBuffer));
-            GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, weightBuffer, ARRAYSIZE(weightBuffer));
-            const std::optional<int> size = TryParseDialogInteger(sizeBuffer);
-            const std::optional<int> weight = TryParseDialogInteger(weightBuffer);
-            const std::wstring faceText(faceBuffer);
-            return state->shellUi->ApplyFontPreview(*parameter, UiFontConfig{Utf8FromWide(faceText), *size, *weight});
-        }
-        if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
-            const auto color = ReadColorDialogValue(hwnd);
-            return state->shellUi->ApplyColorPreview(*parameter, *color);
-        }
-
-        wchar_t valueBuffer[128] = {};
-        GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, valueBuffer, ARRAYSIZE(valueBuffer));
-        if (state->selectedLeaf->valueFormat == configschema::ValueFormat::Integer) {
-            const std::optional<int> value = TryParseDialogInteger(valueBuffer);
-            return state->shellUi->ApplyParameterPreview(*parameter, static_cast<double>(*value));
-        }
-
-        const std::optional<double> value = TryParseDialogDouble(valueBuffer);
-        return state->shellUi->ApplyParameterPreview(*parameter, *value);
-    }
-
-    if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&state->selectedLeaf->focusKey)) {
-        wchar_t titleBuffer[256] = {};
-        GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, titleBuffer, ARRAYSIZE(titleBuffer));
-        return state->shellUi->ApplyCardTitlePreview(*cardTitleKey, Utf8FromWide(titleBuffer));
-    }
-
-    if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey)) {
-        const MetricDefinitionConfig* definition =
-            FindMetricDefinition(state->shellUi->CurrentConfig().metrics, metricKey->metricId);
-        if (definition == nullptr) {
-            return false;
-        }
-
-        std::optional<double> scale;
-        if (!definition->telemetryScale && definition->style != MetricDisplayStyle::LabelOnly) {
-            wchar_t scaleBuffer[128] = {};
-            GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT, scaleBuffer, ARRAYSIZE(scaleBuffer));
-            scale = TryParseDialogDouble(scaleBuffer);
-        }
-
-        wchar_t unitBuffer[256] = {};
-        wchar_t labelBuffer[256] = {};
-        GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT, unitBuffer, ARRAYSIZE(unitBuffer));
-        GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT, labelBuffer, ARRAYSIZE(labelBuffer));
-        const std::string unit =
-            definition->style == MetricDisplayStyle::LabelOnly ? std::string() : Utf8FromWide(unitBuffer);
-        const std::string label = Utf8FromWide(labelBuffer);
-        const auto bindingTarget = ParseBoardMetricBindingTarget(metricKey->metricId);
-        const std::optional<std::string> binding =
-            bindingTarget.has_value() ? std::optional<std::string>(Trim(ReadDialogControlTextUtf8(
-                                          hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT)))
-                                      : std::nullopt;
-        return state->shellUi->ApplyMetricPreview(*metricKey, scale, unit, label, binding);
-    }
-
-    wchar_t firstBuffer[64] = {};
-    wchar_t secondBuffer[64] = {};
-    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT, firstBuffer, ARRAYSIZE(firstBuffer));
-    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT, secondBuffer, ARRAYSIZE(secondBuffer));
-    return PreviewSelectedWeights(state, hwnd);
+    PopulateLayoutEditSelection(state, hwnd);
+    RefreshLayoutEditValidationState(state, hwnd);
 }
 
 bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
@@ -2342,7 +2346,8 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         return false;
     }
 
-    if (const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey); parameter != nullptr) {
+    if (const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
+        parameter != nullptr) {
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec) {
             const auto font = FindLayoutEditTooltipFontValue(state->originalConfig, *parameter);
             if (!font.has_value() || *font == nullptr) {
@@ -2381,7 +2386,8 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         }
     }
 
-    if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&state->selectedLeaf->focusKey); weightKey != nullptr) {
+    if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&state->selectedLeaf->focusKey);
+        weightKey != nullptr) {
         const auto values = FindWeightEditValues(state->originalConfig, *weightKey);
         if (!values.has_value()) {
             return false;
@@ -2394,8 +2400,10 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         return applied;
     }
 
-    if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey); metricKey != nullptr) {
-        const MetricDefinitionConfig* definition = FindMetricDefinition(state->originalConfig.metrics, metricKey->metricId);
+    if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey);
+        metricKey != nullptr) {
+        const MetricDefinitionConfig* definition =
+            FindMetricDefinition(state->originalConfig.metrics, metricKey->metricId);
         if (definition == nullptr) {
             return false;
         }
@@ -2405,7 +2413,8 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
                                        ? state->originalConfig.board.temperatureSensorNames
                                        : state->originalConfig.board.fanSensorNames;
             const auto it = bindings.find(target->logicalName);
-            binding = it != bindings.end() ? std::optional<std::string>(it->second) : std::optional<std::string>(std::string());
+            binding = it != bindings.end() ? std::optional<std::string>(it->second)
+                                           : std::optional<std::string>(std::string());
         }
         const bool applied = state->shellUi->ApplyMetricPreview(*metricKey,
             definition->telemetryScale ? std::nullopt : std::optional<double>(definition->scale),
@@ -2470,7 +2479,7 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
 }
 
 INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    auto* state = reinterpret_cast<LayoutEditDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
+    auto* state = LayoutEditDialogStateFromWindow(hwnd);
     switch (message) {
         case WM_INITDIALOG: {
             state = reinterpret_cast<LayoutEditDialogState*>(lParam);
@@ -2479,8 +2488,14 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
             state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
             ConfigureColorSliders(hwnd);
             ConfigureDialogFonts(state, hwnd);
-            SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(L"Filter settings"));
+            SendDlgItemMessageW(hwnd,
+                IDC_LAYOUT_EDIT_FILTER_EDIT,
+                EM_SETCUEBANNER,
+                FALSE,
+                reinterpret_cast<LPARAM>(L"Filter settings"));
             RebuildLayoutEditTree(state, hwnd, state->initialFocus);
+            state->shellUi->PositionLayoutEditDialogWindow(hwnd);
+            ShowWindow(hwnd, SW_SHOWNORMAL);
             return TRUE;
         }
         case WM_NOTIFY: {
@@ -2612,19 +2627,6 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
                     RefreshLayoutEditValidationState(state, hwnd);
                     return TRUE;
                 }
-                case IDOK:
-                    if (!ValidateActiveLayoutEditSelection(state, hwnd)) {
-                        return TRUE;
-                    }
-                    state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
-                    state->accepted = true;
-                    EndDialog(hwnd, IDOK);
-                    return TRUE;
-                case IDCANCEL:
-                    state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
-                    RestoreLayoutEditDialog(state);
-                    EndDialog(hwnd, IDCANCEL);
-                    return TRUE;
             }
             break;
         case WM_HSCROLL:
@@ -2675,15 +2677,33 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
             break;
         case WM_DESTROY:
             if (state != nullptr) {
+                state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
                 DestroyDialogFont(state->titleFont);
                 DestroyDialogFont(state->fontSampleFont);
             }
             break;
+        case WM_ACTIVATE:
+            if (state != nullptr && state->shellUi != nullptr) {
+                state->shellUi->SetLayoutEditTreeSelectionHighlightVisible(LOWORD(wParam) != WA_INACTIVE);
+            }
+            break;
         case WM_CLOSE:
-            state->shellUi->SetLayoutEditTreeSelectionHighlight(std::nullopt);
-            RestoreLayoutEditDialog(state);
-            EndDialog(hwnd, IDCANCEL);
+            if (state != nullptr && state->shellUi != nullptr) {
+                state->shellUi->HandleEditLayoutToggle();
+            } else {
+                DestroyWindow(hwnd);
+            }
             return TRUE;
+        case WM_NCDESTROY:
+            if (state != nullptr) {
+                if (state->shellUi != nullptr) {
+                    state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:close");
+                    state->shellUi->OnLayoutEditDialogDestroyed(hwnd);
+                }
+                SetWindowLongPtrW(hwnd, DWLP_USER, 0);
+                delete state;
+            }
+            return FALSE;
     }
     return FALSE;
 }
@@ -2692,7 +2712,223 @@ INT_PTR CALLBACK LayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LP
 
 DashboardShellUi::DashboardShellUi(DashboardApp& app) : app_(app) {}
 
-DashboardShellUi::~DashboardShellUi() = default;
+DashboardShellUi::~DashboardShellUi() {
+    DestroyLayoutEditDialogWindow();
+}
+
+bool DashboardShellUi::HandleDialogMessage(MSG* msg) const {
+    return msg != nullptr && layoutEditDialogHwnd_ != nullptr && IsWindow(layoutEditDialogHwnd_) &&
+           IsDialogMessageW(layoutEditDialogHwnd_, msg) != FALSE;
+}
+
+void DashboardShellUi::PositionLayoutEditDialogWindow(HWND hwnd) const {
+    PositionLayoutEditDialogNearDashboard(app_.hwnd_, app_.CurrentWindowDpi(), hwnd);
+}
+
+void DashboardShellUi::OnLayoutEditDialogDestroyed(HWND hwnd) {
+    if (layoutEditDialogHwnd_ == hwnd) {
+        layoutEditDialogHwnd_ = nullptr;
+    }
+    layoutEditTreeSelectionHighlightVisible_ = false;
+    SetLayoutEditTreeSelectionHighlight(std::nullopt);
+}
+
+bool DashboardShellUi::IsLayoutEditDialogForegroundWindow() const {
+    if (layoutEditDialogHwnd_ == nullptr || !IsWindow(layoutEditDialogHwnd_)) {
+        return false;
+    }
+
+    const HWND foreground = GetForegroundWindow();
+    return foreground != nullptr && (foreground == layoutEditDialogHwnd_ || IsChild(layoutEditDialogHwnd_, foreground));
+}
+
+bool DashboardShellUi::ShouldDashboardIgnoreMouse(POINT screenPoint) const {
+    if (layoutEditDialogHwnd_ == nullptr || !IsWindow(layoutEditDialogHwnd_) ||
+        !IsWindowVisible(layoutEditDialogHwnd_)) {
+        return false;
+    }
+
+    RECT dialogRect{};
+    if (!GetWindowRect(layoutEditDialogHwnd_, &dialogRect) || !PtInRect(&dialogRect, screenPoint)) {
+        return false;
+    }
+
+    if (IsLayoutEditDialogForegroundWindow()) {
+        return true;
+    }
+
+    if (HWND hitWindow = WindowFromPoint(screenPoint);
+        hitWindow != nullptr && (hitWindow == layoutEditDialogHwnd_ || IsChild(layoutEditDialogHwnd_, hitWindow))) {
+        return true;
+    }
+
+    for (HWND window = GetWindow(app_.hwnd_, GW_HWNDPREV); window != nullptr; window = GetWindow(window, GW_HWNDPREV)) {
+        if (window == layoutEditDialogHwnd_) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void DashboardShellUi::ApplyLayoutEditTreeSelectionHighlightVisibility() {
+    app_.rendererEditOverlayState_.selectedTreeHighlight =
+        layoutEditTreeSelectionHighlightVisible_ ? layoutEditTreeSelectionHighlight_ : std::nullopt;
+}
+
+void DashboardShellUi::SetLayoutEditTreeSelectionHighlightVisible(bool visible) {
+    if (layoutEditTreeSelectionHighlightVisible_ == visible) {
+        return;
+    }
+
+    layoutEditTreeSelectionHighlightVisible_ = visible;
+    ApplyLayoutEditTreeSelectionHighlightVisibility();
+    InvalidateRect(app_.hwnd_, nullptr, FALSE);
+}
+
+void DashboardShellUi::DestroyLayoutEditDialogWindow() {
+    if (layoutEditDialogHwnd_ == nullptr) {
+        SetLayoutEditTreeSelectionHighlight(std::nullopt);
+        return;
+    }
+
+    HWND dialog = layoutEditDialogHwnd_;
+    layoutEditDialogHwnd_ = nullptr;
+    DestroyWindow(dialog);
+    SetLayoutEditTreeSelectionHighlight(std::nullopt);
+}
+
+void BringModelessDialogToFront(HWND hwnd) {
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return;
+    }
+
+    ShowWindow(hwnd, SW_SHOWNORMAL);
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    BringWindowToTop(hwnd);
+    SetActiveWindow(hwnd);
+    SetForegroundWindow(hwnd);
+}
+
+bool DashboardShellUi::EnsureLayoutEditDialog(const std::optional<LayoutEditFocusKey>& focusKey, bool bringToFront) {
+    if (layoutEditDialogHwnd_ != nullptr && IsWindow(layoutEditDialogHwnd_)) {
+        RefreshLayoutEditDialog(focusKey);
+        if (bringToFront) {
+            BringModelessDialogToFront(layoutEditDialogHwnd_);
+        }
+        return true;
+    }
+
+    auto state = std::make_unique<LayoutEditDialogState>();
+    state->shellUi = this;
+    state->originalConfig = app_.controller_.State().hasLayoutEditSessionSavedConfig
+                                ? app_.controller_.State().layoutEditSessionSavedConfig
+                                : app_.controller_.State().config;
+    state->treeModel = BuildLayoutEditTreeModel(app_.controller_.State().config);
+    state->initialFocus = focusKey;
+
+    std::string initialFocusTrace = "session";
+    if (focusKey.has_value()) {
+        if (const auto* parameter = std::get_if<LayoutEditParameter>(&*focusKey)) {
+            initialFocusTrace =
+                FindLayoutEditTooltipDescriptor(*parameter).value_or(LayoutEditTooltipDescriptor{}).configKey;
+        } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey)) {
+            initialFocusTrace = "[metrics] " + metricKey->metricId;
+        } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
+            initialFocusTrace = "[card." + cardTitleKey->cardId + "] title";
+        } else {
+            initialFocusTrace = "weight";
+        }
+    }
+    TraceLayoutEditDialogEvent("layout_edit_dialog:open", "initial_focus=" + QuoteTraceText(initialFocusTrace));
+
+    HWND dialog = CreateDialogParamW(app_.instance_,
+        MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_CONFIGURATION),
+        nullptr,
+        LayoutEditDialogProc,
+        reinterpret_cast<LPARAM>(state.get()));
+    if (dialog == nullptr) {
+        return false;
+    }
+
+    layoutEditDialogHwnd_ = dialog;
+    state.release();
+    if (bringToFront) {
+        BringModelessDialogToFront(layoutEditDialogHwnd_);
+        SetLayoutEditTreeSelectionHighlightVisible(true);
+    }
+    return true;
+}
+
+void DashboardShellUi::RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus) {
+    if (layoutEditDialogHwnd_ == nullptr || !IsWindow(layoutEditDialogHwnd_)) {
+        return;
+    }
+
+    auto* state = LayoutEditDialogStateFromWindow(layoutEditDialogHwnd_);
+    if (state == nullptr) {
+        return;
+    }
+
+    state->originalConfig = app_.controller_.State().hasLayoutEditSessionSavedConfig
+                                ? app_.controller_.State().layoutEditSessionSavedConfig
+                                : app_.controller_.State().config;
+    state->treeModel = BuildLayoutEditTreeModel(app_.controller_.State().config);
+    RefreshLayoutEditDialogControls(state, layoutEditDialogHwnd_, preferredFocus, true);
+}
+
+void DashboardShellUi::RefreshLayoutEditDialogSelection() {
+    if (layoutEditDialogHwnd_ == nullptr || !IsWindow(layoutEditDialogHwnd_)) {
+        return;
+    }
+
+    auto* state = LayoutEditDialogStateFromWindow(layoutEditDialogHwnd_);
+    if (state == nullptr) {
+        return;
+    }
+
+    state->originalConfig = app_.controller_.State().hasLayoutEditSessionSavedConfig
+                                ? app_.controller_.State().layoutEditSessionSavedConfig
+                                : app_.controller_.State().config;
+    RefreshLayoutEditDialogControls(state, layoutEditDialogHwnd_, std::nullopt, false);
+}
+
+void DashboardShellUi::SyncLayoutEditDialogSelection(
+    const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront) {
+    if (!target.has_value()) {
+        return;
+    }
+
+    const auto focusKey = TooltipPayloadFocusKey(target->payload);
+    if (!focusKey.has_value()) {
+        if (bringToFront && layoutEditDialogHwnd_ != nullptr && IsWindow(layoutEditDialogHwnd_)) {
+            BringModelessDialogToFront(layoutEditDialogHwnd_);
+        }
+        return;
+    }
+
+    if (layoutEditDialogHwnd_ == nullptr || !IsWindow(layoutEditDialogHwnd_)) {
+        if (!bringToFront) {
+            return;
+        }
+        if (!EnsureLayoutEditDialog(focusKey, true)) {
+            MessageBoxW(
+                app_.hwnd_, L"Failed to open the Edit Configuration window.", L"System Telemetry", MB_ICONERROR);
+        }
+        return;
+    }
+
+    auto* state = LayoutEditDialogStateFromWindow(layoutEditDialogHwnd_);
+    if (state != nullptr) {
+        state->originalConfig = app_.controller_.State().hasLayoutEditSessionSavedConfig
+                                    ? app_.controller_.State().layoutEditSessionSavedConfig
+                                    : app_.controller_.State().config;
+        RefreshLayoutEditDialogControls(state, layoutEditDialogHwnd_, focusKey, false);
+    }
+    if (bringToFront) {
+        BringModelessDialogToFront(layoutEditDialogHwnd_);
+    }
+}
 
 std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::PromptForUnsavedLayoutEditChanges(
     UnsavedLayoutEditPrompt prompt) const {
@@ -2810,6 +3046,35 @@ std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::Promp
     return std::nullopt;
 }
 
+bool DashboardShellUi::StopLayoutEditSession(UnsavedLayoutEditPrompt prompt) {
+    DashboardSessionState& state = app_.controller_.State();
+    if (!state.isEditingLayout) {
+        DestroyLayoutEditDialogWindow();
+        return true;
+    }
+
+    if (app_.controller_.HasUnsavedLayoutEditChanges()) {
+        const auto action = PromptForUnsavedLayoutEditChanges(prompt);
+        if (!action.has_value() || *action == UnsavedLayoutEditAction::Cancel) {
+            return false;
+        }
+        if (*action == UnsavedLayoutEditAction::Save) {
+            if (!app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+                return false;
+            }
+        } else if (!app_.controller_.RestoreLayoutEditSessionSavedConfig(app_)) {
+            MessageBoxW(
+                app_.hwnd_, L"Failed to restore the saved layout edit state.", L"System Telemetry", MB_ICONERROR);
+            return false;
+        }
+    }
+
+    app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
+    app_.HideLayoutEditTooltip();
+    DestroyLayoutEditDialogWindow();
+    return true;
+}
+
 bool DashboardShellUi::HandleEditLayoutToggle() {
     DashboardSessionState& state = app_.controller_.State();
     if (!state.isEditingLayout) {
@@ -2817,26 +3082,7 @@ bool DashboardShellUi::HandleEditLayoutToggle() {
         return true;
     }
 
-    if (!app_.controller_.HasUnsavedLayoutEditChanges()) {
-        app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
-        return true;
-    }
-
-    const auto action = PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt::StopEditing);
-    if (!action.has_value() || *action == UnsavedLayoutEditAction::Cancel) {
-        return false;
-    }
-    if (*action == UnsavedLayoutEditAction::Save) {
-        if (!app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
-            return false;
-        }
-    } else if (!app_.controller_.RestoreLayoutEditSessionSavedConfig(app_)) {
-        MessageBoxW(app_.hwnd_, L"Failed to restore the saved layout edit state.", L"System Telemetry", MB_ICONERROR);
-        return false;
-    }
-
-    app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
-    return true;
+    return StopLayoutEditSession(UnsavedLayoutEditPrompt::StopEditing);
 }
 
 bool DashboardShellUi::HandleReloadConfig() {
@@ -2854,6 +3100,7 @@ bool DashboardShellUi::HandleReloadConfig() {
         MessageBoxW(app_.hwnd_, L"Failed to reload config.ini.", L"System Telemetry", MB_ICONERROR);
         return false;
     }
+    RefreshLayoutEditDialog();
     return true;
 }
 
@@ -2865,6 +3112,7 @@ bool DashboardShellUi::HandleConfigureDisplay(const DisplayMenuOption& option) {
     if (wasEditingLayout) {
         app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         app_.HideLayoutEditTooltip();
+        DestroyLayoutEditDialogWindow();
     }
     return true;
 }
@@ -2879,6 +3127,7 @@ void DashboardShellUi::HandleExitRequest() {
             return;
         }
     }
+    DestroyLayoutEditDialogWindow();
     DestroyWindow(app_.hwnd_);
 }
 
@@ -2975,8 +3224,9 @@ bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
     }
     definition->label = label;
     if (const auto target = ParseBoardMetricBindingTarget(key.metricId); target.has_value() && binding.has_value()) {
-        auto& bindings = target->kind == BoardMetricBindingKind::Temperature ? updatedConfig.board.temperatureSensorNames
-                                                                             : updatedConfig.board.fanSensorNames;
+        auto& bindings = target->kind == BoardMetricBindingKind::Temperature
+                             ? updatedConfig.board.temperatureSensorNames
+                             : updatedConfig.board.fanSensorNames;
         if (binding->empty()) {
             bindings.erase(target->logicalName);
         } else {
@@ -3022,8 +3272,9 @@ bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int fi
 
 void DashboardShellUi::SetLayoutEditTreeSelectionHighlight(
     const std::optional<LayoutEditSelectionHighlight>& highlight) {
-    app_.rendererEditOverlayState_.selectedTreeHighlight = highlight;
-    app_.InvalidateShell();
+    layoutEditTreeSelectionHighlight_ = highlight;
+    ApplyLayoutEditTreeSelectionHighlightVisibility();
+    InvalidateRect(app_.hwnd_, nullptr, FALSE);
 }
 
 bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target) {
@@ -3032,33 +3283,19 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
         return false;
     }
 
-    std::string initialFocusTrace = "weight";
-    if (const auto* parameter = std::get_if<LayoutEditParameter>(&*focusKey)) {
-        initialFocusTrace =
-            FindLayoutEditTooltipDescriptor(*parameter).value_or(LayoutEditTooltipDescriptor{}).configKey;
-    } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey)) {
-        initialFocusTrace = "[metrics] " + metricKey->metricId;
-    } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
-        initialFocusTrace = "[card." + cardTitleKey->cardId + "] title";
+    bool startedLayoutEdit = false;
+    if (!app_.controller_.State().isEditingLayout) {
+        app_.controller_.StartLayoutEditMode(app_, app_.layoutEditController_);
+        startedLayoutEdit = true;
     }
-
-    LayoutEditDialogState state;
-    state.shellUi = this;
-    state.originalConfig = app_.controller_.State().config;
-    state.treeModel = BuildLayoutEditTreeModel(app_.controller_.State().config);
-    state.initialFocus = focusKey;
-    TraceLayoutEditDialogEvent("layout_edit_dialog:open", "initial_focus=" + QuoteTraceText(initialFocusTrace));
-
-    DashboardShellUiModalScope scopedModalUi(*this);
-    const INT_PTR result = DialogBoxParamW(app_.instance_,
-        MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_CONFIGURATION),
-        app_.hwnd_,
-        LayoutEditDialogProc,
-        reinterpret_cast<LPARAM>(&state));
-    SetLayoutEditTreeSelectionHighlight(std::nullopt);
-    TraceLayoutEditDialogEvent(
-        "layout_edit_dialog:close", std::string("accepted=") + QuoteTraceText(result == IDOK ? "true" : "false"));
-    return result == IDOK;
+    if (!EnsureLayoutEditDialog(focusKey, true)) {
+        if (startedLayoutEdit) {
+            app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
+        }
+        MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"System Telemetry", MB_ICONERROR);
+        return false;
+    }
+    return true;
 }
 
 std::optional<double> DashboardShellUi::PromptCustomScale() {
@@ -3110,7 +3347,9 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
             HandleReloadConfig();
             break;
         case kCommandSaveConfig:
-            app_.controller_.UpdateConfigFromCurrentPlacement(app_);
+            if (app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+                RefreshLayoutEditDialogSelection();
+            }
             break;
         case kCommandAutoStart:
             app_.controller_.ToggleAutoStart(app_);
@@ -3137,10 +3376,13 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
                 const auto it = std::find_if(state.layoutMenuOptions.begin(),
                     state.layoutMenuOptions.end(),
                     [selected](const LayoutMenuOption& option) { return option.commandId == selected; });
-                if (it != state.layoutMenuOptions.end() &&
-                    !app_.controller_.SwitchLayout(
-                        app_, it->name, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout)) {
-                    MessageBoxW(app_.hwnd_, L"Failed to switch layout.", L"System Telemetry", MB_ICONERROR);
+                if (it != state.layoutMenuOptions.end()) {
+                    if (!app_.controller_.SwitchLayout(
+                            app_, it->name, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout)) {
+                        MessageBoxW(app_.hwnd_, L"Failed to switch layout.", L"System Telemetry", MB_ICONERROR);
+                    } else {
+                        RefreshLayoutEditDialog();
+                    }
                 }
                 break;
             }

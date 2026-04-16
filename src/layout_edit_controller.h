@@ -63,6 +63,7 @@ public:
     bool HandleLButtonUp(RenderPoint clientPoint);
     bool HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner);
     bool HandleSetCursor(HWND hwnd);
+    bool HasActiveDrag() const;
     void CancelInteraction();
     std::optional<TooltipTarget> CurrentTooltipTarget();
 

@@ -83,6 +83,8 @@ private:
     void DestroyLayoutEditTooltip();
     void HideLayoutEditTooltip();
     void UpdateLayoutEditTooltip();
+    bool ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool allowDuringDrag) const;
+    void SuspendCoveredLayoutEditHover();
     void UpdateLayoutEditMouseTracking();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
     bool CreateTrayIcon();

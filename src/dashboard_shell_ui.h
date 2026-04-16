@@ -36,6 +36,14 @@ public:
     void HandleExitRequest();
     void BeginLayoutEditModalUi();
     void EndLayoutEditModalUi();
+    bool HandleDialogMessage(MSG* msg) const;
+    bool HandleEditLayoutToggle();
+    void PositionLayoutEditDialogWindow(HWND hwnd) const;
+    void OnLayoutEditDialogDestroyed(HWND hwnd);
+    bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
+    void SetLayoutEditTreeSelectionHighlightVisible(bool visible);
+    void SyncLayoutEditDialogSelection(
+        const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
     const AppConfig& CurrentConfig() const;
     void RestoreConfigSnapshot(const AppConfig& config);
     bool ApplyParameterPreview(DashboardRenderer::LayoutEditParameter parameter, double value);
@@ -66,9 +74,16 @@ private:
     };
 
     std::optional<UnsavedLayoutEditAction> PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt prompt) const;
-    bool HandleEditLayoutToggle();
     bool HandleReloadConfig();
     bool HandleConfigureDisplay(const DisplayMenuOption& option);
+    bool StopLayoutEditSession(UnsavedLayoutEditPrompt prompt);
+    bool EnsureLayoutEditDialog(
+        const std::optional<LayoutEditFocusKey>& focusKey = std::nullopt, bool bringToFront = false);
+    void RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus = std::nullopt);
+    void RefreshLayoutEditDialogSelection();
+    void DestroyLayoutEditDialogWindow();
+    bool IsLayoutEditDialogForegroundWindow() const;
+    void ApplyLayoutEditTreeSelectionHighlightVisibility();
     UINT ResolveDefaultCommand(
         MenuSource source, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) const;
     void ExecuteCommand(UINT selected,
@@ -78,4 +93,7 @@ private:
     bool PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target);
 
     DashboardApp& app_;
+    HWND layoutEditDialogHwnd_ = nullptr;
+    std::optional<LayoutEditSelectionHighlight> layoutEditTreeSelectionHighlight_;
+    bool layoutEditTreeSelectionHighlightVisible_ = false;
 };

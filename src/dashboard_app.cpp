@@ -605,10 +605,38 @@ void DashboardApp::HideLayoutEditTooltip() {
     layoutEditTooltipRectValid_ = false;
 }
 
+bool DashboardApp::ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool allowDuringDrag) const {
+    if (shellUi_ == nullptr || !controller_.State().isEditingLayout || controller_.State().isMoving ||
+        shellUi_->IsLayoutEditModalUiActive()) {
+        return false;
+    }
+    if (allowDuringDrag && layoutEditController_.HasActiveDrag()) {
+        return false;
+    }
+    return shellUi_->ShouldDashboardIgnoreMouse(screenPoint);
+}
+
+void DashboardApp::SuspendCoveredLayoutEditHover() {
+    if (!controller_.State().isEditingLayout || controller_.State().isMoving || shellUi_ == nullptr ||
+        shellUi_->IsLayoutEditModalUiActive() || layoutEditController_.HasActiveDrag()) {
+        HideLayoutEditTooltip();
+        return;
+    }
+
+    layoutEditController_.HandleMouseLeave();
+    HideLayoutEditTooltip();
+}
+
 void DashboardApp::UpdateLayoutEditTooltip() {
     if (layoutEditTooltipHwnd_ == nullptr || !controller_.State().isEditingLayout || controller_.State().isMoving ||
         shellUi_->IsLayoutEditModalUiActive()) {
         HideLayoutEditTooltip();
+        return;
+    }
+
+    POINT screenPoint{};
+    if (GetCursorPos(&screenPoint) && ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
+        SuspendCoveredLayoutEditHover();
         return;
     }
 
@@ -707,9 +735,10 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     SendMessageW(layoutEditTooltipHwnd_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     SendMessageW(layoutEditTooltipHwnd_, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     SendMessageW(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
-    POINT screenPoint{clientPoint.x + tooltipOffsetX, clientPoint.y + tooltipOffsetY};
-    ClientToScreen(hwnd_, &screenPoint);
-    SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKPOSITION, 0, MAKELPARAM(screenPoint.x, screenPoint.y));
+    POINT tooltipScreenPoint{clientPoint.x + tooltipOffsetX, clientPoint.y + tooltipOffsetY};
+    ClientToScreen(hwnd_, &tooltipScreenPoint);
+    SendMessageW(
+        layoutEditTooltipHwnd_, TTM_TRACKPOSITION, 0, MAKELPARAM(tooltipScreenPoint.x, tooltipScreenPoint.y));
     SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKACTIVATE, TRUE, reinterpret_cast<LPARAM>(&toolInfo));
 
     MSG msg{};
@@ -763,6 +792,9 @@ int DashboardApp::Run() {
 
     MSG msg{};
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+        if (shellUi_ != nullptr && shellUi_->HandleDialogMessage(&msg)) {
+            continue;
+        }
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
@@ -815,6 +847,18 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 return 0;
             }
             return 0;
+        case WM_ACTIVATE:
+            if (shellUi_ != nullptr && LOWORD(wParam) != WA_INACTIVE) {
+                shellUi_->SetLayoutEditTreeSelectionHighlightVisible(false);
+            }
+            break;
+        case WM_NCHITTEST: {
+            const POINT screenPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            if (shellUi_ != nullptr && shellUi_->ShouldDashboardIgnoreMouse(screenPoint)) {
+                return HTTRANSPARENT;
+            }
+            break;
+        }
         case WM_CONTEXTMENU: {
             POINT point{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             std::optional<LayoutEditController::TooltipTarget> layoutEditTarget;
@@ -824,6 +868,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 point.x = rect.left + 24;
                 point.y = rect.top + 24;
             } else if (state.isEditingLayout && !state.isMoving) {
+                if (ShouldIgnoreCoveredLayoutEditPointer(point, true)) {
+                    SuspendCoveredLayoutEditHover();
+                    return 0;
+                }
                 POINT clientPoint = point;
                 ScreenToClient(hwnd_, &clientPoint);
                 RECT clientRect{};
@@ -842,7 +890,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_LBUTTONDOWN:
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                POINT screenPoint{clientPoint.x, clientPoint.y};
+                ClientToScreen(hwnd_, &screenPoint);
+                if (ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
+                    SuspendCoveredLayoutEditHover();
+                    return 0;
+                }
                 if (layoutEditController_.HandleLButtonDown(hwnd_, clientPoint)) {
+                    shellUi_->SyncLayoutEditDialogSelection(layoutEditController_.CurrentTooltipTarget(), false);
                     UpdateLayoutEditTooltip();
                     return 0;
                 }
@@ -855,6 +910,12 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             std::optional<LayoutEditController::TooltipTarget> layoutEditTarget;
             if (state.isEditingLayout && !state.isMoving) {
                 const RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                POINT screenPoint{clientPoint.x, clientPoint.y};
+                ClientToScreen(hwnd_, &screenPoint);
+                if (ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
+                    SuspendCoveredLayoutEditHover();
+                    return 0;
+                }
                 layoutEditController_.HandleMouseMove(clientPoint);
                 layoutEditTarget = layoutEditController_.CurrentTooltipTarget();
             }
@@ -870,6 +931,12 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 UpdateLayoutEditMouseTracking();
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                POINT screenPoint{clientPoint.x, clientPoint.y};
+                ClientToScreen(hwnd_, &screenPoint);
+                if (ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
+                    SuspendCoveredLayoutEditHover();
+                    return 0;
+                }
                 layoutEditController_.HandleMouseMove(clientPoint);
                 UpdateLayoutEditTooltip();
                 return 0;
@@ -880,6 +947,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 POINT screenPoint{};
                 if (GetCursorPos(&screenPoint)) {
+                    if (ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
+                        SuspendCoveredLayoutEditHover();
+                        return 0;
+                    }
                     POINT clientPointWin32 = screenPoint;
                     ScreenToClient(hwnd_, &clientPointWin32);
                     RECT clientRect{};
@@ -900,7 +971,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_LBUTTONUP:
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                POINT screenPoint{clientPoint.x, clientPoint.y};
+                ClientToScreen(hwnd_, &screenPoint);
+                if (ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
+                    SuspendCoveredLayoutEditHover();
+                    return 0;
+                }
                 if (layoutEditController_.HandleLButtonUp(clientPoint)) {
+                    shellUi_->SyncLayoutEditDialogSelection(layoutEditController_.CurrentTooltipTarget(), false);
                     UpdateLayoutEditTooltip();
                     return 0;
                 }
@@ -937,6 +1015,11 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_SETCURSOR:
             if (LOWORD(lParam) == HTCLIENT && state.isEditingLayout && !state.isMoving &&
                 !shellUi_->IsLayoutEditModalUiActive()) {
+                POINT screenPoint{};
+                if (GetCursorPos(&screenPoint) && ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
+                    SuspendCoveredLayoutEditHover();
+                    return TRUE;
+                }
                 layoutEditController_.HandleSetCursor(hwnd_);
                 return TRUE;
             }

@@ -699,6 +699,11 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     return true;
 }
 
+bool LayoutEditController::HasActiveDrag() const {
+    return activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeGapEditDrag_.has_value() ||
+           activeAnchorEditDrag_.has_value();
+}
+
 void LayoutEditController::CancelInteraction() {
     const bool hadInteraction = hoveredLayoutGuideIndex_.has_value() || hoveredLayoutCard_.has_value() ||
                                 hoveredEditableCard_.has_value() || hoveredEditableWidget_.has_value() ||
