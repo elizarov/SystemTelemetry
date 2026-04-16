@@ -10,7 +10,7 @@
 #include "app_diagnostics.h"
 #include "app_strings.h"
 #include "dashboard_app.h"
-#include "layout_edit_config_dialog.h"
+#include "layout_edit_dialog.h"
 #include "layout_edit_parameter.h"
 #include "layout_edit_tree.h"
 #include "layout_edit_service.h"
@@ -556,7 +556,7 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
 
 }  // namespace
 
-class DashboardShellUiDialogHost final : public LayoutEditConfigDialogHost {
+class DashboardShellUiDialogHost final : public LayoutEditDialogHost {
 public:
     explicit DashboardShellUiDialogHost(DashboardShellUi& shellUi) : shellUi_(shellUi) {}
 
@@ -630,7 +630,7 @@ private:
 
 DashboardShellUi::DashboardShellUi(DashboardApp& app)
     : app_(app), layoutEditDialogHost_(std::make_unique<DashboardShellUiDialogHost>(*this)),
-      layoutEditDialog_(std::make_unique<LayoutEditConfigDialog>(*layoutEditDialogHost_)) {}
+      layoutEditDialog_(std::make_unique<LayoutEditDialog>(*layoutEditDialogHost_)) {}
 
 DashboardShellUi::~DashboardShellUi() {
     DestroyLayoutEditDialogWindow();

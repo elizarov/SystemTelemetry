@@ -1,0 +1,17 @@
+#pragma once
+
+#include "state.h"
+
+LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* state);
+bool CurrentLayoutEditShowsMetricBinding(const LayoutEditDialogState* state);
+
+void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd);
+LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* state, HWND hwnd);
+void RefreshLayoutEditValidationState(LayoutEditDialogState* state, HWND hwnd);
+bool PreviewSelectedValue(LayoutEditDialogState* state, HWND hwnd);
+bool PreviewSelectedFont(LayoutEditDialogState* state, HWND hwnd, UINT notificationCode = 0);
+bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd);
+bool SetSelectedDialogColor(LayoutEditDialogState* state, HWND hwnd, unsigned int color);
+bool PreviewSelectedWeights(LayoutEditDialogState* state, HWND hwnd);
+bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd);
+bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd);

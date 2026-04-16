@@ -80,7 +80,13 @@ add_executable(SystemTelemetry WIN32
     src/dashboard_controller.cpp
     src/dashboard_app.cpp
     src/dashboard_shell_ui.cpp
-    src/layout_edit_config_dialog.cpp
+    src/layout_edit_dialog.cpp
+    src/layout_edit_dialog/dialog_proc.cpp
+    src/layout_edit_dialog/editors.cpp
+    src/layout_edit_dialog/pane.cpp
+    src/layout_edit_dialog/trace.cpp
+    src/layout_edit_dialog/tree.cpp
+    src/layout_edit_dialog/util.cpp
     src/layout_edit_controller.cpp
     src/layout_edit_trace_session.cpp
     src/layout_edit_types.cpp

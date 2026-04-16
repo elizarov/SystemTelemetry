@@ -14,11 +14,11 @@
 #include "layout_edit_controller.h"
 #include "layout_edit_parameter.h"
 
-struct LayoutEditConfigDialogState;
+struct LayoutEditDialogState;
 
-class LayoutEditConfigDialogHost {
+class LayoutEditDialogHost {
 public:
-    virtual ~LayoutEditConfigDialogHost() = default;
+    virtual ~LayoutEditDialogHost() = default;
 
     virtual HINSTANCE LayoutEditDialogInstance() const = 0;
     virtual HWND LayoutEditDialogAnchorWindow() const = 0;
@@ -44,16 +44,16 @@ public:
     virtual void OnLayoutEditDialogCloseRequested() = 0;
 };
 
-class LayoutEditConfigDialog {
+class LayoutEditDialog {
 public:
-    explicit LayoutEditConfigDialog(LayoutEditConfigDialogHost& host);
-    ~LayoutEditConfigDialog();
+    explicit LayoutEditDialog(LayoutEditDialogHost& host);
+    ~LayoutEditDialog();
 
-    LayoutEditConfigDialogHost& Host() {
+    LayoutEditDialogHost& Host() {
         return host_;
     }
 
-    const LayoutEditConfigDialogHost& Host() const {
+    const LayoutEditDialogHost& Host() const {
         return host_;
     }
 
@@ -76,9 +76,9 @@ private:
     void ApplySelectionHighlightVisibility();
     void HandleDestroyed(HWND hwnd);
 
-    LayoutEditConfigDialogHost& host_;
+    LayoutEditDialogHost& host_;
     HWND hwnd_ = nullptr;
-    std::unique_ptr<LayoutEditConfigDialogState> state_;
+    std::unique_ptr<LayoutEditDialogState> state_;
     std::optional<LayoutEditSelectionHighlight> selectionHighlight_;
     bool selectionHighlightVisible_ = false;
 };

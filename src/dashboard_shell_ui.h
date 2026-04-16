@@ -17,7 +17,7 @@
 
 class DashboardApp;
 class DashboardShellUiDialogHost;
-class LayoutEditConfigDialog;
+class LayoutEditDialog;
 
 class DashboardShellUi {
 public:
@@ -97,5 +97,5 @@ private:
 
     DashboardApp& app_;
     std::unique_ptr<DashboardShellUiDialogHost> layoutEditDialogHost_;
-    std::unique_ptr<LayoutEditConfigDialog> layoutEditDialog_;
+    std::unique_ptr<LayoutEditDialog> layoutEditDialog_;
 };
