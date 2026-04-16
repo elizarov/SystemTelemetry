@@ -19,10 +19,10 @@ if not "%~2"=="" goto :usage
 set "file_count=0"
 set "failed=0"
 
-for /f "usebackq delims=" %%F in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$files = git -c core.quotepath=off ls-files -- '*.cpp' '*.h'; $files | Where-Object { $_ -notlike 'src/vendor/*' }"`) do (
+for /f "usebackq delims=" %%F in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$files = git -c core.quotepath=off ls-files --cached --others --exclude-standard -- '*.cpp' '*.h'; $files | Where-Object { $_ -notlike 'src/vendor/*' -and (Test-Path $_) } | Sort-Object -Unique"`) do (
     set /a file_count+=1
     if /I "%mode%"=="fix" (
-        "%clang_format%" -i "%%F"
+        call :format_file "%%F"
     ) else (
         "%clang_format%" --dry-run --Werror "%%F"
     )
@@ -55,6 +55,19 @@ if "%failed%"=="0" (
 echo Formatting is required. Run "format fix".
 popd >nul
 exit /b 1
+
+:format_file
+set "target=%~1"
+set "temp_file=%TEMP%\systemtelemetry-clang-format-%RANDOM%-%RANDOM%.tmp"
+"%clang_format%" "%target%" > "%temp_file%"
+if errorlevel 1 (
+    if exist "%temp_file%" del /q "%temp_file%" >nul 2>&1
+    exit /b 1
+)
+copy /y "%temp_file%" "%target%" >nul
+set "copy_result=%errorlevel%"
+if exist "%temp_file%" del /q "%temp_file%" >nul 2>&1
+exit /b %copy_result%
 
 :resolve_clang_format
 set "clang_format="

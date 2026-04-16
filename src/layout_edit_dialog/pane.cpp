@@ -380,8 +380,7 @@ void DestroyDialogFonts(LayoutEditDialogState* state) {
     DestroyDialogFont(state->fontSampleFont);
 }
 
-void SetLayoutEditStatus(
-    LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, const std::wstring& text) {
+void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, const std::wstring& text) {
     if (state == nullptr) {
         return;
     }
@@ -400,10 +399,8 @@ void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int
     InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE), nullptr, TRUE);
 }
 
-void SetFontSamplePreview(LayoutEditDialogState* state,
-    HWND hwnd,
-    std::optional<LayoutEditParameter> parameter,
-    const UiFontConfig* font) {
+void SetFontSamplePreview(
+    LayoutEditDialogState* state, HWND hwnd, std::optional<LayoutEditParameter> parameter, const UiFontConfig* font) {
     if (state == nullptr) {
         return;
     }
