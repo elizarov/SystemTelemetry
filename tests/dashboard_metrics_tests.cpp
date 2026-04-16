@@ -71,6 +71,27 @@ TEST(DashboardMetrics, ResolvesTextMetricsAndStaticTextTraitsFromBindingRegistry
     EXPECT_FALSE(IsStaticDashboardTextMetric("unknown.metric"));
 }
 
+TEST(DashboardMetrics, KeepsDisplayOnlyDriveBindingsMetadataOnly) {
+    MetricsSectionConfig metrics = BuildMetricsConfig();
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"drive.activity.read", MetricDisplayStyle::LabelOnly, true, 0.0, "", "R"});
+    SystemSnapshot snapshot;
+
+    DashboardMetricSource source(snapshot, metrics);
+
+    ASSERT_EQ(FindDashboardMetricDisplayStyle("drive.activity.read"), MetricDisplayStyle::LabelOnly);
+    ASSERT_EQ(FindDashboardMetricDisplayStyle("drive.usage"), MetricDisplayStyle::Percent);
+    EXPECT_FALSE(IsStaticDashboardTextMetric("drive.activity.read"));
+    EXPECT_EQ(ResolveMetricSampleValueText(metrics, "drive.activity.read"), "");
+    EXPECT_EQ(ResolveMetricSampleValueText(metrics, "drive.usage"), "");
+
+    const DashboardMetricValue& metric = source.ResolveMetric("drive.activity.read");
+    EXPECT_TRUE(metric.label.empty());
+    EXPECT_TRUE(metric.valueText.empty());
+    EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
+    EXPECT_DOUBLE_EQ(metric.peakRatio, 0.0);
+}
+
 TEST(DashboardMetrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;

@@ -31,18 +31,64 @@ using MetricResolverFn =
     DashboardMetricValue (*)(const SystemSnapshot&, const MetricDefinitionConfig&, const std::string&, std::string_view);
 using ThroughputValueResolverFn = double (*)(const SystemSnapshot&);
 using ThroughputGuideStepResolverFn = double (*)(double);
+using DashboardMetricPayloadMask = unsigned int;
+
+constexpr DashboardMetricPayloadMask PayloadMask(DashboardMetricPayloadKind kind) {
+    return static_cast<DashboardMetricPayloadMask>(kind);
+}
+
+constexpr DashboardMetricPayloadMask kNoPayload = 0;
+constexpr DashboardMetricPayloadMask kTextPayload = PayloadMask(DashboardMetricPayloadKind::Text);
+constexpr DashboardMetricPayloadMask kValuePayload = PayloadMask(DashboardMetricPayloadKind::Value);
+constexpr DashboardMetricPayloadMask kThroughputPayload = PayloadMask(DashboardMetricPayloadKind::Throughput);
 
 struct DashboardMetricBinding {
     std::string_view key;
     bool prefixMatch = false;
     std::optional<MetricDisplayStyle> metricStyle;
-    unsigned int payloadKinds = 0;
+    DashboardMetricPayloadMask payloadMask = kNoPayload;
     bool staticText = false;
     TextResolverFn resolveText = nullptr;
     MetricResolverFn resolveMetric = nullptr;
     ThroughputValueResolverFn resolveThroughputValue = nullptr;
     ThroughputGraphGroup throughputGroup = ThroughputGraphGroup::None;
     ThroughputGuideStepResolverFn resolveGuideStep = nullptr;
+
+    static constexpr DashboardMetricBinding ExactStaticText(std::string_view key, TextResolverFn resolveText) {
+        return DashboardMetricBinding{key, false, std::nullopt, kTextPayload, true, resolveText};
+    }
+
+    static constexpr DashboardMetricBinding ExactValue(
+        std::string_view key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
+        return DashboardMetricBinding{key, false, style, kValuePayload, false, nullptr, resolveMetric};
+    }
+
+    static constexpr DashboardMetricBinding ExactThroughput(
+        std::string_view key,
+        ThroughputValueResolverFn resolveThroughputValue,
+        ThroughputGraphGroup throughputGroup,
+        ThroughputGuideStepResolverFn resolveGuideStep) {
+        return DashboardMetricBinding{
+            key,
+            false,
+            MetricDisplayStyle::Throughput,
+            kThroughputPayload,
+            false,
+            nullptr,
+            nullptr,
+            resolveThroughputValue,
+            throughputGroup,
+            resolveGuideStep};
+    }
+
+    static constexpr DashboardMetricBinding ExactDisplayOnly(std::string_view key, MetricDisplayStyle style) {
+        return DashboardMetricBinding{key, false, style, kNoPayload};
+    }
+
+    static constexpr DashboardMetricBinding PrefixValue(
+        std::string_view key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
+        return DashboardMetricBinding{key, true, style, kValuePayload, false, nullptr, resolveMetric};
+    }
 };
 
 struct DashboardMetricBindingMatch {
@@ -50,12 +96,8 @@ struct DashboardMetricBindingMatch {
     std::string_view logicalName;
 };
 
-constexpr unsigned int PayloadMask(DashboardMetricPayloadKind kind) {
-    return static_cast<unsigned int>(kind);
-}
-
 bool BindingSupportsPayload(const DashboardMetricBinding& binding, DashboardMetricPayloadKind kind) {
-    return (binding.payloadKinds & PayloadMask(kind)) != 0;
+    return (binding.payloadMask & PayloadMask(kind)) != 0;
 }
 
 std::string FormatScalarValue(std::optional<double> value, std::string_view unit, int precision) {
@@ -442,125 +484,33 @@ double ResolveFiveMbpsGuideStep(double) {
 }
 
 const DashboardMetricBinding kExactBindings[] = {
-    {"cpu.name", false, std::nullopt, PayloadMask(DashboardMetricPayloadKind::Text), true, &ResolveCpuNameText},
-    {"gpu.name", false, std::nullopt, PayloadMask(DashboardMetricPayloadKind::Text), true, &ResolveGpuNameText},
-    {"cpu.load",
-        false,
-        MetricDisplayStyle::Percent,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveCpuLoadMetric},
-    {"cpu.clock",
-        false,
-        MetricDisplayStyle::Scalar,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveCpuClockMetric},
-    {"cpu.ram",
-        false,
-        MetricDisplayStyle::Memory,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveCpuMemoryMetric},
-    {"gpu.load",
-        false,
-        MetricDisplayStyle::Percent,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveGpuLoadMetric},
-    {"gpu.temp",
-        false,
-        MetricDisplayStyle::Scalar,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveGpuTemperatureMetric},
-    {"gpu.clock",
-        false,
-        MetricDisplayStyle::Scalar,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveGpuClockMetric},
-    {"gpu.fan",
-        false,
-        MetricDisplayStyle::Scalar,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveGpuFanMetric},
-    {"gpu.vram",
-        false,
-        MetricDisplayStyle::Memory,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveGpuMemoryMetric},
-    {"network.upload",
-        false,
-        MetricDisplayStyle::Throughput,
-        PayloadMask(DashboardMetricPayloadKind::Throughput),
-        false,
-        nullptr,
-        nullptr,
-        &ResolveNetworkUploadValue,
-        ThroughputGraphGroup::Network,
-        &ResolveFiveMbpsGuideStep},
-    {"network.download",
-        false,
-        MetricDisplayStyle::Throughput,
-        PayloadMask(DashboardMetricPayloadKind::Throughput),
-        false,
-        nullptr,
-        nullptr,
-        &ResolveNetworkDownloadValue,
-        ThroughputGraphGroup::Network,
-        &ResolveFiveMbpsGuideStep},
-    {"storage.read",
-        false,
-        MetricDisplayStyle::Throughput,
-        PayloadMask(DashboardMetricPayloadKind::Throughput),
-        false,
-        nullptr,
-        nullptr,
-        &ResolveStorageReadValue,
-        ThroughputGraphGroup::Storage,
-        &GetStorageGuideStep},
-    {"storage.write",
-        false,
-        MetricDisplayStyle::Throughput,
-        PayloadMask(DashboardMetricPayloadKind::Throughput),
-        false,
-        nullptr,
-        nullptr,
-        &ResolveStorageWriteValue,
-        ThroughputGraphGroup::Storage,
-        &GetStorageGuideStep},
-    {"drive.activity.read", false, MetricDisplayStyle::LabelOnly, 0},
-    {"drive.activity.write", false, MetricDisplayStyle::LabelOnly, 0},
-    {"drive.usage", false, MetricDisplayStyle::Percent, 0},
-    {"drive.free", false, MetricDisplayStyle::SizeAuto, 0},
+    DashboardMetricBinding::ExactStaticText("cpu.name", &ResolveCpuNameText),
+    DashboardMetricBinding::ExactStaticText("gpu.name", &ResolveGpuNameText),
+    DashboardMetricBinding::ExactValue("cpu.load", MetricDisplayStyle::Percent, &ResolveCpuLoadMetric),
+    DashboardMetricBinding::ExactValue("cpu.clock", MetricDisplayStyle::Scalar, &ResolveCpuClockMetric),
+    DashboardMetricBinding::ExactValue("cpu.ram", MetricDisplayStyle::Memory, &ResolveCpuMemoryMetric),
+    DashboardMetricBinding::ExactValue("gpu.load", MetricDisplayStyle::Percent, &ResolveGpuLoadMetric),
+    DashboardMetricBinding::ExactValue("gpu.temp", MetricDisplayStyle::Scalar, &ResolveGpuTemperatureMetric),
+    DashboardMetricBinding::ExactValue("gpu.clock", MetricDisplayStyle::Scalar, &ResolveGpuClockMetric),
+    DashboardMetricBinding::ExactValue("gpu.fan", MetricDisplayStyle::Scalar, &ResolveGpuFanMetric),
+    DashboardMetricBinding::ExactValue("gpu.vram", MetricDisplayStyle::Memory, &ResolveGpuMemoryMetric),
+    DashboardMetricBinding::ExactThroughput(
+        "network.upload", &ResolveNetworkUploadValue, ThroughputGraphGroup::Network, &ResolveFiveMbpsGuideStep),
+    DashboardMetricBinding::ExactThroughput(
+        "network.download", &ResolveNetworkDownloadValue, ThroughputGraphGroup::Network, &ResolveFiveMbpsGuideStep),
+    DashboardMetricBinding::ExactThroughput(
+        "storage.read", &ResolveStorageReadValue, ThroughputGraphGroup::Storage, &GetStorageGuideStep),
+    DashboardMetricBinding::ExactThroughput(
+        "storage.write", &ResolveStorageWriteValue, ThroughputGraphGroup::Storage, &GetStorageGuideStep),
+    DashboardMetricBinding::ExactDisplayOnly("drive.activity.read", MetricDisplayStyle::LabelOnly),
+    DashboardMetricBinding::ExactDisplayOnly("drive.activity.write", MetricDisplayStyle::LabelOnly),
+    DashboardMetricBinding::ExactDisplayOnly("drive.usage", MetricDisplayStyle::Percent),
+    DashboardMetricBinding::ExactDisplayOnly("drive.free", MetricDisplayStyle::SizeAuto),
 };
 
 const DashboardMetricBinding kPrefixBindings[] = {
-    {kBoardTemperaturePrefix,
-        true,
-        MetricDisplayStyle::Scalar,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveBoardTemperatureMetric},
-    {kBoardFanPrefix,
-        true,
-        MetricDisplayStyle::Scalar,
-        PayloadMask(DashboardMetricPayloadKind::Value),
-        false,
-        nullptr,
-        &ResolveBoardFanMetric},
+    DashboardMetricBinding::PrefixValue(kBoardTemperaturePrefix, MetricDisplayStyle::Scalar, &ResolveBoardTemperatureMetric),
+    DashboardMetricBinding::PrefixValue(kBoardFanPrefix, MetricDisplayStyle::Scalar, &ResolveBoardFanMetric),
 };
 
 const std::unordered_map<std::string_view, const DashboardMetricBinding*>& ExactDashboardMetricBindingIndex() {
