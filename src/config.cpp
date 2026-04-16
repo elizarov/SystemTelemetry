@@ -39,10 +39,10 @@ TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& co
 
 TelemetrySettings ExtractTelemetrySettings(const AppConfig& config) {
     TelemetrySettings settings;
-    settings.board.requestedTemperatureNames = config.board.requestedTemperatureNames;
-    settings.board.requestedFanNames = config.board.requestedFanNames;
-    settings.board.temperatureSensorNames = config.board.temperatureSensorNames;
-    settings.board.fanSensorNames = config.board.fanSensorNames;
+    settings.board.requestedTemperatureNames = config.layout.board.requestedTemperatureNames;
+    settings.board.requestedFanNames = config.layout.board.requestedFanNames;
+    settings.board.temperatureSensorNames = config.layout.board.temperatureSensorNames;
+    settings.board.fanSensorNames = config.layout.board.fanSensorNames;
     settings.selection = ExtractTelemetrySelectionSettings(config);
     return settings;
 }
@@ -62,12 +62,13 @@ bool LayoutConfig::operator==(const LayoutConfig& other) const {
            metricList == other.metricList && driveUsageList == other.driveUsageList &&
            throughput == other.throughput && gauge == other.gauge && text == other.text &&
            networkFooter == other.networkFooter && layoutEditor == other.layoutEditor && fonts == other.fonts &&
-           cards == other.cards && structure == other.structure && cardsLayout == other.cardsLayout;
+           board == other.board && metrics == other.metrics && layouts == other.layouts && cards == other.cards &&
+           structure == other.structure && cardsLayout == other.cardsLayout;
 }
 
 bool AppConfig::operator==(const AppConfig& other) const {
-    return display == other.display && network == other.network && storage == other.storage && board == other.board &&
-           metrics == other.metrics && layouts == other.layouts && layout == other.layout;
+    return display == other.display && network == other.network && storage == other.storage &&
+           layout == other.layout;
 }
 
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {

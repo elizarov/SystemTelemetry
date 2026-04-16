@@ -97,13 +97,22 @@ std::string FindConfiguredBoardMetricBinding(const AppConfig& config, const Layo
         return {};
     }
 
-    const auto& bindings = target->kind == BoardMetricBindingKind::Temperature ? config.board.temperatureSensorNames
-                                                                               : config.board.fanSensorNames;
+    const auto& bindings = target->kind == BoardMetricBindingKind::Temperature
+                               ? config.layout.board.temperatureSensorNames
+                               : config.layout.board.fanSensorNames;
     const auto it = bindings.find(target->logicalName);
     if (it != bindings.end() && !it->second.empty()) {
         return it->second;
     }
     return target->logicalName;
+}
+
+AppConfig BuildLayoutEditOriginalConfig(const DashboardSessionState& sessionState) {
+    AppConfig config = sessionState.config;
+    if (sessionState.hasLayoutEditSessionSavedLayout) {
+        config.layout = sessionState.layoutEditSessionSavedLayout;
+    }
+    return config;
 }
 
 bool AreScalesEqual(double left, double right) {
@@ -1800,7 +1809,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         state->shellUi->TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
     } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey)) {
         const MetricDefinitionConfig* definition =
-            FindMetricDefinition(state->shellUi->CurrentConfig().metrics, metricKey->metricId);
+            FindMetricDefinition(state->shellUi->CurrentConfig().layout.metrics, metricKey->metricId);
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE,
             definition != nullptr ? WideFromUtf8(std::string(EnumToString(definition->style))).c_str() : L"");
@@ -1925,7 +1934,7 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey);
         metricKey != nullptr) {
         const MetricDefinitionConfig* definition =
-            FindMetricDefinition(state->shellUi->CurrentConfig().metrics, metricKey->metricId);
+            FindMetricDefinition(state->shellUi->CurrentConfig().layout.metrics, metricKey->metricId);
         if (definition == nullptr) {
             return {false, L"Unable to find the current metric definition."};
         }
@@ -2137,7 +2146,7 @@ bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd) {
     }
 
     const MetricDefinitionConfig* definition =
-        FindMetricDefinition(state->shellUi->CurrentConfig().metrics, key->metricId);
+        FindMetricDefinition(state->shellUi->CurrentConfig().layout.metrics, key->metricId);
     if (definition == nullptr) {
         return false;
     }
@@ -2407,15 +2416,15 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey);
         metricKey != nullptr) {
         const MetricDefinitionConfig* definition =
-            FindMetricDefinition(state->originalConfig.metrics, metricKey->metricId);
+            FindMetricDefinition(state->originalConfig.layout.metrics, metricKey->metricId);
         if (definition == nullptr) {
             return false;
         }
         std::optional<std::string> binding;
         if (const auto target = ParseBoardMetricBindingTarget(metricKey->metricId); target.has_value()) {
             const auto& bindings = target->kind == BoardMetricBindingKind::Temperature
-                                       ? state->originalConfig.board.temperatureSensorNames
-                                       : state->originalConfig.board.fanSensorNames;
+                                       ? state->originalConfig.layout.board.temperatureSensorNames
+                                       : state->originalConfig.layout.board.fanSensorNames;
             const auto it = bindings.find(target->logicalName);
             binding = it != bindings.end() ? std::optional<std::string>(it->second)
                                            : std::optional<std::string>(std::string());
@@ -2825,9 +2834,7 @@ bool DashboardShellUi::EnsureLayoutEditDialog(const std::optional<LayoutEditFocu
 
     auto state = std::make_unique<LayoutEditDialogState>();
     state->shellUi = this;
-    state->originalConfig = app_.controller_.State().hasLayoutEditSessionSavedConfig
-                                ? app_.controller_.State().layoutEditSessionSavedConfig
-                                : app_.controller_.State().config;
+    state->originalConfig = BuildLayoutEditOriginalConfig(app_.controller_.State());
     state->treeModel = BuildLayoutEditTreeModel(app_.controller_.State().config);
     state->initialFocus = focusKey;
 
@@ -2874,9 +2881,7 @@ void DashboardShellUi::RefreshLayoutEditDialog(const std::optional<LayoutEditFoc
         return;
     }
 
-    state->originalConfig = app_.controller_.State().hasLayoutEditSessionSavedConfig
-                                ? app_.controller_.State().layoutEditSessionSavedConfig
-                                : app_.controller_.State().config;
+    state->originalConfig = BuildLayoutEditOriginalConfig(app_.controller_.State());
     state->treeModel = BuildLayoutEditTreeModel(app_.controller_.State().config);
     RefreshLayoutEditDialogControls(state, layoutEditDialogHwnd_, preferredFocus, true);
 }
@@ -2891,9 +2896,7 @@ void DashboardShellUi::RefreshLayoutEditDialogSelection() {
         return;
     }
 
-    state->originalConfig = app_.controller_.State().hasLayoutEditSessionSavedConfig
-                                ? app_.controller_.State().layoutEditSessionSavedConfig
-                                : app_.controller_.State().config;
+    state->originalConfig = BuildLayoutEditOriginalConfig(app_.controller_.State());
     RefreshLayoutEditDialogControls(state, layoutEditDialogHwnd_, std::nullopt, false);
 }
 
@@ -2924,9 +2927,7 @@ void DashboardShellUi::SyncLayoutEditDialogSelection(
 
     auto* state = LayoutEditDialogStateFromWindow(layoutEditDialogHwnd_);
     if (state != nullptr) {
-        state->originalConfig = app_.controller_.State().hasLayoutEditSessionSavedConfig
-                                    ? app_.controller_.State().layoutEditSessionSavedConfig
-                                    : app_.controller_.State().config;
+        state->originalConfig = BuildLayoutEditOriginalConfig(app_.controller_.State());
         RefreshLayoutEditDialogControls(state, layoutEditDialogHwnd_, focusKey, false);
     }
     if (bringToFront) {
@@ -2989,7 +2990,7 @@ bool DashboardShellUi::StopLayoutEditSession(UnsavedLayoutEditPrompt prompt) {
             if (!app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
                 return false;
             }
-        } else if (!app_.controller_.RestoreLayoutEditSessionSavedConfig(app_)) {
+        } else if (!app_.controller_.RestoreLayoutEditSessionSavedLayout(app_)) {
             MessageBoxW(
                 app_.hwnd_, L"Failed to restore the saved layout edit state.", L"System Telemetry", MB_ICONERROR);
             return false;
@@ -3138,7 +3139,7 @@ bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
     const std::string& label,
     const std::optional<std::string>& binding) {
     AppConfig updatedConfig = CurrentConfig();
-    MetricDefinitionConfig* definition = FindMetricDefinition(updatedConfig.metrics, key.metricId);
+    MetricDefinitionConfig* definition = FindMetricDefinition(updatedConfig.layout.metrics, key.metricId);
     if (definition == nullptr) {
         return false;
     }
@@ -3152,8 +3153,8 @@ bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
     definition->label = label;
     if (const auto target = ParseBoardMetricBindingTarget(key.metricId); target.has_value() && binding.has_value()) {
         auto& bindings = target->kind == BoardMetricBindingKind::Temperature
-                             ? updatedConfig.board.temperatureSensorNames
-                             : updatedConfig.board.fanSensorNames;
+                             ? updatedConfig.layout.board.temperatureSensorNames
+                             : updatedConfig.layout.board.fanSensorNames;
         if (binding->empty()) {
             bindings.erase(target->logicalName);
         } else {
@@ -3376,11 +3377,11 @@ void DashboardShellUi::ShowContextMenu(
     HMENU configureDisplayMenu = CreatePopupMenu();
     const UINT autoStartFlags = MF_STRING | (app_.controller_.IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     state.layoutMenuOptions.clear();
-    for (size_t i = 0; i < state.config.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax; ++i) {
+    for (size_t i = 0; i < state.config.layout.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax; ++i) {
         LayoutMenuOption option;
         option.commandId = kCommandLayoutBase + static_cast<UINT>(i);
-        option.name = state.config.layouts[i].name;
-        option.description = state.config.layouts[i].description;
+        option.name = state.config.layout.layouts[i].name;
+        option.description = state.config.layout.layouts[i].description;
         state.layoutMenuOptions.push_back(option);
     }
     if (state.layoutMenuOptions.empty()) {

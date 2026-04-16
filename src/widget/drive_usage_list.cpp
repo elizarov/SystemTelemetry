@@ -10,7 +10,7 @@ namespace {
 
 std::string ResolveDriveMetricLabel(
     const DashboardRenderer& renderer, std::string_view metricRef, std::string_view fallback) {
-    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().metrics, metricRef);
+    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().layout.metrics, metricRef);
     if (definition != nullptr && !definition->label.empty()) {
         return definition->label;
     }
@@ -19,7 +19,7 @@ std::string ResolveDriveMetricLabel(
 
 std::string ResolveDriveMetricSampleValue(
     const DashboardRenderer& renderer, std::string_view metricRef, std::string_view fallback) {
-    const std::string sample = ResolveMetricSampleValueText(renderer.Config().metrics, std::string(metricRef));
+    const std::string sample = ResolveMetricSampleValueText(renderer.Config().layout.metrics, std::string(metricRef));
     return sample.empty() ? std::string(fallback) : sample;
 }
 

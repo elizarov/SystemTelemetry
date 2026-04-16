@@ -61,8 +61,8 @@ TEST(ConfigResolution, NormalizesConfiguredDrivesAndRemovesDuplicates) {
 
 TEST(ConfigResolution, SelectsRequestedLayoutAndFallsBackToFirstLayout) {
     AppConfig config;
-    config.layouts.push_back(MakeNamedLayout("primary", 800, 480, "rows"));
-    config.layouts.push_back(MakeNamedLayout("secondary", 1024, 600, "columns"));
+    config.layout.layouts.push_back(MakeNamedLayout("primary", 800, 480, "rows"));
+    config.layout.layouts.push_back(MakeNamedLayout("secondary", 1024, 600, "columns"));
 
     ASSERT_TRUE(SelectResolvedLayout(config, "secondary"));
     EXPECT_EQ(config.display.layout, "secondary");
@@ -82,12 +82,12 @@ TEST(ConfigResolution, ExtractTelemetrySettingsIncludesOnlyBoardAndSelectionInpu
     AppConfig config;
     config.network.adapterName = "Ethernet";
     config.storage.drives = {"C", "D"};
-    config.board.requestedTemperatureNames = {"cpu"};
-    config.board.requestedFanNames = {"system"};
-    config.board.temperatureSensorNames["cpu"] = "CPU";
-    config.board.fanSensorNames["system"] = "SYS_FAN";
+    config.layout.board.requestedTemperatureNames = {"cpu"};
+    config.layout.board.requestedFanNames = {"system"};
+    config.layout.board.temperatureSensorNames["cpu"] = "CPU";
+    config.layout.board.fanSensorNames["system"] = "SYS_FAN";
     config.layout.gauge.labelBottom = 42;
-    config.metrics.definitions.push_back(
+    config.layout.metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Core Temp"});
 
     const TelemetrySettings settings = ExtractTelemetrySettings(config);
@@ -105,7 +105,7 @@ TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingReso
     uiConfig.network.adapterName = "Configured Ethernet";
     uiConfig.storage.drives = {"Z"};
     uiConfig.layout.gauge.labelBottom = 42;
-    uiConfig.metrics.definitions.push_back(
+    uiConfig.layout.metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Core Temp"});
 
     ResolvedTelemetrySelections resolvedSelections;
@@ -113,7 +113,7 @@ TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingReso
     resolvedSelections.drives = {"C", "D"};
 
     const AppConfig effectiveConfig = BuildEffectiveRuntimeConfig(uiConfig, resolvedSelections);
-    const MetricDefinitionConfig* metric = FindMetricDefinition(effectiveConfig.metrics, "gpu.temp");
+    const MetricDefinitionConfig* metric = FindMetricDefinition(effectiveConfig.layout.metrics, "gpu.temp");
 
     EXPECT_EQ(effectiveConfig.network.adapterName, "Resolved Ethernet");
     EXPECT_EQ(effectiveConfig.storage.drives, (std::vector<std::string>{"C", "D"}));

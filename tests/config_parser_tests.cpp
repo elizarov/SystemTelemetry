@@ -78,14 +78,14 @@ TEST(ConfigParser, ParsesMetricsSectionEntries) {
 
     const AppConfig config = LoadConfig(path, true);
 
-    const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.metrics, "cpu.load");
+    const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.layout.metrics, "cpu.load");
     ASSERT_NE(loadMetric, nullptr);
     EXPECT_EQ(loadMetric->style, MetricDisplayStyle::Percent);
     EXPECT_TRUE(loadMetric->telemetryScale);
     EXPECT_EQ(loadMetric->unit, "%");
     EXPECT_EQ(loadMetric->label, "Processor Load");
 
-    const MetricDefinitionConfig* gpuTemp = FindMetricDefinition(config.metrics, "gpu.temp");
+    const MetricDefinitionConfig* gpuTemp = FindMetricDefinition(config.layout.metrics, "gpu.temp");
     ASSERT_NE(gpuTemp, nullptr);
     EXPECT_EQ(gpuTemp->style, MetricDisplayStyle::Scalar);
     EXPECT_FALSE(gpuTemp->telemetryScale);
@@ -102,7 +102,7 @@ TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
 
     const AppConfig config = LoadConfig(path, true);
 
-    const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.metrics, "cpu.load");
+    const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.layout.metrics, "cpu.load");
     ASSERT_NE(loadMetric, nullptr);
     EXPECT_EQ(loadMetric->style, MetricDisplayStyle::Percent);
     EXPECT_TRUE(loadMetric->telemetryScale);
@@ -118,7 +118,7 @@ TEST(ConfigParser, RejectsSerializedMetricStyleTokensInMetricsSection) {
 
     const AppConfig config = LoadConfig(path, true);
 
-    EXPECT_EQ(FindMetricDefinition(config.metrics, "cpu.load"), nullptr);
+    EXPECT_EQ(FindMetricDefinition(config.layout.metrics, "cpu.load"), nullptr);
 
     std::filesystem::remove(path);
 }
@@ -129,7 +129,7 @@ TEST(ConfigParser, RejectsUnknownMetricIdsWithoutMetadataStyle) {
 
     const AppConfig config = LoadConfig(path, true);
 
-    EXPECT_EQ(FindMetricDefinition(config.metrics, "custom.metric"), nullptr);
+    EXPECT_EQ(FindMetricDefinition(config.layout.metrics, "custom.metric"), nullptr);
 
     std::filesystem::remove(path);
 }

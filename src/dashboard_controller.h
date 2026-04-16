@@ -20,9 +20,9 @@ struct DashboardSessionState {
     bool placementWatchActive = false;
     bool isMoving = false;
     bool isEditingLayout = false;
-    bool hasLayoutEditSessionSavedConfig = false;
+    bool hasLayoutEditSessionSavedLayout = false;
     bool hasUnsavedLayoutEditChanges = false;
-    AppConfig layoutEditSessionSavedConfig;
+    LayoutConfig layoutEditSessionSavedLayout;
     std::vector<DisplayMenuOption> configDisplayOptions;
     std::vector<LayoutMenuOption> layoutMenuOptions;
     std::vector<NetworkMenuOption> networkMenuOptions;
@@ -78,7 +78,7 @@ public:
     void StartLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller);
     void StopLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller, bool diagnosticsEditLayout);
     bool HasUnsavedLayoutEditChanges() const;
-    bool RestoreLayoutEditSessionSavedConfig(DashboardShellHost& shell);
+    bool RestoreLayoutEditSessionSavedLayout(DashboardShellHost& shell);
     bool ApplyLayoutGuideWeights(
         DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
     bool ApplyLayoutEditValue(

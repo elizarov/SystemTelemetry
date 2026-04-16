@@ -422,12 +422,28 @@ std::string JoinConfigLines(const std::vector<std::string>& lines) {
 
 template <typename UpdateKeyFn> void SaveKnownStructuredSections(const AppConfig& config, UpdateKeyFn&& updateKey) {
     SaveKnownSections<AppConfig::BindingList>(config, updateKey);
+    for (const auto& layout : config.layout.layouts) {
+        SaveDynamicStructuredSection<LayoutSectionConfig::Section>(layout, layout.name, updateKey);
+    }
 }
 
 template <typename UpdateKeyFn>
 void SaveKnownStructuredSectionDifferences(
     const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn&& updateKey) {
     SaveKnownSectionDifferences<AppConfig::BindingList>(config, compareConfig, updateKey);
+    for (const auto& layout : config.layout.layouts) {
+        const LayoutSectionConfig* compareLayout = nullptr;
+        if (compareConfig != nullptr) {
+            const auto it = std::find_if(compareConfig->layout.layouts.begin(),
+                compareConfig->layout.layouts.end(),
+                [&](const LayoutSectionConfig& candidate) { return candidate.name == layout.name; });
+            if (it != compareConfig->layout.layouts.end()) {
+                compareLayout = &(*it);
+            }
+        }
+        SaveDynamicStructuredSectionDifferences<LayoutSectionConfig::Section>(
+            layout, layout.name, compareLayout, updateKey);
+    }
 }
 
 }  // namespace

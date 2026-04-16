@@ -94,7 +94,7 @@ void ExpectSpecialSelectionHighlight(
 AppConfig MakeBaseConfig() {
     AppConfig config;
     config.display.layout = "primary";
-    config.metrics.definitions = {
+    config.layout.metrics.definitions = {
         MetricDefinitionConfig{"cpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"},
         MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"},
         MetricDefinitionConfig{"drive.free", MetricDisplayStyle::SizeAuto, true, 0.0, "GB|TB", "Free"},

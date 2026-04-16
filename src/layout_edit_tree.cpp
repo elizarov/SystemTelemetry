@@ -359,11 +359,11 @@ std::optional<LayoutEditTreeNode> BuildStaticSectionNode(const AppConfig& config
         std::vector<std::string> orderedMetricIds;
         orderedMetricIds.reserve(slot.keys.size());
         for (const auto& key : slot.keys) {
-            if (FindMetricDefinition(config.metrics, key) != nullptr) {
+            if (FindMetricDefinition(config.layout.metrics, key) != nullptr) {
                 orderedMetricIds.push_back(key);
             }
         }
-        for (const auto& definition : config.metrics.definitions) {
+        for (const auto& definition : config.layout.metrics.definitions) {
             if (std::find(orderedMetricIds.begin(), orderedMetricIds.end(), definition.id) == orderedMetricIds.end()) {
                 orderedMetricIds.push_back(definition.id);
             }

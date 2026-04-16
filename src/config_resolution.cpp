@@ -112,15 +112,15 @@ std::vector<std::string> NormalizeConfiguredDrives(const std::vector<std::string
 bool SelectResolvedLayout(AppConfig& config, const std::string& requestedName) {
     const LayoutSectionConfig* selected = nullptr;
     if (!requestedName.empty()) {
-        for (const auto& layout : config.layouts) {
+        for (const auto& layout : config.layout.layouts) {
             if (layout.name == requestedName) {
                 selected = &layout;
                 break;
             }
         }
     }
-    if (selected == nullptr && !config.layouts.empty()) {
-        selected = &config.layouts.front();
+    if (selected == nullptr && !config.layout.layouts.empty()) {
+        selected = &config.layout.layouts.front();
     }
     if (selected == nullptr) {
         return false;
@@ -136,7 +136,7 @@ bool SelectLayout(AppConfig& config, const std::string& name) {
     if (name.empty()) {
         return false;
     }
-    for (const auto& layout : config.layouts) {
+    for (const auto& layout : config.layout.layouts) {
         if (layout.name == name) {
             config.display.layout = layout.name;
             config.layout.structure.window = layout.window;

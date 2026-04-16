@@ -293,7 +293,7 @@ void ThroughputWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
         false,
         renderer.Config().layout.throughput.guideStrokeWidth);
 
-    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().metrics, metric_);
+    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().layout.metrics, metric_);
     if (definition != nullptr && !definition->label.empty()) {
         renderer.RegisterStaticTextAnchor(layoutState_.valueRect,
             definition->label,

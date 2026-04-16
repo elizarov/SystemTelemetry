@@ -320,9 +320,12 @@ struct LayoutConfig {
     CONFIG_SECTION_VALUE(NetworkFooterWidgetConfig, networkFooter);
     CONFIG_SECTION_VALUE(LayoutEditorConfig, layoutEditor);
     CONFIG_SECTION_VALUE(UiFontSetConfig, fonts);
+    CONFIG_SECTION_VALUE(BoardConfig, board);
+    CONFIG_SECTION_VALUE(MetricsSectionConfig, metrics);
     CONFIG_DYNAMIC_SECTION_VALUE(LayoutCardConfig, cards, id);
     CONFIG_BINDING_LIST();
 
+    std::vector<LayoutSectionConfig> layouts;
     LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
 
@@ -334,9 +337,6 @@ struct AppConfig {
     CONFIG_SECTION_VALUE(DisplayConfig, display);
     CONFIG_SECTION_VALUE(NetworkConfig, network);
     CONFIG_SECTION_VALUE(StorageConfig, storage);
-    CONFIG_SECTION_VALUE(BoardConfig, board);
-    CONFIG_SECTION_VALUE(MetricsSectionConfig, metrics);
-    CONFIG_DYNAMIC_SECTION_VALUE(LayoutSectionConfig, layouts, name);
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
 

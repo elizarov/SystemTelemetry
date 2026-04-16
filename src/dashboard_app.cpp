@@ -681,7 +681,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
             }
         } else if (metricKey.has_value()) {
             const MetricDefinitionConfig* definition =
-                FindMetricDefinition(controller_.State().config.metrics, metricKey->metricId);
+                FindMetricDefinition(controller_.State().config.layout.metrics, metricKey->metricId);
             if (definition != nullptr) {
                 layoutEditTooltipText_ = BuildMetricTooltipText(*metricKey, *definition);
             } else {

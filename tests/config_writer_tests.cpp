@@ -75,7 +75,7 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceCo
 TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
     AppConfig config = LoadConfig(SourceConfigPath(), true);
 
-    const MetricDefinitionConfig* cpuLoad = FindMetricDefinition(config.metrics, "cpu.load");
+    const MetricDefinitionConfig* cpuLoad = FindMetricDefinition(config.layout.metrics, "cpu.load");
     ASSERT_NE(cpuLoad, nullptr);
 
     const std::string output = BuildSavedConfigText(
@@ -91,7 +91,7 @@ TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {
     AppConfig compareConfig = LoadConfig(SourceConfigPath(), true);
     AppConfig currentConfig = compareConfig;
 
-    MetricDefinitionConfig* gpuTemp = FindMetricDefinition(currentConfig.metrics, "gpu.temp");
+    MetricDefinitionConfig* gpuTemp = FindMetricDefinition(currentConfig.layout.metrics, "gpu.temp");
     ASSERT_NE(gpuTemp, nullptr);
     gpuTemp->label = "Core Temp";
 
@@ -105,7 +105,7 @@ TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {
 TEST(ConfigWriter, SerializedMetricStyleComesFromMetadataInsteadOfStructValue) {
     AppConfig config = LoadConfig(SourceConfigPath(), true);
 
-    MetricDefinitionConfig* gpuTemp = FindMetricDefinition(config.metrics, "gpu.temp");
+    MetricDefinitionConfig* gpuTemp = FindMetricDefinition(config.layout.metrics, "gpu.temp");
     ASSERT_NE(gpuTemp, nullptr);
     gpuTemp->style = MetricDisplayStyle::Percent;
 

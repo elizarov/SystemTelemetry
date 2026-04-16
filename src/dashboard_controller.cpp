@@ -68,31 +68,31 @@ const DashboardSessionState& DashboardController::State() const {
 }
 
 void DashboardController::BeginLayoutEditSessionTracking() {
-    state_.layoutEditSessionSavedConfig = state_.config;
-    state_.hasLayoutEditSessionSavedConfig = true;
+    state_.layoutEditSessionSavedLayout = state_.config.layout;
+    state_.hasLayoutEditSessionSavedLayout = true;
     state_.hasUnsavedLayoutEditChanges = false;
 }
 
 void DashboardController::ClearLayoutEditSessionTracking() {
-    state_.hasLayoutEditSessionSavedConfig = false;
+    state_.hasLayoutEditSessionSavedLayout = false;
     state_.hasUnsavedLayoutEditChanges = false;
-    state_.layoutEditSessionSavedConfig = AppConfig{};
+    state_.layoutEditSessionSavedLayout = LayoutConfig{};
 }
 
 void DashboardController::RefreshLayoutEditSessionDirtyFlag() {
-    if (!state_.isEditingLayout || !state_.hasLayoutEditSessionSavedConfig) {
+    if (!state_.isEditingLayout || !state_.hasLayoutEditSessionSavedLayout) {
         state_.hasUnsavedLayoutEditChanges = false;
         return;
     }
-    state_.hasUnsavedLayoutEditChanges = state_.config != state_.layoutEditSessionSavedConfig;
+    state_.hasUnsavedLayoutEditChanges = state_.config.layout != state_.layoutEditSessionSavedLayout;
 }
 
 void DashboardController::MarkLayoutEditSessionSaved() {
     if (!state_.isEditingLayout) {
         return;
     }
-    state_.layoutEditSessionSavedConfig = state_.config;
-    state_.hasLayoutEditSessionSavedConfig = true;
+    state_.layoutEditSessionSavedLayout = state_.config.layout;
+    state_.hasLayoutEditSessionSavedLayout = true;
     state_.hasUnsavedLayoutEditChanges = false;
 }
 
@@ -423,15 +423,18 @@ void DashboardController::StopLayoutEditMode(
 }
 
 bool DashboardController::HasUnsavedLayoutEditChanges() const {
-    return state_.isEditingLayout && state_.hasLayoutEditSessionSavedConfig && state_.hasUnsavedLayoutEditChanges;
+    return state_.isEditingLayout && state_.hasLayoutEditSessionSavedLayout && state_.hasUnsavedLayoutEditChanges;
 }
 
-bool DashboardController::RestoreLayoutEditSessionSavedConfig(DashboardShellHost& shell) {
-    if (!state_.hasLayoutEditSessionSavedConfig) {
+bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost& shell) {
+    if (!state_.hasLayoutEditSessionSavedLayout) {
         return false;
     }
 
-    state_.config = state_.layoutEditSessionSavedConfig;
+    state_.config.layout = state_.layoutEditSessionSavedLayout;
+    if (!SelectResolvedLayout(state_.config, state_.config.display.layout)) {
+        return false;
+    }
     if (state_.telemetry != nullptr) {
         state_.telemetry->SetPreferredNetworkAdapterName(state_.config.network.adapterName);
         state_.telemetry->SetSelectedStorageDrives(state_.config.storage.drives);
@@ -439,9 +442,6 @@ bool DashboardController::RestoreLayoutEditSessionSavedConfig(DashboardShellHost
         state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    ApplyConfiguredWallpaper();
-    state_.placementWatchActive = true;
-    shell.ApplyConfigPlacement();
     shell.InvalidateShell();
     MarkLayoutEditSessionSaved();
     return true;

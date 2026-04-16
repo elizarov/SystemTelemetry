@@ -2274,7 +2274,7 @@ void DashboardRenderer::Shutdown() {
 const DashboardMetricSource& DashboardRenderer::ResolveMetrics(const SystemSnapshot& snapshot) {
     if (cachedMetricSource_ == nullptr || cachedMetricSnapshot_ != &snapshot ||
         cachedMetricSnapshotRevision_ != snapshot.revision) {
-        cachedMetricSource_ = std::make_unique<DashboardMetricSource>(snapshot, config_.metrics);
+        cachedMetricSource_ = std::make_unique<DashboardMetricSource>(snapshot, config_.layout.metrics);
         cachedMetricSnapshot_ = &snapshot;
         cachedMetricSnapshotRevision_ = snapshot.revision;
     }
