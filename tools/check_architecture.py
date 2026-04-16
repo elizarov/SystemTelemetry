@@ -16,8 +16,14 @@ EXCLUDED_PREFIXES = ("src/vendor/",)
 HEADER_BODY_ALLOWLIST = {
     "src/config_schema.h",
 }
+CPP_WITHOUT_HEADER_ALLOWLIST = {
+    "src/app_main.cpp",
+    "src/board_gigabyte_siv.cpp",
+    "src/gpu_amd_adl.cpp",
+    "src/telemetry_runtime_fake.cpp",
+}
 CONTROL_KEYWORDS = {"if", "for", "while", "switch", "catch"}
-CLASS_DECL_RE = re.compile(r"\b(?:class|struct)\s+([A-Za-z_]\w*)\b")
+CLASS_DECL_RE = re.compile(r"\b(?:class|struct)\s+([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)\b")
 QUALIFIED_DEF_RE = re.compile(
     r"(?:^|[\s*&])([A-Za-z_]\w*(?:::[A-Za-z_~]\w*)+)\s*\([^;{}()]*\)\s*(?:const\b)?\s*(?:noexcept\b)?(?:\s*->\s*[^{}]+)?$"
 )
@@ -168,6 +174,10 @@ def paired_cpp_for_header(header_rel: str) -> str:
     return header_rel[:-2] + ".cpp"
 
 
+def paired_header_for_cpp(cpp_rel: str) -> str:
+    return cpp_rel[:-4] + ".h"
+
+
 def collect_class_headers(headers: Iterable[Path]) -> dict[str, set[str]]:
     mapping: dict[str, set[str]] = {}
     for path in headers:
@@ -214,8 +224,8 @@ def collect_cpp_definition_violations(
             qualified = QUALIFIED_DEF_RE.search(statement)
             if qualified:
                 full_name = qualified.group(1)
-                root = full_name.split("::", 1)[0]
-                owners = class_headers.get(root)
+                owner_name = full_name.rsplit("::", 1)[0]
+                owners = class_headers.get(owner_name)
                 if owners and len(owners) == 1:
                     owner_header = next(iter(owners))
                     expected_cpp = paired_cpp_for_header(owner_header)
@@ -278,6 +288,26 @@ def collect_header_body_violations(headers: Iterable[Path]) -> list[Violation]:
     return violations
 
 
+def collect_cpp_header_violations(cpps: Iterable[Path]) -> list[Violation]:
+    violations: list[Violation] = []
+    for path in cpps:
+        cpp_rel = relpath(path)
+        if cpp_rel in CPP_WITHOUT_HEADER_ALLOWLIST:
+            continue
+        expected_header = PROJECT_ROOT / paired_header_for_cpp(cpp_rel)
+        if expected_header.exists():
+            continue
+        violations.append(
+            Violation(
+                kind="missing-header",
+                relpath=cpp_rel,
+                line=1,
+                message=f"{cpp_rel} has no matching header {paired_header_for_cpp(cpp_rel)}; add one or allowlist the translation unit.",
+            )
+        )
+    return violations
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Check header/implementation ownership constraints.")
     parser.parse_args()
@@ -290,6 +320,7 @@ def main() -> int:
     free_headers = collect_free_function_headers(headers)
 
     violations = []
+    violations.extend(collect_cpp_header_violations(cpps))
     violations.extend(collect_cpp_definition_violations(cpps, class_headers, free_headers))
     violations.extend(collect_header_body_violations(headers))
     violations.sort(key=lambda item: (item.relpath, item.line, item.kind, item.message))

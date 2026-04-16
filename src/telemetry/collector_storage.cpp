@@ -1,10 +1,11 @@
-#include "telemetry/collector_internal.h"
+#include "telemetry/collector_storage.h"
 
 #include <algorithm>
 #include <cctype>
 #include <vector>
 
 #include "numeric_safety.h"
+#include "telemetry/collector_internal.h"
 #include "telemetry/collector_support.h"
 #include "utf8.h"
 

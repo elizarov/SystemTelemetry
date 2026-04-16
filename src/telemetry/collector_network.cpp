@@ -1,4 +1,4 @@
-#include "telemetry/collector_internal.h"
+#include "telemetry/collector_network.h"
 
 #include <algorithm>
 #include <cstring>
@@ -6,6 +6,7 @@
 
 #include "app_strings.h"
 #include "numeric_safety.h"
+#include "telemetry/collector_internal.h"
 #include "utf8.h"
 
 namespace {

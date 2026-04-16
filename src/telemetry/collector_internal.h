@@ -29,8 +29,6 @@ struct DriveCounterState {
     PDH_HCOUNTER writeCounter = nullptr;
 };
 
-std::string NormalizeStorageDriveLetter(const std::string& drive);
-
 struct TelemetryCollector::Impl {
     struct StorageState {
         std::vector<std::string> resolvedDriveLetters;

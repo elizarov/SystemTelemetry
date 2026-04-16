@@ -24,6 +24,7 @@
 #include "system_info_support.h"
 #include "telemetry.h"
 #include "telemetry/collector_internal.h"
+#include "telemetry/collector_storage.h"
 #include "telemetry/collector_support.h"
 #include "trace.h"
 #include "utf8.h"
