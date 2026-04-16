@@ -9,6 +9,7 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -44,10 +45,22 @@ struct DashboardDriveRow {
     std::string freeText;
 };
 
+bool IsStaticDashboardTextMetric(std::string_view metricRef);
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef);
 
 class DashboardMetricSource {
 public:
+    struct ThroughputCacheEntry {
+        DashboardThroughputMetric metric;
+    };
+
+    struct ThroughputSharedState {
+        std::unordered_map<std::string, std::vector<double>> historyByMetricRef;
+        double networkMaxGraph = 10.0;
+        double storageMaxGraph = 10.0;
+        double timeMarkerOffsetSamples = 0.0;
+    };
+
     DashboardMetricSource(const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics);
 
     const std::string& ResolveText(const std::string& metricRef) const;
@@ -60,19 +73,6 @@ public:
     const std::string& ResolveClockDate() const;
 
 private:
-    struct ThroughputCacheEntry {
-        DashboardThroughputMetric metric;
-    };
-
-    struct ThroughputSharedState {
-        std::vector<double> networkUploadHistory;
-        std::vector<double> networkDownloadHistory;
-        std::vector<double> storageReadHistory;
-        std::vector<double> storageWriteHistory;
-        double networkMaxGraph = 10.0;
-        double storageMaxGraph = 10.0;
-        double timeMarkerOffsetSamples = 0.0;
-    };
 
     const SystemSnapshot& snapshot_;
     const MetricsSectionConfig& metrics_;

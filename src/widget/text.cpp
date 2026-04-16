@@ -55,7 +55,7 @@ void TextWidget::Draw(
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     const auto binding = renderer.MakeEditableTextBinding(
         widget, DashboardRenderer::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
-    if (metric_ == "cpu.name" || metric_ == "gpu.name") {
+    if (IsStaticDashboardTextMetric(metric_)) {
         if (!staticAnchorRegistered_) {
             cachedStaticText_ = text;
             renderer.RegisterStaticTextAnchor(widget.rect,

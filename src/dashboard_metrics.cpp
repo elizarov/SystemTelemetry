@@ -11,6 +11,52 @@
 
 namespace {
 
+constexpr std::string_view kBoardTemperaturePrefix = "board.temp.";
+constexpr std::string_view kBoardFanPrefix = "board.fan.";
+
+enum class DashboardMetricPayloadKind : unsigned int {
+    Text = 1u,
+    Value = 2u,
+    Throughput = 4u,
+};
+
+enum class ThroughputGraphGroup {
+    None,
+    Network,
+    Storage,
+};
+
+using TextResolverFn = std::string (*)(const SystemSnapshot&, std::string_view);
+using MetricResolverFn =
+    DashboardMetricValue (*)(const SystemSnapshot&, const MetricDefinitionConfig&, const std::string&, std::string_view);
+using ThroughputValueResolverFn = double (*)(const SystemSnapshot&);
+using ThroughputGuideStepResolverFn = double (*)(double);
+
+struct DashboardMetricBinding {
+    std::string_view key;
+    bool prefixMatch = false;
+    unsigned int payloadKinds = 0;
+    bool staticText = false;
+    TextResolverFn resolveText = nullptr;
+    MetricResolverFn resolveMetric = nullptr;
+    ThroughputValueResolverFn resolveThroughputValue = nullptr;
+    ThroughputGraphGroup throughputGroup = ThroughputGraphGroup::None;
+    ThroughputGuideStepResolverFn resolveGuideStep = nullptr;
+};
+
+struct DashboardMetricBindingMatch {
+    const DashboardMetricBinding* binding = nullptr;
+    std::string_view logicalName;
+};
+
+constexpr unsigned int PayloadMask(DashboardMetricPayloadKind kind) {
+    return static_cast<unsigned int>(kind);
+}
+
+bool BindingSupportsPayload(const DashboardMetricBinding& binding, DashboardMetricPayloadKind kind) {
+    return (binding.payloadKinds & PayloadMask(kind)) != 0;
+}
+
 std::string FormatScalarValue(std::optional<double> value, std::string_view unit, int precision) {
     if (!value.has_value() || !IsFiniteDouble(*value)) {
         return "N/A";
@@ -114,13 +160,15 @@ double ResolveDisplayedThroughputValue(double fallbackValue, const std::vector<d
     return FiniteNonNegativeOr(fallbackValue);
 }
 
-double GetThroughputGraphMax(const std::vector<double>& firstHistory, const std::vector<double>& secondHistory) {
+double GetThroughputGraphMax(const std::vector<const std::vector<double>*>& histories) {
     double rawMax = 10.0;
-    for (double value : firstHistory) {
-        rawMax = std::max(rawMax, FiniteNonNegativeOr(value));
-    }
-    for (double value : secondHistory) {
-        rawMax = std::max(rawMax, FiniteNonNegativeOr(value));
+    for (const auto* history : histories) {
+        if (history == nullptr) {
+            continue;
+        }
+        for (double value : *history) {
+            rawMax = std::max(rawMax, FiniteNonNegativeOr(value));
+        }
     }
     const double roundingStep = rawMax > 100.0 ? 50.0 : 5.0;
     return std::max(10.0, std::ceil(rawMax / roundingStep) * roundingStep);
@@ -239,7 +287,7 @@ DashboardMetricValue BuildResolvedMetric(const SystemSnapshot& snapshot,
         ResolvePeakRatio(snapshot, definition, metricRef, ratio, telemetryScale)};
 }
 
-std::optional<DashboardMetricValue> ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
+DashboardMetricValue ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
     const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
@@ -257,102 +305,292 @@ std::optional<DashboardMetricValue> ResolveBoardMetric(const std::vector<NamedSc
     return BuildResolvedMetric(snapshot, definition, metricRef, "N/A", 0.0);
 }
 
+std::string ResolveCpuNameText(const SystemSnapshot& snapshot, std::string_view) {
+    return snapshot.cpu.name;
+}
+
+std::string ResolveGpuNameText(const SystemSnapshot& snapshot, std::string_view) {
+    return snapshot.gpu.name;
+}
+
+DashboardMetricValue ResolveCpuLoadMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double percent = ClampFinite(snapshot.cpu.loadPercent, 0.0, 100.0);
+    const double ratio = ResolveMetricRatio(definition, percent, 100.0);
+    return BuildResolvedMetric(
+        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, percent), ratio, 100.0);
+}
+
+DashboardMetricValue ResolveCpuClockMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double value = FiniteNonNegativeOr(snapshot.cpu.clock.value.value_or(0.0));
+    const double ratio = ResolveMetricRatio(definition, value);
+    return BuildResolvedMetric(
+        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.cpu.clock.value), ratio);
+}
+
+DashboardMetricValue ResolveCpuMemoryMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double total = FiniteNonNegativeOr(snapshot.cpu.memory.totalGb);
+    const double used = FiniteNonNegativeOr(snapshot.cpu.memory.usedGb);
+    const double ratio = ResolveMetricRatio(definition, used, total);
+    return BuildResolvedMetric(snapshot,
+        definition,
+        metricRef,
+        FormatMetricValueText(definition, metricRef, snapshot.cpu.memory.usedGb, snapshot.cpu.memory.totalGb),
+        ratio,
+        total);
+}
+
+DashboardMetricValue ResolveGpuLoadMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double percent = ClampFinite(snapshot.gpu.loadPercent, 0.0, 100.0);
+    const double ratio = ResolveMetricRatio(definition, percent, 100.0);
+    return BuildResolvedMetric(
+        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, percent), ratio, 100.0);
+}
+
+DashboardMetricValue ResolveGpuTemperatureMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double value = FiniteNonNegativeOr(snapshot.gpu.temperature.value.value_or(0.0));
+    const double ratio = ResolveMetricRatio(definition, value);
+    return BuildResolvedMetric(snapshot,
+        definition,
+        metricRef,
+        FormatMetricValueText(definition, metricRef, snapshot.gpu.temperature.value),
+        ratio);
+}
+
+DashboardMetricValue ResolveGpuClockMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double value = FiniteNonNegativeOr(snapshot.gpu.clock.value.value_or(0.0));
+    const double ratio = ResolveMetricRatio(definition, value);
+    return BuildResolvedMetric(
+        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.gpu.clock.value), ratio);
+}
+
+DashboardMetricValue ResolveGpuFanMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double value = FiniteNonNegativeOr(snapshot.gpu.fan.value.value_or(0.0));
+    const double ratio = ResolveMetricRatio(definition, value);
+    return BuildResolvedMetric(
+        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.gpu.fan.value), ratio);
+}
+
+DashboardMetricValue ResolveGpuMemoryMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double total = FiniteNonNegativeOr(snapshot.gpu.vram.totalGb);
+    const double used = FiniteNonNegativeOr(snapshot.gpu.vram.usedGb);
+    const double ratio = ResolveMetricRatio(definition, used, total);
+    return BuildResolvedMetric(snapshot,
+        definition,
+        metricRef,
+        FormatMetricValueText(definition, metricRef, snapshot.gpu.vram.usedGb, snapshot.gpu.vram.totalGb),
+        ratio,
+        total);
+}
+
+DashboardMetricValue ResolveBoardTemperatureMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view logicalName) {
+    return ResolveBoardMetric(snapshot.boardTemperatures, snapshot, definition, metricRef, logicalName);
+}
+
+DashboardMetricValue ResolveBoardFanMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view logicalName) {
+    return ResolveBoardMetric(snapshot.boardFans, snapshot, definition, metricRef, logicalName);
+}
+
+double ResolveNetworkUploadValue(const SystemSnapshot& snapshot) {
+    return snapshot.network.uploadMbps;
+}
+
+double ResolveNetworkDownloadValue(const SystemSnapshot& snapshot) {
+    return snapshot.network.downloadMbps;
+}
+
+double ResolveStorageReadValue(const SystemSnapshot& snapshot) {
+    return snapshot.storage.readMbps;
+}
+
+double ResolveStorageWriteValue(const SystemSnapshot& snapshot) {
+    return snapshot.storage.writeMbps;
+}
+
+double ResolveFiveMbpsGuideStep(double) {
+    return 5.0;
+}
+
+const DashboardMetricBinding kExactBindings[] = {
+    {"cpu.name", false, PayloadMask(DashboardMetricPayloadKind::Text), true, &ResolveCpuNameText},
+    {"gpu.name", false, PayloadMask(DashboardMetricPayloadKind::Text), true, &ResolveGpuNameText},
+    {"cpu.load", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveCpuLoadMetric},
+    {"cpu.clock", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveCpuClockMetric},
+    {"cpu.ram", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveCpuMemoryMetric},
+    {"gpu.load", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuLoadMetric},
+    {"gpu.temp", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuTemperatureMetric},
+    {"gpu.clock", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuClockMetric},
+    {"gpu.fan", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuFanMetric},
+    {"gpu.vram", false, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveGpuMemoryMetric},
+    {"network.upload",
+        false,
+        PayloadMask(DashboardMetricPayloadKind::Throughput),
+        false,
+        nullptr,
+        nullptr,
+        &ResolveNetworkUploadValue,
+        ThroughputGraphGroup::Network,
+        &ResolveFiveMbpsGuideStep},
+    {"network.download",
+        false,
+        PayloadMask(DashboardMetricPayloadKind::Throughput),
+        false,
+        nullptr,
+        nullptr,
+        &ResolveNetworkDownloadValue,
+        ThroughputGraphGroup::Network,
+        &ResolveFiveMbpsGuideStep},
+    {"storage.read",
+        false,
+        PayloadMask(DashboardMetricPayloadKind::Throughput),
+        false,
+        nullptr,
+        nullptr,
+        &ResolveStorageReadValue,
+        ThroughputGraphGroup::Storage,
+        &GetStorageGuideStep},
+    {"storage.write",
+        false,
+        PayloadMask(DashboardMetricPayloadKind::Throughput),
+        false,
+        nullptr,
+        nullptr,
+        &ResolveStorageWriteValue,
+        ThroughputGraphGroup::Storage,
+        &GetStorageGuideStep},
+};
+
+const DashboardMetricBinding kPrefixBindings[] = {
+    {kBoardTemperaturePrefix,
+        true,
+        PayloadMask(DashboardMetricPayloadKind::Value),
+        false,
+        nullptr,
+        &ResolveBoardTemperatureMetric},
+    {kBoardFanPrefix, true, PayloadMask(DashboardMetricPayloadKind::Value), false, nullptr, &ResolveBoardFanMetric},
+};
+
+DashboardMetricBindingMatch FindDashboardMetricBinding(std::string_view metricRef) {
+    for (const auto& binding : kExactBindings) {
+        if (binding.key == metricRef) {
+            return DashboardMetricBindingMatch{&binding, {}};
+        }
+    }
+    for (const auto& binding : kPrefixBindings) {
+        if (metricRef.rfind(binding.key, 0) == 0) {
+            return DashboardMetricBindingMatch{&binding, metricRef.substr(binding.key.size())};
+        }
+    }
+    return {};
+}
+
 std::optional<DashboardMetricValue> ResolveMetricValue(
     const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics, const std::string& metricRef) {
+    const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
+    if (match.binding == nullptr || !BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Value) ||
+        match.binding->resolveMetric == nullptr) {
+        return std::nullopt;
+    }
+
     const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
     if (definition == nullptr) {
         return std::nullopt;
     }
+    return match.binding->resolveMetric(snapshot, *definition, metricRef, match.logicalName);
+}
 
-    if (metricRef == "cpu.load") {
-        const double percent = ClampFinite(snapshot.cpu.loadPercent, 0.0, 100.0);
-        const double ratio = ResolveMetricRatio(*definition, percent, 100.0);
-        return BuildResolvedMetric(
-            snapshot, *definition, metricRef, FormatMetricValueText(*definition, metricRef, percent), ratio, 100.0);
+const std::vector<double>* FindThroughputHistory(
+    const DashboardMetricSource::ThroughputSharedState& state, std::string_view metricRef) {
+    const auto it = state.historyByMetricRef.find(std::string(metricRef));
+    return it != state.historyByMetricRef.end() ? &it->second : nullptr;
+}
+
+double ResolveThroughputGraphMax(
+    const DashboardMetricSource::ThroughputSharedState& state, const DashboardMetricBinding& binding) {
+    switch (binding.throughputGroup) {
+        case ThroughputGraphGroup::Network:
+            return state.networkMaxGraph;
+        case ThroughputGraphGroup::Storage:
+            return state.storageMaxGraph;
+        case ThroughputGraphGroup::None:
+            return 10.0;
     }
-    if (metricRef == "cpu.clock") {
-        const double value = FiniteNonNegativeOr(snapshot.cpu.clock.value.value_or(0.0));
-        const double ratio = ResolveMetricRatio(*definition, value);
-        return BuildResolvedMetric(snapshot,
-            *definition,
-            metricRef,
-            FormatMetricValueText(*definition, metricRef, snapshot.cpu.clock.value),
-            ratio);
+    return 10.0;
+}
+
+void InitializeThroughputSharedState(
+    const SystemSnapshot& snapshot, DashboardMetricSource::ThroughputSharedState& state) {
+    std::vector<const std::vector<double>*> networkHistories;
+    std::vector<const std::vector<double>*> storageHistories;
+    for (const auto& binding : kExactBindings) {
+        if (!BindingSupportsPayload(binding, DashboardMetricPayloadKind::Throughput)) {
+            continue;
+        }
+        auto [it, inserted] = state.historyByMetricRef.emplace(
+            std::string(binding.key), SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot, std::string(binding.key))));
+        (void)inserted;
+        const auto* history = &it->second;
+        if (binding.throughputGroup == ThroughputGraphGroup::Network) {
+            networkHistories.push_back(history);
+        } else if (binding.throughputGroup == ThroughputGraphGroup::Storage) {
+            storageHistories.push_back(history);
+        }
     }
-    if (metricRef == "cpu.ram") {
-        const double total = FiniteNonNegativeOr(snapshot.cpu.memory.totalGb);
-        const double used = FiniteNonNegativeOr(snapshot.cpu.memory.usedGb);
-        const double ratio = ResolveMetricRatio(*definition, used, total);
-        return BuildResolvedMetric(snapshot,
-            *definition,
-            metricRef,
-            FormatMetricValueText(*definition, metricRef, snapshot.cpu.memory.usedGb, snapshot.cpu.memory.totalGb),
-            ratio,
-            total);
-    }
-    if (metricRef == "gpu.load") {
-        const double percent = ClampFinite(snapshot.gpu.loadPercent, 0.0, 100.0);
-        const double ratio = ResolveMetricRatio(*definition, percent, 100.0);
-        return BuildResolvedMetric(
-            snapshot, *definition, metricRef, FormatMetricValueText(*definition, metricRef, percent), ratio, 100.0);
-    }
-    if (metricRef == "gpu.temp") {
-        const double value = FiniteNonNegativeOr(snapshot.gpu.temperature.value.value_or(0.0));
-        const double ratio = ResolveMetricRatio(*definition, value);
-        return BuildResolvedMetric(snapshot,
-            *definition,
-            metricRef,
-            FormatMetricValueText(*definition, metricRef, snapshot.gpu.temperature.value),
-            ratio);
-    }
-    if (metricRef == "gpu.clock") {
-        const double value = FiniteNonNegativeOr(snapshot.gpu.clock.value.value_or(0.0));
-        const double ratio = ResolveMetricRatio(*definition, value);
-        return BuildResolvedMetric(snapshot,
-            *definition,
-            metricRef,
-            FormatMetricValueText(*definition, metricRef, snapshot.gpu.clock.value),
-            ratio);
-    }
-    if (metricRef == "gpu.fan") {
-        const double value = FiniteNonNegativeOr(snapshot.gpu.fan.value.value_or(0.0));
-        const double ratio = ResolveMetricRatio(*definition, value);
-        return BuildResolvedMetric(snapshot,
-            *definition,
-            metricRef,
-            FormatMetricValueText(*definition, metricRef, snapshot.gpu.fan.value),
-            ratio);
-    }
-    if (metricRef == "gpu.vram") {
-        const double total = FiniteNonNegativeOr(snapshot.gpu.vram.totalGb);
-        const double used = FiniteNonNegativeOr(snapshot.gpu.vram.usedGb);
-        const double ratio = ResolveMetricRatio(*definition, used, total);
-        return BuildResolvedMetric(snapshot,
-            *definition,
-            metricRef,
-            FormatMetricValueText(*definition, metricRef, snapshot.gpu.vram.usedGb, snapshot.gpu.vram.totalGb),
-            ratio,
-            total);
-    }
-    if (metricRef.rfind("board.temp.", 0) == 0) {
-        return ResolveBoardMetric(snapshot.boardTemperatures,
-            snapshot,
-            *definition,
-            metricRef,
-            metricRef.substr(std::string("board.temp.").size()));
-    }
-    if (metricRef.rfind("board.fan.", 0) == 0) {
-        return ResolveBoardMetric(
-            snapshot.boardFans, snapshot, *definition, metricRef, metricRef.substr(std::string("board.fan.").size()));
-    }
-    return std::nullopt;
+    state.networkMaxGraph = GetThroughputGraphMax(networkHistories);
+    state.storageMaxGraph = GetThroughputGraphMax(storageHistories);
+    state.timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot.now);
 }
 
 }  // namespace
 
+bool IsStaticDashboardTextMetric(std::string_view metricRef) {
+    const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
+    return match.binding != nullptr && match.binding->staticText &&
+           BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Text);
+}
+
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef) {
     const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
-    return definition != nullptr ? BuildMetricSampleValueText(*definition, metricRef) : std::string{};
+    if (definition == nullptr) {
+        return {};
+    }
+
+    const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
+    if (match.binding != nullptr &&
+        !BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Value) &&
+        !BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Throughput)) {
+        return {};
+    }
+    return BuildMetricSampleValueText(*definition, metricRef);
 }
 
 DashboardMetricSource::DashboardMetricSource(const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics)
@@ -365,10 +603,10 @@ const std::string& DashboardMetricSource::ResolveText(const std::string& metricR
     }
 
     std::string resolved = "N/A";
-    if (metricRef == "cpu.name") {
-        resolved = snapshot_.cpu.name;
-    } else if (metricRef == "gpu.name") {
-        resolved = snapshot_.gpu.name;
+    const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
+    if (match.binding != nullptr && BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Text) &&
+        match.binding->resolveText != nullptr) {
+        resolved = match.binding->resolveText(snapshot_, match.logicalName);
     }
     return textCache_.emplace(metricRef, std::move(resolved)).first->second;
 }
@@ -417,47 +655,23 @@ const DashboardThroughputMetric& DashboardMetricSource::ResolveThroughput(const 
 
     if (!throughputSharedState_.has_value()) {
         throughputSharedState_ = ThroughputSharedState{};
-        throughputSharedState_->networkUploadHistory =
-            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.upload"));
-        throughputSharedState_->networkDownloadHistory =
-            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "network.download"));
-        throughputSharedState_->storageReadHistory =
-            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.read"));
-        throughputSharedState_->storageWriteHistory =
-            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot_, "storage.write"));
-        throughputSharedState_->networkMaxGraph = GetThroughputGraphMax(
-            throughputSharedState_->networkUploadHistory, throughputSharedState_->networkDownloadHistory);
-        throughputSharedState_->storageMaxGraph = GetThroughputGraphMax(
-            throughputSharedState_->storageReadHistory, throughputSharedState_->storageWriteHistory);
-        throughputSharedState_->timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot_.now);
+        InitializeThroughputSharedState(snapshot_, *throughputSharedState_);
     }
 
+    const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
     const MetricDefinitionConfig* definition = FindMetricDefinition(metrics_, metricRef);
     DashboardThroughputMetric metric;
-    if (metricRef == "network.upload") {
+    if (match.binding != nullptr && BindingSupportsPayload(*match.binding, DashboardMetricPayloadKind::Throughput) &&
+        match.binding->resolveThroughputValue != nullptr) {
+        const auto* history = FindThroughputHistory(*throughputSharedState_, metricRef);
+        const std::vector<double> emptyHistory;
+        const std::vector<double>& resolvedHistory = history != nullptr ? *history : emptyHistory;
         metric.valueMbps =
-            ResolveDisplayedThroughputValue(snapshot_.network.uploadMbps, throughputSharedState_->networkUploadHistory);
-        metric.history = throughputSharedState_->networkUploadHistory;
-        metric.maxGraph = throughputSharedState_->networkMaxGraph;
-        metric.guideStepMbps = 5.0;
-    } else if (metricRef == "network.download") {
-        metric.valueMbps = ResolveDisplayedThroughputValue(
-            snapshot_.network.downloadMbps, throughputSharedState_->networkDownloadHistory);
-        metric.history = throughputSharedState_->networkDownloadHistory;
-        metric.maxGraph = throughputSharedState_->networkMaxGraph;
-        metric.guideStepMbps = 5.0;
-    } else if (metricRef == "storage.read") {
-        metric.valueMbps =
-            ResolveDisplayedThroughputValue(snapshot_.storage.readMbps, throughputSharedState_->storageReadHistory);
-        metric.history = throughputSharedState_->storageReadHistory;
-        metric.maxGraph = throughputSharedState_->storageMaxGraph;
-        metric.guideStepMbps = GetStorageGuideStep(throughputSharedState_->storageMaxGraph);
-    } else if (metricRef == "storage.write") {
-        metric.valueMbps =
-            ResolveDisplayedThroughputValue(snapshot_.storage.writeMbps, throughputSharedState_->storageWriteHistory);
-        metric.history = throughputSharedState_->storageWriteHistory;
-        metric.maxGraph = throughputSharedState_->storageMaxGraph;
-        metric.guideStepMbps = GetStorageGuideStep(throughputSharedState_->storageMaxGraph);
+            ResolveDisplayedThroughputValue(match.binding->resolveThroughputValue(snapshot_), resolvedHistory);
+        metric.history = resolvedHistory;
+        metric.maxGraph = ResolveThroughputGraphMax(*throughputSharedState_, *match.binding);
+        metric.guideStepMbps =
+            match.binding->resolveGuideStep != nullptr ? match.binding->resolveGuideStep(metric.maxGraph) : 5.0;
     }
     metric.timeMarkerOffsetSamples = throughputSharedState_->timeMarkerOffsetSamples;
     metric.timeMarkerIntervalSamples = 20.0;
