@@ -105,6 +105,7 @@ add_executable(SystemTelemetry WIN32
     src/system_info_support.cpp
     src/telemetry.cpp
     src/telemetry/collector_state.cpp
+    src/telemetry/collector_board.cpp
     src/telemetry/collector_cpu.cpp
     src/telemetry/collector_gpu.cpp
     src/telemetry/collector_support.cpp

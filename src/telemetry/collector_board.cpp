@@ -1,0 +1,82 @@
+#include "telemetry/collector_board.h"
+
+#include "board_vendor.h"
+#include "numeric_safety.h"
+#include "system_info_support.h"
+#include "telemetry/collector_state.h"
+
+namespace {
+
+void ApplyBoardVendorSample(TelemetryCollectorState& state, const BoardVendorTelemetrySample& sample) {
+    state.board_.providerSample = sample;
+    state.board_.providerName = sample.providerName.empty() ? "None" : sample.providerName;
+    state.board_.providerDiagnostics = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
+    state.board_.providerAvailable = sample.available;
+    state.snapshot_.boardTemperatures = sample.temperatures;
+    for (auto& metric : state.snapshot_.boardTemperatures) {
+        metric.metric.value = FiniteOptional(metric.metric.value);
+    }
+    state.snapshot_.boardFans = sample.fans;
+    for (auto& metric : state.snapshot_.boardFans) {
+        metric.metric.value = FiniteOptional(metric.metric.value);
+    }
+}
+
+void InitializeRequestedBoardMetrics(TelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
+    state.snapshot_.boardTemperatures =
+        CreateRequestedBoardMetrics(settings.requestedTemperatureNames, ScalarMetricUnit::Celsius);
+    state.snapshot_.boardFans = CreateRequestedBoardMetrics(settings.requestedFanNames, ScalarMetricUnit::Rpm);
+}
+
+}  // namespace
+
+void InitializeBoardCollector(TelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
+    InitializeRequestedBoardMetrics(state, settings);
+
+    state.board_.provider = CreateBoardVendorTelemetryProvider(&state.trace_);
+    if (state.board_.provider != nullptr) {
+        state.trace_.Write("telemetry:board_provider_initialize_begin");
+        if (state.board_.provider->Initialize(settings)) {
+            ApplyBoardVendorSample(state, state.board_.provider->Sample());
+            state.trace_.Write("telemetry:board_provider_initialize_done provider=" + state.board_.providerName +
+                               " available=" + tracing::Trace::BoolText(state.board_.providerAvailable) +
+                               " diagnostics=\"" + state.board_.providerDiagnostics + "\"");
+        } else {
+            ApplyBoardVendorSample(state, state.board_.provider->Sample());
+            state.trace_.Write("telemetry:board_provider_initialize_failed provider=" + state.board_.providerName +
+                               " diagnostics=\"" + state.board_.providerDiagnostics + "\"");
+        }
+    } else {
+        state.trace_.Write("telemetry:board_provider_create result=null");
+    }
+}
+
+void ReconfigureBoardCollector(TelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
+    InitializeRequestedBoardMetrics(state, settings);
+
+    if (state.board_.provider == nullptr) {
+        return;
+    }
+
+    state.trace_.Write("telemetry:board_provider_reconfigure_begin");
+    if (state.board_.provider->Initialize(settings)) {
+        ApplyBoardVendorSample(state, state.board_.provider->Sample());
+        state.trace_.Write("telemetry:board_provider_reconfigure_done provider=" + state.board_.providerName +
+                           " available=" + tracing::Trace::BoolText(state.board_.providerAvailable) +
+                           " diagnostics=\"" + state.board_.providerDiagnostics + "\"");
+    } else {
+        ApplyBoardVendorSample(state, state.board_.provider->Sample());
+        state.trace_.Write("telemetry:board_provider_reconfigure_failed provider=" + state.board_.providerName +
+                           " diagnostics=\"" + state.board_.providerDiagnostics + "\"");
+    }
+}
+
+void UpdateBoardMetrics(TelemetryCollectorState& state) {
+    if (state.board_.provider != nullptr) {
+        ApplyBoardVendorSample(state, state.board_.provider->Sample());
+        state.trace_.Write("telemetry:board_vendor_sample provider=" + state.board_.providerName + " available=" +
+                           tracing::Trace::BoolText(state.board_.providerAvailable) + " diagnostics=\"" +
+                           state.board_.providerDiagnostics + "\"");
+    }
+    state.retainedHistoryStore_.PushBoardMetricSamples(state.snapshot_);
+}

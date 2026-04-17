@@ -11,11 +11,9 @@
 #include <string>
 #include <vector>
 
-#include "board_vendor.h"
-#include "numeric_safety.h"
 #include "snapshot_dump.h"
-#include "system_info_support.h"
 #include "telemetry.h"
+#include "telemetry/collector_board.h"
 #include "telemetry/collector_cpu.h"
 #include "telemetry/collector_gpu.h"
 #include "telemetry/collector_network.h"
@@ -25,68 +23,6 @@
 #include "trace.h"
 
 namespace {
-
-void ApplyBoardVendorSample(TelemetryCollectorState& state, const BoardVendorTelemetrySample& sample) {
-    state.boardProviderSample_ = sample;
-    state.boardProviderName_ = sample.providerName.empty() ? "None" : sample.providerName;
-    state.boardProviderDiagnostics_ = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
-    state.boardProviderAvailable_ = sample.available;
-    state.snapshot_.boardTemperatures = sample.temperatures;
-    for (auto& metric : state.snapshot_.boardTemperatures) {
-        metric.metric.value = FiniteOptional(metric.metric.value);
-    }
-    state.snapshot_.boardFans = sample.fans;
-    for (auto& metric : state.snapshot_.boardFans) {
-        metric.metric.value = FiniteOptional(metric.metric.value);
-    }
-}
-
-void InitializeBoardProvider(TelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
-    state.boardProvider_ = CreateBoardVendorTelemetryProvider(&state.trace_);
-    if (state.boardProvider_ != nullptr) {
-        state.trace_.Write("telemetry:board_provider_initialize_begin");
-        if (state.boardProvider_->Initialize(settings)) {
-            ApplyBoardVendorSample(state, state.boardProvider_->Sample());
-            state.trace_.Write("telemetry:board_provider_initialize_done provider=" + state.boardProviderName_ +
-                               " available=" + tracing::Trace::BoolText(state.boardProviderAvailable_) +
-                               " diagnostics=\"" + state.boardProviderDiagnostics_ + "\"");
-        } else {
-            ApplyBoardVendorSample(state, state.boardProvider_->Sample());
-            state.trace_.Write("telemetry:board_provider_initialize_failed provider=" + state.boardProviderName_ +
-                               " diagnostics=\"" + state.boardProviderDiagnostics_ + "\"");
-        }
-    } else {
-        state.trace_.Write("telemetry:board_provider_create result=null");
-    }
-}
-
-void ReconfigureBoardProvider(TelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
-    if (state.boardProvider_ == nullptr) {
-        return;
-    }
-
-    state.trace_.Write("telemetry:board_provider_reconfigure_begin");
-    if (state.boardProvider_->Initialize(settings)) {
-        ApplyBoardVendorSample(state, state.boardProvider_->Sample());
-        state.trace_.Write("telemetry:board_provider_reconfigure_done provider=" + state.boardProviderName_ +
-                           " available=" + tracing::Trace::BoolText(state.boardProviderAvailable_) +
-                           " diagnostics=\"" + state.boardProviderDiagnostics_ + "\"");
-    } else {
-        ApplyBoardVendorSample(state, state.boardProvider_->Sample());
-        state.trace_.Write("telemetry:board_provider_reconfigure_failed provider=" + state.boardProviderName_ +
-                           " diagnostics=\"" + state.boardProviderDiagnostics_ + "\"");
-    }
-}
-
-void UpdateBoardMetrics(TelemetryCollectorState& state) {
-    if (state.boardProvider_ != nullptr) {
-        ApplyBoardVendorSample(state, state.boardProvider_->Sample());
-        state.trace_.Write("telemetry:board_vendor_sample provider=" + state.boardProviderName_ + " available=" +
-                           tracing::Trace::BoolText(state.boardProviderAvailable_) + " diagnostics=\"" +
-                           state.boardProviderDiagnostics_ + "\"");
-    }
-    state.retainedHistoryStore_.PushBoardMetricSamples(state.snapshot_);
-}
 
 void InitializeStorageCollector(TelemetryCollectorState& state) {
     const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.storage_.query);
@@ -120,9 +56,6 @@ TelemetryCollector& TelemetryCollector::operator=(TelemetryCollector&&) noexcept
 bool TelemetryCollector::Initialize(const TelemetrySettings& settings, std::ostream* traceStream) {
     state_->settings_ = settings;
     state_->trace_.SetOutput(traceStream);
-    state_->snapshot_.boardTemperatures =
-        CreateRequestedBoardMetrics(settings.board.requestedTemperatureNames, ScalarMetricUnit::Celsius);
-    state_->snapshot_.boardFans = CreateRequestedBoardMetrics(settings.board.requestedFanNames, ScalarMetricUnit::Rpm);
     state_->retainedHistoryStore_.Reset(state_->snapshot_);
 
     WSADATA wsaData{};
@@ -138,7 +71,7 @@ bool TelemetryCollector::Initialize(const TelemetrySettings& settings, std::ostr
             HIBYTE(wsaData.wVersion));
         state_->trace_.Write(buffer);
     }
-    InitializeBoardProvider(*state_, settings.board);
+    InitializeBoardCollector(*state_, settings.board);
     InitializeCpuCollector(*state_);
     InitializeGpuCollector(*state_);
     InitializeStorageCollector(*state_);
@@ -165,10 +98,10 @@ TelemetryDump TelemetryCollector::Dump() const {
     dump.gpuProvider.providerName = state_->gpu_.providerName;
     dump.gpuProvider.diagnostics = state_->gpu_.providerDiagnostics;
     dump.gpuProvider.available = state_->gpu_.providerAvailable;
-    dump.boardProvider = state_->boardProviderSample_;
-    dump.boardProvider.providerName = state_->boardProviderName_;
-    dump.boardProvider.diagnostics = state_->boardProviderDiagnostics_;
-    dump.boardProvider.available = state_->boardProviderAvailable_;
+    dump.boardProvider = state_->board_.providerSample;
+    dump.boardProvider.providerName = state_->board_.providerName;
+    dump.boardProvider.diagnostics = state_->board_.providerDiagnostics;
+    dump.boardProvider.available = state_->board_.providerAvailable;
     return dump;
 }
 
@@ -195,7 +128,7 @@ void TelemetryCollector::ApplySettings(const TelemetrySettings& settings) {
     }
 
     if (boardChanged) {
-        ReconfigureBoardProvider(*state_, settings.board);
+        ReconfigureBoardCollector(*state_, settings.board);
     }
 }
 

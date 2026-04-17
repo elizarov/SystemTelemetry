@@ -30,6 +30,14 @@ struct DriveCounterState {
 };
 
 struct TelemetryCollectorState {
+    struct BoardState {
+        std::unique_ptr<BoardVendorTelemetryProvider> provider;
+        std::string providerName = "None";
+        std::string providerDiagnostics = "Provider not initialized.";
+        BoardVendorTelemetrySample providerSample{};
+        bool providerAvailable = false;
+    };
+
     struct CpuState {
         PDH_HQUERY query = nullptr;
         PDH_HCOUNTER loadCounter = nullptr;
@@ -71,15 +79,11 @@ struct TelemetryCollectorState {
     TelemetrySettings settings_;
     ResolvedTelemetrySelections resolvedSelections_;
     SystemSnapshot snapshot_;
+    BoardState board_;
     CpuState cpu_;
     GpuState gpu_;
     StorageState storage_;
     NetworkState network_;
     RetainedHistoryStore retainedHistoryStore_;
     tracing::Trace trace_;
-    std::unique_ptr<BoardVendorTelemetryProvider> boardProvider_;
-    std::string boardProviderName_ = "None";
-    std::string boardProviderDiagnostics_ = "Provider not initialized.";
-    BoardVendorTelemetrySample boardProviderSample_{};
-    bool boardProviderAvailable_ = false;
 };
