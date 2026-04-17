@@ -13,7 +13,7 @@
 
 namespace {
 
-constexpr UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
+const UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
 constexpr UINT kLayoutEditTooltipFlags = TTF_TRACK | TTF_ABSOLUTE | TTF_TRANSPARENT;
 
 RECT RectFromPoint(RenderPoint point, int radius) {
