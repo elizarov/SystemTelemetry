@@ -485,6 +485,13 @@ DashboardMetricValue ResolveBoardFanMetric(const SystemSnapshot& snapshot,
     return ResolveBoardMetric(snapshot.boardFans, snapshot, definition, metricRef, logicalName);
 }
 
+DashboardMetricValue ResolveNothingMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    return BuildResolvedMetric(snapshot, definition, metricRef, "N/A", 0.0);
+}
+
 double ResolveNetworkUploadValue(const SystemSnapshot& snapshot) {
     return snapshot.network.uploadMbps;
 }
@@ -508,6 +515,7 @@ double ResolveFiveMbpsGuideStep(double) {
 const DashboardMetricBinding kExactBindings[] = {
     DashboardMetricBinding::ExactStaticText("cpu.name", &ResolveCpuNameText),
     DashboardMetricBinding::ExactStaticText("gpu.name", &ResolveGpuNameText),
+    DashboardMetricBinding::ExactValue("nothing", MetricDisplayStyle::Scalar, &ResolveNothingMetric),
     DashboardMetricBinding::ExactValue("cpu.load", MetricDisplayStyle::Percent, &ResolveCpuLoadMetric),
     DashboardMetricBinding::ExactValue("cpu.clock", MetricDisplayStyle::Scalar, &ResolveCpuClockMetric),
     DashboardMetricBinding::ExactValue("cpu.ram", MetricDisplayStyle::Memory, &ResolveCpuMemoryMetric),

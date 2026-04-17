@@ -16,6 +16,8 @@
 
 namespace {
 
+constexpr std::string_view kMetricListPlaceholderId = "nothing";
+
 class DashboardShellUiModalScope {
 public:
     explicit DashboardShellUiModalScope(DashboardShellUi& shellUi) : shellUi_(shellUi) {
@@ -944,6 +946,7 @@ bool DashboardShellUi::ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, 
 bool DashboardShellUi::ApplyMetricListOrderPreview(
     const LayoutMetricListOrderEditKey& key, const std::vector<std::string>& metricRefs) {
     AppConfig updatedConfig = CurrentConfig();
+    EnsureMetricListPlaceholderDefinition(updatedConfig);
     const LayoutEditWidgetIdentity widget{"", key.editCardId, key.nodePath};
     if (!::ApplyMetricListOrder(updatedConfig, widget, metricRefs)) {
         return false;
@@ -963,13 +966,13 @@ bool DashboardShellUi::ApplyMetricListAddRowPreview(const LayoutEditController::
         return false;
     }
 
-    const std::vector<std::string> options = AvailableMetricListMetricIds(CurrentConfig());
-    if (options.empty()) {
+    if (!FindDashboardMetricDisplayStyle(kMetricListPlaceholderId).has_value()) {
         return false;
     }
 
     AppConfig updatedConfig = CurrentConfig();
-    if (!AppendMetricListRow(updatedConfig, anchor->key.widget, options.front())) {
+    EnsureMetricListPlaceholderDefinition(updatedConfig);
+    if (!AppendMetricListRow(updatedConfig, anchor->key.widget, kMetricListPlaceholderId)) {
         return false;
     }
     RestoreConfigSnapshot(updatedConfig);

@@ -7,6 +7,9 @@
 
 namespace {
 
+constexpr std::string_view kMetricListPlaceholderId = "nothing";
+constexpr std::string_view kMetricListPlaceholderLabel = "Nothing";
+
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
     const auto it = std::find_if(
         layout.cards.begin(), layout.cards.end(), [&](LayoutCardConfig& card) { return card.id == cardId; });
@@ -106,12 +109,14 @@ std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter) {
 std::vector<std::string> AvailableMetricListMetricIds(const AppConfig& config) {
     std::vector<std::string> metricIds;
     metricIds.reserve(config.layout.metrics.definitions.size());
+    bool hasPlaceholder = false;
     for (const auto& definition : config.layout.metrics.definitions) {
         switch (definition.style) {
             case MetricDisplayStyle::Scalar:
             case MetricDisplayStyle::Percent:
             case MetricDisplayStyle::Memory:
                 if (IsGenerallyAvailableDashboardMetric(definition.id)) {
+                    hasPlaceholder = hasPlaceholder || definition.id == kMetricListPlaceholderId;
                     metricIds.push_back(definition.id);
                 }
                 break;
@@ -121,7 +126,23 @@ std::vector<std::string> AvailableMetricListMetricIds(const AppConfig& config) {
                 break;
         }
     }
+    if (!hasPlaceholder && FindDashboardMetricDisplayStyle(kMetricListPlaceholderId).has_value()) {
+        metricIds.insert(metricIds.begin(), std::string(kMetricListPlaceholderId));
+    }
     return metricIds;
+}
+
+void EnsureMetricListPlaceholderDefinition(AppConfig& config) {
+    if (FindMetricDefinition(config.layout.metrics, std::string(kMetricListPlaceholderId)) != nullptr) {
+        return;
+    }
+    config.layout.metrics.definitions.insert(config.layout.metrics.definitions.begin(),
+        MetricDefinitionConfig{std::string(kMetricListPlaceholderId),
+            MetricDisplayStyle::Scalar,
+            false,
+            1.0,
+            "",
+            std::string(kMetricListPlaceholderLabel)});
 }
 
 std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNodeConfig* node) {
@@ -217,6 +238,8 @@ bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widg
     if (metricRef.empty()) {
         return false;
     }
+
+    EnsureMetricListPlaceholderDefinition(config);
 
     const LayoutEditHost::LayoutTarget target{widget.editCardId, widget.nodePath};
     const LayoutNodeConfig* currentNode = FindGuideNode(config, target);

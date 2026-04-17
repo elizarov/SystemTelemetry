@@ -15,6 +15,8 @@ void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
 MetricsSectionConfig BuildMetricsConfig() {
     MetricsSectionConfig metrics;
     metrics.definitions.push_back(
+        MetricDefinitionConfig{"nothing", MetricDisplayStyle::Scalar, false, 1.0, "", "Nothing"});
+    metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"});
     metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"});
@@ -100,12 +102,26 @@ TEST(DashboardMetrics, KeepsDisplayOnlyDriveBindingsMetadataOnly) {
 }
 
 TEST(DashboardMetrics, MarksDriveMetricsAsSpecialAndNotGenerallyAvailable) {
+    EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("nothing"));
     EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("cpu.load"));
     EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("gpu.vram"));
     EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("board.temp.cpu"));
     EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.activity.read"));
     EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.usage"));
     EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.free"));
+}
+
+TEST(DashboardMetrics, ResolvesNothingPlaceholderMetricAsUnavailableValue) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+
+    DashboardMetricSource source(snapshot, metrics);
+
+    const DashboardMetricValue& metric = source.ResolveMetric("nothing");
+    EXPECT_EQ(metric.label, "Nothing");
+    EXPECT_EQ(metric.valueText, "N/A");
+    EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
+    EXPECT_DOUBLE_EQ(metric.peakRatio, 0.0);
 }
 
 TEST(DashboardMetrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
