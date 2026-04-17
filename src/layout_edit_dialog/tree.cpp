@@ -150,7 +150,6 @@ void RebuildLayoutEditTree(
 }
 
 void HandleLayoutEditTreeSelection(LayoutEditDialogState* state, HWND hwnd, HTREEITEM item) {
-    DialogRedrawScope redrawScope(hwnd);
     const LayoutEditTreeNode* node = TreeNodeFromItem(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE), item);
     state->selectedNode = node;
     state->selectedLeaf = node != nullptr && node->leaf.has_value() ? &(*node->leaf) : nullptr;
@@ -168,7 +167,6 @@ void RefreshLayoutEditDialogControls(LayoutEditDialogState* state,
         return;
     }
 
-    DialogRedrawScope redrawScope(hwnd);
     if (rebuildTree) {
         RebuildLayoutEditTree(state, hwnd, preferredFocus);
         return;

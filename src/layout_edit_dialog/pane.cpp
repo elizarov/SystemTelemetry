@@ -257,7 +257,14 @@ int LayoutLabeledControlRow(HWND hwnd,
 
 }  // namespace
 
-DialogRedrawScope::DialogRedrawScope(HWND hwnd) : hwnd_(hwnd) {
+DialogRedrawScope::DialogRedrawScope(HWND hwnd, UINT redrawFlags) : hwnd_(hwnd), redrawFlags_(redrawFlags) {
+    if (hwnd_ != nullptr) {
+        SendMessageW(hwnd_, WM_SETREDRAW, FALSE, 0);
+    }
+}
+
+DialogRedrawScope::DialogRedrawScope(HWND hwnd, const RECT& redrawRect, UINT redrawFlags)
+    : hwnd_(hwnd), redrawRect_(redrawRect), redrawFlags_(redrawFlags | RDW_ERASE) {
     if (hwnd_ != nullptr) {
         SendMessageW(hwnd_, WM_SETREDRAW, FALSE, 0);
     }
@@ -266,8 +273,34 @@ DialogRedrawScope::DialogRedrawScope(HWND hwnd) : hwnd_(hwnd) {
 DialogRedrawScope::~DialogRedrawScope() {
     if (hwnd_ != nullptr) {
         SendMessageW(hwnd_, WM_SETREDRAW, TRUE, 0);
-        RedrawWindow(hwnd_, nullptr, nullptr, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
+        const RECT* rect = redrawRect_.has_value() ? &*redrawRect_ : nullptr;
+        RedrawWindow(hwnd_, rect, nullptr, redrawFlags_);
     }
+}
+
+DialogRedrawScope::DialogRedrawScope(DialogRedrawScope&& other) noexcept
+    : hwnd_(other.hwnd_), redrawRect_(other.redrawRect_), redrawFlags_(other.redrawFlags_) {
+    other.hwnd_ = nullptr;
+    other.redrawRect_.reset();
+    other.redrawFlags_ = 0;
+}
+
+DialogRedrawScope& DialogRedrawScope::operator=(DialogRedrawScope&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    if (hwnd_ != nullptr) {
+        SendMessageW(hwnd_, WM_SETREDRAW, TRUE, 0);
+        const RECT* rect = redrawRect_.has_value() ? &*redrawRect_ : nullptr;
+        RedrawWindow(hwnd_, rect, nullptr, redrawFlags_);
+    }
+    hwnd_ = other.hwnd_;
+    redrawRect_ = other.redrawRect_;
+    redrawFlags_ = other.redrawFlags_;
+    other.hwnd_ = nullptr;
+    other.redrawRect_.reset();
+    other.redrawFlags_ = 0;
+    return *this;
 }
 
 void ShowDialogControl(HWND hwnd, int controlId, bool show) {
@@ -384,6 +417,28 @@ int DialogUnitsToPixelsY(HWND hwnd, int dialogUnitsY) {
     RECT rect{0, 0, 0, dialogUnitsY};
     MapDialogRect(hwnd, &rect);
     return rect.bottom - rect.top;
+}
+
+std::optional<RECT> LayoutEditRightPaneRect(HWND hwnd) {
+    RECT clientRect{};
+    if (hwnd == nullptr || !GetClientRect(hwnd, &clientRect)) {
+        return std::nullopt;
+    }
+
+    const auto dividerRect = DialogControlRect(hwnd, IDC_LAYOUT_EDIT_DIVIDER);
+    if (!dividerRect.has_value()) {
+        return clientRect;
+    }
+
+    RECT paneRect = clientRect;
+    paneRect.left = dividerRect->right;
+    return paneRect;
+}
+
+void RefreshLayoutEditRightPane(HWND hwnd) {
+    if (const auto paneRect = LayoutEditRightPaneRect(hwnd); paneRect.has_value()) {
+        RedrawWindow(hwnd, &*paneRect, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+    }
 }
 
 void ConfigureDialogFonts(LayoutEditDialogState* state, HWND hwnd) {

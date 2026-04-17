@@ -149,6 +149,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         state->updatingControls = false;
         LayoutLayoutEditRightPane(state, hwnd);
         UpdateLayoutEditActionState(state, hwnd);
+        RefreshLayoutEditRightPane(hwnd);
         state->dialog->Host().TraceLayoutEditDialogEvent(
             "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
         return;
@@ -334,6 +335,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     state->updatingControls = false;
     LayoutLayoutEditRightPane(state, hwnd);
     UpdateLayoutEditActionState(state, hwnd);
+    RefreshLayoutEditRightPane(hwnd);
 }
 
 LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* state, HWND hwnd) {

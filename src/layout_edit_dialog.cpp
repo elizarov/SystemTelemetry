@@ -266,6 +266,9 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
         state->dialog->UpdateSelectionHighlight(std::nullopt);
         ConfigureColorSliders(hwnd);
         ConfigureDialogFonts(state, hwnd);
+        if (HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE); tree != nullptr) {
+            TreeView_SetExtendedStyle(tree, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
+        }
         SendDlgItemMessageW(
             hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(L"Filter settings"));
         RebuildLayoutEditTree(state, hwnd, state->initialFocus);
