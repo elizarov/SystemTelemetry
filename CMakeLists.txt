@@ -232,8 +232,18 @@ if(DEFINED VCPKG_TARGET_TRIPLET AND NOT VCPKG_TARGET_TRIPLET STREQUAL "")
     set(systemtelemetry_vcpkg_triplet "${VCPKG_TARGET_TRIPLET}")
 endif()
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/${systemtelemetry_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
-    list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/${systemtelemetry_vcpkg_triplet}")
+set(systemtelemetry_vcpkg_installed_dir "")
+if(DEFINED VCPKG_INSTALLED_DIR AND NOT VCPKG_INSTALLED_DIR STREQUAL "")
+    set(systemtelemetry_vcpkg_installed_dir "${VCPKG_INSTALLED_DIR}")
+elseif(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg/${systemtelemetry_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
+    set(systemtelemetry_vcpkg_installed_dir "${CMAKE_SOURCE_DIR}/vcpkg")
+elseif(EXISTS "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/${systemtelemetry_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
+    set(systemtelemetry_vcpkg_installed_dir "${CMAKE_SOURCE_DIR}/build/vcpkg_installed")
+endif()
+
+if(NOT systemtelemetry_vcpkg_installed_dir STREQUAL "" AND
+   EXISTS "${systemtelemetry_vcpkg_installed_dir}/${systemtelemetry_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
+    list(PREPEND CMAKE_PREFIX_PATH "${systemtelemetry_vcpkg_installed_dir}/${systemtelemetry_vcpkg_triplet}")
 endif()
 
 find_package(GTest CONFIG REQUIRED)

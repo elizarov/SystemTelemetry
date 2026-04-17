@@ -8,7 +8,7 @@ This document is the single maintained source of truth for build prerequisites, 
 - Visual Studio 2026 Insiders (`18`) Build Tools with CMake support
 - Visual Studio 2026 Insiders (`18`) C++/CLI support
 - .NET Framework 4.8 SDK
-- vcpkg installed locally, with `VCPKG_ROOT` set to that install so the CMake configure step can resolve the repo manifest dependency on GoogleTest
+- vcpkg available either through the active Visual Studio developer environment or through a local install pointed to by `VCPKG_ROOT`, so the CMake configure step can resolve the repo manifest dependency on GoogleTest
 - AMD Software: Adrenalin Edition with ADLX runtime available for AMD GPU telemetry
 - Gigabyte SIV installed on supported Gigabyte motherboards when board temperature and fan telemetry are desired
 
@@ -27,8 +27,8 @@ Always build with `build.cmd` from the repository root:
 build.cmd
 ```
 
-All build artifacts are kept under `build\`.
-`build.cmd` configures the CMake tree with `Ninja Multi-Config`, prefers the active developer environment's bundled vcpkg toolchain when `VSINSTALLDIR` provides it, otherwise falls back to `%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake`, lets that toolchain's manifest-mode configure step install the repo `vcpkg.json` dependency set for the `x64-windows` triplet into `build\cmake\vcpkg_installed\`, and restores `build\cmake\compile_commands.json` for `clangd`-based editors such as Zed.
+All build artifacts are kept under `build\`, except for the persistent repo-root `vcpkg\` manifest install tree that is intentionally kept outside `build\` so deleting `build\` for a clean configure does not force vcpkg to restore the GoogleTest dependency again.
+`build.cmd` configures the CMake tree with `Ninja Multi-Config`, prefers the active developer environment's bundled vcpkg toolchain when `VSINSTALLDIR` provides it, otherwise falls back to `%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake`, directs that toolchain's manifest-mode configure step to install the repo `vcpkg.json` dependency set for the `x64-windows` triplet into `vcpkg\`, and restores `build\cmake\compile_commands.json` for `clangd`-based editors such as Zed.
 
 ## Install
 

@@ -163,8 +163,9 @@
 
 ## Build and deployment
 
-- Build flow: `build.cmd` boots the VS environment via `devenv.cmd`, redirects `TMP` and `TEMP` into a fresh per-build subdirectory under the user's temp area (falling back to `build\tmp\` only when no user temp path is available), re-creates `build\cmake\` when an older cache uses a different generator, configures `build\cmake\` through `cmake -S -B -G "Ninja Multi-Config" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, then builds that tree through `cmake --build`.
+- Build flow: `build.cmd` boots the VS environment via `devenv.cmd`, redirects `TMP` and `TEMP` into a fresh per-build subdirectory under the user's temp area (falling back to `build\tmp\` only when no user temp path is available), re-creates `build\cmake\` when an older cache uses a different generator, configures `build\cmake\` through `cmake -S -B -G "Ninja Multi-Config" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, points `VCPKG_INSTALLED_DIR` at the repo-root `vcpkg\` manifest install tree so dependency restores survive `build\` deletion, then builds that tree through `cmake --build`.
   - Keeps generated Ninja files, dependency state, object files, and `compile_commands.json` under `build\cmake\` while placing the final executable under `build\` and leaving debug-symbol outputs there for debug-style configs.
+  - Keeps the repo-root `vcpkg\` directory gitignored as the deliberate exception to the `build\`-only generated-output rule because it is the long-lived manifest dependency cache for clean builds.
   - Lets Ninja and the MSVC toolchain perform incremental per-source recompilation.
   - Compiles the Win32 app target from the split dashboard shell, controller, service, telemetry, renderer, diagnostics, the minimal vendored ADLX subset, and `resources/SystemTelemetry.rc`.
   - Builds `src/board_gigabyte_siv.cpp` separately as a Common Language Runtime-enabled object library so it can bridge into the Gigabyte .NET assemblies.

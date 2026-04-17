@@ -8,11 +8,13 @@
 - Keep `docs/build.md` as the single maintained source of truth for build prerequisites, build invocation, and developer-facing setup notes; other docs should link to it instead of repeating that material.
 - Keep production sources in `src`, unit tests in `tests`, and package-managed test dependencies declared through the repository manifest instead of vendored into the source tree.
 - Keep generated build outputs inside `build\` so the project root stays clean.
+- Keep the repo-root `vcpkg\` directory as the only maintained exception to the `build\`-only generated-output rule; it holds the manifest-installed dependency tree so clean builds can delete `build\` without forcing vcpkg to restore packages again.
 - Keep the CMake build tree under `build\cmake\` so generated project files, dependency state, and object directories stay inside `build\` as well.
 - Keep the CMake build tree on the `Ninja Multi-Config` generator so `build\cmake\compile_commands.json` stays available for `clangd`-based editors such as Zed.
 - When `build.cmd` runs under the Codex sandbox, route ephemeral compiler and linker scratch space through a fresh per-build subdirectory under the user's temp directory instead of `build\` so MSVC tools can delete their own temp files successfully.
 - Keep transient toolchain scratch files out of the top level of `build\` so the main build output folder stays readable.
 - Keep `build.cmd` using the same active developer environment for both CMake and vcpkg resolution so the manifest install and configure step stay on one Visual Studio toolchain.
+- Keep `build.cmd` pointing `VCPKG_INSTALLED_DIR` at the repo-root `vcpkg\` directory so manifest-managed test dependencies survive `build\` deletion.
 - Always build through `build.cmd`.
 - Use the top-level `profile_benchmark.cmd` script as the maintained entry point for benchmark CPU profiling; it writes the benchmark ETL, flat CPU summary, and benchmark-only butterfly call tree HTML export into `build\`, accepts optional `iterations` and `render_scale` positional arguments, accepts `/daemon-start`, `/daemon-stop`, and `/daemon-status` to manage one elevated benchmark daemon under `build\profile_benchmark_daemon\`, hands off ordinary benchmark runs to that daemon when it is ready, rebuilds the `Release` benchmark binaries inside that elevated daemon before each queued run, resolves `xperf.exe` from the installed Windows Performance Toolkit at runtime, and otherwise accepts `/elevate` to relaunch a one-shot elevated run when WPR profiling needs `SeSystemProfilePrivilege`.
 - Keep the repo-level `.clang-format` as the single maintained source of truth for C++ formatting rules.
