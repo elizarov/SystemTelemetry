@@ -1,6 +1,6 @@
 #pragma once
 
-struct TelemetryCollectorState;
+struct RealTelemetryCollectorState;
 
-void InitializeGpuCollector(TelemetryCollectorState& state);
-void UpdateGpuMetrics(TelemetryCollectorState& state);
+void InitializeGpuCollector(RealTelemetryCollectorState& state);
+void UpdateGpuMetrics(RealTelemetryCollectorState& state);

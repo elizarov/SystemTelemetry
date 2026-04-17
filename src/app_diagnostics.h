@@ -20,7 +20,6 @@
 #include "dashboard_renderer.h"
 #include "diagnostics_options.h"
 #include "snapshot_dump.h"
-#include "telemetry_runtime.h"
 #include "trace.h"
 #include "utf8.h"
 
@@ -87,10 +86,10 @@ std::filesystem::path CreateTempFilePath(const wchar_t* prefix);
 std::filesystem::path CreateElevatedSaveConfigTempPath();
 int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath);
 
-std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
+std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(
     const AppConfig& runtimeConfig, const DiagnosticsOptions& diagnosticsOptions, std::ostream* traceStream);
-bool ReloadTelemetryRuntimeFromDisk(const std::filesystem::path& configPath,
+bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     AppConfig& activeConfig,
-    std::unique_ptr<TelemetryRuntime>& telemetry,
+    std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
     DiagnosticsSession* diagnostics);

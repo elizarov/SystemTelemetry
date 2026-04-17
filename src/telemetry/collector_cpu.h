@@ -1,6 +1,6 @@
 #pragma once
 
-struct TelemetryCollectorState;
+struct RealTelemetryCollectorState;
 
-void InitializeCpuCollector(TelemetryCollectorState& state);
-void UpdateCpuMetrics(TelemetryCollectorState& state);
+void InitializeCpuCollector(RealTelemetryCollectorState& state);
+void UpdateCpuMetrics(RealTelemetryCollectorState& state);

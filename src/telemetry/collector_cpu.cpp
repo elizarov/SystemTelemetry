@@ -6,15 +6,15 @@
 
 namespace {
 
-void Trace(const TelemetryCollectorState& state, const char* text) {
+void Trace(const RealTelemetryCollectorState& state, const char* text) {
     state.trace_.Write(text);
 }
 
-void Trace(const TelemetryCollectorState& state, const std::string& text) {
+void Trace(const RealTelemetryCollectorState& state, const std::string& text) {
     state.trace_.Write(text);
 }
 
-void UpdateMemory(TelemetryCollectorState& state) {
+void UpdateMemory(RealTelemetryCollectorState& state) {
     MEMORYSTATUSEX memory{};
     memory.dwLength = sizeof(memory);
     const BOOL ok = GlobalMemoryStatusEx(&memory);
@@ -31,7 +31,7 @@ void UpdateMemory(TelemetryCollectorState& state) {
 
 }  // namespace
 
-void InitializeCpuCollector(TelemetryCollectorState& state) {
+void InitializeCpuCollector(RealTelemetryCollectorState& state) {
     if (const std::string cpuName = DetectCpuName(); !cpuName.empty()) {
         state.snapshot_.cpu.name = cpuName;
     }
@@ -64,7 +64,7 @@ void InitializeCpuCollector(TelemetryCollectorState& state) {
         ("telemetry:pdh_collect cpu_query " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
 }
 
-void UpdateCpuMetrics(TelemetryCollectorState& state) {
+void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
     if (state.cpu_.query == nullptr) {
         Trace(state, "telemetry:cpu_update skipped=no_query");
         UpdateMemory(state);

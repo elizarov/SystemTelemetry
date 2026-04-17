@@ -13,7 +13,7 @@
 
 struct DashboardSessionState {
     AppConfig config;
-    std::unique_ptr<TelemetryRuntime> telemetry;
+    std::unique_ptr<TelemetryCollector> telemetry;
     std::unique_ptr<DiagnosticsSession> diagnostics;
     std::chrono::steady_clock::time_point lastDiagnosticsOutput{};
     UINT currentDpi = kDefaultDpi;

@@ -7,7 +7,7 @@
 
 namespace {
 
-void ApplyBoardVendorSample(TelemetryCollectorState& state, const BoardVendorTelemetrySample& sample) {
+void ApplyBoardVendorSample(RealTelemetryCollectorState& state, const BoardVendorTelemetrySample& sample) {
     state.board_.providerSample = sample;
     state.board_.providerName = sample.providerName.empty() ? "None" : sample.providerName;
     state.board_.providerDiagnostics = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
@@ -22,7 +22,7 @@ void ApplyBoardVendorSample(TelemetryCollectorState& state, const BoardVendorTel
     }
 }
 
-void InitializeRequestedBoardMetrics(TelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
+void InitializeRequestedBoardMetrics(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
     state.snapshot_.boardTemperatures =
         CreateRequestedBoardMetrics(settings.requestedTemperatureNames, ScalarMetricUnit::Celsius);
     state.snapshot_.boardFans = CreateRequestedBoardMetrics(settings.requestedFanNames, ScalarMetricUnit::Rpm);
@@ -30,7 +30,7 @@ void InitializeRequestedBoardMetrics(TelemetryCollectorState& state, const Board
 
 }  // namespace
 
-void InitializeBoardCollector(TelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
+void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
     InitializeRequestedBoardMetrics(state, settings);
 
     state.board_.provider = CreateBoardVendorTelemetryProvider(&state.trace_);
@@ -51,7 +51,7 @@ void InitializeBoardCollector(TelemetryCollectorState& state, const BoardTelemet
     }
 }
 
-void ReconfigureBoardCollector(TelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
+void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
     InitializeRequestedBoardMetrics(state, settings);
 
     if (state.board_.provider == nullptr) {
@@ -71,7 +71,7 @@ void ReconfigureBoardCollector(TelemetryCollectorState& state, const BoardTeleme
     }
 }
 
-void UpdateBoardMetrics(TelemetryCollectorState& state) {
+void UpdateBoardMetrics(RealTelemetryCollectorState& state) {
     if (state.board_.provider != nullptr) {
         ApplyBoardVendorSample(state, state.board_.provider->Sample());
         state.trace_.Write("telemetry:board_vendor_sample provider=" + state.board_.providerName +

@@ -1,6 +1,6 @@
 #include "telemetry/collector_state.h"
 
-TelemetryCollectorState::~TelemetryCollectorState() {
+RealTelemetryCollectorState::~RealTelemetryCollectorState() {
     if (cpu_.query != nullptr) {
         PdhCloseQuery(cpu_.query);
     }

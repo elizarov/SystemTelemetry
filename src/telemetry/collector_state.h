@@ -29,7 +29,7 @@ struct DriveCounterState {
     PDH_HCOUNTER writeCounter = nullptr;
 };
 
-struct TelemetryCollectorState {
+struct RealTelemetryCollectorState {
     struct BoardState {
         std::unique_ptr<BoardVendorTelemetryProvider> provider;
         std::string providerName = "None";
@@ -74,7 +74,7 @@ struct TelemetryCollectorState {
         std::chrono::steady_clock::time_point previousTick{};
     };
 
-    ~TelemetryCollectorState();
+    ~RealTelemetryCollectorState();
 
     TelemetrySettings settings_;
     ResolvedTelemetrySelections resolvedSelections_;

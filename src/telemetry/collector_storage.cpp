@@ -1,11 +1,11 @@
 #include "telemetry/collector_storage.h"
 
 #include <algorithm>
-#include <cctype>
 #include <vector>
 
 #include "numeric_safety.h"
 #include "telemetry/collector_state.h"
+#include "telemetry/collector_storage_selection.h"
 #include "telemetry/collector_support.h"
 #include "utf8.h"
 
@@ -18,23 +18,6 @@ std::string ReadVolumeLabel(const std::wstring& root) {
         return {};
     }
     return Utf8FromWide(volumeName);
-}
-
-bool IsSelectableStorageDriveType(UINT driveType) {
-    return driveType == DRIVE_FIXED || driveType == DRIVE_REMOVABLE;
-}
-
-std::vector<std::string> SelectFixedDriveLetters(const std::vector<StorageDriveCandidate>& availableDrives) {
-    std::vector<std::string> drives;
-    for (const auto& drive : availableDrives) {
-        if (drive.driveType != DRIVE_FIXED) {
-            continue;
-        }
-        if (std::find(drives.begin(), drives.end(), drive.letter) == drives.end()) {
-            drives.push_back(drive.letter);
-        }
-    }
-    return drives;
 }
 
 std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
@@ -80,25 +63,6 @@ std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
     return candidates;
 }
 
-std::vector<std::string> ResolveConfiguredStorageDrives(
-    const std::vector<std::string>& configuredDrives, const std::vector<StorageDriveCandidate>& availableDrives) {
-    std::vector<std::string> resolvedDrives;
-    resolvedDrives.reserve(configuredDrives.size());
-    for (const auto& drive : configuredDrives) {
-        const std::string letter = NormalizeStorageDriveLetter(drive);
-        if (letter.empty()) {
-            continue;
-        }
-        if (std::find(resolvedDrives.begin(), resolvedDrives.end(), letter) == resolvedDrives.end()) {
-            resolvedDrives.push_back(letter);
-        }
-    }
-    if (!resolvedDrives.empty() || !configuredDrives.empty()) {
-        return resolvedDrives;
-    }
-    return SelectFixedDriveLetters(availableDrives);
-}
-
 void MarkSelectedStorageDriveCandidates(
     std::vector<StorageDriveCandidate>& candidates, const std::vector<std::string>& selectedDrives) {
     for (auto& candidate : candidates) {
@@ -107,7 +71,7 @@ void MarkSelectedStorageDriveCandidates(
     }
 }
 
-void RefreshDriveUsage(TelemetryCollectorState& state) {
+void RefreshDriveUsage(RealTelemetryCollectorState& state) {
     for (auto& drive : state.snapshot_.drives) {
         const std::wstring root = WideFromUtf8(drive.label + "\\");
         const UINT driveType = GetDriveTypeW(root.c_str());
@@ -167,7 +131,7 @@ void RefreshDriveUsage(TelemetryCollectorState& state) {
     }
 }
 
-void UpdateStorageThroughput(TelemetryCollectorState& state, bool initializeOnly) {
+void UpdateStorageThroughput(RealTelemetryCollectorState& state, bool initializeOnly) {
     if (state.storage_.query == nullptr) {
         state.trace_.Write("telemetry:storage_rates skipped=no_query");
         return;
@@ -212,7 +176,7 @@ void UpdateStorageThroughput(TelemetryCollectorState& state, bool initializeOnly
 
 }  // namespace
 
-void InitializeStorageCollector(TelemetryCollectorState& state) {
+void InitializeStorageCollector(RealTelemetryCollectorState& state) {
     const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.storage_.query);
     state.trace_.Write(
         ("telemetry:pdh_open storage_query " + tracing::Trace::FormatPdhStatus("status", queryStatus)).c_str());
@@ -231,21 +195,10 @@ void InitializeStorageCollector(TelemetryCollectorState& state) {
         ("telemetry:pdh_collect storage_query " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
 }
 
-std::string NormalizeStorageDriveLetter(const std::string& drive) {
-    if (drive.empty()) {
-        return {};
-    }
-    const unsigned char ch = static_cast<unsigned char>(drive.front());
-    if (!std::isalpha(ch)) {
-        return {};
-    }
-    return std::string(1, static_cast<char>(std::toupper(ch)));
-}
-
-void ResolveStorageSelection(TelemetryCollectorState& state) {
+void ResolveStorageSelection(RealTelemetryCollectorState& state) {
     state.storage_.driveCandidates = EnumerateStorageDriveCandidates();
-    state.storage_.resolvedDriveLetters =
-        ResolveConfiguredStorageDrives(state.settings_.selection.configuredDrives, state.storage_.driveCandidates);
+    state.storage_.resolvedDriveLetters = ResolveConfiguredStorageDriveLetters(
+        state.settings_.selection.configuredDrives, state.storage_.driveCandidates);
     state.resolvedSelections_.drives = state.storage_.resolvedDriveLetters;
     MarkSelectedStorageDriveCandidates(state.storage_.driveCandidates, state.storage_.resolvedDriveLetters);
 
@@ -286,7 +239,7 @@ void ResolveStorageSelection(TelemetryCollectorState& state) {
     RefreshDriveUsage(state);
 }
 
-void UpdateStorageMetrics(TelemetryCollectorState& state, bool initializeOnly) {
+void UpdateStorageMetrics(RealTelemetryCollectorState& state, bool initializeOnly) {
     UpdateStorageThroughput(state, initializeOnly);
     RefreshDriveUsage(state);
 }

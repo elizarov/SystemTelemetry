@@ -2,8 +2,8 @@
 
 #include "telemetry_settings.h"
 
-struct TelemetryCollectorState;
+struct RealTelemetryCollectorState;
 
-void InitializeBoardCollector(TelemetryCollectorState& state, const BoardTelemetrySettings& settings);
-void ReconfigureBoardCollector(TelemetryCollectorState& state, const BoardTelemetrySettings& settings);
-void UpdateBoardMetrics(TelemetryCollectorState& state);
+void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings);
+void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings);
+void UpdateBoardMetrics(RealTelemetryCollectorState& state);

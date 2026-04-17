@@ -127,7 +127,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         state_.diagnostics->WriteTraceMarker("diagnostics:telemetry_initialize_begin");
     }
 
-    state_.telemetry = InitializeTelemetryRuntimeInstance(
+    state_.telemetry = InitializeTelemetryCollectorInstance(
         state_.config, diagnosticsOptions, state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr);
     if (state_.telemetry == nullptr) {
         if (state_.diagnostics != nullptr) {
@@ -182,7 +182,7 @@ bool DashboardController::WriteDiagnosticsOutputs() {
 bool DashboardController::ReloadConfigFromDisk(
     DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller) {
     (void)controller;
-    if (!ReloadTelemetryRuntimeFromDisk(
+    if (!ReloadTelemetryCollectorFromDisk(
             GetRuntimeConfigPath(), state_.config, state_.telemetry, diagnosticsOptions, state_.diagnostics.get())) {
         shell.ReleaseFonts();
         shell.InitializeFonts();

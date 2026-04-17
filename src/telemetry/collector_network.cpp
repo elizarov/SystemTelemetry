@@ -93,7 +93,7 @@ AdapterSelectionInfo BuildAdapterSelectionInfo(const MIB_IF_ROW2& row, const IP_
 
 }  // namespace
 
-void ResolveNetworkSelection(TelemetryCollectorState& state) {
+void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
     PMIB_IF_TABLE2 table = nullptr;
     const DWORD tableStatus = GetIfTable2(&table);
     if (tableStatus != NO_ERROR || table == nullptr) {
@@ -287,7 +287,7 @@ void ResolveNetworkSelection(TelemetryCollectorState& state) {
     state.trace_.Write("telemetry:network_table_free status=done");
 }
 
-void UpdateNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly) {
+void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnly) {
     if (state.network_.selectedIndex == 0) {
         if (!initializeOnly) {
             state.snapshot_.network.uploadMbps = 0.0;

@@ -111,10 +111,10 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/collector_support.cpp
     src/telemetry/retained_history.cpp
     src/telemetry/collector_storage.cpp
+    src/telemetry/collector_storage_selection.cpp
     src/telemetry/collector_network.cpp
-    src/telemetry_runtime.cpp
-    src/telemetry_runtime_fake.cpp
-    src/telemetry_runtime_factory.cpp
+    src/telemetry/collector_real.cpp
+    src/telemetry/collector_fake.cpp
     src/snapshot_dump.cpp
     src/gpu_vendor.cpp
     src/gpu_amd_adl.cpp

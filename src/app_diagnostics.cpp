@@ -5,7 +5,7 @@
 #include "config_parser.h"
 #include "config_resolution.h"
 #include "config_writer.h"
-#include "telemetry_runtime_factory.h"
+#include "telemetry.h"
 
 #include <cmath>
 #include <cstdio>
@@ -428,21 +428,21 @@ int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std
     return 0;
 }
 
-std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
+std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(
     const AppConfig& runtimeConfig, const DiagnosticsOptions& diagnosticsOptions, std::ostream* traceStream) {
-    std::unique_ptr<TelemetryRuntime> runtime = CreateTelemetryRuntime(diagnosticsOptions, GetWorkingDirectory());
-    if (runtime == nullptr) {
+    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(diagnosticsOptions, GetWorkingDirectory());
+    if (telemetry == nullptr) {
         return nullptr;
     }
-    if (!runtime->Initialize(ExtractTelemetrySettings(runtimeConfig), traceStream)) {
+    if (!telemetry->Initialize(ExtractTelemetrySettings(runtimeConfig), traceStream)) {
         return nullptr;
     }
-    return runtime;
+    return telemetry;
 }
 
-bool ReloadTelemetryRuntimeFromDisk(const std::filesystem::path& configPath,
+bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     AppConfig& activeConfig,
-    std::unique_ptr<TelemetryRuntime>& telemetry,
+    std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
     DiagnosticsSession* diagnostics) {
     const AppConfig reloadedConfig = LoadConfig(configPath, !diagnosticsOptions.defaultConfig);
@@ -459,10 +459,10 @@ bool ReloadTelemetryRuntimeFromDisk(const std::filesystem::path& configPath,
     ApplyDiagnosticsScaleOverride(effectiveReloadedConfig, diagnosticsOptions);
 
     telemetry.reset();
-    std::unique_ptr<TelemetryRuntime> reloadedTelemetry = InitializeTelemetryRuntimeInstance(
+    std::unique_ptr<TelemetryCollector> reloadedTelemetry = InitializeTelemetryCollectorInstance(
         effectiveReloadedConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
     if (reloadedTelemetry == nullptr) {
-        telemetry = InitializeTelemetryRuntimeInstance(
+        telemetry = InitializeTelemetryCollectorInstance(
             activeConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
         if (diagnostics != nullptr) {
             diagnostics->WriteTraceMarker("diagnostics:reload_config_failed");
@@ -533,8 +533,8 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         "diagnostics:headless_start scale=" + std::to_string(ResolveSavedScreenshotScale(config)));
     diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_begin");
 
-    std::unique_ptr<TelemetryRuntime> telemetry =
-        InitializeTelemetryRuntimeInstance(config, diagnosticsOptions, diagnostics.TraceStream());
+    std::unique_ptr<TelemetryCollector> telemetry =
+        InitializeTelemetryCollectorInstance(config, diagnosticsOptions, diagnostics.TraceStream());
     if (telemetry == nullptr) {
         diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_failed");
         if (diagnostics.ShouldShowDialogs()) {
@@ -549,7 +549,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     telemetry->UpdateSnapshot();
     diagnostics.WriteTraceMarker("diagnostics:update_snapshot_done");
     if (diagnosticsOptions.reload) {
-        if (!ReloadTelemetryRuntimeFromDisk(
+        if (!ReloadTelemetryCollectorFromDisk(
                 GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, &diagnostics)) {
             return 1;
         }

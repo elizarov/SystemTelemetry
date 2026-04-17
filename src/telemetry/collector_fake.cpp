@@ -1,13 +1,13 @@
-#include "telemetry_runtime.h"
+#include "telemetry/collector_fake.h"
 
 #include <algorithm>
 #include <chrono>
-#include <cctype>
 #include <filesystem>
 #include <fstream>
 
 #include "app_strings.h"
 #include "snapshot_dump.h"
+#include "telemetry/collector_storage_selection.h"
 #include "trace.h"
 #include "utf8.h"
 
@@ -17,21 +17,6 @@ struct ResolvedNetworkCandidate {
     std::string adapterName;
     std::string ipAddress = "N/A";
 };
-
-std::string NormalizeStorageDriveLetter(const std::string& drive) {
-    if (drive.empty()) {
-        return {};
-    }
-    const unsigned char ch = static_cast<unsigned char>(drive.front());
-    if (!std::isalpha(ch)) {
-        return {};
-    }
-    return std::string(1, static_cast<char>(std::toupper(ch)));
-}
-
-bool IsSelectableStorageDriveType(UINT driveType) {
-    return driveType == DRIVE_FIXED || driveType == DRIVE_REMOVABLE;
-}
 
 std::vector<NetworkAdapterCandidate> EnumerateSnapshotNetworkCandidates(const SystemSnapshot& snapshot) {
     std::vector<NetworkAdapterCandidate> candidates;
@@ -115,34 +100,6 @@ std::vector<StorageDriveCandidate> EnumerateSnapshotStorageDriveCandidates(const
     return candidates;
 }
 
-std::vector<std::string> ResolveConfiguredStorageDrives(
-    const std::vector<std::string>& configuredDrives, const std::vector<StorageDriveCandidate>& availableDrives) {
-    std::vector<std::string> resolvedDrives;
-    resolvedDrives.reserve(configuredDrives.size());
-    for (const auto& drive : configuredDrives) {
-        const std::string letter = NormalizeStorageDriveLetter(drive);
-        if (letter.empty()) {
-            continue;
-        }
-        if (std::find(resolvedDrives.begin(), resolvedDrives.end(), letter) == resolvedDrives.end()) {
-            resolvedDrives.push_back(letter);
-        }
-    }
-    if (!resolvedDrives.empty() || !configuredDrives.empty()) {
-        return resolvedDrives;
-    }
-
-    for (const auto& drive : availableDrives) {
-        if (drive.driveType != DRIVE_FIXED) {
-            continue;
-        }
-        if (std::find(resolvedDrives.begin(), resolvedDrives.end(), drive.letter) == resolvedDrives.end()) {
-            resolvedDrives.push_back(drive.letter);
-        }
-    }
-    return resolvedDrives;
-}
-
 void MarkSelectedStorageDriveCandidates(
     std::vector<StorageDriveCandidate>& candidates, const std::vector<std::string>& selectedDrives) {
     for (auto& candidate : candidates) {
@@ -162,9 +119,9 @@ std::filesystem::path ResolveFakePath(
     return workingDirectory / configuredPath;
 }
 
-class FakeTelemetryRuntime : public TelemetryRuntime {
+class FakeTelemetryCollector : public TelemetryCollector {
 public:
-    FakeTelemetryRuntime(std::filesystem::path fakePath, bool showDialogs)
+    FakeTelemetryCollector(std::filesystem::path fakePath, bool showDialogs)
         : fakePath_(std::move(fakePath)), showDialogs_(showDialogs) {}
 
     bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream) override {
@@ -204,13 +161,13 @@ public:
         RefreshSelectionsAndSnapshot();
     }
 
-    void SetPreferredNetworkAdapterName(const std::string& adapterName) override {
-        selectionSettings_.preferredAdapterName = adapterName;
+    void SetPreferredNetworkAdapterName(std::string adapterName) override {
+        selectionSettings_.preferredAdapterName = std::move(adapterName);
         RefreshNetworkSelection();
     }
 
-    void SetSelectedStorageDrives(const std::vector<std::string>& driveLetters) override {
-        selectionSettings_.configuredDrives = driveLetters;
+    void SetSelectedStorageDrives(std::vector<std::string> driveLetters) override {
+        selectionSettings_.configuredDrives = NormalizeConfiguredStorageDriveLetters(driveLetters);
         RefreshStorageSelection();
     }
 
@@ -241,7 +198,8 @@ private:
 
     void RefreshStorageSelection() {
         storageDrives_ = EnumerateSnapshotStorageDriveCandidates(sourceDump_.snapshot);
-        resolvedStorageDrives_ = ResolveConfiguredStorageDrives(selectionSettings_.configuredDrives, storageDrives_);
+        resolvedStorageDrives_ =
+            ResolveConfiguredStorageDriveLetters(selectionSettings_.configuredDrives, storageDrives_);
         resolvedSelections_.drives = resolvedStorageDrives_;
         MarkSelectedStorageDriveCandidates(storageDrives_, resolvedStorageDrives_);
 
@@ -304,7 +262,7 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryRuntime> CreateFakeTelemetryRuntime(
+std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(
     const std::filesystem::path& workingDirectory, const std::filesystem::path& configuredPath, bool showDialogs) {
-    return std::make_unique<FakeTelemetryRuntime>(ResolveFakePath(workingDirectory, configuredPath), showDialogs);
+    return std::make_unique<FakeTelemetryCollector>(ResolveFakePath(workingDirectory, configuredPath), showDialogs);
 }

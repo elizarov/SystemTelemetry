@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -10,6 +11,7 @@
 #include <windows.h>
 
 #include "board_vendor.h"
+#include "diagnostics_options.h"
 #include "gpu_vendor.h"
 #include "metric_types.h"
 #include "telemetry_settings.h"
@@ -103,31 +105,31 @@ struct TelemetryDump {
     BoardVendorTelemetrySample boardProvider;
 };
 
-struct TelemetryCollectorState;
-
 class TelemetryCollector {
 public:
-    TelemetryCollector();
-    ~TelemetryCollector();
+    virtual ~TelemetryCollector() = default;
 
     TelemetryCollector(const TelemetryCollector&) = delete;
     TelemetryCollector& operator=(const TelemetryCollector&) = delete;
-    TelemetryCollector(TelemetryCollector&&) noexcept;
-    TelemetryCollector& operator=(TelemetryCollector&&) noexcept;
+    TelemetryCollector(TelemetryCollector&&) = delete;
+    TelemetryCollector& operator=(TelemetryCollector&&) = delete;
 
-    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream = nullptr);
-    const SystemSnapshot& Snapshot() const;
-    TelemetryDump Dump() const;
-    const ResolvedTelemetrySelections& ResolvedSelections() const;
-    const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const;
-    const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const;
-    void ApplySettings(const TelemetrySettings& settings);
-    void SetPreferredNetworkAdapterName(std::string adapterName);
-    void SetSelectedStorageDrives(std::vector<std::string> driveLetters);
-    void RefreshSelections();
-    void UpdateSnapshot();
+    virtual bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream = nullptr) = 0;
+    virtual const SystemSnapshot& Snapshot() const = 0;
+    virtual TelemetryDump Dump() const = 0;
+    virtual const ResolvedTelemetrySelections& ResolvedSelections() const = 0;
+    virtual const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const = 0;
+    virtual const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const = 0;
+    virtual void ApplySettings(const TelemetrySettings& settings) = 0;
+    virtual void SetPreferredNetworkAdapterName(std::string adapterName) = 0;
+    virtual void SetSelectedStorageDrives(std::vector<std::string> driveLetters) = 0;
+    virtual void RefreshSelectionsAndSnapshot() = 0;
+    virtual void UpdateSnapshot() = 0;
     void WriteDump(std::ostream& output) const;
 
-private:
-    std::unique_ptr<TelemetryCollectorState> state_;
+protected:
+    TelemetryCollector() = default;
 };
+
+std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
+    const DiagnosticsOptions& options, const std::filesystem::path& workingDirectory);

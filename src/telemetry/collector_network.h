@@ -1,6 +1,6 @@
 #pragma once
 
-struct TelemetryCollectorState;
+struct RealTelemetryCollectorState;
 
-void ResolveNetworkSelection(TelemetryCollectorState& state);
-void UpdateNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly);
+void ResolveNetworkSelection(RealTelemetryCollectorState& state);
+void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnly);

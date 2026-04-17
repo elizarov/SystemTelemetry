@@ -11,15 +11,15 @@
 
 namespace {
 
-void Trace(const TelemetryCollectorState& state, const char* text) {
+void Trace(const RealTelemetryCollectorState& state, const char* text) {
     state.trace_.Write(text);
 }
 
-void Trace(const TelemetryCollectorState& state, const std::string& text) {
+void Trace(const RealTelemetryCollectorState& state, const std::string& text) {
     state.trace_.Write(text);
 }
 
-double SumCounterArray(TelemetryCollectorState& state, PDH_HCOUNTER counter, bool require3d) {
+double SumCounterArray(RealTelemetryCollectorState& state, PDH_HCOUNTER counter, bool require3d) {
     if (counter == nullptr) {
         return 0.0;
     }
@@ -62,7 +62,7 @@ double SumCounterArray(TelemetryCollectorState& state, PDH_HCOUNTER counter, boo
     return FiniteNonNegativeOr(total);
 }
 
-void ApplyGpuVendorSample(TelemetryCollectorState& state, const GpuVendorTelemetrySample& sample) {
+void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTelemetrySample& sample) {
     state.gpu_.providerName = sample.providerName.empty() ? "None" : sample.providerName;
     state.gpu_.providerDiagnostics = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
     state.gpu_.providerAvailable = sample.available;
@@ -84,7 +84,7 @@ void ApplyGpuVendorSample(TelemetryCollectorState& state, const GpuVendorTelemet
     }
 }
 
-void InitializeGpuAdapterInfo(TelemetryCollectorState& state) {
+void InitializeGpuAdapterInfo(RealTelemetryCollectorState& state) {
     IDXGIFactory1* factory = nullptr;
     const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
     if (FAILED(factoryHr) || factory == nullptr) {
@@ -151,7 +151,7 @@ void InitializeGpuAdapterInfo(TelemetryCollectorState& state) {
 
 }  // namespace
 
-void InitializeGpuCollector(TelemetryCollectorState& state) {
+void InitializeGpuCollector(RealTelemetryCollectorState& state) {
     state.gpu_.provider = CreateGpuVendorTelemetryProvider(&state.trace_);
     if (state.gpu_.provider != nullptr) {
         state.trace_.Write("telemetry:gpu_provider_initialize_begin");
@@ -199,7 +199,7 @@ void InitializeGpuCollector(TelemetryCollectorState& state) {
     InitializeGpuAdapterInfo(state);
 }
 
-void UpdateGpuMetrics(TelemetryCollectorState& state) {
+void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
     if (state.gpu_.query != nullptr) {
         const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.query);
         Trace(state, "telemetry:gpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus));
