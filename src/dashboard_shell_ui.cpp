@@ -13,6 +13,7 @@
 #include "layout_edit_parameter.h"
 #include "layout_edit_tree.h"
 #include "layout_edit_service.h"
+
 namespace {
 
 class DashboardShellUiModalScope {
@@ -1243,6 +1244,8 @@ void DashboardShellUi::ShowContextMenu(
                     WideFromUtf8(std::get<LayoutMetricEditKey>(*focusKey).metricId + " metric"));
             } else if (focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"card title");
+            } else if (focusKey.has_value() && std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
+                label = BuildLayoutEditMenuLabel(L"layout container");
             } else {
                 const auto parameter = TooltipPayloadParameter(layoutEditTarget->payload);
                 if (parameter.has_value()) {

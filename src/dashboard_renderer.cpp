@@ -740,6 +740,29 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
                 bottomLeft, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
             const_cast<DashboardRenderer*>(this)->DrawSolidLine(
                 topRight, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
+        } else if (highlighted.shape == AnchorShape::VerticalReorder) {
+            const float outlineWidth =
+                static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
+            const int centerX = highlighted.anchorRect.left +
+                                (std::max<LONG>(0, highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
+            const int centerY = highlighted.anchorRect.top +
+                                (std::max<LONG>(0, highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
+            const int halfWidth =
+                (std::max)(1, static_cast<int>(highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
+            const int gapHalf = (std::max)(1, ScaleLogical(1));
+            const RenderPoint upApex{centerX, highlighted.anchorRect.top};
+            const RenderPoint upLeft{centerX - halfWidth, centerY - gapHalf};
+            const RenderPoint upRight{centerX + halfWidth, centerY - gapHalf};
+            const RenderPoint downApex{centerX, highlighted.anchorRect.bottom};
+            const RenderPoint downLeft{centerX - halfWidth, centerY + gapHalf};
+            const RenderPoint downRight{centerX + halfWidth, centerY + gapHalf};
+            const auto stroke = RenderStroke::Solid(outlineColor, outlineWidth);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(upApex, upLeft, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(upLeft, upRight, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(upRight, upApex, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(downLeft, downApex, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(downApex, downRight, stroke);
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(downRight, downLeft, stroke);
         } else {
             const_cast<DashboardRenderer*>(this)->FillSolidRect(highlighted.anchorRect, outlineColor);
         }

@@ -5,6 +5,7 @@
 
 #include <wtsapi32.h>
 
+#include "config_writer.h"
 #include "dashboard_shell_ui.h"
 #include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"
@@ -130,6 +131,21 @@ std::wstring BuildLayoutGuideTooltipText(const AppConfig& config, const LayoutEd
 std::wstring BuildMetricTooltipText(const LayoutMetricEditKey& key, const MetricDefinitionConfig& definition) {
     std::wstring text = WideFromUtf8("[metrics] " + key.metricId + " = " + FormatMetricDefinitionValue(definition));
     const std::wstring description = WideFromUtf8(FindLocalizedText("layout_edit.metric_definition"));
+    if (!description.empty()) {
+        text += L"\r\n";
+        text += description;
+    }
+    return text;
+}
+
+std::wstring BuildMetricListOrderTooltipText(
+    const AppConfig& config, const LayoutMetricListOrderEditKey& key, int rowIndex) {
+    const auto firstLine = BuildMetricListOrderTooltipLine(config, key, rowIndex);
+    if (!firstLine.has_value()) {
+        return L"";
+    }
+    std::wstring text = WideFromUtf8(*firstLine);
+    const std::wstring description = WideFromUtf8(FindLocalizedText("layout_edit.metric_list_reorder"));
     if (!description.empty()) {
         text += L"\r\n";
         text += description;
@@ -437,6 +453,14 @@ bool DashboardApp::ApplyLayoutGuideWeights(
     return applied;
 }
 
+bool DashboardApp::ApplyMetricListOrder(
+    const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) {
+    const auto start = std::chrono::steady_clock::now();
+    const bool applied = controller_.ApplyMetricListOrder(*this, widget, metricRefs);
+    RecordLayoutEditTracePhase(TracePhase::Apply, std::chrono::steady_clock::now() - start);
+    return applied;
+}
+
 bool DashboardApp::ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) {
     const auto start = std::chrono::steady_clock::now();
     const bool applied = controller_.ApplyLayoutEditValue(*this, parameter, value);
@@ -678,6 +702,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     std::optional<LayoutEditTooltipDescriptor> descriptor;
     std::optional<LayoutMetricEditKey> metricKey;
     std::optional<LayoutCardTitleEditKey> cardTitleKey;
+    std::optional<LayoutMetricListOrderEditKey> metricListOrderKey;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
     std::optional<unsigned int> colorValue;
@@ -691,6 +716,9 @@ void DashboardApp::UpdateLayoutEditTooltip() {
             metricKey = std::get<LayoutMetricEditKey>(*focusKey);
         } else if (focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
             cardTitleKey = std::get<LayoutCardTitleEditKey>(*focusKey);
+        }
+        if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target->payload)) {
+            metricListOrderKey = LayoutEditAnchorMetricListOrderKey(anchor->key);
         }
         if (const auto parameter = TooltipPayloadParameter(target->payload); parameter.has_value()) {
             descriptor = FindLayoutEditTooltipDescriptor(*parameter);
@@ -725,16 +753,27 @@ void DashboardApp::UpdateLayoutEditTooltip() {
                 return;
             }
             stringValue = card->title;
+        } else if (metricListOrderKey.has_value()) {
+            int rowIndex = 0;
+            if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target->payload)) {
+                rowIndex = anchor->key.anchorId;
+            }
+            layoutEditTooltipText_ =
+                BuildMetricListOrderTooltipText(controller_.State().config, *metricListOrderKey, rowIndex);
+            if (layoutEditTooltipText_.empty()) {
+                HideLayoutEditTooltip();
+                return;
+            }
         }
     }
 
     if (!IsLayoutGuidePayload(target->payload) && !descriptor.has_value() && !metricKey.has_value() &&
-        !cardTitleKey.has_value()) {
+        !cardTitleKey.has_value() && !metricListOrderKey.has_value()) {
         HideLayoutEditTooltip();
         return;
     }
 
-    if (!IsLayoutGuidePayload(target->payload) && !metricKey.has_value()) {
+    if (!IsLayoutGuidePayload(target->payload) && !metricKey.has_value() && !metricListOrderKey.has_value()) {
         const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
         if (descriptor->valueFormat == configschema::ValueFormat::String && stringValue.has_value()) {
             layoutEditTooltipText_ = BuildTooltipText(*descriptor, *stringValue, description);

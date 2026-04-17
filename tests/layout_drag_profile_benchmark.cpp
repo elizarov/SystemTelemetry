@@ -271,6 +271,18 @@ private:
         return applied;
     }
 
+    bool ApplyMetricListOrder(
+        const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) override {
+        const auto start = Clock::now();
+        const bool applied = ::ApplyMetricListOrder(config_, widget, metricRefs);
+        if (applied) {
+            renderer_.SetConfig(config_);
+            dirty_ = true;
+        }
+        RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
+        return applied;
+    }
+
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,

@@ -105,6 +105,44 @@ TEST(LayoutEditTooltip, ResolvesFontValueThroughParameterMetadata) {
     EXPECT_EQ((*font)->weight, 600);
 }
 
+TEST(LayoutEditTooltip, BuildsMetricListOrderTooltipLineForCardLayout) {
+    AppConfig config;
+    config.display.layout = "main";
+    config.layout.cards.push_back(LayoutCardConfig{});
+    config.layout.cards.back().id = "cpu";
+    config.layout.cards.back().layout.name = "metric_list";
+    config.layout.cards.back().layout.parameter = "cpu.ram,cpu.clock,board.temp.cpu";
+
+    const auto line = BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}}, 1);
+
+    ASSERT_TRUE(line.has_value());
+    EXPECT_EQ(*line, "[card.cpu] layout = metric_list(cpu.clock)");
+}
+
+TEST(LayoutEditTooltip, BuildsMetricListOrderTooltipLineForDashboardLayout) {
+    AppConfig config;
+    config.display.layout = "main";
+    config.layout.structure.cardsLayout.name = "metric_list";
+    config.layout.structure.cardsLayout.parameter = "network.upload,network.download";
+
+    const auto line = BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"", {}}, 0);
+
+    ASSERT_TRUE(line.has_value());
+    EXPECT_EQ(*line, "[layout.main] cards = metric_list(network.upload)");
+}
+
+TEST(LayoutEditTooltip, RejectsMetricListOrderTooltipLineWhenRowIndexIsInvalid) {
+    AppConfig config;
+    config.display.layout = "main";
+    config.layout.cards.push_back(LayoutCardConfig{});
+    config.layout.cards.back().id = "cpu";
+    config.layout.cards.back().layout.name = "metric_list";
+    config.layout.cards.back().layout.parameter = "cpu.ram,cpu.clock";
+
+    EXPECT_FALSE(BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}}, -1).has_value());
+    EXPECT_FALSE(BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}}, 2).has_value());
+}
+
 TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {
     const auto& gaugeField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::GaugeSegmentCount);
     EXPECT_EQ(gaugeField.sectionName, "gauge");

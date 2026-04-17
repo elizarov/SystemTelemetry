@@ -19,6 +19,7 @@ enum class AnchorShape {
     Diamond,
     Square,
     Wedge,
+    VerticalReorder,
 };
 
 enum class AnchorDragAxis {
@@ -67,6 +68,15 @@ inline bool operator==(const LayoutCardTitleEditKey& left, const LayoutCardTitle
     return left.cardId == right.cardId;
 }
 
+struct LayoutMetricListOrderEditKey {
+    std::string editCardId;
+    std::vector<size_t> nodePath;
+};
+
+inline bool operator==(const LayoutMetricListOrderEditKey& left, const LayoutMetricListOrderEditKey& right) {
+    return left.editCardId == right.editCardId && left.nodePath == right.nodePath;
+}
+
 struct LayoutEditLinearGeometry {
     RenderPoint drawStart{};
     RenderPoint drawEnd{};
@@ -90,8 +100,8 @@ struct LayoutEditGuide {
 
 struct LayoutEditAnchorKey {
     LayoutEditWidgetIdentity widget;
-    std::variant<LayoutEditParameter, LayoutMetricEditKey, LayoutCardTitleEditKey> subject =
-        LayoutEditParameter::MetricListBarHeight;
+    std::variant<LayoutEditParameter, LayoutMetricEditKey, LayoutCardTitleEditKey, LayoutMetricListOrderEditKey>
+        subject = LayoutEditParameter::MetricListBarHeight;
     int anchorId = 0;
 };
 
@@ -177,8 +187,11 @@ struct LayoutEditAnchorBinding {
 
 using TooltipPayload = std::
     variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion, LayoutEditColorRegion>;
-using LayoutEditFocusKey =
-    std::variant<LayoutEditParameter, LayoutWeightEditKey, LayoutMetricEditKey, LayoutCardTitleEditKey>;
+using LayoutEditFocusKey = std::variant<LayoutEditParameter,
+    LayoutWeightEditKey,
+    LayoutMetricEditKey,
+    LayoutCardTitleEditKey,
+    LayoutContainerEditKey>;
 using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
     DashboardWidgetClass,
     LayoutContainerEditKey,
@@ -195,6 +208,8 @@ bool MatchesLayoutContainerEditKey(const LayoutContainerEditKey& left, const Lay
 bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWeightEditKey& right);
 bool MatchesLayoutMetricEditKey(const LayoutMetricEditKey& left, const LayoutMetricEditKey& right);
 bool MatchesLayoutCardTitleEditKey(const LayoutCardTitleEditKey& left, const LayoutCardTitleEditKey& right);
+bool MatchesLayoutMetricListOrderEditKey(
+    const LayoutMetricListOrderEditKey& left, const LayoutMetricListOrderEditKey& right);
 bool MatchesCardChromeSelectionIdentity(
     const LayoutEditWidgetIdentity& selection, const LayoutEditWidgetIdentity& candidate);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right);
@@ -213,6 +228,7 @@ bool MatchesLayoutEditSelectionHighlight(
 std::optional<LayoutEditParameter> LayoutEditAnchorParameter(const LayoutEditAnchorKey& key);
 std::optional<LayoutMetricEditKey> LayoutEditAnchorMetricKey(const LayoutEditAnchorKey& key);
 std::optional<LayoutCardTitleEditKey> LayoutEditAnchorCardTitleKey(const LayoutEditAnchorKey& key);
+std::optional<LayoutMetricListOrderEditKey> LayoutEditAnchorMetricListOrderKey(const LayoutEditAnchorKey& key);
 int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key);
 bool IsLayoutGuidePayload(const TooltipPayload& payload);
 std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload& payload);

@@ -45,9 +45,17 @@ const LayoutEditTreeNode* TreeNodeFromItem(HWND tree, HTREEITEM item) {
 
 HTREEITEM FindTreeItemByFocusKey(LayoutEditDialogState* state, const LayoutEditFocusKey& focusKey) {
     for (const auto& binding : state->treeItems) {
-        if (binding.node != nullptr && binding.node->leaf.has_value() &&
-            MatchesLayoutEditFocusKey(binding.node->leaf->focusKey, focusKey)) {
+        if (binding.node == nullptr) {
+            continue;
+        }
+        if (binding.node->leaf.has_value() && MatchesLayoutEditFocusKey(binding.node->leaf->focusKey, focusKey)) {
             return binding.item;
+        }
+        if (binding.node->selectionHighlight.has_value()) {
+            if (const auto* nodeFocus = std::get_if<LayoutEditFocusKey>(&*binding.node->selectionHighlight);
+                nodeFocus != nullptr && MatchesLayoutEditFocusKey(*nodeFocus, focusKey)) {
+                return binding.item;
+            }
         }
     }
     return nullptr;

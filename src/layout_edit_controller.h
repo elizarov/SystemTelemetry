@@ -34,6 +34,8 @@ public:
     virtual DashboardRenderer& LayoutEditRenderer() = 0;
     virtual DashboardRenderer::EditOverlayState& LayoutEditOverlayState() = 0;
     virtual bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) = 0;
+    virtual bool ApplyMetricListOrder(
+        const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) = 0;
     virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
@@ -146,6 +148,15 @@ private:
         int dragStartCoordinate = 0;
     };
 
+    struct MetricListReorderDragState {
+        LayoutEditWidgetIdentity widget;
+        std::vector<std::string> metricRefs;
+        int rowTop = 0;
+        int rowHeight = 1;
+        int rowCount = 0;
+        int currentIndex = 0;
+    };
+
     const LayoutEditGuide* HitTestLayoutGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
     const LayoutEditWidgetGuide* HitTestWidgetEditGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
     const LayoutEditGapAnchor* HitTestGapEditAnchor(RenderPoint clientPoint, size_t* index = nullptr) const;
@@ -155,6 +166,7 @@ private:
     bool UpdateWidgetEditDrag(RenderPoint clientPoint);
     bool UpdateGapEditDrag(RenderPoint clientPoint);
     bool UpdateAnchorEditDrag(RenderPoint clientPoint);
+    bool UpdateMetricListReorderDrag(RenderPoint clientPoint);
     void SyncRendererInteractionState();
     void ClearInteractionState();
     void SetCursorForPoint(RenderPoint clientPoint);
@@ -174,5 +186,6 @@ private:
     std::optional<WidgetEditDragState> activeWidgetEditDrag_;
     std::optional<GapEditDragState> activeGapEditDrag_;
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
+    std::optional<MetricListReorderDragState> activeMetricListReorderDrag_;
     RenderPoint lastClientPoint_{};
 };

@@ -458,6 +458,17 @@ bool DashboardController::ApplyLayoutGuideWeights(
     return true;
 }
 
+bool DashboardController::ApplyMetricListOrder(
+    DashboardShellHost& shell, const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) {
+    if (!::ApplyMetricListOrder(state_.config, widget, metricRefs)) {
+        return false;
+    }
+    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
+    return true;
+}
+
 bool DashboardController::ApplyLayoutEditValue(
     DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, double value) {
     double nextValue = value;

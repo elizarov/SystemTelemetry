@@ -15,9 +15,12 @@ public:
         int labelWidth = 1;
         int metricBarHeight = 1;
         int anchorSize = 4;
+        int reorderAnchorWidth = 6;
+        int reorderAnchorHeight = 10;
         int visibleRows = 0;
         std::vector<RenderRect> rowRects;
         std::vector<RenderRect> barAnchorRects;
+        std::vector<RenderRect> reorderAnchorRects;
     };
 
     DashboardWidgetClass Class() const override;

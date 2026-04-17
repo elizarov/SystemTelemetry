@@ -54,6 +54,13 @@ const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditH
     return FindLayoutNodeByPath(cardIt->layout, target.nodePath);
 }
 
+const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const LayoutEditWidgetIdentity& widget) {
+    LayoutEditHost::LayoutTarget target;
+    target.editCardId = widget.editCardId;
+    target.nodePath = widget.nodePath;
+    return FindGuideNode(config, target);
+}
+
 std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNodeConfig* node) {
     if (node == nullptr || node->children.size() != guide.childExtents.size()) {
         return guide.childExtents;
@@ -105,6 +112,39 @@ bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& ta
         }
     } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, target.editCardId)) {
         updated = applyWeights(FindLayoutNodeByPath(card->layout, target.nodePath));
+    }
+
+    return updated;
+}
+
+bool ApplyMetricListOrder(
+    AppConfig& config, const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) {
+    const auto applyOrder = [&](LayoutNodeConfig* node) -> bool {
+        if (node == nullptr || node->name != "metric_list") {
+            return false;
+        }
+        std::string parameter;
+        for (size_t i = 0; i < metricRefs.size(); ++i) {
+            if (i > 0) {
+                parameter += ",";
+            }
+            parameter += metricRefs[i];
+        }
+        node->parameter = parameter;
+        return true;
+    };
+
+    bool updated = false;
+    if (widget.editCardId.empty()) {
+        updated = applyOrder(FindLayoutNodeByPath(config.layout.structure.cardsLayout, widget.nodePath));
+        if (!updated) {
+            return false;
+        }
+        if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
+            applyOrder(FindLayoutNodeByPath(namedLayout->cardsLayout, widget.nodePath));
+        }
+    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, widget.editCardId)) {
+        updated = applyOrder(FindLayoutNodeByPath(card->layout, widget.nodePath));
     }
 
     return updated;

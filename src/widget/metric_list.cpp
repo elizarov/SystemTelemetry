@@ -58,6 +58,8 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     layoutState_.labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
     layoutState_.metricBarHeight = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
     layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
+    layoutState_.reorderAnchorWidth = (std::max)(6, renderer.ScaleLogical(8));
+    layoutState_.reorderAnchorHeight = (std::max)(10, renderer.ScaleLogical(12));
     const int valueHeight = renderer.TextMetrics().value;
     const int rowContentHeight = valueHeight + layoutState_.metricBarHeight;
     layoutState_.visibleRows =
@@ -71,6 +73,7 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     layoutState_.valueRects.clear();
     layoutState_.barRects.clear();
     layoutState_.barAnchorRects.clear();
+    layoutState_.reorderAnchorRects.clear();
     RenderRect rowRect{rect.left, rect.top, rect.right, rect.top + layoutState_.rowHeight};
     for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
         layoutState_.rowRects.push_back(rowRect);
@@ -93,6 +96,13 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
             anchorCenterY - (layoutState_.anchorSize / 2),
             anchorCenterX - (layoutState_.anchorSize / 2) + layoutState_.anchorSize,
             anchorCenterY - (layoutState_.anchorSize / 2) + layoutState_.anchorSize});
+        const int reorderCenterX =
+            rowRect.right - (std::max)(layoutState_.reorderAnchorWidth, renderer.ScaleLogical(10)) / 2;
+        const int reorderCenterY = rowRect.top + ((std::max)(0, static_cast<int>(rowRect.bottom - rowRect.top)) / 2);
+        layoutState_.reorderAnchorRects.push_back(RenderRect{reorderCenterX - (layoutState_.reorderAnchorWidth / 2),
+            reorderCenterY - (layoutState_.reorderAnchorHeight / 2),
+            reorderCenterX - (layoutState_.reorderAnchorWidth / 2) + layoutState_.reorderAnchorWidth,
+            reorderCenterY - (layoutState_.reorderAnchorHeight / 2) + layoutState_.reorderAnchorHeight});
         rowRect = RenderRect{
             rowRect.left,
             rowRect.top + layoutState_.rowHeight,
@@ -172,6 +182,21 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
             false,
             true,
             config.barHeight);
+        renderer.RegisterStaticEditableAnchorRegion(
+            LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+                LayoutMetricListOrderEditKey{widget.editCardId, widget.nodePath},
+                rowIndex},
+            layoutState_.rowRects[rowIndex],
+            layoutState_.reorderAnchorRects[rowIndex],
+            AnchorShape::VerticalReorder,
+            AnchorDragAxis::Horizontal,
+            AnchorDragMode::AxisDelta,
+            layoutState_.reorderAnchorRects[rowIndex].Center(),
+            1.0,
+            true,
+            true,
+            false,
+            0);
         const MetricDefinitionConfig* definition =
             FindMetricDefinition(renderer.Config().layout.metrics, metricRefs_[rowIndex]);
         if (definition != nullptr && !definition->label.empty()) {

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <sstream>
 
 #include "layout_edit_parameter.h"
 #include "layout_edit_service.h"
@@ -62,7 +63,8 @@ std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
                                     ? "parameter=" + DescribeWidgetParameter(*LayoutEditAnchorParameter(key))
                                 : LayoutEditAnchorMetricKey(key).has_value()
                                     ? "metric=" + LayoutEditAnchorMetricKey(key)->metricId
-                                    : "subject=unknown";
+                                : LayoutEditAnchorMetricListOrderKey(key).has_value() ? "metric_list_reorder"
+                                                                                      : "subject=unknown";
     return subject + " anchor_id=" + std::to_string(key.anchorId) +
            (key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome
                    ? " card=" + key.widget.editCardId
@@ -469,6 +471,40 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
     if (resolution.actionableAnchorHandle.has_value()) {
         const auto region = renderer.FindEditableAnchorRegion(*resolution.actionableAnchorHandle);
         if (region.has_value()) {
+            if (LayoutEditAnchorMetricListOrderKey(region->key).has_value()) {
+                const LayoutNodeConfig* node = FindEditableWidgetNode(host_.LayoutEditConfig(), region->key.widget);
+                if (node == nullptr || node->name != "metric_list") {
+                    return false;
+                }
+
+                std::vector<std::string> metricRefs;
+                std::stringstream stream(node->parameter);
+                std::string item;
+                while (std::getline(stream, item, ',')) {
+                    if (!item.empty()) {
+                        metricRefs.push_back(item);
+                    }
+                }
+                if (region->key.anchorId < 0 || region->key.anchorId >= static_cast<int>(metricRefs.size())) {
+                    return false;
+                }
+
+                const int rowHeight =
+                    (std::max)(1, static_cast<int>(region->targetRect.bottom - region->targetRect.top));
+                const int rowTop = static_cast<int>(region->targetRect.top) - (region->key.anchorId * rowHeight);
+                activeMetricListReorderDrag_ = MetricListReorderDragState{region->key.widget,
+                    metricRefs,
+                    rowTop,
+                    rowHeight,
+                    static_cast<int>(metricRefs.size()),
+                    region->key.anchorId};
+                hoveredEditableWidget_ = region->key.widget;
+                renderer.SetInteractiveDragTraceActive(true);
+                host_.BeginLayoutEditTraceSession("metric_list_reorder", DescribeEditableAnchor(region->key));
+                SyncRendererInteractionState();
+                SetCapture(hwnd);
+                return true;
+            }
             const double startDx = static_cast<double>(clientPoint.x - region->dragOrigin.x);
             const double startDy = static_cast<double>(clientPoint.y - region->dragOrigin.y);
             activeAnchorEditDrag_ = AnchorEditDragState{region->key,
@@ -561,6 +597,9 @@ bool LayoutEditController::HandleMouseMove(RenderPoint clientPoint) {
     if (activeLayoutDrag_.has_value()) {
         return UpdateLayoutDrag(clientPoint);
     }
+    if (activeMetricListReorderDrag_.has_value()) {
+        return UpdateMetricListReorderDrag(clientPoint);
+    }
     if (activeGapEditDrag_.has_value()) {
         return UpdateGapEditDrag(clientPoint);
     }
@@ -577,7 +616,7 @@ bool LayoutEditController::HandleMouseMove(RenderPoint clientPoint) {
 
 bool LayoutEditController::HandleMouseLeave() {
     if (activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeGapEditDrag_.has_value() ||
-        activeAnchorEditDrag_.has_value()) {
+        activeAnchorEditDrag_.has_value() || activeMetricListReorderDrag_.has_value()) {
         return false;
     }
 
@@ -608,6 +647,9 @@ bool LayoutEditController::HandleLButtonUp(RenderPoint clientPoint) {
     bool releasedLayoutDrag = false;
     if (activeAnchorEditDrag_.has_value()) {
         activeAnchorEditDrag_.reset();
+        released = true;
+    } else if (activeMetricListReorderDrag_.has_value()) {
+        activeMetricListReorderDrag_.reset();
         released = true;
     } else if (activeGapEditDrag_.has_value()) {
         activeGapEditDrag_.reset();
@@ -642,13 +684,15 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
         return false;
     }
 
-    const bool hadActiveDrag = activeAnchorEditDrag_.has_value() || activeGapEditDrag_.has_value() ||
-                               activeWidgetEditDrag_.has_value() || activeLayoutDrag_.has_value();
+    const bool hadActiveDrag = activeAnchorEditDrag_.has_value() || activeMetricListReorderDrag_.has_value() ||
+                               activeGapEditDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
+                               activeLayoutDrag_.has_value();
     if (!hadActiveDrag) {
         return false;
     }
 
     activeAnchorEditDrag_.reset();
+    activeMetricListReorderDrag_.reset();
     activeGapEditDrag_.reset();
     activeWidgetEditDrag_.reset();
     const bool hadLayoutDrag = activeLayoutDrag_.has_value();
@@ -671,6 +715,10 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
             : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both         ? IDC_SIZEALL
             : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical     ? IDC_SIZEWE
                                                                               : IDC_SIZENS));
+        return true;
+    }
+    if (activeMetricListReorderDrag_.has_value()) {
+        SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
         return true;
     }
     if (activeGapEditDrag_.has_value()) {
@@ -701,16 +749,16 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
 
 bool LayoutEditController::HasActiveDrag() const {
     return activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() || activeGapEditDrag_.has_value() ||
-           activeAnchorEditDrag_.has_value();
+           activeAnchorEditDrag_.has_value() || activeMetricListReorderDrag_.has_value();
 }
 
 void LayoutEditController::CancelInteraction() {
-    const bool hadInteraction = hoveredLayoutGuideIndex_.has_value() || hoveredLayoutCard_.has_value() ||
-                                hoveredEditableCard_.has_value() || hoveredEditableWidget_.has_value() ||
-                                hoveredGapEditAnchorIndex_.has_value() || hoveredGapEditAnchor_.has_value() ||
-                                hoveredWidgetEditGuideIndex_.has_value() || hoveredEditableAnchor_.has_value() ||
-                                activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
-                                activeGapEditDrag_.has_value() || activeAnchorEditDrag_.has_value();
+    const bool hadInteraction =
+        hoveredLayoutGuideIndex_.has_value() || hoveredLayoutCard_.has_value() || hoveredEditableCard_.has_value() ||
+        hoveredEditableWidget_.has_value() || hoveredGapEditAnchorIndex_.has_value() ||
+        hoveredGapEditAnchor_.has_value() || hoveredWidgetEditGuideIndex_.has_value() ||
+        hoveredEditableAnchor_.has_value() || activeLayoutDrag_.has_value() || activeWidgetEditDrag_.has_value() ||
+        activeGapEditDrag_.has_value() || activeAnchorEditDrag_.has_value() || activeMetricListReorderDrag_.has_value();
     const bool hadLayoutDrag = activeLayoutDrag_.has_value();
     if (!hadInteraction) {
         return;
@@ -733,6 +781,16 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
     }
 
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
+    if (activeMetricListReorderDrag_.has_value()) {
+        const LayoutEditAnchorKey key{activeMetricListReorderDrag_->widget,
+            LayoutMetricListOrderEditKey{
+                activeMetricListReorderDrag_->widget.editCardId, activeMetricListReorderDrag_->widget.nodePath},
+            activeMetricListReorderDrag_->currentIndex};
+        const auto region = renderer.FindEditableAnchorRegion(key);
+        if (region.has_value()) {
+            return TooltipTarget{lastClientPoint_, *region};
+        }
+    }
     if (activeGapEditDrag_.has_value()) {
         const auto anchor = renderer.FindGapEditAnchor(activeGapEditDrag_->anchor.key);
         if (anchor.has_value()) {
@@ -816,6 +874,12 @@ void LayoutEditController::SyncRendererInteractionState() {
     overlayState.activeEditableAnchor = activeAnchorEditDrag_.has_value()
                                             ? std::optional<LayoutEditAnchorKey>(activeAnchorEditDrag_->key)
                                             : std::nullopt;
+    if (activeMetricListReorderDrag_.has_value()) {
+        overlayState.activeEditableAnchor = LayoutEditAnchorKey{activeMetricListReorderDrag_->widget,
+            LayoutMetricListOrderEditKey{
+                activeMetricListReorderDrag_->widget.editCardId, activeMetricListReorderDrag_->widget.nodePath},
+            activeMetricListReorderDrag_->currentIndex};
+    }
 }
 
 void LayoutEditController::ClearInteractionState() {
@@ -833,6 +897,7 @@ void LayoutEditController::ClearInteractionState() {
     activeWidgetEditDrag_.reset();
     activeGapEditDrag_.reset();
     activeAnchorEditDrag_.reset();
+    activeMetricListReorderDrag_.reset();
 }
 
 void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
@@ -1088,4 +1153,27 @@ bool LayoutEditController::UpdateAnchorEditDrag(RenderPoint clientPoint) {
         SyncRendererInteractionState();
     }
     return updated;
+}
+
+bool LayoutEditController::UpdateMetricListReorderDrag(RenderPoint clientPoint) {
+    MetricListReorderDragState& drag = *activeMetricListReorderDrag_;
+    const int relativeY = clientPoint.y - drag.rowTop;
+    const int targetIndex = std::clamp(relativeY / (std::max)(1, drag.rowHeight), 0, (std::max)(0, drag.rowCount - 1));
+    if (targetIndex == drag.currentIndex) {
+        return true;
+    }
+
+    std::vector<std::string> nextMetricRefs = drag.metricRefs;
+    const std::string movedMetric = nextMetricRefs[drag.currentIndex];
+    nextMetricRefs.erase(nextMetricRefs.begin() + drag.currentIndex);
+    nextMetricRefs.insert(nextMetricRefs.begin() + targetIndex, movedMetric);
+    if (!host_.ApplyMetricListOrder(drag.widget, nextMetricRefs)) {
+        return false;
+    }
+
+    drag.metricRefs = std::move(nextMetricRefs);
+    drag.currentIndex = targetIndex;
+    SyncRendererInteractionState();
+    RefreshHover(clientPoint);
+    return true;
 }

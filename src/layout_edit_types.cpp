@@ -47,6 +47,11 @@ bool MatchesLayoutCardTitleEditKey(const LayoutCardTitleEditKey& left, const Lay
     return left == right;
 }
 
+bool MatchesLayoutMetricListOrderEditKey(
+    const LayoutMetricListOrderEditKey& left, const LayoutMetricListOrderEditKey& right) {
+    return left == right;
+}
+
 bool MatchesCardChromeSelectionIdentity(
     const LayoutEditWidgetIdentity& selection, const LayoutEditWidgetIdentity& candidate) {
     return selection.kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
@@ -66,8 +71,11 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditF
     if (const auto* leftMetric = std::get_if<LayoutMetricEditKey>(&left)) {
         return MatchesLayoutMetricEditKey(*leftMetric, std::get<LayoutMetricEditKey>(right));
     }
-    return MatchesLayoutCardTitleEditKey(
-        std::get<LayoutCardTitleEditKey>(left), std::get<LayoutCardTitleEditKey>(right));
+    if (const auto* leftCardTitle = std::get_if<LayoutCardTitleEditKey>(&left)) {
+        return MatchesLayoutCardTitleEditKey(*leftCardTitle, std::get<LayoutCardTitleEditKey>(right));
+    }
+    return MatchesLayoutContainerEditKey(
+        std::get<LayoutContainerEditKey>(left), std::get<LayoutContainerEditKey>(right));
 }
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGuide& guide) {
@@ -94,9 +102,14 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
         return key.subject.index() == 1 &&
                MatchesLayoutMetricEditKey(*metricKey, std::get<LayoutMetricEditKey>(key.subject));
     }
-    const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&focusKey);
-    return cardTitleKey != nullptr && key.subject.index() == 2 &&
-           MatchesLayoutCardTitleEditKey(*cardTitleKey, std::get<LayoutCardTitleEditKey>(key.subject));
+    if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&focusKey)) {
+        return key.subject.index() == 2 &&
+               MatchesLayoutCardTitleEditKey(*cardTitleKey, std::get<LayoutCardTitleEditKey>(key.subject));
+    }
+    const auto* containerKey = std::get_if<LayoutContainerEditKey>(&focusKey);
+    return containerKey != nullptr && key.subject.index() == 3 &&
+           MatchesLayoutMetricListOrderEditKey(std::get<LayoutMetricListOrderEditKey>(key.subject),
+               LayoutMetricListOrderEditKey{containerKey->editCardId, containerKey->nodePath});
 }
 
 bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditGuide& guide) {
@@ -142,6 +155,12 @@ std::optional<LayoutMetricEditKey> LayoutEditAnchorMetricKey(const LayoutEditAnc
 std::optional<LayoutCardTitleEditKey> LayoutEditAnchorCardTitleKey(const LayoutEditAnchorKey& key) {
     const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&key.subject);
     return cardTitleKey != nullptr ? std::optional<LayoutCardTitleEditKey>(*cardTitleKey) : std::nullopt;
+}
+
+std::optional<LayoutMetricListOrderEditKey> LayoutEditAnchorMetricListOrderKey(const LayoutEditAnchorKey& key) {
+    const auto* metricListOrderKey = std::get_if<LayoutMetricListOrderEditKey>(&key.subject);
+    return metricListOrderKey != nullptr ? std::optional<LayoutMetricListOrderEditKey>(*metricListOrderKey)
+                                         : std::nullopt;
 }
 
 int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key) {
@@ -250,6 +269,11 @@ std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& p
                 }
                 if (const auto cardTitleKey = LayoutEditAnchorCardTitleKey(value.key); cardTitleKey.has_value()) {
                     return LayoutEditFocusKey{*cardTitleKey};
+                }
+                if (const auto metricListOrderKey = LayoutEditAnchorMetricListOrderKey(value.key);
+                    metricListOrderKey.has_value()) {
+                    return LayoutEditFocusKey{
+                        LayoutContainerEditKey{metricListOrderKey->editCardId, metricListOrderKey->nodePath}};
                 }
                 return std::nullopt;
             } else {
