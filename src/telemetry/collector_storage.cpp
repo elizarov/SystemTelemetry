@@ -212,6 +212,25 @@ void UpdateStorageThroughput(TelemetryCollectorState& state, bool initializeOnly
 
 }  // namespace
 
+void InitializeStorageCollector(TelemetryCollectorState& state) {
+    const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.storage_.query);
+    state.trace_.Write(
+        ("telemetry:pdh_open storage_query " + tracing::Trace::FormatPdhStatus("status", queryStatus)).c_str());
+    const PDH_STATUS readStatus = AddCounterCompat(
+        state.storage_.query, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &state.storage_.readCounter);
+    state.trace_.Write(("telemetry:pdh_add storage_read path=\"\\\\PhysicalDisk(_Total)\\\\Disk Read Bytes/sec\" " +
+                        tracing::Trace::FormatPdhStatus("status", readStatus))
+                           .c_str());
+    const PDH_STATUS writeStatus = AddCounterCompat(
+        state.storage_.query, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &state.storage_.writeCounter);
+    state.trace_.Write(("telemetry:pdh_add storage_write path=\"\\\\PhysicalDisk(_Total)\\\\Disk Write Bytes/sec\" " +
+                        tracing::Trace::FormatPdhStatus("status", writeStatus))
+                           .c_str());
+    const PDH_STATUS collectStatus = PdhCollectQueryData(state.storage_.query);
+    state.trace_.Write(
+        ("telemetry:pdh_collect storage_query " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
+}
+
 std::string NormalizeStorageDriveLetter(const std::string& drive) {
     if (drive.empty()) {
         return {};
