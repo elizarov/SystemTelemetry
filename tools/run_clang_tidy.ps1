@@ -3,7 +3,14 @@ param(
     [string]$Root,
 
     [ValidateSet('check', 'fix')]
-    [string]$Mode = 'check'
+    [string]$Mode = 'check',
+
+    [ValidateSet('all', 'changed')]
+    [string]$Scope = 'all',
+
+    [int]$MaxParallel = 0,
+
+    [int]$TimeoutSeconds = 180
 )
 
 $ErrorActionPreference = 'Stop'
@@ -156,6 +163,68 @@ function Get-TrackedCppFiles {
     return $files | Sort-Object FullName
 }
 
+function Get-ChangedCppFiles {
+    param(
+        [string]$RepoRoot
+    )
+
+    $repoRootSlash = $RepoRoot -replace '\\', '/'
+    $pathSpecs = @('src/**/*.cpp', 'tests/**/*.cpp')
+
+    $changedFiles = [System.Collections.Generic.List[string]]::new()
+
+    $headExists = $false
+    & git -C $RepoRoot rev-parse --verify HEAD *> $null
+    if ($LASTEXITCODE -eq 0) {
+        $headExists = $true
+    }
+
+    if ($headExists) {
+        $gitDiffOutput = & git -C $RepoRoot diff --name-only --diff-filter=ACMR HEAD -- $pathSpecs 2>$null
+        foreach ($entry in $gitDiffOutput) {
+            if (-not [string]::IsNullOrWhiteSpace($entry)) {
+                $changedFiles.Add($entry.Trim())
+            }
+        }
+    } else {
+        $gitDiffOutput = & git -C $RepoRoot diff --name-only --diff-filter=ACMR --cached -- $pathSpecs 2>$null
+        foreach ($entry in $gitDiffOutput) {
+            if (-not [string]::IsNullOrWhiteSpace($entry)) {
+                $changedFiles.Add($entry.Trim())
+            }
+        }
+    }
+
+    $untrackedOutput = & git -C $RepoRoot ls-files --others --exclude-standard -- $pathSpecs 2>$null
+    foreach ($entry in $untrackedOutput) {
+        if (-not [string]::IsNullOrWhiteSpace($entry)) {
+            $changedFiles.Add($entry.Trim())
+        }
+    }
+
+    $files = foreach ($relativePath in ($changedFiles | Sort-Object -Unique)) {
+        $fullPath = Join-Path $RepoRoot $relativePath
+        if (-not (Test-Path -LiteralPath $fullPath)) {
+            continue
+        }
+
+        $normalizedPath = [System.IO.Path]::GetFullPath($fullPath)
+        if ($normalizedPath -notmatch '[\\/]src[\\/]|[\\/]tests[\\/]') {
+            continue
+        }
+        if ($normalizedPath -match '[\\/]vendor[\\/]') {
+            continue
+        }
+        if ([System.IO.Path]::GetFileName($normalizedPath) -eq 'board_gigabyte_siv.cpp') {
+            continue
+        }
+
+        Get-Item -LiteralPath $normalizedPath
+    }
+
+    return $files | Sort-Object FullName
+}
+
 function New-ReportWriter {
     param(
         [string]$PreferredPath
@@ -201,6 +270,153 @@ function Get-RelativeRepoPath {
     return $normalizedPath
 }
 
+function Start-TidyProcess {
+    param(
+        [string]$ClangTidyPath,
+        [string]$RepoRoot,
+        [string]$RelativePath,
+        [string]$Mode,
+        [int]$Index
+    )
+
+    $logBase = Join-Path $RepoRoot ("build\clang_tidy_unit_{0:D4}_{1}" -f $Index, [System.Guid]::NewGuid().ToString('N'))
+    $stdoutPath = "$logBase.stdout.log"
+    $stderrPath = "$logBase.stderr.log"
+
+    $commandArgs = @(
+        '--quiet',
+        '-p', (Join-Path $RepoRoot 'build\cmake')
+    )
+    if ($Mode -eq 'fix') {
+        $commandArgs += @('-fix', '--format-style=none')
+    }
+    $commandArgs += $RelativePath
+
+    $argumentString = ($commandArgs | ForEach-Object {
+            if ($_ -match '[\s"]') {
+                '"' + ($_ -replace '"', '\"') + '"'
+            } else {
+                $_
+            }
+        }) -join ' '
+
+    $process = Start-Process -FilePath $ClangTidyPath `
+        -ArgumentList $argumentString `
+        -WorkingDirectory $RepoRoot `
+        -NoNewWindow `
+        -RedirectStandardOutput $stdoutPath `
+        -RedirectStandardError $stderrPath `
+        -PassThru
+
+    return @{
+        Index = $Index
+        RelativePath = $RelativePath
+        StdoutPath = $stdoutPath
+        StderrPath = $stderrPath
+        Process = $process
+        StartedAt = [System.DateTime]::UtcNow
+    }
+}
+
+function Complete-TidyProcess {
+    param(
+        [hashtable]$State,
+        [int]$TimeoutSeconds
+    )
+
+    $timedOut = $false
+    if (-not $state.Process.WaitForExit($TimeoutSeconds * 1000)) {
+        $timedOut = $true
+        Stop-Process -Id $state.Process.Id -Force -ErrorAction SilentlyContinue
+        $null = $state.Process.WaitForExit(5000)
+    }
+
+    $outputLines = @()
+    if (Test-Path -LiteralPath $state.StdoutPath) {
+        $outputLines += Get-Content -LiteralPath $state.StdoutPath
+        Remove-Item -LiteralPath $state.StdoutPath -Force -ErrorAction SilentlyContinue
+    }
+    if (Test-Path -LiteralPath $state.StderrPath) {
+        $outputLines += Get-Content -LiteralPath $state.StderrPath
+        Remove-Item -LiteralPath $state.StderrPath -Force -ErrorAction SilentlyContinue
+    }
+
+    $filteredOutputLines = [System.Collections.Generic.List[string]]::new()
+    $skipIncludeCleanerMissingBlock = $false
+    foreach ($line in $outputLines) {
+        $text = if ($null -eq $line) { '' } else { $line.ToString() }
+
+        if ($skipIncludeCleanerMissingBlock) {
+            if ($text -match '^\s' -or [string]::IsNullOrWhiteSpace($text)) {
+                continue
+            }
+            $skipIncludeCleanerMissingBlock = $false
+        }
+
+        if ($text -match 'warning: no header providing ".+" is directly included \[misc-include-cleaner\]') {
+            $skipIncludeCleanerMissingBlock = $true
+            continue
+        }
+
+        $filteredOutputLines.Add($text)
+    }
+
+    $exitCode = $state.Process.ExitCode
+    if ($timedOut) {
+        $exitCode = -1
+    }
+
+    return @{
+        Index = $state.Index
+        RelativePath = $state.RelativePath
+        ExitCode = $exitCode
+        OutputLines = @($filteredOutputLines)
+        Duration = ([System.DateTime]::UtcNow - $state.StartedAt)
+        TimedOut = $timedOut
+    }
+}
+
+function Write-TidyResult {
+    param(
+        [System.IO.StreamWriter]$Writer,
+        [hashtable]$Result,
+        [int]$FileCount,
+        [int]$TimeoutSeconds,
+        [ref]$TidyFailed
+    )
+
+    $displayIndex = $Result.Index + 1
+    $durationText = '{0:N2}' -f $Result.Duration.TotalSeconds
+    if ($Result.TimedOut) {
+        Write-Host "[$displayIndex/$FileCount] timed out $($Result.RelativePath) after ${durationText}s"
+    } else {
+        Write-Host "[$displayIndex/$FileCount] completed $($Result.RelativePath) in ${durationText}s"
+    }
+
+    $Writer.WriteLine('===============================================================================')
+    $Writer.WriteLine("[$displayIndex/$FileCount] $($Result.RelativePath)")
+    $Writer.WriteLine("Elapsed seconds: $durationText")
+    if ($Result.TimedOut) {
+        $Writer.WriteLine("Timed out after $TimeoutSeconds seconds")
+    }
+
+    foreach ($entry in $Result.OutputLines) {
+        if ($null -eq $entry) {
+            $Writer.WriteLine()
+        } else {
+            $Writer.WriteLine($entry.ToString())
+        }
+    }
+
+    if ($Result.ExitCode -ne 0) {
+        $TidyFailed.Value = $true
+        $Writer.WriteLine("clang-tidy exit code: $($Result.ExitCode)")
+    }
+
+    $Writer.WriteLine()
+    $Writer.Flush()
+}
+
 $resolvedRoot = (Resolve-Path -LiteralPath $Root).Path
 $compileCommands = Join-Path $resolvedRoot 'build\cmake\compile_commands.json'
 $preferredReportPath = Join-Path $resolvedRoot 'build\clang_tidy_report.txt'
@@ -216,11 +432,26 @@ if (-not (Test-Path -LiteralPath $compileCommands)) {
     exit 1
 }
 
-$files = @(Get-TrackedCppFiles -RepoRoot $resolvedRoot)
+$files = if ($Scope -eq 'changed') {
+    @(Get-ChangedCppFiles -RepoRoot $resolvedRoot)
+} else {
+    @(Get-TrackedCppFiles -RepoRoot $resolvedRoot)
+}
 if ($files.Count -eq 0) {
+    if ($Scope -eq 'changed') {
+        Write-Host 'No eligible changed project translation units were found.'
+        exit 0
+    }
+
     Write-Host 'No eligible project translation units were found.'
     exit 1
 }
+
+$parallelism = $MaxParallel
+if ($parallelism -le 0) {
+    $parallelism = [Math]::Min([Math]::Max([Environment]::ProcessorCount - 1, 1), 8)
+}
+$parallelism = [Math]::Min([Math]::Max($parallelism, 1), $files.Count)
 
 $report = New-ReportWriter -PreferredPath $preferredReportPath
 $reportPath = $report.Path
@@ -228,55 +459,68 @@ $writer = $report.Writer
 try {
     $writer.WriteLine('clang-tidy report')
     $writer.WriteLine("Mode: $Mode")
+    $writer.WriteLine("Scope: $Scope")
+    $writer.WriteLine("Max parallel: $parallelism")
+    $writer.WriteLine("Timeout seconds: $TimeoutSeconds")
     $writer.WriteLine("Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')")
     $writer.WriteLine("Using clang-tidy: $clangTidy")
     $writer.WriteLine("Build database: $compileCommands")
     $writer.WriteLine()
 
     Write-Host "Using clang-tidy: $clangTidy"
-    Write-Host "Running optional clang-tidy sweep for $($files.Count) translation units..."
+    Write-Host "Running optional clang-tidy sweep for $($files.Count) translation units with parallelism=$parallelism..."
     if ($report.UsedFallback) {
         Write-Host "Primary report path is locked; writing to $reportPath instead."
     }
     Write-Host "Writing full clang-tidy output to $reportPath"
 
     $tidyFailed = $false
+    $active = [System.Collections.Generic.List[object]]::new()
+
     for ($index = 0; $index -lt $files.Count; $index++) {
         $file = $files[$index]
         $relativePath = Get-RelativeRepoPath -RepoRoot $resolvedRoot -FullPath $file.FullName
 
-        Write-Host "[$($index + 1)/$($files.Count)] $relativePath"
-        $writer.WriteLine('===============================================================================')
-        $writer.WriteLine("[$($index + 1)/$($files.Count)] $relativePath")
+        Write-Host "[$($index + 1)/$($files.Count)] queued $relativePath"
+        $active.Add((Start-TidyProcess -ClangTidyPath $clangTidy -RepoRoot $resolvedRoot -RelativePath $relativePath -Mode $Mode -Index $index))
 
-        $commandArgs = @(
-            '-p', (Join-Path $resolvedRoot 'build\cmake')
-        )
-        if ($Mode -eq 'fix') {
-            $commandArgs += @('-fix', '--format-style=none')
+        while ($active.Count -ge $parallelism) {
+            $finishedState = $null
+            foreach ($state in @($active)) {
+                if ($state.Process.HasExited) {
+                    $finishedState = $state
+                    break
+                }
+            }
+
+            if ($null -eq $finishedState) {
+                Start-Sleep -Milliseconds 200
+                continue
+            }
+
+            [void]$active.Remove($finishedState)
+            $result = Complete-TidyProcess -State $finishedState -TimeoutSeconds $TimeoutSeconds
+            Write-TidyResult -Writer $writer -Result $result -FileCount $files.Count -TimeoutSeconds $TimeoutSeconds -TidyFailed ([ref]$tidyFailed)
         }
-        $commandArgs += $relativePath
+    }
 
-        $previousErrorActionPreference = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        $output = & $clangTidy @commandArgs 2>&1
-        $exitCode = $LASTEXITCODE
-        $ErrorActionPreference = $previousErrorActionPreference
-
-        foreach ($entry in $output) {
-            if ($null -eq $entry) {
-                $writer.WriteLine()
-            } else {
-                $writer.WriteLine($entry.ToString())
+    while ($active.Count -gt 0) {
+        $finishedState = $null
+        foreach ($state in @($active)) {
+            if ($state.Process.HasExited) {
+                $finishedState = $state
+                break
             }
         }
 
-        if ($exitCode -ne 0) {
-            $tidyFailed = $true
-            $writer.WriteLine("clang-tidy exit code: $exitCode")
+        if ($null -eq $finishedState) {
+            Start-Sleep -Milliseconds 200
+            continue
         }
-        $writer.WriteLine()
-        $writer.Flush()
+
+        [void]$active.Remove($finishedState)
+        $result = Complete-TidyProcess -State $finishedState -TimeoutSeconds $TimeoutSeconds
+        Write-TidyResult -Writer $writer -Result $result -FileCount $files.Count -TimeoutSeconds $TimeoutSeconds -TidyFailed ([ref]$tidyFailed)
     }
 
     if ($tidyFailed) {

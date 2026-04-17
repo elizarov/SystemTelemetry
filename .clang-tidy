@@ -2,7 +2,8 @@ Checks: >
   -*,
   clang-analyzer-core.*,
   clang-analyzer-cplusplus.NewDelete,
-  bugprone-use-after-move
+  bugprone-use-after-move,
+  misc-include-cleaner
 WarningsAsErrors: ''
 HeaderFilterRegex: '(^|.*[\\/])(src|tests)[\\/](?!vendor[\\/]).*'
 FormatStyle: none

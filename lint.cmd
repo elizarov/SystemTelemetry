@@ -39,11 +39,25 @@ exit /b 1
 
 :run_clang_tidy
 set "mode=check"
-if /I "%~1"=="fix" set "mode=fix"
-if not "%~1"=="" if /I not "%~1"=="fix" goto :usage
-if not "%~2"=="" goto :usage
+set "scope=all"
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%root%tools\run_clang_tidy.ps1" -Root "%root_arg%" -Mode "%mode%"
+:parse_clang_tidy_args
+if "%~1"=="" goto clang_tidy_args_done
+if /I "%~1"=="fix" (
+    set "mode=fix"
+    shift
+    goto parse_clang_tidy_args
+)
+if /I "%~1"=="changed" (
+    set "scope=changed"
+    shift
+    goto parse_clang_tidy_args
+)
+goto :usage
+
+:clang_tidy_args_done
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%root%tools\run_clang_tidy.ps1" -Root "%root_arg%" -Mode "%mode%" -Scope "%scope%"
 exit /b %errorlevel%
 
 :usage
@@ -51,5 +65,7 @@ echo Usage:
 echo   lint
 echo   lint tidy
 echo   lint tidy fix
+echo   lint tidy changed
+echo   lint tidy changed fix
 popd >nul
 exit /b 2
