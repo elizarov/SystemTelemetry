@@ -14,19 +14,19 @@ python tools\check_includes.py
 if errorlevel 1 set "failed=1"
 
 if /I "%~1"=="tidy" (
-    shift
-    call :run_clang_tidy %*
-    if errorlevel 1 set "failed=1"
+    call :run_clang_tidy %~2 %~3
+    set "tidy_result=%errorlevel%"
+    if "%tidy_result%"=="2" (
+        popd >nul
+        exit /b 2
+    )
+    if not "%tidy_result%"=="0" set "failed=1"
 ) else if not "%~1"=="" (
     goto :usage
 )
 
 if "%failed%"=="0" (
-    if /I "%~1"=="tidy" (
-        echo Lint passed.
-    ) else (
-        echo Lint passed.
-    )
+    echo Lint passed.
     popd >nul
     exit /b 0
 )
