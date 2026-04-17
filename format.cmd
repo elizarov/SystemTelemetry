@@ -1,104 +1,40 @@
 @echo off
-setlocal EnableExtensions DisableDelayedExpansion
+setlocal EnableExtensions EnableDelayedExpansion
 
 set "root=%~dp0"
+set "root_arg=%root%"
+if "%root_arg:~-1%"=="\" set "root_arg=%root_arg:~0,-1%"
 pushd "%root%" >nul || exit /b 1
 
-call :resolve_clang_format
-if errorlevel 1 (
-    echo clang-format.exe was not found. Install the Visual Studio LLVM tools or add clang-format to PATH.
-    popd >nul
-    exit /b 1
-)
-
 set "mode=check"
-if /I "%~1"=="fix" set "mode=fix"
-if not "%~1"=="" if /I not "%~1"=="fix" goto :usage
-if not "%~2"=="" goto :usage
+set "scope=all"
 
-set "file_count=0"
-set "failed=0"
-
-for /f "usebackq delims=" %%F in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$files = git -c core.quotepath=off ls-files --cached --others --exclude-standard -- '*.cpp' '*.h'; $files | Where-Object { $_ -notlike 'src/vendor/*' -and (Test-Path $_) } | Sort-Object -Unique"`) do (
-    set /a file_count+=1
-    if /I "%mode%"=="fix" (
-        call :format_file "%%F"
-    ) else (
-        "%clang_format%" --dry-run --Werror "%%F"
-    )
-    if errorlevel 1 set "failed=1"
+:parse_args
+if "%~1"=="" goto args_done
+if /I "%~1"=="fix" (
+    set "mode=fix"
+    shift
+    goto parse_args
 )
-
-if "%file_count%"=="0" (
-    echo No non-vendored C++ source files were found.
-    popd >nul
-    exit /b 1
+if /I "%~1"=="changed" (
+    set "scope=changed"
+    shift
+    goto parse_args
 )
+goto :usage
 
-if /I "%mode%"=="fix" (
-    if "%failed%"=="0" (
-        echo Formatted %file_count% files.
-        popd >nul
-        exit /b 0
-    )
-    echo Formatting failed.
-    popd >nul
-    exit /b 1
-)
+:args_done
 
-if "%failed%"=="0" (
-    echo Checked %file_count% files. Formatting is up to date.
-    popd >nul
-    exit /b 0
-)
-
-echo Formatting is required. Run "format fix".
+powershell -NoProfile -ExecutionPolicy Bypass -File "%root%tools\run_clang_format.ps1" -Root "%root_arg%" -Mode "%mode%" -Scope "%scope%"
+set "result=%errorlevel%"
 popd >nul
-exit /b 1
-
-:format_file
-set "target=%~1"
-set "temp_file=%TEMP%\systemtelemetry-clang-format-%RANDOM%-%RANDOM%.tmp"
-"%clang_format%" "%target%" > "%temp_file%"
-if errorlevel 1 (
-    if exist "%temp_file%" del /q "%temp_file%" >nul 2>&1
-    exit /b 1
-)
-copy /y "%temp_file%" "%target%" >nul
-set "copy_result=%errorlevel%"
-if exist "%temp_file%" del /q "%temp_file%" >nul 2>&1
-exit /b %copy_result%
-
-:resolve_clang_format
-set "clang_format="
-for %%P in (
-    "%VSINSTALLDIR%VC\Tools\Llvm\x64\bin\clang-format.exe"
-    "%VSINSTALLDIR%VC\Tools\Llvm\bin\clang-format.exe"
-) do (
-    if exist %%~P (
-        set "clang_format=%%~fP"
-        exit /b 0
-    )
-)
-
-for /f "usebackq delims=" %%P in (`where clang-format.exe 2^>nul`) do (
-    set "clang_format=%%~fP"
-    exit /b 0
-)
-
-if exist "%root%devenv.cmd" (
-    call "%root%devenv.cmd" >nul 2>&1
-    for /f "usebackq delims=" %%P in (`where clang-format.exe 2^>nul`) do (
-        set "clang_format=%%~fP"
-        exit /b 0
-    )
-)
-
-exit /b 1
+exit /b %result%
 
 :usage
 echo Usage:
 echo   format
 echo   format fix
+echo   format changed
+echo   format fix changed
 popd >nul
 exit /b 2
