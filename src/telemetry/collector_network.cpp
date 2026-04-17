@@ -284,7 +284,7 @@ void ResolveNetworkSelection(TelemetryCollectorState& state) {
     state.trace_.Write("telemetry:network_table_free status=done");
 }
 
-void CollectNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly) {
+void UpdateNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly) {
     if (state.network_.selectedIndex == 0) {
         if (!initializeOnly) {
             state.snapshot_.network.uploadMbps = 0.0;

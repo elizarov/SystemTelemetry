@@ -3,4 +3,4 @@
 struct TelemetryCollectorState;
 
 void ResolveNetworkSelection(TelemetryCollectorState& state);
-void CollectNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly);
+void UpdateNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly);

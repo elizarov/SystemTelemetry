@@ -144,8 +144,8 @@ bool TelemetryCollector::Initialize(const TelemetrySettings& settings, std::ostr
     InitializeStorageCollector(*state_);
     ResolveStorageSelection(*state_);
     ResolveNetworkSelection(*state_);
-    CollectNetworkMetrics(*state_, true);
-    CollectStorageMetrics(*state_, true);
+    UpdateNetworkMetrics(*state_, true);
+    UpdateStorageMetrics(*state_, true);
     UpdateBoardMetrics(*state_);
     UpdateCpuMetrics(*state_);
     UpdateGpuMetrics(*state_);
@@ -234,8 +234,8 @@ void TelemetryCollector::UpdateSnapshot() {
     UpdateBoardMetrics(*state_);
     UpdateCpuMetrics(*state_);
     UpdateGpuMetrics(*state_);
-    CollectNetworkMetrics(*state_, false);
-    CollectStorageMetrics(*state_, false);
+    UpdateNetworkMetrics(*state_, false);
+    UpdateStorageMetrics(*state_, false);
     GetLocalTime(&state_->snapshot_.now);
     ++state_->snapshot_.revision;
     state_->trace_.Write("telemetry:update_snapshot_done");

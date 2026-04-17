@@ -267,7 +267,7 @@ void ResolveStorageSelection(TelemetryCollectorState& state) {
     RefreshDriveUsage(state);
 }
 
-void CollectStorageMetrics(TelemetryCollectorState& state, bool initializeOnly) {
+void UpdateStorageMetrics(TelemetryCollectorState& state, bool initializeOnly) {
     UpdateStorageThroughput(state, initializeOnly);
     RefreshDriveUsage(state);
 }
