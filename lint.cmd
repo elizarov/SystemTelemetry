@@ -54,6 +54,7 @@ if not exist "%root%build\cmake\compile_commands.json" (
 
 set "file_count=0"
 set "file_list=%root%build\lint_cpp_files.txt"
+set "report_file=%root%build\clang_tidy_report.txt"
 
 echo Using clang-tidy: %clang_tidy%
 echo Preparing lint file list...
@@ -70,18 +71,39 @@ if "%file_count%"=="0" (
     exit /b 1
 )
 
+(
+    echo clang-tidy report
+    echo Mode: %mode%
+    echo Generated: %date% %time%
+    echo Build database: %root%build\cmake\compile_commands.json
+    echo.
+) > "%report_file%"
+if errorlevel 1 (
+    echo Failed to create %report_file%.
+    if exist "%file_list%" del /q "%file_list%" >nul 2>&1
+    exit /b 1
+)
+
 echo Running optional clang-tidy sweep for %file_count% translation units...
+echo Writing full clang-tidy output to %report_file%
 set "current_index=0"
 set "tidy_failed=0"
 for /f "usebackq delims=" %%F in ("%file_list%") do (
     set /a current_index+=1
     echo [!current_index!/%file_count%] %%F
+    >> "%report_file%" echo ===============================================================================
+    >> "%report_file%" echo [!current_index!/%file_count%] %%F
     if /I "%mode%"=="fix" (
-        "%clang_tidy%" -p "%root%build\cmake" --quiet -fix --format-style=none "%%F"
+        "%clang_tidy%" -p "%root%build\cmake" --quiet -fix --format-style=none "%%F" >> "%report_file%" 2>&1
     ) else (
-        "%clang_tidy%" -p "%root%build\cmake" --quiet "%%F"
+        "%clang_tidy%" -p "%root%build\cmake" --quiet "%%F" >> "%report_file%" 2>&1
     )
-    if errorlevel 1 set "tidy_failed=1"
+    set "tidy_exit=!errorlevel!"
+    if not "!tidy_exit!"=="0" (
+        set "tidy_failed=1"
+        >> "%report_file%" echo clang-tidy exit code: !tidy_exit!
+    )
+    >> "%report_file%" echo.
 )
 
 if exist "%file_list%" del /q "%file_list%" >nul 2>&1
@@ -92,6 +114,7 @@ if "%tidy_failed%"=="0" (
     ) else (
         echo clang-tidy passed.
     )
+    echo Full clang-tidy report: %report_file%
     exit /b 0
 )
 
@@ -100,6 +123,7 @@ if /I "%mode%"=="fix" (
 ) else (
     echo clang-tidy failed.
 )
+echo Full clang-tidy report: %report_file%
 exit /b 1
 
 :resolve_clang_tidy
