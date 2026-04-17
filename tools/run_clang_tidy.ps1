@@ -15,6 +15,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$clangTidySkippedFiles = @(
+    # clang-tidy is intentionally skipped for snapshot_dump.cpp because isolated timings show
+    # that Clang diagnostics, clang-analyzer, and misc-include-cleaner all go pathological on
+    # this translation unit, turning the optional tidy sweep into a multi-minute stall.
+    'src/snapshot_dump.cpp'
+)
+
 function Resolve-ClangTidyPath {
     param(
         [string]$RepoRoot,
@@ -156,7 +163,8 @@ function Get-TrackedCppFiles {
         Get-ChildItem -LiteralPath $searchRoot -Recurse -File -Filter *.cpp |
             Where-Object {
                 $_.FullName -notmatch '[\\/]vendor[\\/]' -and
-                $_.Name -ne 'board_gigabyte_siv.cpp'
+                $_.Name -ne 'board_gigabyte_siv.cpp' -and
+                (Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $_.FullName) -notin $clangTidySkippedFiles
             }
     }
 
@@ -216,6 +224,9 @@ function Get-ChangedCppFiles {
             continue
         }
         if ([System.IO.Path]::GetFileName($normalizedPath) -eq 'board_gigabyte_siv.cpp') {
+            continue
+        }
+        if ((Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $normalizedPath) -in $clangTidySkippedFiles) {
             continue
         }
 
