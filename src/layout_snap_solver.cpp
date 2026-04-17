@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <map>
+
 namespace layout_snap_solver {
 
 std::optional<int> FindNearestSnapWeight(int currentWeight,

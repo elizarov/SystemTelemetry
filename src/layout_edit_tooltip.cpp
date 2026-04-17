@@ -23,10 +23,9 @@ const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const Layout
         return FindNodeByPath(config.layout.structure.cardsLayout, key.nodePath);
     }
 
-    const auto it =
-        std::find_if(config.layout.cards.begin(), config.layout.cards.end(), [&](const LayoutCardConfig& card) {
-            return card.id == key.editCardId;
-        });
+    const auto it = std::find_if(config.layout.cards.begin(),
+        config.layout.cards.end(),
+        [&](const LayoutCardConfig& card) { return card.id == key.editCardId; });
     if (it == config.layout.cards.end()) {
         return nullptr;
     }
@@ -123,7 +122,8 @@ std::optional<std::string> BuildMetricListOrderTooltipLine(
     return "[" + sectionName + "] " + memberName + " = metric_list(" + metricRefs[static_cast<size_t>(rowIndex)] + ")";
 }
 
-std::optional<std::string> BuildMetricListAddRowTooltipLine(const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
+std::optional<std::string> BuildMetricListAddRowTooltipLine(
+    const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
     const LayoutNodeConfig* node = FindMetricListNode(config, key);
     if (node == nullptr || node->name != "metric_list") {
         return std::nullopt;

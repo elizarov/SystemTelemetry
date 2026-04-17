@@ -406,8 +406,9 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
     }
     if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&leaf->focusKey)) {
         return "focus=" +
-               QuoteTraceText((metricListKey->editCardId.empty() ? "[layout] " : "[card." + metricListKey->editCardId + "] ") +
-                              std::string("metric_list"));
+               QuoteTraceText(
+                   (metricListKey->editCardId.empty() ? "[layout] " : "[card." + metricListKey->editCardId + "] ") +
+                   std::string("metric_list"));
     }
     return "focus=\"unknown\"";
 }
@@ -1304,11 +1305,14 @@ void DashboardShellUi::ShowContextMenu(
             if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutMetricEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(
                     WideFromUtf8(std::get<LayoutMetricEditKey>(*focusKey).metricId + " metric"));
-            } else if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
+            } else if (label.empty() && focusKey.has_value() &&
+                       std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"card title");
-            } else if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutMetricListOrderEditKey>(*focusKey)) {
+            } else if (label.empty() && focusKey.has_value() &&
+                       std::holds_alternative<LayoutMetricListOrderEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"metrics list");
-            } else if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
+            } else if (label.empty() && focusKey.has_value() &&
+                       std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"layout container");
             } else if (label.empty()) {
                 const auto parameter = TooltipPayloadParameter(layoutEditTarget->payload);

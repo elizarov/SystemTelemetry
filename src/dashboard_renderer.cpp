@@ -843,10 +843,11 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
         if (rect.IsEmpty()) {
             return;
         }
-        const auto existing = std::find_if(selectedRects.begin(), selectedRects.end(), [&](const RenderRect& candidate) {
-            return candidate.left == rect.left && candidate.top == rect.top && candidate.right == rect.right &&
-                   candidate.bottom == rect.bottom;
-        });
+        const auto existing =
+            std::find_if(selectedRects.begin(), selectedRects.end(), [&](const RenderRect& candidate) {
+                return candidate.left == rect.left && candidate.top == rect.top && candidate.right == rect.right &&
+                       candidate.bottom == rect.bottom;
+            });
         if (existing == selectedRects.end()) {
             selectedRects.push_back(rect);
         }
@@ -855,8 +856,8 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
         const bool matchesFocus = MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
         const bool matchesContainer =
             std::holds_alternative<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight) &&
-            MatchesLayoutContainerEditKey(
-                std::get<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight), {guide.editCardId, guide.nodePath});
+            MatchesLayoutContainerEditKey(std::get<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight),
+                {guide.editCardId, guide.nodePath});
         if (matchesFocus || matchesContainer) {
             appendRect(guide.containerRect);
         }

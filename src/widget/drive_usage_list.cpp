@@ -178,8 +178,8 @@ void DriveUsageListWidget::ResolveLayoutState(const DashboardRenderer& renderer,
     layoutState_.driveBarHeight = (std::max)(1, renderer.ScaleLogical(config.barHeight));
     layoutState_.activitySegments = (std::max)(1, config.activitySegments);
     layoutState_.activitySegmentGap = (std::max)(0, renderer.ScaleLogical(config.activitySegmentGap));
-    layoutState_.rowContentHeight = (std::max)(
-        renderer.TextMetrics().label, (std::max)(renderer.TextMetrics().smallText, layoutState_.driveBarHeight));
+    layoutState_.rowContentHeight = (std::max)(renderer.TextMetrics().label,
+        (std::max)(renderer.TextMetrics().smallText, layoutState_.driveBarHeight));
     layoutState_.activityAnchorSize = (std::max)(8, renderer.ScaleLogical(10));
     layoutState_.headerRect = RenderRect{rect.left, rect.top, rect.right, rect.top + layoutState_.headerHeight};
     layoutState_.headerColumns = ResolveColumns(layoutState_.headerRect,

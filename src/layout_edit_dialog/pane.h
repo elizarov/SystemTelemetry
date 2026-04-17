@@ -43,8 +43,7 @@ void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStat
 void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int color);
 void SetFontSamplePreview(
     LayoutEditDialogState* state, HWND hwnd, std::optional<LayoutEditParameter> parameter, const UiFontConfig* font);
-void ShowLayoutEditEditors(
-    HWND hwnd,
+void ShowLayoutEditEditors(HWND hwnd,
     bool showNumeric,
     bool showFont,
     bool showColor,

@@ -774,10 +774,10 @@ void DashboardApp::UpdateLayoutEditTooltip() {
                 rowIndex = anchor->key.anchorId;
                 addRowAnchor = anchor->shape == AnchorShape::Plus;
             }
-            layoutEditTooltipText_ = addRowAnchor
-                                         ? BuildMetricListAddRowTooltipText(controller_.State().config, *metricListOrderKey)
-                                         : BuildMetricListOrderTooltipText(
-                                               controller_.State().config, *metricListOrderKey, rowIndex);
+            layoutEditTooltipText_ =
+                addRowAnchor
+                    ? BuildMetricListAddRowTooltipText(controller_.State().config, *metricListOrderKey)
+                    : BuildMetricListOrderTooltipText(controller_.State().config, *metricListOrderKey, rowIndex);
             if (layoutEditTooltipText_.empty()) {
                 HideLayoutEditTooltip();
                 return;
@@ -975,7 +975,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_MOUSEACTIVATE:
             if (LOWORD(lParam) == HTCLIENT) {
                 POINT screenPoint{};
-                if (GetCursorPos(&screenPoint) && (shellUi_ == nullptr || !shellUi_->ShouldDashboardIgnoreMouse(screenPoint))) {
+                if (GetCursorPos(&screenPoint) &&
+                    (shellUi_ == nullptr || !shellUi_->ShouldDashboardIgnoreMouse(screenPoint))) {
                     BringOnTop();
                     return MA_ACTIVATE;
                 }

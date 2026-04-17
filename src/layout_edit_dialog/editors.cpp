@@ -40,8 +40,10 @@ bool ApplyMetricListOrderRows(LayoutEditDialogState* state, HWND hwnd, const std
     return key != nullptr && state->dialog->Host().ApplyMetricListOrderPreview(*key, metricRefs);
 }
 
-void PopulateMetricListRowCombo(
-    HWND hwnd, const LayoutEditMetricListRowControls& row, const std::vector<std::string>& options, std::string_view selected) {
+void PopulateMetricListRowCombo(HWND hwnd,
+    const LayoutEditMetricListRowControls& row,
+    const std::vector<std::string>& options,
+    std::string_view selected) {
     if (row.combo == nullptr) {
         return;
     }
@@ -664,7 +666,8 @@ bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd,
         return false;
     }
 
-    if (IsMetricListRowControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE, state->metricListRowControls.size()) &&
+    if (IsMetricListRowControlId(
+            controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE, state->metricListRowControls.size()) &&
         notificationCode == CBN_SELCHANGE) {
         const std::vector<std::string> metricRefs = ReadMetricListOrderDialogRows(state, hwnd);
         const bool applied = ApplyMetricListOrderRows(state, hwnd, metricRefs);
@@ -688,7 +691,8 @@ bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd,
         return false;
     }
 
-    if (IsMetricListRowControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE, state->metricListRowControls.size())) {
+    if (IsMetricListRowControlId(
+            controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE, state->metricListRowControls.size())) {
         const int rowIndex = MetricListRowIndexFromControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE);
         return MutateMetricListOrderRows(state, hwnd, [&](std::vector<std::string>& metricRefs) {
             if (rowIndex > 0 && rowIndex < static_cast<int>(metricRefs.size())) {
@@ -822,8 +826,8 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         if (node == nullptr) {
             return false;
         }
-        const bool applied =
-            state->dialog->Host().ApplyMetricListOrderPreview(*metricListKey, ParseMetricListMetricRefs(node->parameter));
+        const bool applied = state->dialog->Host().ApplyMetricListOrderPreview(
+            *metricListKey, ParseMetricListMetricRefs(node->parameter));
         if (applied) {
             PopulateLayoutEditSelection(state, hwnd);
             RefreshLayoutEditValidationState(state, hwnd);

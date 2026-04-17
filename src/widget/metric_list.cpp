@@ -79,7 +79,8 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     layoutState_.addRowAnchorRect = {};
     const int availableRowSlots =
         layoutState_.rowHeight > 0
-            ? (std::max)(0, ((std::max)(0, rect.bottom - rect.top) + layoutState_.rowHeight - 1) / layoutState_.rowHeight)
+            ? (std::max)(0,
+                  ((std::max)(0, rect.bottom - rect.top) + layoutState_.rowHeight - 1) / layoutState_.rowHeight)
             : 0;
     RenderRect rowRect{rect.left, rect.top, rect.right, rect.top + layoutState_.rowHeight};
     for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {

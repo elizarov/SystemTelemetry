@@ -12,6 +12,7 @@
 #include "layout_edit_dialog/tree.h"
 #include "layout_edit_dialog/util.h"
 #include "layout_edit_tree.h"
+
 LayoutEditDialog::LayoutEditDialog(LayoutEditDialogHost& host) : host_(host) {}
 
 LayoutEditDialog::~LayoutEditDialog() {
@@ -154,8 +155,9 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
         } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
             initialFocusTrace = "[card." + cardTitleKey->cardId + "] title";
         } else if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&*focusKey)) {
-            initialFocusTrace = metricListKey->editCardId.empty() ? "[layout] metric_list"
-                                                                  : "[card." + metricListKey->editCardId + "] metric_list";
+            initialFocusTrace = metricListKey->editCardId.empty()
+                                    ? "[layout] metric_list"
+                                    : "[card." + metricListKey->editCardId + "] metric_list";
         } else {
             initialFocusTrace = "weight";
         }
