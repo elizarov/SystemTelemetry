@@ -1,14 +1,14 @@
 #include "telemetry/collector_state.h"
 
 TelemetryCollectorState::~TelemetryCollectorState() {
-    if (cpuQuery_ != nullptr) {
-        PdhCloseQuery(cpuQuery_);
+    if (cpu_.query != nullptr) {
+        PdhCloseQuery(cpu_.query);
     }
-    if (gpuQuery_ != nullptr) {
-        PdhCloseQuery(gpuQuery_);
+    if (gpu_.query != nullptr) {
+        PdhCloseQuery(gpu_.query);
     }
-    if (gpuMemoryQuery_ != nullptr) {
-        PdhCloseQuery(gpuMemoryQuery_);
+    if (gpu_.memoryQuery != nullptr) {
+        PdhCloseQuery(gpu_.memoryQuery);
     }
     if (storage_.query != nullptr) {
         PdhCloseQuery(storage_.query);

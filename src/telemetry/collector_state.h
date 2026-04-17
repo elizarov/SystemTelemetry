@@ -30,6 +30,23 @@ struct DriveCounterState {
 };
 
 struct TelemetryCollectorState {
+    struct CpuState {
+        PDH_HQUERY query = nullptr;
+        PDH_HCOUNTER loadCounter = nullptr;
+        PDH_HCOUNTER frequencyCounter = nullptr;
+    };
+
+    struct GpuState {
+        std::unique_ptr<GpuVendorTelemetryProvider> provider;
+        std::string providerName = "None";
+        std::string providerDiagnostics = "Provider not initialized.";
+        bool providerAvailable = false;
+        PDH_HQUERY query = nullptr;
+        PDH_HCOUNTER loadCounter = nullptr;
+        PDH_HQUERY memoryQuery = nullptr;
+        PDH_HCOUNTER dedicatedCounter = nullptr;
+    };
+
     struct StorageState {
         std::vector<std::string> resolvedDriveLetters;
         std::vector<StorageDriveCandidate> driveCandidates;
@@ -54,25 +71,15 @@ struct TelemetryCollectorState {
     TelemetrySettings settings_;
     ResolvedTelemetrySelections resolvedSelections_;
     SystemSnapshot snapshot_;
+    CpuState cpu_;
+    GpuState gpu_;
     StorageState storage_;
     NetworkState network_;
     RetainedHistoryStore retainedHistoryStore_;
     tracing::Trace trace_;
-    std::unique_ptr<GpuVendorTelemetryProvider> gpuProvider_;
     std::unique_ptr<BoardVendorTelemetryProvider> boardProvider_;
-    std::string gpuProviderName_ = "None";
-    std::string gpuProviderDiagnostics_ = "Provider not initialized.";
-    bool gpuProviderAvailable_ = false;
     std::string boardProviderName_ = "None";
     std::string boardProviderDiagnostics_ = "Provider not initialized.";
     BoardVendorTelemetrySample boardProviderSample_{};
     bool boardProviderAvailable_ = false;
-
-    PDH_HQUERY cpuQuery_ = nullptr;
-    PDH_HCOUNTER cpuLoadCounter_ = nullptr;
-    PDH_HCOUNTER cpuFrequencyCounter_ = nullptr;
-    PDH_HQUERY gpuQuery_ = nullptr;
-    PDH_HCOUNTER gpuLoadCounter_ = nullptr;
-    PDH_HQUERY gpuMemoryQuery_ = nullptr;
-    PDH_HCOUNTER gpuDedicatedCounter_ = nullptr;
 };
