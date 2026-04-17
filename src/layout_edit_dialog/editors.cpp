@@ -60,7 +60,7 @@ void PopulateMetricListRowCombo(
     } else {
         SetWindowTextW(row.combo, WideFromUtf8(std::string(selected)).c_str());
     }
-    SendMessageW(row.combo, CB_SETMINVISIBLE, 8, 0);
+    SendMessageW(row.combo, CB_SETMINVISIBLE, 10, 0);
 }
 
 int MetricListRowIndexFromControlId(int controlId, int baseId) {

@@ -977,7 +977,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     state->metricListAddRowButton != nullptr ? ReadWindowTextWide(state->metricListAddRowButton) : L"Add row") +
                     28);
             const int rowVisibleHeight = comboFieldVisibleHeight;
-            const int comboDropHeight = std::max(140, rowVisibleHeight + 120);
+            const int comboDropHeight = std::max(220, rowVisibleHeight + 180);
             const int buttonsWidth = (buttonWidth * 3) + (metrics.inlineGap * 2);
             const int comboWidth = std::max(60, innerWidth - buttonsWidth - metrics.inlineGap);
 
