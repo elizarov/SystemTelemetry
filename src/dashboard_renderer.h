@@ -56,6 +56,8 @@ public:
 
     struct EditOverlayState {
         bool showLayoutEditGuides = false;
+        bool forceLayoutEditAffordances = false;
+        bool hoverOnExposedDashboard = false;
         SimilarityIndicatorMode similarityIndicatorMode = SimilarityIndicatorMode::ActiveGuide;
         std::optional<LayoutEditGuide> activeLayoutEditGuide;
         std::optional<LayoutEditGuide> hoveredLayoutEditGuide;
@@ -379,6 +381,7 @@ private:
     };
 
     void ClearD2DCaches();
+    bool ShouldDrawLayoutEditAffordances(const EditOverlayState& overlayState) const;
     void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const;
     void DrawSelectedColorEditHighlights(const EditOverlayState& overlayState) const;

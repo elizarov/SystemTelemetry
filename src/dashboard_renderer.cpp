@@ -594,7 +594,7 @@ void DashboardRenderer::DrawText(const RenderRect& rect,
 }
 
 void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const {
-    if (!overlayState.showLayoutEditGuides || !overlayState.hoveredEditableWidget.has_value() ||
+    if (!ShouldDrawLayoutEditAffordances(overlayState) || !overlayState.hoveredEditableWidget.has_value() ||
         overlayState.hoveredEditableWidget->kind != LayoutEditWidgetIdentity::Kind::Widget) {
         return;
     }
@@ -617,8 +617,22 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overl
     const_cast<DashboardRenderer*>(this)->DrawSolidRect(hoveredWidget->rect, RenderStroke::Solid(LayoutGuideColor()));
 }
 
-void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const {
+bool DashboardRenderer::ShouldDrawLayoutEditAffordances(const EditOverlayState& overlayState) const {
     if (!overlayState.showLayoutEditGuides) {
+        return false;
+    }
+    if (overlayState.forceLayoutEditAffordances) {
+        return true;
+    }
+    return overlayState.activeLayoutEditGuide.has_value() || overlayState.hoveredLayoutEditGuide.has_value() ||
+           overlayState.hoveredLayoutCard.has_value() || overlayState.hoveredEditableCard.has_value() ||
+           overlayState.hoveredEditableWidget.has_value() || overlayState.activeWidgetEditGuide.has_value() ||
+           overlayState.hoveredGapEditAnchor.has_value() || overlayState.activeGapEditAnchor.has_value() ||
+           overlayState.hoveredEditableAnchor.has_value() || overlayState.activeEditableAnchor.has_value();
+}
+
+void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const {
+    if (!ShouldDrawLayoutEditAffordances(overlayState)) {
         return;
     }
 
@@ -824,6 +838,52 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
     }
 
     const RenderColor color = ActiveEditColor();
+    std::vector<RenderRect> selectedRects;
+    const auto appendRect = [&](const RenderRect& rect) {
+        if (rect.IsEmpty()) {
+            return;
+        }
+        const auto existing = std::find_if(selectedRects.begin(), selectedRects.end(), [&](const RenderRect& candidate) {
+            return candidate.left == rect.left && candidate.top == rect.top && candidate.right == rect.right &&
+                   candidate.bottom == rect.bottom;
+        });
+        if (existing == selectedRects.end()) {
+            selectedRects.push_back(rect);
+        }
+    };
+    for (const auto& guide : layoutEditGuides_) {
+        const bool matchesFocus = MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
+        const bool matchesContainer =
+            std::holds_alternative<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight) &&
+            MatchesLayoutContainerEditKey(
+                std::get<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight), {guide.editCardId, guide.nodePath});
+        if (matchesFocus || matchesContainer) {
+            appendRect(guide.containerRect);
+        }
+    }
+    for (const auto& guide : widgetEditGuides_) {
+        if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide)) {
+            appendRect(guide.widgetRect);
+        }
+    }
+    const auto collectAnchorTargets = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
+        for (const auto& region : regions) {
+            if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) ||
+                (std::holds_alternative<LayoutEditSelectionHighlightSpecial>(*overlayState.selectedTreeHighlight) &&
+                    std::get<LayoutEditSelectionHighlightSpecial>(*overlayState.selectedTreeHighlight) ==
+                        LayoutEditSelectionHighlightSpecial::AllTexts &&
+                    LayoutEditAnchorParameter(region.key).has_value() &&
+                    IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))) {
+                appendRect(region.targetRect);
+            }
+        }
+    };
+    collectAnchorTargets(staticEditableAnchorRegions_);
+    collectAnchorTargets(dynamicEditableAnchorRegions_);
+    for (const auto& rect : selectedRects) {
+        const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(rect, color, true);
+    }
+
     if (const auto* widgetClass = std::get_if<DashboardWidgetClass>(&*overlayState.selectedTreeHighlight)) {
         for (const auto& card : resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
@@ -914,7 +974,7 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
 }
 
 void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayState) const {
-    if (!overlayState.showLayoutEditGuides || layoutEditGuides_.empty()) {
+    if (!ShouldDrawLayoutEditAffordances(overlayState) || layoutEditGuides_.empty()) {
         return;
     }
 
@@ -940,19 +1000,6 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
     if (overlayState.activeLayoutEditGuide.has_value()) {
         appendContainerHighlight(overlayState.activeLayoutEditGuide->containerRect, true);
     }
-    if (overlayState.selectedTreeHighlight.has_value()) {
-        for (const auto& guide : layoutEditGuides_) {
-            const bool matchesFocus = MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
-            const bool matchesContainer =
-                std::holds_alternative<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight) &&
-                MatchesLayoutContainerEditKey(std::get<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight),
-                    LayoutContainerEditKey{guide.editCardId, guide.nodePath});
-            if (matchesFocus || matchesContainer) {
-                appendContainerHighlight(guide.containerRect, true);
-            }
-        }
-    }
-
     for (const auto& [rect, active] : containerHighlights) {
         const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
         const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(rect, color, active);
@@ -963,21 +1010,23 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
     for (const auto& guide : layoutEditGuides_) {
         const bool active = overlayState.activeLayoutEditGuide.has_value() &&
                             MatchesLayoutEditGuide(guide, *overlayState.activeLayoutEditGuide);
-        const bool selected = overlayState.selectedTreeHighlight.has_value() &&
-                              MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
-        const bool emphasized = active || selected;
-        const RenderColor color = emphasized ? ActiveEditColor() : LayoutGuideColor();
+        const bool hoveredGuide = overlayState.hoveredLayoutEditGuide.has_value() &&
+                                  MatchesLayoutEditGuide(guide, *overlayState.hoveredLayoutEditGuide);
+        if (!active && !hoveredGuide && !overlayState.hoverOnExposedDashboard) {
+            continue;
+        }
+        const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
         const RenderPoint start{guide.lineRect.left, guide.lineRect.top};
         const RenderPoint end = guide.axis == LayoutGuideAxis::Vertical
                                     ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
                                     : RenderPoint{guide.lineRect.right, guide.lineRect.top};
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-            start, end, RenderStroke::Solid(color, static_cast<float>(emphasized ? activeLineWidth : lineWidth)));
+            start, end, RenderStroke::Solid(color, static_cast<float>(active ? activeLineWidth : lineWidth)));
     }
 }
 
 void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayState) const {
-    if (!overlayState.showLayoutEditGuides || widgetEditGuides_.empty()) {
+    if (!ShouldDrawLayoutEditAffordances(overlayState) || widgetEditGuides_.empty()) {
         return;
     }
 
@@ -987,10 +1036,6 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
                    guide.widget.renderCardId == overlayState.activeWidgetEditGuide->widget.renderCardId &&
                    guide.widget.editCardId == overlayState.activeWidgetEditGuide->widget.editCardId &&
                    guide.widget.nodePath == overlayState.activeWidgetEditGuide->widget.nodePath;
-        }
-        if (overlayState.selectedTreeHighlight.has_value() &&
-            MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide)) {
-            return true;
         }
         if (guide.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
             return overlayState.hoveredEditableCard.has_value() &&
@@ -1014,18 +1059,15 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
         }
         const bool active = overlayState.activeWidgetEditGuide.has_value() &&
                             MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
-        const bool selected = overlayState.selectedTreeHighlight.has_value() &&
-                              MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
-        const bool emphasized = active || selected;
-        const RenderColor color = emphasized ? ActiveEditColor() : LayoutGuideColor();
+        const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart,
             guide.drawEnd,
-            RenderStroke::Solid(color, static_cast<float>(emphasized ? activeLineWidth : lineWidth)));
+            RenderStroke::Solid(color, static_cast<float>(active ? activeLineWidth : lineWidth)));
     }
 }
 
 void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState) const {
-    if (!overlayState.showLayoutEditGuides || gapEditAnchors_.empty()) {
+    if (!ShouldDrawLayoutEditAffordances(overlayState) || gapEditAnchors_.empty()) {
         return;
     }
 
@@ -1038,8 +1080,7 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
                    anchor.key.widget.renderCardId == overlayState.activeGapEditAnchor->widget.renderCardId &&
                    anchor.key.widget.editCardId == overlayState.activeGapEditAnchor->widget.editCardId;
         }
-        if (overlayState.selectedTreeHighlight.has_value() &&
-            MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, anchor.key)) {
+        if (overlayState.hoverOnExposedDashboard) {
             return true;
         }
         if (anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome) {
@@ -1060,13 +1101,10 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
         }
         const bool active = overlayState.activeGapEditAnchor.has_value() &&
                             MatchesGapEditAnchorKey(anchor.key, *overlayState.activeGapEditAnchor);
-        const bool selected = overlayState.selectedTreeHighlight.has_value() &&
-                              MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, anchor.key);
         const bool hovered = overlayState.hoveredGapEditAnchor.has_value() &&
                              MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
-        const bool emphasized = active || selected;
-        const RenderColor color = emphasized ? ActiveEditColor() : LayoutGuideColor();
-        const float strokeWidth = static_cast<float>(emphasized ? activeLineWidth : lineWidth);
+        const RenderColor color = active ? ActiveEditColor() : LayoutGuideColor();
+        const float strokeWidth = static_cast<float>(active ? activeLineWidth : lineWidth);
 
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(
             anchor.drawStart, anchor.drawEnd, RenderStroke::Solid(color, strokeWidth));
@@ -1090,7 +1128,7 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
                 RenderStroke::Solid(color, strokeWidth));
         }
 
-        if (emphasized || hovered) {
+        if (active || hovered || overlayState.hoverOnExposedDashboard) {
             const_cast<DashboardRenderer*>(this)->FillSolidRect(anchor.handleRect, color);
         } else {
             const_cast<DashboardRenderer*>(this)->DrawSolidRect(
@@ -1364,6 +1402,9 @@ void DashboardRenderer::RegisterDynamicColorEditRegion(LayoutEditParameter param
 }
 
 void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const {
+    if (!ShouldDrawLayoutEditAffordances(overlayState)) {
+        return;
+    }
     const int threshold = LayoutSimilarityThreshold();
     if (threshold <= 0) {
         return;

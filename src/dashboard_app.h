@@ -83,6 +83,7 @@ private:
     void DestroyLayoutEditTooltip();
     void HideLayoutEditTooltip();
     void UpdateLayoutEditTooltip();
+    void RefreshLayoutEditHoverFromCursor();
     bool ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool allowDuringDrag) const;
     void SuspendCoveredLayoutEditHover();
     void UpdateLayoutEditMouseTracking();

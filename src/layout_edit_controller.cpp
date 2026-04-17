@@ -594,6 +594,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
 
 bool LayoutEditController::HandleMouseMove(RenderPoint clientPoint) {
     lastClientPoint_ = clientPoint;
+    host_.LayoutEditOverlayState().hoverOnExposedDashboard = true;
     if (activeLayoutDrag_.has_value()) {
         return UpdateLayoutDrag(clientPoint);
     }
@@ -619,6 +620,8 @@ bool LayoutEditController::HandleMouseLeave() {
         activeAnchorEditDrag_.has_value() || activeMetricListReorderDrag_.has_value()) {
         return false;
     }
+
+    host_.LayoutEditOverlayState().hoverOnExposedDashboard = false;
 
     const bool hadHover = hoveredLayoutGuideIndex_.has_value() || hoveredLayoutCard_.has_value() ||
                           hoveredEditableCard_.has_value() || hoveredEditableWidget_.has_value() ||
@@ -880,6 +883,7 @@ void LayoutEditController::SyncRendererInteractionState() {
                 activeMetricListReorderDrag_->widget.editCardId, activeMetricListReorderDrag_->widget.nodePath},
             activeMetricListReorderDrag_->currentIndex};
     }
+    overlayState.hoverOnExposedDashboard = overlayState.hoverOnExposedDashboard || HasActiveDrag();
 }
 
 void LayoutEditController::ClearInteractionState() {
@@ -898,6 +902,7 @@ void LayoutEditController::ClearInteractionState() {
     activeGapEditDrag_.reset();
     activeAnchorEditDrag_.reset();
     activeMetricListReorderDrag_.reset();
+    host_.LayoutEditOverlayState().hoverOnExposedDashboard = false;
 }
 
 void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {

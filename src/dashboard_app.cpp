@@ -837,6 +837,37 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     layoutEditTooltipVisible_ = true;
 }
 
+void DashboardApp::RefreshLayoutEditHoverFromCursor() {
+    if (!controller_.State().isEditingLayout || controller_.State().isMoving || shellUi_ == nullptr ||
+        shellUi_->IsLayoutEditModalUiActive()) {
+        HideLayoutEditTooltip();
+        return;
+    }
+    if (layoutEditController_.HasActiveDrag()) {
+        return;
+    }
+
+    POINT screenPoint{};
+    if (!GetCursorPos(&screenPoint) || ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
+        SuspendCoveredLayoutEditHover();
+        return;
+    }
+
+    POINT clientPointWin32 = screenPoint;
+    ScreenToClient(hwnd_, &clientPointWin32);
+    RECT clientRect{};
+    GetClientRect(hwnd_, &clientRect);
+    if (!PtInRect(&clientRect, clientPointWin32)) {
+        layoutEditController_.HandleMouseLeave();
+        HideLayoutEditTooltip();
+        return;
+    }
+
+    UpdateLayoutEditMouseTracking();
+    layoutEditController_.HandleMouseMove(RenderPoint{clientPointWin32.x, clientPointWin32.y});
+    UpdateLayoutEditTooltip();
+}
+
 void DashboardApp::UpdateLayoutEditMouseTracking() {
     if (hwnd_ == nullptr) {
         return;
@@ -934,8 +965,20 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             return 0;
         case WM_ACTIVATE:
-            if (shellUi_ != nullptr && LOWORD(wParam) != WA_INACTIVE) {
-                shellUi_->SetLayoutEditTreeSelectionHighlightVisible(false);
+            if (shellUi_ != nullptr) {
+                if (LOWORD(wParam) != WA_INACTIVE) {
+                    shellUi_->SetLayoutEditTreeSelectionHighlightVisible(false);
+                }
+                RefreshLayoutEditHoverFromCursor();
+            }
+            break;
+        case WM_MOUSEACTIVATE:
+            if (LOWORD(lParam) == HTCLIENT) {
+                POINT screenPoint{};
+                if (GetCursorPos(&screenPoint) && (shellUi_ == nullptr || !shellUi_->ShouldDashboardIgnoreMouse(screenPoint))) {
+                    BringOnTop();
+                    return MA_ACTIVATE;
+                }
             }
             break;
         case WM_NCHITTEST: {

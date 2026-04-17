@@ -492,6 +492,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     DashboardRenderer renderer;
     DashboardRenderer::EditOverlayState overlayState;
     overlayState.showLayoutEditGuides = showLayoutEditGuides;
+    overlayState.forceLayoutEditAffordances = showLayoutEditGuides;
     overlayState.similarityIndicatorMode = similarityIndicatorMode;
     renderer.SetRenderScale(scale);
     renderer.SetConfig(config);
