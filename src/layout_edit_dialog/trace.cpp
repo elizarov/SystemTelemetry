@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <sstream>
 
-#include "layout_edit_tooltip.h"
 #include "layout_edit_dialog/util.h"
 
 namespace {

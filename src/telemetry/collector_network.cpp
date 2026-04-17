@@ -1,6 +1,5 @@
 #include "telemetry/collector_network.h"
 
-#include <algorithm>
 #include <cstring>
 #include <vector>
 

@@ -12,7 +12,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <objidl.h>
 #include <optional>
 #include <set>
 #include <unordered_map>

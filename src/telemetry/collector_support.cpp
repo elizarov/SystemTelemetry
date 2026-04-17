@@ -1,10 +1,8 @@
 #include "telemetry/collector_support.h"
 
 #define NOMINMAX
-#include <windows.h>
 #include <intrin.h>
 
-#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstdio>

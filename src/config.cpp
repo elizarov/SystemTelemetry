@@ -1,7 +1,5 @@
 #include "config.h"
 
-#include "dashboard_metrics.h"
-
 #include <sstream>
 
 ColorConfig ColorConfig::FromRgb(unsigned int value) {

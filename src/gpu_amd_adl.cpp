@@ -1,5 +1,3 @@
-﻿#include <windows.h>
-
 #include <memory>
 #include <optional>
 #include <sstream>

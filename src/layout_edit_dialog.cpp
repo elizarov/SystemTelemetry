@@ -12,8 +12,6 @@
 #include "layout_edit_dialog/tree.h"
 #include "layout_edit_dialog/util.h"
 #include "layout_edit_tree.h"
-#include "layout_edit_tooltip.h"
-
 LayoutEditDialog::LayoutEditDialog(LayoutEditDialogHost& host) : host_(host) {}
 
 LayoutEditDialog::~LayoutEditDialog() {

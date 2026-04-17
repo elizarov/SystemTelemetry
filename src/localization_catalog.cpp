@@ -1,7 +1,6 @@
 #include "localization_catalog.h"
 
 #include <algorithm>
-
 #include <windows.h>
 
 #include "resource.h"

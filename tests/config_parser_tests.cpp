@@ -2,8 +2,6 @@
 
 #include "config_parser.h"
 #include "utf8.h"
-#include "widget.h"
-
 #include <fstream>
 
 namespace {

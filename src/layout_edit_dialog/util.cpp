@@ -7,10 +7,7 @@
 #include <cwctype>
 
 #include "resource.h"
-#include "app_strings.h"
 #include "layout_edit_service.h"
-#include "layout_edit_tooltip.h"
-#include "localization_catalog.h"
 #include "utf8.h"
 
 namespace {

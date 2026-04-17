@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include <objidl.h>
-
 #include "dashboard_metrics.h"
 #include "dashboard_renderer.h"
 #include "numeric_safety.h"

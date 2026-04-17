@@ -11,10 +11,7 @@
 #include <string>
 #include <vector>
 
-#include <windows.h>
-
 #include "config_parser.h"
-#include "dashboard_metrics.h"
 #include "dashboard_renderer.h"
 #include "layout_edit_controller.h"
 #include "layout_edit_parameter.h"

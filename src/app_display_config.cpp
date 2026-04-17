@@ -2,7 +2,6 @@
 
 #include <fstream>
 #include <shellapi.h>
-
 #include <shobjidl.h>
 
 #include "app_command_line.h"

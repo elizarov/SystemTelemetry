@@ -4,7 +4,6 @@
 #include <cmath>
 #include <commdlg.h>
 #include <cwchar>
-#include <cwctype>
 #include <sstream>
 
 #include "app_diagnostics.h"
@@ -14,9 +13,6 @@
 #include "layout_edit_parameter.h"
 #include "layout_edit_tree.h"
 #include "layout_edit_service.h"
-#include "layout_edit_tooltip.h"
-#include "localization_catalog.h"
-
 namespace {
 
 class DashboardShellUiModalScope {

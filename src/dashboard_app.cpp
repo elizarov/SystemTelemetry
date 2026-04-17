@@ -1,7 +1,6 @@
 #include "dashboard_app.h"
 
 #include <cmath>
-#include <cstdio>
 #include <vector>
 
 #include <wtsapi32.h>

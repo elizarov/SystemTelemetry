@@ -6,7 +6,6 @@
 
 #include "resource.h"
 #include "layout_edit_dialog/editors.h"
-#include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
 #include "layout_edit_dialog/util.h"
 #include "utf8.h"

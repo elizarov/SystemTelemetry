@@ -1,9 +1,5 @@
 #define NOMINMAX
 #include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-
-#include <cstdio>
 #include <memory>
 #include <ostream>
 

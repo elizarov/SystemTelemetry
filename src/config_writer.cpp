@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
-#include <functional>
 #include <iomanip>
 #include <sstream>
 #include <type_traits>
