@@ -201,15 +201,16 @@ void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
 void ThroughputWidget::Draw(
     DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
     const DashboardThroughputMetric& metric = metrics.ResolveThroughput(metric_);
-    const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(layoutState_.valueRect,
+    renderer.DrawText(layoutState_.valueRect,
         metric.label,
         TextStyleId::Small,
         renderer.MutedTextColor(),
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
+    const int labelWidth = renderer.MeasureTextWidth(TextStyleId::Small, metric.label);
     renderer.RegisterDynamicColorEditRegion(
         DashboardRenderer::LayoutEditParameter::ColorAccent, layoutState_.graphRect);
     RenderRect numberRect{(std::min)(layoutState_.valueRect.right,
-                              labelLayout.textRect.right +
+                              layoutState_.valueRect.left + labelWidth +
                                   (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.throughput.headerGap))),
         layoutState_.valueRect.top,
         layoutState_.valueRect.right,

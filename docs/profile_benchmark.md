@@ -27,19 +27,19 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `apply avg_ms=0.22`
   - `paint_draw avg_ms=1.98`
 - Current repeatable result on the current tree:
-  - `drag_loop per_iter_ms=2.60` to `2.68`
-  - `snap avg_ms=0.19` to `0.20`
-  - `apply avg_ms=0.13`
-  - `paint_draw avg_ms=2.28` to `2.35`
+  - `drag_loop per_iter_ms=2.54` to `2.57`
+  - `snap avg_ms=0.18` to `0.19`
+  - `apply avg_ms=0.12`
+  - `paint_draw avg_ms=2.22` to `2.27`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The exported WPA text still does not surface stable named renderer functions for the benchmark process, but the latest elevated capture under `build\profile_benchmark_daemon\adhoc\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `amdxx64.dll`, `d3d11.dll`, `DWrite.dll`, `win32kfull.sys`, `WindowsCodecs.dll`, and `TextShaping.dll`.
+- The exported WPA text still does not surface stable named renderer functions for the benchmark process, but the latest daemon-backed capture under `build\profile_benchmark_daemon\requests\16679_1816_23669\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `amdxx64.dll`, `d3d11.dll`, `DWrite.dll`, `win32kfull.sys`, `WindowsCodecs.dll`, and `TextShaping.dll`.
 - The latest fixed-text capture keeps the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape that the earlier full-D2D validation captures showed, so replacing the last GDI+ icon decode and scale path did not move the hot work away from the current frame stack.
 - `GdiPlus.dll` no longer appears in the benchmark-process module list after the panel-icon path moved fully onto WIC plus Direct2D upload.
-- No new benchmark-process hotspot stands out in app-owned code; the named app-side leaves that the call tree resolves remain scattered low-single-digit helpers under the same renderer-driven frame.
+- No new dominant benchmark-process hotspot stands out in app-owned code; the named app-side call-tree frames that still resolve stay under the same renderer-driven frame and continue to center on `DashboardRenderer::DrawWindow`, `DashboardRenderer::DrawDirect2DFrame`, and `DashboardRenderer::EndDirect2DDraw`.
 - The fast benchmark reruns stay consistent enough that the draw-path win is real even though the coarse text export no longer pinpoints the remaining app-side leaves by symbol.
 
 Interpretation:
@@ -252,6 +252,18 @@ These changes produced real wins and remain in the codebase:
   - The anchor-registration measurement cost is not isolated enough for this micro-optimization to move the real drag benchmark, and the extra branching did not produce a clear win.
 - Conclusion:
   - Text-anchor work still matters, but this specific single-line measurement shortcut is not worth keeping as-is.
+
+### Hypothesis: Keep throughput header labels on the cheap single-line text draw path
+
+- Change:
+  - Draw the throughput metric label with `DrawText` plus cached `MeasureTextWidth` instead of `DrawTextBlock`, because that header label only needs a width to place the value text and does not register a text anchor.
+- Result:
+  - Helped.
+- Observed effect:
+  - `build\SystemTelemetryBenchmarks.exe 240 2` reruns improved from about `drag_loop per_iter_ms=2.60-2.68`, `snap avg_ms=0.19-0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.28-2.35` down to about `drag_loop per_iter_ms=2.54-2.57`, `snap avg_ms=0.18-0.19`, `apply avg_ms=0.12`, and `paint_draw avg_ms=2.22-2.27`.
+  - `profile_benchmark.cmd 240 2` stayed on the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape, with no new app-owned hotspot overtaking the frame.
+- Conclusion:
+  - Single-line labels that only need placement width should stay on the cheaper `DrawText` path; using `DrawTextBlock` for those labels adds measurable DirectWrite layout work without paying for any anchor or wrapped-layout benefit.
 
 ### Hypothesis: Reuse a throughput plot-point scratch buffer
 
