@@ -72,14 +72,6 @@ exit /b %copy_result%
 :resolve_clang_format
 set "clang_format="
 for %%P in (
-    "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools\VC\Tools\Llvm\x64\bin\clang-format.exe"
-    "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools\VC\Tools\Llvm\bin\clang-format.exe"
-    "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\x64\bin\clang-format.exe"
-    "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\bin\clang-format.exe"
-    "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Professional\VC\Tools\Llvm\x64\bin\clang-format.exe"
-    "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Professional\VC\Tools\Llvm\bin\clang-format.exe"
-    "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang-format.exe"
-    "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\bin\clang-format.exe"
     "%VSINSTALLDIR%VC\Tools\Llvm\x64\bin\clang-format.exe"
     "%VSINSTALLDIR%VC\Tools\Llvm\bin\clang-format.exe"
 ) do (

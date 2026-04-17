@@ -5,7 +5,7 @@ Build prerequisites, build steps, and provider setup notes live in [docs/build.m
 
 ## Contract
 
-- `devenv.cmd` prepares a Visual Studio 2022 x64 developer shell for this project.
+- `devenv.cmd` prepares a Visual Studio 2026 Insiders (`18`) x64 developer shell for this project.
 - After `devenv.cmd` finishes, the current shell resolves `cl`, `link`, `rc`, `cmake`, and `MSBuild`.
 - `devenv.cmd` exports `NETFXSDKDir` so the CMake build can resolve `mscoree.lib` for the mixed-mode Gigabyte provider build.
 - Keep machine-specific toolchain paths and local installation details in `devenv.cmd`, not in `CMakeLists.txt` or the maintained docs.

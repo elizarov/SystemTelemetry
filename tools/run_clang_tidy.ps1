@@ -9,18 +9,94 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Resolve-ClangTidyPath {
-    $candidates = @(
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Tools\Llvm\x64\bin\clang-tidy.exe"
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\VC\Tools\Llvm\bin\clang-tidy.exe"
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\x64\bin\clang-tidy.exe"
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\bin\clang-tidy.exe"
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Professional\VC\Tools\Llvm\x64\bin\clang-tidy.exe"
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Professional\VC\Tools\Llvm\bin\clang-tidy.exe"
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\x64\bin\clang-tidy.exe"
-        "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise\VC\Tools\Llvm\bin\clang-tidy.exe"
-        "$env:VSINSTALLDIR\VC\Tools\Llvm\x64\bin\clang-tidy.exe"
-        "$env:VSINSTALLDIR\VC\Tools\Llvm\bin\clang-tidy.exe"
+    param(
+        [string]$RepoRoot,
+        [string]$CompileCommandsPath
     )
+
+    function Add-Candidate {
+        param(
+            [System.Collections.Generic.List[string]]$List,
+            [string]$Candidate
+        )
+
+        if (-not [string]::IsNullOrWhiteSpace($Candidate) -and -not $List.Contains($Candidate)) {
+            $List.Add($Candidate)
+        }
+    }
+
+    function Add-VsLlvmCandidates {
+        param(
+            [System.Collections.Generic.List[string]]$List,
+            [string]$VsRoot
+        )
+
+        if ([string]::IsNullOrWhiteSpace($VsRoot)) {
+            return
+        }
+
+        Add-Candidate -List $List -Candidate (Join-Path $VsRoot 'VC\Tools\Llvm\x64\bin\clang-tidy.exe')
+        Add-Candidate -List $List -Candidate (Join-Path $VsRoot 'VC\Tools\Llvm\bin\clang-tidy.exe')
+    }
+
+    function Resolve-ClangTidyFromBuildDatabase {
+        param(
+            [string]$DatabasePath
+        )
+
+        if (-not (Test-Path -LiteralPath $DatabasePath)) {
+            return $null
+        }
+
+        try {
+            $database = Get-Content -LiteralPath $DatabasePath -Raw | ConvertFrom-Json
+        } catch {
+            return $null
+        }
+
+        foreach ($entry in $database) {
+            if (-not $entry.command) {
+                continue
+            }
+
+            $match = [regex]::Match($entry.command, '^(?:"(?<quoted>[^"]*cl\.exe)"|(?<plain>\S*cl\.exe))', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            if (-not $match.Success) {
+                continue
+            }
+
+            $compilerPath = $match.Groups['quoted'].Value
+            if ([string]::IsNullOrWhiteSpace($compilerPath)) {
+                $compilerPath = $match.Groups['plain'].Value
+            }
+
+            if ([string]::IsNullOrWhiteSpace($compilerPath)) {
+                continue
+            }
+
+            $msvcMarker = '\VC\Tools\MSVC\'
+            $markerIndex = $compilerPath.IndexOf($msvcMarker, [System.StringComparison]::OrdinalIgnoreCase)
+            if ($markerIndex -lt 0) {
+                continue
+            }
+
+            $vsRoot = $compilerPath.Substring(0, $markerIndex)
+            $candidate = Join-Path $vsRoot 'VC\Tools\Llvm\x64\bin\clang-tidy.exe'
+            if (Test-Path -LiteralPath $candidate) {
+                return (Resolve-Path -LiteralPath $candidate).Path
+            }
+
+            $candidate = Join-Path $vsRoot 'VC\Tools\Llvm\bin\clang-tidy.exe'
+            if (Test-Path -LiteralPath $candidate) {
+                return (Resolve-Path -LiteralPath $candidate).Path
+            }
+        }
+
+        return $null
+    }
+
+    $candidates = [System.Collections.Generic.List[string]]::new()
+
+    Add-VsLlvmCandidates -List $candidates -VsRoot $env:VSINSTALLDIR
 
     foreach ($candidate in $candidates) {
         if ($candidate -and (Test-Path -LiteralPath $candidate)) {
@@ -33,11 +109,22 @@ function Resolve-ClangTidyPath {
         return $command.Source
     }
 
-    $devenvCmd = Join-Path $Root 'devenv.cmd'
+    $devenvCmd = Join-Path $RepoRoot 'devenv.cmd'
     if (Test-Path -LiteralPath $devenvCmd) {
         $probe = & cmd /c "call `"$devenvCmd`" >nul 2>&1 && where clang-tidy.exe" 2>$null | Select-Object -First 1
         if ($LASTEXITCODE -eq 0 -and $probe) {
             return $probe.Trim()
+        }
+    }
+
+    $buildDatabaseCandidate = Resolve-ClangTidyFromBuildDatabase -DatabasePath $CompileCommandsPath
+    if ($buildDatabaseCandidate) {
+        return $buildDatabaseCandidate
+    }
+
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate)) {
+            return (Resolve-Path -LiteralPath $candidate).Path
         }
     }
 
@@ -117,7 +204,7 @@ function Get-RelativeRepoPath {
 $resolvedRoot = (Resolve-Path -LiteralPath $Root).Path
 $compileCommands = Join-Path $resolvedRoot 'build\cmake\compile_commands.json'
 $preferredReportPath = Join-Path $resolvedRoot 'build\clang_tidy_report.txt'
-$clangTidy = Resolve-ClangTidyPath
+$clangTidy = Resolve-ClangTidyPath -RepoRoot $resolvedRoot -CompileCommandsPath $compileCommands
 
 if (-not $clangTidy) {
     Write-Host 'clang-tidy.exe was not found. Install the Visual Studio LLVM tools or add clang-tidy to PATH.'

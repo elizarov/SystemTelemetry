@@ -266,13 +266,26 @@ if exist "%REQUEST_DONE_FILE%" (
 endlocal & set "REQUEST_RESULT_CODE=%REQUEST_RESULT_CODE%"
 exit /b 0
 
+:resolve_xperf
+set "XPERF_EXE="
+for /f "usebackq delims=" %%P in (`where xperf.exe 2^>nul`) do (
+    set "XPERF_EXE=%%~fP"
+    exit /b 0
+)
+
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$roots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }; $matches = foreach ($root in $roots) { Get-ChildItem -Path (Join-Path $root 'Windows Kits') -Filter xperf.exe -Recurse -ErrorAction SilentlyContinue }; $matches | Sort-Object FullName -Unique | Select-Object -ExpandProperty FullName -First 1"`) do (
+    set "XPERF_EXE=%%~fP"
+    exit /b 0
+)
+exit /b 1
+
 :run_benchmark
 set "TRACE_ETL=%~1"
 set "TRACE_TXT=%~2"
 set "TRACE_CALLTREE_HTML=%~3"
 set "BENCHMARK_OUTPUT=%~4"
 set "WPR_EXE=%SystemRoot%\System32\wpr.exe"
-set "XPERF_EXE=C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\xperf.exe"
+call :resolve_xperf
 set "BENCHMARK_EXE=%REPO_ROOT%\build\SystemTelemetryBenchmarks.exe"
 set "BENCHMARK_PDB_DIR=%REPO_ROOT%\build\cmake\CMakeFiles\SystemTelemetryBenchmarks.dir\Release"
 set "FORCE_BUILD=%PROFILE_BENCHMARK_FORCE_BUILD%"
@@ -282,8 +295,8 @@ if not exist "%WPR_EXE%" (
     exit /b 1
 )
 
-if not exist "%XPERF_EXE%" (
-    echo xperf.exe was not found at "%XPERF_EXE%".
+if errorlevel 1 (
+    echo xperf.exe was not found.
     echo Install the Windows Performance Toolkit, then rerun this script.
     exit /b 1
 )

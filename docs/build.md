@@ -5,12 +5,19 @@ This document is the single maintained source of truth for build prerequisites, 
 ## Requirements
 
 - Windows 11
-- Visual Studio 2022 Build Tools with CMake support
-- Visual Studio 2022 C++/CLI support
+- Visual Studio 2026 Insiders (`18`) Build Tools with CMake support
+- Visual Studio 2026 Insiders (`18`) C++/CLI support
 - .NET Framework 4.8 SDK
-- vcpkg with `VCPKG_ROOT` set so the CMake configure step can resolve the repo manifest dependency on GoogleTest
+- vcpkg installed locally, with `VCPKG_ROOT` set to that install so the CMake configure step can resolve the repo manifest dependency on GoogleTest
 - AMD Software: Adrenalin Edition with ADLX runtime available for AMD GPU telemetry
 - Gigabyte SIV installed on supported Gigabyte motherboards when board temperature and fan telemetry are desired
+
+## Current Toolchain
+
+- `devenv.cmd` currently activates the Visual Studio 2026 Insiders (`18`) x64 developer environment.
+- The active build compiler is MSVC `19.51.36231` for `x64`.
+- The active LLVM tools are `clang-format` `20.1.8` and `clang-tidy` `20.1.8`.
+- The active CMake executable in that environment is `4.2.3-msvc3`.
 
 ## Build
 
