@@ -361,9 +361,7 @@ void DashboardRenderer::SetImmediatePresent(bool enabled) {
         return;
     }
     d2dImmediatePresent_ = enabled;
-    d2dWindowRenderTarget_.Reset();
-    d2dCacheOwnerTarget_ = nullptr;
-    ClearD2DCaches();
+    DiscardWindowRenderTarget("present_mode_change");
 }
 
 void DashboardRenderer::SetRenderMode(RenderMode mode) {
@@ -1841,7 +1839,7 @@ bool DashboardRenderer::SaveSnapshotPng(
         return false;
     }
 
-    if (!BeginDirect2DDraw(bitmapRenderTarget.Get())) {
+    if (!BeginDirect2DDraw(bitmapRenderTarget.Get(), false)) {
         return false;
     }
     DrawDirect2DFrame(snapshot, overlayState);
@@ -2271,6 +2269,19 @@ void DashboardRenderer::Shutdown() {
     ShutdownDirect2D();
 }
 
+void DashboardRenderer::DiscardWindowRenderTarget(std::string_view reason) {
+    if (!reason.empty()) {
+        WriteTrace("renderer:d2d_window_target_discard reason=\"" + std::string(reason) + "\"");
+    }
+    d2dClipDepth_ = 0;
+    if (d2dActiveRenderTarget_ == d2dWindowRenderTarget_.Get()) {
+        d2dActiveRenderTarget_ = nullptr;
+    }
+    d2dWindowRenderTarget_.Reset();
+    d2dCacheOwnerTarget_ = nullptr;
+    ClearD2DCaches();
+}
+
 const DashboardMetricSource& DashboardRenderer::ResolveMetrics(const SystemSnapshot& snapshot) {
     if (cachedMetricSource_ == nullptr || cachedMetricSnapshot_ != &snapshot ||
         cachedMetricSnapshotRevision_ != snapshot.revision) {
@@ -2406,17 +2417,20 @@ bool DashboardRenderer::EnsureWindowRenderTarget() {
     return true;
 }
 
-bool DashboardRenderer::BeginDirect2DDraw(ID2D1RenderTarget* target) {
+bool DashboardRenderer::BeginDirect2DDraw(ID2D1RenderTarget* target, bool allowDeferredWarmup) {
     if (target == nullptr) {
         lastError_ = "renderer:d2d_target_missing";
         return false;
     }
-    if (d2dFirstDrawWarmupPending_) {
+    if (allowDeferredWarmup && d2dFirstDrawWarmupPending_) {
         d2dFirstDrawWarmupPending_ = false;
+        WriteTrace("renderer:d2d_warmup_begin");
         if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
+            WriteTrace("renderer:d2d_warmup_failed");
             d2dFirstDrawWarmupPending_ = true;
             return false;
         }
+        WriteTrace("renderer:d2d_warmup_done");
     }
     if (d2dCacheOwnerTarget_ != target) {
         ClearD2DCaches();
@@ -2442,11 +2456,16 @@ void DashboardRenderer::EndDirect2DDraw() {
     const bool activeWindowTarget = d2dActiveRenderTarget_ == d2dWindowRenderTarget_.Get();
     const HRESULT hr = d2dActiveRenderTarget_->EndDraw();
     d2dActiveRenderTarget_ = nullptr;
-    if (activeWindowTarget && hr == D2DERR_RECREATE_TARGET) {
-        d2dWindowRenderTarget_.Reset();
+    if (!activeWindowTarget) {
         d2dCacheOwnerTarget_ = nullptr;
         ClearD2DCaches();
+    }
+    if (activeWindowTarget && hr == D2DERR_RECREATE_TARGET) {
+        DiscardWindowRenderTarget("recreate_target");
     } else if (FAILED(hr)) {
+        if (activeWindowTarget) {
+            DiscardWindowRenderTarget("end_draw_failed");
+        }
         lastError_ = "renderer:d2d_end_draw_failed hr=0x" + FormatHresult(hr);
     }
 }

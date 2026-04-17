@@ -92,6 +92,9 @@ private:
     HICON LoadAppIcon(int width, int height);
     int WindowWidth() const;
     int WindowHeight() const;
+    bool HandleRenderEnvironmentChange(const char* reason);
+    void RegisterSessionNotifications();
+    void UnregisterSessionNotifications();
     void StartPlacementWatch();
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
@@ -126,6 +129,7 @@ private:
     bool layoutEditMouseTracking_ = false;
     RECT layoutEditTooltipRect_{};
     bool layoutEditTooltipRectValid_ = false;
+    bool sessionNotificationsRegistered_ = false;
     int layoutEditModalUiDepth_ = 0;
     std::optional<POINT> moveCursorAnchorClientPoint_;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;

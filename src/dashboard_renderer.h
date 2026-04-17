@@ -140,6 +140,7 @@ public:
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
     bool SaveSnapshotPng(
         const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    void DiscardWindowRenderTarget(std::string_view reason = {});
     const std::string& LastError() const;
     const AppConfig& Config() const;
     const TextStyleMetrics& TextMetrics() const;
@@ -423,7 +424,7 @@ private:
     void ReleasePanelIcons();
     bool RebuildTextFormatsAndMetrics();
     bool EnsureWindowRenderTarget();
-    bool BeginDirect2DDraw(ID2D1RenderTarget* target);
+    bool BeginDirect2DDraw(ID2D1RenderTarget* target, bool allowDeferredWarmup = true);
     void EndDirect2DDraw();
     bool BeginWindowDraw();
     void EndWindowDraw();

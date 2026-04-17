@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <vector>
 
+#include <wtsapi32.h>
+
 #include "dashboard_shell_ui.h"
 #include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"
@@ -292,6 +294,34 @@ void DashboardApp::ApplyConfigPlacement() {
         return;
     }
     SetWindowPos(hwnd_, HWND_TOP, left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE);
+}
+
+bool DashboardApp::HandleRenderEnvironmentChange(const char* reason) {
+    renderer_.DiscardWindowRenderTarget(reason != nullptr ? reason : "");
+    StartPlacementWatch();
+    RetryConfigPlacementIfPending();
+    controller_.RefreshTelemetrySelections(*this);
+    if (!ApplyWindowDpi(CurrentWindowDpi())) {
+        return false;
+    }
+    movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
+    InvalidateRect(hwnd_, nullptr, FALSE);
+    return true;
+}
+
+void DashboardApp::RegisterSessionNotifications() {
+    if (hwnd_ == nullptr || sessionNotificationsRegistered_) {
+        return;
+    }
+    sessionNotificationsRegistered_ = WTSRegisterSessionNotification(hwnd_, NOTIFY_FOR_THIS_SESSION) != FALSE;
+}
+
+void DashboardApp::UnregisterSessionNotifications() {
+    if (!sessionNotificationsRegistered_ || hwnd_ == nullptr) {
+        return;
+    }
+    WTSUnRegisterSessionNotification(hwnd_);
+    sessionNotificationsRegistered_ = false;
 }
 
 void DashboardApp::StartPlacementWatch() {
@@ -826,6 +856,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (!InitializeFonts()) {
                 return -1;
             }
+            RegisterSessionNotifications();
             StartPlacementWatch();
             ApplyConfigPlacement();
             SetTimer(hwnd_, kRefreshTimerId, kRefreshTimerMs, nullptr);
@@ -1054,29 +1085,40 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
         case WM_DISPLAYCHANGE:
-            StartPlacementWatch();
-            RetryConfigPlacementIfPending();
-            controller_.RefreshTelemetrySelections(*this);
-            if (!ApplyWindowDpi(CurrentWindowDpi())) {
+            if (!HandleRenderEnvironmentChange("display_change")) {
                 return -1;
             }
-            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
-            InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
         case WM_DEVICECHANGE:
         case WM_SETTINGCHANGE:
-            StartPlacementWatch();
-            RetryConfigPlacementIfPending();
-            controller_.RefreshTelemetrySelections(*this);
-            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
-            InvalidateRect(hwnd_, nullptr, FALSE);
+            if (!HandleRenderEnvironmentChange(message == WM_DEVICECHANGE ? "device_change" : "setting_change")) {
+                return -1;
+            }
             return 0;
+        case WM_WTSSESSION_CHANGE:
+            switch (wParam) {
+                case WTS_CONSOLE_CONNECT:
+                case WTS_CONSOLE_DISCONNECT:
+                case WTS_REMOTE_CONNECT:
+                case WTS_REMOTE_DISCONNECT:
+                case WTS_SESSION_LOGON:
+                case WTS_SESSION_LOGOFF:
+                case WTS_SESSION_LOCK:
+                case WTS_SESSION_UNLOCK:
+                    if (!HandleRenderEnvironmentChange("session_change")) {
+                        return -1;
+                    }
+                    return 0;
+                default:
+                    return 0;
+            }
         case WM_ERASEBKGND:
             return 1;
         case WM_DESTROY:
             KillTimer(hwnd_, kRefreshTimerId);
             KillTimer(hwnd_, kMoveTimerId);
             KillTimer(hwnd_, kPlacementTimerId);
+            UnregisterSessionNotifications();
             DestroyLayoutEditTooltip();
             if (state.diagnostics != nullptr) {
                 state.diagnostics->WriteTraceMarker("diagnostics:ui_done");

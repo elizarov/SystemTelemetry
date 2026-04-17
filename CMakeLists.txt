@@ -216,6 +216,7 @@ target_link_libraries(SystemTelemetry PRIVATE
     ole32
     oleaut32
     advapi32
+    wtsapi32
     ${MSCOREE_LIB}
 )
 
