@@ -4,6 +4,6 @@ Checks: >
   clang-analyzer-cplusplus.NewDelete,
   bugprone-use-after-move
 WarningsAsErrors: ''
-HeaderFilterRegex: '^(src|tests)/'
+HeaderFilterRegex: '(^|.*[\\/])(src|tests)[\\/](?!vendor[\\/]).*'
 FormatStyle: none
 UseColor: false
