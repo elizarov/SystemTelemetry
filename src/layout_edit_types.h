@@ -191,6 +191,7 @@ using LayoutEditFocusKey = std::variant<LayoutEditParameter,
     LayoutWeightEditKey,
     LayoutMetricEditKey,
     LayoutCardTitleEditKey,
+    LayoutMetricListOrderEditKey,
     LayoutContainerEditKey>;
 using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
     DashboardWidgetClass,

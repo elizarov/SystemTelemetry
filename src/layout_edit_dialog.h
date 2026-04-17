@@ -36,6 +36,8 @@ public:
         const std::string& label,
         const std::optional<std::string>& binding) = 0;
     virtual bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title) = 0;
+    virtual bool ApplyMetricListOrderPreview(
+        const LayoutMetricListOrderEditKey& key, const std::vector<std::string>& metricRefs) = 0;
     virtual bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) = 0;
 
     virtual std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const = 0;

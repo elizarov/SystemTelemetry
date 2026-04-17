@@ -396,6 +396,11 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
     if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&leaf->focusKey)) {
         return "focus=" + QuoteTraceText("[card." + cardTitleKey->cardId + "] title");
     }
+    if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&leaf->focusKey)) {
+        return "focus=" +
+               QuoteTraceText((metricListKey->editCardId.empty() ? "[layout] " : "[card." + metricListKey->editCardId + "] ") +
+                              std::string("metric_list"));
+    }
     return "focus=\"unknown\"";
 }
 
@@ -599,6 +604,11 @@ public:
 
     bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title) override {
         return shellUi_.ApplyCardTitlePreview(key, title);
+    }
+
+    bool ApplyMetricListOrderPreview(
+        const LayoutMetricListOrderEditKey& key, const std::vector<std::string>& metricRefs) override {
+        return shellUi_.ApplyMetricListOrderPreview(key, metricRefs);
     }
 
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) override {
@@ -925,6 +935,17 @@ bool DashboardShellUi::ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, 
     return true;
 }
 
+bool DashboardShellUi::ApplyMetricListOrderPreview(
+    const LayoutMetricListOrderEditKey& key, const std::vector<std::string>& metricRefs) {
+    AppConfig updatedConfig = CurrentConfig();
+    const LayoutEditWidgetIdentity widget{"", key.editCardId, key.nodePath};
+    if (!::ApplyMetricListOrder(updatedConfig, widget, metricRefs)) {
+        return false;
+    }
+    RestoreConfigSnapshot(updatedConfig);
+    return true;
+}
+
 bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) {
     const LayoutNodeConfig* node = FindWeightEditNode(CurrentConfig(), key);
     if (node == nullptr || key.separatorIndex + 1 >= node->children.size()) {
@@ -1244,6 +1265,8 @@ void DashboardShellUi::ShowContextMenu(
                     WideFromUtf8(std::get<LayoutMetricEditKey>(*focusKey).metricId + " metric"));
             } else if (focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"card title");
+            } else if (focusKey.has_value() && std::holds_alternative<LayoutMetricListOrderEditKey>(*focusKey)) {
+                label = BuildLayoutEditMenuLabel(L"metrics list");
             } else if (focusKey.has_value() && std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"layout container");
             } else {

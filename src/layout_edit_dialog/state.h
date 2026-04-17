@@ -30,6 +30,24 @@ enum class LayoutEditEditorKind {
     Color,
     Weights,
     Metric,
+    MetricListOrder,
+};
+
+inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE = 11000;
+inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE = 11100;
+inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE = 11200;
+inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE = 11300;
+inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ADD_ROW = 11400;
+
+struct LayoutEditMetricListRowControls {
+    HWND combo = nullptr;
+    HWND upButton = nullptr;
+    HWND downButton = nullptr;
+    HWND deleteButton = nullptr;
+    int comboId = 0;
+    int upButtonId = 0;
+    int downButtonId = 0;
+    int deleteButtonId = 0;
 };
 
 struct LayoutEditDialogState {
@@ -50,6 +68,8 @@ struct LayoutEditDialogState {
     bool activeSelectionValid = true;
     COLORREF previewColor = RGB(255, 255, 255);
     bool updatingControls = false;
+    std::vector<LayoutEditMetricListRowControls> metricListRowControls;
+    HWND metricListAddRowButton = nullptr;
 };
 
 LayoutEditDialogState* DialogStateFromWindow(HWND hwnd);

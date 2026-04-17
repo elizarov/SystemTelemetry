@@ -23,13 +23,27 @@ const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const Layout
         return FindNodeByPath(config.layout.structure.cardsLayout, key.nodePath);
     }
 
-    const auto it = std::find_if(config.layout.cards.begin(), config.layout.cards.end(), [&](const LayoutCardConfig& card) {
-        return card.id == key.editCardId;
-    });
+    const auto it =
+        std::find_if(config.layout.cards.begin(), config.layout.cards.end(), [&](const LayoutCardConfig& card) {
+            return card.id == key.editCardId;
+        });
     if (it == config.layout.cards.end()) {
         return nullptr;
     }
     return FindNodeByPath(it->layout, key.nodePath);
+}
+
+std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter) {
+    std::vector<std::string> metricRefs;
+    std::stringstream stream;
+    stream << parameter;
+    std::string item;
+    while (std::getline(stream, item, ',')) {
+        if (!item.empty()) {
+            metricRefs.push_back(item);
+        }
+    }
+    return metricRefs;
 }
 
 }  // namespace
@@ -96,14 +110,7 @@ std::optional<std::string> BuildMetricListOrderTooltipLine(
         return std::nullopt;
     }
 
-    std::vector<std::string> metricRefs;
-    std::stringstream stream(node->parameter);
-    std::string item;
-    while (std::getline(stream, item, ',')) {
-        if (!item.empty()) {
-            metricRefs.push_back(item);
-        }
-    }
+    const std::vector<std::string> metricRefs = ParseMetricListMetricRefs(node->parameter);
     if (rowIndex >= static_cast<int>(metricRefs.size())) {
         return std::nullopt;
     }

@@ -1,6 +1,7 @@
 #include "layout_edit_service.h"
 
 #include <algorithm>
+#include <cctype>
 
 namespace {
 
@@ -59,6 +60,45 @@ const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const La
     target.editCardId = widget.editCardId;
     target.nodePath = widget.nodePath;
     return FindGuideNode(config, target);
+}
+
+const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
+    LayoutEditHost::LayoutTarget target;
+    target.editCardId = key.editCardId;
+    target.nodePath = key.nodePath;
+    const LayoutNodeConfig* node = FindGuideNode(config, target);
+    return node != nullptr && node->name == "metric_list" ? node : nullptr;
+}
+
+std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter) {
+    auto trim = [](std::string_view value) {
+        size_t first = 0;
+        while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first])) != 0) {
+            ++first;
+        }
+        size_t last = value.size();
+        while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1])) != 0) {
+            --last;
+        }
+        return value.substr(first, last - first);
+    };
+
+    std::vector<std::string> metricRefs;
+    size_t start = 0;
+    while (start <= parameter.size()) {
+        const size_t comma = parameter.find(',', start);
+        const std::string_view item =
+            comma == std::string_view::npos ? parameter.substr(start) : parameter.substr(start, comma - start);
+        const std::string_view trimmed = trim(item);
+        if (!trimmed.empty()) {
+            metricRefs.emplace_back(trimmed);
+        }
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+    return metricRefs;
 }
 
 std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNodeConfig* node) {

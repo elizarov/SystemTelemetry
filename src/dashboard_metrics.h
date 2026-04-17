@@ -47,6 +47,7 @@ struct DashboardDriveRow {
 
 bool IsStaticDashboardTextMetric(std::string_view metricRef);
 std::optional<MetricDisplayStyle> FindDashboardMetricDisplayStyle(std::string_view metricRef);
+bool IsGenerallyAvailableDashboardMetric(std::string_view metricRef);
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef);
 
 class DashboardMetricSource {

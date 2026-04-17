@@ -289,6 +289,21 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
         if (const auto childContainer = BuildContainerNode(sectionName, memberName, editCardId, child, childPath);
             childContainer.has_value()) {
             treeNode.children.push_back(*childContainer);
+        } else if (child.name == "metric_list") {
+            LayoutEditTreeNode leafNode;
+            leafNode.kind = LayoutEditTreeNodeKind::Leaf;
+            leafNode.label = "metric_list";
+            leafNode.locationText = MemberLocationText(sectionName, memberName);
+            leafNode.descriptionKey = "layout_edit.metric_list_reorder";
+            leafNode.leaf = LayoutEditTreeLeaf{
+                LayoutMetricListOrderEditKey{editCardId, childPath},
+                sectionName,
+                memberName,
+                leafNode.descriptionKey,
+                configschema::ValueFormat::String,
+            };
+            leafNode.selectionHighlight = leafNode.leaf->focusKey;
+            treeNode.children.push_back(std::move(leafNode));
         }
 
         if (i + 1 < node.children.size() && SeparatorIsEditable(node, i)) {

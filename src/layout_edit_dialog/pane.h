@@ -34,7 +34,16 @@ void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int
 void SetFontSamplePreview(
     LayoutEditDialogState* state, HWND hwnd, std::optional<LayoutEditParameter> parameter, const UiFontConfig* font);
 void ShowLayoutEditEditors(
-    HWND hwnd, bool showNumeric, bool showFont, bool showColor, bool showWeights, bool showMetric, bool showBinding);
+    HWND hwnd,
+    bool showNumeric,
+    bool showFont,
+    bool showColor,
+    bool showWeights,
+    bool showMetric,
+    bool showBinding,
+    bool showMetricListOrder);
+void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state);
+void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd, size_t rowCount);
 void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd);
 void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd);
 void SetLayoutEditDescription(HWND hwnd, const LayoutEditTreeNode* node);

@@ -6,6 +6,7 @@
 #include <cwchar>
 #include <cwctype>
 
+#include "dashboard_metrics.h"
 #include "resource.h"
 #include "layout_edit_service.h"
 #include "utf8.h"
@@ -334,6 +335,31 @@ std::optional<std::pair<int, int>> FindWeightEditValues(const AppConfig& config,
         std::max(1, node->children[key.separatorIndex + 1].weight));
 }
 
+std::vector<std::string> AvailableMetricDefinitionIds(const AppConfig& config) {
+    std::vector<std::string> metricIds;
+    metricIds.reserve(config.layout.metrics.definitions.size());
+    for (const auto& definition : config.layout.metrics.definitions) {
+        if (IsMetricListSupportedDisplayStyle(definition.style) && IsGenerallyAvailableDashboardMetric(definition.id)) {
+            metricIds.push_back(definition.id);
+        }
+    }
+    return metricIds;
+}
+
+bool IsMetricListSupportedDisplayStyle(MetricDisplayStyle style) {
+    switch (style) {
+        case MetricDisplayStyle::Scalar:
+        case MetricDisplayStyle::Percent:
+        case MetricDisplayStyle::Memory:
+            return true;
+        case MetricDisplayStyle::Throughput:
+        case MetricDisplayStyle::SizeAuto:
+        case MetricDisplayStyle::LabelOnly:
+            return false;
+    }
+    return false;
+}
+
 std::wstring BuildWeightEditorLabel(const LayoutEditTreeLeaf& leaf, bool first) {
     const std::wstring side =
         leaf.weightAxis == LayoutGuideAxis::Vertical ? (first ? L"Left" : L"Right") : (first ? L"Top" : L"Bottom");
@@ -359,6 +385,11 @@ std::wstring BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
             node->leaf.has_value() ? std::get_if<LayoutCardTitleEditKey>(&node->leaf->focusKey) : nullptr;
         titleLeaf != nullptr) {
         return L"Card Title";
+    }
+    if (const auto* metricListLeaf =
+            node->leaf.has_value() ? std::get_if<LayoutMetricListOrderEditKey>(&node->leaf->focusKey) : nullptr;
+        metricListLeaf != nullptr) {
+        return L"Metric List";
     }
     if (const auto* weightLeaf =
             node->leaf.has_value() ? std::get_if<LayoutWeightEditKey>(&node->leaf->focusKey) : nullptr;
@@ -426,6 +457,9 @@ std::wstring BuildLayoutEditHintText(const LayoutEditTreeNode* node) {
     }
     if (std::holds_alternative<LayoutCardTitleEditKey>(node->leaf->focusKey)) {
         return L"Edit the card title text. Changes preview live.";
+    }
+    if (std::holds_alternative<LayoutMetricListOrderEditKey>(node->leaf->focusKey)) {
+        return L"Choose the metric for each row, move rows up or down, remove rows, or add a new row.";
     }
     return L"Select a field to edit it here.";
 }

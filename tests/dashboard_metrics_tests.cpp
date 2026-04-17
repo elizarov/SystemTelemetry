@@ -99,6 +99,15 @@ TEST(DashboardMetrics, KeepsDisplayOnlyDriveBindingsMetadataOnly) {
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.0);
 }
 
+TEST(DashboardMetrics, MarksDriveMetricsAsSpecialAndNotGenerallyAvailable) {
+    EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("cpu.load"));
+    EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("gpu.vram"));
+    EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("board.temp.cpu"));
+    EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.activity.read"));
+    EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.usage"));
+    EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.free"));
+}
+
 TEST(DashboardMetrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;

@@ -74,6 +74,10 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditF
     if (const auto* leftCardTitle = std::get_if<LayoutCardTitleEditKey>(&left)) {
         return MatchesLayoutCardTitleEditKey(*leftCardTitle, std::get<LayoutCardTitleEditKey>(right));
     }
+    if (const auto* leftMetricListOrder = std::get_if<LayoutMetricListOrderEditKey>(&left)) {
+        return MatchesLayoutMetricListOrderEditKey(
+            *leftMetricListOrder, std::get<LayoutMetricListOrderEditKey>(right));
+    }
     return MatchesLayoutContainerEditKey(
         std::get<LayoutContainerEditKey>(left), std::get<LayoutContainerEditKey>(right));
 }
@@ -105,6 +109,11 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
     if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&focusKey)) {
         return key.subject.index() == 2 &&
                MatchesLayoutCardTitleEditKey(*cardTitleKey, std::get<LayoutCardTitleEditKey>(key.subject));
+    }
+    if (const auto* metricListOrderKey = std::get_if<LayoutMetricListOrderEditKey>(&focusKey)) {
+        return key.subject.index() == 3 &&
+               MatchesLayoutMetricListOrderEditKey(
+                   *metricListOrderKey, std::get<LayoutMetricListOrderEditKey>(key.subject));
     }
     const auto* containerKey = std::get_if<LayoutContainerEditKey>(&focusKey);
     return containerKey != nullptr && key.subject.index() == 3 &&
@@ -272,8 +281,7 @@ std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& p
                 }
                 if (const auto metricListOrderKey = LayoutEditAnchorMetricListOrderKey(value.key);
                     metricListOrderKey.has_value()) {
-                    return LayoutEditFocusKey{
-                        LayoutContainerEditKey{metricListOrderKey->editCardId, metricListOrderKey->nodePath}};
+                    return LayoutEditFocusKey{*metricListOrderKey};
                 }
                 return std::nullopt;
             } else {

@@ -66,6 +66,8 @@ void PopulateMetricBindingComboBox(
 
 std::optional<std::string> FindCardTitleValue(const AppConfig& config, const LayoutCardTitleEditKey& key);
 std::optional<std::pair<int, int>> FindWeightEditValues(const AppConfig& config, const LayoutWeightEditKey& key);
+std::vector<std::string> AvailableMetricDefinitionIds(const AppConfig& config);
+bool IsMetricListSupportedDisplayStyle(MetricDisplayStyle style);
 std::wstring BuildWeightEditorLabel(const LayoutEditTreeLeaf& leaf, bool first);
 std::wstring BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node);
 std::wstring BuildLayoutEditSummaryText(const LayoutEditTreeNode* node);

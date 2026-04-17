@@ -153,6 +153,9 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
             initialFocusTrace = "[metrics] " + metricKey->metricId;
         } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
             initialFocusTrace = "[card." + cardTitleKey->cardId + "] title";
+        } else if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&*focusKey)) {
+            initialFocusTrace = metricListKey->editCardId.empty() ? "[layout] metric_list"
+                                                                  : "[card." + metricListKey->editCardId + "] metric_list";
         } else {
             initialFocusTrace = "weight";
         }

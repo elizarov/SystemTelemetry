@@ -77,6 +77,33 @@ void DestroyDialogFont(HFONT& font) {
     }
 }
 
+HWND CreateMetricListEditorControl(HWND hwnd,
+    const wchar_t* className,
+    const wchar_t* text,
+    DWORD style,
+    int controlId,
+    DWORD exStyle = 0) {
+    HWND control = CreateWindowExW(exStyle,
+        className,
+        text,
+        WS_CHILD | WS_TABSTOP | style,
+        0,
+        0,
+        1,
+        1,
+        hwnd,
+        reinterpret_cast<HMENU>(static_cast<INT_PTR>(controlId)),
+        reinterpret_cast<HINSTANCE>(GetWindowLongPtrW(hwnd, GWLP_HINSTANCE)),
+        nullptr);
+    if (control != nullptr) {
+        if (HWND templateControl = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT); templateControl != nullptr) {
+            SendMessageW(
+                control, WM_SETFONT, SendMessageW(templateControl, WM_GETFONT, 0, 0), TRUE);
+        }
+    }
+    return control;
+}
+
 HFONT CreateDerivedDialogFont(HWND hwnd, int controlId, int weight, int heightDelta = 0) {
     HWND control = GetDlgItem(hwnd, controlId);
     if (control == nullptr) {
@@ -185,6 +212,7 @@ std::vector<int> ActiveEditorLabelControls(LayoutEditEditorKind kind, bool showB
             }
             return labels;
         }
+        case LayoutEditEditorKind::MetricListOrder:
         case LayoutEditEditorKind::Numeric:
         case LayoutEditEditorKind::Summary:
             return {};
@@ -419,11 +447,42 @@ void SetFontSamplePreview(
     }
 }
 
+void ShowMetricListOrderEditorControls(LayoutEditDialogState* state, bool show) {
+    if (state == nullptr) {
+        return;
+    }
+    for (const auto& row : state->metricListRowControls) {
+        if (row.combo != nullptr) {
+            ShowWindow(row.combo, show ? SW_SHOW : SW_HIDE);
+        }
+        if (row.upButton != nullptr) {
+            ShowWindow(row.upButton, show ? SW_SHOW : SW_HIDE);
+        }
+        if (row.downButton != nullptr) {
+            ShowWindow(row.downButton, show ? SW_SHOW : SW_HIDE);
+        }
+        if (row.deleteButton != nullptr) {
+            ShowWindow(row.deleteButton, show ? SW_SHOW : SW_HIDE);
+        }
+    }
+    if (state->metricListAddRowButton != nullptr) {
+        ShowWindow(state->metricListAddRowButton, show ? SW_SHOW : SW_HIDE);
+    }
+}
+
 void ShowLayoutEditEditors(
-    HWND hwnd, bool showNumeric, bool showFont, bool showColor, bool showWeights, bool showMetric, bool showBinding) {
+    HWND hwnd,
+    bool showNumeric,
+    bool showFont,
+    bool showColor,
+    bool showWeights,
+    bool showMetric,
+    bool showBinding,
+    bool showMetricListOrder) {
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
-    ShowDialogControl(
-        hwnd, IDC_LAYOUT_EDIT_SUMMARY, !(showNumeric || showFont || showColor || showWeights || showMetric));
+    ShowDialogControl(hwnd,
+        IDC_LAYOUT_EDIT_SUMMARY,
+        !(showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder));
 
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, showFont);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, showFont);
@@ -463,7 +522,61 @@ void ShowLayoutEditEditors(
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT, showMetric);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_LABEL, showMetric && showBinding);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT, showMetric && showBinding);
-    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_HINT, showNumeric || showFont || showColor || showWeights || showMetric);
+    ShowDialogControl(
+        hwnd, IDC_LAYOUT_EDIT_HINT, showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder);
+}
+
+void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state) {
+    if (state == nullptr) {
+        return;
+    }
+    for (auto& row : state->metricListRowControls) {
+        if (row.combo != nullptr) {
+            DestroyWindow(row.combo);
+        }
+        if (row.upButton != nullptr) {
+            DestroyWindow(row.upButton);
+        }
+        if (row.downButton != nullptr) {
+            DestroyWindow(row.downButton);
+        }
+        if (row.deleteButton != nullptr) {
+            DestroyWindow(row.deleteButton);
+        }
+    }
+    state->metricListRowControls.clear();
+    if (state->metricListAddRowButton != nullptr) {
+        DestroyWindow(state->metricListAddRowButton);
+        state->metricListAddRowButton = nullptr;
+    }
+}
+
+void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd, size_t rowCount) {
+    if (state == nullptr || hwnd == nullptr) {
+        return;
+    }
+    DestroyMetricListOrderEditorControls(state);
+
+    state->metricListRowControls.reserve(rowCount);
+    for (size_t i = 0; i < rowCount; ++i) {
+        LayoutEditMetricListRowControls row;
+        row.comboId = IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE + static_cast<int>(i);
+        row.upButtonId = IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE + static_cast<int>(i);
+        row.downButtonId = IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE + static_cast<int>(i);
+        row.deleteButtonId = IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE + static_cast<int>(i);
+        row.combo = CreateMetricListEditorControl(
+            hwnd, WC_COMBOBOXW, L"", CBS_DROPDOWNLIST | WS_VSCROLL, row.comboId);
+        row.upButton =
+            CreateMetricListEditorControl(hwnd, WC_BUTTONW, L"", BS_PUSHBUTTON | BS_OWNERDRAW, row.upButtonId);
+        row.downButton =
+            CreateMetricListEditorControl(hwnd, WC_BUTTONW, L"", BS_PUSHBUTTON | BS_OWNERDRAW, row.downButtonId);
+        row.deleteButton =
+            CreateMetricListEditorControl(hwnd, WC_BUTTONW, L"", BS_PUSHBUTTON | BS_OWNERDRAW, row.deleteButtonId);
+        state->metricListRowControls.push_back(row);
+    }
+
+    state->metricListAddRowButton =
+        CreateMetricListEditorControl(hwnd, WC_BUTTONW, L"Add row", BS_PUSHBUTTON, IDC_LAYOUT_EDIT_METRIC_LIST_ADD_ROW);
 }
 
 void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
@@ -557,6 +670,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const int innerTop = groupTop + metrics.groupPadding + groupTopBorderInset;
 
     const LayoutEditEditorKind kind = CurrentLayoutEditEditorKind(state);
+    ShowMetricListOrderEditorControls(state, kind == LayoutEditEditorKind::MetricListOrder);
     const bool showBinding = CurrentLayoutEditShowsMetricBinding(state);
     const int singleLineFieldHeight = MeasureSingleLineFieldVisibleHeight(hwnd);
     const int labelColumnWidth = ActiveEditorLabelControls(kind, showBinding).empty()
@@ -846,6 +960,55 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             } else {
                 cursorY += metrics.hintGap;
             }
+            const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
+            const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
+            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_HINT, innerLeft, cursorY, innerWidth, hintHeight);
+            contentBottom = cursorY + hintHeight;
+            break;
+        }
+        case LayoutEditEditorKind::MetricListOrder: {
+            const int buttonWidth = 38;
+            const int addButtonWidth = 96;
+            const int rowVisibleHeight = singleLineFieldHeight;
+            const int comboDropHeight = std::max(140, rowVisibleHeight + 120);
+            const int buttonsWidth = (buttonWidth * 3) + (metrics.inlineGap * 2);
+            const int comboWidth = std::max(60, innerWidth - buttonsWidth - metrics.inlineGap);
+
+            for (auto& row : state->metricListRowControls) {
+                if (row.combo != nullptr) {
+                    SetWindowPos(row.combo, nullptr, innerLeft, cursorY, comboWidth, comboDropHeight, SWP_NOZORDER);
+                }
+                int buttonLeft = innerLeft + comboWidth + metrics.inlineGap;
+                if (row.upButton != nullptr) {
+                    SetWindowPos(
+                        row.upButton, nullptr, buttonLeft, cursorY, buttonWidth, rowVisibleHeight, SWP_NOZORDER);
+                }
+                buttonLeft += buttonWidth + metrics.inlineGap;
+                if (row.downButton != nullptr) {
+                    SetWindowPos(
+                        row.downButton, nullptr, buttonLeft, cursorY, buttonWidth, rowVisibleHeight, SWP_NOZORDER);
+                }
+                buttonLeft += buttonWidth + metrics.inlineGap;
+                if (row.deleteButton != nullptr) {
+                    SetWindowPos(
+                        row.deleteButton, nullptr, buttonLeft, cursorY, buttonWidth, rowVisibleHeight, SWP_NOZORDER);
+                }
+                cursorY += rowVisibleHeight + metrics.rowGap;
+            }
+
+            const int addButtonHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_REVERT);
+            const int addButtonLeft = innerRight - addButtonWidth;
+            if (state->metricListAddRowButton != nullptr) {
+                SetWindowPos(state->metricListAddRowButton,
+                    nullptr,
+                    addButtonLeft,
+                    cursorY,
+                    addButtonWidth,
+                    addButtonHeight,
+                    SWP_NOZORDER);
+            }
+            cursorY += addButtonHeight + metrics.hintGap;
+
             const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
             const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
             SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_HINT, innerLeft, cursorY, innerWidth, hintHeight);

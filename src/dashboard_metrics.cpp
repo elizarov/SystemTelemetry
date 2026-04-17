@@ -47,6 +47,7 @@ struct DashboardMetricBinding {
     bool prefixMatch = false;
     std::optional<MetricDisplayStyle> metricStyle;
     DashboardMetricPayloadMask payloadMask = kNoPayload;
+    bool generallyAvailable = true;
     bool staticText = false;
     TextResolverFn resolveText = nullptr;
     MetricResolverFn resolveMetric = nullptr;
@@ -55,37 +56,60 @@ struct DashboardMetricBinding {
     ThroughputGuideStepResolverFn resolveGuideStep = nullptr;
 
     static constexpr DashboardMetricBinding ExactStaticText(std::string_view key, TextResolverFn resolveText) {
-        return DashboardMetricBinding{key, false, std::nullopt, kTextPayload, true, resolveText};
+        DashboardMetricBinding binding{};
+        binding.key = key;
+        binding.payloadMask = kTextPayload;
+        binding.staticText = true;
+        binding.resolveText = resolveText;
+        return binding;
     }
 
     static constexpr DashboardMetricBinding ExactValue(
         std::string_view key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
-        return DashboardMetricBinding{key, false, style, kValuePayload, false, nullptr, resolveMetric};
+        DashboardMetricBinding binding{};
+        binding.key = key;
+        binding.metricStyle = style;
+        binding.payloadMask = kValuePayload;
+        binding.resolveMetric = resolveMetric;
+        return binding;
     }
 
     static constexpr DashboardMetricBinding ExactThroughput(std::string_view key,
         ThroughputValueResolverFn resolveThroughputValue,
         ThroughputGraphGroup throughputGroup,
         ThroughputGuideStepResolverFn resolveGuideStep) {
-        return DashboardMetricBinding{key,
-            false,
-            MetricDisplayStyle::Throughput,
-            kThroughputPayload,
-            false,
-            nullptr,
-            nullptr,
-            resolveThroughputValue,
-            throughputGroup,
-            resolveGuideStep};
+        DashboardMetricBinding binding{};
+        binding.key = key;
+        binding.metricStyle = MetricDisplayStyle::Throughput;
+        binding.payloadMask = kThroughputPayload;
+        binding.resolveThroughputValue = resolveThroughputValue;
+        binding.throughputGroup = throughputGroup;
+        binding.resolveGuideStep = resolveGuideStep;
+        return binding;
     }
 
     static constexpr DashboardMetricBinding ExactDisplayOnly(std::string_view key, MetricDisplayStyle style) {
-        return DashboardMetricBinding{key, false, style, kNoPayload};
+        DashboardMetricBinding binding{};
+        binding.key = key;
+        binding.metricStyle = style;
+        return binding;
+    }
+
+    static constexpr DashboardMetricBinding ExactSpecialDisplayOnly(std::string_view key, MetricDisplayStyle style) {
+        DashboardMetricBinding binding = ExactDisplayOnly(key, style);
+        binding.generallyAvailable = false;
+        return binding;
     }
 
     static constexpr DashboardMetricBinding PrefixValue(
         std::string_view key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
-        return DashboardMetricBinding{key, true, style, kValuePayload, false, nullptr, resolveMetric};
+        DashboardMetricBinding binding{};
+        binding.key = key;
+        binding.prefixMatch = true;
+        binding.metricStyle = style;
+        binding.payloadMask = kValuePayload;
+        binding.resolveMetric = resolveMetric;
+        return binding;
     }
 };
 
@@ -500,10 +524,10 @@ const DashboardMetricBinding kExactBindings[] = {
         "storage.read", &ResolveStorageReadValue, ThroughputGraphGroup::Storage, &GetStorageGuideStep),
     DashboardMetricBinding::ExactThroughput(
         "storage.write", &ResolveStorageWriteValue, ThroughputGraphGroup::Storage, &GetStorageGuideStep),
-    DashboardMetricBinding::ExactDisplayOnly("drive.activity.read", MetricDisplayStyle::LabelOnly),
-    DashboardMetricBinding::ExactDisplayOnly("drive.activity.write", MetricDisplayStyle::LabelOnly),
-    DashboardMetricBinding::ExactDisplayOnly("drive.usage", MetricDisplayStyle::Percent),
-    DashboardMetricBinding::ExactDisplayOnly("drive.free", MetricDisplayStyle::SizeAuto),
+    DashboardMetricBinding::ExactSpecialDisplayOnly("drive.activity.read", MetricDisplayStyle::LabelOnly),
+    DashboardMetricBinding::ExactSpecialDisplayOnly("drive.activity.write", MetricDisplayStyle::LabelOnly),
+    DashboardMetricBinding::ExactSpecialDisplayOnly("drive.usage", MetricDisplayStyle::Percent),
+    DashboardMetricBinding::ExactSpecialDisplayOnly("drive.free", MetricDisplayStyle::SizeAuto),
 };
 
 const DashboardMetricBinding kPrefixBindings[] = {
@@ -605,6 +629,11 @@ bool IsStaticDashboardTextMetric(std::string_view metricRef) {
 std::optional<MetricDisplayStyle> FindDashboardMetricDisplayStyle(std::string_view metricRef) {
     const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
     return match.binding != nullptr ? match.binding->metricStyle : std::nullopt;
+}
+
+bool IsGenerallyAvailableDashboardMetric(std::string_view metricRef) {
+    const DashboardMetricBindingMatch match = FindDashboardMetricBinding(metricRef);
+    return match.binding != nullptr && match.binding->generallyAvailable;
 }
 
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef) {

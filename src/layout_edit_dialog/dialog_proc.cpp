@@ -11,6 +11,81 @@
 #include "layout_edit_dialog/util.h"
 #include "utf8.h"
 
+namespace {
+
+bool IsMetricListOrderButtonId(int controlId) {
+    return (controlId >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE &&
+               controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE + 100) ||
+           (controlId >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE &&
+               controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE + 100) ||
+           (controlId >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE &&
+               controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE + 100);
+}
+
+void DrawCenteredFilledTriangle(HDC dc, const RECT& rect, bool up) {
+    const int width = rect.right - rect.left;
+    const int height = rect.bottom - rect.top;
+    const int size = std::max(6, std::min(width, height) - 10);
+    const int centerX = rect.left + (width / 2);
+    const int centerY = rect.top + (height / 2);
+    POINT points[3]{};
+    if (up) {
+        points[0] = POINT{centerX, centerY - (size / 2)};
+        points[1] = POINT{centerX - (size / 2), centerY + (size / 2)};
+        points[2] = POINT{centerX + (size / 2), centerY + (size / 2)};
+    } else {
+        points[0] = POINT{centerX, centerY + (size / 2)};
+        points[1] = POINT{centerX - (size / 2), centerY - (size / 2)};
+        points[2] = POINT{centerX + (size / 2), centerY - (size / 2)};
+    }
+    HGDIOBJ oldPen = SelectObject(dc, GetStockObject(BLACK_PEN));
+    HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(BLACK_BRUSH));
+    Polygon(dc, points, 3);
+    SelectObject(dc, oldBrush);
+    SelectObject(dc, oldPen);
+}
+
+void DrawCenteredCross(HDC dc, const RECT& rect) {
+    const int width = rect.right - rect.left;
+    const int height = rect.bottom - rect.top;
+    const int size = std::max(6, std::min(width, height) - 10);
+    const int centerX = rect.left + (width / 2);
+    const int centerY = rect.top + (height / 2);
+    HPEN pen = CreatePen(PS_SOLID, 2, RGB(0, 0, 0));
+    HGDIOBJ oldPen = SelectObject(dc, pen);
+    MoveToEx(dc, centerX - (size / 2), centerY - (size / 2), nullptr);
+    LineTo(dc, centerX + (size / 2), centerY + (size / 2));
+    MoveToEx(dc, centerX - (size / 2), centerY + (size / 2), nullptr);
+    LineTo(dc, centerX + (size / 2), centerY - (size / 2));
+    SelectObject(dc, oldPen);
+    DeleteObject(pen);
+}
+
+INT_PTR DrawMetricListOrderButton(const DRAWITEMSTRUCT* draw) {
+    FillRect(draw->hDC, &draw->rcItem, GetSysColorBrush(COLOR_3DFACE));
+    UINT edge = (draw->itemState & ODS_SELECTED) != 0 ? EDGE_SUNKEN : EDGE_RAISED;
+    DrawEdge(draw->hDC, const_cast<RECT*>(&draw->rcItem), edge, BF_RECT);
+
+    RECT content = draw->rcItem;
+    InflateRect(&content, -2, -2);
+    if ((draw->itemState & ODS_DISABLED) != 0) {
+        SetTextColor(draw->hDC, RGB(140, 140, 140));
+    }
+
+    if (draw->CtlID >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE &&
+        draw->CtlID < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE + 100) {
+        DrawCenteredFilledTriangle(draw->hDC, content, true);
+    } else if (draw->CtlID >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE &&
+               draw->CtlID < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE + 100) {
+        DrawCenteredFilledTriangle(draw->hDC, content, false);
+    } else {
+        DrawCenteredCross(draw->hDC, content);
+    }
+    return TRUE;
+}
+
+}  // namespace
+
 std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* state = DialogStateFromWindow(hwnd);
     switch (message) {
@@ -23,7 +98,17 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
             }
             break;
         }
+        case WM_DRAWITEM: {
+            const auto* draw = reinterpret_cast<const DRAWITEMSTRUCT*>(lParam);
+            if (draw != nullptr && IsMetricListOrderButtonId(static_cast<int>(draw->CtlID))) {
+                return DrawMetricListOrderButton(draw);
+            }
+            break;
+        }
         case WM_COMMAND:
+            if (HandleMetricListOrderEditorCommand(state, hwnd, LOWORD(wParam), HIWORD(wParam))) {
+                return TRUE;
+            }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FILTER_EDIT && HIWORD(wParam) == EN_CHANGE) {
                 wchar_t filterBuffer[256] = {};
                 GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, filterBuffer, ARRAYSIZE(filterBuffer));
@@ -194,6 +279,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
         case WM_DESTROY:
             if (state != nullptr) {
                 state->dialog->UpdateSelectionHighlight(std::nullopt);
+                DestroyMetricListOrderEditorControls(state);
                 DestroyDialogFonts(state);
             }
             break;

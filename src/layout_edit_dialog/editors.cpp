@@ -1,14 +1,93 @@
 #include "layout_edit_dialog/editors.h"
 
 #include <algorithm>
+#include <functional>
 #include <sstream>
 
 #include "app_strings.h"
+#include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"
 #include "layout_edit_dialog/pane.h"
 #include "layout_edit_dialog/trace.h"
 #include "layout_edit_dialog/util.h"
 #include "utf8.h"
+
+namespace {
+
+const LayoutMetricListOrderEditKey* SelectedMetricListOrderKey(const LayoutEditDialogState* state) {
+    return state != nullptr && state->selectedLeaf != nullptr
+               ? std::get_if<LayoutMetricListOrderEditKey>(&state->selectedLeaf->focusKey)
+               : nullptr;
+}
+
+std::vector<std::string> ReadMetricListOrderDialogRows(const LayoutEditDialogState* state, HWND hwnd) {
+    std::vector<std::string> metricRefs;
+    if (state == nullptr) {
+        return metricRefs;
+    }
+    metricRefs.reserve(state->metricListRowControls.size());
+    for (const auto& row : state->metricListRowControls) {
+        const std::string metricId = Trim(ReadDialogControlTextUtf8(hwnd, row.comboId));
+        if (!metricId.empty()) {
+            metricRefs.push_back(metricId);
+        }
+    }
+    return metricRefs;
+}
+
+bool ApplyMetricListOrderRows(LayoutEditDialogState* state, HWND hwnd, const std::vector<std::string>& metricRefs) {
+    const auto* key = SelectedMetricListOrderKey(state);
+    return key != nullptr && state->dialog->Host().ApplyMetricListOrderPreview(*key, metricRefs);
+}
+
+void PopulateMetricListRowCombo(
+    HWND hwnd, const LayoutEditMetricListRowControls& row, const std::vector<std::string>& options, std::string_view selected) {
+    if (row.combo == nullptr) {
+        return;
+    }
+
+    SendMessageW(row.combo, CB_RESETCONTENT, 0, 0);
+    int selectedIndex = CB_ERR;
+    for (const auto& option : options) {
+        const std::wstring wideOption = WideFromUtf8(option);
+        const LRESULT index = SendMessageW(row.combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideOption.c_str()));
+        if (index != CB_ERR && selectedIndex == CB_ERR && option == selected) {
+            selectedIndex = static_cast<int>(index);
+        }
+    }
+    if (selectedIndex != CB_ERR) {
+        SendMessageW(row.combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
+    } else {
+        SetWindowTextW(row.combo, WideFromUtf8(std::string(selected)).c_str());
+    }
+    SendMessageW(row.combo, CB_SETMINVISIBLE, 8, 0);
+}
+
+int MetricListRowIndexFromControlId(int controlId, int baseId) {
+    return controlId - baseId;
+}
+
+bool IsMetricListRowControlId(int controlId, int baseId, size_t rowCount) {
+    const int index = MetricListRowIndexFromControlId(controlId, baseId);
+    return index >= 0 && index < static_cast<int>(rowCount);
+}
+
+bool MutateMetricListOrderRows(
+    LayoutEditDialogState* state, HWND hwnd, const std::function<void(std::vector<std::string>&)>& mutate) {
+    if (state == nullptr || state->updatingControls) {
+        return false;
+    }
+    std::vector<std::string> metricRefs = ReadMetricListOrderDialogRows(state, hwnd);
+    mutate(metricRefs);
+    if (!ApplyMetricListOrderRows(state, hwnd, metricRefs)) {
+        return false;
+    }
+    PopulateLayoutEditSelection(state, hwnd);
+    RefreshLayoutEditValidationState(state, hwnd);
+    return true;
+}
+
+}  // namespace
 
 LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* state) {
     if (state == nullptr || state->selectedLeaf == nullptr) {
@@ -19,6 +98,9 @@ LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* st
     }
     if (std::holds_alternative<LayoutMetricEditKey>(state->selectedLeaf->focusKey)) {
         return LayoutEditEditorKind::Metric;
+    }
+    if (std::holds_alternative<LayoutMetricListOrderEditKey>(state->selectedLeaf->focusKey)) {
+        return LayoutEditEditorKind::MetricListOrder;
     }
     if (std::holds_alternative<LayoutCardTitleEditKey>(state->selectedLeaf->focusKey)) {
         return LayoutEditEditorKind::Numeric;
@@ -59,7 +141,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     state->updatingControls = true;
     SetLayoutEditDescription(hwnd, state->selectedNode);
     if (state->selectedLeaf == nullptr) {
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false);
+        DestroyMetricListOrderEditorControls(state);
+        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false);
         SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, L"Select a field to edit it here.");
         state->activeSelectionValid = true;
         SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
@@ -81,7 +164,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             SetDlgItemTextW(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
                 font.has_value() && *font != nullptr ? WideFromUtf8(std::to_string((**font).weight)).c_str() : L"");
-            ShowLayoutEditEditors(hwnd, false, true, false, false, false, false);
+            DestroyMetricListOrderEditorControls(state);
+            ShowLayoutEditEditors(hwnd, false, true, false, false, false, false, false);
             SetFontSamplePreview(state,
                 hwnd,
                 std::optional<LayoutEditParameter>(*parameter),
@@ -99,7 +183,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             SetColorDialogChannel(hwnd, kColorDialogControls[0], (color >> 16) & 0xFFu);
             SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 8) & 0xFFu);
             SetColorDialogChannel(hwnd, kColorDialogControls[2], color & 0xFFu);
-            ShowLayoutEditEditors(hwnd, false, false, true, false, false, false);
+            DestroyMetricListOrderEditorControls(state);
+            ShowLayoutEditEditors(hwnd, false, false, true, false, false, false, false);
             SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
             SetColorSamplePreview(state, hwnd, color);
             std::ostringstream trace;
@@ -112,7 +197,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                 value.has_value() ? WideFromUtf8(FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat))
                                   : L"";
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-            ShowLayoutEditEditors(hwnd, true, false, false, false, false, false);
+            DestroyMetricListOrderEditorControls(state);
+            ShowLayoutEditEditors(hwnd, true, false, false, false, false, false, false);
             SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
             std::ostringstream trace;
             trace << BuildTraceNodeText(state->selectedNode) << " editor=\"numeric\""
@@ -131,7 +217,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT,
             values.has_value() ? WideFromUtf8(std::to_string(values->second)).c_str() : L"");
-        ShowLayoutEditEditors(hwnd, false, false, false, true, false, false);
+        DestroyMetricListOrderEditorControls(state);
+        ShowLayoutEditEditors(hwnd, false, false, false, true, false, false, false);
         SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
         std::ostringstream trace;
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"weights\""
@@ -142,11 +229,43 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         const std::wstring text =
             WideFromUtf8(FindCardTitleValue(state->dialog->Host().CurrentConfig(), *cardTitleKey).value_or(""));
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-        ShowLayoutEditEditors(hwnd, true, false, false, false, false, false);
+        DestroyMetricListOrderEditorControls(state);
+        ShowLayoutEditEditors(hwnd, true, false, false, false, false, false, false);
         SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
         std::ostringstream trace;
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"text\""
               << " text=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
+        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
+    } else if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&state->selectedLeaf->focusKey)) {
+        std::vector<std::string> metricRefs;
+        if (const LayoutNodeConfig* node = FindMetricListNode(state->dialog->Host().CurrentConfig(), *metricListKey);
+            node != nullptr) {
+            metricRefs = ParseMetricListMetricRefs(node->parameter);
+        }
+        std::vector<std::string> options = AvailableMetricDefinitionIds(state->dialog->Host().CurrentConfig());
+        for (const auto& metricRef : metricRefs) {
+            const MetricDefinitionConfig* definition =
+                FindMetricDefinition(state->dialog->Host().CurrentConfig().layout.metrics, metricRef);
+            if (definition != nullptr && IsMetricListSupportedDisplayStyle(definition->style) &&
+                std::find(options.begin(), options.end(), metricRef) == options.end()) {
+                options.push_back(metricRef);
+            }
+        }
+        EnsureMetricListOrderEditorControls(state, hwnd, metricRefs.size());
+        for (size_t i = 0; i < state->metricListRowControls.size(); ++i) {
+            PopulateMetricListRowCombo(hwnd, state->metricListRowControls[i], options, metricRefs[i]);
+            EnableWindow(state->metricListRowControls[i].upButton, i > 0 ? TRUE : FALSE);
+            EnableWindow(state->metricListRowControls[i].downButton, i + 1 < metricRefs.size() ? TRUE : FALSE);
+            EnableWindow(state->metricListRowControls[i].deleteButton, TRUE);
+        }
+        if (state->metricListAddRowButton != nullptr) {
+            EnableWindow(state->metricListAddRowButton, !options.empty() ? TRUE : FALSE);
+        }
+        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, true);
+        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+        std::ostringstream trace;
+        trace << BuildTraceNodeText(state->selectedNode) << " editor=\"metric_list_order\""
+              << " rows=" << QuoteTraceText(std::to_string(metricRefs.size()));
         state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
     } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey)) {
         const MetricDefinitionConfig* definition =
@@ -192,7 +311,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT), scaleEditable ? TRUE : FALSE);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT), unitEditable ? TRUE : FALSE);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT), definition != nullptr ? TRUE : FALSE);
-        ShowLayoutEditEditors(hwnd, false, false, false, false, true, showBinding);
+        DestroyMetricListOrderEditorControls(state);
+        ShowLayoutEditEditors(hwnd, false, false, false, false, true, showBinding, false);
         SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
         std::ostringstream trace;
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"metric\"" << BuildMetricDialogTraceValues(hwnd)
@@ -202,7 +322,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
               << " binding_options=" << QuoteTraceText(std::to_string(bindingOptions.size()));
         state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
     } else {
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false);
+        DestroyMetricListOrderEditorControls(state);
+        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false);
         SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
         state->dialog->Host().TraceLayoutEditDialogEvent(
             "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
@@ -271,6 +392,15 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
     }
 
     if (std::holds_alternative<LayoutCardTitleEditKey>(state->selectedLeaf->focusKey)) {
+        return {true, L""};
+    }
+
+    if (std::holds_alternative<LayoutMetricListOrderEditKey>(state->selectedLeaf->focusKey)) {
+        for (const auto& metricRef : ReadMetricListOrderDialogRows(state, hwnd)) {
+            if (metricRef.empty()) {
+                return {false, L"Choose a metric for each row."};
+            }
+        }
         return {true, L""};
     }
 
@@ -527,6 +657,65 @@ bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd) {
     return applied;
 }
 
+bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd, int controlId, UINT notificationCode) {
+    if (state == nullptr || SelectedMetricListOrderKey(state) == nullptr) {
+        return false;
+    }
+
+    if (IsMetricListRowControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE, state->metricListRowControls.size()) &&
+        notificationCode == CBN_SELCHANGE) {
+        const std::vector<std::string> metricRefs = ReadMetricListOrderDialogRows(state, hwnd);
+        const bool applied = ApplyMetricListOrderRows(state, hwnd, metricRefs);
+        if (applied) {
+            PopulateLayoutEditSelection(state, hwnd);
+            RefreshLayoutEditValidationState(state, hwnd);
+        }
+        return true;
+    }
+
+    if (controlId == IDC_LAYOUT_EDIT_METRIC_LIST_ADD_ROW && notificationCode == BN_CLICKED) {
+        return MutateMetricListOrderRows(state, hwnd, [&](std::vector<std::string>& metricRefs) {
+            const auto options = AvailableMetricDefinitionIds(state->dialog->Host().CurrentConfig());
+            if (!options.empty()) {
+                metricRefs.push_back(options.front());
+            }
+        });
+    }
+
+    if (notificationCode != BN_CLICKED) {
+        return false;
+    }
+
+    if (IsMetricListRowControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE, state->metricListRowControls.size())) {
+        const int rowIndex = MetricListRowIndexFromControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE);
+        return MutateMetricListOrderRows(state, hwnd, [&](std::vector<std::string>& metricRefs) {
+            if (rowIndex > 0 && rowIndex < static_cast<int>(metricRefs.size())) {
+                std::swap(metricRefs[static_cast<size_t>(rowIndex)], metricRefs[static_cast<size_t>(rowIndex - 1)]);
+            }
+        });
+    }
+    if (IsMetricListRowControlId(
+            controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE, state->metricListRowControls.size())) {
+        const int rowIndex = MetricListRowIndexFromControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE);
+        return MutateMetricListOrderRows(state, hwnd, [&](std::vector<std::string>& metricRefs) {
+            if (rowIndex >= 0 && rowIndex + 1 < static_cast<int>(metricRefs.size())) {
+                std::swap(metricRefs[static_cast<size_t>(rowIndex)], metricRefs[static_cast<size_t>(rowIndex + 1)]);
+            }
+        });
+    }
+    if (IsMetricListRowControlId(
+            controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE, state->metricListRowControls.size())) {
+        const int rowIndex = MetricListRowIndexFromControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE);
+        return MutateMetricListOrderRows(state, hwnd, [&](std::vector<std::string>& metricRefs) {
+            if (rowIndex >= 0 && rowIndex < static_cast<int>(metricRefs.size())) {
+                metricRefs.erase(metricRefs.begin() + rowIndex);
+            }
+        });
+    }
+
+    return false;
+}
+
 bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
     if (state == nullptr || state->selectedLeaf == nullptr) {
         return false;
@@ -618,6 +807,21 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         cardTitleKey != nullptr) {
         const std::string title = FindCardTitleValue(state->originalConfig, *cardTitleKey).value_or("");
         const bool applied = state->dialog->Host().ApplyCardTitlePreview(*cardTitleKey, title);
+        if (applied) {
+            PopulateLayoutEditSelection(state, hwnd);
+            RefreshLayoutEditValidationState(state, hwnd);
+        }
+        return applied;
+    }
+
+    if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&state->selectedLeaf->focusKey);
+        metricListKey != nullptr) {
+        const LayoutNodeConfig* node = FindMetricListNode(state->originalConfig, *metricListKey);
+        if (node == nullptr) {
+            return false;
+        }
+        const bool applied =
+            state->dialog->Host().ApplyMetricListOrderPreview(*metricListKey, ParseMetricListMetricRefs(node->parameter));
         if (applied) {
             PopulateLayoutEditSelection(state, hwnd);
             RefreshLayoutEditValidationState(state, hwnd);

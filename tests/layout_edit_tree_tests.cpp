@@ -286,7 +286,8 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     const auto& containerKey = std::get<LayoutContainerEditKey>(*alphaContainer->selectionHighlight);
     EXPECT_EQ(containerKey.editCardId, "alpha");
     EXPECT_EQ(containerKey.nodePath, (std::vector<size_t>{0}));
-    EXPECT_EQ(ChildLabels(*alphaContainer), (std::vector<std::string>{"metric_list, gauge", "gauge, text"}));
+    EXPECT_EQ(
+        ChildLabels(*alphaContainer), (std::vector<std::string>{"metric_list", "metric_list, gauge", "gauge, text"}));
 }
 
 TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) {
@@ -321,6 +322,12 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     EXPECT_EQ(titleLeaf->sectionName, "card.alpha");
     EXPECT_EQ(titleLeaf->memberName, "title");
     EXPECT_EQ(titleLeaf->valueFormat, configschema::ValueFormat::String);
+
+    const LayoutEditTreeLeaf* metricListLeaf =
+        FindLayoutEditTreeLeaf(model, LayoutEditFocusKey{LayoutMetricListOrderEditKey{"alpha", {1}}});
+    ASSERT_NE(metricListLeaf, nullptr);
+    EXPECT_EQ(metricListLeaf->sectionName, "card.alpha");
+    EXPECT_EQ(metricListLeaf->memberName, "layout");
 }
 
 TEST(LayoutEditTree, ShowsReachableCardSectionsForRuntimeStyleDashboardCardNodes) {
@@ -347,9 +354,11 @@ TEST(LayoutEditTree, CollapsesSingleChildContainerPathsInCardTrees) {
     ASSERT_EQ(gpuRoot->children.size(), 2u);
     EXPECT_EQ(gpuRoot->children[0].label, "title");
     EXPECT_EQ(gpuRoot->children[1].label, "layout");
-    ASSERT_EQ(gpuRoot->children[1].children.size(), 1u);
+    ASSERT_EQ(gpuRoot->children[1].children.size(), 2u);
     EXPECT_EQ(gpuRoot->children[1].children[0].label, "gauge, metric_list");
     EXPECT_TRUE(gpuRoot->children[1].children[0].leaf.has_value());
+    EXPECT_EQ(gpuRoot->children[1].children[1].label, "metric_list");
+    EXPECT_TRUE(gpuRoot->children[1].children[1].leaf.has_value());
 }
 
 TEST(LayoutEditTree, EveryBuiltNodeHasLocalizedDescriptionAndLocationText) {

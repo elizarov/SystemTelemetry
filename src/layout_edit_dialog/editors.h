@@ -14,4 +14,5 @@ bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd);
 bool SetSelectedDialogColor(LayoutEditDialogState* state, HWND hwnd, unsigned int color);
 bool PreviewSelectedWeights(LayoutEditDialogState* state, HWND hwnd);
 bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd);
+bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd, int controlId, UINT notificationCode);
 bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd);
