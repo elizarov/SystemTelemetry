@@ -28,7 +28,7 @@ build.cmd
 ```
 
 All build artifacts are kept under `build\`.
-`build.cmd` configures the CMake tree with `Ninja Multi-Config`, uses `%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake` when `VCPKG_ROOT` is set, installs the repo `vcpkg.json` manifest for the `x64-windows` triplet into `build\vcpkg_installed\` so `SystemTelemetryTests` links against the full GoogleTest package, and restores `build\cmake\compile_commands.json` for `clangd`-based editors such as Zed.
+`build.cmd` configures the CMake tree with `Ninja Multi-Config`, prefers the active developer environment's bundled vcpkg toolchain when `VSINSTALLDIR` provides it, otherwise falls back to `%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake`, lets that toolchain's manifest-mode configure step install the repo `vcpkg.json` dependency set for the `x64-windows` triplet into `build\cmake\vcpkg_installed\`, and restores `build\cmake\compile_commands.json` for `clangd`-based editors such as Zed.
 
 ## Install
 
