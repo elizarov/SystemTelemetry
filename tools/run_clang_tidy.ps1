@@ -279,7 +279,12 @@ function Start-TidyProcess {
         [int]$Index
     )
 
-    $logBase = Join-Path $RepoRoot ("build\clang_tidy_unit_{0:D4}_{1}" -f $Index, [System.Guid]::NewGuid().ToString('N'))
+    $tempLogRoot = Join-Path $RepoRoot 'build\clang_tidy_units'
+    if (-not (Test-Path -LiteralPath $tempLogRoot)) {
+        New-Item -ItemType Directory -Path $tempLogRoot -Force | Out-Null
+    }
+
+    $logBase = Join-Path $tempLogRoot ("clang_tidy_unit_{0:D4}_{1}" -f $Index, [System.Guid]::NewGuid().ToString('N'))
     $stdoutPath = "$logBase.stdout.log"
     $stderrPath = "$logBase.stderr.log"
 
