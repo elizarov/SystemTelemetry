@@ -968,8 +968,15 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
         }
         case LayoutEditEditorKind::MetricListOrder: {
             const int buttonWidth = 38;
-            const int addButtonWidth = 96;
-            const int rowVisibleHeight = singleLineFieldHeight;
+            const int comboFieldVisibleHeight = (std::max)(1, DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT));
+            const int addButtonWidth = (std::max)(
+                132,
+                MeasureTextWidthForControl(
+                    hwnd,
+                    IDC_LAYOUT_EDIT_REVERT,
+                    state->metricListAddRowButton != nullptr ? ReadWindowTextWide(state->metricListAddRowButton) : L"Add row") +
+                    28);
+            const int rowVisibleHeight = comboFieldVisibleHeight;
             const int comboDropHeight = std::max(140, rowVisibleHeight + 120);
             const int buttonsWidth = (buttonWidth * 3) + (metrics.inlineGap * 2);
             const int comboWidth = std::max(60, innerWidth - buttonsWidth - metrics.inlineGap);
