@@ -26,11 +26,11 @@ This file records the current layout-edit drag benchmark baseline, the latest co
   - `snap avg_ms=0.20`
   - `apply avg_ms=0.22`
   - `paint_draw avg_ms=1.98`
-- Current repeatable result on the optimized tree:
-  - `drag_loop per_iter_ms=2.49` to `2.60`
+- Current repeatable result on the current tree:
+  - `drag_loop per_iter_ms=2.60` to `2.68`
   - `snap avg_ms=0.19` to `0.20`
-  - `apply avg_ms=0.28` to `0.30`
-  - `paint_draw avg_ms=2.02` to `2.10`
+  - `apply avg_ms=0.13`
+  - `paint_draw avg_ms=2.28` to `2.35`
 
 ## Current Confirmed Hotspots
 
@@ -423,6 +423,31 @@ These changes produced real wins and remain in the codebase:
   - The shared `Graphics` path did not offset its own state-management overhead on this workload, and the original per-draw setup stays cheaper in practice.
 - Conclusion:
   - Keep the existing local `Gdiplus::Graphics` construction in the hot gauge and highlight paths.
+
+### Hypothesis: Keep the container guide outline but replace the dashed-stroke implementation
+
+- Change:
+  - Keep the layout-guide container highlight feedback, but draw the dotted outline with a manual filled-dot pattern instead of a Direct2D dashed stroke.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - The current tree before this change measured about `drag_loop per_iter_ms=3.95`, `apply avg_ms=0.55`, and `paint_draw avg_ms=3.20`.
+  - Removing the container outline entirely moved the benchmark to about `drag_loop per_iter_ms=3.51`, `apply avg_ms=0.58`, and `paint_draw avg_ms=2.73`, confirming the highlight itself was the dominant new paint regression from that feedback feature.
+  - Replacing the dashed stroke with the manual filled-dot outline kept the feedback while landing about `drag_loop per_iter_ms=3.54`, `apply avg_ms=0.59`, and `paint_draw avg_ms=2.76`.
+- Conclusion:
+  - The feedback itself is acceptable to keep, but the dashed Direct2D stroke is too expensive on the live drag path. Prefer the cheaper manual-dot outline for large container highlights.
+
+### Hypothesis: Avoid full renderer reconfiguration when only layout weights change
+
+- Change:
+  - Keep `DashboardRenderer::SetConfig` on the drag apply path, but only rebuild palette state, panel-icon assets, DirectWrite text formats, and metric caches when the corresponding config inputs actually change instead of reloading all renderer resources on every layout-weight update.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - With the cheaper container outline already in place, reruns before this change landed around `drag_loop per_iter_ms=3.54`, `snap avg_ms=0.20`, `apply avg_ms=0.59`, and `paint_draw avg_ms=2.76`.
+  - After narrowing `SetConfig` to layout-relevant work only, repeatable reruns landed at `drag_loop per_iter_ms=2.60` to `2.68`, `snap avg_ms=0.19` to `0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.28` to `2.35`.
+- Conclusion:
+  - The regression was not just in draw; the drag path was also paying avoidable per-frame renderer reconfiguration churn. Preserve caches and resource rebuilds across layout-only config updates.
 
 ## Practical Guidance For Future Experiments
 

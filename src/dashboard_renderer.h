@@ -124,6 +124,8 @@ public:
     std::optional<int> FindLayoutWidgetExtent(const LayoutEditWidgetIdentity& widget, LayoutGuideAxis axis) const;
     bool ApplyLayoutGuideWeightsPreview(
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
+    const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const;
+    const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const;
     std::optional<LayoutEditWidgetIdentity> HitTestLayoutCard(RenderPoint clientPoint) const;
     std::optional<LayoutEditWidgetIdentity> HitTestEditableCard(RenderPoint clientPoint) const;
     std::optional<LayoutEditWidgetIdentity> HitTestEditableWidget(RenderPoint clientPoint) const;
@@ -382,6 +384,7 @@ private:
 
     void ClearD2DCaches();
     bool ShouldDrawLayoutEditAffordances(const EditOverlayState& overlayState) const;
+    bool IsContainerGuideDragActive(const EditOverlayState& overlayState) const;
     void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const;
     void DrawSelectedColorEditHighlights(const EditOverlayState& overlayState) const;
@@ -506,6 +509,8 @@ private:
     std::unique_ptr<DashboardMetricSource> cachedMetricSource_;
     const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
     uint64_t cachedMetricSnapshotRevision_ = 0;
+    mutable std::unordered_map<std::string, const MetricDefinitionConfig*> metricDefinitionCache_;
+    mutable std::unordered_map<std::string, std::string> metricSampleValueTextCache_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

@@ -216,8 +216,7 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
             true,
             false,
             0);
-        const MetricDefinitionConfig* definition =
-            FindMetricDefinition(renderer.Config().layout.metrics, metricRefs_[rowIndex]);
+        const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metricRefs_[rowIndex]);
         if (definition != nullptr && !definition->label.empty()) {
             renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
                 definition->label,

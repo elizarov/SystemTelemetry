@@ -150,8 +150,8 @@ int GaugeOuterRadiusForRect(const DashboardRenderer& renderer, const RenderRect&
 }
 
 int GaugeTextHalfWidth(const DashboardRenderer& renderer, const std::string& metricRef) {
-    const std::string sampleValueText = ResolveMetricSampleValueText(renderer.Config().layout.metrics, metricRef);
-    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().layout.metrics, metricRef);
+    const std::string& sampleValueText = renderer.ResolveConfiguredMetricSampleValueText(metricRef);
+    const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metricRef);
     const std::string_view valueText =
         sampleValueText.empty() ? std::string_view("100%") : std::string_view(sampleValueText);
     const int valueWidth = renderer.MeasureTextWidth(TextStyleId::Big, valueText);
@@ -363,7 +363,7 @@ void GaugeWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Dashboar
         true,
         false,
         renderer.Config().layout.gauge.ringThickness);
-    const MetricDefinitionConfig* definition = FindMetricDefinition(renderer.Config().layout.metrics, metric_);
+    const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metric_);
     if (definition != nullptr && !definition->label.empty()) {
         renderer.RegisterStaticTextAnchor(layoutState_.labelRect,
             definition->label,

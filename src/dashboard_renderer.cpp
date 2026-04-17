@@ -47,6 +47,24 @@ std::string FormatHresult(HRESULT hr) {
     return buffer;
 }
 
+bool SamePanelIconInputs(const std::vector<LayoutCardConfig>& left, const std::vector<LayoutCardConfig>& right) {
+    std::set<std::string> leftIcons;
+    for (const auto& card : left) {
+        if (!card.icon.empty()) {
+            leftIcons.insert(card.icon);
+        }
+    }
+
+    std::set<std::string> rightIcons;
+    for (const auto& card : right) {
+        if (!card.icon.empty()) {
+            rightIcons.insert(card.icon);
+        }
+    }
+
+    return leftIcons == rightIcons;
+}
+
 DWRITE_TEXT_ALIGNMENT DWriteTextAlignment(const TextLayoutOptions& options) {
     switch (options.horizontalAlign) {
         case TextHorizontalAlign::Center:
@@ -328,11 +346,25 @@ DashboardRenderer::~DashboardRenderer() {
 }
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
-    InvalidateMetricSourceCache();
+    const bool paletteChanged = config_.layout.colors != config.layout.colors;
+    const bool iconInputsChanged =
+        config_.layout.colors.iconColor != config.layout.colors.iconColor ||
+        !SamePanelIconInputs(config_.layout.cards, config.layout.cards);
+    const bool textFormatsChanged = config_.layout.fonts != config.layout.fonts;
+    const bool metricsChanged = config_.layout.metrics != config.layout.metrics;
+    if (metricsChanged) {
+        InvalidateMetricSourceCache();
+        metricDefinitionCache_.clear();
+        metricSampleValueTextCache_.clear();
+    }
     config_ = config;
-    RebuildPalette();
+    if (paletteChanged) {
+        RebuildPalette();
+    }
     if (dwriteFactory_ != nullptr) {
-        if (!LoadPanelIcons() || !RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
+        const bool iconsReady = !iconInputsChanged || LoadPanelIcons();
+        const bool textReady = !textFormatsChanged || RebuildTextFormatsAndMetrics();
+        if (!iconsReady || !textReady || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:reconfigure_failed" : lastError_;
         } else {
             d2dFirstDrawWarmupPending_ = true;
@@ -594,6 +626,9 @@ void DashboardRenderer::DrawText(const RenderRect& rect,
 }
 
 void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const {
+    if (IsContainerGuideDragActive(overlayState)) {
+        return;
+    }
     if (!ShouldDrawLayoutEditAffordances(overlayState) || !overlayState.hoveredEditableWidget.has_value() ||
         overlayState.hoveredEditableWidget->kind != LayoutEditWidgetIdentity::Kind::Widget) {
         return;
@@ -631,7 +666,14 @@ bool DashboardRenderer::ShouldDrawLayoutEditAffordances(const EditOverlayState& 
            overlayState.hoveredEditableAnchor.has_value() || overlayState.activeEditableAnchor.has_value();
 }
 
+bool DashboardRenderer::IsContainerGuideDragActive(const EditOverlayState& overlayState) const {
+    return overlayState.activeLayoutEditGuide.has_value();
+}
+
 void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const {
+    if (IsContainerGuideDragActive(overlayState)) {
+        return;
+    }
     if (!ShouldDrawLayoutEditAffordances(overlayState)) {
         return;
     }
@@ -800,6 +842,9 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
 }
 
 void DashboardRenderer::DrawSelectedColorEditHighlights(const EditOverlayState& overlayState) const {
+    if (IsContainerGuideDragActive(overlayState)) {
+        return;
+    }
     if (!overlayState.showLayoutEditGuides || !overlayState.selectedTreeHighlight.has_value()) {
         return;
     }
@@ -833,6 +878,9 @@ void DashboardRenderer::DrawSelectedColorEditHighlights(const EditOverlayState& 
 }
 
 void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& overlayState) const {
+    if (IsContainerGuideDragActive(overlayState)) {
+        return;
+    }
     if (!overlayState.showLayoutEditGuides || !overlayState.selectedTreeHighlight.has_value()) {
         return;
     }
@@ -1027,6 +1075,9 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
 }
 
 void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayState) const {
+    if (IsContainerGuideDragActive(overlayState)) {
+        return;
+    }
     if (!ShouldDrawLayoutEditAffordances(overlayState) || widgetEditGuides_.empty()) {
         return;
     }
@@ -1068,6 +1119,9 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
 }
 
 void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState) const {
+    if (IsContainerGuideDragActive(overlayState)) {
+        return;
+    }
     if (!ShouldDrawLayoutEditAffordances(overlayState) || gapEditAnchors_.empty()) {
         return;
     }
@@ -1149,8 +1203,29 @@ void DashboardRenderer::DrawDottedHighlightRect(
                 : RenderRect{rect.left + padding, rect.top + padding, rect.right - padding, rect.bottom - padding};
     const float outlineWidth =
         static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
-    const_cast<DashboardRenderer*>(this)->DrawSolidRect(
-        outlineRect.IsEmpty() ? rect : outlineRect, RenderStroke::Dotted(color, outlineWidth));
+    const RenderRect drawRect = outlineRect.IsEmpty() ? rect : outlineRect;
+    auto* renderer = const_cast<DashboardRenderer*>(this);
+    const int strokeWidth = (std::max)(1, static_cast<int>(std::lround(outlineWidth)));
+    const int dotLength = (std::max)(strokeWidth + 1, ScaleLogical(active ? 6 : 5));
+    const int gapLength = (std::max)(strokeWidth + 1, ScaleLogical(active ? 5 : 4));
+
+    const auto drawHorizontal = [&](int y, int left, int right) {
+        for (int x = left; x < right; x += dotLength + gapLength) {
+            const int segmentRight = (std::min)(x + dotLength, right);
+            renderer->FillSolidRect(RenderRect{x, y, segmentRight, y + strokeWidth}, color);
+        }
+    };
+    const auto drawVertical = [&](int x, int top, int bottom) {
+        for (int y = top; y < bottom; y += dotLength + gapLength) {
+            const int segmentBottom = (std::min)(y + dotLength, bottom);
+            renderer->FillSolidRect(RenderRect{x, y, x + strokeWidth, segmentBottom}, color);
+        }
+    };
+
+    drawHorizontal(drawRect.top, drawRect.left, drawRect.right);
+    drawHorizontal((std::max)(drawRect.top, drawRect.bottom - strokeWidth), drawRect.left, drawRect.right);
+    drawVertical(drawRect.left, drawRect.top, drawRect.bottom);
+    drawVertical((std::max)(drawRect.left, drawRect.right - strokeWidth), drawRect.top, drawRect.bottom);
 }
 
 int DashboardRenderer::WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {
@@ -2131,6 +2206,28 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
         return false;
     }
     return ResolveLayout(false);
+}
+
+const MetricDefinitionConfig* DashboardRenderer::FindConfiguredMetricDefinition(std::string_view metricRef) const {
+    const std::string key(metricRef);
+    const auto cached = metricDefinitionCache_.find(key);
+    if (cached != metricDefinitionCache_.end()) {
+        return cached->second;
+    }
+    const MetricDefinitionConfig* definition = FindMetricDefinition(config_.layout.metrics, metricRef);
+    metricDefinitionCache_.emplace(key, definition);
+    return definition;
+}
+
+const std::string& DashboardRenderer::ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const {
+    const std::string key(metricRef);
+    const auto cached = metricSampleValueTextCache_.find(key);
+    if (cached != metricSampleValueTextCache_.end()) {
+        return cached->second;
+    }
+    return metricSampleValueTextCache_
+        .emplace(key, ResolveMetricSampleValueText(config_.layout.metrics, key))
+        .first->second;
 }
 
 std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestLayoutCard(RenderPoint clientPoint) const {
