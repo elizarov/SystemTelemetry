@@ -20,6 +20,7 @@ enum class AnchorShape {
     Square,
     Wedge,
     VerticalReorder,
+    Plus,
 };
 
 enum class AnchorDragAxis {

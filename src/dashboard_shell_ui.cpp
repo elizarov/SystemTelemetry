@@ -240,6 +240,12 @@ std::wstring BuildLayoutEditMenuLabel(const std::wstring& subject) {
     return L"Edit " + subject + L" ...";
 }
 
+bool IsMetricListAddRowTarget(const LayoutEditController::TooltipTarget& target) {
+    const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target.payload);
+    return anchor != nullptr && anchor->shape == AnchorShape::Plus &&
+           LayoutEditAnchorMetricListOrderKey(anchor->key).has_value();
+}
+
 std::wstring BuildLayoutEditDialogTitle(const std::wstring& subject) {
     return L"Edit " + subject;
 }
@@ -946,6 +952,31 @@ bool DashboardShellUi::ApplyMetricListOrderPreview(
     return true;
 }
 
+bool DashboardShellUi::ApplyMetricListAddRowPreview(const LayoutEditController::TooltipTarget& target) {
+    const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target.payload);
+    if (anchor == nullptr || anchor->shape != AnchorShape::Plus) {
+        return false;
+    }
+
+    const auto metricListKey = LayoutEditAnchorMetricListOrderKey(anchor->key);
+    if (!metricListKey.has_value()) {
+        return false;
+    }
+
+    const std::vector<std::string> options = AvailableMetricListMetricIds(CurrentConfig());
+    if (options.empty()) {
+        return false;
+    }
+
+    AppConfig updatedConfig = CurrentConfig();
+    if (!AppendMetricListRow(updatedConfig, anchor->key.widget, options.front())) {
+        return false;
+    }
+    RestoreConfigSnapshot(updatedConfig);
+    RefreshLayoutEditDialog(LayoutEditFocusKey{*metricListKey});
+    return true;
+}
+
 bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) {
     const LayoutNodeConfig* node = FindWeightEditNode(CurrentConfig(), key);
     if (node == nullptr || key.separatorIndex + 1 >= node->children.size()) {
@@ -988,6 +1019,10 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
         MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"System Telemetry", MB_ICONERROR);
+        return false;
+    }
+    if (IsMetricListAddRowTarget(target) && !ApplyMetricListAddRowPreview(target)) {
+        MessageBoxW(app_.hwnd_, L"Failed to add a metric list row.", L"System Telemetry", MB_ICONERROR);
         return false;
     }
     return true;
@@ -1259,17 +1294,20 @@ void DashboardShellUi::ShowContextMenu(
         if (const auto* guide = std::get_if<LayoutEditGuide>(&layoutEditTarget->payload)) {
             label = BuildLayoutEditMenuLabel(BuildLayoutGuideEditLabel(*guide));
         } else {
+            if (IsMetricListAddRowTarget(*layoutEditTarget)) {
+                label = L"Add metric list row...";
+            }
             const auto focusKey = TooltipPayloadFocusKey(layoutEditTarget->payload);
-            if (focusKey.has_value() && std::holds_alternative<LayoutMetricEditKey>(*focusKey)) {
+            if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutMetricEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(
                     WideFromUtf8(std::get<LayoutMetricEditKey>(*focusKey).metricId + " metric"));
-            } else if (focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
+            } else if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"card title");
-            } else if (focusKey.has_value() && std::holds_alternative<LayoutMetricListOrderEditKey>(*focusKey)) {
+            } else if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutMetricListOrderEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"metrics list");
-            } else if (focusKey.has_value() && std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
+            } else if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"layout container");
-            } else {
+            } else if (label.empty()) {
                 const auto parameter = TooltipPayloadParameter(layoutEditTarget->payload);
                 if (parameter.has_value()) {
                     label = BuildLayoutEditMenuLabel(WideFromUtf8(GetLayoutEditParameterDisplayName(*parameter)));

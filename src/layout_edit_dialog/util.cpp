@@ -336,14 +336,7 @@ std::optional<std::pair<int, int>> FindWeightEditValues(const AppConfig& config,
 }
 
 std::vector<std::string> AvailableMetricDefinitionIds(const AppConfig& config) {
-    std::vector<std::string> metricIds;
-    metricIds.reserve(config.layout.metrics.definitions.size());
-    for (const auto& definition : config.layout.metrics.definitions) {
-        if (IsMetricListSupportedDisplayStyle(definition.style) && IsGenerallyAvailableDashboardMetric(definition.id)) {
-            metricIds.push_back(definition.id);
-        }
-    }
-    return metricIds;
+    return AvailableMetricListMetricIds(config);
 }
 
 bool IsMetricListSupportedDisplayStyle(MetricDisplayStyle style) {

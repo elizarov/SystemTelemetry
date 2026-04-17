@@ -122,3 +122,17 @@ std::optional<std::string> BuildMetricListOrderTooltipLine(
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
     return "[" + sectionName + "] " + memberName + " = metric_list(" + metricRefs[static_cast<size_t>(rowIndex)] + ")";
 }
+
+std::optional<std::string> BuildMetricListAddRowTooltipLine(const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
+    const LayoutNodeConfig* node = FindMetricListNode(config, key);
+    if (node == nullptr || node->name != "metric_list") {
+        return std::nullopt;
+    }
+
+    const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty()
+                                        ? "layout." + config.display.layout
+                                    : key.editCardId.empty() ? "layout"
+                                                             : "card." + key.editCardId;
+    const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
+    return "[" + sectionName + "] " + memberName + " = metric_list(...)";
+}

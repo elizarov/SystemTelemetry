@@ -18,9 +18,12 @@ public:
         int reorderAnchorWidth = 6;
         int reorderAnchorHeight = 10;
         int visibleRows = 0;
+        bool showAddRowAnchor = false;
         std::vector<RenderRect> rowRects;
         std::vector<RenderRect> barAnchorRects;
         std::vector<RenderRect> reorderAnchorRects;
+        RenderRect addRowRect{};
+        RenderRect addRowAnchorRect{};
     };
 
     DashboardWidgetClass Class() const override;

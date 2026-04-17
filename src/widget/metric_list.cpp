@@ -74,6 +74,13 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
     layoutState_.barRects.clear();
     layoutState_.barAnchorRects.clear();
     layoutState_.reorderAnchorRects.clear();
+    layoutState_.showAddRowAnchor = false;
+    layoutState_.addRowRect = {};
+    layoutState_.addRowAnchorRect = {};
+    const int availableRowSlots =
+        layoutState_.rowHeight > 0
+            ? (std::max)(0, ((std::max)(0, rect.bottom - rect.top) + layoutState_.rowHeight - 1) / layoutState_.rowHeight)
+            : 0;
     RenderRect rowRect{rect.left, rect.top, rect.right, rect.top + layoutState_.rowHeight};
     for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
         layoutState_.rowRects.push_back(rowRect);
@@ -109,6 +116,17 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
             rowRect.right,
             rowRect.bottom + layoutState_.rowHeight,
         };
+    }
+    if (availableRowSlots > layoutState_.visibleRows) {
+        layoutState_.showAddRowAnchor = true;
+        layoutState_.addRowRect = rowRect;
+        const int addAnchorSize = (std::max)(layoutState_.reorderAnchorWidth, renderer.ScaleLogical(10));
+        const int addCenterX = rowRect.right - (addAnchorSize / 2);
+        const int addCenterY = rowRect.top + ((std::max)(0, static_cast<int>(rowRect.bottom - rowRect.top)) / 2);
+        layoutState_.addRowAnchorRect = RenderRect{addCenterX - (addAnchorSize / 2),
+            addCenterY - (addAnchorSize / 2),
+            addCenterX - (addAnchorSize / 2) + addAnchorSize,
+            addCenterY - (addAnchorSize / 2) + addAnchorSize};
     }
 }
 
@@ -215,6 +233,23 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
                 renderer.MakeMetricTextBinding(widget, metricRefs_[rowIndex], rowIndex * 2 + 100));
         }
+    }
+    if (layoutState_.showAddRowAnchor && !layoutState_.addRowAnchorRect.IsEmpty()) {
+        renderer.RegisterStaticEditableAnchorRegion(
+            LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+                LayoutMetricListOrderEditKey{widget.editCardId, widget.nodePath},
+                static_cast<int>(metricRefs_.size())},
+            layoutState_.addRowRect,
+            layoutState_.addRowAnchorRect,
+            AnchorShape::Plus,
+            AnchorDragAxis::Horizontal,
+            AnchorDragMode::AxisDelta,
+            layoutState_.addRowAnchorRect.Center(),
+            1.0,
+            false,
+            true,
+            false,
+            0);
     }
 }
 

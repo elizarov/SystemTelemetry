@@ -153,6 +153,20 @@ std::wstring BuildMetricListOrderTooltipText(
     return text;
 }
 
+std::wstring BuildMetricListAddRowTooltipText(const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
+    const auto firstLine = BuildMetricListAddRowTooltipLine(config, key);
+    if (!firstLine.has_value()) {
+        return L"";
+    }
+    std::wstring text = WideFromUtf8(*firstLine);
+    const std::wstring description = WideFromUtf8(FindLocalizedText("layout_edit.metric_list_add_row"));
+    if (!description.empty()) {
+        text += L"\r\n";
+        text += description;
+    }
+    return text;
+}
+
 }  // namespace
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
@@ -755,11 +769,15 @@ void DashboardApp::UpdateLayoutEditTooltip() {
             stringValue = card->title;
         } else if (metricListOrderKey.has_value()) {
             int rowIndex = 0;
+            bool addRowAnchor = false;
             if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target->payload)) {
                 rowIndex = anchor->key.anchorId;
+                addRowAnchor = anchor->shape == AnchorShape::Plus;
             }
-            layoutEditTooltipText_ =
-                BuildMetricListOrderTooltipText(controller_.State().config, *metricListOrderKey, rowIndex);
+            layoutEditTooltipText_ = addRowAnchor
+                                         ? BuildMetricListAddRowTooltipText(controller_.State().config, *metricListOrderKey)
+                                         : BuildMetricListOrderTooltipText(
+                                               controller_.State().config, *metricListOrderKey, rowIndex);
             if (layoutEditTooltipText_.empty()) {
                 HideLayoutEditTooltip();
                 return;

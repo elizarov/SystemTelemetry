@@ -143,6 +143,20 @@ TEST(LayoutEditTooltip, RejectsMetricListOrderTooltipLineWhenRowIndexIsInvalid) 
     EXPECT_FALSE(BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}}, 2).has_value());
 }
 
+TEST(LayoutEditTooltip, BuildsMetricListAddRowTooltipLineForCardLayout) {
+    AppConfig config;
+    config.display.layout = "main";
+    config.layout.cards.push_back(LayoutCardConfig{});
+    config.layout.cards.back().id = "cpu";
+    config.layout.cards.back().layout.name = "metric_list";
+    config.layout.cards.back().layout.parameter = "cpu.ram,cpu.clock";
+
+    const auto line = BuildMetricListAddRowTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}});
+
+    ASSERT_TRUE(line.has_value());
+    EXPECT_EQ(*line, "[card.cpu] layout = metric_list(...)");
+}
+
 TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {
     const auto& gaugeField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::GaugeSegmentCount);
     EXPECT_EQ(gaugeField.sectionName, "gauge");

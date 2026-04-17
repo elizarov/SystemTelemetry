@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cctype>
 
+#include "dashboard_metrics.h"
+
 namespace {
 
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
@@ -101,6 +103,27 @@ std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter) {
     return metricRefs;
 }
 
+std::vector<std::string> AvailableMetricListMetricIds(const AppConfig& config) {
+    std::vector<std::string> metricIds;
+    metricIds.reserve(config.layout.metrics.definitions.size());
+    for (const auto& definition : config.layout.metrics.definitions) {
+        switch (definition.style) {
+            case MetricDisplayStyle::Scalar:
+            case MetricDisplayStyle::Percent:
+            case MetricDisplayStyle::Memory:
+                if (IsGenerallyAvailableDashboardMetric(definition.id)) {
+                    metricIds.push_back(definition.id);
+                }
+                break;
+            case MetricDisplayStyle::Throughput:
+            case MetricDisplayStyle::SizeAuto:
+            case MetricDisplayStyle::LabelOnly:
+                break;
+        }
+    }
+    return metricIds;
+}
+
 std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNodeConfig* node) {
     if (node == nullptr || node->children.size() != guide.childExtents.size()) {
         return guide.childExtents;
@@ -188,6 +211,22 @@ bool ApplyMetricListOrder(
     }
 
     return updated;
+}
+
+bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widget, std::string_view metricRef) {
+    if (metricRef.empty()) {
+        return false;
+    }
+
+    const LayoutEditHost::LayoutTarget target{widget.editCardId, widget.nodePath};
+    const LayoutNodeConfig* currentNode = FindGuideNode(config, target);
+    if (currentNode == nullptr || currentNode->name != "metric_list") {
+        return false;
+    }
+
+    std::vector<std::string> metricRefs = ParseMetricListMetricRefs(currentNode->parameter);
+    metricRefs.push_back(std::string(metricRef));
+    return ApplyMetricListOrder(config, widget, metricRefs);
 }
 
 std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer,
