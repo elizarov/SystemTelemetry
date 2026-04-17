@@ -20,8 +20,7 @@ void UpdateMemory(TelemetryCollectorState& state) {
     const BOOL ok = GlobalMemoryStatusEx(&memory);
     if (ok) {
         state.snapshot_.cpu.memory.totalGb = memory.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
-        state.snapshot_.cpu.memory.usedGb =
-            (memory.ullTotalPhys - memory.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
+        state.snapshot_.cpu.memory.usedGb = (memory.ullTotalPhys - memory.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
     }
     Trace(state,
         "telemetry:memory_status ok=" + tracing::Trace::BoolText(ok != FALSE) +
@@ -39,24 +38,27 @@ void InitializeCpuCollector(TelemetryCollectorState& state) {
     state.trace_.Write("telemetry:cpu_name value=\"" + state.snapshot_.cpu.name + "\"");
 
     const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.cpu_.query);
-    state.trace_.Write(("telemetry:pdh_open cpu_query " + tracing::Trace::FormatPdhStatus("status", queryStatus)).c_str());
-    const PDH_STATUS loadStatus =
-        AddCounterCompat(state.cpu_.query, L"\\Processor Information(_Total)\\% Processor Utility", &state.cpu_.loadCounter);
-    state.trace_.Write(("telemetry:pdh_add cpu_load path=\"\\\\Processor Information(_Total)\\\\% Processor Utility\" " +
-                        tracing::Trace::FormatPdhStatus("status", loadStatus))
-                           .c_str());
+    state.trace_.Write(
+        ("telemetry:pdh_open cpu_query " + tracing::Trace::FormatPdhStatus("status", queryStatus)).c_str());
+    const PDH_STATUS loadStatus = AddCounterCompat(
+        state.cpu_.query, L"\\Processor Information(_Total)\\% Processor Utility", &state.cpu_.loadCounter);
+    state.trace_.Write(
+        ("telemetry:pdh_add cpu_load path=\"\\\\Processor Information(_Total)\\\\% Processor Utility\" " +
+            tracing::Trace::FormatPdhStatus("status", loadStatus))
+            .c_str());
     if (state.cpu_.loadCounter == nullptr) {
         const PDH_STATUS fallbackStatus =
             AddCounterCompat(state.cpu_.query, L"\\Processor(_Total)\\% Processor Time", &state.cpu_.loadCounter);
         state.trace_.Write(("telemetry:pdh_add cpu_load_fallback path=\"\\\\Processor(_Total)\\\\% Processor Time\" " +
                             tracing::Trace::FormatPdhStatus("status", fallbackStatus))
-                               .c_str());
+                .c_str());
     }
     const PDH_STATUS frequencyStatus = AddCounterCompat(
         state.cpu_.query, L"\\Processor Information(_Total)\\Processor Frequency", &state.cpu_.frequencyCounter);
-    state.trace_.Write(("telemetry:pdh_add cpu_frequency path=\"\\\\Processor Information(_Total)\\\\Processor Frequency\" " +
-                        tracing::Trace::FormatPdhStatus("status", frequencyStatus))
-                           .c_str());
+    state.trace_.Write(
+        ("telemetry:pdh_add cpu_frequency path=\"\\\\Processor Information(_Total)\\\\Processor Frequency\" " +
+            tracing::Trace::FormatPdhStatus("status", frequencyStatus))
+            .c_str());
     const PDH_STATUS collectStatus = PdhCollectQueryData(state.cpu_.query);
     state.trace_.Write(
         ("telemetry:pdh_collect cpu_query " + tracing::Trace::FormatPdhStatus("status", collectStatus)).c_str());
@@ -95,8 +97,7 @@ void UpdateCpuMetrics(TelemetryCollectorState& state) {
         "telemetry:cpu_clock " + tracing::Trace::FormatPdhStatus("status", clockStatus) + " value=" +
             (state.snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(state.snapshot_.cpu.clock, 2)
                                                          : std::string("N/A")));
-    state.retainedHistoryStore_.PushSample(
-        state.snapshot_, "cpu.clock", state.snapshot_.cpu.clock.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.clock", state.snapshot_.cpu.clock.value.value_or(0.0));
 
     UpdateMemory(state);
 }

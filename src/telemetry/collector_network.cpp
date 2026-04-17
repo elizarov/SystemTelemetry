@@ -99,19 +99,20 @@ void ResolveNetworkSelection(TelemetryCollectorState& state) {
     if (tableStatus != NO_ERROR || table == nullptr) {
         state.trace_.Write(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) +
                             " table=" + tracing::Trace::BoolText(table != nullptr))
-                               .c_str());
+                .c_str());
         return;
     }
     state.trace_.Write(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) +
                         " entries=" + std::to_string(table->NumEntries))
-                           .c_str());
+            .c_str());
 
     ULONG addressBufferSize = 0;
     const ULONG addressProbeStatus = GetAdaptersAddresses(
         AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, nullptr, &addressBufferSize);
-    state.trace_.Write(("telemetry:network_ip_probe " + tracing::Trace::FormatWin32Status("status", addressProbeStatus) +
-                        " size=" + std::to_string(addressBufferSize))
-                           .c_str());
+    state.trace_.Write(
+        ("telemetry:network_ip_probe " + tracing::Trace::FormatWin32Status("status", addressProbeStatus) +
+            " size=" + std::to_string(addressBufferSize))
+            .c_str());
 
     std::vector<BYTE> addressBuffer;
     IP_ADAPTER_ADDRESSES* addresses = nullptr;
@@ -122,9 +123,10 @@ void ResolveNetworkSelection(TelemetryCollectorState& state) {
         addressFetchStatus = GetAdaptersAddresses(
             AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, addresses, &addressBufferSize);
     }
-    state.trace_.Write(("telemetry:network_ip_fetch " + tracing::Trace::FormatWin32Status("status", addressFetchStatus) +
-                        " size=" + std::to_string(addressBufferSize))
-                           .c_str());
+    state.trace_.Write(
+        ("telemetry:network_ip_fetch " + tracing::Trace::FormatWin32Status("status", addressFetchStatus) +
+            " size=" + std::to_string(addressBufferSize))
+            .c_str());
     if (addressFetchStatus != NO_ERROR) {
         addresses = nullptr;
     }
@@ -183,17 +185,16 @@ void ResolveNetworkSelection(TelemetryCollectorState& state) {
         const bool hardwareInterface = row.InterfaceAndOperStatusFlags.HardwareInterface != FALSE;
         const bool connectorPresent = row.InterfaceAndOperStatusFlags.ConnectorPresent != FALSE;
 
-        state.trace_.Write(("telemetry:network_candidate interface=" + std::to_string(row.InterfaceIndex) + " alias=\"" +
-                            Utf8FromWide(row.Alias) + "\" description=\"" + Utf8FromWide(row.Description) + "\"" +
-                            " exact_match=" + tracing::Trace::BoolText(configuredExactMatch) + " partial_match=" +
-                            tracing::Trace::BoolText(configuredPartialMatch) +
-                            " matched=" + tracing::Trace::BoolText(info.matched) + " has_ipv4=" +
-                            tracing::Trace::BoolText(info.hasIpv4) + " has_gateway=" +
-                            tracing::Trace::BoolText(info.hasGateway) + " hardware=" +
-                            tracing::Trace::BoolText(hardwareInterface) + " connector=" +
-                            tracing::Trace::BoolText(connectorPresent) + " traffic=" + std::to_string(traffic) +
-                            " ip=" + info.ipAddress)
-                               .c_str());
+        state.trace_.Write((
+            "telemetry:network_candidate interface=" + std::to_string(row.InterfaceIndex) + " alias=\"" +
+            Utf8FromWide(row.Alias) + "\" description=\"" + Utf8FromWide(row.Description) + "\"" +
+            " exact_match=" + tracing::Trace::BoolText(configuredExactMatch) + " partial_match=" +
+            tracing::Trace::BoolText(configuredPartialMatch) + " matched=" + tracing::Trace::BoolText(info.matched) +
+            " has_ipv4=" + tracing::Trace::BoolText(info.hasIpv4) + " has_gateway=" +
+            tracing::Trace::BoolText(info.hasGateway) + " hardware=" + tracing::Trace::BoolText(hardwareInterface) +
+            " connector=" + tracing::Trace::BoolText(connectorPresent) + " traffic=" + std::to_string(traffic) +
+            " ip=" + info.ipAddress)
+                .c_str());
 
         NetworkCandidateState candidateState;
         candidateState.interfaceIndex = row.InterfaceIndex;
@@ -249,13 +250,13 @@ void ResolveNetworkSelection(TelemetryCollectorState& state) {
     }
 
     if (selected != nullptr) {
-        state.trace_.Write(("telemetry:network_selected interface=" + std::to_string(selected->InterfaceIndex) +
-                            " alias=\"" + Utf8FromWide(selected->Alias) + "\" description=\"" +
-                            Utf8FromWide(selected->Description) + "\" has_ipv4=" +
-                            tracing::Trace::BoolText(selectedInfo.hasIpv4) + " has_gateway=" +
-                            tracing::Trace::BoolText(selectedInfo.hasGateway) + " traffic=" +
-                            std::to_string(selectedTraffic) + " ip=" + selectedInfo.ipAddress)
-                               .c_str());
+        state.trace_.Write(
+            ("telemetry:network_selected interface=" + std::to_string(selected->InterfaceIndex) + " alias=\"" +
+                Utf8FromWide(selected->Alias) + "\" description=\"" + Utf8FromWide(selected->Description) +
+                "\" has_ipv4=" + tracing::Trace::BoolText(selectedInfo.hasIpv4) +
+                " has_gateway=" + tracing::Trace::BoolText(selectedInfo.hasGateway) +
+                " traffic=" + std::to_string(selectedTraffic) + " ip=" + selectedInfo.ipAddress)
+                .c_str());
         state.snapshot_.network.adapterName =
             Utf8FromWide(selected->Alias[0] != L'\0' ? std::wstring_view(selected->Alias)
                                                      : std::wstring_view(selected->Description));
@@ -269,13 +270,15 @@ void ResolveNetworkSelection(TelemetryCollectorState& state) {
         if (selectedInfo.hasIpv4) {
             state.trace_.Write(("telemetry:network_ip_found interface=" + std::to_string(selected->InterfaceIndex) +
                                 " ip=" + selectedInfo.ipAddress)
-                                   .c_str());
+                    .c_str());
         } else {
-            state.trace_.Write(("telemetry:network_ip_missing interface=" + std::to_string(selected->InterfaceIndex)).c_str());
+            state.trace_.Write(
+                ("telemetry:network_ip_missing interface=" + std::to_string(selected->InterfaceIndex)).c_str());
         }
     } else {
-        state.snapshot_.network.adapterName =
-            state.settings_.selection.preferredAdapterName.empty() ? "Auto" : state.settings_.selection.preferredAdapterName;
+        state.snapshot_.network.adapterName = state.settings_.selection.preferredAdapterName.empty()
+                                                  ? "Auto"
+                                                  : state.settings_.selection.preferredAdapterName;
         state.snapshot_.network.ipAddress = "N/A";
         state.trace_.Write("telemetry:network_selected interface=none");
     }
@@ -299,7 +302,7 @@ void UpdateNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly) {
     if (tableStatus != NO_ERROR || table == nullptr) {
         state.trace_.Write(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) +
                             " table=" + tracing::Trace::BoolText(table != nullptr))
-                               .c_str());
+                .c_str());
         return;
     }
 
@@ -320,7 +323,7 @@ void UpdateNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly) {
         }
         state.trace_.Write(("telemetry:network_rates skipped=selection_missing interface=" +
                             std::to_string(state.network_.selectedIndex))
-                               .c_str());
+                .c_str());
         FreeMibTable(table);
         state.trace_.Write("telemetry:network_table_free status=done");
         return;
@@ -343,16 +346,16 @@ void UpdateNetworkMetrics(TelemetryCollectorState& state, bool initializeOnly) {
                 FiniteNonNegativeOr((static_cast<double>(inDelta) / seconds) / (1024.0 * 1024.0));
             state.snapshot_.network.uploadMbps =
                 FiniteNonNegativeOr((static_cast<double>(outDelta) / seconds) / (1024.0 * 1024.0));
-            state.retainedHistoryStore_.PushSample(state.snapshot_, "network.upload", state.snapshot_.network.uploadMbps);
+            state.retainedHistoryStore_.PushSample(
+                state.snapshot_, "network.upload", state.snapshot_.network.uploadMbps);
             state.retainedHistoryStore_.PushSample(
                 state.snapshot_, "network.download", state.snapshot_.network.downloadMbps);
-            state.trace_.Write(("telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
-                                " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) +
-                                " upload_mbps=" +
-                                tracing::Trace::FormatValueDouble("value", state.snapshot_.network.uploadMbps, 3) +
-                                " download_mbps=" +
-                                tracing::Trace::FormatValueDouble("value", state.snapshot_.network.downloadMbps, 3))
-                                   .c_str());
+            state.trace_.Write((
+                "telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
+                " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) +
+                " upload_mbps=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.network.uploadMbps, 3) +
+                " download_mbps=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.network.downloadMbps, 3))
+                    .c_str());
         } else {
             state.snapshot_.network.uploadMbps = 0.0;
             state.snapshot_.network.downloadMbps = 0.0;

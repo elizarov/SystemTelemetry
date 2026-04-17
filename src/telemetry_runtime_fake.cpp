@@ -53,9 +53,10 @@ ResolvedNetworkCandidate ResolveConfiguredNetworkCandidate(
         return resolved;
     }
 
-    const auto exactIt = std::find_if(availableCandidates.begin(), availableCandidates.end(), [&](const auto& candidate) {
-        return !configuredAdapterName.empty() && EqualsInsensitive(candidate.adapterName, configuredAdapterName);
-    });
+    const auto exactIt =
+        std::find_if(availableCandidates.begin(), availableCandidates.end(), [&](const auto& candidate) {
+            return !configuredAdapterName.empty() && EqualsInsensitive(candidate.adapterName, configuredAdapterName);
+        });
     if (exactIt != availableCandidates.end()) {
         resolved.adapterName = exactIt->adapterName;
         resolved.ipAddress = exactIt->ipAddress;

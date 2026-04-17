@@ -74,9 +74,9 @@ void ReconfigureBoardCollector(TelemetryCollectorState& state, const BoardTeleme
 void UpdateBoardMetrics(TelemetryCollectorState& state) {
     if (state.board_.provider != nullptr) {
         ApplyBoardVendorSample(state, state.board_.provider->Sample());
-        state.trace_.Write("telemetry:board_vendor_sample provider=" + state.board_.providerName + " available=" +
-                           tracing::Trace::BoolText(state.board_.providerAvailable) + " diagnostics=\"" +
-                           state.board_.providerDiagnostics + "\"");
+        state.trace_.Write("telemetry:board_vendor_sample provider=" + state.board_.providerName +
+                           " available=" + tracing::Trace::BoolText(state.board_.providerAvailable) +
+                           " diagnostics=\"" + state.board_.providerDiagnostics + "\"");
     }
     state.retainedHistoryStore_.PushBoardMetricSamples(state.snapshot_);
 }
