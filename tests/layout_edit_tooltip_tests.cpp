@@ -252,6 +252,10 @@ TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
         GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardRowGap),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardColumnGap),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::CardHeaderContentGap));
+    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardRowGap),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::CardHeaderContentGap));
     EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::DashboardColumnGap),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::MetricListRowGap));
 }

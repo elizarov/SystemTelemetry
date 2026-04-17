@@ -17,12 +17,12 @@
     X(CardRadius, CardStyleConfig::cardRadiusMeta)                                                                     \
     X(CardBorder, CardStyleConfig::cardBorderWidthMeta)                                                                \
     X(CardHeaderIconSize, CardStyleConfig::headerIconSizeMeta)                                                         \
+    X(CardRowGap, CardStyleConfig::rowGapMeta)                                                                         \
+    X(CardColumnGap, CardStyleConfig::columnGapMeta)                                                                   \
     /* Card style guides */                                                                                            \
     X(CardPadding, CardStyleConfig::cardPaddingMeta)                                                                   \
     X(CardHeaderIconGap, CardStyleConfig::headerIconGapMeta)                                                           \
     X(CardHeaderContentGap, CardStyleConfig::headerContentGapMeta)                                                     \
-    X(CardRowGap, CardStyleConfig::rowGapMeta)                                                                         \
-    X(CardColumnGap, CardStyleConfig::columnGapMeta)                                                                   \
     /* Dashboard guides */                                                                                             \
     X(DashboardOuterMargin, DashboardSectionConfig::outerMarginMeta)                                                   \
     X(DashboardRowGap, DashboardSectionConfig::rowGapMeta)                                                             \
