@@ -116,62 +116,6 @@ bool IsKnownBenchmarkName(const std::string& name) {
     return IsEditLayoutBenchmarkName(name) || IsUpdateTelemetryBenchmarkName(name);
 }
 
-SystemSnapshot BuildSyntheticSnapshot(const AppConfig& config) {
-    SystemSnapshot snapshot;
-    snapshot.cpu.name = "AMD Ryzen 7";
-    snapshot.cpu.loadPercent = 63.0;
-    snapshot.cpu.clock = ScalarMetric{4.85, ScalarMetricUnit::Gigahertz};
-    snapshot.cpu.memory = MemoryMetric{18.5, 32.0};
-    snapshot.gpu.name = "Radeon RX";
-    snapshot.gpu.loadPercent = 58.0;
-    snapshot.gpu.temperature = ScalarMetric{67.0, ScalarMetricUnit::Celsius};
-    snapshot.gpu.clock = ScalarMetric{2480.0, ScalarMetricUnit::Megahertz};
-    snapshot.gpu.fan = ScalarMetric{1580.0, ScalarMetricUnit::Rpm};
-    snapshot.gpu.vram = MemoryMetric{8.4, 16.0};
-    snapshot.network.adapterName = "Ethernet";
-    snapshot.network.ipAddress = "192.168.1.20";
-    snapshot.network.uploadMbps = 78.0;
-    snapshot.network.downloadMbps = 312.0;
-    snapshot.storage.readMbps = 420.0;
-    snapshot.storage.writeMbps = 155.0;
-    GetLocalTime(&snapshot.now);
-
-    snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{74.0, ScalarMetricUnit::Celsius}});
-    snapshot.boardTemperatures.push_back({"vrm", ScalarMetric{61.0, ScalarMetricUnit::Celsius}});
-    snapshot.boardFans.push_back({"system", ScalarMetric{890.0, ScalarMetricUnit::Rpm}});
-
-    const auto addHistory = [&](const std::string& ref, double base, double amplitude, double period) {
-        RetainedHistorySeries series;
-        series.seriesRef = ref;
-        for (int i = 0; i < 120; ++i) {
-            const double phase = static_cast<double>(i) / period;
-            series.samples.push_back((std::max)(0.0, base + std::sin(phase) * amplitude));
-        }
-        snapshot.retainedHistoryIndexByRef.emplace(series.seriesRef, snapshot.retainedHistories.size());
-        snapshot.retainedHistories.push_back(std::move(series));
-    };
-    addHistory("cpu.load", 55.0, 18.0, 5.5);
-    addHistory("gpu.load", 48.0, 22.0, 6.5);
-    addHistory("network.upload", 55.0, 25.0, 4.0);
-    addHistory("network.download", 220.0, 95.0, 4.5);
-    addHistory("storage.read", 300.0, 140.0, 3.8);
-    addHistory("storage.write", 120.0, 45.0, 3.2);
-
-    for (size_t i = 0; i < config.storage.drives.size(); ++i) {
-        DriveInfo drive;
-        drive.label = config.storage.drives[i] + ":";
-        drive.volumeLabel = "Data";
-        drive.totalGb = 1907.0;
-        drive.usedPercent = 42.0 + static_cast<double>((i * 11) % 37);
-        drive.freeGb = drive.totalGb * (100.0 - drive.usedPercent) / 100.0;
-        drive.readMbps = 35.0 + static_cast<double>(i * 9);
-        drive.writeMbps = 18.0 + static_cast<double>(i * 7);
-        drive.driveType = DRIVE_FIXED;
-        snapshot.drives.push_back(std::move(drive));
-    }
-    return snapshot;
-}
-
 DiagnosticsOptions BenchmarkDiagnosticsOptions() {
     DiagnosticsOptions options;
     options.trace = true;
@@ -180,6 +124,19 @@ DiagnosticsOptions BenchmarkDiagnosticsOptions() {
 
 std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config) {
     const DiagnosticsOptions options = BenchmarkDiagnosticsOptions();
+    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, std::filesystem::current_path());
+    if (telemetry == nullptr) {
+        return nullptr;
+    }
+    if (!telemetry->Initialize(ExtractTelemetrySettings(config), nullptr)) {
+        return nullptr;
+    }
+    return telemetry;
+}
+
+std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const AppConfig& config) {
+    DiagnosticsOptions options;
+    options.fake = true;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, std::filesystem::current_path());
     if (telemetry == nullptr) {
         return nullptr;
@@ -524,9 +481,15 @@ int main(int argc, char** argv) {
 
     if (benchmarkName == "edit-layout") {
         const AppConfig config = LoadConfig(SourceConfigPath(), false);
-        SystemSnapshot snapshot = BuildSyntheticSnapshot(config);
-        BenchmarkHost host(config, renderScale);
-        host.SetSnapshot(snapshot);
+        std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config);
+        if (telemetry == nullptr) {
+            std::cerr << "fake telemetry init failed\n";
+            return 1;
+        }
+
+        const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+        BenchmarkHost host(runtimeConfig, renderScale);
+        host.SetSnapshot(telemetry->Snapshot());
         if (!host.Initialize()) {
             std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
             return 1;
@@ -539,7 +502,7 @@ int main(int argc, char** argv) {
         }
 
         const LayoutEditHost::LayoutTarget target = LayoutEditHost::LayoutTarget::ForGuide(*guide);
-        const LayoutNodeConfig* node = FindGuideNode(config, target);
+        const LayoutNodeConfig* node = FindGuideNode(runtimeConfig, target);
         const std::vector<int> initialWeights = SeedGuideWeights(*guide, node);
         const std::vector<std::vector<int>> weightSequence = BuildWeightSequence(initialWeights, iterations);
         if (weightSequence.empty()) {

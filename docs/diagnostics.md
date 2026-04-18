@@ -11,7 +11,7 @@ This document is the single maintained source of truth for diagnostics command b
 - `/save-full-config[:path]` writes a full embedded-template-shaped INI export to `telemetry_full_config.ini` in the current working directory, or to the optional target path.
 - `/reload` forces a config reload through the live-dashboard reload path before headless diagnostics outputs are exported.
 - `/exit` runs diagnostics as a one-shot headless export path instead of starting the dashboard UI.
-- `/fake[:path]` replaces live telemetry collection with periodic reads from `telemetry_fake.txt` in the current working directory, or from the optional fake dump path.
+- `/fake[:path]` replaces live telemetry collection with the built-in synthetic telemetry baseline when no path is supplied, or with periodic reads from the optional fake dump path when a path is supplied.
 - `/layout:<name>` overrides `display.layout` for the current process so diagnostics can validate a named layout without editing `config.ini`.
 - `/default-config` suppresses loading the executable-side `config.ini` overlay and uses only the embedded `resources/config.ini` defaults for the current process.
 - `/blank` switches screenshot rendering into a blank background mode that keeps static dashboard chrome and static text such as CPU and GPU names while omitting dynamic metric text, time, date, plots, leaders, peak ghosts, gauge fill, and drive activity or usage fill.
@@ -25,12 +25,12 @@ This document is the single maintained source of truth for diagnostics command b
 
 - Without an explicit path, `/trace`, `/dump`, `/screenshot`, `/save-config`, and `/save-full-config` write in the current working directory using their default filenames.
 - With an explicit path, each switch writes the same content format to that requested path instead of the default file.
-- Without an explicit path, `/fake` reads `telemetry_fake.txt` from the current working directory.
-- With an explicit path, `/fake` reads that requested dump file instead of the default fake file.
+- Without an explicit path, `/fake` uses the built-in synthetic telemetry baseline and does not read any fake dump file.
+- With an explicit path, `/fake` reads that requested dump file.
 - Relative diagnostics paths resolve from the current working directory.
 - The UI `Diagnostics` submenu uses a standard Save dialog and defaults `Save full config to...`, `Save dump to...`, and `Save screenshot to...` to the current working directory with the same default file names used by `/save-full-config`, `/dump`, and `/screenshot`.
 - Trace output appends plain UTF-8 text without a BOM and uses the prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
-- Dump output overwrites with a stable text format that can be copied directly into the default fake file or a `/fake` target file.
+- Dump output overwrites with a stable text format that can be copied directly into a `/fake:<path>` target file.
 - Screenshot output overwrites with only the rendered dashboard PNG.
 - `/save-config` overwrites with only the changed live values relative to the target file's loaded config state.
 - `/save-full-config` overwrites with the full embedded-template line structure updated to the live config values.
@@ -45,7 +45,8 @@ This document is the single maintained source of truth for diagnostics command b
 - With `/scale:<value>`, the application replaces the loaded `display.scale` value for the process lifetime, including live UI sizing, `/reload` diagnostics runs, and screenshot exports.
 - Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported PNGs reflect the live scale, text, and widget rendering instead of a separate bitmap-only renderer or fallback export path.
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
-- With `/fake`, the application skips live telemetry providers, loads the selected fake dump file immediately, and reloads it once per second while the process runs.
+- With `/fake` and no explicit path, the application skips live telemetry providers and uses the built-in synthetic telemetry baseline directly from code.
+- With `/fake:<path>`, the application skips live telemetry providers, loads that selected fake dump file immediately, and reloads it once per second while the process runs.
 - With `/blank`, the application keeps the normal layout, panel chrome, card headers, CPU and GPU names, drive labels, and empty chart or bar tracks while suppressing dynamic metric rendering.
 - `/edit-layout` diagnostics outputs always include the resolved container guides, while widget-local guides appear only when the live UI is hovering a supported widget or when `/edit-layout:<widget-name>` forces one supported widget type.
 - `/edit-layout:<widget-name>` fails the screenshot export when the requested widget type does not exist in the active layout.
@@ -57,7 +58,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Trace lines for telemetry or vendor API calls should include returned status or result codes plus key sampled values that help explain missing metrics or failures.
 - Diagnostics output failures such as trace, dump, screenshot, or config-export file-open or write failures must be written to the trace before any error dialog is shown.
 - When `/trace` is enabled, diagnostics failures prefer trace logging over modal UI and complete with a failure exit code.
-- Required `/fake` load failures follow that same rule so `/fake /exit` returns promptly with trace output.
+- Required `/fake:<path>` load failures follow that same rule so `/fake:<path> /exit` returns promptly with trace output.
 - When the renderer initializes under `/trace`, the trace also includes measured font heights, computed layout heights, and resolved widget and card rectangles.
 - While interactive layout editing runs under `/trace`, each started drag writes one `layout_edit_drag:start` marker that identifies the drag kind and edit target, the matching drag end writes one `layout_edit_drag:end` marker with total drag time plus averaged `snap`, `apply`, `paint_total`, and `paint_draw` timings for the phases that ran during that drag, and high-volume per-frame `renderer:*` trace lines stay suppressed for the drag duration so the summary stays readable and the trace itself does not dominate drag timing.
 - While the unified edit dialog runs under `/trace`, tree selection, right-pane control population, live preview attempts, and color-picker open/return/apply paths write `layout_edit_dialog:*` markers that include the selected node location, focus key, raw control text, parsed values, and apply success so dialog-state races can be reconstructed from the trace.
@@ -105,5 +106,5 @@ This document is the single maintained source of truth for diagnostics command b
 - Verify actionable hit priority through an `/edit-layout` UI run by hovering the gauge `segment_count` diamond where it overlaps the outer ring handle, hovering a text anchor near any nearby widget-local guide, and hovering throughput `leader_diameter`, `plot_stroke_width`, and `guide_stroke_width` circles near other editable chrome, and confirm the highest-priority actionable handle wins before widget-local guides, widget-local guides win before the gauge ring circles, and container split guides stay last.
 - Verify headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit` and `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit` when validating size-ruler grouping and numbering, and inspect the trace for consecutive `renderer:layout_similarity_group` ordinals that match the visible rulers.
 - When `/scale:<value>` is involved, confirm the screenshot uses the expected overridden scale-derived pixel dimensions while preserving the same logical composition.
-- For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm that editing the selected fake file changes the next one-second refresh without touching live providers, and verify one run with `/fake:custom_fake.txt`.
+- For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm the built-in synthetic telemetry produces a rich dashboard without touching live providers, and verify one run with `/fake:custom_fake.txt` where editing that selected fake file changes the next one-second refresh.
 - Verify `/blank /fake` fails before startup.
