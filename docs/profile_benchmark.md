@@ -33,28 +33,28 @@ This file records the current benchmark baselines, the latest confirmed hotspots
   - `apply avg_ms=0.12` to `0.13`
   - `paint_draw avg_ms=2.17` to `2.35`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=10.90` to `12.01`
-  - `telemetry_update avg_ms=8.90` to `9.97`
-  - `paint_total avg_ms=2.00` to `2.04`
-  - `paint_draw avg_ms=2.00` to `2.04`
+  - `update_loop per_iter_ms=7.75` to `7.99`
+  - `telemetry_update avg_ms=5.58` to `5.93`
+  - `paint_total avg_ms=2.06` to `2.18`
+  - `paint_draw avg_ms=2.06` to `2.18`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The exported WPA text still does not surface stable named renderer functions for the benchmark process, but the latest daemon-backed capture under `build\profile_benchmark_daemon\requests\16679_1816_23669\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `amdxx64.dll`, `d3d11.dll`, `DWrite.dll`, `win32kfull.sys`, `WindowsCodecs.dll`, and `TextShaping.dll`.
-- The latest fixed-text capture keeps the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape that the earlier full-D2D validation captures showed, so replacing the last GDI+ icon decode and scale path did not move the hot work away from the current frame stack.
-- `GdiPlus.dll` no longer appears in the benchmark-process module list after the panel-icon path moved fully onto WIC plus Direct2D upload.
-- No new dominant benchmark-process hotspot stands out in app-owned code; the named app-side call-tree frames that still resolve stay under the same renderer-driven frame and continue to center on `DashboardRenderer::DrawWindow`, `DashboardRenderer::DrawDirect2DFrame`, and `DashboardRenderer::EndDirect2DDraw`.
-- The fast benchmark reruns stay consistent enough that the draw-path win is real even though the coarse text export no longer pinpoints the remaining app-side leaves by symbol.
+- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\25566_17198_5736\` keeps the benchmark-process inclusive module weight centered on `PDH.DLL`, `clr.dll`, `amdxx64.dll`, `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, and smaller remaining `iphlpapi.dll` work.
+- The uncached capture restores a clearly collector-bound split: `TelemetryCollector::UpdateSnapshot()` stays more than twice the repaint cost on this machine.
+- `PDH.DLL` remains the clearest steady-state collector hotspot, with the Gigabyte CLR-backed board provider and the AMD vendor GPU provider immediately behind it in the current no-cache benchmark shape.
+- The Direct2D and DirectWrite frame is still the dominant repaint cost, but it is no longer the main limiter for `update-telemetry`.
+- The fast direct reruns and the daemon-backed capture agree closely enough that the uncached collector cost is real even though the exported text view still does not fully resolve every app-owned leaf by symbol.
 
 Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the split shows `TelemetryCollector::UpdateSnapshot()` dominating the steady-state refresh at roughly four to five times the repaint cost on this machine.
-- Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `5.58` to `5.93 ms` in `TelemetryCollector::UpdateSnapshot()` versus `2.06` to `2.18 ms` in repaint on this machine.
+- Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
 ## Kept Optimizations
 
@@ -85,6 +85,19 @@ These changes produced real wins and remain in the codebase:
   - `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=10.90`, `telemetry_update avg_ms=8.90`, and `paint_draw avg_ms=2.00`.
 - Conclusion:
   - The earlier repaint-bound result came from a synthetic snapshot-mutation loop and does not describe the real app path. With the real collector in place, steady-state telemetry refresh is collector-bound on this tree, so future `update-telemetry` wins should focus on `TelemetryCollector::UpdateSnapshot()` and its provider work before chasing another millisecond out of repaint.
+
+### Hypothesis: Cache slow-changing collector inputs and narrow the per-refresh network query path
+
+- Change:
+  - Reuse board-vendor and GPU-vendor samples for one second, reuse per-drive capacity and free-space metadata for five seconds while still refreshing storage throughput each tick, and replace the per-refresh `GetIfTable2` walk in steady-state network updates with `GetIfEntry2` against the already selected adapter.
+- Result:
+  - Helped materially, but was backed out.
+- Observed effect:
+  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=10.08`, `telemetry_update avg_ms=8.06`, and `paint_draw avg_ms=2.02`.
+  - After the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=4.17`, `telemetry_update avg_ms=2.34`, and `paint_draw avg_ms=1.83`.
+  - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=4.41`, `telemetry_update avg_ms=2.42`, and `paint_draw avg_ms=2.00`.
+- Conclusion:
+  - The cache-backed version proves those sources are expensive, but the current benchmark intentionally leaves board, GPU-vendor, and drive metadata uncached so steady-state profiles keep stressing the full telemetry path and expose which source is intrinsically slow.
 
 ### Hypothesis: Avoid full config copies during snap probing
 
@@ -498,6 +511,6 @@ These changes produced real wins and remain in the codebase:
 
 ## Validation Notes
 
-- Keep the benchmark comparison on the same command line: `build\SystemTelemetryBenchmarks.exe 240 2`.
-- Use `profile_benchmark.cmd 240 2` directly for profiling validation; it rebuilds automatically through the daemon workflow.
+- Keep the benchmark comparison on the same command line shape: `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` or `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`.
+- Use `profile_benchmark.cmd update-telemetry 240 2` or `profile_benchmark.cmd edit-layout 240 2` directly for profiling validation; it rebuilds automatically through the daemon workflow.
 - If an experiment regresses, revert it and record the result here before finishing.

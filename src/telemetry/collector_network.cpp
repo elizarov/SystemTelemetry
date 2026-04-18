@@ -296,26 +296,18 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
         return;
     }
 
-    PMIB_IF_TABLE2 table = nullptr;
-    const DWORD tableStatus = GetIfTable2(&table);
-    if (tableStatus != NO_ERROR || table == nullptr) {
-        state.trace_.Write(("telemetry:network_table " + tracing::Trace::FormatWin32Status("status", tableStatus) +
-                            " table=" + tracing::Trace::BoolText(table != nullptr))
+    MIB_IF_ROW2 selected{};
+    selected.InterfaceIndex = state.network_.selectedIndex;
+    const DWORD rowStatus = GetIfEntry2(&selected);
+    if (rowStatus != NO_ERROR) {
+        state.trace_.Write(("telemetry:network_row " + tracing::Trace::FormatWin32Status("status", rowStatus) +
+                            " interface=" + std::to_string(state.network_.selectedIndex))
                 .c_str());
         return;
     }
 
     const auto now = std::chrono::steady_clock::now();
-    MIB_IF_ROW2* selected = nullptr;
-    for (ULONG i = 0; i < table->NumEntries; ++i) {
-        auto& row = table->Table[i];
-        if (row.InterfaceIndex == state.network_.selectedIndex) {
-            selected = &row;
-            break;
-        }
-    }
-
-    if (selected == nullptr || selected->OperStatus != IfOperStatusUp) {
+    if (selected.OperStatus != IfOperStatusUp) {
         if (!initializeOnly) {
             state.snapshot_.network.uploadMbps = 0.0;
             state.snapshot_.network.downloadMbps = 0.0;
@@ -323,8 +315,6 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
         state.trace_.Write(("telemetry:network_rates skipped=selection_missing interface=" +
                             std::to_string(state.network_.selectedIndex))
                 .c_str());
-        FreeMibTable(table);
-        state.trace_.Write("telemetry:network_table_free status=done");
         return;
     }
 
@@ -335,11 +325,11 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
     if (!initializeOnly && state.network_.previousTick.time_since_epoch().count() != 0) {
         const double seconds = std::chrono::duration<double>(now - state.network_.previousTick).count();
         if (IsFiniteDouble(seconds) && seconds > 0.0) {
-            const uint64_t inDelta = selected->InOctets >= state.network_.previousInOctets
-                                         ? (selected->InOctets - state.network_.previousInOctets)
+            const uint64_t inDelta = selected.InOctets >= state.network_.previousInOctets
+                                         ? (selected.InOctets - state.network_.previousInOctets)
                                          : 0;
-            const uint64_t outDelta = selected->OutOctets >= state.network_.previousOutOctets
-                                          ? (selected->OutOctets - state.network_.previousOutOctets)
+            const uint64_t outDelta = selected.OutOctets >= state.network_.previousOutOctets
+                                          ? (selected.OutOctets - state.network_.previousOutOctets)
                                           : 0;
             state.snapshot_.network.downloadMbps =
                 FiniteNonNegativeOr((static_cast<double>(inDelta) / seconds) / (1024.0 * 1024.0));
@@ -350,7 +340,7 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
             state.retainedHistoryStore_.PushSample(
                 state.snapshot_, "network.download", state.snapshot_.network.downloadMbps);
             state.trace_.Write((
-                "telemetry:network_rates interface=" + std::to_string(selected->InterfaceIndex) +
+                "telemetry:network_rates interface=" + std::to_string(selected.InterfaceIndex) +
                 " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) +
                 " upload_mbps=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.network.uploadMbps, 3) +
                 " download_mbps=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.network.downloadMbps, 3))
@@ -361,9 +351,7 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
         }
     }
 
-    state.network_.previousInOctets = selected->InOctets;
-    state.network_.previousOutOctets = selected->OutOctets;
+    state.network_.previousInOctets = selected.InOctets;
+    state.network_.previousOutOctets = selected.OutOctets;
     state.network_.previousTick = now;
-    FreeMibTable(table);
-    state.trace_.Write("telemetry:network_table_free status=done");
 }
