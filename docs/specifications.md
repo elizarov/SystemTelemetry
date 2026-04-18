@@ -21,7 +21,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - `Save Full Config To...` exports a full config in the embedded-template shape with live values filled in.
 - Save and export omit runtime-only placeholder metric metadata such as `nothing`, even when metric-list bindings still reference that placeholder id.
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
-- `Save Config` persists live placement, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session.
+- `Save Config` persists live placement, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
 - `Config To Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `telemetry_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
 
 ## Dashboard Composition And Rendering
@@ -60,13 +60,13 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 ## Layout-Edit Behavior
 
 - `Edit layout` toggles interactive layout-edit mode from the popup menu, and the command line can also start the dashboard in that mode for live UI or screenshot diagnostics.
-- Layout-edit mode stays active across move mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Config To Display` completes successfully.
+- Layout-edit mode stays active across move mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Config To Display` completes successfully.
 - While layout-edit mode is active, the renderer shows container guides, the hovered widget outline, supported widget-local guides, and matching edit cursors.
 - Hovering actionable text, card chrome, bars, metric rows, reorder handles, or widget-local geometry exposes the matching highlight and edit affordance for that target class.
 - While the editor window is above the dashboard, selecting a tree node also highlights the matching split guide, widget guide, gap anchor, or text anchor for that config target, and shared gap or ring-stroke targets add the matching widget, card, or dashboard outline.
 - Hovering actionable targets also shows a standard Win32 tooltip whose first line matches the edited config shape and whose second line uses the shared localized description for that target.
 - Right-clicking an actionable target prepends one focused `Edit ...` action for that exact target.
-- The modeless `Edit Configuration` window stays separate from the dashboard window, exposes a config-ordered tree plus a live editor pane, previews valid edits immediately, and keeps only the current edit session inside its save or discard boundary.
+- The modeless `Edit Configuration` window stays separate from the dashboard window, exposes a config-ordered tree plus a live editor pane, previews valid edits immediately, keeps only the current edit session inside its save or discard boundary, and reopens at its last user-moved on-screen position.
 - Bringing the `Edit Configuration` window to the foreground also raises the dashboard directly behind it in Z-order so the editor and dashboard stay visually paired.
 - The editor supports filtering, per-field revert, config-local descriptions, and specialized editors for numeric values, fonts, colors, metrics, weight pairs, and metric-list row ordering.
 - Metric leaves whose ids begin with `board.temp.` or `board.fan.` also expose a live `Binding` selector for the matching board-sensor mapping.
@@ -75,7 +75,8 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Metric-list widgets support row reorder handles and add-row affordances.
 - Gauge, throughput, metric-list, drive-usage, text, card-chrome, dashboard-spacing, and container-split targets all stay editable through the shared layout-edit interaction model rather than through one-off editors.
 - While the editor window is above the dashboard, covered dashboard regions stay mouse-transparent to the editor and suppress dashboard hover, tooltip, and cursor updates for those covered points.
-- Closing the editor window or turning off layout-edit mode uses the shared unsaved-session prompt with save, discard, and cancel outcomes.
+- Closing the editor window closes only the modeless editor window, clears any tree-selection highlight from the dashboard, and keeps layout-edit mode active.
+- Turning off layout-edit mode uses the shared unsaved-session prompt with save, discard, and cancel outcomes.
 - Turning off layout-edit mode, exiting the app, or reloading config while the edit session is dirty always gives the user an explicit save-or-discard choice before destructive loss of the edit-session state.
 
 ## Telemetry And Content Behavior

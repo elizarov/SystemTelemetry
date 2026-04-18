@@ -77,7 +77,7 @@ BEGIN
     LTEXT           "", IDC_LAYOUT_EDIT_HINT, 198, 176, 210, 18
     LTEXT           "", IDC_LAYOUT_EDIT_STATUS_TEXT, 186, 214, 154, 12
     PUSHBUTTON      "Revert Field", IDC_LAYOUT_EDIT_REVERT, 346, 212, 76, 14
-    LTEXT           "Changes preview live. Close this window or turn off Edit layout to save or discard the session.", IDC_LAYOUT_EDIT_FOOTER_HINT, 186, 236, 206, 18
+    LTEXT           "Changes preview live. Closing this window keeps Edit layout active. Use Save Config or turn off Edit layout to finish the session.", IDC_LAYOUT_EDIT_FOOTER_HINT, 186, 236, 206, 18
 END
 
 IDD_UNSAVED_LAYOUT_EDIT DIALOGEX 0, 0, 220, 84

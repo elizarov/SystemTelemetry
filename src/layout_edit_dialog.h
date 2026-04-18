@@ -72,11 +72,14 @@ private:
     void BringToFront();
     void PositionWindow(HWND hwnd) const;
     void ApplySelectionHighlightVisibility();
+    void ClearSelectionHighlight();
+    void RememberWindowPlacement(HWND hwnd);
     void HandleDestroyed(HWND hwnd);
 
     LayoutEditDialogHost& host_;
     HWND hwnd_ = nullptr;
     std::unique_ptr<LayoutEditDialogState> state_;
     std::optional<LayoutEditSelectionHighlight> selectionHighlight_;
+    std::optional<RECT> savedWindowRect_;
     bool selectionHighlightVisible_ = false;
 };

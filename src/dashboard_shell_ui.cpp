@@ -648,7 +648,7 @@ public:
     }
 
     void OnLayoutEditDialogCloseRequested() override {
-        shellUi_.HandleEditLayoutToggle();
+        shellUi_.DestroyLayoutEditDialogWindow();
     }
 
 private:
@@ -1091,7 +1091,11 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
             break;
         case kCommandSaveConfig:
             if (app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
-                RefreshLayoutEditDialogSelection();
+                if (state.isEditingLayout) {
+                    StopLayoutEditSession(UnsavedLayoutEditPrompt::StopEditing);
+                } else {
+                    RefreshLayoutEditDialogSelection();
+                }
             }
             break;
         case kCommandAutoStart:

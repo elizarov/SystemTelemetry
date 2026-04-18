@@ -40,6 +40,38 @@ bool LayoutEditDialog::IsForegroundWindow() const {
     return foreground != nullptr && (foreground == hwnd_ || IsChild(hwnd_, foreground));
 }
 
+namespace {
+
+RECT ClampWindowRectToWorkArea(const RECT& desiredRect, const RECT& workArea) {
+    const int width = desiredRect.right - desiredRect.left;
+    const int height = desiredRect.bottom - desiredRect.top;
+    const int minLeft = static_cast<int>(workArea.left);
+    const int maxLeft = std::max(minLeft, static_cast<int>(workArea.right) - width);
+    const int minTop = static_cast<int>(workArea.top);
+    const int maxTop = std::max(minTop, static_cast<int>(workArea.bottom) - height);
+
+    RECT clamped = desiredRect;
+    clamped.left = static_cast<LONG>(std::clamp(static_cast<int>(desiredRect.left), minLeft, maxLeft));
+    clamped.top = static_cast<LONG>(std::clamp(static_cast<int>(desiredRect.top), minTop, maxTop));
+    clamped.right = clamped.left + width;
+    clamped.bottom = clamped.top + height;
+    return clamped;
+}
+
+bool TryGetMonitorWorkAreaForRect(const RECT& rect, RECT* workArea) {
+    if (workArea == nullptr) {
+        return false;
+    }
+
+    MONITORINFO monitorInfo{};
+    monitorInfo.cbSize = sizeof(monitorInfo);
+    const HMONITOR monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+    return monitor != nullptr && GetMonitorInfoW(monitor, &monitorInfo) != FALSE &&
+           (*workArea = monitorInfo.rcWork, true);
+}
+
+} // namespace
+
 void LayoutEditDialog::BringToFront() {
     if (hwnd_ == nullptr || !IsWindow(hwnd_)) {
         return;
@@ -55,21 +87,46 @@ void LayoutEditDialog::BringToFront() {
 }
 
 void LayoutEditDialog::PositionWindow(HWND hwnd) const {
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    RECT windowRect{};
+    if (!GetWindowRect(hwnd, &windowRect)) {
+        return;
+    }
+
+    if (savedWindowRect_.has_value()) {
+        RECT desiredRect = *savedWindowRect_;
+        desiredRect.right = desiredRect.left + (windowRect.right - windowRect.left);
+        desiredRect.bottom = desiredRect.top + (windowRect.bottom - windowRect.top);
+
+        RECT workArea{};
+        if (TryGetMonitorWorkAreaForRect(desiredRect, &workArea)) {
+            const RECT clampedRect = ClampWindowRectToWorkArea(desiredRect, workArea);
+            SetWindowPos(hwnd,
+                nullptr,
+                clampedRect.left,
+                clampedRect.top,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            return;
+        }
+    }
+
     const HWND anchorHwnd = host_.LayoutEditDialogAnchorWindow();
-    if (anchorHwnd == nullptr || hwnd == nullptr) {
+    if (anchorHwnd == nullptr) {
         return;
     }
 
     RECT anchorRect{};
-    RECT windowRect{};
-    if (!GetWindowRect(anchorHwnd, &anchorRect) || !GetWindowRect(hwnd, &windowRect)) {
+    if (!GetWindowRect(anchorHwnd, &anchorRect)) {
         return;
     }
 
-    MONITORINFO monitorInfo{};
-    monitorInfo.cbSize = sizeof(monitorInfo);
-    const HMONITOR monitor = MonitorFromWindow(anchorHwnd, MONITOR_DEFAULTTONEAREST);
-    if (!GetMonitorInfoW(monitor, &monitorInfo)) {
+    RECT anchorWorkArea{};
+    if (!TryGetMonitorWorkAreaForRect(anchorRect, &anchorWorkArea)) {
         return;
     }
 
@@ -77,18 +134,20 @@ void LayoutEditDialog::PositionWindow(HWND hwnd) const {
     const int height = windowRect.bottom - windowRect.top;
     const int gap = ScaleLogicalToPhysical(16, host_.LayoutEditDialogAnchorDpi());
     int left = anchorRect.right + gap;
-    if (left + width > monitorInfo.rcWork.right) {
+    if (left + width > anchorWorkArea.right) {
         left = anchorRect.left - gap - width;
     }
     int top = anchorRect.top;
 
-    const int minLeft = static_cast<int>(monitorInfo.rcWork.left);
-    const int maxLeft = std::max(minLeft, static_cast<int>(monitorInfo.rcWork.right) - width);
-    const int minTop = static_cast<int>(monitorInfo.rcWork.top);
-    const int maxTop = std::max(minTop, static_cast<int>(monitorInfo.rcWork.bottom) - height);
-    left = std::clamp(left, minLeft, maxLeft);
-    top = std::clamp(top, minTop, maxTop);
-    SetWindowPos(hwnd, nullptr, left, top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    RECT desiredRect{left, top, left + width, top + height};
+    RECT workArea{};
+    if (!TryGetMonitorWorkAreaForRect(desiredRect, &workArea)) {
+        return;
+    }
+
+    const RECT clampedRect = ClampWindowRectToWorkArea(desiredRect, workArea);
+    SetWindowPos(
+        hwnd, nullptr, clampedRect.left, clampedRect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void LayoutEditDialog::UpdateSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) {
@@ -100,6 +159,12 @@ void LayoutEditDialog::ApplySelectionHighlightVisibility() {
     host_.UpdateLayoutEditSelectionHighlight(selectionHighlightVisible_ ? selectionHighlight_ : std::nullopt);
 }
 
+void LayoutEditDialog::ClearSelectionHighlight() {
+    selectionHighlightVisible_ = false;
+    selectionHighlight_.reset();
+    host_.UpdateLayoutEditSelectionHighlight(std::nullopt);
+}
+
 void LayoutEditDialog::SetSelectionHighlightVisible(bool visible) {
     if (selectionHighlightVisible_ == visible) {
         return;
@@ -109,26 +174,36 @@ void LayoutEditDialog::SetSelectionHighlightVisible(bool visible) {
     ApplySelectionHighlightVisibility();
 }
 
+void LayoutEditDialog::RememberWindowPlacement(HWND hwnd) {
+    if (hwnd == nullptr || !IsWindow(hwnd)) {
+        return;
+    }
+
+    RECT rect{};
+    if (GetWindowRect(hwnd, &rect) != FALSE) {
+        savedWindowRect_ = rect;
+    }
+}
+
 void LayoutEditDialog::HandleDestroyed(HWND hwnd) {
+    RememberWindowPlacement(hwnd);
     if (hwnd_ == hwnd) {
         hwnd_ = nullptr;
     }
-    selectionHighlightVisible_ = false;
-    selectionHighlight_.reset();
-    host_.UpdateLayoutEditSelectionHighlight(std::nullopt);
+    ClearSelectionHighlight();
     state_.reset();
 }
 
 void LayoutEditDialog::Close() {
     if (hwnd_ == nullptr) {
-        UpdateSelectionHighlight(std::nullopt);
+        ClearSelectionHighlight();
         return;
     }
 
     HWND dialog = hwnd_;
-    hwnd_ = nullptr;
+    RememberWindowPlacement(dialog);
+    ClearSelectionHighlight();
     DestroyWindow(dialog);
-    UpdateSelectionHighlight(std::nullopt);
 }
 
 bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey, bool bringToFront) {
@@ -287,6 +362,12 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
             state->dialog->HandleDestroyed(hwnd);
         }
         return FALSE;
+    }
+
+    if (message == WM_MOVE) {
+        if (auto* state = DialogStateFromWindow(hwnd); state != nullptr && !IsIconic(hwnd)) {
+            state->dialog->RememberWindowPlacement(hwnd);
+        }
     }
 
     if (const auto handled = HandleLayoutEditDialogProcMessage(hwnd, message, wParam, lParam); handled.has_value()) {
