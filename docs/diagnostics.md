@@ -10,7 +10,7 @@ This document is the single maintained source of truth for diagnostics command b
 - `/save-config[:path]` writes a minimal INI overlay to `telemetry_config.ini` in the current working directory, or to the optional target path.
 - `/save-full-config[:path]` writes a full embedded-template-shaped INI export to `telemetry_full_config.ini` in the current working directory, or to the optional target path.
 - `/reload` forces a config reload through the live-dashboard reload path before headless diagnostics outputs are exported.
-- `/exit` runs diagnostics as a one-shot headless export path instead of starting the dashboard UI.
+- `/exit` runs diagnostics as a one-shot headless export path and does not start the dashboard UI.
 - `/fake[:path]` replaces live telemetry collection with the built-in synthetic telemetry baseline when no path is supplied, or with periodic reads from the optional fake dump path when a path is supplied.
 - `/layout:<name>` overrides `display.layout` for the current process so diagnostics can validate a named layout without editing `config.ini`.
 - `/default-config` suppresses loading the executable-side `config.ini` overlay and uses only the embedded `resources/config.ini` defaults for the current process.
@@ -24,7 +24,7 @@ This document is the single maintained source of truth for diagnostics command b
 ## Output files
 
 - Without an explicit path, `/trace`, `/dump`, `/screenshot`, `/save-config`, and `/save-full-config` write in the current working directory using their default filenames.
-- With an explicit path, each switch writes the same content format to that requested path instead of the default file.
+- With an explicit path, each switch writes the same content format to that requested path.
 - Without an explicit path, `/fake` uses the built-in synthetic telemetry baseline and does not read any fake dump file.
 - With an explicit path, `/fake` reads that requested dump file.
 - Relative diagnostics paths resolve from the current working directory.
@@ -43,7 +43,7 @@ This document is the single maintained source of truth for diagnostics command b
 - With `/default-config`, the application skips the executable-side `config.ini` overlay and keeps only the embedded default config for startup and `/reload` diagnostics runs.
 - With `/layout:<name>`, the application applies that named layout after loading `config.ini` and keeps that override active for the process lifetime, including `/reload` diagnostics runs.
 - With `/scale:<value>`, the application replaces the loaded `display.scale` value for the process lifetime, including live UI sizing, `/reload` diagnostics runs, and screenshot exports.
-- Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported PNGs reflect the live scale, text, and widget rendering instead of a separate bitmap-only renderer or fallback export path.
+- Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported PNGs reflect the live scale, text, and widget rendering.
 - With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
 - With `/fake` and no explicit path, the application skips live telemetry providers and uses the built-in synthetic telemetry baseline directly from code.
 - With `/fake:<path>`, the application skips live telemetry providers, loads that selected fake dump file immediately, and reloads it once per second while the process runs.
@@ -69,7 +69,7 @@ This document is the single maintained source of truth for diagnostics command b
 - Retained histories in the dump store raw sampled values in native runtime units, and the current dump format version is `system_telemetry_snapshot_v8`.
 - The dump schema reflects the runtime snapshot model directly and includes only fields that the runtime loads and renders.
 - Dump scalar-unit fields accept and emit only the snapshot model's canonical tokens: the empty string plus `C`, `GHz`, `MHz`, and `RPM`, even when the live dashboard displays different unit strings from `[metrics]`.
-- Provider diagnostics and provider-specific debug details stay in trace output instead of being duplicated into the dump schema.
+- Provider diagnostics and provider-specific debug details stay in trace output and do not appear in the dump schema.
 
 ## Single-instance behavior
 

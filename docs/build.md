@@ -52,7 +52,7 @@ Diagnostics validation commands and output expectations are documented in [docs/
 
 ### AMD GPU metrics
 
-AMD GPU metrics come from AMD's ADLX runtime instead of LibreHardwareMonitor or OpenHardwareMonitor.
+AMD GPU metrics come from AMD's ADLX runtime.
 On supported Radeon systems, this is typically installed with current AMD graphics drivers and provides GPU temperature, clock, and fan speed directly from AMD's API.
 
 If AMD GPU metrics are missing:
