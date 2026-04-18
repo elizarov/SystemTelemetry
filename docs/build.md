@@ -1,6 +1,7 @@
-# Build and development
+# Build And Development
 
-This document is the single maintained source of truth for build prerequisites, build invocation, and developer-facing setup notes.
+This document owns build prerequisites, developer setup, build and test commands, install flow, and developer entrypoint scripts.
+See also: [docs/project.md](project.md) for repository policy, [docs/diagnostics.md](diagnostics.md) for diagnostics validation commands, and [docs/architecture.md](architecture.md) for subsystem and build-graph structure.
 
 ## Requirements
 
@@ -8,66 +9,73 @@ This document is the single maintained source of truth for build prerequisites, 
 - Visual Studio 2026 Insiders (`18`) Build Tools with CMake support
 - Visual Studio 2026 Insiders (`18`) C++/CLI support
 - .NET Framework 4.8 SDK
-- vcpkg available either through the active Visual Studio developer environment or through a local install pointed to by `VCPKG_ROOT`, so the CMake configure step can resolve the repo manifest dependency on GoogleTest
-- AMD Software: Adrenalin Edition with ADLX runtime available for AMD GPU telemetry
-- Gigabyte SIV installed on supported Gigabyte motherboards when board temperature and fan telemetry are desired
+- vcpkg available either through the active Visual Studio developer environment or through `VCPKG_ROOT`
+- AMD Software: Adrenalin Edition when AMD GPU telemetry is required
+- Gigabyte SIV installed when Gigabyte board temperature or fan telemetry is required
 
 ## Current Toolchain
 
-- `devenv.cmd` currently activates the Visual Studio 2026 Insiders (`18`) x64 developer environment.
-- The active build compiler is MSVC `19.51.36231` for `x64`.
+- `devenv.cmd` activates the Visual Studio 2026 Insiders (`18`) x64 developer environment.
+- The active native compiler is MSVC `19.51.36231` for `x64`.
 - The active LLVM tools are `clang-format` `20.1.8` and `clang-tidy` `20.1.8`.
 - The active CMake executable in that environment is `4.2.3-msvc3`.
 
 ## Build
 
-Always build with `build.cmd` from the repository root:
+Always build through the repository entrypoint:
 
 ```bat
 build.cmd
 ```
 
-All build artifacts are kept under `build\`, except for the persistent repo-root `vcpkg\` manifest install tree that is intentionally kept outside `build\` so deleting `build\` for a clean configure does not force vcpkg to restore the GoogleTest dependency again.
-`build.cmd` configures the CMake tree with `Ninja Multi-Config`, prefers the active developer environment's bundled vcpkg toolchain when `VSINSTALLDIR` provides it, otherwise falls back to `%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake`, directs that toolchain's manifest-mode configure step to install the repo `vcpkg.json` dependency set for the `x64-windows` triplet into `vcpkg\`, and restores `build\cmake\compile_commands.json` for `clangd`-based editors such as Zed.
+`build.cmd` configures and builds the maintained CMake tree under `build\cmake\`, keeps the final executable under `build\`, preserves the repo-root `vcpkg\` manifest install tree across clean builds, and restores `build\cmake\compile_commands.json` for `clangd`-based editors.
 
-## Install
+## Test
 
-Install the already-built runtime with `install.cmd` from the repository root:
-
-```bat
-install.cmd
-```
-
-`install.cmd` requests elevation, stops any running `SystemTelemetry.exe` instances across user sessions, waits for those processes to exit, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and does not run `build.cmd` on its own.
-
-Run unit tests from the generated CMake tree after a successful build:
+Run unit tests after a successful build:
 
 ```bat
 ctest --test-dir build\cmake -C Release --output-on-failure
 ```
 
-Diagnostics validation commands and output expectations are documented in [docs/diagnostics.md](diagnostics.md).
+Diagnostics validation commands live in [docs/diagnostics.md](diagnostics.md).
 
-## Telemetry provider notes
+## Install
 
-### AMD GPU metrics
+Install the already-built runtime through the repository entrypoint:
 
-AMD GPU metrics come from AMD's ADLX runtime.
-On supported Radeon systems, this is typically installed with current AMD graphics drivers and provides GPU temperature, clock, and fan speed directly from AMD's API.
+```bat
+install.cmd
+```
+
+`install.cmd` requests elevation, stops running `SystemTelemetry.exe` instances, waits for them to exit, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and leaves auto-start registration to the runtime menu toggle.
+
+## Developer Tooling Entrypoints
+
+- `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources.
+- `lint.cmd` is the maintained entrypoint for architecture checks, include-path checks, header-body checks, and optional `clang-tidy` runs.
+- `profile_benchmark.cmd` is the maintained entrypoint for elevated benchmark profiling and daemon-backed benchmark requests.
+- `devenv.cmd` is the maintained environment bootstrap for local builds and tool runs.
+
+## Provider Notes
+
+### AMD GPU telemetry
+
+AMD GPU metrics come from the ADLX runtime installed with current Radeon drivers.
 
 If AMD GPU metrics are missing:
 
-1. Install or update AMD Software: Adrenalin Edition for your Radeon GPU.
+1. Install or update AMD Software: Adrenalin Edition.
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
-3. Run `build\SystemTelemetry.exe /dump`.
-4. Check `telemetry_dump.txt` and `telemetry_trace.txt` in the command's working directory for the final snapshot and step-by-step provider diagnostics.
+3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
+4. Inspect the exported dump and trace outputs for the provider state on that machine.
 
-### Gigabyte board metrics
+### Gigabyte board telemetry
 
-On supported Gigabyte systems, named board temperature and fan telemetry come from the app's in-process Gigabyte SIV integration, which loads the installed SIV .NET assemblies directly from native C++ code.
+Gigabyte board metrics come from the in-process SIV integration that loads the installed vendor assemblies.
 
-If those board metrics are missing:
+If board metrics are missing:
 
-1. Install Gigabyte SIV so its assemblies are present and registered.
-2. Run `build\SystemTelemetry.exe /trace /dump /exit`.
-3. Check `telemetry_dump.txt` for the rendered `board.*` metric values and `telemetry_trace.txt` for the `gigabyte_siv:*` trace lines and provider diagnostics.
+1. Install Gigabyte SIV.
+2. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
+3. Inspect the dump for `board.*` values and the trace for `gigabyte_siv:*` diagnostics.

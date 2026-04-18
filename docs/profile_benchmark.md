@@ -1,8 +1,11 @@
 # Profile Benchmark Log
 
+This document owns benchmark workflow, current baselines, confirmed hotspots, and experiment history.
+See also: [docs/build.md](build.md) for build and tooling entrypoints and [docs/architecture.md](architecture.md) for subsystem structure.
+
 ## Purpose
 
-This file records the current benchmark baselines, the latest confirmed hotspots, and the optimization hypotheses that have already been tested. Keep it current after benchmark or profiling work so future experiments can build on prior results instead of repeating failed ideas.
+This file records the current benchmark baselines, latest confirmed hotspots, and tested optimization hypotheses so future profiling work can build on prior results instead of repeating failed ideas.
 
 ## Benchmark Workflow
 
@@ -13,7 +16,6 @@ This file records the current benchmark baselines, the latest confirmed hotspots
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
 - Daemon-backed and one-shot elevated runs persist the benchmark stdout in the request directory and replay it in the caller window after the request finishes, so the requesting shell sees the same timing lines that the elevated process produced.
-- `profile_benchmark.cmd` rebuilds automatically through the daemon path, so profiling runs do not need a separate preceding `build.cmd` step.
 - Treat direct `build\SystemTelemetryBenchmarks.exe <benchmark> 240 2` runs as the fast comparison loop and the WPR profile as hotspot validation.
 
 ## Current Known Baseline

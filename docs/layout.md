@@ -1,266 +1,64 @@
-# System Telemetry layout language specification
+# System Telemetry Layout Language
 
-## Overview
+This document owns the config language, section ownership, syntax, and validation rules.
+See also: [resources/config.ini](../resources/config.ini) for the maintained shipped example and entry spellings, [docs/specifications.md](specifications.md) for runtime behavior, and [docs/diagnostics.md](diagnostics.md) for diagnostics-only switches and workflows.
 
-`config.ini` uses a compact INI-based layout language.
-This document is the single maintained source of truth for the language syntax, section ownership, and inline examples, while [resources/config.ini](../resources/config.ini) is the single maintained source of truth for the shipped configuration shape and entry spellings.
+## Purpose And Scope
 
-### Static behavior
+`config.ini` uses a compact INI-based language that selects runtime targets, defines metric presentation, and describes the static dashboard layout. The runtime loads one active named layout at a time and resolves card and widget coordinates from config during load or reload rather than from live telemetry values.
 
-The language is static:
+## Compact Rules
 
-- layout is loaded from config
-- the active named layout is selected by `display.layout`
-- coordinates are computed during config load or reload
-- rendering uses those precomputed coordinates until the next reload
+- Section names, keys, layout identifiers, card ids, widget names, icon names, and metric ids are case-sensitive.
+- Size pairs use `x,y`.
+- Font specs use `face,size,weight`.
+- Composite metric definitions use `<scale>,<unit>,<label>`.
+- Container weights use `name:weight` or `name:weight(...)`.
+- Omitted weights default to `1`.
+- Widget parameters are written inline as `widget(...)`.
+- Whitespace around commas is ignored.
 
-### Dashboard focus
+## Section Ownership
 
-The language is centered around the dashboard shape:
+The language is divided by responsibility:
 
-- the dashboard-level `cards` layout places cards through generic containers
-- cards contain a small static composition of known widget kinds
-- card layouts may also reference another card id as a reusable sub-layout node
+- Widget sections own widget-local geometry: `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, and `[layout_editor]`.
+- Runtime selection sections own runtime target choice: `[display]`, `[network]`, and `[storage]`.
+- `[board]` owns logical board-metric to provider-sensor bindings.
+- `[metrics]` owns metric presentation and normalization definitions.
+- `[layout.<name>]` owns named dashboard geometry and top-level card placement.
+- `[dashboard]` owns outer dashboard spacing.
+- `[card_style]` owns shared card chrome and in-card spacing.
+- `[colors]` owns the shared palette.
+- `[fonts]` owns the shared font roles.
+- `[card.<id>]` owns card-local title, icon, and inner layout composition.
 
-## Compact rules
+`resources/config.ini` remains the maintained source for the shipped section set and concrete key spellings.
 
-- weights are written as `name:weight(...)` or `name:weight`
-- layout containers are written as `kind(...)`
-- size pairs are written as `x,y`
-- font specs are written as `face,size,weight`
-- widget parameters are written inline as `widget(metric.ref)`
-- omitted weights default to `1`
-- whitespace around commas is ignored
+## Runtime Sections
 
-## Structure
+`[display]` selects the target monitor, active named layout, wallpaper, placement, and optional explicit render scale.
 
-The language has ten levels:
+`[network]` selects the preferred runtime adapter.
 
-1. Widget-specific sizing sections such as `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, and `[network_footer]`
-2. Runtime selection sections such as `[display]`, `[network]`, and `[storage]`
-3. Board sensor mapping in `[board]`
-4. Metric presentation and normalization definitions in `[metrics]`
-5. Named dashboard structure sections in `[layout.<name>]`
-6. Shared dashboard outer spacing in `[dashboard]`
-7. Shared card chrome and inner spacing in `[card_style]`
-8. Shared dashboard palette in `[colors]`
-9. Shared dashboard fonts in `[fonts]`
-10. Card-local title, icon, and content composition in `[card.<id>]`
+`[storage]` selects the drive letters to show in the drive-usage list. An empty drive selection means the runtime resolves all currently available fixed drives.
 
-## Runtime selection sections
+`[board]` maps logical metric ids in the `board.temp.*` and `board.fan.*` families to provider-specific sensor names.
 
-`[display]` owns executable-relative display selection and placement settings:
+`[metrics]` defines the display registry used by bound widgets:
 
-- `monitor_name = ...`
-- `layout = ...`
-- `wallpaper = ...`
-- `position = x,y`
+- Format: `metric.id = <scale>,<unit>,<label>`
+- `*` scale means the widget normalizes against telemetry-provided scale data.
+- Display style is metadata-owned for the metric id and is not a config field.
+- The shipped registry includes generally available dashboard metrics plus the placeholder `nothing` entry.
+- Throughput widgets and drive-usage rows read their displayed labels and units from this registry rather than from widget-local text.
 
-`[network]` owns runtime adapter selection:
+## Containers, Widgets, And Parameters
 
-- `adapter_name = ...`
-
-`[storage]` owns runtime storage-drive selection:
-
-- `drives =`
-
-`[board]` owns the mapping from logical layout metric names to board-specific sensor names:
-
-- `board.temp.<name> = sensor name`
-- `board.fan.<name> = sensor name`
-- In the unified layout-edit metric editor, `board.temp.*` and `board.fan.*` metric leaves also expose a `Binding` dropdown that edits this `[board]` mapping by listing the currently available board sensor names for the matching family.
-
-`[metrics]` owns the metric ids that `metric_list(...)` and `gauge(...)` bind:
-
-- `metric.id = <scale>,<unit>,<label>`
-- `*` as the scale means the renderer normalizes that metric against telemetry-provided scale data such as load percent or total RAM/VRAM capacity
-- Supported metric styles are `percent`, `scalar`, `memory`, `throughput`, `size_auto`, and `label_only`
-- `percent` owns percent text formatting, `memory` owns `used / total <unit>`, `throughput` owns `<value> <unit>`, `size_auto` owns the drive-free `GB|TB` switch, and `label_only` reserves only configured label text
-- `throughput(...)` reads its displayed label and value unit text from the matching `[metrics]` entry, and `drive_usage_list` reads its `R`, `W`, `Usage`, `Free`, percent text, and free-space units from dedicated `[metrics]` entries
-- The serialized metric `style` token comes from built-in metric metadata for that metric id; only scale, unit, and label are config-owned values.
-
-## Widget sections
-
-Widget-specific sizing lives in dedicated sections named exactly after the widget.
-
-Supported widget geometry keys:
-
-- `[metric_list]`: `label_width`, `bar_height`, `row_gap`
-- `[drive_usage_list]`: `label_gap`, `activity_width`, `rw_gap`, `bar_gap`, `percent_gap`, `free_width`, `bar_height`, `header_gap`, `row_gap`, `activity_segments`, `activity_segment_gap`
-- `[throughput]`: `header_gap`, `axis_padding`, `guide_stroke_width`, `plot_stroke_width`, `leader_diameter`
-- `[gauge]`: `outer_padding`, `ring_thickness`, `sweep_degrees`, `segment_count`, `segment_gap_degrees`, `value_bottom`, `label_bottom`
-- `[text]`: `bottom_gap`
-- `[network_footer]`: `bottom_gap`
-
-`[layout_editor]` owns interactive layout-edit affordance tuning:
-
-- `size_similarity_threshold`
-
-## Dashboard sections
-
-Each `[layout.<name>]` section owns only one named dashboard size and card-placement layout.
-
-Supported `[layout.<name>]` keys:
-
-- `description = popup label suffix`
-- `window = width,height`
-- `cards = rows(columns:weight(card:weight,...), ...)`
-
-`[dashboard]` owns the outer dashboard spacing:
-
-- `outer_margin = pixels`
-- `row_gap = pixels`
-- `column_gap = pixels`
-
-`[card_style]` owns shared card chrome and internal spacing:
-
-- `card_padding = pixels`
-- `card_radius = pixels`
-- `card_border = pixels`
-- `header_icon_size = pixels`
-- `header_icon_gap = pixels`
-- `header_content_gap = pixels`
-- `row_gap = pixels`
-- `column_gap = pixels`
-
-Card headers size themselves from the larger of the configured header icon size and the measured title text height. `header_content_gap` applies only when the card renders a title or icon header.
-
-Config sections, config keys, card ids, container names, widget names, icon names, and metric references are case-sensitive and must use their documented spelling exactly.
-Undocumented key spellings and metric aliases are invalid.
-
-Example:
-
-- `[layout.5x3]`
-- `description = 5" 800x480 screen`
-- `cards = rows(columns:3(cpu,gpu), columns:2(network:4,storage:9,time:3))`
-
-`[colors]` owns the shared dashboard palette and uses `#RRGGBB`:
-
-- `background_color`
-- `foreground_color`
-- `accent_color`
-- `layout_guide_color`
-- `active_edit_color`
-- `panel_border_color`
-- `muted_text_color`
-- `track_color`
-- `panel_fill_color`
-- `graph_background_color`
-- `graph_axis_color`
-- `graph_marker_color`
-
-`[fonts]` owns the shared dashboard fonts:
-
-- `title = face,size,weight`
-- `big = face,size,weight`
-- `value = face,size,weight`
-- `label = face,size,weight`
-- `text = face,size,weight`
-- `small = face,size,weight`
-- `footer = face,size,weight`
-- `clock_time = face,size,weight`
-- `clock_date = face,size,weight`
-
-## Card sections
-
-Each card section uses:
-
-- `title = ...` when the card shows a header title
-- `icon = ...` when the card shows a header icon
-- `layout = ...`
-
-When both `title` and `icon` are omitted, the card has no header and the card content starts after the card padding.
-
-Card layouts may reference another card id as a leaf layout node when they want to reuse that card's inner layout:
-
-- `layout = columns(storage_throughput:5, storage_usage:7)`
-
-Recommended section names:
-
-- `[card.cpu]`
-- `[card.gpu]`
-- `[card.network]`
-- `[card.storage]`
-- `[card.time]`
-
-Future cards follow the same pattern:
-
-- `[card.memory]`
-- `[card.board]`
-- `[card.weather]`
-
-## Icon names
-
-`icon` values are resource names, not file paths.
-
-Supported icon names:
-
-- `cpu`
-- `gpu`
-- `network`
-- `storage`
-- `time`
-
-Mixed-case icon spellings such as `CPU` or `Network` are invalid.
-
-## Layout expressions
-
-Supported layout kinds:
+Supported container kinds:
 
 - `rows(...)`
 - `columns(...)`
-
-### Meaning
-
-- `rows(...)` splits content vertically into weighted children, with child weights written as `child:weight`
-- `columns(...)` splits content horizontally into weighted children, with child weights written as `child:weight`
-
-`metric_list(...)` rows use a computed row height of `value_font_height + [metric_list].row_gap + [metric_list].bar_height`, then center the stacked value text and bar inside that row band with no internal gap.
-`drive_usage_list(...)` uses a header height of `small_font_height + [drive_usage_list].header_gap`, then rows use a computed row height of `max(label_font_height,small_font_height,[drive_usage_list].bar_height) + [drive_usage_list].row_gap`.
-`text(...)` uses a preferred height of `text_font_height + [text].bottom_gap`.
-`network_footer` uses a preferred height of `footer_font_height + [network_footer].bottom_gap`.
-`vertical_spacer(widget_name)` uses the preferred height of the referenced widget type.
-`clock_time` uses a preferred height of `clock_time_font_height`.
-`clock_date` uses a preferred height of `clock_date_font_height`.
-`throughput(...)` uses a preferred height of `small_font_height + [throughput].header_gap + small_font_height`.
-Throughput header labels use their actual rendered text width at draw time.
-Drive label width and drive percent width are measured from the configured fonts at layout load.
-Throughput axis width is measured from the configured fonts at layout load, then widened by `[throughput].axis_padding`.
-
-Nested layout expressions are allowed.
-Inside a `[card.<id>]` layout, a leaf identifier that matches another card id is a card-layout reference and resolves to that referenced card's layout during layout resolution.
-In a vertical `rows(...)` container, fixed-height direct children such as `text`, `network_footer`, and `vertical_spacer(...)` keep their preferred height and the remaining space goes to flexible siblings when no `vertical_spring` is present.
-When one or more direct `vertical_spring` children are present in `rows(...)`, every spring absorbs the remaining height before weighted stretching and multiple springs divide that height by weight.
-Interactive layout editing always exposes the container guides for `rows(...)` and `columns(...)`, reseeds dragged container weights from the current resolved child extents, snaps to the nearest same-type exact-size group as soon as the similarity ruler threshold is reached by iteratively re-evaluating nested weighted layouts, lets `Alt` temporarily bypass that snap and continue free dragging, then saves the updated integer weights back into the same `name:weight(...)` expression structure.
-The dashboard layout always shows one horizontal top-left anchor for `[dashboard].outer_margin` plus at most one `row_gap` gap anchor and one `column_gap` gap anchor on the first encountered rendered `rows(...)` and `columns(...)` containers, using `[dashboard].row_gap` or `[dashboard].column_gap`.
-When the pointer hovers the top band of a card in layout-edit mode, up to the top edge of the content area, the renderer shows that card's shared `[card_style]` guides and anchors.
-When the pointer is anywhere inside a rendered card in layout-edit mode, that card shows at most one `row_gap` gap anchor and one `column_gap` gap anchor on the first encountered rendered `rows(...)` and `columns(...)` containers inside the card, using `[card_style].row_gap` or `[card_style].column_gap`.
-`[card_style].card_padding` exposes a horizontal guide at the top inner edge of the card padding band.
-`[card_style].card_radius` exposes a square anchor at the top-left rounded-corner tangent point.
-`[card_style].card_border` exposes a circular radial size anchor centered on the top card border.
-Hovering a card header icon exposes a dotted icon highlight plus a square upper-right anchor for `[card_style].header_icon_size`.
-`[card_style].header_icon_gap` exposes a vertical guide at the start of the card title text when the card renders both an icon and title.
-`[card_style].header_content_gap` exposes a horizontal guide at the top edge of the card content area when the card renders a header.
-`row_gap` gap anchors render as vertical lines on the left edge of the topmost rendered gap with T-caps at both ends and a square drag handle at the bottom end; dragging that handle down increases the gap.
-`column_gap` gap anchors render as horizontal lines on the top edge of the leftmost rendered gap with T-caps at both ends and a square drag handle at the right end; dragging that handle right increases the gap.
-`outer_margin` renders as a horizontal gap anchor in the top-left window corner, spanning from the left window edge to the dashboard content left edge at the dashboard content top edge, and dragging its right-end handle right increases the margin.
-When the pointer hovers a non-empty widget in layout-edit mode, the renderer outlines that widget's resolved box and shows any widget-local size guides that widget supports.
-`metric_list(...)` exposes a vertical guide for `[metric_list].label_width` at the label/value split.
-`metric_list(...)` also exposes horizontal guides after each visible non-empty row for `[metric_list].row_gap`.
-`throughput(...)` exposes a vertical guide for `[throughput].axis_padding` at the graph's left plot edge so the scale gutter can be widened or narrowed live.
-`throughput(...)` also exposes a horizontal guide for `[throughput].header_gap` at the boundary between the value header row and the graph body.
-`throughput(...)` also exposes circular radial size anchors for `[throughput].leader_diameter` at the middle of the plot's right edge, `[throughput].plot_stroke_width` at the middle of the plot's left edge, and `[throughput].guide_stroke_width` on a centered horizontal guide line whose center stays fixed while the stroke width changes; each anchor circle renders slightly larger than the edited size and dragging it in any direction resizes that throughput chrome from the pointer distance to the anchor center.
-`gauge(...)` also exposes concentric circular radial size anchors centered on the gauge, with the outer circle editing `[gauge].outer_padding` and the inner circle editing `[gauge].ring_thickness`.
-Dragging the `gauge` `segment_gap_degrees` guide and the `drive_usage_list` `activity_segment_gap` guide clamps those edits against the current live geometry, while later layout resolution still keeps every segment drawable if another config change or a loaded file leaves a larger saved gap behind.
-`drive_usage_list(...)` exposes vertical guides for `[drive_usage_list].label_gap` at the left edge of the `R` activity column, `[drive_usage_list].rw_gap` at the left edge of the `W` activity column, `[drive_usage_list].bar_gap` at the left edge of the usage bar, `[drive_usage_list].percent_gap` at the right edge of the usage bar, `[drive_usage_list].activity_width` at the right edge of the `W` activity column, and `[drive_usage_list].free_width` on the free-space column, plus horizontal guides for `[drive_usage_list].activity_segment_gap` at the top edge of the lowermost read/write segment, `[drive_usage_list].header_gap` below the header band, and `[drive_usage_list].row_gap` after each visible non-empty row.
-`drive_usage_list(...)` also exposes a diamond anchor centered on the top edge of the read/write activity band so `[drive_usage_list].activity_segments` can be dragged live in either axis.
-
-Example:
-
-- `columns(rows:5(throughput:4(storage.read),throughput:4(storage.write)), rows:7(drive_usage_list,vertical_spring))`
-- `columns(storage_throughput:5, storage_usage:7)`
-
-## Widget names
 
 Supported widget names:
 
@@ -275,132 +73,74 @@ Supported widget names:
 - `clock_time`
 - `clock_date`
 
-Legacy widget aliases are not supported. Bind telemetry through the documented generic widget names and explicit parameters, for example `text(cpu.name)`, `gauge(cpu.load)`, or `throughput(network.upload)`.
-Mixed-case widget or container spellings such as `Throughput(...)` or `Columns(...)` are invalid.
+Supported icon names:
 
-## Widget parameters
+- `cpu`
+- `gpu`
+- `network`
+- `storage`
+- `time`
 
-- Widgets may bind data inline.
-- For widgets that accept a list, the plain comma-separated body is passed through as that widget's parameter string.
-- `metric_list(...)` and `gauge(...)` bind metric ids declared in `[metrics]`.
+Card sections use:
 
-Examples:
+- `title = ...`
+- `icon = ...`
+- `layout = ...`
 
-- `text(cpu.name)`
-- `gauge(gpu.load)`
-- `metric_list(cpu.ram,board.temp.cpu,cpu.clock,board.fan.cpu,board.fan.system)`
-- `throughput(network.upload)`
-- `drive_usage_list`
-- `vertical_spacer(network_footer)`
+Card layouts may reference another card id as a leaf node to reuse that card's inner composition.
 
-`vertical_spacer(widget_name)` reserves the referenced widget's vertical layout space without drawing content.
-`vertical_spring` draws nothing and absorbs remaining height inside a vertical `rows(...)` container.
+Widget parameter rules:
 
-Supported metric references include:
+- `text(...)`, `gauge(...)`, and `throughput(...)` bind one metric id.
+- `metric_list(...)` binds a comma-separated list of metric ids.
+- `drive_usage_list`, `clock_time`, `clock_date`, and `vertical_spring` take no inline parameter payload.
+- `vertical_spacer(widget_name)` reserves the preferred height of the referenced widget type without drawing content.
 
-- `cpu.name`
-- `cpu.load`
-- `cpu.clock`
-- `cpu.ram`
-- `board.temp.cpu`
-- `board.fan.cpu`
-- `board.fan.system`
-- `gpu.name`
-- `gpu.load`
-- `gpu.temp`
-- `gpu.clock`
-- `gpu.fan`
-- `gpu.vram`
-- `network.upload`
-- `network.download`
-- `storage.read`
-- `storage.write`
-- `drive.activity.read`
-- `drive.activity.write`
-- `drive.usage`
-- `drive.free`
+Supported metric ids include built-in CPU, GPU, network, storage, drive, and placeholder metrics plus configured `board.temp.*` and `board.fan.*` logical metrics.
 
-## Drive and sensor selection
+## Static Sizing Rules
 
-Runtime storage-drive selection lives in `[storage]`, while board-sensor selection comes from layout metric references.
+The language defines static layout behavior rather than live interaction behavior:
 
-Example:
+- Named layouts resolve one dashboard window size plus a top-level `cards` composition.
+- Dashboard spacing belongs only in `[dashboard]`.
+- Shared card chrome and in-card spacing belong only in `[card_style]`.
+- Shared visual styling belongs only in `[colors]` and `[fonts]`.
+- Card sections define relative composition only: title, icon, layout tree, widget bindings, and child weights.
+- Metric-list row height derives from measured fonts plus `[metric_list]` bar and gap settings.
+- Drive-usage header and row heights derive from measured fonts plus `[drive_usage_list]` geometry settings.
+- `text(...)` and `network_footer` preferred heights derive from their font roles plus their bottom-gap settings.
+- `clock_time` and `clock_date` preferred heights derive directly from their dedicated font roles.
+- `throughput(...)` preferred height derives from the measured header row, configured header gap, and measured plot-label band.
+- Gauge preferred height derives from gauge geometry plus measured gauge text metrics.
+- `vertical_spacer(widget_name)` mirrors the preferred height of the referenced widget type.
+- In `rows(...)`, fixed-height direct children keep their preferred height and the remaining height goes to flexible siblings.
+- `vertical_spring` absorbs the remaining height in `rows(...)` and divides it by weight across multiple springs.
+- Layout resolution uses live-independent geometry; telemetry values do not change preferred size decisions.
 
-- `[storage]`
-- `drives =`
-- `[metrics]`
-- `cpu.ram = *,GB,RAM`
-- `board.temp.cpu = 100,°C,Temp`
-- `board.fan.cpu = scalar,3000,RPM,CPU Fan`
-- `board.fan.system = scalar,3000,RPM,System Fan`
-- `drive.activity.read = *,,R`
-- `drive.activity.write = *,,W`
-- `drive.usage = percent,100,%,Usage`
-- `drive.free = *,GB|TB,Free`
-- `metric_list(cpu.ram,board.temp.cpu,board.fan.cpu,board.fan.system)`
+## Validation Rules
 
-- `[storage] drives` defines the vertical drive-usage list contents and order.
-- An empty `[storage] drives` value means the storage telemetry selection flow auto-selects all currently available fixed drives.
-- Layout metric references define which logical board temperature and fan metrics are requested from the board provider.
-- The `[board]` section maps those logical metric names to the board-specific sensor names that the provider looks up.
+- Every dashboard and container weight must be positive.
+- Every referenced card id in the active layout must have a matching `[card.<id>]` section.
+- Every icon name must resolve to a supported embedded resource name.
+- Every widget or container name must use a supported canonical token.
+- Only documented spellings are valid for keys, section families, widget names, icon names, and metric ids.
+- Overlaying executable-side config replaces named-layout and card-layout expressions instead of duplicating them.
 
-## Consistency rules
+## Minimal Example
 
-Shared absolute geometry belongs only in `[layout]`, including:
+```ini
+[display]
+layout = 5x3
 
-- window size
-- cards layout tree
+[layout.5x3]
+window = 800,480
+cards = rows(columns:3(cpu,gpu), columns:2(network:4,storage:9,time:3))
 
-Shared dashboard spacing belongs only in `[dashboard]`, including:
+[card.cpu]
+title = CPU
+icon = cpu
+layout = columns(gauge(cpu.load), metric_list(cpu.ram,board.temp.cpu,cpu.clock,board.fan.cpu))
+```
 
-- margins
-- row and column gaps
-
-Shared card chrome and inner spacing belong only in `[card_style]`, including:
-
-- border radius and border width
-- card padding
-- measured header size, icon size, and icon gap
-- header-to-content spacing when a card renders a header
-- column gap
-- `row_gap`
-
-Shared visual styling belongs only in:
-
-- colors in `[colors]`
-- fonts in `[fonts]`
-
-Card sections define relative structure only:
-
-- card title
-- card icon
-- layout expression
-- widget parameters
-- relative child weights using the `name:weight(...)` form
-
-## Static sizing rules
-
-Layout is resolved without using live telemetry values.
-
-Static sizing rules:
-
-- header height comes from config
-- metric rows and drive rows derive their packed heights from measured font metrics plus their configured bar heights and vertical gaps
-- drive-usage widgets reserve a dedicated header row and use fixed-width read/write activity columns from `[drive_usage_list]`
-- widget-specific heights, paddings, widths, segment counts, and gauge/throughput chrome come from their matching widget sections, while fixed text columns, text-widget preferred heights, footer preferred heights, `vertical_spacer(...)` mirrored preferred heights, and clock preferred heights derive directly from their documented measured font metrics plus their matching documented padding where applicable
-- throughput sections follow the configured vertical rhythm
-- centered time/date layouts use `rows(vertical_spring, ..., vertical_spring)` so springs balance the surrounding free space
-- repeated lists such as drives divide their assigned area using the item count from config
-
-## Validation rules
-
-- every dashboard container weight must be positive
-- every card referenced from `cards` must have a matching `[card.<id>]` section
-- every icon name must resolve to a supported embedded resource
-- every widget name must resolve to a supported hard-coded widget kind
-
-## Reference
-
-See [resources/config.ini](../resources/config.ini) for the maintained example of the
-language in use. That file is the single source of truth for the checked-in layout shape and supported
-spelling of the shipped configuration.
+See [resources/config.ini](../resources/config.ini) for the maintained full example, the shipped default layouts, and the authoritative spelling of supported entries.

@@ -1,110 +1,109 @@
-# System Telemetry diagnostics
+# System Telemetry Diagnostics
 
-This document is the single maintained source of truth for diagnostics command behavior, validation commands, and diagnostics-output inspection guidance.
+This document owns diagnostics CLI behavior, output contracts, failure policy, and validation recipes.
+See also: [docs/specifications.md](specifications.md) for user-visible runtime behavior, [docs/layout.md](layout.md) for config language, and [docs/build.md](build.md) for build and test entrypoints.
 
-## Command-line switches
+## Switches
 
-- `/trace[:path]` enables continuous trace logging to `telemetry_trace.txt` in the current working directory, or to the optional target path.
-- `/dump[:path]` writes a machine-parseable snapshot dump to `telemetry_dump.txt` in the current working directory, or to the optional target path.
-- `/screenshot[:path]` writes a rendered dashboard PNG to `telemetry_screenshot.png` in the current working directory, or to the optional target path.
-- `/save-config[:path]` writes a minimal INI overlay to `telemetry_config.ini` in the current working directory, or to the optional target path.
-- `/save-full-config[:path]` writes a full embedded-template-shaped INI export to `telemetry_full_config.ini` in the current working directory, or to the optional target path.
-- `/reload` forces a config reload through the live-dashboard reload path before headless diagnostics outputs are exported.
-- `/exit` runs diagnostics as a one-shot headless export path and does not start the dashboard UI.
-- `/fake[:path]` replaces live telemetry collection with the built-in synthetic telemetry baseline when no path is supplied, or with periodic reads from the optional fake dump path when a path is supplied.
-- `/layout:<name>` overrides `display.layout` for the current process so diagnostics can validate a named layout without editing `config.ini`.
-- `/default-config` suppresses loading the executable-side `config.ini` overlay and uses only the embedded `resources/config.ini` defaults for the current process.
-- `/blank` switches screenshot rendering into a blank background mode that keeps static dashboard chrome and static text such as CPU and GPU names while omitting dynamic metric text, time, date, plots, leaders, peak ghosts, gauge fill, and drive activity or usage fill.
-- `/scale:<value>` overrides `display.scale` for the current process, accepts fractional values such as `1.5`, and drives both live UI sizing and diagnostics screenshot rendering for that process.
-- `/edit-layout:<widget-name>` keeps layout-edit guides enabled and, for screenshots, forces the first visible widget of that type into the same outline and widget-guide state that live UI hover would show.
-- `/edit-layout:horizonatal-sizes` turns on layout-edit guides plus every visible horizontal size ruler and its exact-match numbering for diagnostics screenshots without requiring an active drag.
-- `/edit-layout:vertical-sizes` turns on layout-edit guides plus every visible vertical size ruler and its exact-match numbering for diagnostics screenshots without requiring an active drag.
+### Output switches
+
+- `/trace[:path]` writes continuous trace output.
+- `/dump[:path]` writes the machine-parseable snapshot dump.
+- `/screenshot[:path]` writes the rendered dashboard PNG.
+- `/save-config[:path]` writes the minimal config overlay export.
+- `/save-full-config[:path]` writes the full embedded-template-shaped config export.
+
+### Source and config overrides
+
+- `/reload` forces a config reload through the normal live-dashboard reload path before exporting outputs.
+- `/fake[:path]` uses the built-in synthetic telemetry source or reloads the selected fake dump file once per second.
+- `/layout:<name>` overrides the active named layout for the current process.
+- `/default-config` suppresses the executable-side `config.ini` overlay for the current process.
+- `/scale:<value>` overrides the runtime render scale for the current process.
+
+### Render modifiers
+
+- `/blank` exports the blank rendering mode.
+- `/edit-layout` enables layout-edit guides for the current process and for screenshot exports.
+- `/edit-layout:<widget-name>` forces one visible widget of that type into its hover-equivalent layout-edit guide state for screenshot validation.
+- `/edit-layout:horizonatal-sizes` renders every visible horizontal size ruler and numbering group.
+- `/edit-layout:vertical-sizes` renders every visible vertical size ruler and numbering group.
+
+### Control flow
+
+- `/exit` runs the one-shot headless diagnostics path and does not start the interactive dashboard UI.
+
+### Invalid combinations
+
 - `/blank` cannot be combined with `/fake`.
 
-## Output files
+## Output Paths And File Behavior
 
-- Without an explicit path, `/trace`, `/dump`, `/screenshot`, `/save-config`, and `/save-full-config` write in the current working directory using their default filenames.
-- With an explicit path, each switch writes the same content format to that requested path.
-- Without an explicit path, `/fake` uses the built-in synthetic telemetry baseline and does not read any fake dump file.
-- With an explicit path, `/fake` reads that requested dump file.
-- Relative diagnostics paths resolve from the current working directory.
-- The UI `Diagnostics` submenu uses a standard Save dialog and defaults `Save full config to...`, `Save dump to...`, and `Save screenshot to...` to the current working directory with the same default file names used by `/save-full-config`, `/dump`, and `/screenshot`.
-- Trace output appends plain UTF-8 text without a BOM and uses the prefix format `[trace yyyy-mm-dd hh:mm:ss.mmm]`.
-- Dump output overwrites with a stable text format that can be copied directly into a `/fake:<path>` target file.
-- Screenshot output overwrites with only the rendered dashboard PNG.
-- `/save-config` overwrites with only the changed live values relative to the target file's loaded config state.
-- `/save-full-config` overwrites with the full embedded-template line structure updated to the live config values.
+- Without an explicit path, output switches write in the current working directory.
+- Relative explicit paths also resolve from the current working directory.
+- Default filenames are `telemetry_trace.txt`, `telemetry_dump.txt`, `telemetry_screenshot.png`, `telemetry_config.ini`, and `telemetry_full_config.ini`.
+- Trace output appends UTF-8 text without a BOM and uses the `[trace yyyy-mm-dd hh:mm:ss.mmm]` prefix format.
+- Dump, screenshot, minimal-config, and full-config exports overwrite only their requested target file.
+- `/fake` without a path uses the built-in synthetic baseline and reads no external file.
+- `/fake:<path>` reads only the selected dump file.
+- The UI diagnostics save dialogs use the same dump, screenshot, and full-config formats as the CLI outputs.
 
-## Runtime behavior
+## Runtime Mode Behavior
 
-- Without `/exit`, the application starts the normal dashboard UI and keeps producing any requested diagnostics outputs while it runs.
-- In UI-attached mode, trace logging continues for the process lifetime, while dump and screenshot outputs refresh once per second from the latest snapshot.
-- With `/exit`, the application initializes telemetry from the normal runtime `config.ini`, performs the first update, optionally writes the requested outputs once, and exits without starting the GUI.
-- With `/default-config`, the application skips the executable-side `config.ini` overlay and keeps only the embedded default config for startup and `/reload` diagnostics runs.
-- With `/layout:<name>`, the application applies that named layout after loading `config.ini` and keeps that override active for the process lifetime, including `/reload` diagnostics runs.
-- With `/scale:<value>`, the application replaces the loaded `display.scale` value for the process lifetime, including live UI sizing, `/reload` diagnostics runs, and screenshot exports.
-- Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported PNGs reflect the live scale, text, and widget rendering.
-- With `/reload /exit`, the application completes the normal first startup and update path, reloads config through the same live-dashboard logic, and exports outputs from the reloaded state.
-- With `/fake` and no explicit path, the application skips live telemetry providers and uses the built-in synthetic telemetry baseline directly from code.
-- With `/fake:<path>`, the application skips live telemetry providers, loads that selected fake dump file immediately, and reloads it once per second while the process runs.
-- With `/blank`, the application keeps the normal layout, panel chrome, card headers, CPU and GPU names, drive labels, and empty chart or bar tracks while suppressing dynamic metric rendering.
-- `/edit-layout` diagnostics outputs always include the resolved container guides, while widget-local guides appear only when the live UI is hovering a supported widget or when `/edit-layout:<widget-name>` forces one supported widget type.
-- `/edit-layout:<widget-name>` fails the screenshot export when the requested widget type does not exist in the active layout.
-- Live layout-edit tooltips use a standard Win32 tooltip window outside the renderer, so screenshot diagnostics do not capture them.
+- Without `/exit`, the application starts the normal dashboard UI and keeps requested diagnostics outputs refreshed while the process runs.
+- In UI-attached mode, trace logging continues for the process lifetime and dump or screenshot outputs refresh once per second from the latest snapshot.
+- With `/exit`, the application loads config, performs the first update, optionally exports the requested outputs once, and exits without entering the normal GUI lifetime.
+- `/default-config`, `/layout:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
+- `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
+- `/fake:<path>` reloads the selected fake file once per second while the process runs so manual edits affect the next refresh.
+- Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior.
+- Live layout-edit tooltips use a separate Win32 tooltip window and therefore do not appear in diagnostics screenshots.
 
-## Failures and trace coverage
+## Failure And Trace Policy
 
-- The diagnostics trace covers all diagnostics collection paths, not only vendor GPU integration.
-- Trace lines for telemetry or vendor API calls should include returned status or result codes plus key sampled values that help explain missing metrics or failures.
-- Diagnostics output failures such as trace, dump, screenshot, or config-export file-open or write failures must be written to the trace before any error dialog is shown.
-- When `/trace` is enabled, diagnostics failures prefer trace logging over modal UI and complete with a failure exit code.
-- Required `/fake:<path>` load failures follow that same rule so `/fake:<path> /exit` returns promptly with trace output.
-- When the renderer initializes under `/trace`, the trace also includes measured font heights, computed layout heights, and resolved widget and card rectangles.
-- While interactive layout editing runs under `/trace`, each started drag writes one `layout_edit_drag:start` marker that identifies the drag kind and edit target, the matching drag end writes one `layout_edit_drag:end` marker with total drag time plus averaged `snap`, `apply`, `paint_total`, and `paint_draw` timings for the phases that ran during that drag, and high-volume per-frame `renderer:*` trace lines stay suppressed for the drag duration so the summary stays readable and the trace itself does not dominate drag timing.
-- While the unified edit dialog runs under `/trace`, tree selection, right-pane control population, live preview attempts, and color-picker open/return/apply paths write `layout_edit_dialog:*` markers that include the selected node location, focus key, raw control text, parsed values, and apply success so dialog-state races can be reconstructed from the trace.
+- The diagnostics trace covers startup, reload, output export, renderer layout data, telemetry collection, and vendor-provider activity when `/trace` is enabled.
+- Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
+- When `/trace` is enabled, diagnostics failures prefer trace logging plus a failure exit code over blocking modal behavior.
+- Required fake-file load failures follow that same rule so `/fake:<path> /exit` returns promptly under trace.
+- Layout-edit drag profiling writes one start marker and one end marker per drag with summarized timing instead of high-volume per-frame renderer trace spam.
+- The modeless layout-edit dialog writes focused trace markers for tree selection, preview, and color-picker flows when trace is enabled.
 
-## Dump content
+## Dump Contract
 
-- The dump includes only the runtime snapshot model that `/fake` loads and the dashboard renders, including retained histories, configured drive rows with per-drive read and write MB/s, and the full local date and time down to milliseconds.
-- Retained histories in the dump store raw sampled values in native runtime units, and the current dump format version is `system_telemetry_snapshot_v8`.
-- The dump schema reflects the runtime snapshot model directly and includes only fields that the runtime loads and renders.
-- Dump scalar-unit fields accept and emit only the snapshot model's canonical tokens: the empty string plus `C`, `GHz`, `MHz`, and `RPM`, even when the live dashboard displays different unit strings from `[metrics]`.
-- Provider diagnostics and provider-specific debug details stay in trace output and do not appear in the dump schema.
+- The dump contains only the runtime snapshot model that the dashboard renders and that `/fake` reloads.
+- The dump includes retained histories, configured drive rows, and local date and time down to milliseconds.
+- Retained histories store raw sampled values in native runtime units.
+- The current dump format version is `system_telemetry_snapshot_v8`.
+- Dump scalar-unit fields use only the canonical dump tokens: the empty string plus `C`, `GHz`, `MHz`, and `RPM`.
+- Provider-specific diagnostics and trace-only debug details do not appear in the dump schema.
 
-## Single-instance behavior
+## Single-Instance Interaction
 
-- `/exit` runs outside the normal single-instance behavior as an independent one-shot command.
-- Diagnostics switches without `/exit` stay on the normal UI startup path and follow the standard single-instance replacement behavior.
-- `/fake` by itself stays on the normal UI startup path and follows the standard single-instance replacement behavior.
+- `/exit` runs outside the normal single-instance dashboard replacement path.
+- Diagnostics switches without `/exit` stay on the normal UI startup path and therefore follow the standard single-instance behavior.
+- `/fake` by itself also stays on the normal UI path.
 
-## Validation
+## Validation Recipes
 
-- Always rebuild through `build.cmd` before validating diagnostics changes.
-- Always include `/trace` in diagnostics validation and inspect trace output, even when the primary change affects dump or screenshot behavior.
-- When headless validation is meant to exercise the built-in config, always add `/default-config` so executable-side `config.ini` does not mask the embedded defaults.
-- When validating default diagnostics paths, launch the executable from the intended working directory and confirm the default files land there.
-- When validation commands specify diagnostics paths explicitly, point them somewhere under `build\` so trace, dump, screenshot, and fake files do not pollute the repository root.
-- Verify UI-attached `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot`.
-- Verify headless `/trace /default-config /dump /screenshot /exit` and `/trace /default-config /reload /screenshot /exit` when validating the built-in config, and confirm the process exits after the requested export path.
-- Verify headless `/trace /default-config /layout:<name> /save-config /save-full-config /exit`, confirm the minimal config contains only the changed live overrides, and confirm the full config keeps the embedded template structure with updated live values.
-- Verify headless `/trace /blank /screenshot /exit`, and confirm the saved PNG keeps the blank background composition without dynamic metric content.
-- Verify one headless run that supplies explicit output filenames such as `/trace:custom_trace.txt`, `/dump:custom_dump.txt`, and `/screenshot:custom_screenshot.png`, and confirm only the requested paths are updated.
-- Verify one headless `/trace /default-config /layout:<name> /screenshot /exit` run when validating the built-in config, and confirm the screenshot and trace use the requested named layout without editing `config.ini`.
-- Verify one headless `/trace /default-config /edit-layout /screenshot /exit` run when validating layout-guide rendering, and confirm the screenshot includes the layout edit guides.
-- Verify one headless `/trace /default-config /edit-layout:gauge /screenshot /exit` run when validating the gauge widget-local guides, and confirm the screenshot includes the gauge outline plus its right-end diagonal `sweep_degrees` guide, first-segment diagonal `segment_gap_degrees` guide, horizontal `value_bottom` and `label_bottom` guides, top-edge diamond `segment_count` anchor, and concentric circle anchors for `outer_padding` and `ring_thickness` without needing live hover.
-- Verify one headless `/trace /default-config /edit-layout:metric_list /screenshot /exit` run when validating widget-local metric-list guides, and confirm the screenshot includes the metric-list outline plus its `label_width` guide and row-gap guides without needing live hover.
-- Verify one headless `/trace /default-config /edit-layout:throughput /screenshot /exit` run when validating the throughput widget-local guides, and confirm the screenshot includes the throughput outline plus its `axis_padding` guide at the plot-left edge, its `header_gap` guide at the header/graph boundary, the `leader_diameter` circle anchor on the live leader, the `plot_stroke_width` circle anchor at the plot's left edge midpoint, and the `guide_stroke_width` circle anchor on a horizontal plot guide without needing live hover.
-- Verify one headless `/trace /default-config /edit-layout:drive_usage_list /screenshot /exit` run when validating the drive-usage widget-local guides, and confirm the screenshot includes the drive-usage outline plus its `label_gap`, `rw_gap`, `bar_gap`, `percent_gap` guide at the usage bar's right edge, `activity_width`, `free_width`, `activity_segment_gap`, `header_gap`, and `row_gap` guides together with the top-edge diamond `activity_segments` anchor without needing live hover.
-- Verify card-style edit chrome through an `/edit-layout` UI run, hover several cards including one with a header icon and one headerless card, and confirm the shared `card_padding` top guide, `card_radius` square corner anchor, and `card_border` top circle anchor appear only while the pointer stays in the card's top band through the header or top padding area and stop once the pointer moves below the content top edge, confirm headered cards also show the `header_content_gap` guide and cards with both icon and title also show the `header_icon_gap` guide, and confirm hovering a header icon adds the dotted icon highlight plus the square `header_icon_size` anchor.
-- Verify widget-local edit guides through an `/edit-layout` UI run, hover `gauge`, `metric_list`, `throughput`, and `drive_usage_list`, and confirm the widget outline plus the gauge `sweep_degrees` and `segment_gap_degrees` radial guides, `value_bottom` and `label_bottom` horizontal guides, top-edge diamond `segment_count` anchor, concentric `outer_padding` and `ring_thickness` circles, `label_width`, metric-list `row_gap`, `axis_padding`, `header_gap`, `label_gap`, `rw_gap`, `bar_gap`, `percent_gap`, `activity_width`, `free_width`, `activity_segment_gap`, drive-usage `header_gap`, `row_gap`, and top-edge `activity_segments` anchor appear inside those widgets and drag live, with the gauge `segment_count` and circle anchors and the drive-usage `activity_segments` anchor staying visible anywhere inside the hovered widget.
-- Verify interactive text editing through an `/edit-layout` UI run, hover several rendered text runs inside different widgets plus card title text, confirm the dotted per-text highlight and upper-right font-size anchor appear on hover for ordinary text, confirm metric-backed labels and rendered values also show the upper-left wedge metric anchor, confirm the wedge anchor tooltip uses the `[metrics] metric_id = scale,unit,label` format, and confirm metric wedge double-click or context-menu edit opens the unified editor focused on the matching `[metrics]` entry while dragging the font-size anchor still updates the corresponding shared `[fonts]` size live; when the selected metric id begins with `board.temp.` or `board.fan.`, confirm the metric editor also shows a `Binding` dropdown populated from the currently available board sensor names for that family and that choosing a different entry updates the matching `[board]` mapping and live board metric preview immediately.
-- Verify interactive bar editing through an `/edit-layout` UI run, hover metric-list and drive-usage fill bars, confirm the dotted per-bar highlight and bottom-center anchor appear on hover, and confirm dragging that anchor up or down updates `[metric_list].bar_height` or `[drive_usage_list].bar_height` live.
-- Verify interactive guide and anchor drag feedback through an `/edit-layout` UI run, drag one container guide, one widget-local guide, one text anchor, one bar anchor, one gauge size anchor, the gauge `segment_count` anchor, one throughput size anchor, and the drive-usage `activity_segments` anchor, and confirm only the actively dragged guide or anchor switches to the configured `[colors].active_edit_color` while the rest of the edit visuals keep their existing widths and sizes.
-- Verify interactive layout-edit drag profiling through an `/edit-layout /trace` UI run, drag at least one container guide, one widget-local guide, and one editable anchor, and confirm the trace contains matching `layout_edit_drag:start` and `layout_edit_drag:end` markers with averaged drag-phase timings for the active drag kind.
-- Verify interactive layout-edit tooltips through an `/edit-layout` UI run, hover supported card-style, metric-list, throughput, drive-usage, and gauge guides, container split guides, both non-font and font anchor handles, and metric wedge anchors on metric-backed text, confirm the standard Windows tooltip can extend beyond the dashboard window, confirm the first line uses `[section] parameter = value` for normal parameters, `[fonts] key = face,size,weight` for font anchor handles, `[metrics] metric_id = scale,unit,label` for metric wedge anchors, and `[card.<id>] layout = ... rows(...)` or `columns(...)` or `[layout.<name>] cards = ... rows(...)` or `columns(...)` for container split guides with the two neighboring children and their current weights, confirm the second line uses the shared localized help text for each target type, confirm metric wedge anchors remain tooltip-visible even though they are not draggable, confirm the tooltip is shown only if pressing mouse down changes parameter or opens the matching unified edit target, and confirm hovered text-target highlight regions without an anchor handle do not show a tooltip.
-- Verify modeless editor hover suppression through an `/edit-layout` UI run, bring the unified editor above the dashboard, and confirm hover-driven guides, anchors, tooltips, and cursor changes stop as soon as the cursor is outside the dashboard or inside a dashboard region covered by the editor while the selected tree-node highlight stays visible until the dashboard is raised above the editor again.
-- Verify actionable hit priority through an `/edit-layout` UI run by hovering the gauge `segment_count` diamond where it overlaps the outer ring handle, hovering a text anchor near any nearby widget-local guide, and hovering throughput `leader_diameter`, `plot_stroke_width`, and `guide_stroke_width` circles near other editable chrome, and confirm the highest-priority actionable handle wins before widget-local guides, widget-local guides win before the gauge ring circles, and container split guides stay last.
-- Verify headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit` and `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit` when validating size-ruler grouping and numbering, and inspect the trace for consecutive `renderer:layout_similarity_group` ordinals that match the visible rulers.
-- When `/scale:<value>` is involved, confirm the screenshot uses the expected overridden scale-derived pixel dimensions while preserving the same logical composition.
-- For fake-mode changes, verify both interactive `/fake` runs and headless `/fake /exit` runs, confirm the built-in synthetic telemetry produces a rich dashboard without touching live providers, and verify one run with `/fake:custom_fake.txt` where editing that selected fake file changes the next one-second refresh.
-- Verify `/blank /fake` fails before startup.
+- Build first through `build.cmd`.
+- Include `/trace` during diagnostics validation and inspect trace output even when the main change affects dump or screenshot behavior.
+- When validation is meant to exercise the built-in config, add `/default-config`.
+- Put explicit diagnostics paths under `build\` so repository files stay clean.
+
+Recommended checks:
+
+- UI-attached `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot`
+- Headless `/trace /default-config /dump /screenshot /exit`
+- Headless `/trace /default-config /reload /screenshot /exit`
+- Headless `/trace /default-config /layout:<name> /save-config /save-full-config /exit`
+- Headless `/trace /blank /screenshot /exit`
+- One headless run with explicit output filenames for trace, dump, and screenshot
+- One headless `/trace /default-config /layout:<name> /screenshot /exit`
+- One headless `/trace /default-config /edit-layout /screenshot /exit`
+- One headless `/trace /default-config /edit-layout:<widget-name> /screenshot /exit` for each widget class whose edit chrome changed
+- One headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit`
+- One headless `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit`
+- UI `/edit-layout` verification when hover-only or drag-only artifacts changed
+- Both interactive `/fake` and headless `/fake /exit` when fake-runtime behavior changed
+
+When layout-edit screenshots are involved, validate the presence of the intended guide family or ruler grouping rather than re-documenting widget-specific edit semantics here; the user-visible layout-edit behavior itself is defined in [docs/specifications.md](specifications.md).
