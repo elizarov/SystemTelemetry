@@ -94,6 +94,21 @@ TEST(ConfigParser, ParsesMetricsSectionEntries) {
     std::filesystem::remove(path);
 }
 
+TEST(ConfigParser, IgnoresRuntimePlaceholderMetricMetadataInMetricsSection) {
+    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
+                                                       "nothing = 7,ignored,Overridden Placeholder\n"
+                                                       "cpu.load = *,%,Processor Load\n");
+
+    const AppConfig config = LoadConfig(path, true);
+
+    EXPECT_EQ(FindMetricDefinition(config.layout.metrics, "nothing"), nullptr);
+    const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.layout.metrics, "cpu.load");
+    ASSERT_NE(loadMetric, nullptr);
+    EXPECT_EQ(loadMetric->label, "Processor Load");
+
+    std::filesystem::remove(path);
+}
+
 TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
     const std::filesystem::path path = WriteTestConfig("[display]\n"
                                                        "layout = portrait\n"

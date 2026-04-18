@@ -176,8 +176,8 @@ bool UseWholeWidgetSelectionOutline(LayoutEditParameter parameter) {
 }
 
 bool UseWholeDashboardSelectionOutline(LayoutEditParameter parameter) {
-    return parameter == LayoutEditParameter::DashboardOuterMargin || parameter == LayoutEditParameter::DashboardRowGap ||
-           parameter == LayoutEditParameter::DashboardColumnGap;
+    return parameter == LayoutEditParameter::DashboardOuterMargin ||
+           parameter == LayoutEditParameter::DashboardRowGap || parameter == LayoutEditParameter::DashboardColumnGap;
 }
 
 bool UseAllCardsSelectionOutline(LayoutEditParameter parameter) {
@@ -2300,7 +2300,7 @@ const MetricDefinitionConfig* DashboardRenderer::FindConfiguredMetricDefinition(
     if (cached != metricDefinitionCache_.end()) {
         return cached->second;
     }
-    const MetricDefinitionConfig* definition = FindMetricDefinition(config_.layout.metrics, metricRef);
+    const MetricDefinitionConfig* definition = FindEffectiveMetricDefinition(config_.layout.metrics, metricRef);
     metricDefinitionCache_.emplace(key, definition);
     return definition;
 }

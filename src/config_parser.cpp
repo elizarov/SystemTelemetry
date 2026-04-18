@@ -533,6 +533,9 @@ template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, Metri
         if (key.empty()) {
             return false;
         }
+        if (IsRuntimePlaceholderMetricId(key)) {
+            return true;
+        }
 
         MetricDefinitionConfig* definition = FindMetricDefinition(metrics, key);
         MetricDefinitionConfig candidate = definition != nullptr ? *definition : MetricDefinitionConfig{};

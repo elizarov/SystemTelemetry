@@ -14,7 +14,6 @@ const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const La
 const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const LayoutMetricListOrderEditKey& key);
 std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter);
 std::vector<std::string> AvailableMetricListMetricIds(const AppConfig& config);
-void EnsureMetricListPlaceholderDefinition(AppConfig& config);
 
 std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNodeConfig* node);
 

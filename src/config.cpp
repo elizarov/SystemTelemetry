@@ -2,6 +2,21 @@
 
 #include <sstream>
 
+namespace {
+
+constexpr std::string_view kRuntimePlaceholderMetricId = "nothing";
+
+const MetricDefinitionConfig kRuntimePlaceholderMetricDefinition{
+    std::string(kRuntimePlaceholderMetricId),
+    MetricDisplayStyle::Scalar,
+    false,
+    1.0,
+    "",
+    "Nothing",
+};
+
+}  // namespace
+
 ColorConfig ColorConfig::FromRgb(unsigned int value) {
     return ColorConfig{static_cast<std::uint32_t>(value & 0xFFFFFFu)};
 }
@@ -26,6 +41,18 @@ MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std:
         }
     }
     return nullptr;
+}
+
+bool IsRuntimePlaceholderMetricId(std::string_view id) {
+    return id == kRuntimePlaceholderMetricId;
+}
+
+const MetricDefinitionConfig* FindEffectiveMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id) {
+    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, id);
+    if (definition != nullptr) {
+        return definition;
+    }
+    return IsRuntimePlaceholderMetricId(id) ? &kRuntimePlaceholderMetricDefinition : nullptr;
 }
 
 TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& config) {

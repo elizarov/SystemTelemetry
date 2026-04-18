@@ -158,8 +158,10 @@ void MetricListWidget::Draw(
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size),
                 DashboardRenderer::LayoutEditParameter::ColorForeground);
-            renderer.RegisterDynamicTextAnchor(
-                valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs_[rowIndex], rowIndex * 2 + 101));
+            if (!IsRuntimePlaceholderMetricId(metricRefs_[rowIndex])) {
+                renderer.RegisterDynamicTextAnchor(
+                    valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs_[rowIndex], rowIndex * 2 + 101));
+            }
         }
         const RenderRect& barRect = layoutState_.barRects[rowIndex];
         renderer.DrawPillBar(
@@ -217,7 +219,8 @@ void MetricListWidget::BuildStaticAnchors(DashboardRenderer& renderer, const Das
             false,
             0);
         const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metricRefs_[rowIndex]);
-        if (definition != nullptr && !definition->label.empty()) {
+        if (definition != nullptr && !definition->label.empty() &&
+            !IsRuntimePlaceholderMetricId(metricRefs_[rowIndex])) {
             renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
                 definition->label,
                 TextStyleId::Label,

@@ -179,7 +179,7 @@ template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardCo
 template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, MetricsSectionConfig> {
     template <typename UpdateKeyFn> static void Save(const MetricsSectionConfig& metrics, UpdateKeyFn&& updateKey) {
         for (const auto& definition : metrics.definitions) {
-            if (definition.id.empty()) {
+            if (definition.id.empty() || IsRuntimePlaceholderMetricId(definition.id)) {
                 continue;
             }
             updateKey("[metrics]", definition.id, FormatMetricDefinitionValue(definition));
@@ -190,7 +190,7 @@ template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, Metri
     static void SaveDifferences(
         const MetricsSectionConfig& metrics, const MetricsSectionConfig* compareMetrics, UpdateKeyFn&& updateKey) {
         for (const auto& definition : metrics.definitions) {
-            if (definition.id.empty()) {
+            if (definition.id.empty() || IsRuntimePlaceholderMetricId(definition.id)) {
                 continue;
             }
             const MetricDefinitionConfig* compareDefinition =

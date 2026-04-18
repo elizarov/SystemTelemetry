@@ -577,7 +577,7 @@ std::optional<DashboardMetricValue> ResolveMetricValue(
         return std::nullopt;
     }
 
-    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
+    const MetricDefinitionConfig* definition = FindEffectiveMetricDefinition(metrics, metricRef);
     if (definition == nullptr) {
         return std::nullopt;
     }
@@ -645,7 +645,7 @@ bool IsGenerallyAvailableDashboardMetric(std::string_view metricRef) {
 }
 
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef) {
-    const MetricDefinitionConfig* definition = FindMetricDefinition(metrics, metricRef);
+    const MetricDefinitionConfig* definition = FindEffectiveMetricDefinition(metrics, metricRef);
     if (definition == nullptr) {
         return {};
     }

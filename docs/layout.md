@@ -50,7 +50,7 @@ The language is divided by responsibility:
 - Format: `metric.id = <scale>,<unit>,<label>`
 - `*` scale means the widget normalizes against telemetry-provided scale data.
 - Display style is metadata-owned for the metric id and is not a config field.
-- The shipped registry includes generally available dashboard metrics plus the placeholder `nothing` entry.
+- The runtime-only `nothing` placeholder keeps built-in metadata and `[metrics]` entries for it are ignored.
 - Throughput widgets and drive-usage rows read their displayed labels and units from this registry rather than from widget-local text.
 
 ## Containers, Widgets, And Parameters
@@ -96,7 +96,7 @@ Widget parameter rules:
 - `drive_usage_list`, `clock_time`, `clock_date`, and `vertical_spring` take no inline parameter payload.
 - `vertical_spacer(widget_name)` reserves the preferred height of the referenced widget type without drawing content.
 
-Supported metric ids include built-in CPU, GPU, network, storage, drive, and placeholder metrics plus configured `board.temp.*` and `board.fan.*` logical metrics.
+Supported configurable metric ids include built-in CPU, GPU, network, storage, and drive metrics plus configured `board.temp.*` and `board.fan.*` logical metrics. The runtime-only `nothing` placeholder remains valid in metric-list bindings but does not belong in `[metrics]`.
 
 ## Static Sizing Rules
 

@@ -958,7 +958,6 @@ bool DashboardShellUi::ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, 
 bool DashboardShellUi::ApplyMetricListOrderPreview(
     const LayoutMetricListOrderEditKey& key, const std::vector<std::string>& metricRefs) {
     AppConfig updatedConfig = CurrentConfig();
-    EnsureMetricListPlaceholderDefinition(updatedConfig);
     const LayoutEditWidgetIdentity widget{"", key.editCardId, key.nodePath};
     if (!::ApplyMetricListOrder(updatedConfig, widget, metricRefs)) {
         return false;
@@ -983,7 +982,6 @@ bool DashboardShellUi::ApplyMetricListAddRowPreview(const LayoutEditController::
     }
 
     AppConfig updatedConfig = CurrentConfig();
-    EnsureMetricListPlaceholderDefinition(updatedConfig);
     if (!AppendMetricListRow(updatedConfig, anchor->key.widget, kMetricListPlaceholderId)) {
         return false;
     }

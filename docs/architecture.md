@@ -26,6 +26,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - The config subsystem parses the embedded template first, overlays executable-side config, resolves the active named layout, and writes either minimal overlay saves or full embedded-template-shaped exports.
 - `LayoutConfig` is the layout-edit session boundary and includes layout-owned sections such as widget geometry, shared styling, board bindings, and metric definitions.
 - `AppConfig` layers runtime display, network, storage, and active-layout selection around the shared layout-owned state.
+- Runtime-only placeholder metric metadata stays synthesized outside persisted config so `[metrics]` remains limited to configurable metric definitions.
 - Parser and writer code keep UTF-8 I/O, overlay behavior, and text-preserving saves separate from higher-level config resolution.
 
 ### Telemetry

@@ -84,7 +84,20 @@ TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
     EXPECT_THAT(output, testing::HasSubstr("[metrics]\r\ncpu.load = *,%,Load\r\n"));
     EXPECT_THAT(output, testing::HasSubstr("network.upload = *,MB/s,Up\r\n"));
     EXPECT_THAT(output, testing::HasSubstr("drive.free = *,GB|TB,Free\r\n"));
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("nothing = 1,,Nothing\r\n")));
     EXPECT_THAT(output, testing::Not(testing::HasSubstr("[metric_scales]")));
+}
+
+TEST(ConfigWriter, FullExportOmitsRuntimePlaceholderMetricDefinition) {
+    AppConfig config = LoadConfig(SourceConfigPath(), true);
+    config.layout.metrics.definitions.insert(config.layout.metrics.definitions.begin(),
+        MetricDefinitionConfig{"nothing", MetricDisplayStyle::Scalar, false, 1.0, "", "Nothing Override"});
+
+    const std::string output = BuildSavedConfigText(
+        ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
+
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("nothing = 1,,Nothing Override\r\n")));
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("nothing = 1,,Nothing\r\n")));
 }
 
 TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {

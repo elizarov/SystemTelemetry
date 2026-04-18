@@ -15,8 +15,6 @@ void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
 MetricsSectionConfig BuildMetricsConfig() {
     MetricsSectionConfig metrics;
     metrics.definitions.push_back(
-        MetricDefinitionConfig{"nothing", MetricDisplayStyle::Scalar, false, 1.0, "", "Nothing"});
-    metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"});
     metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.temp", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"});

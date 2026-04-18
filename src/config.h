@@ -361,6 +361,8 @@ CONFIG_EDITABLE_ROOT_BINDING_PATH(
 
 const MetricDefinitionConfig* FindMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id);
 MetricDefinitionConfig* FindMetricDefinition(MetricsSectionConfig& metrics, std::string_view id);
+bool IsRuntimePlaceholderMetricId(std::string_view id);
+const MetricDefinitionConfig* FindEffectiveMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id);
 TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& config);
 TelemetrySettings ExtractTelemetrySettings(const AppConfig& config);
 AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections);

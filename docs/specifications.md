@@ -19,6 +19,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - `Save Config` writes only the live values that differ from the loaded executable-side config state, preserving unchanged explicit overrides and unknown lines.
 - When `Save Config` creates a new executable-side `config.ini`, it writes only the values that differ from the embedded defaults.
 - `Save Full Config To...` exports a full config in the embedded-template shape with live values filled in.
+- Save and export omit runtime-only placeholder metric metadata such as `nothing`, even when metric-list bindings still reference that placeholder id.
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
 - `Save Config` persists live placement, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session.
 - `Config To Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `telemetry_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
