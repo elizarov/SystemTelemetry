@@ -62,6 +62,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Layout-edit mode stays active across move mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Config To Display` completes successfully.
 - While layout-edit mode is active, the renderer shows container guides, the hovered widget outline, supported widget-local guides, and matching edit cursors.
 - Hovering actionable text, card chrome, bars, metric rows, reorder handles, or widget-local geometry exposes the matching highlight and edit affordance for that target class.
+- While the editor window is above the dashboard, selecting a tree node also highlights the matching split guide, widget guide, gap anchor, or text anchor for that config target, and shared gap or ring-stroke targets add the matching widget, card, or dashboard outline.
 - Hovering actionable targets also shows a standard Win32 tooltip whose first line matches the edited config shape and whose second line uses the shared localized description for that target.
 - Right-clicking an actionable target prepends one focused `Edit ...` action for that exact target.
 - The modeless `Edit Configuration` window stays separate from the dashboard window, exposes a config-ordered tree plus a live editor pane, previews valid edits immediately, and keeps only the current edit session inside its save or discard boundary.
