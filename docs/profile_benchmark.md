@@ -112,6 +112,20 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - The no-cache benchmark still spends most of its time in the real telemetry APIs, but a meaningful slice of the old cost was collector-side scaffolding around those calls. Lazy trace formatting and reusable per-provider scratch state are worth keeping because they reduce benchmark noise without hiding the real source-update cost.
 
+### Hypothesis: Collapse the GPU PDH path into one query collect and one array scan
+
+- Change:
+  - Put the GPU dedicated-memory counter onto the same PDH query as the GPU engine-utilization counter and replace the two `PdhGetFormattedCounterArrayW` scans for GPU load with one combined array walk that computes both the 3D-only total and the all-engine total.
+- Result:
+  - Regressed and was reverted.
+- Observed effect:
+  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
+  - With the collapsed GPU PDH path in place, the same benchmark regressed to about `update_loop per_iter_ms=7.07`, `telemetry_update avg_ms=5.06`, and `paint_draw avg_ms=2.01`.
+- Why it failed:
+  - Combining the GPU memory and engine counters onto one PDH query and scanning the shared wildcard arrays together increased the measured hot-path cost instead of reducing it, likely because the merged query shape or the broader array fetch paid more than the saved call count.
+- Conclusion:
+  - Do not assume fewer PDH calls automatically help. On this tree, the split GPU query shape is faster than the collapsed variant and remains the better live-update baseline.
+
 ### Hypothesis: Avoid full config copies during snap probing
 
 - Change:
