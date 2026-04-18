@@ -71,6 +71,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The editor supports filtering, per-field revert, config-local descriptions, and specialized editors for numeric values, fonts, colors, metrics, weight pairs, and metric-list row ordering.
 - Metric leaves whose ids begin with `board.temp.` or `board.fan.` also expose a live `Binding` selector for the matching board-sensor mapping.
 - The board-metric `Binding` selector keeps the last discovered provider sensor-name list available for config editing even if a later live board sample omits that metadata.
+- Multiple logical board metrics can bind to the same provider sensor name, and each bound row shows that same live value.
 - Metric-list widgets support row reorder handles and add-row affordances.
 - Gauge, throughput, metric-list, drive-usage, text, card-chrome, dashboard-spacing, and container-split targets all stay editable through the shared layout-edit interaction model rather than through one-off editors.
 - While the editor window is above the dashboard, covered dashboard regions stay mouse-transparent to the editor and suppress dashboard hover, tooltip, and cursor updates for those covered points.

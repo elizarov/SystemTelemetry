@@ -357,6 +357,14 @@ template <typename Reading> std::vector<std::string> ExtractSensorNames(const st
     return names;
 }
 
+void AppendRequestedMetricIndex(
+    std::unordered_map<std::string, std::vector<size_t>>& indexBySourceName, std::string sourceName, size_t index) {
+    auto& indices = indexBySourceName[std::move(sourceName)];
+    if (std::find(indices.begin(), indices.end(), index) == indices.end()) {
+        indices.push_back(index);
+    }
+}
+
 void ResetMetricValues(std::vector<NamedScalarMetric>& metrics) {
     for (auto& metric : metrics) {
         metric.metric.value.reset();
@@ -397,11 +405,13 @@ public:
         requestedTemperatureIndexBySourceName_.clear();
         requestedFanIndexBySourceName_.clear();
         for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
-            requestedTemperatureIndexBySourceName_.emplace(
-                ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name), i);
+            AppendRequestedMetricIndex(requestedTemperatureIndexBySourceName_,
+                ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name),
+                i);
         }
         for (size_t i = 0; i < fanMetricTemplate_.size(); ++i) {
-            requestedFanIndexBySourceName_.emplace(ResolveFanSensorName(fanMetricTemplate_[i].name), i);
+            AppendRequestedMetricIndex(
+                requestedFanIndexBySourceName_, ResolveFanSensorName(fanMetricTemplate_[i].name), i);
         }
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
@@ -453,15 +463,18 @@ public:
         ResetMetricValues(sample.fans);
         for (const auto& reading : snapshot.temperatures) {
             const auto it = requestedTemperatureIndexBySourceName_.find(reading.title);
-            if (it != requestedTemperatureIndexBySourceName_.end() &&
-                !sample.temperatures[it->second].metric.value.has_value()) {
-                sample.temperatures[it->second].metric.value = reading.celsius;
+            if (it != requestedTemperatureIndexBySourceName_.end()) {
+                for (const size_t index : it->second) {
+                    sample.temperatures[index].metric.value = reading.celsius;
+                }
             }
         }
         for (const auto& reading : snapshot.fans) {
             const auto it = requestedFanIndexBySourceName_.find(reading.title);
-            if (it != requestedFanIndexBySourceName_.end() && !sample.fans[it->second].metric.value.has_value()) {
-                sample.fans[it->second].metric.value = reading.rpm;
+            if (it != requestedFanIndexBySourceName_.end()) {
+                for (const size_t index : it->second) {
+                    sample.fans[index].metric.value = reading.rpm;
+                }
             }
         }
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
@@ -495,8 +508,8 @@ private:
     std::vector<std::string> availableTemperatureNames_;
     std::vector<NamedScalarMetric> fanMetricTemplate_;
     std::vector<NamedScalarMetric> temperatureMetricTemplate_;
-    std::unordered_map<std::string, size_t> requestedFanIndexBySourceName_;
-    std::unordered_map<std::string, size_t> requestedTemperatureIndexBySourceName_;
+    std::unordered_map<std::string, std::vector<size_t>> requestedFanIndexBySourceName_;
+    std::unordered_map<std::string, std::vector<size_t>> requestedTemperatureIndexBySourceName_;
     bool initialized_ = false;
 };
 
