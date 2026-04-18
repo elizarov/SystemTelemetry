@@ -23,6 +23,17 @@ namespace {
 using Clock = std::chrono::steady_clock;
 using Duration = std::chrono::duration<double, std::milli>;
 
+enum class BenchPhase {
+    TelemetryUpdate = 0,
+    Snap,
+    Apply,
+    PaintTotal,
+    PaintDraw,
+    Count,
+};
+
+constexpr size_t kBenchPhaseCount = static_cast<size_t>(BenchPhase::Count);
+
 struct PhaseStats {
     std::chrono::nanoseconds total{};
     size_t samples = 0;
@@ -37,6 +48,28 @@ std::filesystem::path SourceConfigPath() {
     return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
 }
 
+size_t PhaseIndex(BenchPhase phase) {
+    return static_cast<size_t>(phase);
+}
+
+const char* PhaseName(BenchPhase phase) {
+    switch (phase) {
+        case BenchPhase::TelemetryUpdate:
+            return "telemetry_update";
+        case BenchPhase::Snap:
+            return "snap";
+        case BenchPhase::Apply:
+            return "apply";
+        case BenchPhase::PaintTotal:
+            return "paint_total";
+        case BenchPhase::PaintDraw:
+            return "paint_draw";
+        case BenchPhase::Count:
+            break;
+    }
+    return "unknown";
+}
+
 double DurationMilliseconds(std::chrono::nanoseconds value) {
     return std::chrono::duration<double, std::milli>(value).count();
 }
@@ -44,13 +77,13 @@ double DurationMilliseconds(std::chrono::nanoseconds value) {
 size_t PhaseIndex(LayoutEditHost::TracePhase phase) {
     switch (phase) {
         case LayoutEditHost::TracePhase::Snap:
-            return 0;
+            return PhaseIndex(BenchPhase::Snap);
         case LayoutEditHost::TracePhase::Apply:
-            return 1;
+            return PhaseIndex(BenchPhase::Apply);
         case LayoutEditHost::TracePhase::PaintTotal:
-            return 2;
+            return PhaseIndex(BenchPhase::PaintTotal);
         case LayoutEditHost::TracePhase::PaintDraw:
-            return 3;
+            return PhaseIndex(BenchPhase::PaintDraw);
     }
     return 0;
 }
@@ -67,6 +100,18 @@ const char* PhaseName(LayoutEditHost::TracePhase phase) {
             return "paint_draw";
     }
     return "unknown";
+}
+
+bool IsEditLayoutBenchmarkName(const std::string& name) {
+    return name == "edit-layout" || name == "eidt-layout";
+}
+
+bool IsUpdateTelemetryBenchmarkName(const std::string& name) {
+    return name == "update-telemetry";
+}
+
+bool IsKnownBenchmarkName(const std::string& name) {
+    return IsEditLayoutBenchmarkName(name) || IsUpdateTelemetryBenchmarkName(name);
 }
 
 SystemSnapshot BuildSyntheticSnapshot(const AppConfig& config) {
@@ -125,6 +170,94 @@ SystemSnapshot BuildSyntheticSnapshot(const AppConfig& config) {
     return snapshot;
 }
 
+size_t FindRetainedHistoryIndex(const SystemSnapshot& snapshot, std::string_view seriesRef) {
+    const auto it = snapshot.retainedHistoryIndexByRef.find(std::string(seriesRef));
+    if (it == snapshot.retainedHistoryIndexByRef.end() || it->second >= snapshot.retainedHistories.size()) {
+        return snapshot.retainedHistories.size();
+    }
+    return it->second;
+}
+
+void PushRetainedHistorySample(SystemSnapshot& snapshot, std::string_view seriesRef, double value) {
+    const size_t index = FindRetainedHistoryIndex(snapshot, seriesRef);
+    if (index >= snapshot.retainedHistories.size()) {
+        return;
+    }
+
+    std::vector<double>& samples = snapshot.retainedHistories[index].samples;
+    if (samples.empty()) {
+        return;
+    }
+
+    samples.erase(samples.begin());
+    samples.push_back(value);
+}
+
+void AdvanceSyntheticSnapshot(SystemSnapshot& snapshot, size_t iteration) {
+    const double step = static_cast<double>(iteration + 1);
+    snapshot.cpu.loadPercent = 52.0 + std::sin(step * 0.12) * 18.0;
+    snapshot.cpu.clock = ScalarMetric{4.65 + std::sin(step * 0.07) * 0.22, ScalarMetricUnit::Gigahertz};
+    snapshot.cpu.memory.usedGb = 17.8 + std::sin(step * 0.03) * 1.1;
+
+    snapshot.gpu.loadPercent = 49.0 + std::sin(step * 0.09 + 0.4) * 24.0;
+    snapshot.gpu.temperature = ScalarMetric{64.0 + std::sin(step * 0.05 + 0.8) * 5.0, ScalarMetricUnit::Celsius};
+    snapshot.gpu.clock = ScalarMetric{2410.0 + std::sin(step * 0.08 + 0.2) * 105.0, ScalarMetricUnit::Megahertz};
+    snapshot.gpu.fan = ScalarMetric{1540.0 + std::sin(step * 0.06 + 0.5) * 140.0, ScalarMetricUnit::Rpm};
+    snapshot.gpu.vram.usedGb = 8.1 + std::sin(step * 0.04 + 0.1) * 0.9;
+
+    snapshot.network.uploadMbps = 82.0 + std::sin(step * 0.18) * 32.0;
+    snapshot.network.downloadMbps = 305.0 + std::sin(step * 0.14 + 0.6) * 110.0;
+    snapshot.storage.readMbps = 410.0 + std::sin(step * 0.15 + 0.3) * 135.0;
+    snapshot.storage.writeMbps = 148.0 + std::sin(step * 0.11 + 0.9) * 58.0;
+
+    for (size_t i = 0; i < snapshot.drives.size(); ++i) {
+        DriveInfo& drive = snapshot.drives[i];
+        const double phase = step * (0.09 + static_cast<double>(i) * 0.01);
+        drive.usedPercent = 35.0 + std::fmod(static_cast<double>(i) * 13.0 + step * 0.35, 55.0);
+        drive.freeGb = drive.totalGb * (100.0 - drive.usedPercent) / 100.0;
+        drive.readMbps = 28.0 + std::sin(phase) * 12.0 + static_cast<double>(i * 7);
+        drive.writeMbps = 14.0 + std::sin(phase + 0.8) * 8.0 + static_cast<double>(i * 5);
+    }
+
+    if (!snapshot.boardTemperatures.empty()) {
+        snapshot.boardTemperatures[0].metric.value = 71.0 + std::sin(step * 0.05) * 4.0;
+    }
+    if (snapshot.boardTemperatures.size() > 1) {
+        snapshot.boardTemperatures[1].metric.value = 60.0 + std::sin(step * 0.04 + 0.7) * 3.0;
+    }
+    if (!snapshot.boardFans.empty()) {
+        snapshot.boardFans[0].metric.value = 900.0 + std::sin(step * 0.08 + 0.5) * 90.0;
+    }
+
+    PushRetainedHistorySample(snapshot, "cpu.load", snapshot.cpu.loadPercent);
+    PushRetainedHistorySample(snapshot, "gpu.load", snapshot.gpu.loadPercent);
+    PushRetainedHistorySample(snapshot, "network.upload", snapshot.network.uploadMbps);
+    PushRetainedHistorySample(snapshot, "network.download", snapshot.network.downloadMbps);
+    PushRetainedHistorySample(snapshot, "storage.read", snapshot.storage.readMbps);
+    PushRetainedHistorySample(snapshot, "storage.write", snapshot.storage.writeMbps);
+    if (!snapshot.boardTemperatures.empty()) {
+        PushRetainedHistorySample(snapshot, "board.temp.cpu", snapshot.boardTemperatures[0].metric.value.value_or(0.0));
+    }
+    if (snapshot.boardTemperatures.size() > 1) {
+        PushRetainedHistorySample(snapshot, "board.temp.vrm", snapshot.boardTemperatures[1].metric.value.value_or(0.0));
+    }
+    if (!snapshot.boardFans.empty()) {
+        PushRetainedHistorySample(snapshot, "board.fan.system", snapshot.boardFans[0].metric.value.value_or(0.0));
+    }
+
+    FILETIME fileTime{};
+    SystemTimeToFileTime(&snapshot.now, &fileTime);
+    ULARGE_INTEGER ticks{};
+    ticks.LowPart = fileTime.dwLowDateTime;
+    ticks.HighPart = fileTime.dwHighDateTime;
+    ticks.QuadPart += 10ULL * 1000ULL * 1000ULL;
+    fileTime.dwLowDateTime = ticks.LowPart;
+    fileTime.dwHighDateTime = ticks.HighPart;
+    FileTimeToSystemTime(&fileTime, &snapshot.now);
+
+    ++snapshot.revision;
+}
+
 std::optional<LayoutEditGuide> FindTopLevelGuide(const DashboardRenderer& renderer) {
     const auto& guides = renderer.LayoutEditGuides();
     const auto it = std::find_if(guides.begin(), guides.end(), [](const auto& guide) {
@@ -176,7 +309,7 @@ RenderPoint DragPointForWeights(
 
 class BenchmarkDragHost : private LayoutEditHost {
 public:
-    BenchmarkDragHost(const AppConfig& config, const SystemSnapshot& snapshot, double renderScale)
+    BenchmarkDragHost(const AppConfig& config, SystemSnapshot& snapshot, double renderScale)
         : config_(config), snapshot_(snapshot), renderScale_(renderScale), layoutEditController_(*this) {
         renderer_.SetConfig(config_);
         renderer_.SetRenderScale(renderScale_);
@@ -223,8 +356,23 @@ public:
         return renderer_;
     }
 
-    const std::array<PhaseStats, 4>& PhaseTotals() const {
+    const std::array<PhaseStats, kBenchPhaseCount>& PhaseTotals() const {
         return phaseTotals_;
+    }
+
+    void ResetPhaseTotals() {
+        phaseTotals_ = {};
+    }
+
+    void DrawCurrentSnapshot() {
+        const auto paintStart = Clock::now();
+        const auto drawStart = Clock::now();
+        renderer_.DrawWindow(snapshot_, overlayState_);
+        const auto drawEnd = Clock::now();
+
+        const auto paintEnd = Clock::now();
+        RecordPhase(BenchPhase::PaintDraw, drawEnd - drawStart);
+        RecordPhase(BenchPhase::PaintTotal, paintEnd - paintStart);
     }
 
     void FlushPaintIfDirty() {
@@ -233,14 +381,13 @@ public:
         }
 
         dirty_ = false;
-        const auto paintStart = Clock::now();
-        const auto drawStart = Clock::now();
-        renderer_.DrawWindow(snapshot_, overlayState_);
-        const auto drawEnd = Clock::now();
+        DrawCurrentSnapshot();
+    }
 
-        const auto paintEnd = Clock::now();
-        RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);
-        RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);
+    void AdvanceTelemetry(size_t iteration) {
+        const auto start = Clock::now();
+        AdvanceSyntheticSnapshot(snapshot_, iteration);
+        RecordPhase(BenchPhase::TelemetryUpdate, Clock::now() - start);
     }
 
     HWND WindowHandle() const {
@@ -314,9 +461,7 @@ private:
 
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override {
         traceSession_.Record(phase, elapsed);
-        PhaseStats& stats = phaseTotals_[PhaseIndex(phase)];
-        stats.total += elapsed;
-        ++stats.samples;
+        RecordPhase(static_cast<BenchPhase>(PhaseIndex(phase)), elapsed);
     }
 
     void EndLayoutEditTraceSession(const std::string& reason) override {
@@ -327,13 +472,19 @@ private:
     AppConfig config_{};
     DashboardRenderer renderer_{};
     DashboardRenderer::EditOverlayState overlayState_{};
-    const SystemSnapshot& snapshot_;
+    void RecordPhase(BenchPhase phase, std::chrono::nanoseconds elapsed) {
+        PhaseStats& stats = phaseTotals_[PhaseIndex(phase)];
+        stats.total += elapsed;
+        ++stats.samples;
+    }
+
+    SystemSnapshot& snapshot_;
     double renderScale_ = 1.0;
     bool dirty_ = false;
     LayoutEditController layoutEditController_;
     LayoutEditTraceSession traceSession_{};
     std::ostringstream traceStream_{};
-    std::array<PhaseStats, 4> phaseTotals_{};
+    std::array<PhaseStats, kBenchPhaseCount> phaseTotals_{};
 };
 
 BenchResult RunDragBenchmark(BenchmarkDragHost& host,
@@ -369,6 +520,24 @@ void PrintBenchResult(const BenchResult& result) {
               << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
 }
 
+BenchResult RunTelemetryUpdateBenchmark(BenchmarkDragHost& host, size_t iterations) {
+    host.DrawCurrentSnapshot();
+    host.ResetPhaseTotals();
+
+    const auto start = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        host.AdvanceTelemetry(iteration);
+        host.DrawCurrentSnapshot();
+    }
+    const Duration total = Clock::now() - start;
+    return {total, total / static_cast<double>(iterations)};
+}
+
+void PrintTelemetryBenchResult(const BenchResult& result) {
+    std::cout << std::left << std::setw(14) << "update_loop" << " total_ms=" << std::fixed << std::setprecision(2)
+              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+}
+
 void PrintPhaseResult(const char* name, const PhaseStats& stats) {
     if (stats.samples == 0) {
         return;
@@ -383,58 +552,82 @@ void PrintPhaseResult(const char* name, const PhaseStats& stats) {
 }  // namespace
 
 int main(int argc, char** argv) {
+    std::string benchmarkName = "edit-layout";
     size_t iterations = 240;
     double renderScale = 2.0;
     if (argc >= 2) {
-        const long long parsed = std::atoll(argv[1]);
-        if (parsed > 0) {
-            iterations = static_cast<size_t>(parsed);
+        const std::string firstArg = argv[1];
+        int nextArgument = 1;
+        if (IsKnownBenchmarkName(firstArg)) {
+            benchmarkName = IsEditLayoutBenchmarkName(firstArg) ? "edit-layout" : firstArg;
+            ++nextArgument;
         }
-    }
-    if (argc >= 3) {
-        const double parsed = std::atof(argv[2]);
-        if (std::isfinite(parsed) && parsed > 0.0) {
-            renderScale = parsed;
+
+        if (argc > nextArgument) {
+            const long long parsed = std::atoll(argv[nextArgument]);
+            if (parsed > 0) {
+                iterations = static_cast<size_t>(parsed);
+            }
+        }
+        if (argc > nextArgument + 1) {
+            const double parsed = std::atof(argv[nextArgument + 1]);
+            if (std::isfinite(parsed) && parsed > 0.0) {
+                renderScale = parsed;
+            }
         }
     }
 
+    if (!IsKnownBenchmarkName(benchmarkName)) {
+        std::cerr << "unknown benchmark \"" << benchmarkName << "\"\n";
+        return 1;
+    }
+
     const AppConfig config = LoadConfig(SourceConfigPath(), false);
-    const SystemSnapshot snapshot = BuildSyntheticSnapshot(config);
+    SystemSnapshot snapshot = BuildSyntheticSnapshot(config);
     BenchmarkDragHost host(config, snapshot, renderScale);
     if (!host.Initialize()) {
         std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
         return 1;
     }
 
-    const std::optional<LayoutEditGuide> guide = FindTopLevelGuide(host.LayoutRenderer());
-    if (!guide.has_value()) {
-        std::cerr << "no top-level layout guide found\n";
-        return 1;
+    if (benchmarkName == "edit-layout") {
+        const std::optional<LayoutEditGuide> guide = FindTopLevelGuide(host.LayoutRenderer());
+        if (!guide.has_value()) {
+            std::cerr << "no top-level layout guide found\n";
+            return 1;
+        }
+
+        const LayoutEditHost::LayoutTarget target = LayoutEditHost::LayoutTarget::ForGuide(*guide);
+        const LayoutNodeConfig* node = FindGuideNode(config, target);
+        const std::vector<int> initialWeights = SeedGuideWeights(*guide, node);
+        const std::vector<std::vector<int>> weightSequence = BuildWeightSequence(initialWeights, iterations);
+        if (weightSequence.empty()) {
+            std::cerr << "weight sequence generation failed\n";
+            return 1;
+        }
+
+        std::cout << "layout_edit_drag_benchmark guide_children=" << initialWeights.size()
+                  << " separator_index=" << guide->separatorIndex << " iterations=" << weightSequence.size()
+                  << " render_scale=" << renderScale << "\n";
+
+        const BenchResult result = RunDragBenchmark(host, *guide, initialWeights, weightSequence);
+        PrintBenchResult(result);
+
+        const auto& phases = host.PhaseTotals();
+        PrintPhaseResult(PhaseName(BenchPhase::Snap), phases[PhaseIndex(BenchPhase::Snap)]);
+        PrintPhaseResult(PhaseName(BenchPhase::Apply), phases[PhaseIndex(BenchPhase::Apply)]);
+        PrintPhaseResult(PhaseName(BenchPhase::PaintTotal), phases[PhaseIndex(BenchPhase::PaintTotal)]);
+        PrintPhaseResult(PhaseName(BenchPhase::PaintDraw), phases[PhaseIndex(BenchPhase::PaintDraw)]);
+        return 0;
     }
 
-    const LayoutEditHost::LayoutTarget target = LayoutEditHost::LayoutTarget::ForGuide(*guide);
-    const LayoutNodeConfig* node = FindGuideNode(config, target);
-    const std::vector<int> initialWeights = SeedGuideWeights(*guide, node);
-    const std::vector<std::vector<int>> weightSequence = BuildWeightSequence(initialWeights, iterations);
-    if (weightSequence.empty()) {
-        std::cerr << "weight sequence generation failed\n";
-        return 1;
-    }
-
-    std::cout << "layout_edit_drag_benchmark guide_children=" << initialWeights.size()
-              << " separator_index=" << guide->separatorIndex << " iterations=" << weightSequence.size()
-              << " render_scale=" << renderScale << "\n";
-
-    const BenchResult result = RunDragBenchmark(host, *guide, initialWeights, weightSequence);
-    PrintBenchResult(result);
+    std::cout << "update_telemetry_benchmark iterations=" << iterations << " render_scale=" << renderScale << "\n";
+    const BenchResult result = RunTelemetryUpdateBenchmark(host, iterations);
+    PrintTelemetryBenchResult(result);
 
     const auto& phases = host.PhaseTotals();
-    PrintPhaseResult(PhaseName(LayoutEditHost::TracePhase::Snap), phases[PhaseIndex(LayoutEditHost::TracePhase::Snap)]);
-    PrintPhaseResult(
-        PhaseName(LayoutEditHost::TracePhase::Apply), phases[PhaseIndex(LayoutEditHost::TracePhase::Apply)]);
-    PrintPhaseResult(
-        PhaseName(LayoutEditHost::TracePhase::PaintTotal), phases[PhaseIndex(LayoutEditHost::TracePhase::PaintTotal)]);
-    PrintPhaseResult(
-        PhaseName(LayoutEditHost::TracePhase::PaintDraw), phases[PhaseIndex(LayoutEditHost::TracePhase::PaintDraw)]);
+    PrintPhaseResult(PhaseName(BenchPhase::TelemetryUpdate), phases[PhaseIndex(BenchPhase::TelemetryUpdate)]);
+    PrintPhaseResult(PhaseName(BenchPhase::PaintTotal), phases[PhaseIndex(BenchPhase::PaintTotal)]);
+    PrintPhaseResult(PhaseName(BenchPhase::PaintDraw), phases[PhaseIndex(BenchPhase::PaintDraw)]);
     return 0;
 }

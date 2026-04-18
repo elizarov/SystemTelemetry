@@ -2,35 +2,41 @@
 
 ## Purpose
 
-This file records the current layout-edit drag benchmark baseline, the latest confirmed hotspots, and the optimization hypotheses that have already been tested. Keep it current after benchmark or profiling work so future experiments can build on prior results instead of repeating failed ideas.
+This file records the current benchmark baselines, the latest confirmed hotspots, and the optimization hypotheses that have already been tested. Keep it current after benchmark or profiling work so future experiments can build on prior results instead of repeating failed ideas.
 
 ## Benchmark Workflow
 
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
-- Measure the repeatable benchmark with `build\SystemTelemetryBenchmarks.exe 240 2`.
-- Capture a full profile with `profile_benchmark.cmd 240 2` when a change materially moves the benchmark or when hotspot confirmation is needed.
+- Measure the repeatable layout-edit benchmark with `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`.
+- Measure the repeatable telemetry-refresh benchmark with `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`.
+- Capture a full profile with `profile_benchmark.cmd edit-layout 240 2` or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
 - Daemon-backed and one-shot elevated runs persist the benchmark stdout in the request directory and replay it in the caller window after the request finishes, so the requesting shell sees the same timing lines that the elevated process produced.
 - `profile_benchmark.cmd` rebuilds automatically through the daemon path, so profiling runs do not need a separate preceding `build.cmd` step.
-- Treat `build\SystemTelemetryBenchmarks.exe 240 2` as the fast comparison loop and the WPR profile as hotspot validation.
+- Treat direct `build\SystemTelemetryBenchmarks.exe <benchmark> 240 2` runs as the fast comparison loop and the WPR profile as hotspot validation.
 
 ## Current Known Baseline
 
-- Original baseline before the drag-path optimizations in this workstream:
+- Original `edit-layout` baseline before the drag-path optimizations in this workstream:
   - `drag_loop per_iter_ms=7.24`
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
-- Best measured result reached during this workstream:
+- Best measured `edit-layout` result reached during this workstream:
   - `drag_loop per_iter_ms=2.45`
   - `snap avg_ms=0.20`
   - `apply avg_ms=0.22`
   - `paint_draw avg_ms=1.98`
-- Current repeatable result on the current tree:
-  - `drag_loop per_iter_ms=2.54` to `2.57`
-  - `snap avg_ms=0.18` to `0.19`
-  - `apply avg_ms=0.12`
-  - `paint_draw avg_ms=2.22` to `2.27`
+- Current repeatable `edit-layout` result on the current tree:
+  - `drag_loop per_iter_ms=2.48` to `2.68`
+  - `snap avg_ms=0.19` to `0.20`
+  - `apply avg_ms=0.12` to `0.13`
+  - `paint_draw avg_ms=2.17` to `2.35`
+- Current repeatable `update-telemetry` result on the current tree:
+  - `update_loop per_iter_ms=1.82` to `1.85`
+  - `telemetry_update avg_ms~=0.002`
+  - `paint_total avg_ms=1.82` to `1.85`
+  - `paint_draw avg_ms=1.82` to `1.85`
 
 ## Current Confirmed Hotspots
 
@@ -47,6 +53,7 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
+- The direct `update-telemetry` benchmark split shows the same steady-state shape: snapshot mutation stays below one tenth of one percent of total loop time, while repaint accounts for effectively all measured work.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely.
 
 ## Kept Optimizations
@@ -66,6 +73,18 @@ These changes produced real wins and remain in the codebase:
 - Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
 
 ## Tested Hypotheses
+
+### Hypothesis: Steady-state telemetry refresh cost is mostly repaint, not snapshot mutation
+
+- Change:
+  - Add a second `update-telemetry` benchmark mode to `SystemTelemetryBenchmarks`, thread that selector through `profile_benchmark.cmd`, and measure a loop that mutates one live `SystemSnapshot` revision plus retained histories before each repaint without changing layout config.
+- Result:
+  - Confirmed.
+- Observed effect:
+  - `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=1.82` to `1.85`, `telemetry_update total_ms=0.42` to `0.43`, and `paint_draw avg_ms=1.82` to `1.85`.
+  - `build\SystemTelemetryBenchmarks.exe update-telemetry 480 2` ran at `update_loop per_iter_ms=1.84`, `telemetry_update total_ms=0.87`, and `paint_draw avg_ms=1.84`.
+- Conclusion:
+  - The current steady-state telemetry refresh path is overwhelmingly repaint-bound on this tree. Snapshot mutation plus retained-history updates are negligible compared with the Direct2D and DirectWrite frame, so future telemetry-refresh wins are more likely to come from draw-path reductions than from collector-side micro-optimizations.
 
 ### Hypothesis: Avoid full config copies during snap probing
 

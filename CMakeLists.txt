@@ -319,7 +319,7 @@ add_test(NAME SystemTelemetryTests COMMAND SystemTelemetryTests)
 
 add_executable(SystemTelemetryBenchmarks
     resources/SystemTelemetry.rc
-    tests/layout_drag_profile_benchmark.cpp
+    tests/benchmarks.cpp
     src/config.cpp
     src/config_parser.cpp
     src/config_resolution.cpp

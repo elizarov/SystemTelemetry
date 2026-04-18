@@ -90,17 +90,19 @@ try {
 
             Set-Content -LiteralPath $lockFile -Value "running" -Encoding ascii
 
+            $benchmark = Read-RequestValue -RequestPath $requestFile -Name "benchmark" -DefaultValue "edit-layout"
             $iterations = Read-RequestValue -RequestPath $requestFile -Name "iterations" -DefaultValue "600"
             $renderScale = Read-RequestValue -RequestPath $requestFile -Name "render_scale" -DefaultValue "2"
-            $etlPath = Join-Path $requestDir.FullName "layout_edit_benchmark_wpr.etl"
-            $summaryPath = Join-Path $requestDir.FullName "layout_edit_benchmark_wpr.txt"
-            $calltreePath = Join-Path $requestDir.FullName "layout_edit_benchmark_wpr_calltree.html"
+            $benchmarkStem = $benchmark.Replace("-", "_")
+            $etlPath = Join-Path $requestDir.FullName "${benchmarkStem}_benchmark_wpr.etl"
+            $summaryPath = Join-Path $requestDir.FullName "${benchmarkStem}_benchmark_wpr.txt"
+            $calltreePath = Join-Path $requestDir.FullName "${benchmarkStem}_benchmark_wpr_calltree.html"
 
             try {
-                Write-Host "[daemon] Running request $($requestDir.Name) iterations=$iterations scale=$renderScale"
+                Write-Host "[daemon] Running request $($requestDir.Name) benchmark=$benchmark iterations=$iterations scale=$renderScale"
                 $previousForceBuild = $env:PROFILE_BENCHMARK_FORCE_BUILD
                 $env:PROFILE_BENCHMARK_FORCE_BUILD = "1"
-                & $profileScript $iterations $renderScale /run-request $requestDir.FullName
+                & $profileScript $benchmark $iterations $renderScale /run-request $requestDir.FullName
                 $exitCode = $LASTEXITCODE
                 if (-not (Test-Path -LiteralPath $doneFile) -and -not (Test-Path -LiteralPath $errorFile)) {
                     $lines = @(

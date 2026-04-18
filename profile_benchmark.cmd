@@ -7,6 +7,8 @@ if errorlevel 1 exit /b %errorlevel%
 
 set "ITERATIONS="
 set "RENDER_SCALE="
+set "BENCHMARK_NAME="
+set "BENCHMARK_STEM="
 set "COMMAND=run"
 set "REQUEST_ELEVATION=0"
 set "IS_ELEVATED_RELAUNCH=0"
@@ -52,6 +54,21 @@ if /i "%~1"=="/elevated" (
     shift
     goto parse_args
 )
+if not defined BENCHMARK_NAME if /i "%~1"=="edit-layout" (
+    set "BENCHMARK_NAME=edit-layout"
+    shift
+    goto parse_args
+)
+if not defined BENCHMARK_NAME if /i "%~1"=="eidt-layout" (
+    set "BENCHMARK_NAME=edit-layout"
+    shift
+    goto parse_args
+)
+if not defined BENCHMARK_NAME if /i "%~1"=="update-telemetry" (
+    set "BENCHMARK_NAME=update-telemetry"
+    shift
+    goto parse_args
+)
 if not defined ITERATIONS (
     set "ITERATIONS=%~1"
 ) else if not defined RENDER_SCALE (
@@ -61,8 +78,10 @@ shift
 goto parse_args
 
 :args_done
+if not defined BENCHMARK_NAME set "BENCHMARK_NAME=edit-layout"
 if not defined ITERATIONS set "ITERATIONS=600"
 if not defined RENDER_SCALE set "RENDER_SCALE=2"
+call :set_benchmark_stem
 
 if /i "%COMMAND%"=="daemon_start" goto daemon_start
 if /i "%COMMAND%"=="daemon_stop" goto daemon_stop
@@ -134,10 +153,17 @@ if not defined REQUEST_DIR (
     echo Missing request directory for /run-request.
     exit /b 1
 )
-set "TRACE_ETL=%REQUEST_DIR%\layout_edit_benchmark_wpr.etl"
-set "TRACE_TXT=%REQUEST_DIR%\layout_edit_benchmark_wpr.txt"
-set "TRACE_CALLTREE_HTML=%REQUEST_DIR%\layout_edit_benchmark_wpr_calltree.html"
-set "BENCHMARK_OUTPUT=%REQUEST_DIR%\layout_edit_benchmark_stdout.txt"
+if exist "%REQUEST_DIR%\request.env" (
+    for /f "usebackq tokens=1,* delims==" %%A in ("%REQUEST_DIR%\request.env") do (
+        if /i "%%A"=="benchmark" set "BENCHMARK_NAME=%%B"
+    )
+    if not defined BENCHMARK_NAME set "BENCHMARK_NAME=edit-layout"
+    call :set_benchmark_stem
+)
+set "TRACE_ETL=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr.etl"
+set "TRACE_TXT=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr.txt"
+set "TRACE_CALLTREE_HTML=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr_calltree.html"
+set "BENCHMARK_OUTPUT=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_stdout.txt"
 del /q "%REQUEST_DIR%\done.env" >nul 2>nul
 del /q "%REQUEST_DIR%\error.txt" >nul 2>nul
 call :run_benchmark "%TRACE_ETL%" "%TRACE_TXT%" "%TRACE_CALLTREE_HTML%" "%BENCHMARK_OUTPUT%"
@@ -206,10 +232,11 @@ if errorlevel 1 (
     exit /b 1
 )
 > "%REQUEST_DIR%\request.env" (
+    echo benchmark=%BENCHMARK_NAME%
     echo iterations=%ITERATIONS%
     echo render_scale=%RENDER_SCALE%
 )
-echo Waiting for benchmark daemon request %REQUEST_ID%...
+echo Waiting for benchmark daemon request %REQUEST_ID% benchmark=%BENCHMARK_NAME%...
 call :wait_for_request_completion "%REQUEST_DIR%" 600
 call :read_request_exit_code "%REQUEST_DIR%\done.env"
 exit /b %REQUEST_RESULT_CODE%
@@ -334,9 +361,10 @@ if errorlevel 1 (
 echo Running benchmark iterations=%ITERATIONS% scale=%RENDER_SCALE%...
 if defined BENCHMARK_OUTPUT (
     set "PROFILE_BENCHMARK_STDOUT=%BENCHMARK_OUTPUT%"
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & $env:BENCHMARK_EXE %ITERATIONS% %RENDER_SCALE% 2>&1 | Tee-Object -FilePath $env:PROFILE_BENCHMARK_STDOUT; exit $LASTEXITCODE }"
+    set "PROFILE_BENCHMARK_NAME=%BENCHMARK_NAME%"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & $env:BENCHMARK_EXE $env:PROFILE_BENCHMARK_NAME %ITERATIONS% %RENDER_SCALE% 2>&1 | Tee-Object -FilePath $env:PROFILE_BENCHMARK_STDOUT; exit $LASTEXITCODE }"
 ) else (
-    "%BENCHMARK_EXE%" %ITERATIONS% %RENDER_SCALE%
+    "%BENCHMARK_EXE%" %BENCHMARK_NAME% %ITERATIONS% %RENDER_SCALE%
 )
 set "BENCHMARK_RC=%errorlevel%"
 
@@ -368,15 +396,16 @@ if "%IS_ELEVATED_RELAUNCH%"=="1" (
     exit /b 1
 )
 
+call :set_benchmark_stem
 if not exist "%DAEMON_ROOT%\adhoc" mkdir "%DAEMON_ROOT%\adhoc"
 del /q "%DAEMON_ROOT%\adhoc\done.env" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\error.txt" >nul 2>nul
-del /q "%DAEMON_ROOT%\adhoc\layout_edit_benchmark_stdout.txt" >nul 2>nul
-del /q "%DAEMON_ROOT%\adhoc\layout_edit_benchmark_wpr.etl" >nul 2>nul
-del /q "%DAEMON_ROOT%\adhoc\layout_edit_benchmark_wpr.txt" >nul 2>nul
-del /q "%DAEMON_ROOT%\adhoc\layout_edit_benchmark_wpr_calltree.html" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_stdout.txt" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr.etl" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr.txt" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr_calltree.html" >nul 2>nul
 echo Requesting administrator access for WPR CPU profiling...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:ComSpec -ArgumentList '/c ""%~f0"" %ITERATIONS% %RENDER_SCALE% /elevated /run-request ""%DAEMON_ROOT%\adhoc""' -WorkingDirectory '%REPO_ROOT%' -Verb RunAs -Wait | Out-Null"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:ComSpec -ArgumentList '/c ""%~f0"" %BENCHMARK_NAME% %ITERATIONS% %RENDER_SCALE% /elevated /run-request ""%DAEMON_ROOT%\adhoc""' -WorkingDirectory '%REPO_ROOT%' -Verb RunAs -Wait | Out-Null"
 if errorlevel 1 (
     echo Administrator approval is required to capture the benchmark CPU profile.
     exit /b 1
@@ -384,3 +413,7 @@ if errorlevel 1 (
 call :wait_for_request_completion "%DAEMON_ROOT%\adhoc" 10
 call :read_request_exit_code "%DAEMON_ROOT%\adhoc\done.env"
 exit /b %REQUEST_RESULT_CODE%
+
+:set_benchmark_stem
+set "BENCHMARK_STEM=%BENCHMARK_NAME:-=_%"
+exit /b 0
