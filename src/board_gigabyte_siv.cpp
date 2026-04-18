@@ -275,7 +275,9 @@ void CollectManagedSensors(GigabyteRuntimeContext ^ context,
         args = gcnew array<Object ^>{sensorKind, nullptr};
     }
     args[0] = sensorKind;
-    args[1] = nullptr;
+    // Gigabyte SIV expects a live collection instance here even though the
+    // parameter is passed by reference; a null out value faults inside SIV.
+    args[1] = Activator::CreateInstance(context->collectionType);
     context->getCurrentMethod->Invoke(context->monitor, args);
     IEnumerable ^ enumerable = dynamic_cast<IEnumerable ^>(args[1]);
     if (enumerable == nullptr) {
@@ -295,8 +297,7 @@ void CollectManagedSensors(GigabyteRuntimeContext ^ context,
             }
             fans->push_back(FanReading{titleUtf8, numericValue});
         } else if (temperatures != nullptr) {
-            if (!ManagedUnitEquals(unit, context->celsiusUnit) &&
-                !ManagedUnitEquals(unit, context->degreeCUnit)) {
+            if (!ManagedUnitEquals(unit, context->celsiusUnit) && !ManagedUnitEquals(unit, context->degreeCUnit)) {
                 continue;
             }
             temperatures->push_back(TemperatureReading{titleUtf8, numericValue});
@@ -396,7 +397,8 @@ public:
         requestedTemperatureIndexBySourceName_.clear();
         requestedFanIndexBySourceName_.clear();
         for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
-            requestedTemperatureIndexBySourceName_.emplace(ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name), i);
+            requestedTemperatureIndexBySourceName_.emplace(
+                ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name), i);
         }
         for (size_t i = 0; i < fanMetricTemplate_.size(); ++i) {
             requestedFanIndexBySourceName_.emplace(ResolveFanSensorName(fanMetricTemplate_[i].name), i);

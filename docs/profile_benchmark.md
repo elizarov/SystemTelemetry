@@ -35,17 +35,17 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.12` to `0.13`
   - `paint_draw avg_ms=2.17` to `2.35`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=3.27` to `3.39`
-  - `telemetry_update avg_ms=1.44` to `1.55`
-  - `paint_total avg_ms=1.83` to `1.84`
-  - `paint_draw avg_ms=1.83` to `1.84`
+  - `update_loop per_iter_ms=4.05` to `4.14`
+  - `telemetry_update avg_ms=2.19` to `2.22`
+  - `paint_total avg_ms=1.86` to `1.92`
+  - `paint_draw avg_ms=1.86` to `1.92`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\32133_5363_16857\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, `amdxx64.dll`, `clr.dll`, and a much smaller remaining `PDH.DLL` slice.
-- The current uncached capture is no longer collector-bound on this machine: `TelemetryCollector::UpdateSnapshot()` now lands below repaint in both the direct and daemon-backed runs.
+- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\22655_18646_22144\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `DWrite.dll`, `clr.dll`, `TextShaping.dll`, `amdxx64.dll`, and a much smaller remaining `pdh.dll` slice.
+- The current uncached capture is mildly collector-bound again on this machine: `TelemetryCollector::UpdateSnapshot()` now lands slightly above repaint in both the direct and daemon-backed runs after restoring the live Gigabyte collection allocation required for real board samples.
 - `PDH.DLL` is no longer the dominant steady-state collector hotspot after the AMD GPU path stops redundantly asking both ADLX and PDH for live GPU load and used VRAM on supported hardware.
 - The remaining collector cost is now concentrated more heavily in the Gigabyte CLR-backed board provider and the AMD vendor GPU provider, while the Direct2D and DirectWrite frame becomes the larger side of the full benchmark again.
 - The fast direct reruns and the daemon-backed capture still agree closely enough that the latest collector reduction is real even though the exported text view still does not fully resolve every app-owned leaf by symbol.
@@ -54,8 +54,8 @@ Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
-- Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `1.44` to `1.55 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.83` to `1.84 ms` in repaint on this machine.
+- Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.19` to `2.22 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.86` to `1.92 ms` in repaint on this machine.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
 ## Kept Optimizations
@@ -131,16 +131,18 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Reuse board-provider reflection scaffolding and remove remaining vendor trace-format churn
 
 - Change:
-  - Keep every telemetry source live on every update, but let the Gigabyte SIV reflection call reuse hot-path argument arrays and cached managed unit strings instead of allocating them per sample, pass the collection parameter as an out value instead of constructing a new collection instance before every call, and make the remaining AMD per-sample metric trace formatting lazy when no trace stream is attached.
+  - Keep every telemetry source live on every update, but let the Gigabyte SIV reflection call reuse hot-path argument arrays and cached managed unit strings instead of rebuilding them per sample, and make the remaining AMD per-sample metric trace formatting lazy when no trace stream is attached.
 - Result:
-  - Helped materially.
+  - Helped materially, but one attempted sub-change was backed out after real-provider validation.
 - Observed effect:
   - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
-  - After the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=5.16`, `telemetry_update avg_ms=3.33`, and `paint_draw avg_ms=1.84`.
-  - A confirmation rerun `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` landed at `update_loop per_iter_ms=5.34`, `telemetry_update avg_ms=3.48`, and `paint_draw avg_ms=1.86`.
-  - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=5.50`, `telemetry_update avg_ms=3.56`, and `paint_draw avg_ms=1.94`.
+  - The first version of the change, which also passed the SIV collection parameter as a null by-ref out value, benchmarked at `update_loop per_iter_ms=5.16`, `telemetry_update avg_ms=3.33`, and `paint_draw avg_ms=1.84`, with a confirmation rerun at `update_loop per_iter_ms=5.34`, `telemetry_update avg_ms=3.48`, and `paint_draw avg_ms=1.86`.
+  - A fresh real headless validation run on April 18, 2026 with `SystemTelemetry.exe /trace:build\gigabyte_fixed_trace.txt /dump:build\gigabyte_fixed_dump.txt /default-config /exit` showed that null by-ref out value faulted inside SIV as `gigabyte_siv:snapshot_exception ... NullReferenceException`, so the collection-instance part of the optimization was reverted while keeping the reused argument arrays and cached unit strings.
+  - With the live collection instance restored, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` now runs at `update_loop per_iter_ms=4.05`, `telemetry_update avg_ms=2.19`, and `paint_draw avg_ms=1.86`.
+  - A confirmation rerun `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` lands at `update_loop per_iter_ms=4.14`, `telemetry_update avg_ms=2.22`, and `paint_draw avg_ms=1.92`.
+  - The latest daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` lands at `update_loop per_iter_ms=4.28`, `telemetry_update avg_ms=2.29`, and `paint_draw avg_ms=2.00`.
 - Conclusion:
-  - The live-update benchmark still spends most of its time inside real telemetry APIs, but the Gigabyte provider in particular was paying meaningful extra CPU for per-sample reflection argument setup and managed-string churn. Reusing those internal resources is worth keeping because it reduces real CPU consumed in the uncached path without reusing sampled values or hiding latency behind parallel work.
+  - The live-update benchmark still spends most of its time inside real telemetry APIs, but the Gigabyte provider was paying meaningful extra CPU for per-sample reflection argument setup and managed-string churn. Reusing those internal resources is worth keeping, but `GetCurrentMonitoredData` still requires a live collection instance even on its by-reference parameter, so that specific null-out shortcut must stay reverted.
 
 ### Hypothesis: Compute both GPU PDH engine totals from one wildcard fetch
 
