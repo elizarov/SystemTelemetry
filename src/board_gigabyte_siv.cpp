@@ -322,13 +322,15 @@ bool CaptureGigabyteSnapshot(
                 << " fan_count=" << snapshot.fans.size() << " temp_count=" << snapshot.temperatures.size();
         snapshot.diagnostics = details.str();
         diagnostics = snapshot.diagnostics;
-        trace.Write("gigabyte_siv:snapshot_done fan_count=" + std::to_string(snapshot.fans.size()) +
-                    " temp_count=" + std::to_string(snapshot.temperatures.size()));
+        trace.WriteLazy([&] {
+            return "gigabyte_siv:snapshot_done fan_count=" + std::to_string(snapshot.fans.size()) +
+                   " temp_count=" + std::to_string(snapshot.temperatures.size());
+        });
         return true;
     } catch (Exception ^ ex) {
         diagnostics = Utf8FromManagedString(ex->ToString());
         snapshot.diagnostics = diagnostics;
-        trace.Write("gigabyte_siv:snapshot_exception " + diagnostics);
+        trace.WriteLazy([&] { return "gigabyte_siv:snapshot_exception " + diagnostics; });
         return false;
     }
 }
@@ -381,6 +383,13 @@ public:
 
         loadedLibrary_ = Utf8FromWide((std::filesystem::path(*sivDirectory) / kEngineEnvironmentControlDll).wstring());
         diagnostics_ = "Gigabyte SIV provider ready.";
+        requestedDiagnosticsSuffix_.clear();
+        if (!settings_.requestedTemperatureNames.empty()) {
+            requestedDiagnosticsSuffix_ += " requested_temps=" + JoinNames(settings_.requestedTemperatureNames);
+        }
+        if (!settings_.requestedFanNames.empty()) {
+            requestedDiagnosticsSuffix_ += " requested_fans=" + JoinNames(settings_.requestedFanNames);
+        }
         initialized_ = true;
         return true;
     }
@@ -390,17 +399,17 @@ public:
         sample.providerName = "Gigabyte";
         sample.requestedFanNames = settings_.requestedFanNames;
         sample.requestedTemperatureNames = settings_.requestedTemperatureNames;
-        sample.availableFanNames = ExtractSensorNames(fanReadings_);
-        sample.availableTemperatureNames = ExtractSensorNames(tempReadings_);
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
         sample.driverLibrary = loadedLibrary_;
-        sample.temperatures = BuildRequestedTemperatures();
-        sample.fans = BuildRequestedFans();
-        sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = diagnostics_;
 
         if (!initialized_) {
+            sample.availableFanNames = ExtractSensorNames(fanReadings_);
+            sample.availableTemperatureNames = ExtractSensorNames(tempReadings_);
+            sample.temperatures = BuildRequestedTemperatures();
+            sample.fans = BuildRequestedFans();
+            sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
+            sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
             return sample;
         }
 
@@ -421,13 +430,7 @@ public:
         sample.temperatures = BuildRequestedTemperatures();
         sample.fans = BuildRequestedFans();
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = diagnostics_;
-        if (!sample.requestedTemperatureNames.empty()) {
-            sample.diagnostics += " requested_temps=" + JoinNames(sample.requestedTemperatureNames);
-        }
-        if (!sample.requestedFanNames.empty()) {
-            sample.diagnostics += " requested_fans=" + JoinNames(sample.requestedFanNames);
-        }
+        sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
         return sample;
     }
 
@@ -477,6 +480,7 @@ private:
     std::string boardProduct_;
     std::string loadedLibrary_;
     std::string diagnostics_ = "Gigabyte provider not initialized.";
+    std::string requestedDiagnosticsSuffix_;
     std::vector<FanReading> fanReadings_;
     std::vector<TemperatureReading> tempReadings_;
     bool initialized_ = false;

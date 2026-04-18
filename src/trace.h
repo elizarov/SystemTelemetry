@@ -15,6 +15,13 @@ public:
 
     void Write(const char* text) const;
     void Write(const std::string& text) const;
+    template <typename Builder>
+    void WriteLazy(Builder&& builder) const {
+        if (output_ == nullptr) {
+            return;
+        }
+        Write(builder());
+    }
 
     static std::string BoolText(bool value);
     static std::string FormatAdlxResult(const char* label, int result);

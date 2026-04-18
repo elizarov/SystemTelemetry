@@ -300,9 +300,10 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
     selected.InterfaceIndex = state.network_.selectedIndex;
     const DWORD rowStatus = GetIfEntry2(&selected);
     if (rowStatus != NO_ERROR) {
-        state.trace_.Write(("telemetry:network_row " + tracing::Trace::FormatWin32Status("status", rowStatus) +
-                            " interface=" + std::to_string(state.network_.selectedIndex))
-                .c_str());
+        state.trace_.WriteLazy([&] {
+            return "telemetry:network_row " + tracing::Trace::FormatWin32Status("status", rowStatus) +
+                   " interface=" + std::to_string(state.network_.selectedIndex);
+        });
         return;
     }
 
@@ -312,9 +313,10 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
             state.snapshot_.network.uploadMbps = 0.0;
             state.snapshot_.network.downloadMbps = 0.0;
         }
-        state.trace_.Write(("telemetry:network_rates skipped=selection_missing interface=" +
-                            std::to_string(state.network_.selectedIndex))
-                .c_str());
+        state.trace_.WriteLazy([&] {
+            return "telemetry:network_rates skipped=selection_missing interface=" +
+                   std::to_string(state.network_.selectedIndex);
+        });
         return;
     }
 
@@ -339,12 +341,13 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
                 state.snapshot_, "network.upload", state.snapshot_.network.uploadMbps);
             state.retainedHistoryStore_.PushSample(
                 state.snapshot_, "network.download", state.snapshot_.network.downloadMbps);
-            state.trace_.Write((
-                "telemetry:network_rates interface=" + std::to_string(selected.InterfaceIndex) +
-                " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) +
-                " upload_mbps=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.network.uploadMbps, 3) +
-                " download_mbps=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.network.downloadMbps, 3))
-                    .c_str());
+            state.trace_.WriteLazy([&] {
+                return "telemetry:network_rates interface=" + std::to_string(selected.InterfaceIndex) +
+                       " seconds=" + tracing::Trace::FormatValueDouble("value", seconds, 3) + " upload_mbps=" +
+                       tracing::Trace::FormatValueDouble("value", state.snapshot_.network.uploadMbps, 3) +
+                       " download_mbps=" +
+                       tracing::Trace::FormatValueDouble("value", state.snapshot_.network.downloadMbps, 3);
+            });
         } else {
             state.snapshot_.network.uploadMbps = 0.0;
             state.snapshot_.network.downloadMbps = 0.0;

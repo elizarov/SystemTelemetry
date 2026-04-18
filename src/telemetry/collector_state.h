@@ -25,6 +25,7 @@
 
 struct DriveCounterState {
     std::string label;
+    std::wstring rootPath;
     PDH_HCOUNTER readCounter = nullptr;
     PDH_HCOUNTER writeCounter = nullptr;
 };
@@ -53,6 +54,7 @@ struct RealTelemetryCollectorState {
         PDH_HCOUNTER loadCounter = nullptr;
         PDH_HQUERY memoryQuery = nullptr;
         PDH_HCOUNTER dedicatedCounter = nullptr;
+        std::vector<BYTE> counterArrayBuffer;
     };
 
     struct StorageState {

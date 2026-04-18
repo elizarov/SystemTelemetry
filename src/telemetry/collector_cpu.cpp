@@ -22,10 +22,11 @@ void UpdateMemory(RealTelemetryCollectorState& state) {
         state.snapshot_.cpu.memory.totalGb = memory.ullTotalPhys / (1024.0 * 1024.0 * 1024.0);
         state.snapshot_.cpu.memory.usedGb = (memory.ullTotalPhys - memory.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
     }
-    Trace(state,
-        "telemetry:memory_status ok=" + tracing::Trace::BoolText(ok != FALSE) +
-            " total_gb=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.totalGb, 2) +
-            " used_gb=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.usedGb, 2));
+    state.trace_.WriteLazy([&] {
+        return "telemetry:memory_status ok=" + tracing::Trace::BoolText(ok != FALSE) +
+               " total_gb=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.totalGb, 2) +
+               " used_gb=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.usedGb, 2);
+    });
     state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.ram", state.snapshot_.cpu.memory.usedGb);
 }
 
@@ -72,7 +73,8 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
     }
 
     const PDH_STATUS collectStatus = PdhCollectQueryData(state.cpu_.query);
-    Trace(state, "telemetry:cpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus));
+    state.trace_.WriteLazy(
+        [&] { return "telemetry:cpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus); });
 
     PDH_FMT_COUNTERVALUE value{};
     PDH_STATUS loadStatus = PDH_INVALID_DATA;
@@ -81,9 +83,10 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
             ERROR_SUCCESS) {
         state.snapshot_.cpu.loadPercent = ClampFinite(value.doubleValue, 0.0, 100.0);
     }
-    Trace(state,
-        "telemetry:cpu_load " + tracing::Trace::FormatPdhStatus("status", loadStatus) + " " +
-            tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.loadPercent, 2));
+    state.trace_.WriteLazy([&] {
+        return "telemetry:cpu_load " + tracing::Trace::FormatPdhStatus("status", loadStatus) + " " +
+               tracing::Trace::FormatValueDouble("value", state.snapshot_.cpu.loadPercent, 2);
+    });
     state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.load", state.snapshot_.cpu.loadPercent);
 
     PDH_STATUS clockStatus = PDH_INVALID_DATA;
@@ -93,10 +96,11 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
         state.snapshot_.cpu.clock.value = FiniteOptional(value.doubleValue / 1000.0);
         state.snapshot_.cpu.clock.unit = ScalarMetricUnit::Gigahertz;
     }
-    Trace(state,
-        "telemetry:cpu_clock " + tracing::Trace::FormatPdhStatus("status", clockStatus) + " value=" +
-            (state.snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(state.snapshot_.cpu.clock, 2)
-                                                         : std::string("N/A")));
+    state.trace_.WriteLazy([&] {
+        return "telemetry:cpu_clock " + tracing::Trace::FormatPdhStatus("status", clockStatus) + " value=" +
+               (state.snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(state.snapshot_.cpu.clock, 2)
+                                                            : std::string("N/A"));
+    });
     state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.clock", state.snapshot_.cpu.clock.value.value_or(0.0));
 
     UpdateMemory(state);

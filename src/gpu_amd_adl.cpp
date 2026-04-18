@@ -125,6 +125,9 @@ public:
         const ADLX_RESULT tempResult = metricsSupport_->IsSupportedGPUTemperature(&tempSupported);
         const ADLX_RESULT clockResult = metricsSupport_->IsSupportedGPUClockSpeed(&clockSupported);
         const ADLX_RESULT fanResult = metricsSupport_->IsSupportedGPUFanSpeed(&fanSupported);
+        temperatureSupported_ = ADLX_SUCCEEDED(tempResult) && tempSupported;
+        clockSupported_ = ADLX_SUCCEEDED(clockResult) && clockSupported;
+        fanSupported_ = ADLX_SUCCEEDED(fanResult) && fanSupported;
 
         std::ostringstream diag;
         diag << "ADLX GPU=" << gpuName_ << " temp_supported=" << (tempSupported ? "yes" : "no") << "("
@@ -153,28 +156,24 @@ public:
         IADLXGPUMetricsPtr metrics;
         trace().Write("amd_adlx:get_current_metrics_begin");
         const ADLX_RESULT metricsResult = performanceMonitoring_->GetCurrentGPUMetrics(gpu_, &metrics);
-        trace().Write("amd_adlx:get_current_metrics_done " +
-                      tracing::Trace::FormatAdlxResult("result", static_cast<int>(metricsResult)) +
-                      " available=" + tracing::Trace::BoolText(metrics != nullptr));
+        trace().WriteLazy([&] {
+            return "amd_adlx:get_current_metrics_done " +
+                   tracing::Trace::FormatAdlxResult("result", static_cast<int>(metricsResult)) +
+                   " available=" + tracing::Trace::BoolText(metrics != nullptr);
+        });
         if (ADLX_FAILED(metricsResult) || !metrics) {
             sample.diagnostics = diagnostics_ + " " +
                                  tracing::Trace::FormatAdlxResult("current_metrics", static_cast<int>(metricsResult));
             sample.available = false;
-            trace().Write("amd_adlx:get_current_metrics_failed diagnostics=\"" + sample.diagnostics + "\"");
+            trace().WriteLazy([&] { return "amd_adlx:get_current_metrics_failed diagnostics=\"" + sample.diagnostics + "\""; });
             return sample;
         }
-
-        std::ostringstream status;
-        status << diagnostics_ << " sample:";
         bool hasAnyMetric = false;
 
-        adlx_bool supported = false;
-        ADLX_RESULT result = metricsSupport_->IsSupportedGPUTemperature(&supported);
-        status << " temp_support=" << static_cast<int>(result);
-        if (ADLX_SUCCEEDED(result) && supported) {
+        if (temperatureSupported_) {
             adlx_double temperature = 0.0;
             trace().Write("amd_adlx:get_temperature_begin");
-            result = metrics->GPUTemperature(&temperature);
+            const ADLX_RESULT result = metrics->GPUTemperature(&temperature);
             {
                 char buffer[128];
                 sprintf_s(buffer,
@@ -183,20 +182,16 @@ public:
                     temperature);
                 trace().Write(buffer);
             }
-            status << " temp=" << static_cast<int>(result);
             if (ADLX_SUCCEEDED(result)) {
                 sample.temperatureC = temperature;
                 hasAnyMetric = true;
             }
         }
 
-        supported = false;
-        result = metricsSupport_->IsSupportedGPUClockSpeed(&supported);
-        status << " clock_support=" << static_cast<int>(result);
-        if (ADLX_SUCCEEDED(result) && supported) {
+        if (clockSupported_) {
             adlx_int clockMhz = 0;
             trace().Write("amd_adlx:get_clock_begin");
-            result = metrics->GPUClockSpeed(&clockMhz);
+            const ADLX_RESULT result = metrics->GPUClockSpeed(&clockMhz);
             {
                 char buffer[128];
                 sprintf_s(buffer,
@@ -205,20 +200,16 @@ public:
                     static_cast<int>(clockMhz));
                 trace().Write(buffer);
             }
-            status << " clock=" << static_cast<int>(result);
             if (ADLX_SUCCEEDED(result)) {
                 sample.coreClockMhz = static_cast<double>(clockMhz);
                 hasAnyMetric = true;
             }
         }
 
-        supported = false;
-        result = metricsSupport_->IsSupportedGPUFanSpeed(&supported);
-        status << " fan_support=" << static_cast<int>(result);
-        if (ADLX_SUCCEEDED(result) && supported) {
+        if (fanSupported_) {
             adlx_int fanRpm = 0;
             trace().Write("amd_adlx:get_fan_begin");
-            result = metrics->GPUFanSpeed(&fanRpm);
+            const ADLX_RESULT result = metrics->GPUFanSpeed(&fanRpm);
             {
                 char buffer[128];
                 sprintf_s(buffer,
@@ -227,17 +218,17 @@ public:
                     static_cast<int>(fanRpm));
                 trace().Write(buffer);
             }
-            status << " fan=" << static_cast<int>(result);
             if (ADLX_SUCCEEDED(result)) {
                 sample.fanRpm = static_cast<double>(fanRpm);
                 hasAnyMetric = true;
             }
         }
 
-        sample.diagnostics = status.str();
         sample.available = hasAnyMetric;
-        trace().Write("amd_adlx:sample_done available=" + tracing::Trace::BoolText(sample.available) +
-                      " diagnostics=\"" + sample.diagnostics + "\"");
+        trace().WriteLazy([&] {
+            return "amd_adlx:sample_done available=" + tracing::Trace::BoolText(sample.available) + " diagnostics=\"" +
+                   sample.diagnostics + "\"";
+        });
         return sample;
     }
 
@@ -255,6 +246,9 @@ private:
     std::string gpuName_;
     std::string diagnostics_ = "ADLX provider not initialized.";
     std::optional<double> totalVramGb_;
+    bool temperatureSupported_ = false;
+    bool clockSupported_ = false;
+    bool fanSupported_ = false;
     bool initialized_ = false;
 };
 

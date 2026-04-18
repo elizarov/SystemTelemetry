@@ -33,27 +33,27 @@ This file records the current benchmark baselines, the latest confirmed hotspots
   - `apply avg_ms=0.12` to `0.13`
   - `paint_draw avg_ms=2.17` to `2.35`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=7.75` to `7.99`
-  - `telemetry_update avg_ms=5.58` to `5.93`
-  - `paint_total avg_ms=2.06` to `2.18`
-  - `paint_draw avg_ms=2.06` to `2.18`
+  - `update_loop per_iter_ms=6.15` to `6.23`
+  - `telemetry_update avg_ms=4.22` to `4.34`
+  - `paint_total avg_ms=1.88` to `1.94`
+  - `paint_draw avg_ms=1.88` to `1.94`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\25566_17198_5736\` keeps the benchmark-process inclusive module weight centered on `PDH.DLL`, `clr.dll`, `amdxx64.dll`, `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, and smaller remaining `iphlpapi.dll` work.
-- The uncached capture restores a clearly collector-bound split: `TelemetryCollector::UpdateSnapshot()` stays more than twice the repaint cost on this machine.
-- `PDH.DLL` remains the clearest steady-state collector hotspot, with the Gigabyte CLR-backed board provider and the AMD vendor GPU provider immediately behind it in the current no-cache benchmark shape.
+- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\27365_8562_18495\` keeps the benchmark-process inclusive module weight centered on `PDH.DLL`, `clr.dll`, `amdxx64.dll`, `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, and smaller remaining `iphlpapi.dll` work.
+- The current uncached capture stays clearly collector-bound: `TelemetryCollector::UpdateSnapshot()` is still a bit more than twice the repaint cost on this machine.
+- `PDH.DLL` remains the clearest steady-state collector hotspot, with the Gigabyte CLR-backed board provider and the AMD vendor GPU provider still immediately behind it in the current no-cache benchmark shape.
 - The Direct2D and DirectWrite frame is still the dominant repaint cost, but it is no longer the main limiter for `update-telemetry`.
-- The fast direct reruns and the daemon-backed capture agree closely enough that the uncached collector cost is real even though the exported text view still does not fully resolve every app-owned leaf by symbol.
+- The fast direct reruns and the daemon-backed capture agree closely enough that the reduced uncached collector cost is real even though the exported text view still does not fully resolve every app-owned leaf by symbol.
 
 Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `5.58` to `5.93 ms` in `TelemetryCollector::UpdateSnapshot()` versus `2.06` to `2.18 ms` in repaint on this machine.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `4.22` to `4.34 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.88` to `1.94 ms` in repaint on this machine.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
 ## Kept Optimizations
@@ -98,6 +98,19 @@ These changes produced real wins and remain in the codebase:
   - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=4.41`, `telemetry_update avg_ms=2.42`, and `paint_draw avg_ms=2.00`.
 - Conclusion:
   - The cache-backed version proves those sources are expensive, but the current benchmark intentionally leaves board, GPU-vendor, and drive metadata uncached so steady-state profiles keep stressing the full telemetry path and expose which source is intrinsically slow.
+
+### Hypothesis: Trim telemetry bookkeeping around live API calls without reusing sampled values
+
+- Change:
+  - Keep every telemetry source live on every update, but stop building dynamic trace strings when no trace stream is attached, reuse the GPU PDH array scratch buffer, reuse per-drive root-path state instead of rebuilding it per refresh, cache ADLX support flags discovered at initialization, and stop rebuilding verbose provider diagnostics payloads on each successful vendor sample.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=7.75`, `telemetry_update avg_ms=5.58`, and `paint_draw avg_ms=2.18`.
+  - After the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
+  - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=6.16`, `telemetry_update avg_ms=4.22`, and `paint_draw avg_ms=1.94`.
+- Conclusion:
+  - The no-cache benchmark still spends most of its time in the real telemetry APIs, but a meaningful slice of the old cost was collector-side scaffolding around those calls. Lazy trace formatting and reusable per-provider scratch state are worth keeping because they reduce benchmark noise without hiding the real source-update cost.
 
 ### Hypothesis: Avoid full config copies during snap probing
 
