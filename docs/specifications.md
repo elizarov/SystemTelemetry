@@ -4,7 +4,7 @@ This project is a compact, real-time system monitoring dashboard designed for a 
 presenting only the telemetry that can be collected cleanly through Windows APIs or vendor APIs.
 It combines CPU load, temperature, clock, fan speed, and RAM usage with GPU load, temperature, clock, fan speed, and VRAM usage,
 alongside network activity, system-wide storage throughput, multi-drive storage status, and a clock, all organized into a balanced panel layout.
-The design emphasizes glanceable visuals with large load indicators, concise numeric stats, and minimal clutter.
+The design emphasizes glanceable visuals with large load indicators, concise numeric stats, minimal clutter, and subdued card separators.
 
 ```text
 ┌──────────────────────────────┬───────────────────────────────┐
@@ -66,6 +66,7 @@ Examples include:
 - The `[display]` section must select the active dashboard layout by name through `display.layout`, and named dashboard size-and-card-placement definitions must live in `[layout.<name>]` sections with aspect-ratio names plus an optional `description` popup label suffix.
 - The `[display]` section must store the dashboard render scale through `display.scale` as a fractional multiplier where `0` means the runtime uses the current monitor DPI scale.
 - The shipped config template must define `5x3` as the default active layout, also include an experimental `3x5` portrait layout for the same panel resolution, and expose human-readable layout descriptions such as `5" 800x480 screen` for the layout popup.
+- The shipped `[colors]` defaults must keep card borders visible as subtle separators instead of bright outlines.
 - The config overlay path must replace parsed layout expressions during overlay, so `config.ini` overrides `[layout.<name>]` and `[card.*]` layout trees without duplicating cards or widgets.
 
 ### Layout and rendering behavior
