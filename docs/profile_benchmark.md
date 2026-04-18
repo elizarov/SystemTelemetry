@@ -33,10 +33,10 @@ This file records the current benchmark baselines, the latest confirmed hotspots
   - `apply avg_ms=0.12` to `0.13`
   - `paint_draw avg_ms=2.17` to `2.35`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=1.82` to `1.85`
-  - `telemetry_update avg_ms~=0.002`
-  - `paint_total avg_ms=1.82` to `1.85`
-  - `paint_draw avg_ms=1.82` to `1.85`
+  - `update_loop per_iter_ms=10.90` to `12.01`
+  - `telemetry_update avg_ms=8.90` to `9.97`
+  - `paint_total avg_ms=2.00` to `2.04`
+  - `paint_draw avg_ms=2.00` to `2.04`
 
 ## Current Confirmed Hotspots
 
@@ -53,7 +53,7 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark split shows the same steady-state shape: snapshot mutation stays below one tenth of one percent of total loop time, while repaint accounts for effectively all measured work.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the split shows `TelemetryCollector::UpdateSnapshot()` dominating the steady-state refresh at roughly four to five times the repaint cost on this machine.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely.
 
 ## Kept Optimizations
@@ -77,14 +77,14 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Steady-state telemetry refresh cost is mostly repaint, not snapshot mutation
 
 - Change:
-  - Add a second `update-telemetry` benchmark mode to `SystemTelemetryBenchmarks`, thread that selector through `profile_benchmark.cmd`, and measure a loop that mutates one live `SystemSnapshot` revision plus retained histories before each repaint without changing layout config.
+  - Add a second `update-telemetry` benchmark mode to `SystemTelemetryBenchmarks`, thread that selector through `profile_benchmark.cmd`, and measure a loop that constructs the real `TelemetryCollector`, uses the collector-resolved runtime config, calls `TelemetryCollector::UpdateSnapshot()` each iteration, and repaints the collector-owned snapshot without inserting any timer wait.
 - Result:
-  - Confirmed.
+  - Rejected.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=1.82` to `1.85`, `telemetry_update total_ms=0.42` to `0.43`, and `paint_draw avg_ms=1.82` to `1.85`.
-  - `build\SystemTelemetryBenchmarks.exe update-telemetry 480 2` ran at `update_loop per_iter_ms=1.84`, `telemetry_update total_ms=0.87`, and `paint_draw avg_ms=1.84`.
+  - `build\SystemTelemetryBenchmarks.exe update-telemetry 60 2` ran at `update_loop per_iter_ms=12.01`, `telemetry_update avg_ms=9.97`, and `paint_draw avg_ms=2.04`.
+  - `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=10.90`, `telemetry_update avg_ms=8.90`, and `paint_draw avg_ms=2.00`.
 - Conclusion:
-  - The current steady-state telemetry refresh path is overwhelmingly repaint-bound on this tree. Snapshot mutation plus retained-history updates are negligible compared with the Direct2D and DirectWrite frame, so future telemetry-refresh wins are more likely to come from draw-path reductions than from collector-side micro-optimizations.
+  - The earlier repaint-bound result came from a synthetic snapshot-mutation loop and does not describe the real app path. With the real collector in place, steady-state telemetry refresh is collector-bound on this tree, so future `update-telemetry` wins should focus on `TelemetryCollector::UpdateSnapshot()` and its provider work before chasing another millisecond out of repaint.
 
 ### Hypothesis: Avoid full config copies during snap probing
 

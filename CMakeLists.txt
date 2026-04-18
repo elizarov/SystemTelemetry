@@ -320,9 +320,27 @@ add_test(NAME SystemTelemetryTests COMMAND SystemTelemetryTests)
 add_executable(SystemTelemetryBenchmarks
     resources/SystemTelemetry.rc
     tests/benchmarks.cpp
+    src/app_strings.cpp
     src/config.cpp
     src/config_parser.cpp
     src/config_resolution.cpp
+    src/system_info_support.cpp
+    src/telemetry.cpp
+    src/telemetry/collector_state.cpp
+    src/telemetry/collector_board.cpp
+    src/telemetry/collector_cpu.cpp
+    src/telemetry/collector_gpu.cpp
+    src/telemetry/collector_support.cpp
+    src/telemetry/retained_history.cpp
+    src/telemetry/collector_storage.cpp
+    src/telemetry/collector_storage_selection.cpp
+    src/telemetry/collector_network.cpp
+    src/telemetry/collector_real.cpp
+    src/telemetry/collector_fake.cpp
+    src/snapshot_dump.cpp
+    src/gpu_vendor.cpp
+    src/gpu_amd_adl.cpp
+    src/board_vendor.cpp
     src/layout_edit_types.cpp
     src/layout_edit_parameter.cpp
     src/layout_edit_controller.cpp
@@ -347,10 +365,16 @@ add_executable(SystemTelemetryBenchmarks
     src/dashboard_renderer.cpp
     src/utf8.cpp
     src/trace.cpp
+    src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
+    src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
+)
+target_sources(SystemTelemetryBenchmarks PRIVATE
+    $<TARGET_OBJECTS:SystemTelemetryGigabyte>
 )
 target_include_directories(SystemTelemetryBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
+    "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
 )
 target_compile_definitions(SystemTelemetryBenchmarks PRIVATE
     UNICODE
@@ -379,6 +403,14 @@ target_link_libraries(SystemTelemetryBenchmarks PRIVATE
     d2d1
     dwrite
     windowscodecs
+    pdh
+    iphlpapi
+    dxgi
+    ws2_32
+    ole32
+    oleaut32
+    advapi32
+    ${MSCOREE_LIB}
 )
 set_target_properties(SystemTelemetryBenchmarks PROPERTIES
     PDB_NAME_RELEASE "SystemTelemetryBenchmarks"
