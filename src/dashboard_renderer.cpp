@@ -192,10 +192,14 @@ RenderRect TextAnchorRectForShape(const DashboardRenderer& renderer, const Rende
     const int anchorSize = std::max(4, renderer.ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     if (shape == AnchorShape::Wedge) {
-        return RenderRect{textRect.left - anchorHalf,
-            textRect.top - anchorHalf,
-            textRect.left - anchorHalf + anchorSize,
-            textRect.top - anchorHalf + anchorSize};
+        const int wedgeHeight = std::max(6, renderer.ScaleLogical(8));
+        const int wedgeHalfHeight = wedgeHeight / 2;
+        const int protrusion = std::max(4, renderer.ScaleLogical(7));
+        const int inset = std::max(4, renderer.ScaleLogical(5));
+        return RenderRect{textRect.left - protrusion,
+            textRect.top - wedgeHalfHeight,
+            textRect.left + inset,
+            textRect.top - wedgeHalfHeight + wedgeHeight};
     }
 
     const int anchorCenterX = textRect.right;
@@ -1383,7 +1387,8 @@ void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<LayoutEditAncho
     region.targetRect = targetRect;
     region.anchorRect = anchorRect;
     region.shape = shape;
-    const int anchorHitInset = shape == AnchorShape::Wedge ? 0 : std::max(3, ScaleLogical(4));
+    const int anchorHitInset =
+        shape == AnchorShape::Wedge ? std::max(4, ScaleLogical(5)) : std::max(3, ScaleLogical(4));
     region.anchorHitPadding = anchorHitInset;
     region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
         region.anchorRect.top - anchorHitInset,

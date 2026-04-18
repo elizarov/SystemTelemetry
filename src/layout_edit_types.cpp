@@ -174,7 +174,7 @@ int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key) {
     if (const auto parameter = LayoutEditAnchorParameter(key); parameter.has_value()) {
         return GetLayoutEditParameterHitPriority(*parameter);
     }
-    return 0;
+    return -1;
 }
 
 bool IsLayoutGuidePayload(const TooltipPayload& payload) {

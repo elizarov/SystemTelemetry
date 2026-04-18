@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "layout_edit_parameter.h"
 #include "layout_edit_types.h"
 
 TEST(LayoutEditTypes, MatchesWidgetIdentityUsingKindAndPath) {
@@ -208,6 +209,21 @@ TEST(LayoutEditTypes, MatchesSelectedParameterFocusAgainstWidgetAndAnchorArtifac
     EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, widgetGuide));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, gapAnchorKey));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(focusKey, editableAnchorKey));
+}
+
+TEST(LayoutEditTypes, PrioritizesMetricAndTitleAnchorsAboveGuides) {
+    LayoutEditAnchorKey metricAnchor;
+    metricAnchor.subject = LayoutMetricEditKey{"board.fan.system"};
+
+    LayoutEditAnchorKey titleAnchor;
+    titleAnchor.subject = LayoutCardTitleEditKey{"card-a"};
+
+    EXPECT_LT(LayoutEditAnchorHitPriority(metricAnchor),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::MetricListLabelWidth));
+    EXPECT_LT(LayoutEditAnchorHitPriority(metricAnchor),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
+    EXPECT_LT(LayoutEditAnchorHitPriority(titleAnchor),
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::CardHeaderContentGap));
 }
 
 TEST(LayoutEditTypes, MatchesSelectedWeightFocusAgainstLayoutGuidesOnly) {
