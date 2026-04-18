@@ -138,8 +138,7 @@ public:
         std::ostringstream diag;
         diag << "ADLX GPU=" << gpuName_ << " usage_supported=" << (usageSupported ? "yes" : "no") << "("
              << static_cast<int>(usageResult) << ")"
-             << " temp_supported=" << (tempSupported ? "yes" : "no") << "("
-             << static_cast<int>(tempResult) << ")"
+             << " temp_supported=" << (tempSupported ? "yes" : "no") << "(" << static_cast<int>(tempResult) << ")"
              << " clock_supported=" << (clockSupported ? "yes" : "no") << "(" << static_cast<int>(clockResult) << ")"
              << " fan_supported=" << (fanSupported ? "yes" : "no") << "(" << static_cast<int>(fanResult) << ")"
              << " vram_supported=" << (vramSupported ? "yes" : "no") << "(" << static_cast<int>(vramResult) << ")";
@@ -174,7 +173,8 @@ public:
             sample.diagnostics = diagnostics_ + " " +
                                  tracing::Trace::FormatAdlxResult("current_metrics", static_cast<int>(metricsResult));
             sample.available = false;
-            trace().WriteLazy([&] { return "amd_adlx:get_current_metrics_failed diagnostics=\"" + sample.diagnostics + "\""; });
+            trace().WriteLazy(
+                [&] { return "amd_adlx:get_current_metrics_failed diagnostics=\"" + sample.diagnostics + "\""; });
             return sample;
         }
         bool hasAnyMetric = false;
@@ -185,10 +185,7 @@ public:
             const ADLX_RESULT result = metrics->GPUUsage(&usage);
             trace().WriteLazy([&] {
                 char buffer[128];
-                sprintf_s(buffer,
-                    "amd_adlx:get_usage_done result=%d value=%.1f",
-                    static_cast<int>(result),
-                    usage);
+                sprintf_s(buffer, "amd_adlx:get_usage_done result=%d value=%.1f", static_cast<int>(result), usage);
                 return std::string(buffer);
             });
             if (ADLX_SUCCEEDED(result)) {

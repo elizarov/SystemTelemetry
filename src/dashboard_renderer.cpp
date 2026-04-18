@@ -347,9 +347,8 @@ DashboardRenderer::~DashboardRenderer() {
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
     const bool paletteChanged = config_.layout.colors != config.layout.colors;
-    const bool iconInputsChanged =
-        config_.layout.colors.iconColor != config.layout.colors.iconColor ||
-        !SamePanelIconInputs(config_.layout.cards, config.layout.cards);
+    const bool iconInputsChanged = config_.layout.colors.iconColor != config.layout.colors.iconColor ||
+                                   !SamePanelIconInputs(config_.layout.cards, config.layout.cards);
     const bool textFormatsChanged = config_.layout.fonts != config.layout.fonts;
     const bool metricsChanged = config_.layout.metrics != config.layout.metrics;
     if (metricsChanged) {
@@ -2225,8 +2224,7 @@ const std::string& DashboardRenderer::ResolveConfiguredMetricSampleValueText(std
     if (cached != metricSampleValueTextCache_.end()) {
         return cached->second;
     }
-    return metricSampleValueTextCache_
-        .emplace(key, ResolveMetricSampleValueText(config_.layout.metrics, key))
+    return metricSampleValueTextCache_.emplace(key, ResolveMetricSampleValueText(config_.layout.metrics, key))
         .first->second;
 }
 

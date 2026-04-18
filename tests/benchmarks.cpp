@@ -369,6 +369,7 @@ private:
     AppConfig config_{};
     DashboardRenderer renderer_{};
     DashboardRenderer::EditOverlayState overlayState_{};
+
     void RecordPhase(BenchPhase phase, std::chrono::nanoseconds elapsed) {
         PhaseStats& stats = phaseTotals_[PhaseIndex(phase)];
         stats.total += elapsed;
