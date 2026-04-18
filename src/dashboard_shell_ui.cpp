@@ -632,6 +632,17 @@ public:
         shellUi_.UpdateLayoutEditSelectionHighlight(highlight);
     }
 
+    void RestackLayoutEditDialogAnchor(HWND dialogHwnd) override {
+        const HWND anchorHwnd = shellUi_.app_.WindowHandle();
+        if (dialogHwnd == nullptr || anchorHwnd == nullptr || !IsWindow(dialogHwnd) || !IsWindow(anchorHwnd) ||
+            dialogHwnd == anchorHwnd) {
+            return;
+        }
+
+        ShowWindow(anchorHwnd, SW_SHOWNOACTIVATE);
+        SetWindowPos(anchorHwnd, dialogHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+
     void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const override {
         shellUi_.TraceLayoutEditDialogEvent(event, details);
     }

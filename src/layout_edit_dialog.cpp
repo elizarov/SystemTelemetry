@@ -51,6 +51,7 @@ void LayoutEditDialog::BringToFront() {
     BringWindowToTop(hwnd_);
     SetActiveWindow(hwnd_);
     SetForegroundWindow(hwnd_);
+    host_.RestackLayoutEditDialogAnchor(hwnd_);
 }
 
 void LayoutEditDialog::PositionWindow(HWND hwnd) const {

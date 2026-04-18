@@ -42,6 +42,7 @@ public:
 
     virtual std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const = 0;
     virtual void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) = 0;
+    virtual void RestackLayoutEditDialogAnchor(HWND dialogHwnd) = 0;
     virtual void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const = 0;
     virtual void OnLayoutEditDialogCloseRequested() = 0;
 };

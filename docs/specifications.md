@@ -66,6 +66,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Hovering actionable targets also shows a standard Win32 tooltip whose first line matches the edited config shape and whose second line uses the shared localized description for that target.
 - Right-clicking an actionable target prepends one focused `Edit ...` action for that exact target.
 - The modeless `Edit Configuration` window stays separate from the dashboard window, exposes a config-ordered tree plus a live editor pane, previews valid edits immediately, and keeps only the current edit session inside its save or discard boundary.
+- Bringing the `Edit Configuration` window to the foreground also raises the dashboard directly behind it in Z-order so the editor and dashboard stay visually paired.
 - The editor supports filtering, per-field revert, config-local descriptions, and specialized editors for numeric values, fonts, colors, metrics, weight pairs, and metric-list row ordering.
 - Metric leaves whose ids begin with `board.temp.` or `board.fan.` also expose a live `Binding` selector for the matching board-sensor mapping.
 - Metric-list widgets support row reorder handles and add-row affordances.
