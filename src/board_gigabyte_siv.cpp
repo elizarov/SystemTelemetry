@@ -175,6 +175,11 @@ public:
     Object ^ sourceHwRegister = nullptr;
     Object ^ sensorFan = nullptr;
     Object ^ sensorTemperature = nullptr;
+    array<Object ^> ^ fanArgs = nullptr;
+    array<Object ^> ^ temperatureArgs = nullptr;
+    String ^ rpmUnit = nullptr;
+    String ^ celsiusUnit = nullptr;
+    String ^ degreeCUnit = nullptr;
     bool loaded = false;
 };
 
@@ -251,6 +256,11 @@ bool InitializeGigabyteRuntime(GigabyteRuntimeContext ^ context, tracing::Trace&
             context->sourceHwRegister = Enum::Parse(context->sourceType, "HwRegister", false);
             context->sensorFan = Enum::Parse(context->sensorType, "Fan", false);
             context->sensorTemperature = Enum::Parse(context->sensorType, "Temperature", false);
+            context->fanArgs = gcnew array<Object ^>{context->sensorFan, nullptr};
+            context->temperatureArgs = gcnew array<Object ^>{context->sensorTemperature, nullptr};
+            context->rpmUnit = gcnew String(L"RPM");
+            context->celsiusUnit = gcnew String(L"\u2103");
+            context->degreeCUnit = gcnew String(L"\u00B0C");
 
             trace.Write("gigabyte_siv:monitor_created type=\"" +
                         Utf8FromManagedString(context->monitor->GetType()->FullName) + "\"");
@@ -273,8 +283,12 @@ void CollectManagedSensors(GigabyteRuntimeContext ^ context,
     Object ^ sensorKind,
     std::vector<FanReading>* fans,
     std::vector<TemperatureReading>* temperatures) {
-    Object ^ collection = Activator::CreateInstance(context->collectionType);
-    array<Object ^> ^ args = gcnew array<Object ^>{sensorKind, collection};
+    array<Object ^> ^ args = fans != nullptr ? context->fanArgs : context->temperatureArgs;
+    if (args == nullptr) {
+        args = gcnew array<Object ^>{sensorKind, nullptr};
+    }
+    args[0] = sensorKind;
+    args[1] = nullptr;
     context->getCurrentMethod->Invoke(context->monitor, args);
     IEnumerable ^ enumerable = dynamic_cast<IEnumerable ^>(args[1]);
     if (enumerable == nullptr) {
@@ -289,13 +303,13 @@ void CollectManagedSensors(GigabyteRuntimeContext ^ context,
         const double numericValue = Convert::ToDouble(valueObject, Globalization::CultureInfo::InvariantCulture);
 
         if (fans != nullptr) {
-            if (!ManagedUnitEquals(unit, "RPM")) {
+            if (!ManagedUnitEquals(unit, context->rpmUnit)) {
                 continue;
             }
             fans->push_back(FanReading{titleUtf8, numericValue});
         } else if (temperatures != nullptr) {
-            if (!ManagedUnitEquals(unit, gcnew String(L"\u2103")) &&
-                !ManagedUnitEquals(unit, gcnew String(L"\u00B0C"))) {
+            if (!ManagedUnitEquals(unit, context->celsiusUnit) &&
+                !ManagedUnitEquals(unit, context->degreeCUnit)) {
                 continue;
             }
             temperatures->push_back(TemperatureReading{titleUtf8, numericValue});

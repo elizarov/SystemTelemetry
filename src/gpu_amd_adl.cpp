@@ -174,14 +174,14 @@ public:
             adlx_double temperature = 0.0;
             trace().Write("amd_adlx:get_temperature_begin");
             const ADLX_RESULT result = metrics->GPUTemperature(&temperature);
-            {
+            trace().WriteLazy([&] {
                 char buffer[128];
                 sprintf_s(buffer,
                     "amd_adlx:get_temperature_done result=%d value=%.1f",
                     static_cast<int>(result),
                     temperature);
-                trace().Write(buffer);
-            }
+                return std::string(buffer);
+            });
             if (ADLX_SUCCEEDED(result)) {
                 sample.temperatureC = temperature;
                 hasAnyMetric = true;
@@ -192,14 +192,14 @@ public:
             adlx_int clockMhz = 0;
             trace().Write("amd_adlx:get_clock_begin");
             const ADLX_RESULT result = metrics->GPUClockSpeed(&clockMhz);
-            {
+            trace().WriteLazy([&] {
                 char buffer[128];
                 sprintf_s(buffer,
                     "amd_adlx:get_clock_done result=%d value=%d",
                     static_cast<int>(result),
                     static_cast<int>(clockMhz));
-                trace().Write(buffer);
-            }
+                return std::string(buffer);
+            });
             if (ADLX_SUCCEEDED(result)) {
                 sample.coreClockMhz = static_cast<double>(clockMhz);
                 hasAnyMetric = true;
@@ -210,14 +210,14 @@ public:
             adlx_int fanRpm = 0;
             trace().Write("amd_adlx:get_fan_begin");
             const ADLX_RESULT result = metrics->GPUFanSpeed(&fanRpm);
-            {
+            trace().WriteLazy([&] {
                 char buffer[128];
                 sprintf_s(buffer,
                     "amd_adlx:get_fan_done result=%d value=%d",
                     static_cast<int>(result),
                     static_cast<int>(fanRpm));
-                trace().Write(buffer);
-            }
+                return std::string(buffer);
+            });
             if (ADLX_SUCCEEDED(result)) {
                 sample.fanRpm = static_cast<double>(fanRpm);
                 hasAnyMetric = true;
