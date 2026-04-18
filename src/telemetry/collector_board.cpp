@@ -16,8 +16,8 @@ void ApplyBoardVendorSample(RealTelemetryCollectorState& state, const BoardVendo
     state.board_.driverLibrary = sample.driverLibrary;
     state.board_.requestedFanNames = sample.requestedFanNames;
     state.board_.requestedTemperatureNames = sample.requestedTemperatureNames;
-    state.board_.availableFanNames = sample.availableFanNames;
-    state.board_.availableTemperatureNames = sample.availableTemperatureNames;
+    UpdateDiscoveredBoardSensorNames(state.board_.availableFanNames, sample.availableFanNames);
+    UpdateDiscoveredBoardSensorNames(state.board_.availableTemperatureNames, sample.availableTemperatureNames);
     state.snapshot_.boardTemperatures = sample.temperatures;
     for (auto& metric : state.snapshot_.boardTemperatures) {
         metric.metric.value = FiniteOptional(metric.metric.value);

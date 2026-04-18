@@ -23,6 +23,7 @@ private:
 };
 
 void ShowDialogControl(HWND hwnd, int controlId, bool show);
+void BringDialogControlToTop(HWND hwnd, int controlId);
 std::optional<RECT> DialogControlRect(HWND hwnd, int controlId);
 int DialogControlWidth(HWND hwnd, int controlId);
 int DialogControlHeight(HWND hwnd, int controlId);

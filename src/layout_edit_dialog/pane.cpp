@@ -57,6 +57,33 @@ bool UsesSingleLineFieldFrame(HWND hwnd, int controlId) {
     return IsDialogEditControl(hwnd, controlId) || IsDialogComboBoxControl(hwnd, controlId);
 }
 
+int DialogComboBoxSelectionHeight(HWND hwnd, int controlId) {
+    HWND control = GetDlgItem(hwnd, controlId);
+    if (control == nullptr) {
+        return 0;
+    }
+
+    const LRESULT selectionHeight = SendMessageW(control, CB_GETITEMHEIGHT, static_cast<WPARAM>(-1), 0);
+    if (selectionHeight != CB_ERR && selectionHeight > 0) {
+        return static_cast<int>(selectionHeight);
+    }
+
+    COMBOBOXINFO info{};
+    info.cbSize = sizeof(info);
+    if (GetComboBoxInfo(control, &info) != FALSE) {
+        const int itemHeight = (std::max)(0, static_cast<int>(info.rcItem.bottom - info.rcItem.top));
+        if (itemHeight > 0) {
+            return itemHeight;
+        }
+    }
+
+    RECT rect{};
+    if (GetClientRect(control, &rect) != FALSE) {
+        return (std::max)(1, static_cast<int>(rect.bottom - rect.top));
+    }
+    return 0;
+}
+
 std::wstring ReadWindowTextWide(HWND window) {
     if (window == nullptr) {
         return {};
@@ -304,6 +331,12 @@ void ShowDialogControl(HWND hwnd, int controlId, bool show) {
     }
 }
 
+void BringDialogControlToTop(HWND hwnd, int controlId) {
+    if (HWND control = GetDlgItem(hwnd, controlId); control != nullptr) {
+        SetWindowPos(control, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+}
+
 std::optional<RECT> DialogControlRect(HWND hwnd, int controlId) {
     RECT rect{};
     HWND control = GetDlgItem(hwnd, controlId);
@@ -325,6 +358,12 @@ int DialogControlHeight(HWND hwnd, int controlId) {
 }
 
 int DialogControlVisibleHeight(HWND hwnd, int controlId) {
+    if (IsDialogComboBoxControl(hwnd, controlId)) {
+        const int comboHeight = DialogComboBoxSelectionHeight(hwnd, controlId);
+        if (comboHeight > 0) {
+            return comboHeight;
+        }
+    }
     const auto rect = DialogControlRect(hwnd, controlId);
     if (!rect.has_value()) {
         return 0;
@@ -1076,6 +1115,26 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const int desiredGroupHeight = std::max(60, (contentBottom - groupTop) + metrics.groupPadding);
     const int groupHeight = std::min(maxGroupHeight, desiredGroupHeight);
     SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_EDITOR_GROUP, paneLeft, groupTop, paneWidth, groupHeight);
+
+    switch (kind) {
+        case LayoutEditEditorKind::Font:
+            BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
+            break;
+        case LayoutEditEditorKind::Metric:
+            if (showBinding) {
+                BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
+            }
+            break;
+        case LayoutEditEditorKind::MetricListOrder:
+            for (const auto& row : state->metricListRowControls) {
+                if (row.combo != nullptr) {
+                    SetWindowPos(row.combo, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                }
+            }
+            break;
+        default:
+            break;
+    }
 
     if (kind == LayoutEditEditorKind::Font) {
         if (const auto* parameter = state->selectedLeaf != nullptr

@@ -21,6 +21,13 @@ bool HasAvailableMetricValue(const std::vector<NamedScalarMetric>& metrics) {
     return false;
 }
 
+void UpdateDiscoveredBoardSensorNames(
+    std::vector<std::string>& cachedNames, const std::vector<std::string>& latestNames) {
+    if (!latestNames.empty() || cachedNames.empty()) {
+        cachedNames = latestNames;
+    }
+}
+
 std::optional<std::wstring> ReadRegistryWideString(HKEY root, const wchar_t* subKey, const wchar_t* valueName) {
     DWORD type = 0;
     DWORD bytes = 0;

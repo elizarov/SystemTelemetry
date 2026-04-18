@@ -34,6 +34,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `TelemetryCollector` owns steady-state snapshot refresh, provider composition, and runtime target resolution for network and storage.
 - Windows-native collection covers generic CPU, memory, network, storage, and clock data.
 - Vendor providers extend that collector with AMD GPU support and the Gigabyte board-metric path without changing the renderer-facing snapshot model.
+- Board telemetry keeps the last discovered provider sensor-name lists cached alongside live samples so layout-edit binding pickers stay populated across transient board-sample gaps.
 - Fake-runtime support bypasses live providers and serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot.
 
 ### Rendering and layout resolution

@@ -256,6 +256,7 @@ void PopulateFontFaceComboBox(HWND hwnd, const std::wstring& selectedFace) {
     }
 
     SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    SendMessageW(combo, CB_SETMINVISIBLE, 10, 0);
     const auto families = EnumerateInstalledFontFamilies(hwnd);
     int selectedIndex = CB_ERR;
     for (const auto& family : families) {
@@ -300,6 +301,7 @@ void PopulateMetricBindingComboBox(
     }
 
     SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    SendMessageW(combo, CB_SETMINVISIBLE, 10, 0);
     int selectedIndex = CB_ERR;
     for (const auto& option : options) {
         const std::wstring wideOption = WideFromUtf8(option);

@@ -419,17 +419,17 @@ public:
         sample.providerName = "Gigabyte";
         sample.requestedFanNames = settings_.requestedFanNames;
         sample.requestedTemperatureNames = settings_.requestedTemperatureNames;
+        sample.availableFanNames = availableFanNames_;
+        sample.availableTemperatureNames = availableTemperatureNames_;
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
         sample.driverLibrary = loadedLibrary_;
+        sample.temperatures = temperatureMetricTemplate_;
+        sample.fans = fanMetricTemplate_;
+        sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
+        sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
 
         if (!initialized_) {
-            sample.availableFanNames = availableFanNames_;
-            sample.availableTemperatureNames = availableTemperatureNames_;
-            sample.temperatures = temperatureMetricTemplate_;
-            sample.fans = fanMetricTemplate_;
-            sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-            sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
             return sample;
         }
 
@@ -437,7 +437,7 @@ public:
         std::string captureDiagnostics;
         if (!CaptureGigabyteSnapshot(runtime_, snapshot, trace(), captureDiagnostics)) {
             diagnostics_ = captureDiagnostics;
-            sample.diagnostics = diagnostics_;
+            sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
             return sample;
         }
 

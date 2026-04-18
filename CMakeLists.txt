@@ -262,6 +262,7 @@ add_executable(SystemTelemetryTests
     tests/config_parser_tests.cpp
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
+    tests/system_info_support_tests.cpp
     tests/telemetry_retained_history_tests.cpp
     src/config.cpp
     src/config_parser.cpp
@@ -274,6 +275,7 @@ add_executable(SystemTelemetryTests
     src/localization_catalog.cpp
     src/layout_snap_solver.cpp
     src/numeric_safety.cpp
+    src/system_info_support.cpp
     src/dashboard_metrics.cpp
     src/render_types.cpp
     src/snapshot_dump.cpp

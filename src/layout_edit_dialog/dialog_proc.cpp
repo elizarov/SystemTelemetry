@@ -22,6 +22,66 @@ bool IsMetricListOrderButtonId(int controlId) {
                controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE + 100);
 }
 
+void RaiseComboDropList(HWND hwnd, int controlId) {
+    BringDialogControlToTop(hwnd, controlId);
+
+    HWND combo = GetDlgItem(hwnd, controlId);
+    if (combo == nullptr) {
+        return;
+    }
+
+    COMBOBOXINFO info{};
+    info.cbSize = sizeof(info);
+    if (GetComboBoxInfo(combo, &info) == FALSE || info.hwndList == nullptr) {
+        return;
+    }
+
+    SetWindowPos(info.hwndList, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    SetWindowPos(info.hwndList, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
+void ResizeComboDropList(HWND hwnd, int controlId, int maxVisibleItems = 10) {
+    HWND combo = GetDlgItem(hwnd, controlId);
+    if (combo == nullptr) {
+        return;
+    }
+
+    COMBOBOXINFO info{};
+    info.cbSize = sizeof(info);
+    if (GetComboBoxInfo(combo, &info) == FALSE || info.hwndList == nullptr) {
+        return;
+    }
+
+    const LRESULT itemCount = SendMessageW(combo, CB_GETCOUNT, 0, 0);
+    if (itemCount == CB_ERR || itemCount <= 0) {
+        return;
+    }
+
+    const LRESULT listItemHeight = SendMessageW(combo, CB_GETITEMHEIGHT, 0, 0);
+    const LRESULT selectionItemHeight = SendMessageW(combo, CB_GETITEMHEIGHT, static_cast<WPARAM>(-1), 0);
+    const int itemHeight =
+        (std::max)(1, static_cast<int>(listItemHeight != CB_ERR ? listItemHeight : selectionItemHeight));
+    const int visibleItems = (std::max)(1, (std::min)(static_cast<int>(itemCount), maxVisibleItems));
+    const int borderHeight = GetSystemMetrics(SM_CYEDGE) * 2;
+    const int desiredHeight = (visibleItems * itemHeight) + borderHeight;
+
+    RECT comboRect{};
+    RECT listRect{};
+    if (GetWindowRect(combo, &comboRect) == FALSE || GetWindowRect(info.hwndList, &listRect) == FALSE) {
+        return;
+    }
+
+    const int comboWidth = static_cast<int>(comboRect.right - comboRect.left);
+    const int listWidth = static_cast<int>(listRect.right - listRect.left);
+    const int width = (std::max)(comboWidth, listWidth);
+    const bool opensBelow = listRect.top >= comboRect.bottom - 1;
+    const int left = listRect.left;
+    const int top = opensBelow ? comboRect.bottom : listRect.bottom - desiredHeight;
+
+    SetWindowPos(info.hwndList, HWND_TOPMOST, left, top, width, desiredHeight, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    SetWindowPos(info.hwndList, HWND_NOTOPMOST, left, top, width, desiredHeight, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+}
+
 void DrawCenteredFilledTriangle(HDC dc, const RECT& rect, bool up) {
     const int width = rect.right - rect.left;
     const int height = rect.bottom - rect.top;
@@ -122,10 +182,15 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 return TRUE;
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT &&
-                    (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) ||
+                    (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE ||
+                        HIWORD(wParam) == CBN_DROPDOWN)) ||
                 ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_SIZE_EDIT ||
                      LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT) &&
                     HIWORD(wParam) == EN_CHANGE)) {
+                if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT && HIWORD(wParam) == CBN_DROPDOWN) {
+                    RaiseComboDropList(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
+                    return TRUE;
+                }
                 PreviewSelectedFont(state, hwnd, HIWORD(wParam));
                 RefreshLayoutEditValidationState(state, hwnd);
                 return TRUE;
@@ -183,7 +248,13 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 return TRUE;
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT &&
-                (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) {
+                (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE ||
+                    HIWORD(wParam) == CBN_DROPDOWN)) {
+                if (HIWORD(wParam) == CBN_DROPDOWN) {
+                    ResizeComboDropList(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
+                    RaiseComboDropList(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
+                    return TRUE;
+                }
                 PreviewSelectedMetric(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
                 return TRUE;
