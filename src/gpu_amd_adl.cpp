@@ -120,20 +120,29 @@ public:
         }
 
         adlx_bool tempSupported = false;
+        adlx_bool usageSupported = false;
         adlx_bool clockSupported = false;
         adlx_bool fanSupported = false;
+        adlx_bool vramSupported = false;
+        const ADLX_RESULT usageResult = metricsSupport_->IsSupportedGPUUsage(&usageSupported);
         const ADLX_RESULT tempResult = metricsSupport_->IsSupportedGPUTemperature(&tempSupported);
         const ADLX_RESULT clockResult = metricsSupport_->IsSupportedGPUClockSpeed(&clockSupported);
         const ADLX_RESULT fanResult = metricsSupport_->IsSupportedGPUFanSpeed(&fanSupported);
+        const ADLX_RESULT vramResult = metricsSupport_->IsSupportedGPUVRAM(&vramSupported);
+        usageSupported_ = ADLX_SUCCEEDED(usageResult) && usageSupported;
         temperatureSupported_ = ADLX_SUCCEEDED(tempResult) && tempSupported;
         clockSupported_ = ADLX_SUCCEEDED(clockResult) && clockSupported;
         fanSupported_ = ADLX_SUCCEEDED(fanResult) && fanSupported;
+        vramSupported_ = ADLX_SUCCEEDED(vramResult) && vramSupported;
 
         std::ostringstream diag;
-        diag << "ADLX GPU=" << gpuName_ << " temp_supported=" << (tempSupported ? "yes" : "no") << "("
+        diag << "ADLX GPU=" << gpuName_ << " usage_supported=" << (usageSupported ? "yes" : "no") << "("
+             << static_cast<int>(usageResult) << ")"
+             << " temp_supported=" << (tempSupported ? "yes" : "no") << "("
              << static_cast<int>(tempResult) << ")"
              << " clock_supported=" << (clockSupported ? "yes" : "no") << "(" << static_cast<int>(clockResult) << ")"
-             << " fan_supported=" << (fanSupported ? "yes" : "no") << "(" << static_cast<int>(fanResult) << ")";
+             << " fan_supported=" << (fanSupported ? "yes" : "no") << "(" << static_cast<int>(fanResult) << ")"
+             << " vram_supported=" << (vramSupported ? "yes" : "no") << "(" << static_cast<int>(vramResult) << ")";
         diagnostics_ = diag.str();
         initialized_ = true;
         trace().Write("amd_adlx:initialize_done diagnostics=\"" + diagnostics_ + "\"");
@@ -169,6 +178,24 @@ public:
             return sample;
         }
         bool hasAnyMetric = false;
+
+        if (usageSupported_) {
+            adlx_double usage = 0.0;
+            trace().Write("amd_adlx:get_usage_begin");
+            const ADLX_RESULT result = metrics->GPUUsage(&usage);
+            trace().WriteLazy([&] {
+                char buffer[128];
+                sprintf_s(buffer,
+                    "amd_adlx:get_usage_done result=%d value=%.1f",
+                    static_cast<int>(result),
+                    usage);
+                return std::string(buffer);
+            });
+            if (ADLX_SUCCEEDED(result)) {
+                sample.loadPercent = usage;
+                hasAnyMetric = true;
+            }
+        }
 
         if (temperatureSupported_) {
             adlx_double temperature = 0.0;
@@ -224,6 +251,24 @@ public:
             }
         }
 
+        if (vramSupported_) {
+            adlx_int usedVramMb = 0;
+            trace().Write("amd_adlx:get_vram_begin");
+            const ADLX_RESULT result = metrics->GPUVRAM(&usedVramMb);
+            trace().WriteLazy([&] {
+                char buffer[128];
+                sprintf_s(buffer,
+                    "amd_adlx:get_vram_done result=%d value=%d",
+                    static_cast<int>(result),
+                    static_cast<int>(usedVramMb));
+                return std::string(buffer);
+            });
+            if (ADLX_SUCCEEDED(result) && usedVramMb >= 0) {
+                sample.usedVramGb = static_cast<double>(usedVramMb) / 1024.0;
+                hasAnyMetric = true;
+            }
+        }
+
         sample.available = hasAnyMetric;
         trace().WriteLazy([&] {
             return "amd_adlx:sample_done available=" + tracing::Trace::BoolText(sample.available) + " diagnostics=\"" +
@@ -246,9 +291,11 @@ private:
     std::string gpuName_;
     std::string diagnostics_ = "ADLX provider not initialized.";
     std::optional<double> totalVramGb_;
+    bool usageSupported_ = false;
     bool temperatureSupported_ = false;
     bool clockSupported_ = false;
     bool fanSupported_ = false;
+    bool vramSupported_ = false;
     bool initialized_ = false;
 };
 

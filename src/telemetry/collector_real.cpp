@@ -62,7 +62,15 @@ public:
         dump.gpuProvider.providerName = state_->gpu_.providerName;
         dump.gpuProvider.diagnostics = state_->gpu_.providerDiagnostics;
         dump.gpuProvider.available = state_->gpu_.providerAvailable;
-        dump.boardProvider = state_->board_.providerSample;
+        dump.boardProvider.boardManufacturer = state_->board_.boardManufacturer;
+        dump.boardProvider.boardProduct = state_->board_.boardProduct;
+        dump.boardProvider.driverLibrary = state_->board_.driverLibrary;
+        dump.boardProvider.requestedFanNames = state_->board_.requestedFanNames;
+        dump.boardProvider.requestedTemperatureNames = state_->board_.requestedTemperatureNames;
+        dump.boardProvider.availableFanNames = state_->board_.availableFanNames;
+        dump.boardProvider.availableTemperatureNames = state_->board_.availableTemperatureNames;
+        dump.boardProvider.fans = state_->snapshot_.boardFans;
+        dump.boardProvider.temperatures = state_->snapshot_.boardTemperatures;
         dump.boardProvider.providerName = state_->board_.providerName;
         dump.boardProvider.diagnostics = state_->board_.providerDiagnostics;
         dump.boardProvider.available = state_->board_.providerAvailable;

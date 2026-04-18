@@ -19,18 +19,22 @@ void Trace(const RealTelemetryCollectorState& state, const std::string& text) {
     state.trace_.Write(text);
 }
 
-double SumCounterArray(RealTelemetryCollectorState& state, PDH_HCOUNTER counter, bool require3d) {
+struct CounterArrayTotals {
+    double total = 0.0;
+    double total3d = 0.0;
+};
+
+CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PDH_HCOUNTER counter) {
+    CounterArrayTotals totals;
     if (counter == nullptr) {
-        return 0.0;
+        return totals;
     }
     DWORD bufferSize = 0;
     DWORD itemCount = 0;
     PDH_STATUS status = PdhGetFormattedCounterArrayW(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, nullptr);
     if (status != PDH_MORE_DATA) {
-        Trace(state,
-            "telemetry:pdh_array_prepare " + tracing::Trace::FormatPdhStatus("status", status) +
-                " require3d=" + tracing::Trace::BoolText(require3d));
-        return 0.0;
+        Trace(state, "telemetry:pdh_array_prepare " + tracing::Trace::FormatPdhStatus("status", status));
+        return totals;
     }
 
     state.gpu_.counterArrayBuffer.resize(bufferSize);
@@ -39,29 +43,35 @@ double SumCounterArray(RealTelemetryCollectorState& state, PDH_HCOUNTER counter,
     if (status != ERROR_SUCCESS) {
         state.trace_.WriteLazy([&] {
             return "telemetry:pdh_array_fetch " + tracing::Trace::FormatPdhStatus("status", status) +
-                   " count=" + std::to_string(itemCount) + " require3d=" + tracing::Trace::BoolText(require3d);
+                   " count=" + std::to_string(itemCount);
         });
-        return 0.0;
+        return totals;
     }
 
-    double total = 0.0;
     for (DWORD i = 0; i < itemCount; ++i) {
         const wchar_t* instance = items[i].szName;
-        if (require3d && (instance == nullptr || wcsstr(instance, L"engtype_3D") == nullptr)) {
-            continue;
-        }
         if (items[i].FmtValue.CStatus != ERROR_SUCCESS || !IsFiniteDouble(items[i].FmtValue.doubleValue)) {
             continue;
         }
-        total += items[i].FmtValue.doubleValue;
+        totals.total += items[i].FmtValue.doubleValue;
+        if (instance != nullptr && wcsstr(instance, L"engtype_3D") != nullptr) {
+            totals.total3d += items[i].FmtValue.doubleValue;
+        }
     }
 
     state.trace_.WriteLazy([&] {
         return "telemetry:pdh_array_done " + tracing::Trace::FormatPdhStatus("status", status) +
-               " count=" + std::to_string(itemCount) + " require3d=" + tracing::Trace::BoolText(require3d) + " " +
-               tracing::Trace::FormatValueDouble("total", total, 2);
+               " count=" + std::to_string(itemCount) +
+               " total=" + tracing::Trace::FormatValueDouble("value", totals.total, 2) +
+               " total3d=" + tracing::Trace::FormatValueDouble("value", totals.total3d, 2);
     });
-    return FiniteNonNegativeOr(total);
+    totals.total = FiniteNonNegativeOr(totals.total);
+    totals.total3d = FiniteNonNegativeOr(totals.total3d);
+    return totals;
+}
+
+double SumCounterArray(RealTelemetryCollectorState& state, PDH_HCOUNTER counter) {
+    return ReadCounterArrayTotals(state, counter).total;
 }
 
 void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTelemetrySample& sample) {
@@ -72,12 +82,18 @@ void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTel
     if (sample.name.has_value() && !sample.name->empty()) {
         state.snapshot_.gpu.name = *sample.name;
     }
+    if (sample.loadPercent.has_value()) {
+        state.snapshot_.gpu.loadPercent = ClampFinite(*sample.loadPercent, 0.0, 100.0);
+    }
     state.snapshot_.gpu.temperature.value = FiniteOptional(sample.temperatureC);
     state.snapshot_.gpu.temperature.unit = ScalarMetricUnit::Celsius;
     state.snapshot_.gpu.clock.value = FiniteOptional(sample.coreClockMhz);
     state.snapshot_.gpu.clock.unit = ScalarMetricUnit::Megahertz;
     state.snapshot_.gpu.fan.value = FiniteOptional(sample.fanRpm);
     state.snapshot_.gpu.fan.unit = ScalarMetricUnit::Rpm;
+    if (sample.usedVramGb.has_value()) {
+        state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(*sample.usedVramGb);
+    }
     if (sample.totalVramGb.has_value()) {
         const double totalVramGb = FiniteNonNegativeOr(*sample.totalVramGb);
         if (totalVramGb > 0.0) {
@@ -202,12 +218,28 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
 }
 
 void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
-    if (state.gpu_.query != nullptr) {
+    bool hasVendorLoad = false;
+    bool hasVendorVram = false;
+
+    if (state.gpu_.provider != nullptr) {
+        const GpuVendorTelemetrySample sample = state.gpu_.provider->Sample();
+        hasVendorLoad = sample.loadPercent.has_value();
+        hasVendorVram = sample.usedVramGb.has_value();
+        ApplyGpuVendorSample(state, sample);
+        state.trace_.WriteLazy([&] {
+            return "telemetry:gpu_vendor_sample provider=" + state.gpu_.providerName +
+                   " available=" + tracing::Trace::BoolText(state.gpu_.providerAvailable) + " diagnostics=\"" +
+                   state.gpu_.providerDiagnostics + "\"";
+        });
+    }
+
+    if (!hasVendorLoad && state.gpu_.query != nullptr) {
         const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.query);
         state.trace_.WriteLazy(
             [&] { return "telemetry:gpu_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus); });
-        const double load3d = SumCounterArray(state, state.gpu_.loadCounter, true);
-        const double loadAll = SumCounterArray(state, state.gpu_.loadCounter, false);
+        const CounterArrayTotals loadTotals = ReadCounterArrayTotals(state, state.gpu_.loadCounter);
+        const double load3d = loadTotals.total3d;
+        const double loadAll = loadTotals.total;
         state.snapshot_.gpu.loadPercent = ClampFinite(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
         state.trace_.WriteLazy([&] {
             return "telemetry:gpu_load load3d=" + tracing::Trace::FormatValueDouble("value", load3d, 2) +
@@ -217,24 +249,15 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
     }
     state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.load", state.snapshot_.gpu.loadPercent);
 
-    if (state.gpu_.memoryQuery != nullptr) {
+    if (!hasVendorVram && state.gpu_.memoryQuery != nullptr) {
         const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.memoryQuery);
         state.trace_.WriteLazy(
             [&] { return "telemetry:gpu_memory_collect " + tracing::Trace::FormatPdhStatus("status", collectStatus); });
-        const double bytes = SumCounterArray(state, state.gpu_.dedicatedCounter, false);
+        const double bytes = SumCounterArray(state, state.gpu_.dedicatedCounter);
         state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(bytes / (1024.0 * 1024.0 * 1024.0));
         state.trace_.WriteLazy([&] {
             return "telemetry:gpu_memory bytes=" + tracing::Trace::FormatValueDouble("value", bytes, 0) +
                    " used_gb=" + tracing::Trace::FormatValueDouble("value", state.snapshot_.gpu.vram.usedGb, 2);
-        });
-    }
-
-    if (state.gpu_.provider != nullptr) {
-        ApplyGpuVendorSample(state, state.gpu_.provider->Sample());
-        state.trace_.WriteLazy([&] {
-            return "telemetry:gpu_vendor_sample provider=" + state.gpu_.providerName +
-                   " available=" + tracing::Trace::BoolText(state.gpu_.providerAvailable) + " diagnostics=\"" +
-                   state.gpu_.providerDiagnostics + "\"";
         });
     }
 

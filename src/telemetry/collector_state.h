@@ -35,7 +35,13 @@ struct RealTelemetryCollectorState {
         std::unique_ptr<BoardVendorTelemetryProvider> provider;
         std::string providerName = "None";
         std::string providerDiagnostics = "Provider not initialized.";
-        BoardVendorTelemetrySample providerSample{};
+        std::string boardManufacturer;
+        std::string boardProduct;
+        std::string driverLibrary;
+        std::vector<std::string> requestedFanNames;
+        std::vector<std::string> requestedTemperatureNames;
+        std::vector<std::string> availableFanNames;
+        std::vector<std::string> availableTemperatureNames;
         bool providerAvailable = false;
     };
 

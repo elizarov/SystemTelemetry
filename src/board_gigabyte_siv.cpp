@@ -10,6 +10,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -54,20 +55,6 @@ struct GigabyteSnapshot {
     std::vector<FanReading> fans;
     std::vector<TemperatureReading> temperatures;
 };
-
-template <typename Reading>
-const Reading* FindReadingByName(const std::vector<Reading>& readings, const std::string& requestedName) {
-    if (requestedName.empty()) {
-        return nullptr;
-    }
-
-    for (const auto& reading : readings) {
-        if (EqualsInsensitive(reading.title, requestedName)) {
-            return &reading;
-        }
-    }
-    return nullptr;
-}
 
 std::string Utf8FromManagedString(String ^ value) {
     return value == nullptr ? std::string() : marshal_as<std::string>(value);
@@ -369,6 +356,12 @@ template <typename Reading> std::vector<std::string> ExtractSensorNames(const st
     return names;
 }
 
+void ResetMetricValues(std::vector<NamedScalarMetric>& metrics) {
+    for (auto& metric : metrics) {
+        metric.metric.value.reset();
+    }
+}
+
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
     explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace)
@@ -397,6 +390,17 @@ public:
 
         loadedLibrary_ = Utf8FromWide((std::filesystem::path(*sivDirectory) / kEngineEnvironmentControlDll).wstring());
         diagnostics_ = "Gigabyte SIV provider ready.";
+        temperatureMetricTemplate_ =
+            CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
+        fanMetricTemplate_ = CreateRequestedBoardMetrics(settings_.requestedFanNames, ScalarMetricUnit::Rpm);
+        requestedTemperatureIndexBySourceName_.clear();
+        requestedFanIndexBySourceName_.clear();
+        for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
+            requestedTemperatureIndexBySourceName_.emplace(ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name), i);
+        }
+        for (size_t i = 0; i < fanMetricTemplate_.size(); ++i) {
+            requestedFanIndexBySourceName_.emplace(ResolveFanSensorName(fanMetricTemplate_[i].name), i);
+        }
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
             requestedDiagnosticsSuffix_ += " requested_temps=" + JoinNames(settings_.requestedTemperatureNames);
@@ -418,10 +422,10 @@ public:
         sample.driverLibrary = loadedLibrary_;
 
         if (!initialized_) {
-            sample.availableFanNames = ExtractSensorNames(fanReadings_);
-            sample.availableTemperatureNames = ExtractSensorNames(tempReadings_);
-            sample.temperatures = BuildRequestedTemperatures();
-            sample.fans = BuildRequestedFans();
+            sample.availableFanNames = availableFanNames_;
+            sample.availableTemperatureNames = availableTemperatureNames_;
+            sample.temperatures = temperatureMetricTemplate_;
+            sample.fans = fanMetricTemplate_;
             sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
             sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
             return sample;
@@ -436,13 +440,28 @@ public:
         }
 
         diagnostics_ = snapshot.diagnostics;
-        fanReadings_ = std::move(snapshot.fans);
-        tempReadings_ = std::move(snapshot.temperatures);
-        sample.availableFanNames = ExtractSensorNames(fanReadings_);
-        sample.availableTemperatureNames = ExtractSensorNames(tempReadings_);
+        availableFanNames_ = ExtractSensorNames(snapshot.fans);
+        availableTemperatureNames_ = ExtractSensorNames(snapshot.temperatures);
+        sample.availableFanNames = availableFanNames_;
+        sample.availableTemperatureNames = availableTemperatureNames_;
 
-        sample.temperatures = BuildRequestedTemperatures();
-        sample.fans = BuildRequestedFans();
+        sample.temperatures = temperatureMetricTemplate_;
+        sample.fans = fanMetricTemplate_;
+        ResetMetricValues(sample.temperatures);
+        ResetMetricValues(sample.fans);
+        for (const auto& reading : snapshot.temperatures) {
+            const auto it = requestedTemperatureIndexBySourceName_.find(reading.title);
+            if (it != requestedTemperatureIndexBySourceName_.end() &&
+                !sample.temperatures[it->second].metric.value.has_value()) {
+                sample.temperatures[it->second].metric.value = reading.celsius;
+            }
+        }
+        for (const auto& reading : snapshot.fans) {
+            const auto it = requestedFanIndexBySourceName_.find(reading.title);
+            if (it != requestedFanIndexBySourceName_.end() && !sample.fans[it->second].metric.value.has_value()) {
+                sample.fans[it->second].metric.value = reading.rpm;
+            }
+        }
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
         return sample;
@@ -462,31 +481,6 @@ private:
         return trace_ != nullptr ? *trace_ : nullTrace;
     }
 
-    std::vector<NamedScalarMetric> BuildRequestedTemperatures() const {
-        std::vector<NamedScalarMetric> metrics =
-            CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
-        for (auto& metric : metrics) {
-            if (const TemperatureReading* reading =
-                    FindReadingByName(tempReadings_, ResolveTemperatureSensorName(metric.name));
-                reading != nullptr) {
-                metric.metric.value = reading->celsius;
-            }
-        }
-        return metrics;
-    }
-
-    std::vector<NamedScalarMetric> BuildRequestedFans() const {
-        std::vector<NamedScalarMetric> metrics =
-            CreateRequestedBoardMetrics(settings_.requestedFanNames, ScalarMetricUnit::Rpm);
-        for (auto& metric : metrics) {
-            if (const FanReading* reading = FindReadingByName(fanReadings_, ResolveFanSensorName(metric.name));
-                reading != nullptr) {
-                metric.metric.value = reading->rpm;
-            }
-        }
-        return metrics;
-    }
-
     tracing::Trace* trace_ = nullptr;
     BoardTelemetrySettings settings_{};
     gcroot<GigabyteRuntimeContext ^> runtime_;
@@ -495,8 +489,12 @@ private:
     std::string loadedLibrary_;
     std::string diagnostics_ = "Gigabyte provider not initialized.";
     std::string requestedDiagnosticsSuffix_;
-    std::vector<FanReading> fanReadings_;
-    std::vector<TemperatureReading> tempReadings_;
+    std::vector<std::string> availableFanNames_;
+    std::vector<std::string> availableTemperatureNames_;
+    std::vector<NamedScalarMetric> fanMetricTemplate_;
+    std::vector<NamedScalarMetric> temperatureMetricTemplate_;
+    std::unordered_map<std::string, size_t> requestedFanIndexBySourceName_;
+    std::unordered_map<std::string, size_t> requestedTemperatureIndexBySourceName_;
     bool initialized_ = false;
 };
 

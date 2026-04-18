@@ -8,10 +8,16 @@
 namespace {
 
 void ApplyBoardVendorSample(RealTelemetryCollectorState& state, const BoardVendorTelemetrySample& sample) {
-    state.board_.providerSample = sample;
     state.board_.providerName = sample.providerName.empty() ? "None" : sample.providerName;
     state.board_.providerDiagnostics = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
     state.board_.providerAvailable = sample.available;
+    state.board_.boardManufacturer = sample.boardManufacturer;
+    state.board_.boardProduct = sample.boardProduct;
+    state.board_.driverLibrary = sample.driverLibrary;
+    state.board_.requestedFanNames = sample.requestedFanNames;
+    state.board_.requestedTemperatureNames = sample.requestedTemperatureNames;
+    state.board_.availableFanNames = sample.availableFanNames;
+    state.board_.availableTemperatureNames = sample.availableTemperatureNames;
     state.snapshot_.boardTemperatures = sample.temperatures;
     for (auto& metric : state.snapshot_.boardTemperatures) {
         metric.metric.value = FiniteOptional(metric.metric.value);

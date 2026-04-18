@@ -10,9 +10,11 @@ class Trace;
 
 struct GpuVendorTelemetrySample {
     std::optional<std::string> name;
+    std::optional<double> loadPercent;
     std::optional<double> temperatureC;
     std::optional<double> coreClockMhz;
     std::optional<double> fanRpm;
+    std::optional<double> usedVramGb;
     std::optional<double> totalVramGb;
     std::string providerName = "None";
     std::string diagnostics;

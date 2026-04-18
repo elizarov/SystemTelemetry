@@ -33,27 +33,27 @@ This file records the current benchmark baselines, the latest confirmed hotspots
   - `apply avg_ms=0.12` to `0.13`
   - `paint_draw avg_ms=2.17` to `2.35`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=5.16` to `5.34`
-  - `telemetry_update avg_ms=3.33` to `3.48`
-  - `paint_total avg_ms=1.84` to `1.86`
-  - `paint_draw avg_ms=1.84` to `1.86`
+  - `update_loop per_iter_ms=3.27` to `3.39`
+  - `telemetry_update avg_ms=1.44` to `1.55`
+  - `paint_total avg_ms=1.83` to `1.84`
+  - `paint_draw avg_ms=1.83` to `1.84`
 
 ## Current Confirmed Hotspots
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\30023_8709_10939\` keeps the benchmark-process inclusive module weight centered on `PDH.DLL`, `clr.dll`, `amdxx64.dll`, `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, and smaller remaining `iphlpapi.dll` work.
-- The current uncached capture stays clearly collector-bound: `TelemetryCollector::UpdateSnapshot()` is still a bit more than twice the repaint cost on this machine.
-- `PDH.DLL` remains the clearest steady-state collector hotspot, with the Gigabyte CLR-backed board provider and the AMD vendor GPU provider still immediately behind it in the current no-cache benchmark shape even after the latest provider-side allocation cuts.
-- The Direct2D and DirectWrite frame is still the dominant repaint cost, but it is no longer the main limiter for `update-telemetry`.
-- The fast direct reruns and the daemon-backed capture agree closely enough that the reduced uncached collector cost is real even though the exported text view still does not fully resolve every app-owned leaf by symbol.
+- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\32133_5363_16857\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, `amdxx64.dll`, `clr.dll`, and a much smaller remaining `PDH.DLL` slice.
+- The current uncached capture is no longer collector-bound on this machine: `TelemetryCollector::UpdateSnapshot()` now lands below repaint in both the direct and daemon-backed runs.
+- `PDH.DLL` is no longer the dominant steady-state collector hotspot after the AMD GPU path stops redundantly asking both ADLX and PDH for live GPU load and used VRAM on supported hardware.
+- The remaining collector cost is now concentrated more heavily in the Gigabyte CLR-backed board provider and the AMD vendor GPU provider, while the Direct2D and DirectWrite frame becomes the larger side of the full benchmark again.
+- The fast direct reruns and the daemon-backed capture still agree closely enough that the latest collector reduction is real even though the exported text view still does not fully resolve every app-owned leaf by symbol.
 
 Interpretation:
 
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark is primarily measuring the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `3.33` to `3.48 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.84` to `1.86 ms` in repaint on this machine.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `1.44` to `1.55 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.83` to `1.84 ms` in repaint on this machine.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
 ## Kept Optimizations
@@ -139,6 +139,33 @@ These changes produced real wins and remain in the codebase:
   - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=5.50`, `telemetry_update avg_ms=3.56`, and `paint_draw avg_ms=1.94`.
 - Conclusion:
   - The live-update benchmark still spends most of its time inside real telemetry APIs, but the Gigabyte provider in particular was paying meaningful extra CPU for per-sample reflection argument setup and managed-string churn. Reusing those internal resources is worth keeping because it reduces real CPU consumed in the uncached path without reusing sampled values or hiding latency behind parallel work.
+
+### Hypothesis: Compute both GPU PDH engine totals from one wildcard fetch
+
+- Change:
+  - Keep the GPU engine and dedicated-memory counters on separate PDH queries, but read the engine wildcard array once per update and compute both the 3D-only and all-engine totals from that one buffer instead of calling `PdhGetFormattedCounterArrayW` twice on the same GPU engine counter.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=5.16`, `telemetry_update avg_ms=3.33`, and `paint_draw avg_ms=1.84`.
+  - After the change, the same benchmark ran at `update_loop per_iter_ms=4.43`, `telemetry_update avg_ms=2.59`, and `paint_draw avg_ms=1.84`.
+  - A confirmation rerun `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` landed at `update_loop per_iter_ms=4.68`, `telemetry_update avg_ms=2.82`, and `paint_draw avg_ms=1.87`.
+- Conclusion:
+  - The earlier failed merged-query experiment did not mean the duplicated GPU engine-array fetch was free. Keeping the memory counter on its own query while collapsing the duplicated engine-array fetch removes real PDH CPU without changing the live data source.
+
+### Hypothesis: Prefer live ADLX GPU usage and VRAM metrics over redundant PDH sampling on supported AMD hardware
+
+- Change:
+  - Extend the AMD ADLX provider to return live GPU usage and live used-VRAM metrics alongside temperature, clock, and fan, then let `collector_gpu.cpp` use those vendor metrics first and fall back to the existing PDH load and VRAM paths only when the vendor provider does not supply them.
+- Result:
+  - Helped materially.
+- Observed effect:
+  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=4.43`, `telemetry_update avg_ms=2.59`, and `paint_draw avg_ms=1.84`.
+  - After the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=3.27`, `telemetry_update avg_ms=1.44`, and `paint_draw avg_ms=1.83`.
+  - A confirmation rerun `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` landed at `update_loop per_iter_ms=3.39`, `telemetry_update avg_ms=1.55`, and `paint_draw avg_ms=1.84`.
+  - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=3.55`, `telemetry_update avg_ms=1.59`, and `paint_draw avg_ms=1.96`.
+- Conclusion:
+  - The redundant AMD path was asking two different live APIs for the same GPU load and used-VRAM facts every refresh. Preferring ADLX for those supported vendor metrics and keeping PDH only as fallback is the highest-value no-cache win in this workstream, and it pushes telemetry update below repaint on the target machine.
 
 ### Hypothesis: Avoid full config copies during snap probing
 
