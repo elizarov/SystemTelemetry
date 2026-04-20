@@ -326,11 +326,6 @@ bool LayoutEditDialog::ShouldDashboardIgnoreMouse(POINT screenPoint) const {
         return true;
     }
 
-    if (HWND hitWindow = WindowFromPoint(screenPoint);
-        hitWindow != nullptr && (hitWindow == hwnd_ || IsChild(hwnd_, hitWindow))) {
-        return true;
-    }
-
     const HWND anchor = host_.LayoutEditDialogAnchorWindow();
     for (HWND window = GetWindow(anchor, GW_HWNDPREV); window != nullptr; window = GetWindow(window, GW_HWNDPREV)) {
         if (window == hwnd_) {
