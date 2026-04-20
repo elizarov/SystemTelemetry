@@ -275,6 +275,9 @@ void LayoutEditDialog::RestackAnchor() {
     if (hwnd_ == nullptr || !IsWindow(hwnd_)) {
         return;
     }
+    if (!IsForegroundWindow()) {
+        return;
+    }
     host_.RestackLayoutEditDialogAnchor(hwnd_);
 }
 
