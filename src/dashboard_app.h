@@ -90,6 +90,8 @@ private:
     void SuspendCoveredLayoutEditHover();
     void UpdateLayoutEditMouseTracking();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
+    void TraceLayoutEditUiEvent(const std::string& event, const std::string& details = {}) const;
+    std::string BuildLayoutEditUiTraceState() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);

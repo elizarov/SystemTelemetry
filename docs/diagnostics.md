@@ -61,12 +61,12 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 
 ## Failure And Trace Policy
 
-- The diagnostics trace covers startup, reload, output export, renderer layout data, telemetry collection, and vendor-provider activity when `/trace` is enabled.
+- The diagnostics trace covers startup, reload, output export, renderer layout data, telemetry collection, vendor-provider activity, and focused interactive layout-edit UI markers for layout switches, modal-menu scope, dialog-tree refresh, hover refresh, tooltip show or hide, and capture-state transitions when `/trace` is enabled.
 - Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
 - When `/trace` is enabled, diagnostics failures prefer trace logging plus a failure exit code over blocking modal behavior.
 - Required fake-file load failures follow that same rule so `/fake:<path> /exit` returns promptly under trace.
 - Layout-edit drag profiling writes one start marker and one end marker per drag with summarized timing instead of high-volume per-frame renderer trace spam.
-- The modeless layout-edit dialog writes focused trace markers for tree selection, preview, and color-picker flows when trace is enabled.
+- The modeless layout-edit dialog writes focused trace markers for tree rebuild, tree selection, preview, and color-picker flows when trace is enabled.
 
 ## Dump Contract
 

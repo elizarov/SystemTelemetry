@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <string_view>
 
 #include "app_autostart.h"
 #include "app_config_io.h"
@@ -14,6 +15,35 @@
 #include "layout_edit_service.h"
 
 namespace {
+
+std::string EscapeTraceText(std::string_view text) {
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (const char ch : text) {
+        switch (ch) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            default:
+                escaped.push_back(ch);
+                break;
+        }
+    }
+    return escaped;
+}
+
+std::string QuoteTraceText(std::string_view text) {
+    return "\"" + EscapeTraceText(text) + "\"";
+}
 
 std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOptions& options) {
     auto session = std::make_unique<DiagnosticsSession>(options);
@@ -307,8 +337,17 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
 
 bool DashboardController::SwitchLayout(
     DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout) {
+    if (state_.diagnostics != nullptr) {
+        state_.diagnostics->WriteTraceMarker(
+            "layout_switch:begin current_layout=" + QuoteTraceText(state_.config.display.layout) +
+            " requested_layout=" + QuoteTraceText(layoutName));
+    }
     AppConfig updatedConfig = state_.config;
     if (!SelectLayout(updatedConfig, layoutName)) {
+        if (state_.diagnostics != nullptr) {
+            state_.diagnostics->WriteTraceMarker(
+                "layout_switch:select_failed requested_layout=" + QuoteTraceText(layoutName));
+        }
         return false;
     }
 
@@ -316,6 +355,11 @@ bool DashboardController::SwitchLayout(
     state_.config = updatedConfig;
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
     if (!shell.Renderer().LastError().empty()) {
+        if (state_.diagnostics != nullptr) {
+            state_.diagnostics->WriteTraceMarker(
+                "layout_switch:sync_failed requested_layout=" + QuoteTraceText(layoutName) +
+                " renderer_error=" + QuoteTraceText(shell.Renderer().LastError()));
+        }
         state_.config = previousConfig;
         SyncRuntimeAndRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
         return false;
@@ -325,6 +369,10 @@ bool DashboardController::SwitchLayout(
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();
     RefreshLayoutEditSessionDirtyFlag();
+    if (state_.diagnostics != nullptr) {
+        state_.diagnostics->WriteTraceMarker(
+            "layout_switch:done active_layout=" + QuoteTraceText(state_.config.display.layout));
+    }
     return true;
 }
 

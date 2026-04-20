@@ -128,6 +128,9 @@ void RebuildLayoutEditTree(
         return;
     }
     const ScopedWindowRedrawSuspension redrawSuspension(tree);
+    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:tree_rebuild_begin",
+        "preferred_focus=" + QuoteTraceText(preferredFocus.has_value() ? "set" : "none") +
+            " filter=" + QuoteTraceText(Utf8FromWide(state->currentFilter)));
 
     std::string preferredLocation;
     if (preferredFocus.has_value()) {
@@ -163,6 +166,9 @@ void RebuildLayoutEditTree(
         TreeView_SelectItem(tree, selectedItem);
         TreeView_EnsureVisible(tree, selectedItem);
         HandleLayoutEditTreeSelection(state, hwnd, selectedItem);
+        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:tree_rebuild_done",
+            "roots=" + std::to_string(state->visibleTreeModel.roots.size()) +
+                " items=" + std::to_string(state->treeItems.size()) + " selected=" + QuoteTraceText("true"));
         return;
     }
 
@@ -170,6 +176,9 @@ void RebuildLayoutEditTree(
     state->selectedLeaf = nullptr;
     state->dialog->UpdateSelectionHighlight(std::nullopt);
     PopulateLayoutEditSelection(state, hwnd);
+    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:tree_rebuild_done",
+        "roots=" + std::to_string(state->visibleTreeModel.roots.size()) +
+            " items=" + std::to_string(state->treeItems.size()) + " selected=" + QuoteTraceText("false"));
 }
 
 void HandleLayoutEditTreeSelection(LayoutEditDialogState* state, HWND hwnd, HTREEITEM item) {
