@@ -622,6 +622,7 @@ bool LayoutEditController::HandleMouseLeave() {
     }
 
     host_.LayoutEditOverlayState().hoverOnExposedDashboard = false;
+    lastClientPoint_.reset();
 
     const bool hadHover = hoveredLayoutGuideIndex_.has_value() || hoveredLayoutCard_.has_value() ||
                           hoveredEditableCard_.has_value() || hoveredEditableWidget_.has_value() ||
@@ -779,8 +780,13 @@ void LayoutEditController::CancelInteraction() {
 }
 
 std::optional<LayoutEditController::TooltipTarget> LayoutEditController::CurrentTooltipTarget() {
+    if (!lastClientPoint_.has_value()) {
+        return std::nullopt;
+    }
+    const RenderPoint clientPoint = *lastClientPoint_;
+
     if (activeLayoutDrag_.has_value()) {
-        return TooltipTarget{lastClientPoint_, activeLayoutDrag_->guide};
+        return TooltipTarget{clientPoint, activeLayoutDrag_->guide};
     }
 
     DashboardRenderer& renderer = host_.LayoutEditRenderer();
@@ -791,65 +797,65 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
             activeMetricListReorderDrag_->currentIndex};
         const auto region = renderer.FindEditableAnchorRegion(key);
         if (region.has_value()) {
-            return TooltipTarget{lastClientPoint_, *region};
+            return TooltipTarget{clientPoint, *region};
         }
     }
     if (activeGapEditDrag_.has_value()) {
         const auto anchor = renderer.FindGapEditAnchor(activeGapEditDrag_->anchor.key);
         if (anchor.has_value()) {
-            return TooltipTarget{lastClientPoint_, *anchor};
+            return TooltipTarget{clientPoint, *anchor};
         }
     }
 
     if (activeWidgetEditDrag_.has_value()) {
-        return TooltipTarget{lastClientPoint_, activeWidgetEditDrag_->guide};
+        return TooltipTarget{clientPoint, activeWidgetEditDrag_->guide};
     }
 
     if (activeAnchorEditDrag_.has_value()) {
         const auto region = renderer.FindEditableAnchorRegion(activeAnchorEditDrag_->key);
         if (region.has_value()) {
-            return TooltipTarget{lastClientPoint_, *region};
+            return TooltipTarget{clientPoint, *region};
         }
     }
 
-    const HoverResolution resolution = ResolveHover(lastClientPoint_);
+    const HoverResolution resolution = ResolveHover(clientPoint);
     if (resolution.actionableGapEditAnchor.has_value()) {
         const auto anchor = renderer.FindGapEditAnchor(*resolution.actionableGapEditAnchor);
         if (anchor.has_value()) {
-            return TooltipTarget{lastClientPoint_, *anchor};
+            return TooltipTarget{clientPoint, *anchor};
         }
     }
 
     if (resolution.actionableAnchorHandle.has_value()) {
         const auto region = renderer.FindEditableAnchorRegion(*resolution.actionableAnchorHandle);
         if (region.has_value()) {
-            return TooltipTarget{lastClientPoint_, *region};
+            return TooltipTarget{clientPoint, *region};
         }
     }
 
-    if (const auto anchorHandle = renderer.HitTestEditableAnchorHandle(lastClientPoint_); anchorHandle.has_value()) {
+    if (const auto anchorHandle = renderer.HitTestEditableAnchorHandle(clientPoint); anchorHandle.has_value()) {
         const auto region = renderer.FindEditableAnchorRegion(*anchorHandle);
         if (region.has_value() && !region->draggable) {
-            return TooltipTarget{lastClientPoint_, *region};
+            return TooltipTarget{clientPoint, *region};
         }
     }
 
     if (resolution.hoveredWidgetEditGuideIndex.has_value()) {
         const auto& guides = renderer.WidgetEditGuides();
         if (*resolution.hoveredWidgetEditGuideIndex < guides.size()) {
-            return TooltipTarget{lastClientPoint_, guides[*resolution.hoveredWidgetEditGuideIndex]};
+            return TooltipTarget{clientPoint, guides[*resolution.hoveredWidgetEditGuideIndex]};
         }
     }
 
     if (resolution.hoveredLayoutGuideIndex.has_value()) {
         const auto& guides = renderer.LayoutEditGuides();
         if (*resolution.hoveredLayoutGuideIndex < guides.size()) {
-            return TooltipTarget{lastClientPoint_, guides[*resolution.hoveredLayoutGuideIndex]};
+            return TooltipTarget{clientPoint, guides[*resolution.hoveredLayoutGuideIndex]};
         }
     }
 
-    if (const auto colorRegion = renderer.HitTestEditableColorRegion(lastClientPoint_); colorRegion.has_value()) {
-        return TooltipTarget{lastClientPoint_, *colorRegion};
+    if (const auto colorRegion = renderer.HitTestEditableColorRegion(clientPoint); colorRegion.has_value()) {
+        return TooltipTarget{clientPoint, *colorRegion};
     }
 
     return std::nullopt;
@@ -887,6 +893,7 @@ void LayoutEditController::SyncRendererInteractionState() {
 }
 
 void LayoutEditController::ClearInteractionState() {
+    lastClientPoint_.reset();
     hoveredLayoutGuideIndex_.reset();
     hoveredLayoutCard_.reset();
     hoveredEditableCard_.reset();

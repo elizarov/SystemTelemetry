@@ -187,5 +187,5 @@ private:
     std::optional<GapEditDragState> activeGapEditDrag_;
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
     std::optional<MetricListReorderDragState> activeMetricListReorderDrag_;
-    RenderPoint lastClientPoint_{};
+    std::optional<RenderPoint> lastClientPoint_;
 };
