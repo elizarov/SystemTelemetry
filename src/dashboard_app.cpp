@@ -1270,10 +1270,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                     RECT clientRect{};
                     GetClientRect(hwnd_, &clientRect);
                     if (PtInRect(&clientRect, clientPointWin32)) {
-                        const RenderPoint clientPoint{clientPointWin32.x, clientPointWin32.y};
-                        UpdateLayoutEditMouseTracking();
-                        layoutEditController_.HandleMouseMove(clientPoint);
-                        UpdateLayoutEditTooltip();
+                        TraceLayoutEditUiEvent("layout_edit_ui:wm_mouseleave_ignore",
+                            "reason=" + QuoteTraceText("cursor_still_in_client"));
                         return 0;
                     }
                 }

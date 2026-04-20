@@ -77,7 +77,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Draw-time metric binding uses the latest snapshot plus the current metric registry.
 - Live paints and screenshot exports share the same renderer-owned layout resolution and widget draw code.
 - Layout, scale, reload, and configure-display actions reconfigure the live renderer in place and force a dashboard repaint before any follow-on modeless layout-editor refresh work runs.
-- While the modeless layout editor stays open, its tree refreshes reuse one cached embedded-template snapshot instead of reloading that template on each refresh.
+- While the modeless layout editor stays open, its tree refreshes rebuild directly from the current live config and the shared uncached tree-model builder.
 
 ### Diagnostics flow
 
@@ -89,7 +89,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - The shell forwards pointer events into the layout-edit controller, which resolves actionable targets from renderer-provided guide and anchor data.
 - Edits preview through shared config mutation helpers and the same renderer resolution path used by ordinary runtime rendering.
-- The modeless editor window uses the same config mutation and preview path as drag-based editing so both interaction styles operate on the same session state.
+- The modeless editor window uses the same config mutation and preview path as drag-based editing so both interaction styles operate on the same session state, and post-menu hover recovery relies on explicit cursor refresh instead of rebuilding hover inside `WM_MOUSELEAVE`.
 
 ### Persistence and elevation flow
 
