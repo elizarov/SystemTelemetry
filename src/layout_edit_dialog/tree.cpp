@@ -10,6 +10,28 @@
 
 namespace {
 
+class ScopedWindowRedrawSuspension {
+public:
+    explicit ScopedWindowRedrawSuspension(HWND hwnd) : hwnd_(hwnd) {
+        if (hwnd_ != nullptr) {
+            SendMessageW(hwnd_, WM_SETREDRAW, FALSE, 0);
+        }
+    }
+
+    ~ScopedWindowRedrawSuspension() {
+        if (hwnd_ != nullptr) {
+            SendMessageW(hwnd_, WM_SETREDRAW, TRUE, 0);
+            RedrawWindow(hwnd_, nullptr, nullptr, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW);
+        }
+    }
+
+    ScopedWindowRedrawSuspension(const ScopedWindowRedrawSuspension&) = delete;
+    ScopedWindowRedrawSuspension& operator=(const ScopedWindowRedrawSuspension&) = delete;
+
+private:
+    HWND hwnd_ = nullptr;
+};
+
 void InsertLayoutEditTreeNodes(
     LayoutEditDialogState* state, HWND tree, const std::vector<LayoutEditTreeNode>& nodes, HTREEITEM parent) {
     for (const auto& node : nodes) {
@@ -105,6 +127,7 @@ void RebuildLayoutEditTree(
     if (tree == nullptr) {
         return;
     }
+    const ScopedWindowRedrawSuspension redrawSuspension(tree);
 
     std::string preferredLocation;
     if (preferredFocus.has_value()) {
