@@ -5,6 +5,7 @@
 
 #include "resource.h"
 #include "app_monitor.h"
+#include "config_parser.h"
 #include "layout_edit_dialog/dialog_proc.h"
 #include "layout_edit_dialog/pane.h"
 #include "layout_edit_dialog/state.h"
@@ -70,7 +71,7 @@ bool TryGetMonitorWorkAreaForRect(const RECT& rect, RECT* workArea) {
            (*workArea = monitorInfo.rcWork, true);
 }
 
-} // namespace
+}  // namespace
 
 void LayoutEditDialog::BringToFront() {
     if (hwnd_ == nullptr || !IsWindow(hwnd_)) {
@@ -104,13 +105,8 @@ void LayoutEditDialog::PositionWindow(HWND hwnd) const {
         RECT workArea{};
         if (TryGetMonitorWorkAreaForRect(desiredRect, &workArea)) {
             const RECT clampedRect = ClampWindowRectToWorkArea(desiredRect, workArea);
-            SetWindowPos(hwnd,
-                nullptr,
-                clampedRect.left,
-                clampedRect.top,
-                0,
-                0,
-                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            SetWindowPos(
+                hwnd, nullptr, clampedRect.left, clampedRect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
             return;
         }
     }
@@ -146,8 +142,7 @@ void LayoutEditDialog::PositionWindow(HWND hwnd) const {
     }
 
     const RECT clampedRect = ClampWindowRectToWorkArea(desiredRect, workArea);
-    SetWindowPos(
-        hwnd, nullptr, clampedRect.left, clampedRect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(hwnd, nullptr, clampedRect.left, clampedRect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void LayoutEditDialog::UpdateSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) {
@@ -218,7 +213,8 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
     state_ = std::make_unique<LayoutEditDialogState>();
     state_->dialog = this;
     state_->originalConfig = host_.BuildLayoutEditOriginalConfig();
-    state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig());
+    state_->templateText = LoadEmbeddedConfigTemplate();
+    state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig(), state_->templateText);
     state_->initialFocus = focusKey;
 
     std::string initialFocusTrace = "session";
@@ -264,7 +260,7 @@ void LayoutEditDialog::Refresh(const std::optional<LayoutEditFocusKey>& preferre
     }
 
     state_->originalConfig = host_.BuildLayoutEditOriginalConfig();
-    state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig());
+    state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig(), state_->templateText);
     RefreshLayoutEditDialogControls(state_.get(), hwnd_, preferredFocus, true);
 }
 
@@ -275,6 +271,13 @@ void LayoutEditDialog::RefreshSelection() {
 
     state_->originalConfig = host_.BuildLayoutEditOriginalConfig();
     RefreshLayoutEditDialogControls(state_.get(), hwnd_, std::nullopt, false);
+}
+
+void LayoutEditDialog::RestackAnchor() {
+    if (hwnd_ == nullptr || !IsWindow(hwnd_)) {
+        return;
+    }
+    host_.RestackLayoutEditDialogAnchor(hwnd_);
 }
 
 bool LayoutEditDialog::SyncSelection(

@@ -76,6 +76,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Layout resolution converts the active config into static dashboard, card, and widget rectangles.
 - Draw-time metric binding uses the latest snapshot plus the current metric registry.
 - Live paints and screenshot exports share the same renderer-owned layout resolution and widget draw code.
+- Layout, scale, reload, and configure-display actions reconfigure the live renderer in place and force a dashboard repaint before any follow-on modeless layout-editor refresh work runs.
+- While the modeless layout editor stays open, its tree refreshes reuse one cached embedded-template snapshot instead of reloading that template on each refresh.
 
 ### Diagnostics flow
 

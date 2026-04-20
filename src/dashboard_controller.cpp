@@ -180,18 +180,16 @@ bool DashboardController::WriteDiagnosticsOutputs() {
 }
 
 bool DashboardController::ReloadConfigFromDisk(
-    DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller) {
-    (void)controller;
+    DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
     if (!ReloadTelemetryCollectorFromDisk(
             GetRuntimeConfigPath(), state_.config, state_.telemetry, diagnosticsOptions, state_.diagnostics.get())) {
         shell.ReleaseFonts();
         shell.InitializeFonts();
         return false;
     }
-    shell.ReleaseFonts();
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsOptions.editLayout);
     shell.Renderer().SetTraceOutput(state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr);
-    if (!shell.InitializeFonts()) {
+    if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
             state_.diagnostics->WriteTraceMarker("diagnostics:reload_config_failed");
         }
@@ -200,7 +198,7 @@ bool DashboardController::ReloadConfigFromDisk(
     ApplyConfiguredWallpaper();
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
-    shell.InvalidateShell();
+    shell.RedrawShellNow();
     if (state_.isEditingLayout) {
         MarkLayoutEditSessionSaved();
     }
@@ -303,34 +301,29 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
     ApplyConfiguredWallpaper();
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
-    shell.InvalidateShell();
+    shell.RedrawShellNow();
     return true;
 }
 
-bool DashboardController::SwitchLayout(DashboardShellHost& shell,
-    const std::string& layoutName,
-    LayoutEditController& controller,
-    bool diagnosticsEditLayout) {
-    (void)controller;
+bool DashboardController::SwitchLayout(
+    DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout) {
     AppConfig updatedConfig = state_.config;
     if (!SelectLayout(updatedConfig, layoutName)) {
         return false;
     }
 
     const AppConfig previousConfig = state_.config;
-    shell.ReleaseFonts();
     state_.config = updatedConfig;
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
-    if (!shell.InitializeFonts()) {
+    if (!shell.Renderer().LastError().empty()) {
         state_.config = previousConfig;
         SyncRuntimeAndRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
-        shell.InitializeFonts();
         return false;
     }
 
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
-    shell.InvalidateShell();
+    shell.RedrawShellNow();
     RefreshLayoutEditSessionDirtyFlag();
     return true;
 }
@@ -348,7 +341,7 @@ bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scal
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
-    shell.InvalidateShell();
+    shell.RedrawShellNow();
     RefreshLayoutEditSessionDirtyFlag();
     return true;
 }

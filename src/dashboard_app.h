@@ -53,6 +53,7 @@ public:
     double CurrentRenderScale() const override;
     void ApplyConfigPlacement() override;
     void InvalidateShell() override;
+    void RedrawShellNow() override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
     std::optional<std::filesystem::path> PromptDiagnosticsSavePath(
         const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const override;
@@ -82,6 +83,7 @@ private:
     bool CreateLayoutEditTooltip();
     void DestroyLayoutEditTooltip();
     void HideLayoutEditTooltip();
+    void SetLayoutEditTooltipRefreshSuppressed(bool suppressed);
     void UpdateLayoutEditTooltip();
     void RefreshLayoutEditHoverFromCursor();
     bool ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool allowDuringDrag) const;
@@ -132,6 +134,7 @@ private:
     bool layoutEditMouseTracking_ = false;
     RECT layoutEditTooltipRect_{};
     bool layoutEditTooltipRectValid_ = false;
+    bool layoutEditTooltipRefreshSuppressed_ = false;
     bool sessionNotificationsRegistered_ = false;
     int layoutEditModalUiDepth_ = 0;
     std::optional<POINT> moveCursorAnchorClientPoint_;

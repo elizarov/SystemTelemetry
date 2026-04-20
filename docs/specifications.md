@@ -52,7 +52,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Double-clicking the tray icon performs `Bring On Top`.
 - The tray menu shows `Bring On Top` as its default action.
 - Move mode keeps the dashboard attached to the pointer until placement completes and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard.
-- The `Layout` submenu lists configured named layouts, marks the active layout, and applies a new selection immediately.
+- The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless layout-editor refresh work runs.
 - The `Scale` submenu offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog. Changing scale applies immediately.
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.
 - The `Storage drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.

@@ -44,6 +44,7 @@ public:
     virtual void ReleaseFonts() = 0;
     virtual void ApplyConfigPlacement() = 0;
     virtual void InvalidateShell() = 0;
+    virtual void RedrawShellNow() = 0;
     virtual MonitorPlacementInfo GetWindowPlacementInfo() const = 0;
     virtual std::optional<std::filesystem::path> PromptDiagnosticsSavePath(
         const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const = 0;
@@ -59,18 +60,14 @@ public:
     bool InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     bool HandleRefreshTimer(DashboardShellHost& shell);
     bool WriteDiagnosticsOutputs();
-    bool ReloadConfigFromDisk(
-        DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions, LayoutEditController& controller);
+    bool ReloadConfigFromDisk(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     void SaveDumpAs(DashboardShellHost& shell);
     void SaveScreenshotAs(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     void SaveFullConfigAs(DashboardShellHost& shell);
     bool IsAutoStartEnabled() const;
     void ToggleAutoStart(DashboardShellHost& shell);
     bool ConfigureDisplay(DashboardShellHost& shell, const DisplayMenuOption& option);
-    bool SwitchLayout(DashboardShellHost& shell,
-        const std::string& layoutName,
-        LayoutEditController& controller,
-        bool diagnosticsEditLayout);
+    bool SwitchLayout(DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout);
     bool SetDisplayScale(DashboardShellHost& shell, double scale);
     void SelectNetworkAdapter(DashboardShellHost& shell, const NetworkMenuOption& option);
     void ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option);

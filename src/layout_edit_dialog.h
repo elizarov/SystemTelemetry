@@ -59,6 +59,7 @@ public:
     bool Ensure(const std::optional<LayoutEditFocusKey>& focusKey = std::nullopt, bool bringToFront = false);
     void Refresh(const std::optional<LayoutEditFocusKey>& preferredFocus = std::nullopt);
     void RefreshSelection();
+    void RestackAnchor();
     bool SyncSelection(const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
     bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
     void SetSelectionHighlightVisible(bool visible);

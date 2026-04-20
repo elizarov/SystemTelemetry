@@ -690,6 +690,8 @@ bool DashboardShellUi::EnsureLayoutEditDialog(const std::optional<LayoutEditFocu
 void DashboardShellUi::RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus) {
     if (layoutEditDialog_ != nullptr) {
         layoutEditDialog_->Refresh(preferredFocus);
+        layoutEditDialog_->SetSelectionHighlightVisible(true);
+        layoutEditDialog_->RestackAnchor();
     }
 }
 
@@ -793,7 +795,7 @@ bool DashboardShellUi::HandleReloadConfig() {
         }
     }
 
-    if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_, app_.layoutEditController_)) {
+    if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_)) {
         MessageBoxW(app_.hwnd_, L"Failed to reload config.ini.", L"System Telemetry", MB_ICONERROR);
         return false;
     }
@@ -862,7 +864,9 @@ void DashboardShellUi::EndLayoutEditModalUi() {
     }
     --app_.layoutEditModalUiDepth_;
     if (app_.layoutEditModalUiDepth_ == 0) {
-        app_.UpdateLayoutEditTooltip();
+        ReleaseCapture();
+        app_.layoutEditMouseTracking_ = false;
+        app_.RefreshLayoutEditHoverFromCursor();
     }
 }
 
@@ -1124,11 +1128,22 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
                     state.layoutMenuOptions.end(),
                     [selected](const LayoutMenuOption& option) { return option.commandId == selected; });
                 if (it != state.layoutMenuOptions.end()) {
-                    if (!app_.controller_.SwitchLayout(
-                            app_, it->name, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout)) {
+                    const bool suppressTooltipRefresh = app_.controller_.State().isEditingLayout;
+                    if (suppressTooltipRefresh) {
+                        app_.SetLayoutEditTooltipRefreshSuppressed(true);
+                        app_.layoutEditController_.HandleMouseLeave();
+                        app_.HideLayoutEditTooltip();
+                    }
+                    if (!app_.controller_.SwitchLayout(app_, it->name, app_.diagnosticsOptions_.editLayout)) {
+                        if (suppressTooltipRefresh) {
+                            app_.SetLayoutEditTooltipRefreshSuppressed(false);
+                        }
                         MessageBoxW(app_.hwnd_, L"Failed to switch layout.", L"System Telemetry", MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
+                        if (suppressTooltipRefresh) {
+                            app_.SetLayoutEditTooltipRefreshSuppressed(false);
+                        }
                     }
                 }
                 break;

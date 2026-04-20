@@ -597,6 +597,14 @@ void DashboardApp::InvalidateShell() {
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
+void DashboardApp::RedrawShellNow() {
+    UpdateLayoutEditTooltip();
+    if (hwnd_ == nullptr) {
+        return;
+    }
+    RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+}
+
 MonitorPlacementInfo DashboardApp::GetWindowPlacementInfo() const {
     return hwnd_ != nullptr ? GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale)
                             : movePlacementInfo_;
@@ -672,6 +680,13 @@ void DashboardApp::HideLayoutEditTooltip() {
     layoutEditTooltipRectValid_ = false;
 }
 
+void DashboardApp::SetLayoutEditTooltipRefreshSuppressed(bool suppressed) {
+    layoutEditTooltipRefreshSuppressed_ = suppressed;
+    if (suppressed) {
+        HideLayoutEditTooltip();
+    }
+}
+
 bool DashboardApp::ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool allowDuringDrag) const {
     if (shellUi_ == nullptr || !controller_.State().isEditingLayout || controller_.State().isMoving ||
         shellUi_->IsLayoutEditModalUiActive()) {
@@ -695,6 +710,10 @@ void DashboardApp::SuspendCoveredLayoutEditHover() {
 }
 
 void DashboardApp::UpdateLayoutEditTooltip() {
+    if (layoutEditTooltipRefreshSuppressed_) {
+        HideLayoutEditTooltip();
+        return;
+    }
     if (layoutEditTooltipHwnd_ == nullptr || !controller_.State().isEditingLayout || controller_.State().isMoving ||
         shellUi_->IsLayoutEditModalUiActive()) {
         HideLayoutEditTooltip();
@@ -838,6 +857,10 @@ void DashboardApp::UpdateLayoutEditTooltip() {
 }
 
 void DashboardApp::RefreshLayoutEditHoverFromCursor() {
+    if (layoutEditTooltipRefreshSuppressed_) {
+        HideLayoutEditTooltip();
+        return;
+    }
     if (!controller_.State().isEditingLayout || controller_.State().isMoving || shellUi_ == nullptr ||
         shellUi_->IsLayoutEditModalUiActive()) {
         HideLayoutEditTooltip();
@@ -966,9 +989,6 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             return 0;
         case WM_ACTIVATE:
             if (shellUi_ != nullptr) {
-                if (LOWORD(wParam) != WA_INACTIVE) {
-                    shellUi_->SetLayoutEditTreeSelectionHighlightVisible(false);
-                }
                 RefreshLayoutEditHoverFromCursor();
             }
             break;

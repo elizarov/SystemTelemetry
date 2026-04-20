@@ -376,6 +376,7 @@ DashboardRenderer::~DashboardRenderer() {
 }
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
+    lastError_.clear();
     const bool paletteChanged = config_.layout.colors != config.layout.colors;
     const bool iconInputsChanged = config_.layout.colors.iconColor != config.layout.colors.iconColor ||
                                    !SamePanelIconInputs(config_.layout.cards, config.layout.cards);
@@ -396,12 +397,13 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
         if (!iconsReady || !textReady || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:reconfigure_failed" : lastError_;
         } else {
-            d2dFirstDrawWarmupPending_ = true;
+            d2dFirstDrawWarmupPending_ = false;
         }
     }
 }
 
 void DashboardRenderer::SetRenderScale(double scale) {
+    lastError_.clear();
     const double nextScale = std::clamp(scale, 0.1, 16.0);
     if (std::abs(renderScale_ - nextScale) < 0.0001) {
         return;
@@ -411,7 +413,7 @@ void DashboardRenderer::SetRenderScale(double scale) {
         if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:rescale_failed" : lastError_;
         } else {
-            d2dFirstDrawWarmupPending_ = true;
+            d2dFirstDrawWarmupPending_ = false;
         }
     }
 }

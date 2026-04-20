@@ -356,8 +356,8 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
             break;
         case WM_ACTIVATE:
             if (state != nullptr) {
-                state->dialog->SetSelectionHighlightVisible(LOWORD(wParam) != WA_INACTIVE);
                 if (LOWORD(wParam) != WA_INACTIVE) {
+                    state->dialog->SetSelectionHighlightVisible(true);
                     state->dialog->Host().RestackLayoutEditDialogAnchor(hwnd);
                 }
             }
