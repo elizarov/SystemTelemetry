@@ -345,6 +345,7 @@ add_executable(SystemTelemetryBenchmarks
     src/board_vendor.cpp
     src/layout_edit_types.cpp
     src/layout_edit_parameter.cpp
+    src/layout_edit_tree.cpp
     src/layout_edit_controller.cpp
     src/layout_edit_trace_session.cpp
     src/layout_edit_service.cpp

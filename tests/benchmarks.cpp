@@ -9,12 +9,20 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+
 #include "config_parser.h"
+#include "config_resolution.h"
 #include "diagnostics_options.h"
 #include "dashboard_renderer.h"
 #include "layout_edit_controller.h"
+#include "layout_edit_tree.h"
 #include "layout_edit_parameter.h"
 #include "layout_edit_service.h"
 #include "layout_edit_trace_session.h"
@@ -112,8 +120,12 @@ bool IsUpdateTelemetryBenchmarkName(const std::string& name) {
     return name == "update-telemetry";
 }
 
+bool IsLayoutSwitchBenchmarkName(const std::string& name) {
+    return name == "layout-switch";
+}
+
 bool IsKnownBenchmarkName(const std::string& name) {
-    return IsEditLayoutBenchmarkName(name) || IsUpdateTelemetryBenchmarkName(name);
+    return IsEditLayoutBenchmarkName(name) || IsUpdateTelemetryBenchmarkName(name) || IsLayoutSwitchBenchmarkName(name);
 }
 
 DiagnosticsOptions BenchmarkDiagnosticsOptions() {
@@ -291,6 +303,19 @@ public:
         return hwnd_;
     }
 
+    const AppConfig& CurrentConfig() const {
+        return config_;
+    }
+
+    bool SwitchLayout(std::string_view layoutName) {
+        if (!SelectLayout(config_, std::string(layoutName))) {
+            return false;
+        }
+        renderer_.SetConfig(config_);
+        dirty_ = true;
+        return true;
+    }
+
 private:
     const AppConfig& LayoutEditConfig() const override {
         return config_;
@@ -384,6 +409,74 @@ private:
     std::ostringstream traceStream_{};
     std::array<PhaseStats, kBenchPhaseCount> phaseTotals_{};
 };
+
+std::vector<std::string> CollectLayoutNames(const AppConfig& config) {
+    std::vector<std::string> names;
+    names.reserve(config.layout.layouts.size());
+    for (const auto& layout : config.layout.layouts) {
+        if (!layout.name.empty()) {
+            names.push_back(layout.name);
+        }
+    }
+    return names;
+}
+
+struct LayoutSwitchPhaseTotals {
+    PhaseStats switchApply;
+    PhaseStats dialogRefresh;
+    PhaseStats paint;
+};
+
+struct LayoutSwitchBenchTotals {
+    BenchResult switchLoop;
+    LayoutSwitchPhaseTotals phases;
+};
+
+void RecordPhase(PhaseStats& stats, std::chrono::nanoseconds elapsed) {
+    stats.total += elapsed;
+    ++stats.samples;
+}
+
+void PrintBenchLoopResult(const char* name, const BenchResult& result) {
+    std::cout << std::left << std::setw(18) << name << " total_ms=" << std::fixed << std::setprecision(2)
+              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+}
+
+LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
+    BenchmarkHost& host, const std::vector<std::string>& layoutNames, size_t iterations) {
+    LayoutSwitchBenchTotals totals{};
+    if (layoutNames.empty() || iterations == 0) {
+        return totals;
+    }
+
+    host.DrawCurrentSnapshot();
+    host.ResetPhaseTotals();
+
+    const auto switchLoopStart = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        const std::string& layoutName = layoutNames[iteration % layoutNames.size()];
+
+        const auto switchApplyStart = Clock::now();
+        if (!host.SwitchLayout(layoutName)) {
+            return {};
+        }
+        const auto switchApplyEnd = Clock::now();
+        RecordPhase(totals.phases.switchApply, switchApplyEnd - switchApplyStart);
+
+        const auto dialogRefreshStart = Clock::now();
+        [[maybe_unused]] const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
+        const auto dialogRefreshEnd = Clock::now();
+        RecordPhase(totals.phases.dialogRefresh, dialogRefreshEnd - dialogRefreshStart);
+
+        const auto paintStart = Clock::now();
+        host.FlushPaintIfDirty();
+        const auto paintEnd = Clock::now();
+        RecordPhase(totals.phases.paint, paintEnd - paintStart);
+    }
+    totals.switchLoop.total = Clock::now() - switchLoopStart;
+    totals.switchLoop.perIteration = totals.switchLoop.total / static_cast<double>(iterations);
+    return totals;
+}
 
 BenchResult RunDragBenchmark(BenchmarkHost& host,
     const LayoutEditGuide& guide,
@@ -523,6 +616,38 @@ int main(int argc, char** argv) {
         PrintPhaseResult(PhaseName(BenchPhase::Apply), phases[PhaseIndex(BenchPhase::Apply)]);
         PrintPhaseResult(PhaseName(BenchPhase::PaintTotal), phases[PhaseIndex(BenchPhase::PaintTotal)]);
         PrintPhaseResult(PhaseName(BenchPhase::PaintDraw), phases[PhaseIndex(BenchPhase::PaintDraw)]);
+        return 0;
+    }
+
+    if (benchmarkName == "layout-switch") {
+        const AppConfig config = LoadConfig(SourceConfigPath(), false);
+        std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config);
+        if (telemetry == nullptr) {
+            std::cerr << "fake telemetry init failed\n";
+            return 1;
+        }
+
+        const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+        const std::vector<std::string> layoutNames = CollectLayoutNames(runtimeConfig);
+        if (layoutNames.size() < 2) {
+            std::cerr << "layout-switch benchmark requires at least two named layouts\n";
+            return 1;
+        }
+
+        BenchmarkHost host(runtimeConfig, renderScale);
+        host.SetSnapshot(telemetry->Snapshot());
+        if (!host.Initialize()) {
+            std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
+            return 1;
+        }
+
+        std::cout << "layout_switch_benchmark layouts=" << layoutNames.size() << " iterations=" << iterations
+                  << " render_scale=" << renderScale << "\n";
+        const LayoutSwitchBenchTotals totals = RunLayoutSwitchBenchmark(host, layoutNames, iterations);
+        PrintBenchLoopResult("switch_loop", totals.switchLoop);
+        PrintPhaseResult("switch_apply", totals.phases.switchApply);
+        PrintPhaseResult("dialog_refresh", totals.phases.dialogRefresh);
+        PrintPhaseResult("switch_paint", totals.phases.paint);
         return 0;
     }
 

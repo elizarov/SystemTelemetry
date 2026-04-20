@@ -5,7 +5,6 @@
 
 #include "resource.h"
 #include "app_monitor.h"
-#include "config_parser.h"
 #include "layout_edit_dialog/dialog_proc.h"
 #include "layout_edit_dialog/pane.h"
 #include "layout_edit_dialog/state.h"
@@ -213,8 +212,7 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
     state_ = std::make_unique<LayoutEditDialogState>();
     state_->dialog = this;
     state_->originalConfig = host_.BuildLayoutEditOriginalConfig();
-    state_->templateText = LoadEmbeddedConfigTemplate();
-    state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig(), state_->templateText);
+    state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig());
     state_->initialFocus = focusKey;
 
     std::string initialFocusTrace = "session";
@@ -260,7 +258,7 @@ void LayoutEditDialog::Refresh(const std::optional<LayoutEditFocusKey>& preferre
     }
 
     state_->originalConfig = host_.BuildLayoutEditOriginalConfig();
-    state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig(), state_->templateText);
+    state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig());
     RefreshLayoutEditDialogControls(state_.get(), hwnd_, preferredFocus, true);
 }
 

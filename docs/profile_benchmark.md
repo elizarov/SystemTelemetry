@@ -11,8 +11,9 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
 - Measure the repeatable layout-edit benchmark with `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`.
+- Measure the repeatable layout-switch benchmark with `build\SystemTelemetryBenchmarks.exe layout-switch 240 2`.
 - Measure the repeatable telemetry-refresh benchmark with `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`.
-- Capture a full profile with `profile_benchmark.cmd edit-layout 240 2` or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
+- Capture a full profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
 - Daemon-backed and one-shot elevated runs persist the benchmark stdout in the request directory and replay it in the caller window after the request finishes, so the requesting shell sees the same timing lines that the elevated process produced.
@@ -39,6 +40,11 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `telemetry_update avg_ms=2.19` to `2.22`
   - `paint_total avg_ms=1.86` to `1.92`
   - `paint_draw avg_ms=1.86` to `1.92`
+- Current repeatable `layout-switch` result on the current tree:
+  - `switch_loop per_iter_ms=3.48` to `3.63`
+  - `switch_apply avg_ms=0.74` to `0.76`
+  - `dialog_refresh avg_ms=0.14` to `0.16`
+  - `switch_paint avg_ms=2.59` to `2.71`
 
 ## Current Confirmed Hotspots
 
@@ -56,6 +62,7 @@ Interpretation:
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
 - The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.19` to `2.22 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.86` to `1.92 ms` in repaint on this machine.
+- The direct `layout-switch` benchmark is paint-bound on this machine: repaint sits around `2.59` to `2.71 ms` of the `3.48` to `3.63 ms` loop while the dialog refresh work stays around `0.14` to `0.16 ms`.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
 ## Kept Optimizations
@@ -75,6 +82,18 @@ These changes produced real wins and remain in the codebase:
 - Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
 
 ## Tested Hypotheses
+
+### Hypothesis: Caching the embedded layout-edit template materially improves layout switching while the edit dialog is open
+
+- Change:
+  - Add a `layout-switch` benchmark mode to `SystemTelemetryBenchmarks` and `profile_benchmark.cmd`, cycle the configured named layouts through `SelectLayout()` plus `DashboardRenderer::SetConfig()`, rebuild the edit-dialog tree model each iteration, and compare cached versus uncached template-tree rebuild timings while measuring the full switch loop.
+- Result:
+  - Rejected.
+- Observed effect:
+  - `build\SystemTelemetryBenchmarks.exe layout-switch 240 2` ran at `switch_loop per_iter_ms=3.63`, `switch_apply avg_ms=0.76`, `dialog_refresh avg_ms=0.15`, `switch_paint avg_ms=2.71`, while the isolated cached and uncached tree rebuild reruns both landed at `0.13 ms` per iteration.
+  - `build\SystemTelemetryBenchmarks.exe layout-switch 480 2` reran at `switch_loop per_iter_ms=3.48`, `switch_apply avg_ms=0.74`, `dialog_refresh avg_ms=0.14`, `switch_paint avg_ms=2.59`, while the isolated cached and uncached tree rebuild reruns again both landed at `0.13 ms` per iteration.
+- Conclusion:
+  - The embedded-template cache does not buy a meaningful steady-state layout-switch win on this machine. The tree rebuild itself is already small, the cached-versus-uncached delta stays inside run-to-run noise, the dominant cost in the benchmarked open-dialog path is repaint rather than template loading, and the app now uses the simpler uncached path.
 
 ### Hypothesis: Steady-state telemetry refresh cost is mostly repaint, not snapshot mutation
 

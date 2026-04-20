@@ -69,6 +69,11 @@ if not defined BENCHMARK_NAME if /i "%~1"=="update-telemetry" (
     shift
     goto parse_args
 )
+if not defined BENCHMARK_NAME if /i "%~1"=="layout-switch" (
+    set "BENCHMARK_NAME=layout-switch"
+    shift
+    goto parse_args
+)
 if not defined ITERATIONS (
     set "ITERATIONS=%~1"
 ) else if not defined RENDER_SCALE (

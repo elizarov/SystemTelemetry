@@ -53,7 +53,6 @@ struct LayoutEditMetricListRowControls {
 struct LayoutEditDialogState {
     LayoutEditDialog* dialog = nullptr;
     AppConfig originalConfig;
-    std::string templateText;
     LayoutEditTreeModel treeModel;
     LayoutEditTreeModel visibleTreeModel;
     std::optional<LayoutEditFocusKey> initialFocus;
