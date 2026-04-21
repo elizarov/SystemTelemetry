@@ -1,7 +1,7 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "dashboard_metrics.h"
-#include "dashboard_widget_class.h"
+#include "widget/widget_class.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX

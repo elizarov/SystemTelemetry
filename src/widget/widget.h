@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "config/config.h"
-#include "dashboard_widget_class.h"
+#include "widget/widget_class.h"
 #include "dashboard_renderer/render_types.h"
 
 class DashboardMetricSource;
