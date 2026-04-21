@@ -5,7 +5,7 @@
 
 #include "resource.h"
 
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

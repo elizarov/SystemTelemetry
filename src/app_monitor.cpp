@@ -4,8 +4,8 @@
 #include <cmath>
 
 #include "app_constants.h"
-#include "app_strings.h"
-#include "utf8.h"
+#include "util/strings.h"
+#include "util/utf8.h"
 
 namespace {
 

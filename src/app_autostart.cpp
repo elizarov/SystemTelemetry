@@ -2,9 +2,9 @@
 
 #include <shellapi.h>
 
-#include "app_command_line.h"
+#include "util/command_line.h"
 #include "app_constants.h"
-#include "app_paths.h"
+#include "util/paths.h"
 
 std::optional<std::wstring> ReadAutoStartCommand() {
     HKEY key = nullptr;

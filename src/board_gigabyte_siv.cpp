@@ -20,11 +20,11 @@
 #using < mscorlib.dll>
 #using < System.dll>
 
-#include "app_strings.h"
+#include "util/strings.h"
 #include "board_vendor.h"
 #include "system_info_support.h"
 #include "trace.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 using namespace System;
 using namespace System::Collections;

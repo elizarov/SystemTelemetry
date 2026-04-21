@@ -1,6 +1,6 @@
 #pragma once
 
-#include "enum_string.h"
+#include "util/enum_string.h"
 
 #define SYSTEM_TELEMETRY_METRIC_DISPLAY_STYLE_ITEMS(X)                                                                 \
     X(Scalar, "scalar")                                                                                                \

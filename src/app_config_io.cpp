@@ -3,7 +3,7 @@
 #include <shellapi.h>
 
 #include "app_diagnostics.h"
-#include "app_paths.h"
+#include "util/paths.h"
 #include "config_writer.h"
 
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {

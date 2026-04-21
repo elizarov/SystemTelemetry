@@ -7,7 +7,7 @@
 #include "telemetry/collector_state.h"
 #include "telemetry/collector_storage_selection.h"
 #include "telemetry/collector_support.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

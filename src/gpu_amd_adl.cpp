@@ -7,7 +7,7 @@
 #include "vendor/adlx/SDK/Include/IPerformanceMonitoring.h"
 #include "gpu_vendor.h"
 #include "trace.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

@@ -7,12 +7,12 @@
 #include <filesystem>
 #include <fstream>
 
-#include "app_strings.h"
+#include "util/strings.h"
 #include "snapshot_dump.h"
 #include "telemetry/retained_history.h"
 #include "telemetry/collector_storage_selection.h"
 #include "trace.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

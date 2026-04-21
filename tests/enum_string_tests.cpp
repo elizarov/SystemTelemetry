@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "enum_string.h"
+#include "util/enum_string.h"
 
 #define SYSTEM_TELEMETRY_TEST_ENUM_ITEMS(X)                                                                            \
     X(Zero, "zero")                                                                                                    \

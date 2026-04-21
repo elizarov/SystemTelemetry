@@ -1,6 +1,6 @@
 #pragma once
 
-#include "enum_string.h"
+#include "util/enum_string.h"
 
 #include <optional>
 #include <string_view>

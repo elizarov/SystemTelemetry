@@ -8,7 +8,7 @@
 #include <cstdio>
 #include <string_view>
 
-#include "app_strings.h"
+#include "util/strings.h"
 #include "system_info_support.h"
 
 namespace {

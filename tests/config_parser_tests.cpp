@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "config_parser.h"
-#include "utf8.h"
+#include "util/utf8.h"
 #include <fstream>
 
 namespace {

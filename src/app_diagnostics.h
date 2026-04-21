@@ -21,7 +21,7 @@
 #include "diagnostics_options.h"
 #include "snapshot_dump.h"
 #include "trace.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     const SystemSnapshot& snapshot,

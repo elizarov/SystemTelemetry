@@ -6,7 +6,7 @@
 #include "layout_edit_dialog/editors.h"
 #include "layout_edit_dialog/pane.h"
 #include "layout_edit_dialog/trace.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

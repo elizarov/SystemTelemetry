@@ -4,7 +4,7 @@
 #include <optional>
 #include <sstream>
 
-#include "app_strings.h"
+#include "util/strings.h"
 #include "dashboard_metrics.h"
 #include "dashboard_renderer.h"
 

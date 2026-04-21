@@ -7,7 +7,7 @@
 
 #include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 TEST(LocalizationCatalog, ParsesKeyValueLines) {
     const LocalizationCatalogMap catalog =

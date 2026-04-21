@@ -7,7 +7,7 @@
 #include <sstream>
 
 #include "app_diagnostics.h"
-#include "app_strings.h"
+#include "util/strings.h"
 #include "dashboard_app.h"
 #include "layout_edit_dialog.h"
 #include "layout_edit_parameter.h"

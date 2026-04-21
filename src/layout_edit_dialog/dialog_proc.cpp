@@ -9,7 +9,7 @@
 #include "layout_edit_dialog/trace.h"
 #include "layout_edit_dialog/tree.h"
 #include "layout_edit_dialog/util.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

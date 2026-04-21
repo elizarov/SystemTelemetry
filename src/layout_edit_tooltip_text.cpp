@@ -6,7 +6,7 @@
 #include "layout_edit_service.h"
 #include "layout_edit_tooltip.h"
 #include "localization_catalog.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

@@ -3,10 +3,10 @@
 #include <cstring>
 #include <vector>
 
-#include "app_strings.h"
+#include "util/strings.h"
 #include "numeric_safety.h"
 #include "telemetry/collector_state.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

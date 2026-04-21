@@ -9,7 +9,7 @@
 #include "dashboard_metrics.h"
 #include "resource.h"
 #include "layout_edit_service.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

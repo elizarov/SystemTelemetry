@@ -25,11 +25,11 @@
 #include <dwrite.h>
 #include <wincodec.h>
 
-#include "app_strings.h"
+#include "util/strings.h"
 #include "resource.h"
 #include "numeric_safety.h"
 #include "trace.h"
-#include "utf8.h"
+#include "util/utf8.h"
 
 namespace {
 

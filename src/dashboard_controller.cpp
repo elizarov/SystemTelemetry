@@ -8,7 +8,7 @@
 #include "app_autostart.h"
 #include "app_config_io.h"
 #include "app_display_config.h"
-#include "app_paths.h"
+#include "util/paths.h"
 #include "config_resolution.h"
 #include "config_writer.h"
 #include "layout_edit_parameter.h"

@@ -4,11 +4,11 @@
 #include <shellapi.h>
 #include <shobjidl.h>
 
-#include "app_command_line.h"
+#include "util/command_line.h"
 #include "app_diagnostics.h"
 #include "app_monitor.h"
-#include "app_paths.h"
-#include "app_strings.h"
+#include "util/paths.h"
+#include "util/strings.h"
 #include "config_parser.h"
 #include "config_writer.h"
 #include "trace.h"

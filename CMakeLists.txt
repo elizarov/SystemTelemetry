@@ -70,13 +70,13 @@ add_executable(SystemTelemetry WIN32
     src/app_main.cpp
     src/app_diagnostics.cpp
     src/app_autostart.cpp
-    src/app_command_line.cpp
+    src/util/command_line.cpp
     src/app_config_io.cpp
     src/app_display_config.cpp
     src/diagnostics_options.cpp
     src/app_monitor.cpp
-    src/app_paths.cpp
-    src/app_strings.cpp
+    src/util/paths.cpp
+    src/util/strings.cpp
     src/dashboard_controller.cpp
     src/dashboard_app.cpp
     src/dashboard_shell_ui.cpp
@@ -139,7 +139,7 @@ add_executable(SystemTelemetry WIN32
     src/widget/clock_date.cpp
     src/dashboard_renderer/layout_resolver.cpp
     src/dashboard_renderer.cpp
-    src/utf8.cpp
+    src/util/utf8.cpp
     src/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
@@ -285,7 +285,7 @@ add_executable(SystemTelemetryTests
     src/render_types.cpp
     src/snapshot_dump.cpp
     src/telemetry/retained_history.cpp
-    src/utf8.cpp
+    src/util/utf8.cpp
   )
 target_include_directories(SystemTelemetryTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
@@ -327,7 +327,7 @@ add_test(NAME SystemTelemetryTests COMMAND SystemTelemetryTests)
 add_executable(SystemTelemetryBenchmarks
     resources/SystemTelemetry.rc
     tests/benchmarks.cpp
-    src/app_strings.cpp
+    src/util/strings.cpp
     src/config.cpp
     src/config_parser.cpp
     src/config_resolution.cpp
@@ -375,7 +375,7 @@ add_executable(SystemTelemetryBenchmarks
     src/widget/clock_date.cpp
     src/dashboard_renderer/layout_resolver.cpp
     src/dashboard_renderer.cpp
-    src/utf8.cpp
+    src/util/utf8.cpp
     src/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
