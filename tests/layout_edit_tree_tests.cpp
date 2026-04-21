@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "layout_edit_tree.h"
+#include "layout_edit/layout_edit_tree.h"
 #include "localization_catalog.h"
 
 #include <filesystem>

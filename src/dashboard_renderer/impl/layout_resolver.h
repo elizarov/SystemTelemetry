@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "config/config.h"
-#include "layout_edit_types.h"
+#include "layout_edit/layout_edit_types.h"
 #include "render_types.h"
 #include "widget/widget.h"
 

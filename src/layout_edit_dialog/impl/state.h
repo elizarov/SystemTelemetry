@@ -6,7 +6,7 @@
 
 #include "layout_edit_dialog/layout_edit_dialog.h"
 #include <commctrl.h>
-#include "layout_edit_tree.h"
+#include "layout_edit/layout_edit_tree.h"
 
 struct LayoutEditTreeItemBinding {
     const LayoutEditTreeNode* node = nullptr;

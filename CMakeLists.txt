@@ -88,20 +88,20 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_dialog/impl/trace.cpp
     src/layout_edit_dialog/impl/tree.cpp
     src/layout_edit_dialog/impl/util.cpp
-    src/layout_edit_controller.cpp
-    src/layout_edit_trace_session.cpp
-    src/layout_edit_types.cpp
-    src/layout_edit_tree.cpp
-    src/layout_edit_parameter.cpp
-    src/layout_edit_tooltip.cpp
-    src/layout_edit_tooltip_text.cpp
-    src/layout_edit_service.cpp
+    src/layout_edit/layout_edit_controller.cpp
+    src/layout_edit/layout_edit_trace_session.cpp
+    src/layout_edit/layout_edit_types.cpp
+    src/layout_edit/layout_edit_tree.cpp
+    src/layout_edit/layout_edit_parameter.cpp
+    src/layout_edit/layout_edit_tooltip.cpp
+    src/layout_edit/layout_edit_tooltip_text.cpp
+    src/layout_edit/layout_edit_service.cpp
     src/config/config.cpp
     src/config/config_parser.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
     src/localization_catalog.cpp
-    src/layout_snap_solver.cpp
+    src/layout_edit/layout_snap_solver.cpp
     src/numeric_safety.cpp
     src/system_info_support.cpp
     src/telemetry/telemetry.cpp
@@ -273,12 +273,12 @@ add_executable(SystemTelemetryTests
     src/config/config_parser.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
-    src/layout_edit_types.cpp
-    src/layout_edit_tree.cpp
-    src/layout_edit_parameter.cpp
-    src/layout_edit_tooltip.cpp
+    src/layout_edit/layout_edit_types.cpp
+    src/layout_edit/layout_edit_tree.cpp
+    src/layout_edit/layout_edit_parameter.cpp
+    src/layout_edit/layout_edit_tooltip.cpp
     src/localization_catalog.cpp
-    src/layout_snap_solver.cpp
+    src/layout_edit/layout_snap_solver.cpp
     src/numeric_safety.cpp
     src/system_info_support.cpp
     src/dashboard_metrics.cpp
@@ -348,13 +348,13 @@ add_executable(SystemTelemetryBenchmarks
     src/gpu_vendor.cpp
     src/gpu_amd_adl.cpp
     src/board_vendor.cpp
-    src/layout_edit_types.cpp
-    src/layout_edit_parameter.cpp
-    src/layout_edit_tree.cpp
-    src/layout_edit_controller.cpp
-    src/layout_edit_trace_session.cpp
-    src/layout_edit_service.cpp
-    src/layout_snap_solver.cpp
+    src/layout_edit/layout_edit_types.cpp
+    src/layout_edit/layout_edit_parameter.cpp
+    src/layout_edit/layout_edit_tree.cpp
+    src/layout_edit/layout_edit_controller.cpp
+    src/layout_edit/layout_edit_trace_session.cpp
+    src/layout_edit/layout_edit_service.cpp
+    src/layout_edit/layout_snap_solver.cpp
     src/numeric_safety.cpp
     src/dashboard_metrics.cpp
     src/dashboard_overlay_state.cpp

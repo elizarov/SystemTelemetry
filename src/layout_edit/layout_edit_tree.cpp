@@ -1,4 +1,4 @@
-#include "layout_edit_tree.h"
+#include "layout_edit/layout_edit_tree.h"
 
 #include <algorithm>
 #include <cctype>
@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 #include "config/config_parser.h"
-#include "layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter.h"
 
 namespace {
 

@@ -5,7 +5,7 @@
 #include <string_view>
 
 #include "config/config.h"
-#include "layout_edit_parameter_id.h"
+#include "layout_edit/layout_edit_parameter_id.h"
 
 struct LayoutEditTooltipDescriptor {
     std::string configKey;

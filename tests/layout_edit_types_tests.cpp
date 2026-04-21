@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "layout_edit_parameter.h"
-#include "layout_edit_types.h"
+#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_types.h"
 
 TEST(LayoutEditTypes, MatchesWidgetIdentityUsingKindAndPath) {
     const LayoutEditWidgetIdentity widgetA{"card-a", "card-a", {1, 2, 3}};

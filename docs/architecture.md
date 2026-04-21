@@ -11,6 +11,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, and UTF-8 conversion.
 - `src/dashboard_overlay_state.*` contains the shared layout-edit overlay state consumed by the renderer and layout-edit hosts.
 - `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, and `src/dashboard_renderer/impl/` contains helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
+- `src/layout_edit/` contains shared layout-edit interaction, parameter, tooltip, tree, trace-session, and snap-solver modules.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
 - `src/telemetry/telemetry.*` owns the telemetry collector boundary, and `src/telemetry/impl/` contains collector submodules for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.

@@ -28,8 +28,8 @@
 #include "util/strings.h"
 #include "dashboard_controller.h"
 #include "diagnostics_options.h"
-#include "layout_edit_controller.h"
-#include "layout_edit_trace_session.h"
+#include "layout_edit/layout_edit_controller.h"
+#include "layout_edit/layout_edit_trace_session.h"
 
 class DashboardShellUi;
 

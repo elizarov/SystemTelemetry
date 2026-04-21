@@ -8,8 +8,8 @@
 #include <wtsapi32.h>
 
 #include "dashboard_shell_ui.h"
-#include "layout_edit_service.h"
-#include "layout_edit_tooltip_text.h"
+#include "layout_edit/layout_edit_service.h"
+#include "layout_edit/layout_edit_tooltip_text.h"
 #include "localization_catalog.h"
 #include "trace.h"
 

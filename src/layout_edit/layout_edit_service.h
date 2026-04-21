@@ -7,7 +7,7 @@
 
 #include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"
-#include "layout_edit_controller.h"
+#include "layout_edit/layout_edit_controller.h"
 
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditHost::LayoutTarget& target);
 const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const LayoutEditWidgetIdentity& widget);

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "layout_snap_solver.h"
+#include "layout_edit/layout_snap_solver.h"
 
 namespace {
 

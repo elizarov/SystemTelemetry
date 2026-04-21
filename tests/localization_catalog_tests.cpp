@@ -5,7 +5,7 @@
 #include <sstream>
 #include <vector>
 
-#include "layout_edit_tooltip.h"
+#include "layout_edit/layout_edit_tooltip.h"
 #include "localization_catalog.h"
 #include "util/utf8.h"
 

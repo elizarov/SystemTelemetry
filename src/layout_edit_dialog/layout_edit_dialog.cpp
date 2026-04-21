@@ -11,7 +11,7 @@
 #include "layout_edit_dialog/impl/trace.h"
 #include "layout_edit_dialog/impl/tree.h"
 #include "layout_edit_dialog/impl/util.h"
-#include "layout_edit_tree.h"
+#include "layout_edit/layout_edit_tree.h"
 
 LayoutEditDialog::LayoutEditDialog(LayoutEditDialogHost& host) : host_(host) {}
 

@@ -4,7 +4,7 @@
 #include <ostream>
 #include <string>
 
-#include "layout_edit_controller.h"
+#include "layout_edit/layout_edit_controller.h"
 
 class LayoutEditTraceSession {
 public:

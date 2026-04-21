@@ -9,7 +9,7 @@
 #endif
 #include <windows.h>
 
-#include "layout_edit_tree.h"
+#include "layout_edit/layout_edit_tree.h"
 
 std::string EscapeTraceText(std::string_view text);
 std::string QuoteTraceText(std::string_view text);
