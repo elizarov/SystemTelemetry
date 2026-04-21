@@ -10,8 +10,8 @@
 #include "app_monitor.h"
 #include "util/paths.h"
 #include "util/strings.h"
-#include "config_parser.h"
-#include "config_writer.h"
+#include "config/config_parser.h"
+#include "config/config_writer.h"
 #include "trace.h"
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) {

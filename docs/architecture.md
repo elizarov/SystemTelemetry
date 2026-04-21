@@ -6,6 +6,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ## Top-Level Map
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
+- `src/config/` contains the config model, parser, resolver, writer, and schema metadata.
 - `src/widget/widget.*` owns the widget interface and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, and UTF-8 conversion.
 - `src/dashboard_overlay_state.*` contains the shared layout-edit overlay state consumed by the renderer and layout-edit hosts.

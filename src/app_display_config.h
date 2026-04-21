@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <ostream>
 
-#include "config.h"
+#include "config/config.h"
 #include "snapshot_dump.h"
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream);

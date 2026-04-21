@@ -9,7 +9,7 @@
 #endif
 #include <windows.h>
 
-#include "config.h"
+#include "config/config.h"
 
 struct MonitorPlacementInfo {
     std::string deviceName;

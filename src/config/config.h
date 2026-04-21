@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config_schema.h"
+#include "config/config_schema.h"
 #include "metric_display_style.h"
 #include "telemetry_settings.h"
 

@@ -10,7 +10,7 @@
 #endif
 #include <windows.h>
 
-#include "config.h"
+#include "config/config.h"
 #include "layout_edit_controller.h"
 #include "layout_edit_parameter.h"
 

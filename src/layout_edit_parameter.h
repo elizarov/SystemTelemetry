@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-#include "config.h"
+#include "config/config.h"
 #include "layout_edit_parameter_id.h"
 
 struct LayoutEditTooltipDescriptor {

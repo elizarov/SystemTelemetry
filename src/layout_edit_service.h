@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-#include "config.h"
+#include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_edit_controller.h"
 

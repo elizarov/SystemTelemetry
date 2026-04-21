@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = PROJECT_ROOT / "src"
 EXCLUDED_PREFIXES = ("src/vendor/",)
 HEADER_BODY_ALLOWLIST = {
-    "src/config_schema.h",
+    "src/config/config_schema.h",
 }
 CPP_WITHOUT_HEADER_ALLOWLIST = {
     "src/app_main.cpp",

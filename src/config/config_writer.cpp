@@ -1,5 +1,5 @@
-#include "config_parser.h"
-#include "config_writer.h"
+#include "config/config_parser.h"
+#include "config/config_writer.h"
 
 #include <algorithm>
 #include <cctype>

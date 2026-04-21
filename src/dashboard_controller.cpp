@@ -9,8 +9,8 @@
 #include "app_config_io.h"
 #include "app_display_config.h"
 #include "util/paths.h"
-#include "config_resolution.h"
-#include "config_writer.h"
+#include "config/config_resolution.h"
+#include "config/config_writer.h"
 #include "layout_edit_parameter.h"
 #include "layout_edit_service.h"
 

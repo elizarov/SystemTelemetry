@@ -5,7 +5,7 @@
 
 #include <d2d1.h>
 
-#include "config.h"
+#include "config/config.h"
 #include "render_types.h"
 
 struct RenderColor {

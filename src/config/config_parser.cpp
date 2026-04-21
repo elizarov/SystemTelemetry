@@ -1,5 +1,5 @@
-#include "config_parser.h"
-#include "config_resolution.h"
+#include "config/config_parser.h"
+#include "config/config_resolution.h"
 #include "dashboard_metrics.h"
 #include "dashboard_widget_class.h"
 

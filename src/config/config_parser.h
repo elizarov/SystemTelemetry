@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-#include "config.h"
+#include "config/config.h"
 
 std::string LoadEmbeddedConfigTemplate();
 bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node);

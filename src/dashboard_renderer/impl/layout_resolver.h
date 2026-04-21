@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "config.h"
+#include "config/config.h"
 #include "layout_edit_types.h"
 #include "render_types.h"
 #include "widget/widget.h"

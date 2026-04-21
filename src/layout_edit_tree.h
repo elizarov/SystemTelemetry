@@ -5,8 +5,8 @@
 #include <string_view>
 #include <vector>
 
-#include "config.h"
-#include "config_schema.h"
+#include "config/config.h"
+#include "config/config_schema.h"
 #include "layout_edit_types.h"
 
 enum class LayoutEditTreeNodeKind {

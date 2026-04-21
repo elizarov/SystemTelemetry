@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "config.h"
+#include "config/config.h"
 
 struct LayoutBindingSelection {
     std::vector<std::string> boardTemperatureNames;

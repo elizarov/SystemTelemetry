@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "config_parser.h"
-#include "config_writer.h"
+#include "config/config_parser.h"
+#include "config/config_writer.h"
 
 #include <fstream>
 #include <sstream>

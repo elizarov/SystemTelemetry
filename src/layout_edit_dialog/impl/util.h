@@ -13,7 +13,7 @@
 #include <windows.h>
 
 #include "resource.h"
-#include "config.h"
+#include "config/config.h"
 #include "layout_edit_tree.h"
 
 struct ColorDialogControls {

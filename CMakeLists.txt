@@ -96,10 +96,10 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_tooltip.cpp
     src/layout_edit_tooltip_text.cpp
     src/layout_edit_service.cpp
-    src/config.cpp
-    src/config_parser.cpp
-    src/config_writer.cpp
-    src/config_resolution.cpp
+    src/config/config.cpp
+    src/config/config_parser.cpp
+    src/config/config_writer.cpp
+    src/config/config_resolution.cpp
     src/localization_catalog.cpp
     src/layout_snap_solver.cpp
     src/numeric_safety.cpp
@@ -269,10 +269,10 @@ add_executable(SystemTelemetryTests
     tests/config_writer_tests.cpp
     tests/system_info_support_tests.cpp
     tests/telemetry_retained_history_tests.cpp
-    src/config.cpp
-    src/config_parser.cpp
-    src/config_writer.cpp
-    src/config_resolution.cpp
+    src/config/config.cpp
+    src/config/config_parser.cpp
+    src/config/config_writer.cpp
+    src/config/config_resolution.cpp
     src/layout_edit_types.cpp
     src/layout_edit_tree.cpp
     src/layout_edit_parameter.cpp
@@ -328,9 +328,9 @@ add_executable(SystemTelemetryBenchmarks
     resources/SystemTelemetry.rc
     tests/benchmarks.cpp
     src/util/strings.cpp
-    src/config.cpp
-    src/config_parser.cpp
-    src/config_resolution.cpp
+    src/config/config.cpp
+    src/config/config_parser.cpp
+    src/config/config_resolution.cpp
     src/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector_state.cpp

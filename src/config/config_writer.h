@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <string>
 
-#include "config.h"
+#include "config/config.h"
 
 enum class ConfigSaveShape {
     UpdateOrAppend,

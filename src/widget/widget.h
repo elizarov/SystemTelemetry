@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "config.h"
+#include "config/config.h"
 #include "dashboard_widget_class.h"
 #include "render_types.h"
 

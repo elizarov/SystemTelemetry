@@ -13,7 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "config.h"
+#include "config/config.h"
 #include "telemetry/telemetry.h"
 
 struct DashboardMetricValue {

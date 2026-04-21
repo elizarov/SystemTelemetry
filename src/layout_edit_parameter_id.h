@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config.h"
+#include "config/config.h"
 
 #define SYSTEM_TELEMETRY_LAYOUT_EDIT_PARAMETER_ITEMS(X)                                                                \
     /* Fonts */                                                                                                        \

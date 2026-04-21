@@ -7,7 +7,7 @@
 #endif
 #include <windows.h>
 
-#include "config.h"
+#include "config/config.h"
 #include "diagnostics_options.h"
 
 std::filesystem::path GetRuntimeConfigPath();

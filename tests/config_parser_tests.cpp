@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "config_parser.h"
+#include "config/config_parser.h"
 #include "util/utf8.h"
 #include <fstream>
 

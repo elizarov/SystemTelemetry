@@ -16,7 +16,7 @@
 #include <shellapi.h>
 
 #include "app_constants.h"
-#include "config.h"
+#include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "diagnostics_options.h"
 #include "snapshot_dump.h"

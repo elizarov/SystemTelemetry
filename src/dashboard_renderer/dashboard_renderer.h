@@ -25,7 +25,7 @@
 #include <windows.h>
 #include <wrl/client.h>
 
-#include "config.h"
+#include "config/config.h"
 #include "dashboard_metrics.h"
 #include "dashboard_overlay_state.h"
 #include "layout_edit_parameter_id.h"
