@@ -517,7 +517,9 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         renderer.gapEditAnchors_.push_back(std::move(anchor));
     }
 
-    const auto resolveCard = [&](const LayoutNodeConfig& node, const RenderRect& rect) {
+    const auto resolveCard = [&](const LayoutNodeConfig& node,
+                                 const RenderRect& rect,
+                                 const std::vector<size_t>& nodePath) {
         const auto cardIt = std::find_if(renderer.config_.layout.cards.begin(),
             renderer.config_.layout.cards.end(),
             [&](const auto& card) { return card.id == node.name; });
@@ -530,6 +532,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         card.title = cardIt->title;
         card.iconName = cardIt->icon;
         card.hasHeader = !card.title.empty() || !card.iconName.empty();
+        card.nodePath = nodePath;
         card.rect = rect;
 
         const int padding = renderer.ScaleLogical(renderer.config_.layout.cardStyle.cardPadding);
@@ -575,7 +578,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     std::function<void(const LayoutNodeConfig&, const RenderRect&, const std::vector<size_t>&)> resolveDashboardNode =
         [&](const LayoutNodeConfig& node, const RenderRect& rect, const std::vector<size_t>& nodePath) {
             if (!DashboardRenderer::IsContainerNode(node)) {
-                resolveCard(node, rect);
+                resolveCard(node, rect, nodePath);
                 return;
             }
 

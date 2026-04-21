@@ -239,6 +239,7 @@ private:
         std::string title;
         std::string iconName;
         bool hasHeader = true;
+        std::vector<size_t> nodePath;
         RenderRect rect{};
         RenderRect titleRect{};
         RenderRect iconRect{};
@@ -436,6 +437,7 @@ private:
     void EndWindowDraw();
     void DrawDirect2DFrame(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     bool SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath);
+    void WriteScreenshotActiveRegionsTrace(const EditOverlayState& overlayState) const;
     ID2D1SolidColorBrush* D2DSolidBrush(RenderColor color);
     IDWriteTextFormat* DWriteTextFormat(TextStyleId style) const;
     bool CreateDWriteTextFormats();

@@ -57,6 +57,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
 - `/fake:<path>` reloads the selected fake file once per second while the process runs so manual edits affect the next refresh.
 - Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior.
+- When `/trace` and `/screenshot` are both enabled, each screenshot export writes `diagnostics:active_region` trace lines for layout-edit mouse-reactive dashboard regions that are present in the exported frame. Each line includes the client-coordinate box, visual type, config or layout path, and a short detail string; a `diagnostics:active_regions` summary records the exported count.
 - Live layout-edit tooltips use a separate Win32 tooltip window and therefore do not appear in diagnostics screenshots.
 
 ## Failure And Trace Policy
@@ -87,6 +88,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 
 - Build first through `build.cmd`.
 - Include `/trace` during diagnostics validation and inspect trace output even when the main change affects dump or screenshot behavior.
+- For layout-edit screenshot diagnostics, inspect `diagnostics:active_region` lines to verify mouse-reactive region geometry and layout paths.
 - When validation is meant to exercise the built-in config, add `/default-config`.
 - Put explicit diagnostics paths under `build\` so repository files stay clean.
 

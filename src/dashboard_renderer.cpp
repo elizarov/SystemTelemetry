@@ -110,6 +110,130 @@ std::string FormatWin32Error(DWORD error) {
     return message;
 }
 
+std::string EscapeTraceText(std::string_view text) {
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (const char ch : text) {
+        switch (ch) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            default:
+                escaped.push_back(ch);
+                break;
+        }
+    }
+    return escaped;
+}
+
+std::string QuoteTraceText(std::string_view text) {
+    return "\"" + EscapeTraceText(text) + "\"";
+}
+
+std::string FormatTraceRect(const RenderRect& rect) {
+    return "(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," + std::to_string(rect.right) + "," +
+           std::to_string(rect.bottom) + ")";
+}
+
+std::string FormatNodePath(const std::vector<size_t>& nodePath) {
+    if (nodePath.empty()) {
+        return "root";
+    }
+    std::string text;
+    for (size_t index : nodePath) {
+        if (!text.empty()) {
+            text += "/";
+        }
+        text += "children[";
+        text += std::to_string(index);
+        text += "]";
+    }
+    return text;
+}
+
+std::string ActiveLayoutSectionName(const AppConfig& config) {
+    return config.display.layout.empty() ? "layout" : "layout." + config.display.layout;
+}
+
+std::string FormatLayoutConfigPath(
+    const AppConfig& config, const std::string& editCardId, const std::vector<size_t>& nodePath) {
+    if (editCardId.empty()) {
+        return ActiveLayoutSectionName(config) + ".cards/" + FormatNodePath(nodePath);
+    }
+    return "card." + editCardId + ".layout/" + FormatNodePath(nodePath);
+}
+
+std::string FormatLayoutEditParameterPath(LayoutEditParameter parameter) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
+    if (!descriptor.has_value()) {
+        return "parameter";
+    }
+    return descriptor->configKey;
+}
+
+std::string FormatLayoutEditParameterDetail(LayoutEditParameter parameter) {
+    return GetLayoutEditParameterDisplayName(parameter) + " (" + FormatLayoutEditParameterPath(parameter) + ")";
+}
+
+std::string FormatWidgetIdentityPath(const AppConfig& config, const LayoutEditWidgetIdentity& widget) {
+    switch (widget.kind) {
+        case LayoutEditWidgetIdentity::Kind::DashboardChrome:
+            return ActiveLayoutSectionName(config) + ".dashboard";
+        case LayoutEditWidgetIdentity::Kind::CardChrome:
+            return ActiveLayoutSectionName(config) + ".cards/card[" + widget.editCardId + "]";
+        case LayoutEditWidgetIdentity::Kind::Widget:
+        default:
+            return FormatLayoutConfigPath(config, widget.editCardId, widget.nodePath);
+    }
+}
+
+std::string FormatGuideAxis(LayoutGuideAxis axis) {
+    return axis == LayoutGuideAxis::Vertical ? "vertical" : "horizontal";
+}
+
+std::string FormatAnchorShape(AnchorShape shape) {
+    switch (shape) {
+        case AnchorShape::Circle:
+            return "circle";
+        case AnchorShape::Diamond:
+            return "diamond";
+        case AnchorShape::Square:
+            return "square";
+        case AnchorShape::Wedge:
+            return "wedge";
+        case AnchorShape::VerticalReorder:
+            return "vertical-reorder";
+        case AnchorShape::Plus:
+            return "plus";
+    }
+    return "unknown";
+}
+
+std::string FormatAnchorSubject(const AppConfig& config, const LayoutEditAnchorKey& key) {
+    if (const auto parameter = LayoutEditAnchorParameter(key); parameter.has_value()) {
+        return FormatLayoutEditParameterDetail(*parameter);
+    }
+    if (const auto metric = LayoutEditAnchorMetricKey(key); metric.has_value()) {
+        return "metric binding " + metric->metricId;
+    }
+    if (const auto title = LayoutEditAnchorCardTitleKey(key); title.has_value()) {
+        return "card title " + title->cardId;
+    }
+    if (const auto order = LayoutEditAnchorMetricListOrderKey(key); order.has_value()) {
+        return "metric list order " + FormatLayoutConfigPath(config, order->editCardId, order->nodePath);
+    }
+    return "unknown anchor subject";
+}
+
 std::string Trim(std::string value) {
     const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
     const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
@@ -2096,7 +2220,101 @@ bool DashboardRenderer::SaveSnapshotPng(
         return false;
     }
 
-    return SaveWicBitmapPng(bitmap.Get(), imagePath);
+    const bool saved = SaveWicBitmapPng(bitmap.Get(), imagePath);
+    if (saved) {
+        WriteScreenshotActiveRegionsTrace(overlayState);
+    }
+    return saved;
+}
+
+void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const EditOverlayState& overlayState) const {
+    if (traceOutput_ == nullptr) {
+        return;
+    }
+
+    size_t count = 0;
+    const auto appendRegion =
+        [&](const RenderRect& box, std::string_view visualType, const std::string& path, const std::string& detail) {
+            if (box.IsEmpty()) {
+                return;
+            }
+            ++count;
+            WriteTrace("diagnostics:active_region box=" + FormatTraceRect(box) +
+                       " visual_type=" + QuoteTraceText(visualType) + " path=" + QuoteTraceText(path) +
+                       " detail=" + QuoteTraceText(detail));
+        };
+
+    if (overlayState.showLayoutEditGuides) {
+        for (const auto& card : resolvedLayout_.cards) {
+            const std::string cardPath =
+                ActiveLayoutSectionName(config_) + ".cards/" + FormatNodePath(card.nodePath) + "/card[" + card.id + "]";
+            appendRegion(card.rect, "card", cardPath, "card chrome " + card.id);
+            if (card.hasHeader) {
+                appendRegion(card.titleRect, "card-header", cardPath + "/header", "card header " + card.id);
+            }
+            for (const auto& widget : card.widgets) {
+                if (widget.widget == nullptr || !widget.widget->IsHoverable()) {
+                    continue;
+                }
+                const std::string widgetType = std::string(EnumToString(widget.widget->Class()));
+                appendRegion(widget.rect,
+                    "widget-hover",
+                    FormatLayoutConfigPath(config_, widget.editCardId, widget.nodePath) + "/widget[" + widgetType + "]",
+                    "hoverable widget " + widgetType + " in card " + widget.cardId);
+            }
+        }
+
+        for (const auto& guide : layoutEditGuides_) {
+            appendRegion(guide.hitRect,
+                "layout-weight-guide",
+                FormatLayoutConfigPath(config_, guide.editCardId, guide.nodePath) + "/separator[" +
+                    std::to_string(guide.separatorIndex) + "]",
+                FormatGuideAxis(guide.axis) + " layout weight separator");
+        }
+
+        for (const auto& anchor : gapEditAnchors_) {
+            appendRegion(anchor.hitRect,
+                "gap-handle",
+                FormatWidgetIdentityPath(config_, anchor.key.widget) + "/gap/" +
+                    FormatLayoutConfigPath(config_, anchor.key.widget.editCardId, anchor.key.nodePath),
+                FormatLayoutEditParameterDetail(anchor.key.parameter));
+        }
+
+        for (const auto& guide : widgetEditGuides_) {
+            appendRegion(guide.hitRect,
+                "widget-guide",
+                FormatWidgetIdentityPath(config_, guide.widget) + "/guide[" + std::to_string(guide.guideId) + "]",
+                FormatGuideAxis(guide.axis) + " " + FormatLayoutEditParameterDetail(guide.parameter));
+        }
+
+        const auto appendAnchorRegions = [&](const std::vector<LayoutEditAnchorRegion>& regions,
+                                             std::string_view phase) {
+            for (const auto& region : regions) {
+                const std::string basePath = FormatWidgetIdentityPath(config_, region.key.widget) + "/anchor[" +
+                                             std::to_string(region.key.anchorId) + "]";
+                const std::string detail = std::string(phase) + " " + FormatAnchorShape(region.shape) + " " +
+                                           FormatAnchorSubject(config_, region.key);
+                appendRegion(region.anchorHitRect, "edit-anchor-handle", basePath + "/handle", detail);
+                appendRegion(region.targetRect, "edit-anchor-target", basePath + "/target", detail);
+            }
+        };
+        appendAnchorRegions(staticEditableAnchorRegions_, "static");
+        appendAnchorRegions(dynamicEditableAnchorRegions_, "dynamic");
+
+        const auto appendColorRegions = [&](const std::vector<LayoutEditColorRegion>& regions, std::string_view phase) {
+            for (const auto& region : regions) {
+                appendRegion(region.targetRect,
+                    "color-target",
+                    FormatLayoutEditParameterPath(region.parameter),
+                    std::string(phase) + " color " + FormatLayoutEditParameterDetail(region.parameter));
+            }
+        };
+        appendColorRegions(staticColorEditRegions_, "static");
+        appendColorRegions(dynamicColorEditRegions_, "dynamic");
+    }
+
+    WriteTrace("diagnostics:active_regions count=" + std::to_string(count) +
+               " layout_edit=" + tracing::Trace::BoolText(overlayState.showLayoutEditGuides));
 }
 
 bool DashboardRenderer::SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath) {
