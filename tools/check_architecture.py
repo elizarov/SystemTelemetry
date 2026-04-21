@@ -57,14 +57,22 @@ def is_project_source(path: Path) -> bool:
 
 def list_project_files() -> list[Path]:
     try:
-        result = subprocess.run(
+        tracked = subprocess.run(
             ["git", "ls-files", "src"],
             cwd=PROJECT_ROOT,
             check=True,
             capture_output=True,
             text=True,
         )
-        files = [PROJECT_ROOT / line.strip() for line in result.stdout.splitlines() if line.strip()]
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "src"],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        paths = tracked.stdout.splitlines() + untracked.stdout.splitlines()
+        files = [PROJECT_ROOT / line.strip() for line in paths if line.strip()]
     except (OSError, subprocess.CalledProcessError):
         files = list(SOURCE_ROOT.rglob("*"))
     return [path for path in files if path.is_file() and is_project_source(path)]
@@ -178,12 +186,31 @@ def paired_header_for_cpp(cpp_rel: str) -> str:
     return cpp_rel[:-4] + ".h"
 
 
+def namespace_stack_for_line(line: str, namespace_stack: list[str]) -> list[str]:
+    namespace_match = re.fullmatch(r"\s*(?:inline\s+)?namespace\s+([A-Za-z_]\w*)\s*\{\s*", line)
+    if namespace_match:
+        namespace_stack.append(namespace_match.group(1))
+        return namespace_stack
+    if re.fullmatch(r"\s*}\s*(?://.*)?", line) and namespace_stack:
+        namespace_stack.pop()
+    return namespace_stack
+
+
 def collect_class_headers(headers: Iterable[Path]) -> dict[str, set[str]]:
     mapping: dict[str, set[str]] = {}
     for path in headers:
-        names = set(CLASS_DECL_RE.findall(strip_comments_and_strings(path.read_text(encoding="utf-8"))))
-        for name in names:
-            mapping.setdefault(name, set()).add(relpath(path))
+        namespace_stack: list[str] = []
+        stripped = strip_comments_and_strings(path.read_text(encoding="utf-8"))
+        for raw_line in stripped.splitlines():
+            namespace_stack_for_line(raw_line, namespace_stack)
+            for match in CLASS_DECL_RE.finditer(raw_line):
+                name = match.group(1)
+                suffix = raw_line[match.end() :]
+                if "{" not in suffix:
+                    continue
+                mapping.setdefault(name, set()).add(relpath(path))
+                if namespace_stack:
+                    mapping.setdefault("::".join([*namespace_stack, name]), set()).add(relpath(path))
     return mapping
 
 
