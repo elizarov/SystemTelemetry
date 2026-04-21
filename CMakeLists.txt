@@ -80,14 +80,14 @@ add_executable(SystemTelemetry WIN32
     src/dashboard_controller.cpp
     src/dashboard_app.cpp
     src/dashboard_shell_ui.cpp
-    src/layout_edit_dialog.cpp
-    src/layout_edit_dialog/dialog_proc.cpp
-    src/layout_edit_dialog/editors.cpp
-    src/layout_edit_dialog/pane.cpp
-    src/layout_edit_dialog/state.cpp
-    src/layout_edit_dialog/trace.cpp
-    src/layout_edit_dialog/tree.cpp
-    src/layout_edit_dialog/util.cpp
+    src/layout_edit_dialog/layout_edit_dialog.cpp
+    src/layout_edit_dialog/impl/dialog_proc.cpp
+    src/layout_edit_dialog/impl/editors.cpp
+    src/layout_edit_dialog/impl/pane.cpp
+    src/layout_edit_dialog/impl/state.cpp
+    src/layout_edit_dialog/impl/trace.cpp
+    src/layout_edit_dialog/impl/tree.cpp
+    src/layout_edit_dialog/impl/util.cpp
     src/layout_edit_controller.cpp
     src/layout_edit_trace_session.cpp
     src/layout_edit_types.cpp
@@ -104,18 +104,18 @@ add_executable(SystemTelemetry WIN32
     src/layout_snap_solver.cpp
     src/numeric_safety.cpp
     src/system_info_support.cpp
-    src/telemetry.cpp
-    src/telemetry/collector_state.cpp
-    src/telemetry/collector_board.cpp
-    src/telemetry/collector_cpu.cpp
-    src/telemetry/collector_gpu.cpp
-    src/telemetry/collector_support.cpp
-    src/telemetry/retained_history.cpp
-    src/telemetry/collector_storage.cpp
-    src/telemetry/collector_storage_selection.cpp
-    src/telemetry/collector_network.cpp
-    src/telemetry/collector_real.cpp
-    src/telemetry/collector_fake.cpp
+    src/telemetry/telemetry.cpp
+    src/telemetry/impl/collector_state.cpp
+    src/telemetry/impl/collector_board.cpp
+    src/telemetry/impl/collector_cpu.cpp
+    src/telemetry/impl/collector_gpu.cpp
+    src/telemetry/impl/collector_support.cpp
+    src/telemetry/impl/retained_history.cpp
+    src/telemetry/impl/collector_storage.cpp
+    src/telemetry/impl/collector_storage_selection.cpp
+    src/telemetry/impl/collector_network.cpp
+    src/telemetry/impl/collector_real.cpp
+    src/telemetry/impl/collector_fake.cpp
     src/snapshot_dump.cpp
     src/gpu_vendor.cpp
     src/gpu_amd_adl.cpp
@@ -123,22 +123,22 @@ add_executable(SystemTelemetry WIN32
     src/dashboard_metrics.cpp
     src/dashboard_overlay_state.cpp
     src/render_types.cpp
-    src/dashboard_renderer/d2d_cache.cpp
-    src/dashboard_renderer/palette.cpp
-    src/dashboard_renderer/text_width_cache.cpp
-    src/widget.cpp
-    src/widget/text.cpp
-    src/widget/gauge.cpp
-    src/widget/metric_list.cpp
-    src/widget/throughput.cpp
-    src/widget/network_footer.cpp
-    src/widget/vertical_spacer.cpp
-    src/widget/vertical_spring.cpp
-    src/widget/drive_usage_list.cpp
-    src/widget/clock_time.cpp
-    src/widget/clock_date.cpp
-    src/dashboard_renderer/layout_resolver.cpp
-    src/dashboard_renderer.cpp
+    src/dashboard_renderer/impl/d2d_cache.cpp
+    src/dashboard_renderer/impl/palette.cpp
+    src/dashboard_renderer/impl/text_width_cache.cpp
+    src/widget/widget.cpp
+    src/widget/impl/text.cpp
+    src/widget/impl/gauge.cpp
+    src/widget/impl/metric_list.cpp
+    src/widget/impl/throughput.cpp
+    src/widget/impl/network_footer.cpp
+    src/widget/impl/vertical_spacer.cpp
+    src/widget/impl/vertical_spring.cpp
+    src/widget/impl/drive_usage_list.cpp
+    src/widget/impl/clock_time.cpp
+    src/widget/impl/clock_date.cpp
+    src/dashboard_renderer/impl/layout_resolver.cpp
+    src/dashboard_renderer/dashboard_renderer.cpp
     src/util/utf8.cpp
     src/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
@@ -284,7 +284,7 @@ add_executable(SystemTelemetryTests
     src/dashboard_metrics.cpp
     src/render_types.cpp
     src/snapshot_dump.cpp
-    src/telemetry/retained_history.cpp
+    src/telemetry/impl/retained_history.cpp
     src/util/utf8.cpp
   )
 target_include_directories(SystemTelemetryTests PRIVATE
@@ -332,18 +332,18 @@ add_executable(SystemTelemetryBenchmarks
     src/config_parser.cpp
     src/config_resolution.cpp
     src/system_info_support.cpp
-    src/telemetry.cpp
-    src/telemetry/collector_state.cpp
-    src/telemetry/collector_board.cpp
-    src/telemetry/collector_cpu.cpp
-    src/telemetry/collector_gpu.cpp
-    src/telemetry/collector_support.cpp
-    src/telemetry/retained_history.cpp
-    src/telemetry/collector_storage.cpp
-    src/telemetry/collector_storage_selection.cpp
-    src/telemetry/collector_network.cpp
-    src/telemetry/collector_real.cpp
-    src/telemetry/collector_fake.cpp
+    src/telemetry/telemetry.cpp
+    src/telemetry/impl/collector_state.cpp
+    src/telemetry/impl/collector_board.cpp
+    src/telemetry/impl/collector_cpu.cpp
+    src/telemetry/impl/collector_gpu.cpp
+    src/telemetry/impl/collector_support.cpp
+    src/telemetry/impl/retained_history.cpp
+    src/telemetry/impl/collector_storage.cpp
+    src/telemetry/impl/collector_storage_selection.cpp
+    src/telemetry/impl/collector_network.cpp
+    src/telemetry/impl/collector_real.cpp
+    src/telemetry/impl/collector_fake.cpp
     src/snapshot_dump.cpp
     src/gpu_vendor.cpp
     src/gpu_amd_adl.cpp
@@ -359,22 +359,22 @@ add_executable(SystemTelemetryBenchmarks
     src/dashboard_metrics.cpp
     src/dashboard_overlay_state.cpp
     src/render_types.cpp
-    src/dashboard_renderer/d2d_cache.cpp
-    src/dashboard_renderer/palette.cpp
-    src/dashboard_renderer/text_width_cache.cpp
-    src/widget.cpp
-    src/widget/text.cpp
-    src/widget/gauge.cpp
-    src/widget/metric_list.cpp
-    src/widget/throughput.cpp
-    src/widget/network_footer.cpp
-    src/widget/vertical_spacer.cpp
-    src/widget/vertical_spring.cpp
-    src/widget/drive_usage_list.cpp
-    src/widget/clock_time.cpp
-    src/widget/clock_date.cpp
-    src/dashboard_renderer/layout_resolver.cpp
-    src/dashboard_renderer.cpp
+    src/dashboard_renderer/impl/d2d_cache.cpp
+    src/dashboard_renderer/impl/palette.cpp
+    src/dashboard_renderer/impl/text_width_cache.cpp
+    src/widget/widget.cpp
+    src/widget/impl/text.cpp
+    src/widget/impl/gauge.cpp
+    src/widget/impl/metric_list.cpp
+    src/widget/impl/throughput.cpp
+    src/widget/impl/network_footer.cpp
+    src/widget/impl/vertical_spacer.cpp
+    src/widget/impl/vertical_spring.cpp
+    src/widget/impl/drive_usage_list.cpp
+    src/widget/impl/clock_time.cpp
+    src/widget/impl/clock_date.cpp
+    src/dashboard_renderer/impl/layout_resolver.cpp
+    src/dashboard_renderer/dashboard_renderer.cpp
     src/util/utf8.cpp
     src/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp

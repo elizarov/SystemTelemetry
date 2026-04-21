@@ -54,7 +54,7 @@ install.cmd
 
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources.
 - `lint.cmd` is the maintained entrypoint for architecture checks, include-path checks, header-body checks, and optional `clang-tidy` runs.
-- `architecture_graph.cmd` is the maintained entrypoint for writing `build\architecture\source_dependencies.dot`.
+- `architecture_graph.cmd` is the maintained entrypoint for writing the source dependency graph artifacts described in [docs/architecture.md](architecture.md).
 - `profile_benchmark.cmd` is the maintained entrypoint for elevated benchmark profiling and daemon-backed benchmark requests.
 - `devenv.cmd` is the maintained environment bootstrap for local builds and tool runs.
 

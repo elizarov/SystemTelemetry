@@ -7,7 +7,7 @@
 
 #include "layout_edit_parameter.h"
 #include "render_types.h"
-#include "widget.h"
+#include "widget/widget.h"
 
 enum class LayoutGuideAxis {
     Horizontal,

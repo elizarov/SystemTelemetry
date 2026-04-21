@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "config.h"
-#include "dashboard_renderer.h"
+#include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_edit_controller.h"
 
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditHost::LayoutTarget& target);

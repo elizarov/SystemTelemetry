@@ -10,7 +10,7 @@
 #include <windows.h>
 
 #include "config.h"
-#include "dashboard_renderer.h"
+#include "dashboard_renderer/dashboard_renderer.h"
 
 class LayoutEditHost {
 public:

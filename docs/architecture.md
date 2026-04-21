@@ -6,12 +6,12 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ## Top-Level Map
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
-- `src/widget/` contains the concrete widget draw and layout-state modules used by the renderer.
+- `src/widget/widget.*` owns the widget interface and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, and UTF-8 conversion.
 - `src/dashboard_overlay_state.*` contains the shared layout-edit overlay state consumed by the renderer and layout-edit hosts.
-- `src/dashboard_renderer/` contains renderer helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
-- `src/layout_edit_dialog/` contains the internal modules behind the modeless `Edit Configuration` window.
-- `src/telemetry/` contains collector submodules for CPU, GPU, board, network, storage, and fake-runtime support.
+- `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, and `src/dashboard_renderer/impl/` contains helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
+- `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
+- `src/telemetry/telemetry.*` owns the telemetry collector boundary, and `src/telemetry/impl/` contains collector submodules for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
@@ -52,7 +52,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `LayoutEditController` owns hover state, active drags, hit-testing, capture, cursor choice, and drag-session flow.
 - Layout-edit parameter metadata and helpers centralize editable target identity, config-path mapping, clamps, shared tooltip text, and preview application.
-- `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/`.
+- `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/impl/`.
 - The renderer exposes the resolved guide and anchor geometry used both by live interaction and by diagnostics screenshot validation.
 
 ### Diagnostics
@@ -113,7 +113,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ## Source Dependency Graph
 
-- `architecture_graph.cmd` writes the maintained DOT view of non-vendored `src` module dependencies under `build\architecture\`.
+- `architecture_graph.cmd` writes the maintained DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\`.
 - Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
 - DOT clusters group nodes by their containing source directory.
+- GraphML nodes include `label` and `directory` data, and GraphML edges include `label` and `kind` data.
 - A dependency from an including module to an included module is `public` when it appears in a header and `private` when it appears only in an implementation file.

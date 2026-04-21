@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
@@ -16,6 +17,7 @@ EXCLUDED_PREFIXES = ("src/vendor/",)
 SOURCE_SUFFIXES = {".cpp", ".h"}
 HEADER_SUFFIXES = {".h"}
 INCLUDE_RE = re.compile(r'^\s*#include\s+(?:"([^"]+)"|<([^>]+)>)')
+GRAPHML_NS = "http://graphml.graphdrawing.org/xmlns"
 
 
 @dataclass
@@ -184,14 +186,83 @@ def write_dot(modules: dict[str, Module], edges: dict[tuple[str, str], str], out
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def graphml_tag(name: str) -> str:
+    return f"{{{GRAPHML_NS}}}{name}"
+
+
+def add_graphml_data(parent: ET.Element, key: str, value: str) -> None:
+    data = ET.SubElement(parent, graphml_tag("data"), key=key)
+    data.text = value
+
+
+def write_graphml(modules: dict[str, Module], edges: dict[tuple[str, str], str], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    ET.register_namespace("", GRAPHML_NS)
+    root = ET.Element(graphml_tag("graphml"))
+    ET.SubElement(
+        root,
+        graphml_tag("key"),
+        id="node_label",
+        **{"for": "node", "attr.name": "label", "attr.type": "string"},
+    )
+    ET.SubElement(
+        root,
+        graphml_tag("key"),
+        id="node_directory",
+        **{"for": "node", "attr.name": "directory", "attr.type": "string"},
+    )
+    ET.SubElement(
+        root,
+        graphml_tag("key"),
+        id="edge_label",
+        **{"for": "edge", "attr.name": "label", "attr.type": "string"},
+    )
+    ET.SubElement(
+        root,
+        graphml_tag("key"),
+        id="edge_kind",
+        **{"for": "edge", "attr.name": "kind", "attr.type": "string"},
+    )
+
+    graph = ET.SubElement(root, graphml_tag("graph"), id="SourceDependencies", edgedefault="directed")
+    module_ids = {module_name: f"n{index}" for index, module_name in enumerate(sorted(modules))}
+
+    for module_name in sorted(modules):
+        module = modules[module_name]
+        node = ET.SubElement(graph, graphml_tag("node"), id=module_ids[module_name])
+        add_graphml_data(node, "node_label", display_name(module.name))
+        add_graphml_data(node, "node_directory", "src" if module.directory == "." else module.directory)
+
+    for index, ((source, target), kind) in enumerate(sorted(edges.items())):
+        edge = ET.SubElement(
+            graph,
+            graphml_tag("edge"),
+            id=f"e{index}",
+            source=module_ids[source],
+            target=module_ids[target],
+        )
+        add_graphml_data(edge, "edge_label", kind)
+        add_graphml_data(edge, "edge_kind", kind)
+
+    ET.indent(root, space="  ")
+    ET.ElementTree(root).write(output_path, encoding="utf-8", xml_declaration=True)
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Write a DOT graph of non-vendored src module dependencies.")
+    parser = argparse.ArgumentParser(description="Write DOT and GraphML graphs of non-vendored src module dependencies.")
     parser.add_argument(
         "--output",
         "-o",
         type=Path,
         default=DEFAULT_DOT_PATH,
         help=f"DOT output path. Defaults to {DEFAULT_DOT_PATH.relative_to(PROJECT_ROOT)}.",
+    )
+    parser.add_argument(
+        "--graphml-output",
+        type=Path,
+        default=None,
+        help="GraphML output path. Defaults to the DOT output path with a .graphml suffix.",
     )
     return parser.parse_args()
 
@@ -202,12 +273,14 @@ def main() -> int:
     modules, module_by_file = collect_modules(files, SOURCE_ROOT)
     uses = collect_include_uses(files, SOURCE_ROOT, module_by_file)
     edges = merge_edges(uses)
+    graphml_output = args.graphml_output or args.output.with_suffix(".graphml")
     write_dot(modules, edges, args.output)
+    write_graphml(modules, edges, graphml_output)
 
     public_edges = sum(1 for kind in edges.values() if kind == "public")
     private_edges = sum(1 for kind in edges.values() if kind == "private")
     print(
-        f"Wrote {args.output} with {len(modules)} modules, "
+        f"Wrote {args.output} and {graphml_output} with {len(modules)} modules, "
         f"{public_edges} public dependencies, and {private_edges} private dependencies."
     )
     return 0

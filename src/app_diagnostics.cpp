@@ -8,7 +8,7 @@
 #include "config_writer.h"
 #include "layout_edit_controller.h"
 #include "layout_edit_tooltip_text.h"
-#include "telemetry.h"
+#include "telemetry/telemetry.h"
 
 #include <cmath>
 #include <cstdio>

@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "config.h"
-#include "telemetry.h"
+#include "telemetry/telemetry.h"
 
 struct DashboardMetricValue {
     std::string label;
