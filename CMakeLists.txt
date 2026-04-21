@@ -134,7 +134,7 @@ add_executable(SystemTelemetry WIN32
     src/widget/drive_usage_list.cpp
     src/widget/clock_time.cpp
     src/widget/clock_date.cpp
-    src/dashboard_layout_resolver.cpp
+    src/dashboard_renderer/layout_resolver.cpp
     src/dashboard_renderer.cpp
     src/utf8.cpp
     src/trace.cpp
@@ -367,7 +367,7 @@ add_executable(SystemTelemetryBenchmarks
     src/widget/drive_usage_list.cpp
     src/widget/clock_time.cpp
     src/widget/clock_date.cpp
-    src/dashboard_layout_resolver.cpp
+    src/dashboard_renderer/layout_resolver.cpp
     src/dashboard_renderer.cpp
     src/utf8.cpp
     src/trace.cpp

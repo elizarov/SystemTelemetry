@@ -32,6 +32,7 @@
 #include "render_types.h"
 #include "widget.h"
 
+class DashboardLayoutResolver;
 class DashboardPalette;
 
 class DashboardRenderer {
@@ -218,38 +219,12 @@ public:
     int MeasureTextWidth(TextStyleId style, std::string_view text) const;
 
 private:
-    friend struct DashboardLayoutResolver;
+    friend class DashboardLayoutResolver;
 
     struct SimilarityIndicator {
         LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
         RenderRect rect{};
         int exactTypeOrdinal = 0;
-    };
-
-    struct ResolvedCardLayout {
-        std::string id;
-        std::string title;
-        std::string iconName;
-        bool hasHeader = true;
-        std::vector<size_t> nodePath;
-        RenderRect rect{};
-        RenderRect titleRect{};
-        RenderRect iconRect{};
-        RenderRect contentRect{};
-        std::vector<DashboardWidgetLayout> widgets;
-    };
-
-    struct ResolvedDashboardLayout {
-        int windowWidth = 800;
-        int windowHeight = 480;
-        std::vector<ResolvedCardLayout> cards;
-    };
-
-    struct ParsedWidgetInfo {
-        std::unique_ptr<DashboardWidget> widgetPrototype;
-        int preferredHeight = 0;
-        bool fixedPreferredHeightInRows = false;
-        bool verticalSpring = false;
     };
 
     struct TextWidthCacheKey {
@@ -372,12 +347,9 @@ private:
     void DrawDottedHighlightRect(const RenderRect& rect, RenderColorId color, bool active, bool outside = true) const;
     void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
     void DrawMoveOverlay(const MoveOverlayState& overlayState);
-    void DrawPanel(const ResolvedCardLayout& card);
+    void DrawPanel(size_t cardIndex);
     void DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect);
     void DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
-    const ParsedWidgetInfo* FindParsedWidgetInfo(const LayoutNodeConfig& node) const;
-    DashboardWidgetLayout ResolveWidgetLayout(
-        const LayoutNodeConfig& node, const RenderRect& rect, bool instantiateWidget) const;
     bool UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
@@ -428,7 +400,6 @@ private:
         const RenderRect& rect,
         std::vector<DashboardWidgetLayout>& widgets,
         bool instantiateWidgets = true);
-    int PreferredNodeHeight(const LayoutNodeConfig& node, int width) const;
     bool SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const;
     std::vector<const DashboardWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
     int WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;
@@ -469,16 +440,7 @@ private:
     std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
     TextStyleMetrics textStyleMetrics_{};
     std::unique_ptr<DashboardPalette> palette_;
-    ResolvedDashboardLayout resolvedLayout_{};
-    std::vector<LayoutEditGuide> layoutEditGuides_;
-    std::vector<LayoutEditWidgetGuide> widgetEditGuides_;
-    std::vector<LayoutEditGapAnchor> gapEditAnchors_;
-    std::vector<LayoutEditAnchorRegion> staticEditableAnchorRegions_;
-    std::vector<LayoutEditAnchorRegion> dynamicEditableAnchorRegions_;
-    std::vector<LayoutEditColorRegion> staticColorEditRegions_;
-    std::vector<LayoutEditColorRegion> dynamicColorEditRegions_;
-    bool dynamicAnchorRegistrationEnabled_ = false;
-    mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
+    std::unique_ptr<DashboardLayoutResolver> layoutResolver_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textWidthCache_;
     std::unordered_map<D2DBrushCacheKey, Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>, D2DBrushCacheKeyHash>
         d2dSolidBrushCache_;
