@@ -2,7 +2,7 @@
 
 #include "config/config_schema.h"
 #include "telemetry/metric_display_style.h"
-#include "telemetry_settings.h"
+#include "telemetry/telemetry_settings.h"
 
 #include <cstdint>
 #include <filesystem>
