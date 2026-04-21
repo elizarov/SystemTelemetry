@@ -35,12 +35,12 @@ std::vector<std::string> ReadMetricListOrderDialogRows(const LayoutEditDialogSta
     return metricRefs;
 }
 
-bool ApplyMetricListOrderRows(LayoutEditDialogState* state, HWND hwnd, const std::vector<std::string>& metricRefs) {
+bool ApplyMetricListOrderRows(LayoutEditDialogState* state, HWND, const std::vector<std::string>& metricRefs) {
     const auto* key = SelectedMetricListOrderKey(state);
     return key != nullptr && state->dialog->Host().ApplyMetricListOrderPreview(*key, metricRefs);
 }
 
-void PopulateMetricListRowCombo(HWND hwnd,
+void PopulateMetricListRowCombo(HWND,
     const LayoutEditMetricListRowControls& row,
     const std::vector<std::string>& options,
     std::string_view selected) {
