@@ -29,7 +29,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     double scale,
     DashboardRenderer::RenderMode renderMode,
     bool showLayoutEditGuides,
-    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
+    LayoutSimilarityIndicatorMode similarityIndicatorMode,
     const std::string& editLayoutWidgetName,
     std::optional<RenderPoint> hoverPoint = std::nullopt,
     std::ostream* traceStream = nullptr,
@@ -38,7 +38,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
 DiagnosticsOptions GetDiagnosticsOptions();
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options);
-DashboardRenderer::SimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options);
+LayoutSimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options);
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions);
 
 class DiagnosticsSession {

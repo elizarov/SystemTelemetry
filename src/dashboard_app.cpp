@@ -76,10 +76,10 @@ DashboardApp::~DashboardApp() = default;
 void DashboardApp::SetRenderConfig(const AppConfig& config) {
     controller_.State().config = config;
     renderer_.SetConfig(config);
-    rendererEditOverlayState_.showLayoutEditGuides =
+    rendererDashboardOverlayState_.showLayoutEditGuides =
         controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
-    rendererEditOverlayState_.similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions_);
-    SyncMoveOverlayState();
+    rendererDashboardOverlayState_.similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions_);
+    SyncDashboardMoveOverlayState();
 }
 
 void DashboardApp::UpdateRendererScale(double scale) {
@@ -113,8 +113,8 @@ DashboardRenderer& DashboardApp::LayoutEditRenderer() {
     return renderer_;
 }
 
-DashboardRenderer::EditOverlayState& DashboardApp::LayoutEditOverlayState() {
-    return rendererEditOverlayState_;
+DashboardOverlayState& DashboardApp::LayoutDashboardOverlayState() {
+    return rendererDashboardOverlayState_;
 }
 
 void DashboardApp::InvalidateLayoutEdit() {
@@ -299,15 +299,15 @@ HICON DashboardApp::LoadAppIcon(int width, int height) {
 
 bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
     renderer_.SetConfig(controller_.State().config);
-    rendererEditOverlayState_.showLayoutEditGuides =
+    rendererDashboardOverlayState_.showLayoutEditGuides =
         controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
-    SyncMoveOverlayState();
+    SyncDashboardMoveOverlayState();
     renderer_.SetTraceOutput(
         controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
     if (!renderer_.Initialize(hwnd_)) {
         return false;
     }
-    return renderer_.SaveSnapshotPng(imagePath, snapshot, rendererEditOverlayState_);
+    return renderer_.SaveSnapshotPng(imagePath, snapshot, rendererDashboardOverlayState_);
 }
 
 bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
@@ -415,7 +415,7 @@ void DashboardApp::StartMoveMode(std::optional<POINT> cursorAnchorClientPoint) {
     controller_.State().isMoving = true;
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
     UpdateMoveTracking();
-    SyncMoveOverlayState();
+    SyncDashboardMoveOverlayState();
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -428,7 +428,7 @@ void DashboardApp::StopMoveMode() {
     controller_.State().isMoving = false;
     KillTimer(hwnd_, kMoveTimerId);
     HideLayoutEditTooltip();
-    SyncMoveOverlayState();
+    SyncDashboardMoveOverlayState();
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -453,11 +453,11 @@ void DashboardApp::UpdateMoveTracking() {
     }
     SetWindowPos(hwnd_, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
-    SyncMoveOverlayState();
+    SyncDashboardMoveOverlayState();
 }
 
-void DashboardApp::SyncMoveOverlayState() {
-    auto& overlayState = rendererEditOverlayState_.moveOverlay;
+void DashboardApp::SyncDashboardMoveOverlayState() {
+    auto& overlayState = rendererDashboardOverlayState_.moveOverlay;
     if (!controller_.State().isMoving) {
         overlayState = {};
         return;
@@ -482,12 +482,12 @@ const DashboardRenderer& DashboardApp::Renderer() const {
     return renderer_;
 }
 
-DashboardRenderer::EditOverlayState& DashboardApp::RendererEditOverlayState() {
-    return rendererEditOverlayState_;
+DashboardOverlayState& DashboardApp::RendererDashboardOverlayState() {
+    return rendererDashboardOverlayState_;
 }
 
-const DashboardRenderer::EditOverlayState& DashboardApp::RendererEditOverlayState() const {
-    return rendererEditOverlayState_;
+const DashboardOverlayState& DashboardApp::RendererDashboardOverlayState() const {
+    return rendererDashboardOverlayState_;
 }
 
 void DashboardApp::InvalidateShell() {
@@ -1198,8 +1198,8 @@ void DashboardApp::Paint() {
     BeginPaint(hwnd_, &ps);
     const SystemSnapshot& snapshot = controller_.State().telemetry->Snapshot();
     const auto drawStart = std::chrono::steady_clock::now();
-    SyncMoveOverlayState();
-    renderer_.DrawWindow(snapshot, rendererEditOverlayState_);
+    SyncDashboardMoveOverlayState();
+    renderer_.DrawWindow(snapshot, rendererDashboardOverlayState_);
     const auto drawEnd = std::chrono::steady_clock::now();
     EndPaint(hwnd_, &ps);
     const auto paintEnd = std::chrono::steady_clock::now();

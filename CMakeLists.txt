@@ -121,6 +121,7 @@ add_executable(SystemTelemetry WIN32
     src/gpu_amd_adl.cpp
     src/board_vendor.cpp
     src/dashboard_metrics.cpp
+    src/dashboard_overlay_state.cpp
     src/render_types.cpp
     src/dashboard_renderer/d2d_cache.cpp
     src/dashboard_renderer/palette.cpp
@@ -356,6 +357,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_snap_solver.cpp
     src/numeric_safety.cpp
     src/dashboard_metrics.cpp
+    src/dashboard_overlay_state.cpp
     src/render_types.cpp
     src/dashboard_renderer/d2d_cache.cpp
     src/dashboard_renderer/palette.cpp

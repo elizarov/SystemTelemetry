@@ -27,6 +27,7 @@
 
 #include "config.h"
 #include "dashboard_metrics.h"
+#include "dashboard_overlay_state.h"
 #include "layout_edit_parameter_id.h"
 #include "layout_edit_types.h"
 #include "render_types.h"
@@ -44,38 +45,6 @@ public:
     enum class RenderMode {
         Normal,
         Blank,
-    };
-
-    enum class SimilarityIndicatorMode {
-        ActiveGuide,
-        AllHorizontal,
-        AllVertical,
-    };
-
-    struct MoveOverlayState {
-        bool visible = false;
-        std::string monitorName;
-        RenderPoint relativePosition{};
-        double monitorScale = 1.0;
-    };
-
-    struct EditOverlayState {
-        bool showLayoutEditGuides = false;
-        bool forceLayoutEditAffordances = false;
-        bool hoverOnExposedDashboard = false;
-        SimilarityIndicatorMode similarityIndicatorMode = SimilarityIndicatorMode::ActiveGuide;
-        std::optional<LayoutEditGuide> activeLayoutEditGuide;
-        std::optional<LayoutEditGuide> hoveredLayoutEditGuide;
-        std::optional<LayoutEditWidgetIdentity> hoveredLayoutCard;
-        std::optional<LayoutEditWidgetIdentity> hoveredEditableCard;
-        std::optional<LayoutEditWidgetIdentity> hoveredEditableWidget;
-        std::optional<LayoutEditWidgetGuide> activeWidgetEditGuide;
-        std::optional<LayoutEditGapAnchorKey> hoveredGapEditAnchor;
-        std::optional<LayoutEditGapAnchorKey> activeGapEditAnchor;
-        std::optional<LayoutEditAnchorKey> hoveredEditableAnchor;
-        std::optional<LayoutEditAnchorKey> activeEditableAnchor;
-        std::optional<LayoutEditSelectionHighlight> selectedTreeHighlight;
-        MoveOverlayState moveOverlay{};
     };
 
     struct TextStyleMetrics {
@@ -104,7 +73,6 @@ public:
     void SetLayoutGuideDragActive(bool active);
     void SetInteractiveDragTraceActive(bool active);
     void RebuildEditArtifacts();
-    bool SetLayoutEditPreviewWidgetType(EditOverlayState& overlayState, const std::string& widgetTypeName) const;
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
@@ -115,6 +83,7 @@ public:
     int LayoutSimilarityThreshold() const;
     std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
     std::optional<int> FindLayoutWidgetExtent(const LayoutEditWidgetIdentity& widget, LayoutGuideAxis axis) const;
+    std::optional<LayoutEditWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
     bool ApplyLayoutGuideWeightsPreview(
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
     const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const;
@@ -133,11 +102,12 @@ public:
     void Shutdown();
 
     bool DrawWindow(const SystemSnapshot& snapshot);
-    bool DrawWindow(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    bool DrawWindow(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
-    bool SaveSnapshotPng(
-        const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
-    bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    bool SaveSnapshotPng(const std::filesystem::path& imagePath,
+        const SystemSnapshot& snapshot,
+        const DashboardOverlayState& overlayState);
+    bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DiscardWindowRenderTarget(std::string_view reason = {});
     const std::string& LastError() const;
     const AppConfig& Config() const;
@@ -229,18 +199,16 @@ private:
         int exactTypeOrdinal = 0;
     };
 
-    bool ShouldDrawLayoutEditAffordances(const EditOverlayState& overlayState) const;
-    bool IsContainerGuideDragActive(const EditOverlayState& overlayState) const;
-    void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
-    void DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const;
-    void DrawSelectedColorEditHighlights(const EditOverlayState& overlayState) const;
-    void DrawSelectedTreeNodeHighlight(const EditOverlayState& overlayState) const;
-    void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
-    void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
-    void DrawGapEditAnchors(const EditOverlayState& overlayState) const;
+    void DrawHoveredWidgetHighlight(const DashboardOverlayState& overlayState) const;
+    void DrawHoveredEditableAnchorHighlight(const DashboardOverlayState& overlayState) const;
+    void DrawSelectedColorEditHighlights(const DashboardOverlayState& overlayState) const;
+    void DrawSelectedTreeNodeHighlight(const DashboardOverlayState& overlayState) const;
+    void DrawLayoutEditGuides(const DashboardOverlayState& overlayState) const;
+    void DrawWidgetEditGuides(const DashboardOverlayState& overlayState) const;
+    void DrawGapEditAnchors(const DashboardOverlayState& overlayState) const;
     void DrawDottedHighlightRect(const RenderRect& rect, RenderColorId color, bool active, bool outside = true) const;
-    void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
-    void DrawMoveOverlay(const MoveOverlayState& overlayState);
+    void DrawLayoutSimilarityIndicators(const DashboardOverlayState& overlayState) const;
+    void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawPanel(size_t cardIndex);
     void DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect);
     void DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
@@ -263,8 +231,6 @@ private:
         bool instantiateWidgets);
     void BuildWidgetEditGuides();
     void BuildStaticEditableAnchors();
-    std::optional<LayoutEditWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
-
     bool InitializeDirect2D();
     bool InitializeWic();
     void ShutdownDirect2D();
@@ -277,9 +243,9 @@ private:
     void EndDirect2DDraw();
     bool BeginWindowDraw();
     void EndWindowDraw();
-    void DrawDirect2DFrame(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    void DrawDirect2DFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath);
-    void WriteScreenshotActiveRegionsTrace(const EditOverlayState& overlayState) const;
+    void WriteScreenshotActiveRegionsTrace(const DashboardOverlayState& overlayState) const;
     ID2D1SolidColorBrush* D2DSolidBrush(RenderColorId color);
     IDWriteTextFormat* DWriteTextFormat(TextStyleId style) const;
     bool CreateDWriteTextFormats();

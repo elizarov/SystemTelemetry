@@ -1028,7 +1028,7 @@ bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int fi
 
 void DashboardShellUi::UpdateLayoutEditSelectionHighlight(
     const std::optional<LayoutEditSelectionHighlight>& highlight) {
-    app_.rendererEditOverlayState_.selectedTreeHighlight = highlight;
+    app_.rendererDashboardOverlayState_.selectedTreeHighlight = highlight;
     InvalidateRect(app_.hwnd_, nullptr, FALSE);
 }
 

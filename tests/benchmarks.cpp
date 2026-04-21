@@ -325,7 +325,7 @@ private:
         return renderer_;
     }
 
-    DashboardRenderer::EditOverlayState& LayoutEditOverlayState() override {
+    DashboardOverlayState& LayoutDashboardOverlayState() override {
         return overlayState_;
     }
 
@@ -393,7 +393,7 @@ private:
     HWND hwnd_ = nullptr;
     AppConfig config_{};
     DashboardRenderer renderer_{};
-    DashboardRenderer::EditOverlayState overlayState_{};
+    DashboardOverlayState overlayState_{};
 
     void RecordPhase(BenchPhase phase, std::chrono::nanoseconds elapsed) {
         PhaseStats& stats = phaseTotals_[PhaseIndex(phase)];

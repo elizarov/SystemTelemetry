@@ -55,6 +55,12 @@ enum class StrokePattern {
     Dotted,
 };
 
+enum class LayoutSimilarityIndicatorMode {
+    ActiveGuide,
+    AllHorizontal,
+    AllVertical,
+};
+
 struct RenderStroke {
     RenderColorId color = RenderColorId::Foreground;
     float width = 1.0f;

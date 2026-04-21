@@ -86,8 +86,7 @@ std::string FormatTracePoint(RenderPoint point) {
 
 class DiagnosticsLayoutEditHost final : public LayoutEditHost {
 public:
-    DiagnosticsLayoutEditHost(
-        const AppConfig& config, DashboardRenderer& renderer, DashboardRenderer::EditOverlayState& overlayState)
+    DiagnosticsLayoutEditHost(const AppConfig& config, DashboardRenderer& renderer, DashboardOverlayState& overlayState)
         : config_(config), renderer_(renderer), overlayState_(overlayState) {}
 
     const AppConfig& LayoutEditConfig() const override {
@@ -98,7 +97,7 @@ public:
         return renderer_;
     }
 
-    DashboardRenderer::EditOverlayState& LayoutEditOverlayState() override {
+    DashboardOverlayState& LayoutDashboardOverlayState() override {
         return overlayState_;
     }
 
@@ -151,7 +150,7 @@ public:
 private:
     const AppConfig& config_;
     DashboardRenderer& renderer_;
-    DashboardRenderer::EditOverlayState& overlayState_;
+    DashboardOverlayState& overlayState_;
 };
 
 }  // namespace
@@ -238,15 +237,15 @@ DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions&
     return options.blank ? DashboardRenderer::RenderMode::Blank : DashboardRenderer::RenderMode::Normal;
 }
 
-DashboardRenderer::SimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options) {
+LayoutSimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options) {
     switch (options.layoutSimilarityMode) {
         case DiagnosticsLayoutSimilarityMode::HorizontalSizes:
-            return DashboardRenderer::SimilarityIndicatorMode::AllHorizontal;
+            return LayoutSimilarityIndicatorMode::AllHorizontal;
         case DiagnosticsLayoutSimilarityMode::VerticalSizes:
-            return DashboardRenderer::SimilarityIndicatorMode::AllVertical;
+            return LayoutSimilarityIndicatorMode::AllVertical;
         case DiagnosticsLayoutSimilarityMode::None:
         default:
-            return DashboardRenderer::SimilarityIndicatorMode::ActiveGuide;
+            return LayoutSimilarityIndicatorMode::ActiveGuide;
     }
 }
 
@@ -640,13 +639,13 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     double scale,
     DashboardRenderer::RenderMode renderMode,
     bool showLayoutEditGuides,
-    DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
+    LayoutSimilarityIndicatorMode similarityIndicatorMode,
     const std::string& editLayoutWidgetName,
     std::optional<RenderPoint> hoverPoint,
     std::ostream* traceStream,
     std::string* errorText) {
     DashboardRenderer renderer;
-    DashboardRenderer::EditOverlayState overlayState;
+    DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = showLayoutEditGuides || hoverPoint.has_value();
     overlayState.forceLayoutEditAffordances = showLayoutEditGuides && !hoverPoint.has_value();
     overlayState.similarityIndicatorMode = similarityIndicatorMode;
@@ -661,12 +660,14 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
         return false;
     }
     if (!editLayoutWidgetName.empty()) {
-        if (!renderer.SetLayoutEditPreviewWidgetType(overlayState, editLayoutWidgetName)) {
+        const auto widget = renderer.FindFirstLayoutEditPreviewWidget(editLayoutWidgetName);
+        if (!widget.has_value()) {
             if (errorText != nullptr) {
                 *errorText = "renderer:edit_layout_widget_not_found name=\"" + editLayoutWidgetName + "\"";
             }
             return false;
         }
+        overlayState.SetPreviewWidget(*widget);
         tracing::Trace(traceStream).Write("diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
     }
     if (hoverPoint.has_value()) {

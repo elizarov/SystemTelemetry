@@ -32,7 +32,7 @@ public:
 
     virtual const AppConfig& LayoutEditConfig() const = 0;
     virtual DashboardRenderer& LayoutEditRenderer() = 0;
-    virtual DashboardRenderer::EditOverlayState& LayoutEditOverlayState() = 0;
+    virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
     virtual bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) = 0;
     virtual bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) = 0;

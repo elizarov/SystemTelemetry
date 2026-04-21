@@ -36,8 +36,8 @@ public:
     virtual HWND WindowHandle() const = 0;
     virtual DashboardRenderer& Renderer() = 0;
     virtual const DashboardRenderer& Renderer() const = 0;
-    virtual DashboardRenderer::EditOverlayState& RendererEditOverlayState() = 0;
-    virtual const DashboardRenderer::EditOverlayState& RendererEditOverlayState() const = 0;
+    virtual DashboardOverlayState& RendererDashboardOverlayState() = 0;
+    virtual const DashboardOverlayState& RendererDashboardOverlayState() const = 0;
     virtual UINT CurrentWindowDpi() const = 0;
     virtual double CurrentRenderScale() const = 0;
     virtual bool InitializeFonts() = 0;

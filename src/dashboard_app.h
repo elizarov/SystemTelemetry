@@ -47,8 +47,8 @@ public:
     HWND WindowHandle() const override;
     DashboardRenderer& Renderer() override;
     const DashboardRenderer& Renderer() const override;
-    DashboardRenderer::EditOverlayState& RendererEditOverlayState() override;
-    const DashboardRenderer::EditOverlayState& RendererEditOverlayState() const override;
+    DashboardOverlayState& RendererDashboardOverlayState() override;
+    const DashboardOverlayState& RendererDashboardOverlayState() const override;
     UINT CurrentWindowDpi() const override;
     double CurrentRenderScale() const override;
     void ApplyConfigPlacement() override;
@@ -79,7 +79,7 @@ private:
     void StartMoveMode(std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
     void StopMoveMode();
     void UpdateMoveTracking();
-    void SyncMoveOverlayState();
+    void SyncDashboardMoveOverlayState();
     bool CreateLayoutEditTooltip();
     void DestroyLayoutEditTooltip();
     void HideLayoutEditTooltip();
@@ -110,7 +110,7 @@ private:
 
     const AppConfig& LayoutEditConfig() const override;
     DashboardRenderer& LayoutEditRenderer() override;
-    DashboardRenderer::EditOverlayState& LayoutEditOverlayState() override;
+    DashboardOverlayState& LayoutDashboardOverlayState() override;
     bool ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) override;
     bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) override;
@@ -120,7 +120,7 @@ private:
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
     DashboardRenderer renderer_;
-    DashboardRenderer::EditOverlayState rendererEditOverlayState_{};
+    DashboardOverlayState rendererDashboardOverlayState_{};
     DashboardController controller_{};
     NOTIFYICONDATAW trayIcon_{};
     MonitorPlacementInfo movePlacementInfo_{};

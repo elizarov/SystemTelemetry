@@ -19,6 +19,7 @@
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <d2d1.h>
@@ -565,16 +566,6 @@ void DashboardRenderer::RebuildEditArtifacts() {
     BuildStaticEditableAnchors();
 }
 
-bool DashboardRenderer::SetLayoutEditPreviewWidgetType(
-    EditOverlayState& overlayState, const std::string& widgetTypeName) const {
-    const auto widget = FindFirstLayoutEditPreviewWidget(widgetTypeName);
-    if (!widget.has_value()) {
-        return false;
-    }
-    overlayState.hoveredEditableWidget = widget;
-    return true;
-}
-
 double DashboardRenderer::RenderScale() const {
     return renderScale_;
 }
@@ -734,11 +725,11 @@ void DashboardRenderer::DrawText(const RenderRect& rect,
         wideText.c_str(), static_cast<UINT32>(wideText.size()), textFormat, rect.ToD2DRectF(), brush, drawOptions);
 }
 
-void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const {
-    if (IsContainerGuideDragActive(overlayState)) {
+void DashboardRenderer::DrawHoveredWidgetHighlight(const DashboardOverlayState& overlayState) const {
+    if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
-    if (!ShouldDrawLayoutEditAffordances(overlayState) || !overlayState.hoveredEditableWidget.has_value() ||
+    if (!overlayState.ShouldDrawLayoutEditAffordances() || !overlayState.hoveredEditableWidget.has_value() ||
         overlayState.hoveredEditableWidget->kind != LayoutEditWidgetIdentity::Kind::Widget) {
         return;
     }
@@ -762,30 +753,11 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overl
         hoveredWidget->rect, RenderStroke::Solid(RenderColorId::LayoutGuide));
 }
 
-bool DashboardRenderer::ShouldDrawLayoutEditAffordances(const EditOverlayState& overlayState) const {
-    if (!overlayState.showLayoutEditGuides) {
-        return false;
-    }
-    if (overlayState.forceLayoutEditAffordances) {
-        return true;
-    }
-    return overlayState.activeLayoutEditGuide.has_value() || overlayState.hoveredLayoutEditGuide.has_value() ||
-           overlayState.hoveredLayoutCard.has_value() || overlayState.hoveredEditableCard.has_value() ||
-           overlayState.hoveredEditableWidget.has_value() || overlayState.activeWidgetEditGuide.has_value() ||
-           overlayState.hoveredGapEditAnchor.has_value() || overlayState.activeGapEditAnchor.has_value() ||
-           overlayState.hoveredEditableAnchor.has_value() || overlayState.activeEditableAnchor.has_value() ||
-           overlayState.selectedTreeHighlight.has_value();
-}
-
-bool DashboardRenderer::IsContainerGuideDragActive(const EditOverlayState& overlayState) const {
-    return overlayState.activeLayoutEditGuide.has_value();
-}
-
-void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayState& overlayState) const {
-    if (IsContainerGuideDragActive(overlayState)) {
+void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverlayState& overlayState) const {
+    if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
-    if (!ShouldDrawLayoutEditAffordances(overlayState)) {
+    if (!overlayState.ShouldDrawLayoutEditAffordances()) {
         return;
     }
 
@@ -952,11 +924,11 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
     }
 }
 
-void DashboardRenderer::DrawSelectedColorEditHighlights(const EditOverlayState& overlayState) const {
-    if (IsContainerGuideDragActive(overlayState)) {
+void DashboardRenderer::DrawSelectedColorEditHighlights(const DashboardOverlayState& overlayState) const {
+    if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
-    if (!overlayState.showLayoutEditGuides || !overlayState.selectedTreeHighlight.has_value()) {
+    if (!overlayState.ShouldDrawSelectedTreeHighlight()) {
         return;
     }
 
@@ -988,11 +960,11 @@ void DashboardRenderer::DrawSelectedColorEditHighlights(const EditOverlayState& 
     }
 }
 
-void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& overlayState) const {
-    if (IsContainerGuideDragActive(overlayState)) {
+void DashboardRenderer::DrawSelectedTreeNodeHighlight(const DashboardOverlayState& overlayState) const {
+    if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
-    if (!overlayState.showLayoutEditGuides || !overlayState.selectedTreeHighlight.has_value()) {
+    if (!overlayState.ShouldDrawSelectedTreeHighlight()) {
         return;
     }
 
@@ -1177,8 +1149,8 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
     }
 }
 
-void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayState) const {
-    if (!ShouldDrawLayoutEditAffordances(overlayState) || layoutResolver_->layoutEditGuides_.empty()) {
+void DashboardRenderer::DrawLayoutEditGuides(const DashboardOverlayState& overlayState) const {
+    if (!overlayState.ShouldDrawLayoutEditAffordances() || layoutResolver_->layoutEditGuides_.empty()) {
         return;
     }
 
@@ -1232,11 +1204,11 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
     }
 }
 
-void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayState) const {
-    if (IsContainerGuideDragActive(overlayState)) {
+void DashboardRenderer::DrawWidgetEditGuides(const DashboardOverlayState& overlayState) const {
+    if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
-    if (!ShouldDrawLayoutEditAffordances(overlayState) || layoutResolver_->widgetEditGuides_.empty()) {
+    if (!overlayState.ShouldDrawLayoutEditAffordances() || layoutResolver_->widgetEditGuides_.empty()) {
         return;
     }
 
@@ -1284,11 +1256,11 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
     }
 }
 
-void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState) const {
-    if (IsContainerGuideDragActive(overlayState)) {
+void DashboardRenderer::DrawGapEditAnchors(const DashboardOverlayState& overlayState) const {
+    if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
-    if (!ShouldDrawLayoutEditAffordances(overlayState) || layoutResolver_->gapEditAnchors_.empty()) {
+    if (!overlayState.ShouldDrawLayoutEditAffordances() || layoutResolver_->gapEditAnchors_.empty()) {
         return;
     }
 
@@ -1658,8 +1630,8 @@ void DashboardRenderer::RegisterDynamicColorEditRegion(LayoutEditParameter param
     layoutResolver_->dynamicColorEditRegions_.push_back(LayoutEditColorRegion{parameter, targetRect});
 }
 
-void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const {
-    if (!ShouldDrawLayoutEditAffordances(overlayState)) {
+void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlayState& overlayState) const {
+    if (!overlayState.ShouldDrawLayoutEditAffordances()) {
         return;
     }
     const int threshold = LayoutSimilarityThreshold();
@@ -1695,12 +1667,12 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
     const char* axisLabel = "horizontal";
     std::vector<const DashboardWidgetLayout*> affectedWidgets;
     std::vector<const DashboardWidgetLayout*> allWidgets;
-    if (overlayState.similarityIndicatorMode == SimilarityIndicatorMode::AllHorizontal) {
+    if (overlayState.similarityIndicatorMode == LayoutSimilarityIndicatorMode::AllHorizontal) {
         axis = LayoutGuideAxis::Vertical;
         axisLabel = "horizontal";
         allWidgets = CollectSimilarityIndicatorWidgets(axis);
         affectedWidgets = allWidgets;
-    } else if (overlayState.similarityIndicatorMode == SimilarityIndicatorMode::AllVertical) {
+    } else if (overlayState.similarityIndicatorMode == LayoutSimilarityIndicatorMode::AllVertical) {
         axis = LayoutGuideAxis::Horizontal;
         axisLabel = "vertical";
         allWidgets = CollectSimilarityIndicatorWidgets(axis);
@@ -1871,7 +1843,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
     }
 }
 
-void DashboardRenderer::DrawMoveOverlay(const MoveOverlayState& overlayState) {
+void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlayState) {
     if (!overlayState.visible || !IsDrawActive()) {
         return;
     }
@@ -2063,10 +2035,10 @@ void DashboardRenderer::DrawResolvedWidget(const DashboardWidgetLayout& widget, 
 }
 
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
-    return DrawWindow(snapshot, EditOverlayState{});
+    return DrawWindow(snapshot, DashboardOverlayState{});
 }
 
-bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
+bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     if (!BeginWindowDraw()) {
         return false;
     }
@@ -2075,15 +2047,14 @@ bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot, const EditOve
     return lastError_.empty();
 }
 
-void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
+void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     if (d2dActiveRenderTarget_ == nullptr) {
         lastError_ = "renderer:d2d_target_missing";
         return;
     }
 
     layoutResolver_->ClearDynamicEditArtifacts();
-    layoutResolver_->dynamicAnchorRegistrationEnabled_ =
-        overlayState.showLayoutEditGuides && !overlayState.activeLayoutEditGuide.has_value();
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
     const DashboardMetricSource& metrics = ResolveMetrics(snapshot);
     d2dActiveRenderTarget_->Clear(palette_->Get(RenderColorId::Background).ToD2DColorF());
     for (size_t cardIndex = 0; cardIndex < layoutResolver_->resolvedLayout_.cards.size(); ++cardIndex) {
@@ -2106,11 +2077,11 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
 }
 
 bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
-    return SaveSnapshotPng(imagePath, snapshot, EditOverlayState{});
+    return SaveSnapshotPng(imagePath, snapshot, DashboardOverlayState{});
 }
 
 bool DashboardRenderer::SaveSnapshotPng(
-    const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
+    const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     if (!InitializeDirect2D()) {
         return false;
     }
@@ -2153,7 +2124,7 @@ bool DashboardRenderer::SaveSnapshotPng(
 }
 
 bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
-    const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
+    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     if (!InitializeDirect2D()) {
         return false;
     }
@@ -2187,7 +2158,7 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
     return lastError_.empty();
 }
 
-void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const EditOverlayState& overlayState) const {
+void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const DashboardOverlayState& overlayState) const {
     if (traceOutput_ == nullptr) {
         return;
     }

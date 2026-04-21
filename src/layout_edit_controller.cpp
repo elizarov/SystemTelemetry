@@ -179,14 +179,14 @@ LayoutEditHost::LayoutTarget LayoutEditHost::LayoutTarget::ForGuide(const Layout
 LayoutEditController::LayoutEditController(LayoutEditHost& host) : host_(host) {}
 
 void LayoutEditController::StartSession() {
-    host_.LayoutEditOverlayState().showLayoutEditGuides = true;
+    host_.LayoutDashboardOverlayState().showLayoutEditGuides = true;
     ClearInteractionState();
     SyncRendererInteractionState();
 }
 
 void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
     ClearInteractionState();
-    host_.LayoutEditOverlayState().showLayoutEditGuides = showLayoutEditGuidesAfterStop;
+    host_.LayoutDashboardOverlayState().showLayoutEditGuides = showLayoutEditGuidesAfterStop;
     SyncRendererInteractionState();
     ReleaseCapture();
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
@@ -390,7 +390,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     }
     if (hoverChanged) {
         hoveredLayoutCard_ = nextHoveredLayoutCard;
-        host_.LayoutEditOverlayState().hoveredLayoutCard = hoveredLayoutCard_;
+        host_.LayoutDashboardOverlayState().hoveredLayoutCard = hoveredLayoutCard_;
     }
 
     bool cardHoverChanged = (hoveredEditableCard_.has_value() != nextHoveredCard.has_value());
@@ -399,7 +399,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     }
     if (cardHoverChanged) {
         hoveredEditableCard_ = nextHoveredCard;
-        host_.LayoutEditOverlayState().hoveredEditableCard = hoveredEditableCard_;
+        host_.LayoutDashboardOverlayState().hoveredEditableCard = hoveredEditableCard_;
     }
     hoverChanged = hoverChanged || cardHoverChanged;
 
@@ -409,7 +409,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     }
     if (widgetHoverChanged) {
         hoveredEditableWidget_ = nextHoveredWidget;
-        host_.LayoutEditOverlayState().hoveredEditableWidget = hoveredEditableWidget_;
+        host_.LayoutDashboardOverlayState().hoveredEditableWidget = hoveredEditableWidget_;
     }
     hoverChanged = hoverChanged || widgetHoverChanged;
 
@@ -417,7 +417,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
         (hoveredGapEditAnchor_.has_value() && nextHoveredGapAnchor.has_value() &&
             !MatchesGapEditAnchorKey(*hoveredGapEditAnchor_, *nextHoveredGapAnchor))) {
         hoveredGapEditAnchor_ = nextHoveredGapAnchor;
-        host_.LayoutEditOverlayState().hoveredGapEditAnchor = hoveredGapEditAnchor_;
+        host_.LayoutDashboardOverlayState().hoveredGapEditAnchor = hoveredGapEditAnchor_;
         hoverChanged = true;
     }
 
@@ -431,7 +431,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
         (hoveredEditableAnchor_.has_value() && nextHoveredAnchor.has_value() &&
             !MatchesEditableAnchorKey(*hoveredEditableAnchor_, *nextHoveredAnchor))) {
         hoveredEditableAnchor_ = nextHoveredAnchor;
-        host_.LayoutEditOverlayState().hoveredEditableAnchor = hoveredEditableAnchor_;
+        host_.LayoutDashboardOverlayState().hoveredEditableAnchor = hoveredEditableAnchor_;
         hoverChanged = true;
     }
 
@@ -444,7 +444,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     const std::optional<size_t>& nextLayoutGuideIndex = resolution.hoveredLayoutGuideIndex;
     if (hoveredLayoutGuideIndex_ != nextLayoutGuideIndex) {
         hoveredLayoutGuideIndex_ = nextLayoutGuideIndex;
-        host_.LayoutEditOverlayState().hoveredLayoutEditGuide =
+        host_.LayoutDashboardOverlayState().hoveredLayoutEditGuide =
             hoveredLayoutGuideIndex_.has_value()
                 ? std::optional<LayoutEditGuide>(
                       host_.LayoutEditRenderer().LayoutEditGuides()[*hoveredLayoutGuideIndex_])
@@ -594,7 +594,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
 
 bool LayoutEditController::HandleMouseMove(RenderPoint clientPoint) {
     lastClientPoint_ = clientPoint;
-    host_.LayoutEditOverlayState().hoverOnExposedDashboard = true;
+    host_.LayoutDashboardOverlayState().hoverOnExposedDashboard = true;
     if (activeLayoutDrag_.has_value()) {
         return UpdateLayoutDrag(clientPoint);
     }
@@ -621,7 +621,7 @@ bool LayoutEditController::HandleMouseLeave() {
         return false;
     }
 
-    host_.LayoutEditOverlayState().hoverOnExposedDashboard = false;
+    host_.LayoutDashboardOverlayState().hoverOnExposedDashboard = false;
     lastClientPoint_.reset();
 
     const bool hadHover = hoveredLayoutGuideIndex_.has_value() || hoveredLayoutCard_.has_value() ||
@@ -862,7 +862,7 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
 }
 
 void LayoutEditController::SyncRendererInteractionState() {
-    DashboardRenderer::EditOverlayState& overlayState = host_.LayoutEditOverlayState();
+    DashboardOverlayState& overlayState = host_.LayoutDashboardOverlayState();
     overlayState.hoveredLayoutEditGuide =
         hoveredLayoutGuideIndex_.has_value()
             ? std::optional<LayoutEditGuide>(host_.LayoutEditRenderer().LayoutEditGuides()[*hoveredLayoutGuideIndex_])
@@ -909,7 +909,7 @@ void LayoutEditController::ClearInteractionState() {
     activeGapEditDrag_.reset();
     activeAnchorEditDrag_.reset();
     activeMetricListReorderDrag_.reset();
-    host_.LayoutEditOverlayState().hoverOnExposedDashboard = false;
+    host_.LayoutDashboardOverlayState().hoverOnExposedDashboard = false;
 }
 
 void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
