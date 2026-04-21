@@ -29,12 +29,12 @@
 
 namespace {
 
-RenderColor ToRenderColor(ColorConfig color, std::uint8_t alpha = 255) {
+RenderColor ToRenderColor(ColorConfig color) {
     const unsigned int rgb = color.ToRgb();
     return RenderColor{static_cast<std::uint8_t>((rgb >> 16) & 0xFFu),
         static_cast<std::uint8_t>((rgb >> 8) & 0xFFu),
         static_cast<std::uint8_t>(rgb & 0xFFu),
-        alpha};
+        color.Alpha()};
 }
 
 std::size_t TextStyleSlot(TextStyleId style) {
@@ -468,7 +468,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
     }
 
     for (size_t offset = 0; offset + 3 < pixels.size(); offset += 4) {
-        const BYTE alpha = pixels[offset + 3];
+        const BYTE alpha = static_cast<BYTE>((static_cast<unsigned int>(pixels[offset + 3]) * color.a) / 255u);
         pixels[offset + 0] = static_cast<BYTE>((static_cast<unsigned int>(color.b) * alpha) / 255u);
         pixels[offset + 1] = static_cast<BYTE>((static_cast<unsigned int>(color.g) * alpha) / 255u);
         pixels[offset + 2] = static_cast<BYTE>((static_cast<unsigned int>(color.r) * alpha) / 255u);
@@ -2024,7 +2024,7 @@ void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
     }
 }
 
-void DashboardRenderer::DrawPillBar(
+std::optional<RenderRect> DashboardRenderer::DrawPillBar(
     const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
     const RenderColor accentColor = palette_.accent;
     const auto fillCapsule = [&](const RenderRect& capsuleRect, RenderColor color) {
@@ -2064,11 +2064,11 @@ void DashboardRenderer::DrawPillBar(
     const int width = rect.Width();
     const int height = rect.Height();
     if (width <= 0 || height <= 0) {
-        return;
+        return std::nullopt;
     }
 
     if (!drawFill) {
-        return;
+        return std::nullopt;
     }
 
     const double clampedRatio = ClampFinite(ratio, 0.0, 1.0);
@@ -2086,8 +2086,10 @@ void DashboardRenderer::DrawPillBar(
         const int maxLeft = rect.right - markerWidth;
         const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
         RenderRect markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-        fillCapsule(markerRect, accentColor.WithAlpha(96));
+        fillCapsule(markerRect, palette_.peakGhost);
+        return markerRect;
     }
+    return std::nullopt;
 }
 
 void DashboardRenderer::DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) {
@@ -3263,6 +3265,7 @@ void DashboardRenderer::RebuildPalette() {
     palette_.foreground = ToRenderColor(config_.layout.colors.foregroundColor);
     palette_.icon = ToRenderColor(config_.layout.colors.iconColor);
     palette_.accent = ToRenderColor(config_.layout.colors.accentColor);
+    palette_.peakGhost = ToRenderColor(config_.layout.colors.peakGhostColor);
     palette_.mutedText = ToRenderColor(config_.layout.colors.mutedTextColor);
     palette_.track = ToRenderColor(config_.layout.colors.trackColor);
     palette_.layoutGuide = ToRenderColor(config_.layout.colors.layoutGuideColor);

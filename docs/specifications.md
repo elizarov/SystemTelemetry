@@ -40,6 +40,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The UI style stays high-contrast and minimal: dark background, bright foreground text, restrained separators, rounded cards, compact headers, and shared visual rhythm across comparable cards.
 - CPU and GPU gauges share one fitted gauge size within the active layout even when their surrounding cards differ in height.
 - Metric rows and usage bars render as rounded horizontal fills, throughput widgets render scrolling retained-history lines with shared time markers, and drive activity renders as stacked whole-segment indicators.
+- Palette colors include alpha, and gauge peak segments and metric-list recent-peak markers use the shared peak ghost color from the palette.
 - Rendering rejects non-finite telemetry values by treating them as unavailable rather than propagating invalid math into layout or draw paths.
 - Blank rendering mode keeps the dashboard chrome, headers, static labels, device names, and empty tracks while omitting dynamic metric text, time, date, plot lines, leaders, peak ghosts, gauge fill, and drive-activity or usage fill.
 
@@ -71,7 +72,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The modeless `Edit Configuration` window stays separate from the dashboard window, exposes a config-ordered tree plus a live editor pane, previews valid edits immediately, refreshes its tree contents without painting an intermediate empty or partially rebuilt tree, keeps only the current edit session inside its save or discard boundary, and reopens at its last user-moved on-screen position.
 - Bringing the `Edit Configuration` window to the foreground also raises the dashboard directly behind it in Z-order so the editor and dashboard stay visually paired, but dashboard-driven refreshes do not raise the editor window unless the user brings it forward.
 - Dashboard hit-testing treats the editor as covering the dashboard only when the editor is actually above the dashboard in window Z-order, not merely because the windows overlap on screen or because the editor still has keyboard focus.
-- The editor supports filtering, per-field revert, config-local descriptions, and specialized editors for numeric values, fonts, colors, metrics, weight pairs, and metric-list row ordering.
+- The editor supports filtering, per-field revert, config-local descriptions, and specialized editors for numeric values, fonts, RGBA colors, metrics, weight pairs, and metric-list row ordering.
 - Metric leaves whose ids begin with `board.temp.` or `board.fan.` also expose a live `Binding` selector for the matching board-sensor mapping.
 - The board-metric `Binding` selector keeps the last discovered provider sensor-name list available for config editing even if a later live board sample omits that metadata.
 - Multiple logical board metrics can bind to the same provider sensor name, and each bound row shows that same live value.

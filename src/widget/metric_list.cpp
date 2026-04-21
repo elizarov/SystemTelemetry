@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 #include <sstream>
 
 #include "dashboard_metrics.h"
@@ -164,13 +165,17 @@ void MetricListWidget::Draw(
             }
         }
         const RenderRect& barRect = layoutState_.barRects[rowIndex];
-        renderer.DrawPillBar(
+        const std::optional<RenderRect> peakMarkerRect = renderer.DrawPillBar(
             barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank);
         const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
         renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorAccent,
             RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
         renderer.RegisterDynamicColorEditRegion(DashboardRenderer::LayoutEditParameter::ColorTrack,
             RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
+        if (peakMarkerRect.has_value()) {
+            renderer.RegisterDynamicColorEditRegion(
+                DashboardRenderer::LayoutEditParameter::ColorPeakGhost, *peakMarkerRect);
+        }
 
         ++rowIndex;
     }

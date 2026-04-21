@@ -24,7 +24,7 @@ std::string Trim(const std::string& input) {
 
 std::string FormatHexColor(ColorConfig color) {
     std::ostringstream stream;
-    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(6) << color.ToRgb();
+    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << color.ToRgba();
     return stream.str();
 }
 

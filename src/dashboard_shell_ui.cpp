@@ -328,7 +328,7 @@ std::string QuoteTraceText(std::string_view text) {
 
 std::string FormatTraceColorHex(unsigned int color) {
     char buffer[16] = {};
-    sprintf_s(buffer, "#%06X", color & 0xFFFFFFu);
+    sprintf_s(buffer, "#%08X", color);
     return buffer;
 }
 

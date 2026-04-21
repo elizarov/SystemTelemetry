@@ -201,9 +201,10 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                     GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, buffer, ARRAYSIZE(buffer));
                     if (const auto color = TryParseDialogHexColor(buffer); color.has_value()) {
                         state->updatingControls = true;
-                        SetColorDialogChannel(hwnd, kColorDialogControls[0], (*color >> 16) & 0xFFu);
-                        SetColorDialogChannel(hwnd, kColorDialogControls[1], (*color >> 8) & 0xFFu);
-                        SetColorDialogChannel(hwnd, kColorDialogControls[2], *color & 0xFFu);
+                        SetColorDialogChannel(hwnd, kColorDialogControls[0], (*color >> 24) & 0xFFu);
+                        SetColorDialogChannel(hwnd, kColorDialogControls[1], (*color >> 16) & 0xFFu);
+                        SetColorDialogChannel(hwnd, kColorDialogControls[2], (*color >> 8) & 0xFFu);
+                        SetColorDialogChannel(hwnd, kColorDialogControls[3], *color & 0xFFu);
                         state->updatingControls = false;
                     }
                 }
@@ -213,7 +214,8 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_RED_EDIT ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT ||
-                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT) &&
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
                 if (const auto* channel = FindColorDialogControlsByEditId(LOWORD(wParam));
                     channel != nullptr && state != nullptr && !state->updatingControls) {
@@ -273,21 +275,23 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                     }
                     const auto parameter = std::get<LayoutEditParameter>(state->selectedLeaf->focusKey);
                     const unsigned int currentColor =
-                        FindLayoutEditParameterColorValue(state->dialog->Host().CurrentConfig(), parameter).value_or(0);
+                        FindLayoutEditParameterColorValue(state->dialog->Host().CurrentConfig(), parameter)
+                            .value_or(0x000000FFu);
                     CHOOSECOLORW chooseColor{};
                     chooseColor.lStructSize = sizeof(chooseColor);
                     chooseColor.hwndOwner = hwnd;
                     chooseColor.rgbResult =
-                        RGB((currentColor >> 16) & 0xFFu, (currentColor >> 8) & 0xFFu, currentColor & 0xFFu);
+                        RGB((currentColor >> 24) & 0xFFu, (currentColor >> 16) & 0xFFu, (currentColor >> 8) & 0xFFu);
                     chooseColor.lpCustColors = state->customColors;
                     chooseColor.Flags = CC_FULLOPEN | CC_RGBINIT;
                     state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:picker_open",
                         BuildTraceNodeText(state->selectedNode) +
                             " current=" + QuoteTraceText(FormatTraceColorHex(currentColor)));
                     if (ChooseColorW(&chooseColor) == TRUE) {
-                        const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 16) |
-                                                       (GetGValue(chooseColor.rgbResult) << 8) |
-                                                       GetBValue(chooseColor.rgbResult);
+                        const unsigned int currentAlpha = ReadColorDialogValue(hwnd).value_or(currentColor) & 0xFFu;
+                        const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 24) |
+                                                       (GetGValue(chooseColor.rgbResult) << 16) |
+                                                       (GetBValue(chooseColor.rgbResult) << 8) | currentAlpha;
                         state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:picker_return",
                             BuildTraceNodeText(state->selectedNode) +
                                 " accepted=\"true\" chosen=" + QuoteTraceText(FormatTraceColorHex(nextColor)));

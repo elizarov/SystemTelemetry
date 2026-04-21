@@ -13,17 +13,19 @@
 #include <vector>
 
 struct ColorConfig {
-    std::uint32_t rgb = 0;
+    std::uint32_t rgba = 0x000000FFu;
 
-    static ColorConfig FromRgb(unsigned int value);
+    static ColorConfig FromRgba(unsigned int value);
 
     unsigned int ToRgb() const;
+    unsigned int ToRgba() const;
+    std::uint8_t Alpha() const;
 
     constexpr bool operator==(const ColorConfig& other) const = default;
 };
 
 inline bool operator==(const ColorConfig& color, unsigned int value) {
-    return color.ToRgb() == (value & 0xFFFFFFu);
+    return color.ToRgba() == value;
 }
 
 inline bool operator==(unsigned int value, const ColorConfig& color) {
@@ -157,6 +159,7 @@ struct ColorsConfig {
     CONFIG_EDITABLE_VALUE(ColorConfig, foregroundColor, "foreground_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, iconColor, "icon_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, accentColor, "accent_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, peakGhostColor, "peak_ghost_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideColor, "layout_guide_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, activeEditColor, "active_edit_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, panelBorderColor, "panel_border_color");

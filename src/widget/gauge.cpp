@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 #include "dashboard_metrics.h"
 #include "dashboard_renderer.h"
@@ -140,6 +141,20 @@ RenderRect MakeCircleAnchorRect(int centerX, int centerY, int representedDiamete
     const int diameter = (std::max)(4, representedDiameter + extraDiameter);
     const int radius = diameter / 2;
     return RenderRect{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
+}
+
+std::optional<RenderRect> GaugeSegmentBounds(ID2D1Geometry* segmentPath) {
+    if (segmentPath == nullptr) {
+        return std::nullopt;
+    }
+    D2D1_RECT_F bounds{};
+    if (FAILED(segmentPath->GetBounds(nullptr, &bounds))) {
+        return std::nullopt;
+    }
+    return RenderRect{static_cast<LONG>(std::floor(bounds.left)),
+        static_cast<LONG>(std::floor(bounds.top)),
+        static_cast<LONG>(std::ceil(bounds.right)),
+        static_cast<LONG>(std::ceil(bounds.bottom))};
 }
 
 int GaugeOuterRadiusForRect(const DashboardRenderer& renderer, const RenderRect& rect) {
@@ -283,8 +298,12 @@ void GaugeWidget::Draw(
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && peakSegment >= 0 &&
         static_cast<size_t>(peakSegment) < layoutState_.d2dSegmentPaths.size() &&
         layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)] != nullptr) {
-        renderer.FillD2DGeometry(layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)].Get(),
-            renderer.ColorPalette().accent.WithAlpha(96));
+        ID2D1Geometry* peakSegmentPath = layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)].Get();
+        renderer.FillD2DGeometry(peakSegmentPath, renderer.ColorPalette().peakGhost);
+        if (const auto peakSegmentBounds = GaugeSegmentBounds(peakSegmentPath); peakSegmentBounds.has_value()) {
+            renderer.RegisterDynamicColorEditRegion(
+                DashboardRenderer::LayoutEditParameter::ColorPeakGhost, *peakSegmentBounds);
+        }
     }
 
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {

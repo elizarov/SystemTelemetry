@@ -72,6 +72,17 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceCo
     EXPECT_THAT(output, testing::HasSubstr("[network]\r\nadapter_name = Ethernet\r\n"));
 }
 
+TEST(ConfigWriter, WritesColorAlphaInHexColorValues) {
+    AppConfig compareConfig;
+    AppConfig currentConfig = compareConfig;
+    currentConfig.layout.colors.accentColor = ColorConfig::FromRgba(0x12345678u);
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::HasSubstr("[colors]\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("accent_color = #12345678\r\n"));
+}
+
 TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
     AppConfig config = LoadConfig(SourceConfigPath(), true);
 

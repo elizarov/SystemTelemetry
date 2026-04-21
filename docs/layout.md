@@ -30,6 +30,7 @@ The language is divided by responsibility:
 - `[dashboard]` owns outer dashboard spacing.
 - `[card_style]` owns shared card chrome and in-card spacing.
 - `[colors]` owns the shared palette.
+- Color values use `#RRGGBBAA`.
 - `[fonts]` owns the shared font roles.
 - `[card.<id>]` owns card-local title, icon, and inner layout composition.
 

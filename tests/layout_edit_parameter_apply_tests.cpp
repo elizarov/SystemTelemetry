@@ -176,13 +176,13 @@ TEST(LayoutEditParameterApply, LeavesDriveUsageActivitySegmentGapAsNonNegativeCo
 TEST(LayoutEditParameterApply, UpdatesColorFieldsThroughCommands) {
     AppConfig config;
 
-    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorForeground, 0xABCDEFu));
-    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorIcon, 0xFEDCBAu));
-    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorTrack, 0x102030u));
+    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorForeground, 0xABCDEF12u));
+    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorIcon, 0xFEDCBA34u));
+    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorTrack, 0x10203056u));
 
-    EXPECT_EQ(config.layout.colors.foregroundColor, 0xABCDEFu);
-    EXPECT_EQ(config.layout.colors.iconColor, 0xFEDCBAu);
-    EXPECT_EQ(config.layout.colors.trackColor, 0x102030u);
+    EXPECT_EQ(config.layout.colors.foregroundColor.ToRgba(), 0xABCDEF12u);
+    EXPECT_EQ(config.layout.colors.iconColor.ToRgba(), 0xFEDCBA34u);
+    EXPECT_EQ(config.layout.colors.trackColor.ToRgba(), 0x10203056u);
 }
 
 TEST(LayoutEditParameterApply, AppliesColorFieldsViaMetadata) {
@@ -192,19 +192,20 @@ TEST(LayoutEditParameterApply, AppliesColorFieldsViaMetadata) {
     };
 
     const TestCase cases[] = {
-        {LayoutEditParameter::ColorBackground, 0x112233u},
-        {LayoutEditParameter::ColorForeground, 0x445566u},
-        {LayoutEditParameter::ColorIcon, 0x556677u},
-        {LayoutEditParameter::ColorAccent, 0x778899u},
-        {LayoutEditParameter::ColorLayoutGuide, 0xAABBCCu},
-        {LayoutEditParameter::ColorActiveEdit, 0xDDEEFFu},
-        {LayoutEditParameter::ColorPanelBorder, 0x123456u},
-        {LayoutEditParameter::ColorMutedText, 0x234567u},
-        {LayoutEditParameter::ColorTrack, 0x345678u},
-        {LayoutEditParameter::ColorPanelFill, 0x456789u},
-        {LayoutEditParameter::ColorGraphBackground, 0x56789Au},
-        {LayoutEditParameter::ColorGraphAxis, 0x6789ABu},
-        {LayoutEditParameter::ColorGraphMarker, 0x789ABCu},
+        {LayoutEditParameter::ColorBackground, 0x11223310u},
+        {LayoutEditParameter::ColorForeground, 0x44556620u},
+        {LayoutEditParameter::ColorIcon, 0x55667730u},
+        {LayoutEditParameter::ColorAccent, 0x77889940u},
+        {LayoutEditParameter::ColorPeakGhost, 0x8899AA50u},
+        {LayoutEditParameter::ColorLayoutGuide, 0xAABBCC60u},
+        {LayoutEditParameter::ColorActiveEdit, 0xDDEEFF70u},
+        {LayoutEditParameter::ColorPanelBorder, 0x12345680u},
+        {LayoutEditParameter::ColorMutedText, 0x23456790u},
+        {LayoutEditParameter::ColorTrack, 0x345678A0u},
+        {LayoutEditParameter::ColorPanelFill, 0x456789B0u},
+        {LayoutEditParameter::ColorGraphBackground, 0x56789AC0u},
+        {LayoutEditParameter::ColorGraphAxis, 0x6789ABD0u},
+        {LayoutEditParameter::ColorGraphMarker, 0x789ABCE0u},
     };
 
     AppConfig config;

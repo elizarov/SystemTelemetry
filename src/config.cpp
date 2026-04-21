@@ -17,12 +17,20 @@ const MetricDefinitionConfig kRuntimePlaceholderMetricDefinition{
 
 }  // namespace
 
-ColorConfig ColorConfig::FromRgb(unsigned int value) {
-    return ColorConfig{static_cast<std::uint32_t>(value & 0xFFFFFFu)};
+ColorConfig ColorConfig::FromRgba(unsigned int value) {
+    return ColorConfig{static_cast<std::uint32_t>(value)};
 }
 
 unsigned int ColorConfig::ToRgb() const {
-    return rgb & 0xFFFFFFu;
+    return (rgba >> 8) & 0xFFFFFFu;
+}
+
+unsigned int ColorConfig::ToRgba() const {
+    return rgba;
+}
+
+std::uint8_t ColorConfig::Alpha() const {
+    return static_cast<std::uint8_t>(rgba & 0xFFu);
 }
 
 const MetricDefinitionConfig* FindMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id) {

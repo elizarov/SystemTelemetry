@@ -46,7 +46,7 @@ template <typename Meta> std::optional<double> FindNumericFieldValue(const AppCo
 
 template <typename Meta> std::optional<unsigned int> FindColorFieldValue(const AppConfig& config) {
     if constexpr (std::is_same_v<typename Meta::value_type, ColorConfig>) {
-        return Meta::RawGet(config).ToRgb();
+        return Meta::RawGet(config).ToRgba();
     } else {
         return std::nullopt;
     }
@@ -74,7 +74,7 @@ template <typename Meta> bool ApplyFontFieldEdit(AppConfig& config, const UiFont
 
 template <typename Meta> bool ApplyColorFieldEdit(AppConfig& config, unsigned int value) {
     if constexpr (std::is_same_v<typename Meta::value_type, ColorConfig>) {
-        Meta::Set(config, ColorConfig::FromRgb(value));
+        Meta::Set(config, ColorConfig::FromRgba(value));
         return true;
     } else {
         (void)config;

@@ -58,7 +58,7 @@ TEST(LayoutEditTooltip, FormatsFloatingPointValuesWithoutTrailingZeros) {
 }
 
 TEST(LayoutEditTooltip, FormatsColorValuesAsUppercaseHex) {
-    EXPECT_EQ(FormatLayoutEditTooltipValue(0x12ab34u), "#12AB34");
+    EXPECT_EQ(FormatLayoutEditTooltipValue(0x12ab34cdu), "#12AB34CD");
 }
 
 TEST(LayoutEditTooltip, BuildsTooltipFirstLine) {
@@ -80,7 +80,7 @@ TEST(LayoutEditTooltip, BuildsColorTooltipFirstLine) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::ColorAccent);
 
     ASSERT_TRUE(descriptor.has_value());
-    EXPECT_EQ(BuildLayoutEditTooltipLine(*descriptor, 0x00BFFFu), "[colors] accent_color = #00BFFF");
+    EXPECT_EQ(BuildLayoutEditTooltipLine(*descriptor, 0x00BFFFFFu), "[colors] accent_color = #00BFFFFF");
 }
 
 TEST(LayoutEditTooltip, BuildsStringTooltipFirstLine) {
@@ -196,12 +196,12 @@ TEST(LayoutEditParameter, RootLensReturnsUnderlyingFontField) {
 TEST(LayoutEditParameter, AppliesAndReadsBackColorFieldsThroughMetadata) {
     AppConfig config;
 
-    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorAccent, 0x123456u));
+    ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, LayoutEditParameter::ColorAccent, 0x12345678u));
     const auto color = FindLayoutEditParameterColorValue(config, LayoutEditParameter::ColorAccent);
 
     ASSERT_TRUE(color.has_value());
-    EXPECT_EQ(*color, 0x123456u);
-    EXPECT_EQ(config.layout.colors.accentColor, 0x123456u);
+    EXPECT_EQ(*color, 0x12345678u);
+    EXPECT_EQ(config.layout.colors.accentColor.ToRgba(), 0x12345678u);
 }
 
 TEST(LayoutEditParameter, BuildsDisplayNamesForMenuActions) {

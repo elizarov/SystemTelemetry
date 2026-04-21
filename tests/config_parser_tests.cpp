@@ -69,6 +69,20 @@ TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
     std::filesystem::remove(path);
 }
 
+TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
+    const std::filesystem::path path = WriteTestConfig("[colors]\n"
+                                                       "accent_color = #12345678\n"
+                                                       "track_color = #ABCDEF\n");
+
+    const AppConfig config = LoadConfig(path, true);
+    const AppConfig defaults;
+
+    EXPECT_EQ(config.layout.colors.accentColor.ToRgba(), 0x12345678u);
+    EXPECT_EQ(config.layout.colors.trackColor, defaults.layout.colors.trackColor);
+
+    std::filesystem::remove(path);
+}
+
 TEST(ConfigParser, ParsesMetricsSectionEntries) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
                                                        "cpu.load = *,%,Processor Load\n"

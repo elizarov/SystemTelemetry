@@ -73,7 +73,7 @@ std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat
 
 std::string FormatLayoutEditTooltipValue(unsigned int value) {
     std::ostringstream stream;
-    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(6) << (value & 0xFFFFFFu);
+    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << value;
     return stream.str();
 }
 

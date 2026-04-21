@@ -70,7 +70,7 @@ std::string QuoteTraceText(std::string_view text) {
 
 std::string FormatTraceColorHex(unsigned int color) {
     char buffer[16] = {};
-    sprintf_s(buffer, "#%06X", color & 0xFFFFFFu);
+    sprintf_s(buffer, "#%08X", color);
     return buffer;
 }
 
@@ -138,7 +138,8 @@ std::string BuildColorDialogTraceValues(HWND hwnd) {
     trace << " hex=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT))
           << " red=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT))
           << " green=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT))
-          << " blue=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT));
+          << " blue=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT))
+          << " alpha=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT));
     return trace.str();
 }
 

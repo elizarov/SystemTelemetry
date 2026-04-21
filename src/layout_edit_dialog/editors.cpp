@@ -181,11 +181,12 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
         } else if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
             const auto value = FindLayoutEditParameterColorValue(state->dialog->Host().CurrentConfig(), *parameter);
-            const unsigned int color = value.value_or(0);
+            const unsigned int color = value.value_or(0x000000FFu);
             SetColorDialogHex(hwnd, color);
-            SetColorDialogChannel(hwnd, kColorDialogControls[0], (color >> 16) & 0xFFu);
-            SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 8) & 0xFFu);
-            SetColorDialogChannel(hwnd, kColorDialogControls[2], color & 0xFFu);
+            SetColorDialogChannel(hwnd, kColorDialogControls[0], (color >> 24) & 0xFFu);
+            SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 16) & 0xFFu);
+            SetColorDialogChannel(hwnd, kColorDialogControls[2], (color >> 8) & 0xFFu);
+            SetColorDialogChannel(hwnd, kColorDialogControls[3], color & 0xFFu);
             DestroyMetricListOrderEditorControls(state);
             ShowLayoutEditEditors(hwnd, false, false, true, false, false, false, false);
             SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
@@ -372,10 +373,10 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
             wchar_t hexBuffer[64] = {};
             GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, hexBuffer, ARRAYSIZE(hexBuffer));
             if (!std::wstring(hexBuffer).empty() && !TryParseDialogHexColor(hexBuffer).has_value()) {
-                return {false, L"Enter a #RRGGBB color value."};
+                return {false, L"Enter a #RRGGBBAA color value."};
             }
             if (!ReadColorDialogValue(hwnd).has_value()) {
-                return {false, L"Enter each RGB channel as a whole number between 0 and 255."};
+                return {false, L"Enter each RGBA channel as a whole number between 0 and 255."};
             }
             return {true, L""};
         }

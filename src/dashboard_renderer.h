@@ -94,6 +94,7 @@ public:
         RenderColor foreground{};
         RenderColor icon{};
         RenderColor accent{};
+        RenderColor peakGhost{};
         RenderColor mutedText{};
         RenderColor track{};
         RenderColor layoutGuide{};
@@ -167,7 +168,8 @@ public:
         TextStyleId style,
         RenderColor color,
         const TextLayoutOptions& options);
-    void DrawPillBar(const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
+    std::optional<RenderRect> DrawPillBar(
+        const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
     void PushClipRect(const RenderRect& rect);
     void PopClipRect();
     bool FillSolidRect(const RenderRect& rect, RenderColor color);

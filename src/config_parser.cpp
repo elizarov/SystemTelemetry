@@ -85,7 +85,7 @@ ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallbac
     if (!text.empty() && text.front() == '#') {
         text.erase(text.begin());
     }
-    if (text.size() != 6) {
+    if (text.size() != 8) {
         return fallback;
     }
     for (unsigned char ch : text) {
@@ -94,7 +94,7 @@ ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallbac
         }
     }
     try {
-        return ColorConfig::FromRgb(static_cast<unsigned int>(std::stoul(text, nullptr, 16)));
+        return ColorConfig::FromRgba(static_cast<unsigned int>(std::stoul(text, nullptr, 16)));
     } catch (...) {
         return fallback;
     }

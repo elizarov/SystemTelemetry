@@ -124,7 +124,7 @@ std::string ReadDialogControlTextUtf8(HWND hwnd, int controlId) {
 
 std::wstring FormatDialogColorHex(unsigned int color) {
     wchar_t buffer[16] = {};
-    swprintf_s(buffer, L"#%06X", color & 0xFFFFFFu);
+    swprintf_s(buffer, L"#%08X", color);
     return buffer;
 }
 
@@ -139,7 +139,7 @@ std::optional<unsigned int> TryParseDialogHexColor(const wchar_t* text) {
     if (!value.empty() && value.front() == L'#') {
         value.erase(value.begin());
     }
-    if (value.size() != 6) {
+    if (value.size() != 8) {
         return std::nullopt;
     }
 
@@ -208,10 +208,11 @@ std::optional<unsigned int> ReadColorDialogValue(HWND hwnd) {
     const auto red = ParseColorDialogChannel(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT);
     const auto green = ParseColorDialogChannel(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT);
     const auto blue = ParseColorDialogChannel(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT);
-    if (!red.has_value() || !green.has_value() || !blue.has_value()) {
+    const auto alpha = ParseColorDialogChannel(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT);
+    if (!red.has_value() || !green.has_value() || !blue.has_value() || !alpha.has_value()) {
         return std::nullopt;
     }
-    return (*red << 16) | (*green << 8) | *blue;
+    return (*red << 24) | (*green << 16) | (*blue << 8) | *alpha;
 }
 
 const ColorDialogControls* FindColorDialogControlsByEditId(int editId) {
@@ -441,7 +442,7 @@ std::wstring BuildLayoutEditHintText(const LayoutEditTreeNode* node) {
             case configschema::ValueFormat::FontSpec:
                 return L"Choose a font family, size, and weight. Changes preview live.";
             case configschema::ValueFormat::ColorHex:
-                return L"Edit the color as #RRGGBB or use the RGB controls and picker.";
+                return L"Edit the color as #RRGGBBAA or use the RGBA controls and picker.";
         }
     }
     if (std::holds_alternative<LayoutWeightEditKey>(node->leaf->focusKey)) {
