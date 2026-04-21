@@ -11,7 +11,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/telemetry/` contains collector submodules for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `tools/` contains shared formatting, lint, tidy, and profiling helper scripts.
+- `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
 
 ## Major Subsystems
 
@@ -105,3 +105,10 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `src/board_gigabyte_siv.cpp` builds as a CLR-enabled unit so it can bridge to the vendor .NET assemblies.
 - The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, and telemetry-refresh paths through the same runtime subsystems used by the app.
+
+## Source Dependency Graph
+
+- `architecture_graph.cmd` writes the maintained DOT view of non-vendored `src` module dependencies under `build\architecture\`.
+- Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
+- DOT clusters group nodes by their containing source directory.
+- A dependency from an including module to an included module is `public` when it appears in a header and `private` when it appears only in an implementation file.
