@@ -98,8 +98,8 @@ void DrawSegmentIndicator(DashboardRenderer& renderer,
     int segmentCount,
     int segmentGap,
     double ratio,
-    RenderColor trackColor,
-    RenderColor accentColor) {
+    RenderColorId trackColor,
+    RenderColorId accentColor) {
     const int width = (std::max)(0, rect.right - rect.left);
     const int height = (std::max)(0, rect.bottom - rect.top);
     if (width <= 0 || height <= 0 || segmentCount <= 0) {
@@ -289,22 +289,22 @@ void DriveUsageListWidget::Draw(
     renderer.DrawText(layoutState_.headerReadLabelRect,
         readLabel,
         TextStyleId::Small,
-        renderer.ColorPalette().mutedText,
+        RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false));
     renderer.DrawText(layoutState_.headerWriteLabelRect,
         writeLabel,
         TextStyleId::Small,
-        renderer.ColorPalette().mutedText,
+        RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false));
     renderer.DrawText(layoutState_.usageHeaderRect,
         usageLabel,
         TextStyleId::Small,
-        renderer.ColorPalette().mutedText,
+        RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
     renderer.DrawText(layoutState_.headerColumns.free,
         freeLabel,
         TextStyleId::Small,
-        renderer.ColorPalette().mutedText,
+        RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
 
     const auto rows = metrics.ResolveDriveRows();
@@ -319,7 +319,7 @@ void DriveUsageListWidget::Draw(
         const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(columns.label,
             drive.label,
             TextStyleId::Label,
-            renderer.ColorPalette().foreground,
+            RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
         renderer.RegisterDynamicTextAnchor(labelLayout,
             renderer.MakeEditableTextBinding(widget,
@@ -332,15 +332,15 @@ void DriveUsageListWidget::Draw(
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
             renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank ? 0.0 : drive.readActivity,
-            renderer.ColorPalette().track,
-            renderer.ColorPalette().accent);
+            RenderColorId::Track,
+            RenderColorId::Accent);
         DrawSegmentIndicator(renderer,
             writeIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
             renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank ? 0.0 : drive.writeActivity,
-            renderer.ColorPalette().track,
-            renderer.ColorPalette().accent);
+            RenderColorId::Track,
+            RenderColorId::Accent);
         renderer.DrawPillBar(barRect,
             drive.usedPercent / 100.0,
             std::nullopt,
@@ -354,7 +354,7 @@ void DriveUsageListWidget::Draw(
             const DashboardRenderer::TextLayoutResult percentLayout = renderer.DrawTextBlock(columns.percent,
                 drive.usedText,
                 TextStyleId::Label,
-                renderer.ColorPalette().foreground,
+                RenderColorId::Foreground,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
             renderer.RegisterDynamicTextAnchor(percentLayout,
                 renderer.MakeEditableTextBinding(widget,
@@ -367,7 +367,7 @@ void DriveUsageListWidget::Draw(
             const DashboardRenderer::TextLayoutResult freeLayout = renderer.DrawTextBlock(columns.free,
                 drive.freeText,
                 TextStyleId::Small,
-                renderer.ColorPalette().mutedText,
+                RenderColorId::MutedText,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
             renderer.RegisterDynamicTextAnchor(freeLayout,
                 renderer.MakeEditableTextBinding(widget,

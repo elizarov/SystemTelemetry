@@ -32,19 +32,22 @@ struct RenderRect {
     D2D1_RECT_F ToD2DRectF() const;
 };
 
-struct RenderColor {
-    std::uint8_t r = 0;
-    std::uint8_t g = 0;
-    std::uint8_t b = 0;
-    std::uint8_t a = 255;
-
-    bool operator==(const RenderColor& other) const = default;
-
-    RenderColor WithAlpha(std::uint8_t alpha) const;
-
-    std::uint32_t PackedRgba() const;
-
-    D2D1_COLOR_F ToD2DColorF() const;
+enum class RenderColorId {
+    Background,
+    Foreground,
+    Icon,
+    Accent,
+    PeakGhost,
+    MutedText,
+    Track,
+    LayoutGuide,
+    ActiveEdit,
+    PanelBorder,
+    PanelFill,
+    GraphBackground,
+    GraphMarker,
+    GraphAxis,
+    Count,
 };
 
 enum class StrokePattern {
@@ -53,13 +56,13 @@ enum class StrokePattern {
 };
 
 struct RenderStroke {
-    RenderColor color{};
+    RenderColorId color = RenderColorId::Foreground;
     float width = 1.0f;
     StrokePattern pattern = StrokePattern::Solid;
 
-    static RenderStroke Solid(RenderColor color, float width = 1.0f);
+    static RenderStroke Solid(RenderColorId color, float width = 1.0f);
 
-    static RenderStroke Dotted(RenderColor color, float width = 1.0f);
+    static RenderStroke Dotted(RenderColorId color, float width = 1.0f);
 };
 
 enum class TextStyleId {

@@ -50,7 +50,7 @@ void NetworkFooterWidget::Draw(
     const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         TextStyleId::Footer,
-        renderer.ColorPalette().mutedText,
+        RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(

@@ -7,6 +7,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
 - `src/widget/` contains the concrete widget draw and layout-state modules used by the renderer.
+- `src/dashboard_renderer/` contains renderer-private helper modules such as palette conversion and lookup.
 - `src/layout_edit_dialog/` contains the internal modules behind the modeless `Edit Configuration` window.
 - `src/telemetry/` contains collector submodules for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
@@ -41,7 +42,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `DashboardRenderer` owns static layout resolution, renderer resource lifetime, icon loading, text measurement, live window rendering, and screenshot export rendering.
 - Shared render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
-- The renderer exposes its resolved color palette as one renderer-owned palette object used by widget draw modules.
+- Widget draw modules refer to colors by render color id; `DashboardRenderer` keeps the resolved RGBA palette private and maps ids to colors internally.
 - Widget modules own widget-local preferred-size logic, draw behavior, and layout-edit artifact registration.
 - `DashboardMetricSource` adapts `SystemSnapshot` into widget-facing values, histories, drive rows, and formatted text while caching per-frame derived results.
 

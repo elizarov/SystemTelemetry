@@ -1,5 +1,6 @@
 #include "dashboard_renderer.h"
 #include "dashboard_layout_resolver.h"
+#include "dashboard_renderer/palette.h"
 #include "layout_edit_service.h"
 #include "layout_edit_parameter.h"
 
@@ -28,14 +29,6 @@
 #include "utf8.h"
 
 namespace {
-
-RenderColor ToRenderColor(ColorConfig color) {
-    const unsigned int rgb = color.ToRgb();
-    return RenderColor{static_cast<std::uint8_t>((rgb >> 16) & 0xFFu),
-        static_cast<std::uint8_t>((rgb >> 8) & 0xFFu),
-        static_cast<std::uint8_t>(rgb & 0xFFu),
-        color.Alpha()};
-}
 
 std::size_t TextStyleSlot(TextStyleId style) {
     return static_cast<std::size_t>(style);
@@ -493,7 +486,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
 
 }  // namespace
 
-DashboardRenderer::DashboardRenderer() = default;
+DashboardRenderer::DashboardRenderer() : palette_(std::make_unique<DashboardPalette>(config_.layout.colors)) {}
 
 DashboardRenderer::~DashboardRenderer() {
     Shutdown();
@@ -617,10 +610,6 @@ int DashboardRenderer::WindowHeight() const {
     return std::max(1, ScaleLogical(config_.layout.structure.window.height));
 }
 
-const DashboardRenderer::Palette& DashboardRenderer::ColorPalette() const {
-    return palette_;
-}
-
 void DashboardRenderer::SetTraceOutput(std::ostream* traceOutput) {
     traceOutput_ = traceOutput;
 }
@@ -694,7 +683,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlock(
 DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
-    RenderColor color,
+    RenderColorId color,
     const TextLayoutOptions& options) {
     TextLayoutResult result{rect};
     const std::wstring wideText = WideFromUtf8(text);
@@ -720,7 +709,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(const Rende
 void DashboardRenderer::DrawText(const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
-    RenderColor color,
+    RenderColorId color,
     const TextLayoutOptions& options) const {
     const std::wstring wideText = WideFromUtf8(text);
     if (wideText.empty()) {
@@ -764,7 +753,8 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(const EditOverlayState& overl
     if (hoveredWidget == nullptr) {
         return;
     }
-    const_cast<DashboardRenderer*>(this)->DrawSolidRect(hoveredWidget->rect, RenderStroke::Solid(palette_.layoutGuide));
+    const_cast<DashboardRenderer*>(this)->DrawSolidRect(
+        hoveredWidget->rect, RenderStroke::Solid(RenderColorId::LayoutGuide));
 }
 
 bool DashboardRenderer::ShouldDrawLayoutEditAffordances(const EditOverlayState& overlayState) const {
@@ -890,7 +880,7 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const EditOverlayStat
         return;
     }
     for (const auto& [highlighted, active] : highlights) {
-        const RenderColor outlineColor = active ? palette_.activeEdit : palette_.layoutGuide;
+        const RenderColorId outlineColor = active ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
         if (highlighted.drawTargetOutline && !highlighted.targetRect.IsEmpty()) {
             const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(highlighted.targetRect, outlineColor, active);
         }
@@ -989,7 +979,7 @@ void DashboardRenderer::DrawSelectedColorEditHighlights(const EditOverlayState& 
     collect(staticColorEditRegions_);
     collect(dynamicColorEditRegions_);
     for (const auto& rect : highlightedRects) {
-        const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(rect, palette_.activeEdit, true);
+        const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(rect, RenderColorId::ActiveEdit, true);
     }
 }
 
@@ -1001,7 +991,7 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const EditOverlayState& ov
         return;
     }
 
-    const RenderColor color = palette_.activeEdit;
+    const RenderColorId color = RenderColorId::ActiveEdit;
     std::vector<RenderRect> selectedRects;
     bool drawDashboardBoundsOutline = false;
     const auto appendRect = [&](const RenderRect& rect) {
@@ -1202,7 +1192,7 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
         appendContainerHighlight(overlayState.activeLayoutEditGuide->containerRect, true);
     }
     for (const auto& [rect, active] : containerHighlights) {
-        const RenderColor color = active ? palette_.activeEdit : palette_.layoutGuide;
+        const RenderColorId color = active ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
         const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(rect, color, active);
     }
 
@@ -1219,7 +1209,7 @@ void DashboardRenderer::DrawLayoutEditGuides(const EditOverlayState& overlayStat
         if (!emphasized && !hoveredGuide && !overlayState.hoverOnExposedDashboard) {
             continue;
         }
-        const RenderColor color = emphasized ? palette_.activeEdit : palette_.layoutGuide;
+        const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
         const RenderPoint start{guide.lineRect.left, guide.lineRect.top};
         const RenderPoint end = guide.axis == LayoutGuideAxis::Vertical
                                     ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
@@ -1274,7 +1264,7 @@ void DashboardRenderer::DrawWidgetEditGuides(const EditOverlayState& overlayStat
                               overlayState.selectedTreeHighlight.has_value() &&
                               MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
         const bool emphasized = active || selected;
-        const RenderColor color = emphasized ? palette_.activeEdit : palette_.layoutGuide;
+        const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart,
             guide.drawEnd,
             RenderStroke::Solid(color, static_cast<float>(emphasized ? activeLineWidth : lineWidth)));
@@ -1334,7 +1324,7 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
         const bool hovered = overlayState.hoveredGapEditAnchor.has_value() &&
                              MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
         const bool emphasized = active || selected;
-        const RenderColor color = emphasized ? palette_.activeEdit : palette_.layoutGuide;
+        const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
         const float strokeWidth = static_cast<float>(emphasized ? activeLineWidth : lineWidth);
 
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(
@@ -1369,7 +1359,7 @@ void DashboardRenderer::DrawGapEditAnchors(const EditOverlayState& overlayState)
 }
 
 void DashboardRenderer::DrawDottedHighlightRect(
-    const RenderRect& rect, RenderColor color, bool active, bool outside) const {
+    const RenderRect& rect, RenderColorId color, bool active, bool outside) const {
     if (rect.IsEmpty()) {
         return;
     }
@@ -1804,7 +1794,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const EditOverlayState& o
         }
     }
 
-    const RenderColor color = palette_.layoutGuide;
+    const RenderColorId color = RenderColorId::LayoutGuide;
     const int inset = std::max(2, ScaleLogical(4));
     const int cap = std::max(3, ScaleLogical(4));
     const int offset = std::max(4, ScaleLogical(6));
@@ -1907,8 +1897,8 @@ void DashboardRenderer::DrawMoveOverlay(const MoveOverlayState& overlayState) {
                               bodyHeight + lineGap + hintHeight;
     const RenderRect overlayRect{margin, margin, margin + overlayWidth, margin + overlayHeight};
 
-    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(palette_.background);
-    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(palette_.accent);
+    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(RenderColorId::Background);
+    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(RenderColorId::Accent);
     const D2D1_ROUNDED_RECT roundedRect =
         D2D1::RoundedRect(overlayRect.ToD2DRectF(), static_cast<float>(cornerRadius), static_cast<float>(cornerRadius));
     if (fillBrush != nullptr) {
@@ -1922,7 +1912,7 @@ void DashboardRenderer::DrawMoveOverlay(const MoveOverlayState& overlayState) {
     DrawText(RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, y + titleHeight},
         titleText,
         TextStyleId::Label,
-        palette_.accent,
+        RenderColorId::Accent,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
     y += titleHeight + lineGap;
 
@@ -1930,7 +1920,7 @@ void DashboardRenderer::DrawMoveOverlay(const MoveOverlayState& overlayState) {
         DrawText(RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, y + bodyHeight},
             text,
             TextStyleId::Small,
-            palette_.foreground,
+            RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center, true, ellipsis));
         y += bodyHeight + lineGap;
     };
@@ -1940,7 +1930,7 @@ void DashboardRenderer::DrawMoveOverlay(const MoveOverlayState& overlayState) {
     DrawText(RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, overlayRect.bottom - padding},
         hintText,
         TextStyleId::Small,
-        palette_.mutedText,
+        RenderColorId::MutedText,
         TextLayoutOptions::Wrapped());
 }
 
@@ -2000,8 +1990,8 @@ void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
                                                                 static_cast<float>(card.rect.bottom)),
         radius,
         radius);
-    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(palette_.panelFill);
-    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(palette_.panelBorder);
+    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(RenderColorId::PanelFill);
+    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(RenderColorId::PanelBorder);
     if (fillBrush != nullptr) {
         d2dActiveRenderTarget_->FillRoundedRectangle(roundedRect, fillBrush);
     }
@@ -2018,7 +2008,7 @@ void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
         const TextLayoutResult titleLayout = DrawTextBlock(card.titleRect,
             card.title,
             TextStyleId::Title,
-            palette_.foreground,
+            RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
         RegisterDynamicColorEditRegion(LayoutEditParameter::ColorForeground, titleLayout.textRect);
     }
@@ -2026,8 +2016,7 @@ void DashboardRenderer::DrawPanel(const ResolvedCardLayout& card) {
 
 std::optional<RenderRect> DashboardRenderer::DrawPillBar(
     const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
-    const RenderColor accentColor = palette_.accent;
-    const auto fillCapsule = [&](const RenderRect& capsuleRect, RenderColor color) {
+    const auto fillCapsule = [&](const RenderRect& capsuleRect, RenderColorId color) {
         const int capsuleWidth = capsuleRect.Width();
         const int capsuleHeight = capsuleRect.Height();
         if (capsuleWidth <= 0 || capsuleHeight <= 0) {
@@ -2059,7 +2048,7 @@ std::optional<RenderRect> DashboardRenderer::DrawPillBar(
         }
     };
 
-    fillCapsule(rect, palette_.track);
+    fillCapsule(rect, RenderColorId::Track);
 
     const int width = rect.Width();
     const int height = rect.Height();
@@ -2076,7 +2065,7 @@ std::optional<RenderRect> DashboardRenderer::DrawPillBar(
     const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
     RenderRect fillRect = rect;
     fillRect.right = fillRect.left + fillWidth;
-    fillCapsule(fillRect, accentColor);
+    fillCapsule(fillRect, RenderColorId::Accent);
 
     if (peakRatio.has_value()) {
         const double peak = ClampFinite(*peakRatio, 0.0, 1.0);
@@ -2086,7 +2075,7 @@ std::optional<RenderRect> DashboardRenderer::DrawPillBar(
         const int maxLeft = rect.right - markerWidth;
         const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
         RenderRect markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-        fillCapsule(markerRect, palette_.peakGhost);
+        fillCapsule(markerRect, RenderColorId::PeakGhost);
         return markerRect;
     }
     return std::nullopt;
@@ -2123,7 +2112,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     dynamicAnchorRegistrationEnabled_ =
         overlayState.showLayoutEditGuides && !overlayState.activeLayoutEditGuide.has_value();
     const DashboardMetricSource& metrics = ResolveMetrics(snapshot);
-    d2dActiveRenderTarget_->Clear(palette_.background.ToD2DColorF());
+    d2dActiveRenderTarget_->Clear(palette_->Get(RenderColorId::Background).ToD2DColorF());
     for (const auto& card : resolvedLayout_.cards) {
         DrawPanel(card);
         for (const auto& widget : card.widgets) {
@@ -2965,11 +2954,12 @@ void DashboardRenderer::EndWindowDraw() {
     EndDirect2DDraw();
 }
 
-ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(RenderColor color) {
+ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(RenderColorId colorId) {
     if (d2dActiveRenderTarget_ == nullptr) {
         return nullptr;
     }
-    const D2DBrushCacheKey key{color};
+    const RenderColor& color = palette_->Get(colorId);
+    const D2DBrushCacheKey key{color.PackedRgba()};
     if (const auto it = d2dSolidBrushCache_.find(key); it != d2dSolidBrushCache_.end()) {
         return it->second.Get();
     }
@@ -2996,7 +2986,7 @@ void DashboardRenderer::PopClipRect() {
     }
 }
 
-bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColor color) {
+bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColorId color) {
     if (!IsDrawActive()) {
         return false;
     }
@@ -3008,7 +2998,7 @@ bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColor color)
     return true;
 }
 
-bool DashboardRenderer::FillSolidEllipse(RenderPoint center, int diameter, RenderColor color) {
+bool DashboardRenderer::FillSolidEllipse(RenderPoint center, int diameter, RenderColorId color) {
     if (!IsDrawActive() || diameter <= 0) {
         return false;
     }
@@ -3021,7 +3011,7 @@ bool DashboardRenderer::FillSolidEllipse(RenderPoint center, int diameter, Rende
     return true;
 }
 
-bool DashboardRenderer::FillSolidDiamond(const RenderRect& rect, RenderColor color) {
+bool DashboardRenderer::FillSolidDiamond(const RenderRect& rect, RenderColorId color) {
     if (!IsDrawActive()) {
         return false;
     }
@@ -3126,7 +3116,7 @@ Microsoft::WRL::ComPtr<ID2D1GeometryGroup> DashboardRenderer::CreateD2DGeometryG
     return group;
 }
 
-bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, RenderColor color) {
+bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId color) {
     if (!IsDrawActive() || geometry == nullptr) {
         return false;
     }
@@ -3261,20 +3251,7 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::MeasureTextBlockD2D(const
 }
 
 void DashboardRenderer::RebuildPalette() {
-    palette_.background = ToRenderColor(config_.layout.colors.backgroundColor);
-    palette_.foreground = ToRenderColor(config_.layout.colors.foregroundColor);
-    palette_.icon = ToRenderColor(config_.layout.colors.iconColor);
-    palette_.accent = ToRenderColor(config_.layout.colors.accentColor);
-    palette_.peakGhost = ToRenderColor(config_.layout.colors.peakGhostColor);
-    palette_.mutedText = ToRenderColor(config_.layout.colors.mutedTextColor);
-    palette_.track = ToRenderColor(config_.layout.colors.trackColor);
-    palette_.layoutGuide = ToRenderColor(config_.layout.colors.layoutGuideColor);
-    palette_.activeEdit = ToRenderColor(config_.layout.colors.activeEditColor);
-    palette_.panelBorder = ToRenderColor(config_.layout.colors.panelBorderColor);
-    palette_.panelFill = ToRenderColor(config_.layout.colors.panelFillColor);
-    palette_.graphBackground = ToRenderColor(config_.layout.colors.graphBackgroundColor);
-    palette_.graphMarker = ToRenderColor(config_.layout.colors.graphMarkerColor);
-    palette_.graphAxis = ToRenderColor(config_.layout.colors.graphAxisColor);
+    palette_->Rebuild(config_.layout.colors);
 }
 
 void DashboardRenderer::ClearD2DCaches() {
@@ -3306,7 +3283,8 @@ bool DashboardRenderer::LoadPanelIcons() {
             ReleasePanelIcons();
             return false;
         }
-        auto tintedBitmap = TintMonochromeBitmapSource(wicFactory_.Get(), bitmap.Get(), palette_.icon);
+        auto tintedBitmap =
+            TintMonochromeBitmapSource(wicFactory_.Get(), bitmap.Get(), palette_->Get(RenderColorId::Icon));
         if (tintedBitmap == nullptr) {
             lastError_ = "renderer:icon_tint_failed name=\"" + iconName + "\" resource=" + std::to_string(resourceId);
             ReleasePanelIcons();

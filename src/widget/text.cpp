@@ -51,7 +51,7 @@ void TextWidget::Draw(
     const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         TextStyleId::Text,
-        renderer.ColorPalette().foreground,
+        RenderColorId::Foreground,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     const auto binding = renderer.MakeEditableTextBinding(
         widget, DashboardRenderer::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);

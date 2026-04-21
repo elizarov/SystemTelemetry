@@ -32,6 +32,8 @@
 #include "render_types.h"
 #include "widget.h"
 
+class DashboardPalette;
+
 class DashboardRenderer {
 public:
     using LayoutEditParameter = ::LayoutEditParameter;
@@ -89,23 +91,6 @@ public:
         RenderRect textRect{};
     };
 
-    struct Palette {
-        RenderColor background{};
-        RenderColor foreground{};
-        RenderColor icon{};
-        RenderColor accent{};
-        RenderColor peakGhost{};
-        RenderColor mutedText{};
-        RenderColor track{};
-        RenderColor layoutGuide{};
-        RenderColor activeEdit{};
-        RenderColor panelBorder{};
-        RenderColor panelFill{};
-        RenderColor graphBackground{};
-        RenderColor graphMarker{};
-        RenderColor graphAxis{};
-    };
-
     DashboardRenderer();
     ~DashboardRenderer();
 
@@ -120,7 +105,6 @@ public:
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
-    const Palette& ColorPalette() const;
     void SetTraceOutput(std::ostream* traceOutput);
     const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
     const std::vector<LayoutEditWidgetGuide>& WidgetEditGuides() const;
@@ -161,27 +145,27 @@ public:
     void DrawText(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
-        RenderColor color,
+        RenderColorId color,
         const TextLayoutOptions& options) const;
     TextLayoutResult DrawTextBlock(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
-        RenderColor color,
+        RenderColorId color,
         const TextLayoutOptions& options);
     std::optional<RenderRect> DrawPillBar(
         const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
     void PushClipRect(const RenderRect& rect);
     void PopClipRect();
-    bool FillSolidRect(const RenderRect& rect, RenderColor color);
-    bool FillSolidEllipse(RenderPoint center, int diameter, RenderColor color);
-    bool FillSolidDiamond(const RenderRect& rect, RenderColor color);
+    bool FillSolidRect(const RenderRect& rect, RenderColorId color);
+    bool FillSolidEllipse(RenderPoint center, int diameter, RenderColorId color);
+    bool FillSolidDiamond(const RenderRect& rect, RenderColorId color);
     bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke);
     bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke);
     bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke);
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DPathGeometry() const;
     Microsoft::WRL::ComPtr<ID2D1GeometryGroup> CreateD2DGeometryGroup(
         std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
-    bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColor color);
+    bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId color);
     bool DrawD2DPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke);
     LayoutEditAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
@@ -362,16 +346,16 @@ private:
     };
 
     struct D2DBrushCacheKey {
-        RenderColor color{};
+        std::uint32_t packedRgba = 0;
 
         bool operator==(const D2DBrushCacheKey& other) const {
-            return color == other.color;
+            return packedRgba == other.packedRgba;
         }
     };
 
     struct D2DBrushCacheKeyHash {
         size_t operator()(const D2DBrushCacheKey& key) const {
-            return std::hash<std::uint32_t>{}(key.color.PackedRgba());
+            return std::hash<std::uint32_t>{}(key.packedRgba);
         }
     };
 
@@ -385,7 +369,7 @@ private:
     void DrawLayoutEditGuides(const EditOverlayState& overlayState) const;
     void DrawWidgetEditGuides(const EditOverlayState& overlayState) const;
     void DrawGapEditAnchors(const EditOverlayState& overlayState) const;
-    void DrawDottedHighlightRect(const RenderRect& rect, RenderColor color, bool active, bool outside = true) const;
+    void DrawDottedHighlightRect(const RenderRect& rect, RenderColorId color, bool active, bool outside = true) const;
     void DrawLayoutSimilarityIndicators(const EditOverlayState& overlayState) const;
     void DrawMoveOverlay(const MoveOverlayState& overlayState);
     void DrawPanel(const ResolvedCardLayout& card);
@@ -430,7 +414,7 @@ private:
     void DrawDirect2DFrame(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     bool SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath);
     void WriteScreenshotActiveRegionsTrace(const EditOverlayState& overlayState) const;
-    ID2D1SolidColorBrush* D2DSolidBrush(RenderColor color);
+    ID2D1SolidColorBrush* D2DSolidBrush(RenderColorId color);
     IDWriteTextFormat* DWriteTextFormat(TextStyleId style) const;
     bool CreateDWriteTextFormats();
     void ConfigureDWriteTextFormat(IDWriteTextFormat* format, const TextLayoutOptions& options) const;
@@ -484,7 +468,7 @@ private:
     std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>> panelIcons_;
     std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
     TextStyleMetrics textStyleMetrics_{};
-    Palette palette_{};
+    std::unique_ptr<DashboardPalette> palette_;
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<LayoutEditWidgetGuide> widgetEditGuides_;

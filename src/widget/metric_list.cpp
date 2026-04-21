@@ -145,13 +145,13 @@ void MetricListWidget::Draw(
         renderer.DrawText(labelRect,
             row.label,
             TextStyleId::Label,
-            renderer.ColorPalette().mutedText,
+            RenderColorId::MutedText,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
         if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
             const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(valueRect,
                 row.valueText,
                 TextStyleId::Value,
-                renderer.ColorPalette().foreground,
+                RenderColorId::Foreground,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
             renderer.RegisterDynamicTextAnchor(valueLayout,
                 renderer.MakeEditableTextBinding(widget,
