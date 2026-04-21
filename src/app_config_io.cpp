@@ -4,7 +4,18 @@
 
 #include "app_diagnostics.h"
 #include "util/paths.h"
+#include "config_parser.h"
 #include "config_writer.h"
+
+std::filesystem::path GetRuntimeConfigPath() {
+    return GetExecutableDirectory() / L"config.ini";
+}
+
+AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) {
+    AppConfig config = LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig);
+    ApplyDiagnosticsScaleOverride(config, options);
+    return config;
+}
 
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {
     const std::filesystem::path tempPath = CreateElevatedSaveConfigTempPath();

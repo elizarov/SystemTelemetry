@@ -1,10 +1,13 @@
 #include "util/paths.h"
 
-#include "diagnostics_options.h"
-#include "app_diagnostics.h"
-#include "config_parser.h"
+#include <array>
 
 namespace {
+
+extern "C" __declspec(dllimport) unsigned long __stdcall GetModuleFileNameW(
+    void* module, wchar_t* filename, unsigned long size);
+
+constexpr size_t kModulePathBufferLength = 32768;
 
 std::filesystem::path CaptureLaunchWorkingDirectory() {
     try {
@@ -17,12 +20,12 @@ std::filesystem::path CaptureLaunchWorkingDirectory() {
 }  // namespace
 
 std::filesystem::path GetExecutableDirectory() {
-    wchar_t modulePath[MAX_PATH];
-    const DWORD length = GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
-    if (length == 0 || length >= ARRAYSIZE(modulePath)) {
+    std::array<wchar_t, kModulePathBufferLength> modulePath{};
+    const auto length = GetModuleFileNameW(nullptr, modulePath.data(), static_cast<unsigned long>(modulePath.size()));
+    if (length == 0 || length >= modulePath.size()) {
         return std::filesystem::current_path();
     }
-    return std::filesystem::path(modulePath).parent_path();
+    return std::filesystem::path(modulePath.data()).parent_path();
 }
 
 std::filesystem::path GetWorkingDirectory() {
@@ -48,20 +51,10 @@ std::filesystem::path ResolveExecutableRelativePath(const std::filesystem::path&
 }
 
 std::optional<std::wstring> GetExecutablePath() {
-    wchar_t modulePath[MAX_PATH];
-    const DWORD length = GetModuleFileNameW(nullptr, modulePath, ARRAYSIZE(modulePath));
-    if (length == 0 || length >= ARRAYSIZE(modulePath)) {
+    std::array<wchar_t, kModulePathBufferLength> modulePath{};
+    const auto length = GetModuleFileNameW(nullptr, modulePath.data(), static_cast<unsigned long>(modulePath.size()));
+    if (length == 0 || length >= modulePath.size()) {
         return std::nullopt;
     }
-    return std::wstring(modulePath, length);
-}
-
-std::filesystem::path GetRuntimeConfigPath() {
-    return GetExecutableDirectory() / L"config.ini";
-}
-
-AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) {
-    AppConfig config = LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig);
-    ApplyDiagnosticsScaleOverride(config, options);
-    return config;
+    return std::wstring(modulePath.data(), length);
 }

@@ -8,5 +8,8 @@
 #include <windows.h>
 
 #include "config.h"
+#include "diagnostics_options.h"
 
+std::filesystem::path GetRuntimeConfigPath();
+AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options);
 bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner);
