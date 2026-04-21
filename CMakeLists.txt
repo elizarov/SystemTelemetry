@@ -124,6 +124,7 @@ add_executable(SystemTelemetry WIN32
     src/render_types.cpp
     src/dashboard_renderer/d2d_cache.cpp
     src/dashboard_renderer/palette.cpp
+    src/dashboard_renderer/text_width_cache.cpp
     src/widget.cpp
     src/widget/text.cpp
     src/widget/gauge.cpp
@@ -358,6 +359,7 @@ add_executable(SystemTelemetryBenchmarks
     src/render_types.cpp
     src/dashboard_renderer/d2d_cache.cpp
     src/dashboard_renderer/palette.cpp
+    src/dashboard_renderer/text_width_cache.cpp
     src/widget.cpp
     src/widget/text.cpp
     src/widget/gauge.cpp

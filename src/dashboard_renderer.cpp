@@ -2,6 +2,7 @@
 #include "dashboard_renderer/d2d_cache.h"
 #include "dashboard_renderer/layout_resolver.h"
 #include "dashboard_renderer/palette.h"
+#include "dashboard_renderer/text_width_cache.h"
 #include "layout_edit_service.h"
 #include "layout_edit_parameter.h"
 
@@ -489,7 +490,8 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
 
 DashboardRenderer::DashboardRenderer()
     : palette_(std::make_unique<DashboardPalette>(config_.layout.colors)),
-      layoutResolver_(std::make_unique<DashboardLayoutResolver>()), d2dCache_(std::make_unique<DashboardD2DCache>()) {}
+      layoutResolver_(std::make_unique<DashboardLayoutResolver>()), d2dCache_(std::make_unique<DashboardD2DCache>()),
+      textWidthCache_(std::make_unique<DashboardTextWidthCache>()) {}
 
 DashboardRenderer::~DashboardRenderer() {
     Shutdown();
@@ -2371,9 +2373,8 @@ int DashboardRenderer::ScaleLogical(int value) const {
 }
 
 int DashboardRenderer::MeasureTextWidth(TextStyleId style, std::string_view text) const {
-    const TextWidthCacheLookupKey cacheKey{style, text};
-    if (const auto it = textWidthCache_.find(cacheKey); it != textWidthCache_.end()) {
-        return it->second;
+    if (const std::optional<int> cachedWidth = textWidthCache_->Find(style, text)) {
+        return *cachedWidth;
     }
 
     if (dwriteFactory_ == nullptr) {
@@ -2392,7 +2393,7 @@ int DashboardRenderer::MeasureTextWidth(TextStyleId style, std::string_view text
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
             nullptr)
                 .textRect.right));
-    textWidthCache_.emplace(TextWidthCacheKey{style, std::string(text)}, width);
+    textWidthCache_->Store(style, text, width);
     return width;
 }
 
@@ -2703,7 +2704,7 @@ void DashboardRenderer::Shutdown() {
     dwriteTextFormats_ = {};
     textStyleMetrics_ = {};
     layoutResolver_->Clear();
-    textWidthCache_.clear();
+    textWidthCache_->Clear();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
     d2dFirstDrawWarmupPending_ = false;
     d2dCache_->Clear();
@@ -3261,7 +3262,7 @@ bool DashboardRenderer::RebuildTextFormatsAndMetrics() {
         lastError_ = "renderer:text_format_create_failed";
         return false;
     }
-    textWidthCache_.clear();
+    textWidthCache_->Clear();
     textStyleMetrics_ = {};
     if (dwriteFactory_ == nullptr) {
         return true;

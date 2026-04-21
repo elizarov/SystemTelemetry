@@ -35,6 +35,7 @@
 class DashboardLayoutResolver;
 class DashboardD2DCache;
 class DashboardPalette;
+class DashboardTextWidthCache;
 
 class DashboardRenderer {
 public:
@@ -228,80 +229,6 @@ private:
         int exactTypeOrdinal = 0;
     };
 
-    struct TextWidthCacheKey {
-        TextStyleId style = TextStyleId::Text;
-        std::string text;
-
-        bool operator==(const TextWidthCacheKey& other) const {
-            return style == other.style && text == other.text;
-        }
-    };
-
-    struct TransparentStringHash {
-        using is_transparent = void;
-
-        size_t operator()(std::string_view value) const {
-            return std::hash<std::string_view>{}(value);
-        }
-
-        size_t operator()(const std::string& value) const {
-            return (*this)(std::string_view(value));
-        }
-    };
-
-    struct TransparentStringEqual {
-        using is_transparent = void;
-
-        bool operator()(std::string_view left, std::string_view right) const {
-            return left == right;
-        }
-
-        bool operator()(const std::string& left, const std::string& right) const {
-            return left == right;
-        }
-
-        bool operator()(const std::string& left, std::string_view right) const {
-            return std::string_view(left) == right;
-        }
-
-        bool operator()(std::string_view left, const std::string& right) const {
-            return left == std::string_view(right);
-        }
-    };
-
-    struct TextWidthCacheLookupKey {
-        TextStyleId style = TextStyleId::Text;
-        std::string_view text;
-    };
-
-    struct TextWidthCacheKeyHash {
-        using is_transparent = void;
-
-        size_t operator()(const TextWidthCacheKey& key) const {
-            return (std::hash<int>{}(static_cast<int>(key.style)) * 1315423911u) ^ TransparentStringHash {}(key.text);
-        }
-
-        size_t operator()(const TextWidthCacheLookupKey& key) const {
-            return (std::hash<int>{}(static_cast<int>(key.style)) * 1315423911u) ^ TransparentStringHash {}(key.text);
-        }
-    };
-
-    struct TextWidthCacheKeyEqual {
-        using is_transparent = void;
-
-        bool operator()(const TextWidthCacheKey& left, const TextWidthCacheKey& right) const {
-            return left.style == right.style && left.text == right.text;
-        }
-
-        bool operator()(const TextWidthCacheKey& left, const TextWidthCacheLookupKey& right) const {
-            return left.style == right.style && std::string_view(left.text) == right.text;
-        }
-
-        bool operator()(const TextWidthCacheLookupKey& left, const TextWidthCacheKey& right) const {
-            return left.style == right.style && left.text == std::string_view(right.text);
-        }
-    };
-
     bool ShouldDrawLayoutEditAffordances(const EditOverlayState& overlayState) const;
     bool IsContainerGuideDragActive(const EditOverlayState& overlayState) const;
     void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
@@ -409,7 +336,7 @@ private:
     std::unique_ptr<DashboardPalette> palette_;
     std::unique_ptr<DashboardLayoutResolver> layoutResolver_;
     std::unique_ptr<DashboardD2DCache> d2dCache_;
-    mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textWidthCache_;
+    std::unique_ptr<DashboardTextWidthCache> textWidthCache_;
     std::unique_ptr<DashboardMetricSource> cachedMetricSource_;
     const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
     uint64_t cachedMetricSnapshotRevision_ = 0;
