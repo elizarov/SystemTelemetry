@@ -80,4 +80,33 @@ std::string Trace::FormatValueDouble(const char* label, double value, int precis
     return buffer;
 }
 
+std::string Trace::EscapeText(std::string_view text) {
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (const char ch : text) {
+        switch (ch) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            default:
+                escaped.push_back(ch);
+                break;
+        }
+    }
+    return escaped;
+}
+
+std::string Trace::QuoteText(std::string_view text) {
+    return "\"" + EscapeText(text) + "\"";
+}
+
 }  // namespace tracing

@@ -1,24 +1,14 @@
 #include "widget/metric_list.h"
 
 #include <algorithm>
-#include <cctype>
 #include <optional>
 #include <sstream>
 
+#include "app_strings.h"
 #include "dashboard_metrics.h"
 #include "dashboard_renderer.h"
 
 namespace {
-
-std::string Trim(std::string value) {
-    const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
-    const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
-    if (first == value.end()) {
-        return {};
-    }
-    const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
-    return std::string(first, last);
-}
 
 int EffectiveMetricRowHeight(const DashboardRenderer& renderer) {
     const int valueHeight = renderer.TextMetrics().value;

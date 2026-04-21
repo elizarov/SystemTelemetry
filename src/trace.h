@@ -2,6 +2,7 @@
 
 #include <ostream>
 #include <string>
+#include <string_view>
 
 namespace tracing {
 
@@ -28,6 +29,8 @@ public:
     static std::string FormatPdhStatus(const char* label, long status);
     static std::string FormatWin32Status(const char* label, unsigned long status);
     static std::string FormatValueDouble(const char* label, double value, int precision = 3);
+    static std::string EscapeText(std::string_view text);
+    static std::string QuoteText(std::string_view text);
 
 private:
     std::ostream* output_ = nullptr;

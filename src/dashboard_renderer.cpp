@@ -8,7 +8,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -26,6 +25,7 @@
 #include <dwrite.h>
 #include <wincodec.h>
 
+#include "app_strings.h"
 #include "resource.h"
 #include "numeric_safety.h"
 #include "trace.h"
@@ -35,12 +35,6 @@ namespace {
 
 std::size_t TextStyleSlot(TextStyleId style) {
     return static_cast<std::size_t>(style);
-}
-
-std::string FormatHresult(HRESULT hr) {
-    char buffer[16];
-    sprintf_s(buffer, "%08X", static_cast<unsigned int>(hr));
-    return buffer;
 }
 
 bool SamePanelIconInputs(const std::vector<LayoutCardConfig>& left, const std::vector<LayoutCardConfig>& right) {
@@ -83,56 +77,6 @@ DWRITE_PARAGRAPH_ALIGNMENT DWriteParagraphAlignment(const TextLayoutOptions& opt
         default:
             return DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
     }
-}
-
-std::string FormatWin32Error(DWORD error) {
-    if (error == 0) {
-        return "win32=0";
-    }
-    LPWSTR buffer = nullptr;
-    const DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-    const DWORD length = FormatMessageW(flags, nullptr, error, 0, reinterpret_cast<LPWSTR>(&buffer), 0, nullptr);
-    std::string message = "win32=" + std::to_string(error);
-    if (length != 0 && buffer != nullptr) {
-        message += " ";
-        message += Utf8FromWide(std::wstring(buffer, length));
-        while (!message.empty() && (message.back() == '\r' || message.back() == '\n' || message.back() == ' ')) {
-            message.pop_back();
-        }
-    }
-    if (buffer != nullptr) {
-        LocalFree(buffer);
-    }
-    return message;
-}
-
-std::string EscapeTraceText(std::string_view text) {
-    std::string escaped;
-    escaped.reserve(text.size());
-    for (const char ch : text) {
-        switch (ch) {
-            case '\\':
-                escaped += "\\\\";
-                break;
-            case '"':
-                escaped += "\\\"";
-                break;
-            case '\r':
-                escaped += "\\r";
-                break;
-            case '\n':
-                escaped += "\\n";
-                break;
-            default:
-                escaped.push_back(ch);
-                break;
-        }
-    }
-    return escaped;
-}
-
-std::string QuoteTraceText(std::string_view text) {
-    return "\"" + EscapeTraceText(text) + "\"";
 }
 
 std::string FormatTraceRect(const RenderRect& rect) {
@@ -228,23 +172,6 @@ std::string FormatAnchorSubject(const AppConfig& config, const LayoutEditAnchorK
         return "metric list order " + FormatLayoutConfigPath(config, order->editCardId, order->nodePath);
     }
     return "unknown anchor subject";
-}
-
-std::string Trim(std::string value) {
-    const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
-    const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
-    if (first == value.end()) {
-        return {};
-    }
-    const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
-    return std::string(first, last);
-}
-
-std::string ToLowerAscii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
-        return static_cast<char>(std::tolower(ch));
-    });
-    return value;
 }
 
 bool FontConfigEquals(const UiFontConfig& left, const UiFontConfig& right) {
@@ -2091,7 +2018,7 @@ bool DashboardRenderer::SaveSnapshotPng(
     const UINT height = static_cast<UINT>(std::max(1, WindowHeight()));
     HRESULT hr = wicFactory_->CreateBitmap(width, height, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
     if (FAILED(hr) || bitmap == nullptr) {
-        lastError_ = "renderer:screenshot_wic_bitmap_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_wic_bitmap_failed hr=" + FormatHresult(hr);
         return false;
     }
 
@@ -2103,7 +2030,7 @@ bool DashboardRenderer::SaveSnapshotPng(
             96.0f),
         bitmapRenderTarget.GetAddressOf());
     if (FAILED(hr) || bitmapRenderTarget == nullptr) {
-        lastError_ = "renderer:screenshot_d2d_target_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_d2d_target_failed hr=" + FormatHresult(hr);
         return false;
     }
 
@@ -2134,7 +2061,7 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
     const UINT height = static_cast<UINT>(std::max(1, WindowHeight()));
     HRESULT hr = wicFactory_->CreateBitmap(width, height, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
     if (FAILED(hr) || bitmap == nullptr) {
-        lastError_ = "renderer:hover_wic_bitmap_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:hover_wic_bitmap_failed hr=" + FormatHresult(hr);
         return false;
     }
 
@@ -2146,7 +2073,7 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
             96.0f),
         bitmapRenderTarget.GetAddressOf());
     if (FAILED(hr) || bitmapRenderTarget == nullptr) {
-        lastError_ = "renderer:hover_d2d_target_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:hover_d2d_target_failed hr=" + FormatHresult(hr);
         return false;
     }
 
@@ -2171,8 +2098,8 @@ void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const DashboardOverlay
             }
             ++count;
             WriteTrace("diagnostics:active_region box=" + FormatTraceRect(box) +
-                       " visual_type=" + QuoteTraceText(visualType) + " path=" + QuoteTraceText(path) +
-                       " detail=" + QuoteTraceText(detail));
+                       " visual_type=" + tracing::Trace::QuoteText(visualType) +
+                       " path=" + tracing::Trace::QuoteText(path) + " detail=" + tracing::Trace::QuoteText(detail));
         };
 
     if (overlayState.showLayoutEditGuides) {
@@ -2257,13 +2184,13 @@ bool DashboardRenderer::SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesyst
     Microsoft::WRL::ComPtr<IWICStream> stream;
     HRESULT hr = wicFactory_->CreateStream(stream.GetAddressOf());
     if (FAILED(hr) || stream == nullptr) {
-        lastError_ = "renderer:screenshot_stream_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_stream_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     hr = stream->InitializeFromFilename(imagePath.c_str(), GENERIC_WRITE);
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_stream_open_failed hr=0x" + FormatHresult(hr) + " path=\"" +
+        lastError_ = "renderer:screenshot_stream_open_failed hr=" + FormatHresult(hr) + " path=\"" +
                      Utf8FromWide(imagePath.wstring()) + "\"";
         return false;
     }
@@ -2271,26 +2198,26 @@ bool DashboardRenderer::SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesyst
     Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
     hr = wicFactory_->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.GetAddressOf());
     if (FAILED(hr) || encoder == nullptr) {
-        lastError_ = "renderer:screenshot_encoder_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_encoder_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_encoder_init_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_encoder_init_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
     hr = encoder->CreateNewFrame(frame.GetAddressOf(), nullptr);
     if (FAILED(hr) || frame == nullptr) {
-        lastError_ = "renderer:screenshot_frame_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_frame_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     hr = frame->Initialize(nullptr);
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_frame_init_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_frame_init_failed hr=" + FormatHresult(hr);
         return false;
     }
 
@@ -2298,38 +2225,38 @@ bool DashboardRenderer::SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesyst
     UINT height = 0;
     hr = bitmap->GetSize(&width, &height);
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_bitmap_size_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_bitmap_size_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     hr = frame->SetSize(width, height);
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_frame_size_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_frame_size_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat32bppPBGRA;
     hr = frame->SetPixelFormat(&pixelFormat);
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_frame_format_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_frame_format_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     hr = frame->WriteSource(bitmap, nullptr);
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_frame_write_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_frame_write_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     hr = frame->Commit();
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_frame_commit_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_frame_commit_failed hr=" + FormatHresult(hr);
         return false;
     }
 
     hr = encoder->Commit();
     if (FAILED(hr)) {
-        lastError_ = "renderer:screenshot_commit_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:screenshot_commit_failed hr=" + FormatHresult(hr);
         return false;
     }
 
@@ -2637,7 +2564,7 @@ std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(const La
 
 std::optional<LayoutEditWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
     const std::string& widgetTypeName) const {
-    const std::string normalizedName = ToLowerAscii(Trim(widgetTypeName));
+    const std::string normalizedName = ToLower(Trim(widgetTypeName));
     const auto widgetClass =
         normalizedName.empty() ? std::nullopt : EnumFromString<DashboardWidgetClass>(normalizedName);
     if (!widgetClass.has_value()) {
@@ -2715,7 +2642,7 @@ bool DashboardRenderer::InitializeDirect2D() {
     if (d2dFactory_ == nullptr) {
         const HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, d2dFactory_.ReleaseAndGetAddressOf());
         if (FAILED(hr) || d2dFactory_ == nullptr) {
-            lastError_ = "renderer:d2d_factory_failed hr=0x" + FormatHresult(hr);
+            lastError_ = "renderer:d2d_factory_failed hr=" + FormatHresult(hr);
             return false;
         }
     }
@@ -2724,7 +2651,7 @@ bool DashboardRenderer::InitializeDirect2D() {
             __uuidof(IDWriteFactory),
             reinterpret_cast<IUnknown**>(dwriteFactory_.ReleaseAndGetAddressOf()));
         if (FAILED(hr) || dwriteFactory_ == nullptr) {
-            lastError_ = "renderer:dwrite_factory_failed hr=0x" + FormatHresult(hr);
+            lastError_ = "renderer:dwrite_factory_failed hr=" + FormatHresult(hr);
             return false;
         }
     }
@@ -2754,7 +2681,7 @@ bool DashboardRenderer::InitializeWic() {
 
     const HRESULT initHr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(initHr) && initHr != RPC_E_CHANGED_MODE) {
-        lastError_ = "renderer:wic_com_init_failed hr=0x" + FormatHresult(initHr);
+        lastError_ = "renderer:wic_com_init_failed hr=" + FormatHresult(initHr);
         return false;
     }
     wicComInitialized_ = initHr == S_OK || initHr == S_FALSE;
@@ -2762,7 +2689,7 @@ bool DashboardRenderer::InitializeWic() {
     const HRESULT hr = CoCreateInstance(
         CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(wicFactory_.ReleaseAndGetAddressOf()));
     if (FAILED(hr) || wicFactory_ == nullptr) {
-        lastError_ = "renderer:wic_factory_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:wic_factory_failed hr=" + FormatHresult(hr);
         if (wicComInitialized_) {
             CoUninitialize();
             wicComInitialized_ = false;
@@ -2806,7 +2733,7 @@ bool DashboardRenderer::EnsureWindowRenderTarget() {
             D2D1::HwndRenderTargetProperties(hwnd_, D2D1::SizeU(width, height), presentOptions),
             d2dWindowRenderTarget_.ReleaseAndGetAddressOf());
         if (FAILED(hr) || d2dWindowRenderTarget_ == nullptr) {
-            lastError_ = "renderer:d2d_hwnd_target_failed hr=0x" + FormatHresult(hr);
+            lastError_ = "renderer:d2d_hwnd_target_failed hr=" + FormatHresult(hr);
             return false;
         }
         d2dCache_->ResetTarget();
@@ -2872,7 +2799,7 @@ void DashboardRenderer::EndDirect2DDraw() {
         if (activeWindowTarget) {
             DiscardWindowRenderTarget("end_draw_failed");
         }
-        lastError_ = "renderer:d2d_end_draw_failed hr=0x" + FormatHresult(hr);
+        lastError_ = "renderer:d2d_end_draw_failed hr=" + FormatHresult(hr);
     }
 }
 
