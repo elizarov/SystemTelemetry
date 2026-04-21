@@ -2227,6 +2227,41 @@ bool DashboardRenderer::SaveSnapshotPng(
     return saved;
 }
 
+bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
+    const SystemSnapshot& snapshot, const EditOverlayState& overlayState) {
+    if (!InitializeDirect2D()) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+    const UINT width = static_cast<UINT>(std::max(1, WindowWidth()));
+    const UINT height = static_cast<UINT>(std::max(1, WindowHeight()));
+    HRESULT hr = wicFactory_->CreateBitmap(width, height, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
+    if (FAILED(hr) || bitmap == nullptr) {
+        lastError_ = "renderer:hover_wic_bitmap_failed hr=0x" + FormatHresult(hr);
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1RenderTarget> bitmapRenderTarget;
+    hr = d2dFactory_->CreateWicBitmapRenderTarget(bitmap.Get(),
+        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+            96.0f,
+            96.0f),
+        bitmapRenderTarget.GetAddressOf());
+    if (FAILED(hr) || bitmapRenderTarget == nullptr) {
+        lastError_ = "renderer:hover_d2d_target_failed hr=0x" + FormatHresult(hr);
+        return false;
+    }
+
+    if (!BeginDirect2DDraw(bitmapRenderTarget.Get(), false)) {
+        return false;
+    }
+    DrawDirect2DFrame(snapshot, overlayState);
+    EndDirect2DDraw();
+    return lastError_.empty();
+}
+
 void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const EditOverlayState& overlayState) const {
     if (traceOutput_ == nullptr) {
         return;

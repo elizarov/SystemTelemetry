@@ -144,6 +144,7 @@ public:
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
     bool SaveSnapshotPng(
         const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
+    bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const EditOverlayState& overlayState);
     void DiscardWindowRenderTarget(std::string_view reason = {});
     const std::string& LastError() const;
     const AppConfig& Config() const;

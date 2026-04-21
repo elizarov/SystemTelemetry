@@ -31,6 +31,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     bool showLayoutEditGuides,
     DashboardRenderer::SimilarityIndicatorMode similarityIndicatorMode,
     const std::string& editLayoutWidgetName,
+    std::optional<RenderPoint> hoverPoint = std::nullopt,
     std::ostream* traceStream = nullptr,
     std::string* errorText = nullptr);
 

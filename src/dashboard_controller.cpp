@@ -272,6 +272,10 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
             state_.isEditingLayout || diagnosticsOptions.editLayout,
             GetSimilarityIndicatorMode(diagnosticsOptions),
             diagnosticsOptions.editLayoutWidgetName,
+            diagnosticsOptions.hoverPoint.has_value()
+                ? std::optional<RenderPoint>(
+                      RenderPoint{diagnosticsOptions.hoverPoint->x, diagnosticsOptions.hoverPoint->y})
+                : std::nullopt,
             state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr,
             &errorText)) {
         std::string message = "Failed to save screenshot:\n" + Utf8FromWide(path->wstring());

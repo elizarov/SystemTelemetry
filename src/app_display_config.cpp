@@ -112,6 +112,7 @@ bool ConfigureDisplay(
             false,
             DashboardRenderer::SimilarityIndicatorMode::ActiveGuide,
             std::string{},
+            std::nullopt,
             traceStream,
             &screenshotError);
         return imageSaved && SaveConfig(configPath, config) && ApplyConfiguredWallpaper(config, traceStream);
@@ -219,6 +220,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         false,
         DashboardRenderer::SimilarityIndicatorMode::ActiveGuide,
         std::string{},
+        std::nullopt,
         nullptr,
         &screenshotError);
     const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config);

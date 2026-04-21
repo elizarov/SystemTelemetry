@@ -47,7 +47,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Layout editing
 
 - `LayoutEditController` owns hover state, active drags, hit-testing, capture, cursor choice, and drag-session flow.
-- Layout-edit parameter metadata and helpers centralize editable target identity, config-path mapping, clamps, tooltip formatting, and preview application.
+- Layout-edit parameter metadata and helpers centralize editable target identity, config-path mapping, clamps, shared tooltip text, and preview application.
 - `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/`.
 - The renderer exposes the resolved guide and anchor geometry used both by live interaction and by diagnostics screenshot validation.
 
@@ -55,7 +55,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - The diagnostics subsystem parses diagnostics CLI switches, manages headless `/exit` runs, owns requested output exports, and creates the top-level trace session when trace is enabled.
 - Snapshot dumps and fake-runtime imports share the same dump serializer and parser.
-- Diagnostics screenshot export uses the same renderer scene as the live window path instead of a separate rendering implementation.
+- Diagnostics screenshot export uses the same renderer scene, layout-edit hover resolver, and tooltip text builder as the live window path instead of a separate rendering implementation.
 
 ## Runtime Flows
 

@@ -1,12 +1,18 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 
 enum class DiagnosticsLayoutSimilarityMode {
     None,
     HorizontalSizes,
     VerticalSizes,
+};
+
+struct DiagnosticsHoverPoint {
+    int x = 0;
+    int y = 0;
 };
 
 struct DiagnosticsOptions {
@@ -22,6 +28,7 @@ struct DiagnosticsOptions {
     bool saveConfig = false;
     bool saveFullConfig = false;
     bool hasScaleOverride = false;
+    std::optional<DiagnosticsHoverPoint> hoverPoint;
     DiagnosticsLayoutSimilarityMode layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::None;
     double scale = 1.0;
     std::string layoutName;

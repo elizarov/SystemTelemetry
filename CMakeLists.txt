@@ -94,6 +94,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_tree.cpp
     src/layout_edit_parameter.cpp
     src/layout_edit_tooltip.cpp
+    src/layout_edit_tooltip_text.cpp
     src/layout_edit_service.cpp
     src/config.cpp
     src/config_parser.cpp

@@ -28,6 +28,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - `/edit-layout:<widget-name>` forces one visible widget of that type into its hover-equivalent layout-edit guide state for screenshot validation.
 - `/edit-layout:horizonatal-sizes` renders every visible horizontal size ruler and numbering group.
 - `/edit-layout:vertical-sizes` renders every visible vertical size ruler and numbering group.
+- `/hover:<x>,<y>` applies a layout-edit hover point in dashboard client coordinates during screenshot exports and enables layout-edit hover affordances for that export.
 
 ### Control flow
 
@@ -58,6 +59,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - `/fake:<path>` reloads the selected fake file once per second while the process runs so manual edits affect the next refresh.
 - Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior.
 - When `/trace` and `/screenshot` are both enabled, each screenshot export writes `diagnostics:active_region` trace lines for layout-edit mouse-reactive dashboard regions that are present in the exported frame. Each line includes the client-coordinate box, visual type, config or layout path, and a short detail string; a `diagnostics:active_regions` summary records the exported count.
+- When `/hover:<x>,<y>` is active during a traced screenshot export, the trace writes one `diagnostics:hover` line with the hover point, resolved target kind, and tooltip text that the live layout-edit UI would show. If no hover target resolves, the line reports `target="none"`.
 - Live layout-edit tooltips use a separate Win32 tooltip window and therefore do not appear in diagnostics screenshots.
 
 ## Failure And Trace Policy
@@ -89,6 +91,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - Build first through `build.cmd`.
 - Include `/trace` during diagnostics validation and inspect trace output even when the main change affects dump or screenshot behavior.
 - For layout-edit screenshot diagnostics, inspect `diagnostics:active_region` lines to verify mouse-reactive region geometry and layout paths.
+- For headless hover validation, add `/hover:<x>,<y>` to the traced screenshot command and inspect the `diagnostics:hover` tooltip text.
 - When validation is meant to exercise the built-in config, add `/default-config`.
 - Put explicit diagnostics paths under `build\` so repository files stay clean.
 
@@ -102,6 +105,7 @@ Recommended checks:
 - One headless run with explicit output filenames for trace, dump, and screenshot
 - One headless `/trace /default-config /layout:<name> /screenshot /exit`
 - One headless `/trace /default-config /edit-layout /screenshot /exit`
+- One headless `/trace /default-config /edit-layout /hover:<x>,<y> /screenshot /exit`
 - One headless `/trace /default-config /edit-layout:<widget-name> /screenshot /exit` for each widget class whose edit chrome changed
 - One headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit`
 - One headless `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit`
