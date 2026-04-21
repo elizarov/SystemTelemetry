@@ -13,7 +13,7 @@
 
 #include "config/config.h"
 #include "dashboard_widget_class.h"
-#include "render_types.h"
+#include "dashboard_renderer/render_types.h"
 
 class DashboardMetricSource;
 class DashboardRenderer;

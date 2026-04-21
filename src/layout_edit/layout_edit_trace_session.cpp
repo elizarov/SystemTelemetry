@@ -3,7 +3,7 @@
 #include <iomanip>
 #include <sstream>
 
-#include "trace.h"
+#include "util/trace.h"
 
 namespace {
 

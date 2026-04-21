@@ -6,7 +6,7 @@
 
 #include "dashboard_metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
-#include "numeric_safety.h"
+#include "util/numeric_safety.h"
 
 struct GaugeSharedLayout {
     int radius = 0;

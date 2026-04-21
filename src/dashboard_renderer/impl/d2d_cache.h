@@ -11,7 +11,7 @@
 #include <wrl/client.h>
 
 #include "dashboard_renderer/impl/palette.h"
-#include "render_types.h"
+#include "dashboard_renderer/render_types.h"
 
 class DashboardD2DCache {
 public:

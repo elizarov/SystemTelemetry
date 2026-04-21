@@ -1,6 +1,6 @@
-﻿#include "gpu_vendor.h"
+#include "gpu_vendor.h"
 
-#include "trace.h"
+#include "util/trace.h"
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateAmdGpuTelemetryProvider(tracing::Trace* trace);
 

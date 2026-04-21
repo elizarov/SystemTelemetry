@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <vector>
 
-#include "numeric_safety.h"
+#include "util/numeric_safety.h"
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/collector_storage_selection.h"
 #include "telemetry/impl/collector_support.h"

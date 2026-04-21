@@ -11,7 +11,7 @@
 #include "snapshot_dump.h"
 #include "telemetry/impl/retained_history.h"
 #include "telemetry/impl/collector_storage_selection.h"
-#include "trace.h"
+#include "util/trace.h"
 #include "util/utf8.h"
 
 namespace {

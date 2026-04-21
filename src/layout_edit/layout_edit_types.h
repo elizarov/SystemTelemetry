@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "layout_edit/layout_edit_parameter.h"
-#include "render_types.h"
+#include "dashboard_renderer/render_types.h"
 #include "widget/widget.h"
 
 enum class LayoutGuideAxis {

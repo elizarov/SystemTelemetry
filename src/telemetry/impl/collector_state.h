@@ -21,7 +21,7 @@
 #include "gpu_vendor.h"
 #include "telemetry/telemetry.h"
 #include "telemetry/impl/retained_history.h"
-#include "trace.h"
+#include "util/trace.h"
 
 struct DriveCounterState {
     std::string label;

@@ -1,6 +1,6 @@
 #include "board_vendor.h"
 
-#include "trace.h"
+#include "util/trace.h"
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(tracing::Trace* trace);
 

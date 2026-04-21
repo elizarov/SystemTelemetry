@@ -20,7 +20,7 @@
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "diagnostics_options.h"
 #include "snapshot_dump.h"
-#include "trace.h"
+#include "util/trace.h"
 #include "util/utf8.h"
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath,

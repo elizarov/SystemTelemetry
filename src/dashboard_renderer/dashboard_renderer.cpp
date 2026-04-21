@@ -27,8 +27,8 @@
 
 #include "util/strings.h"
 #include "resource.h"
-#include "numeric_safety.h"
-#include "trace.h"
+#include "util/numeric_safety.h"
+#include "util/trace.h"
 #include "util/utf8.h"
 
 namespace {

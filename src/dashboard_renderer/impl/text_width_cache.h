@@ -7,7 +7,7 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "render_types.h"
+#include "dashboard_renderer/render_types.h"
 
 class DashboardTextWidthCache {
 public:

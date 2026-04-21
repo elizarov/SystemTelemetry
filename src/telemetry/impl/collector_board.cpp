@@ -1,7 +1,7 @@
 #include "telemetry/impl/collector_board.h"
 
 #include "board_vendor.h"
-#include "numeric_safety.h"
+#include "util/numeric_safety.h"
 #include "system_info_support.h"
 #include "telemetry/impl/collector_state.h"
 

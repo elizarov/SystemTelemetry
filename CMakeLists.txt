@@ -102,7 +102,7 @@ add_executable(SystemTelemetry WIN32
     src/config/config_resolution.cpp
     src/localization_catalog.cpp
     src/layout_edit/layout_snap_solver.cpp
-    src/numeric_safety.cpp
+    src/util/numeric_safety.cpp
     src/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector_state.cpp
@@ -122,7 +122,7 @@ add_executable(SystemTelemetry WIN32
     src/board_vendor.cpp
     src/dashboard_metrics.cpp
     src/dashboard_overlay_state.cpp
-    src/render_types.cpp
+    src/dashboard_renderer/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
     src/dashboard_renderer/impl/palette.cpp
     src/dashboard_renderer/impl/text_width_cache.cpp
@@ -140,7 +140,7 @@ add_executable(SystemTelemetry WIN32
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/utf8.cpp
-    src/trace.cpp
+    src/util/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
 )
@@ -279,10 +279,10 @@ add_executable(SystemTelemetryTests
     src/layout_edit/layout_edit_tooltip.cpp
     src/localization_catalog.cpp
     src/layout_edit/layout_snap_solver.cpp
-    src/numeric_safety.cpp
+    src/util/numeric_safety.cpp
     src/system_info_support.cpp
     src/dashboard_metrics.cpp
-    src/render_types.cpp
+    src/dashboard_renderer/render_types.cpp
     src/snapshot_dump.cpp
     src/telemetry/impl/retained_history.cpp
     src/util/utf8.cpp
@@ -355,10 +355,10 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_edit/layout_edit_trace_session.cpp
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_snap_solver.cpp
-    src/numeric_safety.cpp
+    src/util/numeric_safety.cpp
     src/dashboard_metrics.cpp
     src/dashboard_overlay_state.cpp
-    src/render_types.cpp
+    src/dashboard_renderer/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
     src/dashboard_renderer/impl/palette.cpp
     src/dashboard_renderer/impl/text_width_cache.cpp
@@ -376,7 +376,7 @@ add_executable(SystemTelemetryBenchmarks
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/utf8.cpp
-    src/trace.cpp
+    src/util/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
 )

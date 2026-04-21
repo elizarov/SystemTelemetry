@@ -1,6 +1,6 @@
 #include "telemetry/impl/retained_history.h"
 
-#include "numeric_safety.h"
+#include "util/numeric_safety.h"
 
 namespace {
 

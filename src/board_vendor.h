@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "metric_types.h"
+#include "telemetry/metric_types.h"
 #include "telemetry_settings.h"
 
 namespace tracing {

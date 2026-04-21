@@ -6,7 +6,7 @@
 #include "vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.h"
 #include "vendor/adlx/SDK/Include/IPerformanceMonitoring.h"
 #include "gpu_vendor.h"
-#include "trace.h"
+#include "util/trace.h"
 #include "util/utf8.h"
 
 namespace {

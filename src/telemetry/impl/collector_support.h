@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include "metric_types.h"
+#include "telemetry/metric_types.h"
 
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, const wchar_t* path, PDH_HCOUNTER* counter);
 std::string DetectCpuName();

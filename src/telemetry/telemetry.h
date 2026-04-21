@@ -13,7 +13,7 @@
 #include "board_vendor.h"
 #include "diagnostics_options.h"
 #include "gpu_vendor.h"
-#include "metric_types.h"
+#include "telemetry/metric_types.h"
 #include "telemetry_settings.h"
 
 struct MemoryMetric {

@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "metric_types.h"
+#include "telemetry/metric_types.h"
 
 std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(
     const std::vector<std::string>& names, ScalarMetricUnit unit);

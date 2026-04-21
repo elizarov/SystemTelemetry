@@ -1,6 +1,6 @@
 #include "telemetry/impl/collector_cpu.h"
 
-#include "numeric_safety.h"
+#include "util/numeric_safety.h"
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/collector_support.h"
 

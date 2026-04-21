@@ -23,7 +23,7 @@
 #include "util/strings.h"
 #include "board_vendor.h"
 #include "system_info_support.h"
-#include "trace.h"
+#include "util/trace.h"
 #include "util/utf8.h"
 
 using namespace System;

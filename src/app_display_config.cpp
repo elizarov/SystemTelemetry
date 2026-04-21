@@ -12,7 +12,7 @@
 #include "util/strings.h"
 #include "config/config_parser.h"
 #include "config/config_writer.h"
-#include "trace.h"
+#include "util/trace.h"
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) {
     const tracing::Trace trace(traceStream);
