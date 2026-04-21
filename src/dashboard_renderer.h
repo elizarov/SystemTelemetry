@@ -89,6 +89,22 @@ public:
         RenderRect textRect{};
     };
 
+    struct Palette {
+        RenderColor background{};
+        RenderColor foreground{};
+        RenderColor icon{};
+        RenderColor accent{};
+        RenderColor mutedText{};
+        RenderColor track{};
+        RenderColor layoutGuide{};
+        RenderColor activeEdit{};
+        RenderColor panelBorder{};
+        RenderColor panelFill{};
+        RenderColor graphBackground{};
+        RenderColor graphMarker{};
+        RenderColor graphAxis{};
+    };
+
     DashboardRenderer();
     ~DashboardRenderer();
 
@@ -103,18 +119,7 @@ public:
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
-
-    RenderColor BackgroundColor() const;
-    RenderColor ForegroundColor() const;
-    RenderColor IconColor() const;
-    RenderColor AccentColor() const;
-    RenderColor LayoutGuideColor() const;
-    RenderColor ActiveEditColor() const;
-    RenderColor MutedTextColor() const;
-    RenderColor TrackColor() const;
-    RenderColor GraphBackgroundColor() const;
-    RenderColor GraphMarkerColor() const;
-    RenderColor GraphAxisColor() const;
+    const Palette& ColorPalette() const;
     void SetTraceOutput(std::ostream* traceOutput);
     const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
     const std::vector<LayoutEditWidgetGuide>& WidgetEditGuides() const;
@@ -366,22 +371,6 @@ private:
         size_t operator()(const D2DBrushCacheKey& key) const {
             return std::hash<std::uint32_t>{}(key.color.PackedRgba());
         }
-    };
-
-    struct Palette {
-        RenderColor background{};
-        RenderColor foreground{};
-        RenderColor icon{};
-        RenderColor accent{};
-        RenderColor mutedText{};
-        RenderColor track{};
-        RenderColor layoutGuide{};
-        RenderColor activeEdit{};
-        RenderColor panelBorder{};
-        RenderColor panelFill{};
-        RenderColor graphBackground{};
-        RenderColor graphMarker{};
-        RenderColor graphAxis{};
     };
 
     void ClearD2DCaches();

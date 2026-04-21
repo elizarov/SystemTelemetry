@@ -54,7 +54,7 @@ void DrawGraph(DashboardRenderer& renderer,
     double timeMarkerOffsetSamples,
     double timeMarkerIntervalSamples,
     const std::optional<LayoutEditAnchorBinding>& maxLabelEditable) {
-    renderer.FillSolidRect(rect, renderer.GraphBackgroundColor());
+    renderer.FillSolidRect(rect, renderer.ColorPalette().graphBackground);
     maxValue = FiniteNonNegativeOr(maxValue, 10.0);
     if (maxValue <= 0.0) {
         maxValue = 10.0;
@@ -63,7 +63,7 @@ void DrawGraph(DashboardRenderer& renderer,
     const double markerOffset = FiniteNonNegativeOr(timeMarkerOffsetSamples);
     const double markerInterval =
         IsFiniteDouble(timeMarkerIntervalSamples) && timeMarkerIntervalSamples > 0.0 ? timeMarkerIntervalSamples : 20.0;
-    const RenderColor markerColor = renderer.GraphMarkerColor();
+    const RenderColor markerColor = renderer.ColorPalette().graphMarker;
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
         const double ratio = ClampFinite(tick / maxValue, 0.0, 1.0);
         const int centerY = layout.graphBottom - static_cast<int>(std::round(ratio * layout.plotHeight));
@@ -90,7 +90,7 @@ void DrawGraph(DashboardRenderer& renderer,
         }
     }
 
-    const RenderColor axisColor = renderer.GraphAxisColor();
+    const RenderColor axisColor = renderer.ColorPalette().graphAxis;
     const int verticalAxisCenterX = rect.left + layout.axisWidth;
     const int verticalAxisLeft = verticalAxisCenterX - (layout.guideStrokeWidth / 2);
     const int horizontalAxisCenterY = rect.bottom - 1;
@@ -111,7 +111,7 @@ void DrawGraph(DashboardRenderer& renderer,
         const DashboardRenderer::TextLayoutResult maxLabelLayout = renderer.DrawTextBlock(maxRect,
             maxLabel,
             TextStyleId::Small,
-            renderer.MutedTextColor(),
+            renderer.ColorPalette().mutedText,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
         if (maxLabelEditable.has_value()) {
             renderer.RegisterDynamicTextAnchor(
@@ -123,7 +123,7 @@ void DrawGraph(DashboardRenderer& renderer,
         return;
     }
 
-    const RenderColor plotColor = renderer.AccentColor();
+    const RenderColor plotColor = renderer.ColorPalette().accent;
     const size_t historyDenominator = std::max<size_t>(1, history.size() - 1);
     std::vector<RenderPoint> plotPoints;
     plotPoints.reserve(history.size());
@@ -204,7 +204,7 @@ void ThroughputWidget::Draw(
     renderer.DrawText(layoutState_.valueRect,
         metric.label,
         TextStyleId::Small,
-        renderer.MutedTextColor(),
+        renderer.ColorPalette().mutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
     const int labelWidth = renderer.MeasureTextWidth(TextStyleId::Small, metric.label);
     renderer.RegisterDynamicColorEditRegion(
@@ -219,7 +219,7 @@ void ThroughputWidget::Draw(
         const DashboardRenderer::TextLayoutResult numberLayout = renderer.DrawTextBlock(numberRect,
             metric.valueText,
             TextStyleId::Small,
-            renderer.ForegroundColor(),
+            renderer.ColorPalette().foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
         renderer.RegisterDynamicTextAnchor(numberLayout,
             renderer.MakeEditableTextBinding(widget,

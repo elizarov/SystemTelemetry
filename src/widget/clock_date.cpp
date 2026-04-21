@@ -31,7 +31,7 @@ void ClockDateWidget::Draw(
     const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         TextStyleId::ClockDate,
-        renderer.MutedTextColor(),
+        renderer.ColorPalette().mutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(widget,

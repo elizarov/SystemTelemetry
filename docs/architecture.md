@@ -41,6 +41,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `DashboardRenderer` owns static layout resolution, renderer resource lifetime, icon loading, text measurement, live window rendering, and screenshot export rendering.
 - Shared render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
+- The renderer exposes its resolved color palette as one renderer-owned palette object used by widget draw modules.
 - Widget modules own widget-local preferred-size logic, draw behavior, and layout-edit artifact registration.
 - `DashboardMetricSource` adapts `SystemSnapshot` into widget-facing values, histories, drive rows, and formatted text while caching per-frame derived results.
 

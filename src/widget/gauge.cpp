@@ -268,7 +268,7 @@ void GaugeWidget::Draw(
                   gaugeLayout.segmentCount - 1);
 
     if (layoutState_.d2dTrackPath != nullptr) {
-        renderer.FillD2DGeometry(layoutState_.d2dTrackPath.Get(), renderer.TrackColor());
+        renderer.FillD2DGeometry(layoutState_.d2dTrackPath.Get(), renderer.ColorPalette().track);
     }
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && filledSegments > 0) {
         if (layoutState_.cachedUsageSegmentCount != filledSegments || layoutState_.d2dCachedUsagePath == nullptr) {
@@ -277,21 +277,21 @@ void GaugeWidget::Draw(
             layoutState_.cachedUsageSegmentCount = filledSegments;
         }
         if (layoutState_.d2dCachedUsagePath != nullptr) {
-            renderer.FillD2DGeometry(layoutState_.d2dCachedUsagePath.Get(), renderer.AccentColor());
+            renderer.FillD2DGeometry(layoutState_.d2dCachedUsagePath.Get(), renderer.ColorPalette().accent);
         }
     }
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank && peakSegment >= 0 &&
         static_cast<size_t>(peakSegment) < layoutState_.d2dSegmentPaths.size() &&
         layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)] != nullptr) {
-        renderer.FillD2DGeometry(
-            layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)].Get(), renderer.AccentColor().WithAlpha(96));
+        renderer.FillD2DGeometry(layoutState_.d2dSegmentPaths[static_cast<size_t>(peakSegment)].Get(),
+            renderer.ColorPalette().accent.WithAlpha(96));
     }
 
     if (renderer.CurrentRenderMode() != DashboardRenderer::RenderMode::Blank) {
         const DashboardRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(layoutState_.valueRect,
             metric.valueText,
             TextStyleId::Big,
-            renderer.ForegroundColor(),
+            renderer.ColorPalette().foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
         renderer.RegisterDynamicTextAnchor(valueLayout,
             renderer.MakeEditableTextBinding(
@@ -310,7 +310,7 @@ void GaugeWidget::Draw(
     renderer.DrawText(layoutState_.labelRect,
         metric.label,
         TextStyleId::Small,
-        renderer.MutedTextColor(),
+        renderer.ColorPalette().mutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
 }
 

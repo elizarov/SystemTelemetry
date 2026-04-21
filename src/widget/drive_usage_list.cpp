@@ -289,22 +289,22 @@ void DriveUsageListWidget::Draw(
     renderer.DrawText(layoutState_.headerReadLabelRect,
         readLabel,
         TextStyleId::Small,
-        renderer.MutedTextColor(),
+        renderer.ColorPalette().mutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false));
     renderer.DrawText(layoutState_.headerWriteLabelRect,
         writeLabel,
         TextStyleId::Small,
-        renderer.MutedTextColor(),
+        renderer.ColorPalette().mutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false));
     renderer.DrawText(layoutState_.usageHeaderRect,
         usageLabel,
         TextStyleId::Small,
-        renderer.MutedTextColor(),
+        renderer.ColorPalette().mutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
     renderer.DrawText(layoutState_.headerColumns.free,
         freeLabel,
         TextStyleId::Small,
-        renderer.MutedTextColor(),
+        renderer.ColorPalette().mutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
 
     const auto rows = metrics.ResolveDriveRows();
@@ -319,7 +319,7 @@ void DriveUsageListWidget::Draw(
         const DashboardRenderer::TextLayoutResult labelLayout = renderer.DrawTextBlock(columns.label,
             drive.label,
             TextStyleId::Label,
-            renderer.ForegroundColor(),
+            renderer.ColorPalette().foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
         renderer.RegisterDynamicTextAnchor(labelLayout,
             renderer.MakeEditableTextBinding(widget,
@@ -332,15 +332,15 @@ void DriveUsageListWidget::Draw(
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
             renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank ? 0.0 : drive.readActivity,
-            renderer.TrackColor(),
-            renderer.AccentColor());
+            renderer.ColorPalette().track,
+            renderer.ColorPalette().accent);
         DrawSegmentIndicator(renderer,
             writeIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
             renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank ? 0.0 : drive.writeActivity,
-            renderer.TrackColor(),
-            renderer.AccentColor());
+            renderer.ColorPalette().track,
+            renderer.ColorPalette().accent);
         renderer.DrawPillBar(barRect,
             drive.usedPercent / 100.0,
             std::nullopt,
@@ -354,7 +354,7 @@ void DriveUsageListWidget::Draw(
             const DashboardRenderer::TextLayoutResult percentLayout = renderer.DrawTextBlock(columns.percent,
                 drive.usedText,
                 TextStyleId::Label,
-                renderer.ForegroundColor(),
+                renderer.ColorPalette().foreground,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
             renderer.RegisterDynamicTextAnchor(percentLayout,
                 renderer.MakeEditableTextBinding(widget,
@@ -367,7 +367,7 @@ void DriveUsageListWidget::Draw(
             const DashboardRenderer::TextLayoutResult freeLayout = renderer.DrawTextBlock(columns.free,
                 drive.freeText,
                 TextStyleId::Small,
-                renderer.MutedTextColor(),
+                renderer.ColorPalette().mutedText,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
             renderer.RegisterDynamicTextAnchor(freeLayout,
                 renderer.MakeEditableTextBinding(widget,

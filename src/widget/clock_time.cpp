@@ -31,7 +31,7 @@ void ClockTimeWidget::Draw(
     const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         TextStyleId::ClockTime,
-        renderer.ForegroundColor(),
+        renderer.ColorPalette().foreground,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(widget,
