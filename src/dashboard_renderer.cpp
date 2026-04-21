@@ -1,4 +1,5 @@
 #include "dashboard_renderer.h"
+#include "dashboard_renderer/d2d_cache.h"
 #include "dashboard_renderer/layout_resolver.h"
 #include "dashboard_renderer/palette.h"
 #include "layout_edit_service.h"
@@ -488,7 +489,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
 
 DashboardRenderer::DashboardRenderer()
     : palette_(std::make_unique<DashboardPalette>(config_.layout.colors)),
-      layoutResolver_(std::make_unique<DashboardLayoutResolver>()) {}
+      layoutResolver_(std::make_unique<DashboardLayoutResolver>()), d2dCache_(std::make_unique<DashboardD2DCache>()) {}
 
 DashboardRenderer::~DashboardRenderer() {
     Shutdown();
@@ -1946,51 +1947,7 @@ void DashboardRenderer::DrawMoveOverlay(const MoveOverlayState& overlayState) {
 }
 
 void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect) {
-    const auto it = std::find_if(
-        panelIcons_.begin(), panelIcons_.end(), [&](const auto& entry) { return entry.first == iconName; });
-    if (it == panelIcons_.end() || it->second == nullptr || d2dActiveRenderTarget_ == nullptr) {
-        return;
-    }
-    const int width = std::max(0, static_cast<int>(iconRect.right - iconRect.left));
-    const int height = std::max(0, static_cast<int>(iconRect.bottom - iconRect.top));
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-
-    const PanelIconCacheKey cacheKey{iconName, width, height};
-    auto scaled = d2dPanelIconCache_.find(cacheKey);
-    if (scaled == d2dPanelIconCache_.end()) {
-        if (wicFactory_ == nullptr) {
-            return;
-        }
-
-        Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
-        HRESULT hr = wicFactory_->CreateBitmapScaler(scaler.GetAddressOf());
-        if (FAILED(hr) || scaler == nullptr) {
-            return;
-        }
-
-        hr = scaler->Initialize(
-            it->second.Get(), static_cast<UINT>(width), static_cast<UINT>(height), WICBitmapInterpolationModeFant);
-        if (FAILED(hr)) {
-            return;
-        }
-
-        Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
-        hr = d2dActiveRenderTarget_->CreateBitmapFromWicBitmap(scaler.Get(), bitmap.GetAddressOf());
-        if (FAILED(hr) || bitmap == nullptr) {
-            return;
-        }
-        scaled = d2dPanelIconCache_.emplace(cacheKey, std::move(bitmap)).first;
-    }
-
-    d2dActiveRenderTarget_->DrawBitmap(scaled->second.Get(),
-        D2D1::RectF(static_cast<float>(iconRect.left),
-            static_cast<float>(iconRect.top),
-            static_cast<float>(iconRect.right),
-            static_cast<float>(iconRect.bottom)),
-        1.0f,
-        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    d2dCache_->DrawPanelIcon(wicFactory_.Get(), d2dActiveRenderTarget_, panelIcons_, iconName, iconRect);
 }
 
 void DashboardRenderer::DrawPanel(size_t cardIndex) {
@@ -2749,7 +2706,7 @@ void DashboardRenderer::Shutdown() {
     textWidthCache_.clear();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
     d2dFirstDrawWarmupPending_ = false;
-    ClearD2DCaches();
+    d2dCache_->Clear();
     ReleasePanelIcons();
     ShutdownDirect2D();
 }
@@ -2763,8 +2720,7 @@ void DashboardRenderer::DiscardWindowRenderTarget(std::string_view reason) {
         d2dActiveRenderTarget_ = nullptr;
     }
     d2dWindowRenderTarget_.Reset();
-    d2dCacheOwnerTarget_ = nullptr;
-    ClearD2DCaches();
+    d2dCache_->ResetTarget();
 }
 
 const DashboardMetricSource& DashboardRenderer::ResolveMetrics(const SystemSnapshot& snapshot) {
@@ -2847,8 +2803,7 @@ bool DashboardRenderer::InitializeWic() {
 void DashboardRenderer::ShutdownDirect2D() {
     d2dClipDepth_ = 0;
     d2dActiveRenderTarget_ = nullptr;
-    d2dCacheOwnerTarget_ = nullptr;
-    ClearD2DCaches();
+    d2dCache_->ResetTarget();
     d2dDashedStrokeStyle_.Reset();
     d2dSolidStrokeStyle_.Reset();
     d2dWindowRenderTarget_.Reset();
@@ -2882,8 +2837,7 @@ bool DashboardRenderer::EnsureWindowRenderTarget() {
             lastError_ = "renderer:d2d_hwnd_target_failed hr=0x" + FormatHresult(hr);
             return false;
         }
-        d2dCacheOwnerTarget_ = nullptr;
-        ClearD2DCaches();
+        d2dCache_->ResetTarget();
         return true;
     }
 
@@ -2894,11 +2848,10 @@ bool DashboardRenderer::EnsureWindowRenderTarget() {
     const HRESULT hr = d2dWindowRenderTarget_->Resize(D2D1::SizeU(width, height));
     if (FAILED(hr)) {
         d2dWindowRenderTarget_.Reset();
-        d2dCacheOwnerTarget_ = nullptr;
-        ClearD2DCaches();
+        d2dCache_->ResetTarget();
         return EnsureWindowRenderTarget();
     }
-    ClearD2DCaches();
+    d2dCache_->Clear();
     return true;
 }
 
@@ -2917,10 +2870,7 @@ bool DashboardRenderer::BeginDirect2DDraw(ID2D1RenderTarget* target, bool allowD
         }
         WriteTrace("renderer:d2d_warmup_done");
     }
-    if (d2dCacheOwnerTarget_ != target) {
-        ClearD2DCaches();
-        d2dCacheOwnerTarget_ = target;
-    }
+    d2dCache_->AttachTarget(target);
     lastError_.clear();
     d2dActiveRenderTarget_ = target;
     d2dActiveRenderTarget_->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
@@ -2942,8 +2892,7 @@ void DashboardRenderer::EndDirect2DDraw() {
     const HRESULT hr = d2dActiveRenderTarget_->EndDraw();
     d2dActiveRenderTarget_ = nullptr;
     if (!activeWindowTarget) {
-        d2dCacheOwnerTarget_ = nullptr;
-        ClearD2DCaches();
+        d2dCache_->ResetTarget();
     }
     if (activeWindowTarget && hr == D2DERR_RECREATE_TARGET) {
         DiscardWindowRenderTarget("recreate_target");
@@ -2970,18 +2919,7 @@ ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(RenderColorId colorId) {
     if (d2dActiveRenderTarget_ == nullptr) {
         return nullptr;
     }
-    const RenderColor& color = palette_->Get(colorId);
-    const D2DBrushCacheKey key{color.PackedRgba()};
-    if (const auto it = d2dSolidBrushCache_.find(key); it != d2dSolidBrushCache_.end()) {
-        return it->second.Get();
-    }
-
-    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
-    if (FAILED(d2dActiveRenderTarget_->CreateSolidColorBrush(color.ToD2DColorF(), brush.GetAddressOf())) ||
-        brush == nullptr) {
-        return nullptr;
-    }
-    return d2dSolidBrushCache_.emplace(key, std::move(brush)).first->second.Get();
+    return d2dCache_->SolidBrush(d2dActiveRenderTarget_, palette_->Get(colorId));
 }
 
 void DashboardRenderer::PushClipRect(const RenderRect& rect) {
@@ -3266,11 +3204,6 @@ void DashboardRenderer::RebuildPalette() {
     palette_->Rebuild(config_.layout.colors);
 }
 
-void DashboardRenderer::ClearD2DCaches() {
-    d2dSolidBrushCache_.clear();
-    d2dPanelIconCache_.clear();
-}
-
 bool DashboardRenderer::LoadPanelIcons() {
     ReleasePanelIcons();
     if (wicFactory_ == nullptr && !InitializeWic()) {
@@ -3308,7 +3241,7 @@ bool DashboardRenderer::LoadPanelIcons() {
 }
 
 void DashboardRenderer::ReleasePanelIcons() {
-    d2dPanelIconCache_.clear();
+    d2dCache_->ClearPanelIconBitmaps();
     panelIcons_.clear();
 }
 

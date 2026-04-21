@@ -33,6 +33,7 @@
 #include "widget.h"
 
 class DashboardLayoutResolver;
+class DashboardD2DCache;
 class DashboardPalette;
 
 class DashboardRenderer {
@@ -301,40 +302,6 @@ private:
         }
     };
 
-    struct PanelIconCacheKey {
-        std::string name;
-        int width = 0;
-        int height = 0;
-
-        bool operator==(const PanelIconCacheKey& other) const {
-            return name == other.name && width == other.width && height == other.height;
-        }
-    };
-
-    struct PanelIconCacheKeyHash {
-        size_t operator()(const PanelIconCacheKey& key) const {
-            size_t hash = std::hash<std::string>{}(key.name);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
-            return hash;
-        }
-    };
-
-    struct D2DBrushCacheKey {
-        std::uint32_t packedRgba = 0;
-
-        bool operator==(const D2DBrushCacheKey& other) const {
-            return packedRgba == other.packedRgba;
-        }
-    };
-
-    struct D2DBrushCacheKeyHash {
-        size_t operator()(const D2DBrushCacheKey& key) const {
-            return std::hash<std::uint32_t>{}(key.packedRgba);
-        }
-    };
-
-    void ClearD2DCaches();
     bool ShouldDrawLayoutEditAffordances(const EditOverlayState& overlayState) const;
     bool IsContainerGuideDragActive(const EditOverlayState& overlayState) const;
     void DrawHoveredWidgetHighlight(const EditOverlayState& overlayState) const;
@@ -441,11 +408,8 @@ private:
     TextStyleMetrics textStyleMetrics_{};
     std::unique_ptr<DashboardPalette> palette_;
     std::unique_ptr<DashboardLayoutResolver> layoutResolver_;
+    std::unique_ptr<DashboardD2DCache> d2dCache_;
     mutable std::unordered_map<TextWidthCacheKey, int, TextWidthCacheKeyHash, TextWidthCacheKeyEqual> textWidthCache_;
-    std::unordered_map<D2DBrushCacheKey, Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>, D2DBrushCacheKeyHash>
-        d2dSolidBrushCache_;
-    std::unordered_map<PanelIconCacheKey, Microsoft::WRL::ComPtr<ID2D1Bitmap>, PanelIconCacheKeyHash>
-        d2dPanelIconCache_;
     std::unique_ptr<DashboardMetricSource> cachedMetricSource_;
     const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
     uint64_t cachedMetricSnapshotRevision_ = 0;
@@ -463,7 +427,6 @@ private:
     Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dSolidStrokeStyle_;
     Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dDashedStrokeStyle_;
     ID2D1RenderTarget* d2dActiveRenderTarget_ = nullptr;
-    ID2D1RenderTarget* d2dCacheOwnerTarget_ = nullptr;
     bool d2dImmediatePresent_ = false;
     bool wicComInitialized_ = false;
     bool d2dFirstDrawWarmupPending_ = false;

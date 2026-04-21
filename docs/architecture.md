@@ -7,7 +7,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
 - `src/widget/` contains the concrete widget draw and layout-state modules used by the renderer.
-- `src/dashboard_renderer/` contains renderer-private helper modules such as palette conversion, palette lookup, and layout resolution state.
+- `src/dashboard_renderer/` contains renderer-private helper modules such as palette conversion, palette lookup, Direct2D caches, and layout resolution state.
 - `src/layout_edit_dialog/` contains the internal modules behind the modeless `Edit Configuration` window.
 - `src/telemetry/` contains collector submodules for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.

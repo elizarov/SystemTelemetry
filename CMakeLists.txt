@@ -122,6 +122,7 @@ add_executable(SystemTelemetry WIN32
     src/board_vendor.cpp
     src/dashboard_metrics.cpp
     src/render_types.cpp
+    src/dashboard_renderer/d2d_cache.cpp
     src/dashboard_renderer/palette.cpp
     src/widget.cpp
     src/widget/text.cpp
@@ -355,6 +356,7 @@ add_executable(SystemTelemetryBenchmarks
     src/numeric_safety.cpp
     src/dashboard_metrics.cpp
     src/render_types.cpp
+    src/dashboard_renderer/d2d_cache.cpp
     src/dashboard_renderer/palette.cpp
     src/widget.cpp
     src/widget/text.cpp
