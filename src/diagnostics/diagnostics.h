@@ -10,6 +10,7 @@
 #include <ostream>
 #include <shellapi.h>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "config/config.h"
@@ -82,11 +83,15 @@ bool CanWriteRuntimeConfig(const std::filesystem::path& path);
 std::filesystem::path CreateTempFilePath(const wchar_t* prefix);
 std::filesystem::path CreateElevatedSaveConfigTempPath();
 int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath);
+std::wstring FormatTelemetryInitializeError(std::string_view errorText);
 
-std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(
-    const AppConfig& runtimeConfig, const DiagnosticsOptions& diagnosticsOptions, std::ostream* traceStream);
+std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(const AppConfig& runtimeConfig,
+    const DiagnosticsOptions& diagnosticsOptions,
+    std::ostream* traceStream,
+    std::string* errorText = nullptr);
 bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
-    DiagnosticsSession* diagnostics);
+    DiagnosticsSession* diagnostics,
+    std::string* errorText = nullptr);

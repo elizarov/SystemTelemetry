@@ -131,7 +131,6 @@ bool IsKnownBenchmarkName(const std::string& name) {
 
 std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config) {
     TelemetryCollectorOptions options;
-    options.showDialogs = false;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, std::filesystem::current_path());
     if (telemetry == nullptr) {
         return nullptr;
@@ -145,7 +144,6 @@ std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppC
 std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const AppConfig& config) {
     TelemetryCollectorOptions options;
     options.fake = true;
-    options.showDialogs = false;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, std::filesystem::current_path());
     if (telemetry == nullptr) {
         return nullptr;

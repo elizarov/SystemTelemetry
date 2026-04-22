@@ -369,16 +369,18 @@ std::filesystem::path ResolveFakePath(
 
 class FakeTelemetryCollector : public TelemetryCollector {
 public:
-    FakeTelemetryCollector(std::filesystem::path fakePath, bool showDialogs, TelemetryDumpLoader loadFakeDump)
-        : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), showDialogs_(showDialogs),
-          loadFakeDump_(loadFakeDump) {}
+    FakeTelemetryCollector(std::filesystem::path fakePath, TelemetryDumpLoader loadFakeDump)
+        : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), loadFakeDump_(loadFakeDump) {}
 
-    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream) override {
+    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream, std::string* errorText) override {
+        if (errorText != nullptr) {
+            errorText->clear();
+        }
         selectionSettings_ = settings.selection;
         trace_.SetOutput(traceStream);
         trace_.Write(useSyntheticSource_ ? std::string("fake:initialize_begin source=synthetic")
                                          : "fake:initialize_begin path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
-        if (!ReloadFakeDump(true)) {
+        if (!ReloadFakeDump(true, errorText)) {
             trace_.Write("fake:initialize_failed");
             return false;
         }
@@ -465,7 +467,7 @@ private:
         ++dump_.snapshot.revision;
     }
 
-    bool ReloadFakeDump(bool required) {
+    bool ReloadFakeDump(bool required, std::string* errorText = nullptr) {
         if (useSyntheticSource_) {
             sourceDump_ = BuildSyntheticTelemetryDump(syntheticTick_++);
             dump_ = sourceDump_;
@@ -478,18 +480,16 @@ private:
         std::ifstream input(fakePath_, std::ios::binary);
         if (!input.is_open()) {
             trace_.Write("fake:load_failed reason=open path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
-            if (required && showDialogs_) {
-                const std::wstring message =
-                    WideFromUtf8("Failed to open fake telemetry file:\n" + Utf8FromWide(fakePath_.wstring()));
-                MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+            if (required && errorText != nullptr) {
+                *errorText = "Failed to open fake telemetry file:\n" + Utf8FromWide(fakePath_.wstring());
             }
             return false;
         }
 
         if (loadFakeDump_ == nullptr) {
             trace_.Write("fake:load_failed reason=loader_unavailable");
-            if (required && showDialogs_) {
-                MessageBoxW(nullptr, L"Fake telemetry dump loading is unavailable.", L"System Telemetry", MB_ICONERROR);
+            if (required && errorText != nullptr) {
+                *errorText = "Fake telemetry dump loading is unavailable.";
             }
             return false;
         }
@@ -498,9 +498,8 @@ private:
         std::string error;
         if (!loadFakeDump_(input, loaded, &error)) {
             trace_.Write("fake:load_failed reason=parse error=\"" + error + "\"");
-            if (required && showDialogs_) {
-                const std::wstring message = WideFromUtf8("Failed to parse fake telemetry file:\n" + error);
-                MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+            if (required && errorText != nullptr) {
+                *errorText = "Failed to parse fake telemetry file:\n" + error;
             }
             return false;
         }
@@ -515,7 +514,6 @@ private:
 
     std::filesystem::path fakePath_;
     bool useSyntheticSource_ = false;
-    bool showDialogs_ = true;
     TelemetryDumpLoader loadFakeDump_ = nullptr;
     TelemetrySelectionSettings selectionSettings_{};
     ResolvedTelemetrySelections resolvedSelections_{};
@@ -534,8 +532,6 @@ private:
 
 std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(const std::filesystem::path& workingDirectory,
     const std::filesystem::path& configuredPath,
-    bool showDialogs,
     TelemetryDumpLoader loadFakeDump) {
-    return std::make_unique<FakeTelemetryCollector>(
-        ResolveFakePath(workingDirectory, configuredPath), showDialogs, loadFakeDump);
+    return std::make_unique<FakeTelemetryCollector>(ResolveFakePath(workingDirectory, configuredPath), loadFakeDump);
 }

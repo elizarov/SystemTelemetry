@@ -68,6 +68,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
 - When `/trace` is enabled, diagnostics failures prefer trace logging plus a failure exit code over blocking modal behavior.
 - Required fake-file load failures follow that same rule so `/fake:<path> /exit` returns promptly under trace.
+- Telemetry collectors report initialization failure detail to their caller; diagnostics and dashboard callers own trace or dialog reporting.
 - Layout-edit drag profiling writes one start marker and one end marker per drag with summarized timing instead of high-volume per-frame renderer trace spam.
 - The modeless layout-edit dialog writes focused trace markers for tree rebuild, tree selection, preview, and color-picker flows when trace is enabled.
 

@@ -143,6 +143,7 @@ bool DashboardController::ApplyConfiguredWallpaper() {
 }
 
 bool DashboardController::InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
+    state_.lastError.clear();
     state_.config = LoadRuntimeConfig(diagnosticsOptions);
     if (!ApplyDiagnosticsLayoutOverride(state_.config, diagnosticsOptions)) {
         return false;
@@ -159,12 +160,20 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         state_.diagnostics->WriteTraceMarker("diagnostics:telemetry_initialize_begin");
     }
 
-    state_.telemetry = InitializeTelemetryCollectorInstance(
-        state_.config, diagnosticsOptions, state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr);
+    std::string telemetryError;
+    state_.telemetry = InitializeTelemetryCollectorInstance(state_.config,
+        diagnosticsOptions,
+        state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr,
+        &telemetryError);
     if (state_.telemetry == nullptr) {
         if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarker("diagnostics:telemetry_initialize_failed");
+            std::string traceText = "diagnostics:telemetry_initialize_failed";
+            if (!telemetryError.empty()) {
+                traceText += " detail=" + QuoteTraceText(telemetryError);
+            }
+            state_.diagnostics->WriteTraceMarker(traceText);
         }
+        state_.lastError = FormatTelemetryInitializeError(telemetryError);
         return false;
     }
 
@@ -213,8 +222,16 @@ bool DashboardController::WriteDiagnosticsOutputs() {
 
 bool DashboardController::ReloadConfigFromDisk(
     DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
-    if (!ReloadTelemetryCollectorFromDisk(
-            GetRuntimeConfigPath(), state_.config, state_.telemetry, diagnosticsOptions, state_.diagnostics.get())) {
+    std::string telemetryError;
+    if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
+            state_.config,
+            state_.telemetry,
+            diagnosticsOptions,
+            state_.diagnostics.get(),
+            &telemetryError)) {
+        if (!telemetryError.empty() && (state_.diagnostics == nullptr || state_.diagnostics->ShouldShowDialogs())) {
+            shell.ShowError(FormatTelemetryInitializeError(telemetryError));
+        }
         shell.ReleaseFonts();
         shell.InitializeFonts();
         return false;

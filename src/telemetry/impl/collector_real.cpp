@@ -17,7 +17,10 @@ namespace {
 
 class RealTelemetryCollector : public TelemetryCollector {
 public:
-    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream) override {
+    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream, std::string* errorText) override {
+        if (errorText != nullptr) {
+            errorText->clear();
+        }
         state_->settings_ = settings;
         state_->trace_.SetOutput(traceStream);
         state_->retainedHistoryStore_.Reset(state_->snapshot_);

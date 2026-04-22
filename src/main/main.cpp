@@ -1,5 +1,6 @@
 #include <cwchar>
 #include <filesystem>
+#include <string>
 
 #include "dashboard/constants.h"
 #include "dashboard/dashboard_app.h"
@@ -77,7 +78,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
     DashboardApp app(diagnosticsOptions);
     if (!app.Initialize(instance)) {
-        MessageBoxW(nullptr, L"Failed to initialize the telemetry dashboard.", L"System Telemetry", MB_ICONERROR);
+        const std::wstring& message = app.LastError();
+        MessageBoxW(nullptr,
+            message.empty() ? L"Failed to initialize the telemetry dashboard." : message.c_str(),
+            L"System Telemetry",
+            MB_ICONERROR);
         return 1;
     }
     return app.Run();

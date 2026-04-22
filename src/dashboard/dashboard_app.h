@@ -36,6 +36,7 @@ public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {});
     ~DashboardApp();
     bool Initialize(HINSTANCE instance);
+    const std::wstring& LastError() const;
     int Run();
     bool InitializeFonts() override;
     void SetRenderConfig(const AppConfig& config);
@@ -130,6 +131,7 @@ private:
     std::unique_ptr<DashboardShellUi> shellUi_;
     HWND layoutEditTooltipHwnd_ = nullptr;
     std::wstring layoutEditTooltipText_;
+    std::wstring lastError_;
     bool layoutEditTooltipVisible_ = false;
     bool layoutEditMouseTracking_ = false;
     RECT layoutEditTooltipRect_{};

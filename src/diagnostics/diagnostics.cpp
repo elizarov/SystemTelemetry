@@ -574,7 +574,6 @@ TelemetryCollectorOptions BuildTelemetryCollectorOptions(const DiagnosticsOption
     TelemetryCollectorOptions options;
     options.fake = diagnosticsOptions.fake;
     options.fakePath = diagnosticsOptions.fakePath;
-    options.showDialogs = !diagnosticsOptions.trace;
     options.loadFakeDump = &LoadTelemetryDump;
     return options;
 }
@@ -594,14 +593,28 @@ int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std
     return 0;
 }
 
-std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(
-    const AppConfig& runtimeConfig, const DiagnosticsOptions& diagnosticsOptions, std::ostream* traceStream) {
+std::wstring FormatTelemetryInitializeError(std::string_view errorText) {
+    std::string message = "Failed to initialize telemetry collector.";
+    if (!errorText.empty()) {
+        message += "\n\n";
+        message += errorText;
+    }
+    return WideFromUtf8(message);
+}
+
+std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(const AppConfig& runtimeConfig,
+    const DiagnosticsOptions& diagnosticsOptions,
+    std::ostream* traceStream,
+    std::string* errorText) {
+    if (errorText != nullptr) {
+        errorText->clear();
+    }
     std::unique_ptr<TelemetryCollector> telemetry =
         CreateTelemetryCollector(BuildTelemetryCollectorOptions(diagnosticsOptions), GetWorkingDirectory());
     if (telemetry == nullptr) {
         return nullptr;
     }
-    if (!telemetry->Initialize(ExtractTelemetrySettings(runtimeConfig), traceStream)) {
+    if (!telemetry->Initialize(ExtractTelemetrySettings(runtimeConfig), traceStream, errorText)) {
         return nullptr;
     }
     return telemetry;
@@ -611,7 +624,11 @@ bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
-    DiagnosticsSession* diagnostics) {
+    DiagnosticsSession* diagnostics,
+    std::string* errorText) {
+    if (errorText != nullptr) {
+        errorText->clear();
+    }
     const AppConfig reloadedConfig =
         LoadConfig(configPath, !diagnosticsOptions.defaultConfig, RuntimeConfigParseContext());
     AppConfig effectiveReloadedConfig = reloadedConfig;
@@ -627,13 +644,24 @@ bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     ApplyDiagnosticsScaleOverride(effectiveReloadedConfig, diagnosticsOptions);
 
     telemetry.reset();
-    std::unique_ptr<TelemetryCollector> reloadedTelemetry = InitializeTelemetryCollectorInstance(
-        effectiveReloadedConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
+    std::string reloadError;
+    std::unique_ptr<TelemetryCollector> reloadedTelemetry =
+        InitializeTelemetryCollectorInstance(effectiveReloadedConfig,
+            diagnosticsOptions,
+            diagnostics != nullptr ? diagnostics->TraceStream() : nullptr,
+            &reloadError);
     if (reloadedTelemetry == nullptr) {
         telemetry = InitializeTelemetryCollectorInstance(
             activeConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
+        if (errorText != nullptr) {
+            *errorText = reloadError;
+        }
         if (diagnostics != nullptr) {
-            diagnostics->WriteTraceMarker("diagnostics:reload_config_failed");
+            std::string traceText = "diagnostics:reload_config_failed";
+            if (!reloadError.empty()) {
+                traceText += " detail=" + QuoteTraceText(reloadError);
+            }
+            diagnostics->WriteTraceMarker(traceText);
         }
         return false;
     }
@@ -734,12 +762,18 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         "diagnostics:headless_start scale=" + std::to_string(ResolveSavedScreenshotScale(config)));
     diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_begin");
 
+    std::string telemetryError;
     std::unique_ptr<TelemetryCollector> telemetry =
-        InitializeTelemetryCollectorInstance(config, diagnosticsOptions, diagnostics.TraceStream());
+        InitializeTelemetryCollectorInstance(config, diagnosticsOptions, diagnostics.TraceStream(), &telemetryError);
     if (telemetry == nullptr) {
-        diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_failed");
+        std::string traceText = "diagnostics:telemetry_initialize_failed";
+        if (!telemetryError.empty()) {
+            traceText += " detail=" + QuoteTraceText(telemetryError);
+        }
+        diagnostics.WriteTraceMarker(traceText);
         if (diagnostics.ShouldShowDialogs()) {
-            MessageBoxW(nullptr, L"Failed to initialize telemetry collector.", L"System Telemetry", MB_ICONERROR);
+            const std::wstring message = FormatTelemetryInitializeError(telemetryError);
+            MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
         }
         return 1;
     }
@@ -750,8 +784,13 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     telemetry->UpdateSnapshot();
     diagnostics.WriteTraceMarker("diagnostics:update_snapshot_done");
     if (diagnosticsOptions.reload) {
+        std::string reloadError;
         if (!ReloadTelemetryCollectorFromDisk(
-                GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, &diagnostics)) {
+                GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, &diagnostics, &reloadError)) {
+            if (diagnostics.ShouldShowDialogs() && !reloadError.empty()) {
+                const std::wstring message = FormatTelemetryInitializeError(reloadError);
+                MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+            }
             return 1;
         }
     }

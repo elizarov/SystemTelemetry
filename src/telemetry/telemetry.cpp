@@ -6,8 +6,7 @@
 std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
     const TelemetryCollectorOptions& options, const std::filesystem::path& workingDirectory) {
     if (options.fake) {
-        return CreateFakeTelemetryCollector(
-            workingDirectory, options.fakePath, options.showDialogs, options.loadFakeDump);
+        return CreateFakeTelemetryCollector(workingDirectory, options.fakePath, options.loadFakeDump);
     }
     return CreateRealTelemetryCollector();
 }

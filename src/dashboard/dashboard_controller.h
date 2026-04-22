@@ -3,6 +3,7 @@
 #include <chrono>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "dashboard/dashboard_menu_types.h"
@@ -29,6 +30,7 @@ struct DashboardSessionState {
     std::vector<NetworkMenuOption> networkMenuOptions;
     std::vector<StorageDriveMenuOption> storageDriveMenuOptions;
     std::vector<ScaleMenuOption> scaleMenuOptions;
+    std::wstring lastError;
 };
 
 class DashboardShellHost {

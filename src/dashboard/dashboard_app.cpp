@@ -131,9 +131,11 @@ int DashboardApp::WindowHeight() const {
 }
 
 bool DashboardApp::Initialize(HINSTANCE instance) {
+    lastError_.clear();
     instance_ = instance;
     InitializeLocalizationCatalog();
     if (!controller_.InitializeSession(*this, diagnosticsOptions_)) {
+        lastError_ = controller_.State().lastError;
         return false;
     }
 
@@ -188,6 +190,10 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
         return false;
     }
     return CreateLayoutEditTooltip();
+}
+
+const std::wstring& DashboardApp::LastError() const {
+    return lastError_;
 }
 
 void DashboardApp::ApplyConfigPlacement() {

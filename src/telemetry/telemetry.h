@@ -115,7 +115,8 @@ public:
     TelemetryCollector(TelemetryCollector&&) = delete;
     TelemetryCollector& operator=(TelemetryCollector&&) = delete;
 
-    virtual bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream = nullptr) = 0;
+    virtual bool Initialize(
+        const TelemetrySettings& settings, std::ostream* traceStream = nullptr, std::string* errorText = nullptr) = 0;
     virtual const SystemSnapshot& Snapshot() const = 0;
     virtual TelemetryDump Dump() const = 0;
     virtual const ResolvedTelemetrySelections& ResolvedSelections() const = 0;
@@ -136,7 +137,6 @@ using TelemetryDumpLoader = bool (*)(std::istream& input, TelemetryDump& dump, s
 struct TelemetryCollectorOptions {
     bool fake = false;
     std::filesystem::path fakePath;
-    bool showDialogs = true;
     TelemetryDumpLoader loadFakeDump = nullptr;
 };
 
