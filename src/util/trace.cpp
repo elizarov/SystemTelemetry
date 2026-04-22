@@ -1,26 +1,33 @@
 #include "util/trace.h"
 
-#include <windows.h>
-
-#include <cstdio>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <mutex>
+#include <sstream>
 
 namespace {
 
-std::string FormatTraceTimestamp() {
-    SYSTEMTIME localTime{};
-    GetLocalTime(&localTime);
+std::tm LocalTime(std::time_t time) {
+#pragma warning(suppress : 4996)
+    const std::tm* localTime = std::localtime(&time);
+    return localTime != nullptr ? *localTime : std::tm{};
+}
 
-    char buffer[40];
-    sprintf_s(buffer,
-        "%04u-%02u-%02u %02u:%02u:%02u.%03u",
-        static_cast<unsigned>(localTime.wYear),
-        static_cast<unsigned>(localTime.wMonth),
-        static_cast<unsigned>(localTime.wDay),
-        static_cast<unsigned>(localTime.wHour),
-        static_cast<unsigned>(localTime.wMinute),
-        static_cast<unsigned>(localTime.wSecond),
-        static_cast<unsigned>(localTime.wMilliseconds));
-    return buffer;
+std::string FormatTraceTimestamp() {
+    const auto now = std::chrono::system_clock::now();
+    const auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
+    const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now - seconds).count();
+    const std::tm localTime = LocalTime(std::chrono::system_clock::to_time_t(now));
+    std::ostringstream output;
+    output << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(3)
+           << milliseconds;
+    return output.str();
+}
+
+std::mutex& TraceWriteMutex() {
+    static std::mutex mutex;
+    return mutex;
 }
 
 }  // namespace
@@ -35,6 +42,7 @@ void Trace::Write(const char* text) const {
     if (output_ == nullptr) {
         return;
     }
+    const std::lock_guard lock(TraceWriteMutex());
     (*output_) << "[trace " << FormatTraceTimestamp() << "] " << text << '\n';
     output_->flush();
 }
@@ -48,9 +56,9 @@ std::string Trace::BoolText(bool value) {
 }
 
 std::string Trace::FormatValueDouble(const char* label, double value, int precision) {
-    char buffer[96];
-    sprintf_s(buffer, "%s=%.*f", label, precision, value);
-    return buffer;
+    std::ostringstream output;
+    output << label << '=' << std::fixed << std::setprecision(precision) << value;
+    return output.str();
 }
 
 std::string Trace::EscapeText(std::string_view text) {
