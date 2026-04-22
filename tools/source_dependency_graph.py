@@ -34,6 +34,14 @@ class IncludeUse:
     kind: str
 
 
+@dataclass(frozen=True)
+class Violation:
+    kind: str
+    source: str
+    target: str
+    message: str
+
+
 def relpath(path: Path) -> str:
     return path.relative_to(PROJECT_ROOT).as_posix()
 
@@ -49,14 +57,22 @@ def is_project_source(path: Path) -> bool:
 
 def list_project_source_files(source_root: Path) -> list[Path]:
     try:
-        result = subprocess.run(
+        tracked = subprocess.run(
             ["git", "ls-files", str(source_root.relative_to(PROJECT_ROOT))],
             cwd=PROJECT_ROOT,
             check=True,
             capture_output=True,
             text=True,
         )
-        files = [PROJECT_ROOT / line.strip() for line in result.stdout.splitlines() if line.strip()]
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", str(source_root.relative_to(PROJECT_ROOT))],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        paths = tracked.stdout.splitlines() + untracked.stdout.splitlines()
+        files = [PROJECT_ROOT / line.strip() for line in paths if line.strip()]
     except (OSError, subprocess.CalledProcessError, ValueError):
         files = list(source_root.rglob("*"))
     return sorted(path for path in files if path.is_file() and is_project_source(path))
@@ -130,6 +146,42 @@ def merge_edges(uses: list[IncludeUse]) -> dict[tuple[str, str], str]:
             continue
         edges[key] = "public" if use.kind == "public" else "private"
     return edges
+
+
+def top_level_package(module_name: str) -> str:
+    return module_name.split("/", 1)[0]
+
+
+def is_package_private_module(module_name: str) -> bool:
+    return len(module_name.split("/")) > 2
+
+
+def check_package_encapsulation(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    for source, target in sorted(edges):
+        if not is_package_private_module(target):
+            continue
+        source_package = top_level_package(source)
+        target_package = top_level_package(target)
+        if source_package == target_package:
+            continue
+        violations.append(
+            Violation(
+                kind="package-encapsulation",
+                source=source,
+                target=target,
+                message=(
+                    f"{source} depends on package-private module {target}; "
+                    f"only src/{target_package}/ files may include modules below src/{target_package}/*/."
+                ),
+            )
+        )
+    return violations
+
+
+def print_violations(violations: list[Violation]) -> None:
+    for violation in violations:
+        print(f"{violation.source} -> {violation.target}: {violation.kind}: {violation.message}")
 
 
 def dot_quote(text: str) -> str:
@@ -250,7 +302,9 @@ def write_graphml(modules: dict[str, Module], edges: dict[tuple[str, str], str],
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Write DOT and GraphML graphs of non-vendored src module dependencies.")
+    parser = argparse.ArgumentParser(
+        description="Write and lint DOT and GraphML graphs of non-vendored src module dependencies."
+    )
     parser.add_argument(
         "--output",
         "-o",
@@ -263,6 +317,11 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="GraphML output path. Defaults to the DOT output path with a .graphml suffix.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail when source dependency architecture rules are violated.",
     )
     return parser.parse_args()
 
@@ -283,6 +342,13 @@ def main() -> int:
         f"Wrote {args.output} and {graphml_output} with {len(modules)} modules, "
         f"{public_edges} public dependencies, and {private_edges} private dependencies."
     )
+    if args.check:
+        violations = check_package_encapsulation(edges)
+        if violations:
+            print_violations(violations)
+            print(f"Source dependency check failed with {len(violations)} violation(s).")
+            return 1
+        print("Source dependency check passed.")
     return 0
 
 

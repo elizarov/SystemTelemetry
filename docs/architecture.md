@@ -119,8 +119,9 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ## Source Dependency Graph
 
-- `architecture_graph.cmd` writes the maintained DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\`.
+- `lint.cmd` writes the maintained DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
 - Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
 - DOT clusters group nodes by their containing source directory.
 - GraphML nodes include `label` and `directory` data, and GraphML edges include `label` and `kind` data.
 - A dependency from an including module to an included module is `public` when it appears in a header and `private` when it appears only in an implementation file.
+- Files below package subdirectories are package-private implementation modules, so dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.

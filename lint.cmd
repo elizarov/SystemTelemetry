@@ -11,6 +11,10 @@ echo Running architecture checks...
 python tools\check_architecture.py
 if errorlevel 1 set "failed=1"
 
+echo Running source dependency checks...
+python tools\source_dependency_graph.py --check
+if errorlevel 1 set "failed=1"
+
 echo Running include style checks...
 python tools\check_includes.py
 if errorlevel 1 set "failed=1"
