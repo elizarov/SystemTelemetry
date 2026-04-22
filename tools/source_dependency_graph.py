@@ -179,6 +179,31 @@ def check_package_encapsulation(edges: dict[tuple[str, str], str]) -> list[Viola
     return violations
 
 
+def check_util_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    for source, target in sorted(edges):
+        if top_level_package(source) != "util":
+            continue
+        if top_level_package(target) == "util":
+            continue
+        violations.append(
+            Violation(
+                kind="layer-util",
+                source=source,
+                target=target,
+                message=f"{source} is in the util layer and must not depend on project module {target}.",
+            )
+        )
+    return violations
+
+
+def check_graph_rules(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    return [
+        *check_package_encapsulation(edges),
+        *check_util_layer(edges),
+    ]
+
+
 def print_violations(violations: list[Violation]) -> None:
     for violation in violations:
         print(f"{violation.source} -> {violation.target}: {violation.kind}: {violation.message}")
@@ -343,7 +368,7 @@ def main() -> int:
         f"{public_edges} public dependencies, and {private_edges} private dependencies."
     )
     if args.check:
-        violations = check_package_encapsulation(edges)
+        violations = check_graph_rules(edges)
         if violations:
             print_violations(violations)
             print(f"Source dependency check failed with {len(violations)} violation(s).")
