@@ -1,4 +1,4 @@
-#include "board_vendor.h"
+#include "telemetry/board/board_vendor.h"
 
 #include "util/trace.h"
 

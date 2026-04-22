@@ -10,9 +10,9 @@
 #include <vector>
 #include <windows.h>
 
-#include "board_vendor.h"
+#include "telemetry/board/board_vendor.h"
 #include "diagnostics_options.h"
-#include "gpu_vendor.h"
+#include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/metric_types.h"
 #include "telemetry/telemetry_settings.h"
 

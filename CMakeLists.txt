@@ -117,9 +117,9 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/impl/collector_real.cpp
     src/telemetry/impl/collector_fake.cpp
     src/snapshot_dump.cpp
-    src/gpu_vendor.cpp
-    src/gpu_amd_adl.cpp
-    src/board_vendor.cpp
+    src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/amd/gpu_amd_adl.cpp
+    src/telemetry/board/board_vendor.cpp
     src/dashboard_metrics.cpp
     src/dashboard_overlay_state.cpp
     src/dashboard_renderer/render_types.cpp
@@ -150,7 +150,7 @@ set_source_files_properties(resources/SystemTelemetry.rc PROPERTIES
 )
 
 add_library(SystemTelemetryGigabyte OBJECT
-    src/board_gigabyte_siv.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
 )
 
 set_target_properties(SystemTelemetryGigabyte PROPERTIES
@@ -345,9 +345,9 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/impl/collector_real.cpp
     src/telemetry/impl/collector_fake.cpp
     src/snapshot_dump.cpp
-    src/gpu_vendor.cpp
-    src/gpu_amd_adl.cpp
-    src/board_vendor.cpp
+    src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/amd/gpu_amd_adl.cpp
+    src/telemetry/board/board_vendor.cpp
     src/layout_edit/layout_edit_types.cpp
     src/layout_edit/layout_edit_parameter.cpp
     src/layout_edit/layout_edit_tree.cpp

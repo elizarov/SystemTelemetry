@@ -17,8 +17,8 @@
 #include <string>
 #include <vector>
 
-#include "board_vendor.h"
-#include "gpu_vendor.h"
+#include "telemetry/board/board_vendor.h"
+#include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/telemetry.h"
 #include "telemetry/impl/retained_history.h"
 #include "util/trace.h"

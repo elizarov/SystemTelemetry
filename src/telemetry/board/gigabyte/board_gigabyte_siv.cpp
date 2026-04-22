@@ -21,7 +21,7 @@
 #using < System.dll>
 
 #include "util/strings.h"
-#include "board_vendor.h"
+#include "telemetry/board/board_vendor.h"
 #include "system_info_support.h"
 #include "util/trace.h"
 #include "util/utf8.h"

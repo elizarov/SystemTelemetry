@@ -18,8 +18,8 @@ HEADER_BODY_ALLOWLIST = {
 }
 CPP_WITHOUT_HEADER_ALLOWLIST = {
     "src/app_main.cpp",
-    "src/board_gigabyte_siv.cpp",
-    "src/gpu_amd_adl.cpp",
+    "src/telemetry/board/gigabyte/board_gigabyte_siv.cpp",
+    "src/telemetry/gpu/amd/gpu_amd_adl.cpp",
     "src/telemetry_runtime_fake.cpp",
 }
 CONTROL_KEYWORDS = {"if", "for", "while", "switch", "catch"}

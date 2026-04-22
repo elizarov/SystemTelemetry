@@ -13,7 +13,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, `src/dashboard_renderer/render_types.*` owns shared render-space contract types, and `src/dashboard_renderer/impl/` contains helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
 - `src/layout_edit/` contains shared layout-edit interaction, parameter, tooltip, tree, trace-session, and snap-solver modules.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
-- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metric_types.h`, `src/telemetry/metric_display_style.h`, and `src/telemetry/telemetry_settings.h` own shared telemetry and metric enums, and `src/telemetry/impl/` contains collector submodules for CPU, GPU, board, network, storage, and fake-runtime support.
+- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metric_types.h`, `src/telemetry/metric_display_style.h`, and `src/telemetry/telemetry_settings.h` own shared telemetry and metric enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
@@ -110,7 +110,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `resources/resource.h` owns the resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and the mixed-mode Gigabyte board-provider object library.
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
-- `src/board_gigabyte_siv.cpp` builds as a CLR-enabled unit so it can bridge to the vendor .NET assemblies.
+- `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` builds as a CLR-enabled unit so it can bridge to the vendor .NET assemblies.
 - The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, and telemetry-refresh paths through the same runtime subsystems used by the app.
 
 ## Source Dependency Graph
