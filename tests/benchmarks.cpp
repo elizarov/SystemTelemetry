@@ -717,7 +717,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::ostringstream traceStream;
-    Trace trace(&traceStream);
+    Trace trace;
     return RunBenchmarkCommand(*commandLine, trace);
 }

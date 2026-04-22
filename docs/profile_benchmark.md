@@ -14,6 +14,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - Measure the repeatable layout-switch benchmark with `build\SystemTelemetryBenchmarks.exe layout-switch 240 2`.
 - Measure the repeatable telemetry-refresh benchmark with `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`.
 - `SystemTelemetryBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-switch`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
+- Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
 - Capture a full profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
