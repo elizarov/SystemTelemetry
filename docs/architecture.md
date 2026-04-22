@@ -132,10 +132,10 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ## Source Dependency Graph
 
-- `lint.cmd` writes the maintained DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
+- `lint.cmd` writes the maintained DOT, GraphML, and SVG views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
 - Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
 - Graph generation counts physical source lines in each non-vendored `.h` and `.cpp` file, annotates each node with header, implementation, and total LOC, and prints LOC totals for each top-level `src` package plus an overall total.
-- DOT clusters group nodes by their containing source directory.
+- DOT clusters group nodes by their containing source directory, and the SVG graph is rendered from the DOT graph with Graphviz `dot`.
 - GraphML nodes include `label`, `directory`, `header_loc`, `cpp_loc`, `total_loc`, and `loc_annotation` data, and GraphML edges include `label` and `kind` data.
 - A dependency from an including module to an included module is `public` when it appears in a header and `private` when it appears only in an implementation file.
 - Files below package subdirectories are package-private implementation modules, so dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.

@@ -357,7 +357,7 @@ def write_dot(modules: dict[str, Module], edges: dict[tuple[str, str], str], out
 
     lines = [
         "digraph SourceDependencies {",
-        "  graph [rankdir=LR, compound=true, fontname=\"Segoe UI\", labelloc=t, label=\"SystemTelemetry src module dependencies\"];",
+        "  graph [rankdir=LR, compound=true, newrank=true, fontname=\"Segoe UI\", labelloc=t, label=\"SystemTelemetry src module dependencies\"];",
         "  node [shape=box, style=\"rounded,filled\", fillcolor=\"#f8fafc\", color=\"#64748b\", fontname=\"Segoe UI\", fontsize=10];",
         "  edge [fontname=\"Segoe UI\", fontsize=9, arrowsize=0.7];",
         "",
@@ -386,6 +386,26 @@ def write_dot(modules: dict[str, Module], edges: dict[tuple[str, str], str], out
 
     lines.append("}")
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_svg(dot_path: Path, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            ["dot", "-Tsvg", str(dot_path), "-o", str(output_path)],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as error:
+        raise RuntimeError("Graphviz dot was not found on PATH; install Graphviz to render the SVG graph.") from error
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or error.stdout).strip()
+        message = f"Graphviz dot failed while rendering {output_path}."
+        if detail:
+            message += f" {detail}"
+        raise RuntimeError(message) from error
 
 
 def graphml_tag(name: str) -> str:
@@ -497,6 +517,12 @@ def parse_args() -> argparse.Namespace:
         help="GraphML output path. Defaults to the DOT output path with a .graphml suffix.",
     )
     parser.add_argument(
+        "--svg-output",
+        type=Path,
+        default=None,
+        help="SVG output path. Defaults to the DOT output path with a .svg suffix.",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="Fail when source dependency architecture rules are violated.",
@@ -511,13 +537,19 @@ def main() -> int:
     uses = collect_include_uses(files, SOURCE_ROOT, module_by_file)
     edges = merge_edges(uses)
     graphml_output = args.graphml_output or args.output.with_suffix(".graphml")
+    svg_output = args.svg_output or args.output.with_suffix(".svg")
     write_dot(modules, edges, args.output)
     write_graphml(modules, edges, graphml_output)
+    try:
+        write_svg(args.output, svg_output)
+    except RuntimeError as error:
+        print(error, file=sys.stderr)
+        return 1
 
     public_edges = sum(1 for kind in edges.values() if kind == "public")
     private_edges = sum(1 for kind in edges.values() if kind == "private")
     print(
-        f"Wrote {args.output} and {graphml_output} with {len(modules)} modules, "
+        f"Wrote {args.output}, {graphml_output}, and {svg_output} with {len(modules)} modules, "
         f"{public_edges} public dependencies, and {private_edges} private dependencies."
     )
     print_package_loc_summary(modules)
