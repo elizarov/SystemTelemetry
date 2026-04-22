@@ -12,10 +12,12 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
 - Measure the repeatable layout-edit benchmark with `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`.
 - Measure the repeatable layout-switch benchmark with `build\SystemTelemetryBenchmarks.exe layout-switch 240 2`.
+- Measure the repeatable mouse-hover benchmark with `build\SystemTelemetryBenchmarks.exe mouse-hover 240 2`.
 - Measure the repeatable telemetry-refresh benchmark with `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`.
-- `SystemTelemetryBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-switch`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
+- `SystemTelemetryBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-switch`, `mouse-hover`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
-- Capture a full profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
+- The mouse-hover benchmark moves the layout-edit cursor path from the dashboard's top-left corner to bottom-right corner, resolving hover hits and drawing the resulting overlay state on every step.
+- Capture a full profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
 - Daemon-backed and one-shot elevated runs persist the benchmark stdout in the request directory and replay it in the caller window after the request finishes, so the requesting shell sees the same timing lines that the elevated process produced.
@@ -33,20 +35,25 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.13`
   - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.41`
-  - `snap avg_ms=0.19`
+  - `drag_loop per_iter_ms=2.41` to `2.48`
+  - `snap avg_ms=0.19` to `0.20`
   - `apply avg_ms=0.13`
-  - `paint_draw avg_ms=2.09`
+  - `paint_draw avg_ms=2.09` to `2.15`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=3.95` to `4.00`
-  - `telemetry_update avg_ms=2.11` to `2.12`
+  - `update_loop per_iter_ms=3.95` to `4.03`
+  - `telemetry_update avg_ms=2.11` to `2.18`
   - `paint_total avg_ms=1.85` to `1.88`
   - `paint_draw avg_ms=1.85` to `1.88`
 - Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=3.53` to `3.56`
-  - `switch_apply avg_ms=0.74`
+  - `switch_loop per_iter_ms=3.53` to `3.59`
+  - `switch_apply avg_ms=0.74` to `0.75`
   - `dialog_refresh avg_ms=0.15`
-  - `switch_paint avg_ms=2.63` to `2.66`
+  - `switch_paint avg_ms=2.63` to `2.68`
+- Current repeatable `mouse-hover` result on the current tree:
+  - `hover_loop per_iter_ms=2.11` to `2.12`
+  - `hover_hit_test avg_ms=0.01`
+  - `paint_total avg_ms=2.10` to `2.11`
+  - `paint_draw avg_ms=2.10` to `2.11`
 
 ## Current Confirmed Hotspots
 
@@ -63,9 +70,10 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.11` to `2.12 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.85` to `1.88 ms` in repaint on this machine.
-- The direct `layout-switch` benchmark is paint-bound on this machine: repaint sits around `2.63` to `2.66 ms` of the `3.53` to `3.56 ms` loop while the dialog refresh work stays around `0.15 ms`.
-- Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs are within or faster than the previous current-tree ranges.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.11` to `2.18 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.85` to `1.88 ms` in repaint on this machine.
+- The direct `layout-switch` benchmark is paint-bound on this machine: repaint sits around `2.63` to `2.68 ms` of the `3.53` to `3.59 ms` loop while the dialog refresh work stays around `0.15 ms`.
+- The direct `mouse-hover` benchmark is paint-bound on this machine: hover hit testing stays around `0.01 ms` per step while repaint sits around `2.10` to `2.11 ms`, so layout-edit hit testing is not a bottleneck relative to drawing hovered overlays.
+- Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs remain in the established current-tree range.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
 ## Kept Optimizations

@@ -10,7 +10,7 @@ set "RENDER_SCALE="
 set "BENCHMARK_NAME="
 set "BENCHMARK_STEM="
 set "ARGUMENT_ERROR="
-set "SUPPORTED_BENCHMARKS=edit-layout, layout-switch, update-telemetry"
+set "SUPPORTED_BENCHMARKS=edit-layout, layout-switch, mouse-hover, update-telemetry"
 set "COMMAND=run"
 set "REQUEST_ELEVATION=0"
 set "IS_ELEVATED_RELAUNCH=0"
@@ -68,6 +68,11 @@ if not defined BENCHMARK_NAME if /i "%~1"=="update-telemetry" (
 )
 if not defined BENCHMARK_NAME if /i "%~1"=="layout-switch" (
     set "BENCHMARK_NAME=layout-switch"
+    shift
+    goto parse_args
+)
+if not defined BENCHMARK_NAME if /i "%~1"=="mouse-hover" (
+    set "BENCHMARK_NAME=mouse-hover"
     shift
     goto parse_args
 )
@@ -440,6 +445,7 @@ exit /b 0
 :validate_benchmark_name
 if /i "%BENCHMARK_NAME%"=="edit-layout" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-switch" exit /b 0
+if /i "%BENCHMARK_NAME%"=="mouse-hover" exit /b 0
 if /i "%BENCHMARK_NAME%"=="update-telemetry" exit /b 0
 echo Unknown benchmark '%BENCHMARK_NAME%'. Supported benchmarks: %SUPPORTED_BENCHMARKS%
 exit /b 1

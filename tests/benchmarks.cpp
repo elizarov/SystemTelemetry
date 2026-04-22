@@ -35,6 +35,7 @@ using Duration = std::chrono::duration<double, std::milli>;
 #define SYSTEM_TELEMETRY_BENCHMARK_ITEMS(X)                                                                            \
     X(EditLayout, "edit-layout")                                                                                       \
     X(LayoutSwitch, "layout-switch")                                                                                   \
+    X(MouseHover, "mouse-hover")                                                                                       \
     X(UpdateTelemetry, "update-telemetry")
 
 ENUM_STRING_DECLARE(Benchmark, SYSTEM_TELEMETRY_BENCHMARK_ITEMS);
@@ -43,6 +44,7 @@ ENUM_STRING_DECLARE(Benchmark, SYSTEM_TELEMETRY_BENCHMARK_ITEMS);
 
 enum class BenchPhase {
     TelemetryUpdate = 0,
+    HoverHitTest,
     Snap,
     Apply,
     PaintTotal,
@@ -84,6 +86,8 @@ const char* PhaseName(BenchPhase phase) {
     switch (phase) {
         case BenchPhase::TelemetryUpdate:
             return "telemetry_update";
+        case BenchPhase::HoverHitTest:
+            return "hover_hit_test";
         case BenchPhase::Snap:
             return "snap";
         case BenchPhase::Apply:
@@ -261,6 +265,24 @@ RenderPoint DragPointForWeights(
     return dragPoint;
 }
 
+std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t iterations) {
+    std::vector<RenderPoint> path;
+    if (width <= 0 || height <= 0 || iterations == 0) {
+        return path;
+    }
+
+    path.reserve(iterations);
+    const int maxX = (std::max)(0, width - 1);
+    const int maxY = (std::max)(0, height - 1);
+    const double denominator = static_cast<double>((std::max)(size_t{1}, iterations - 1));
+    for (size_t index = 0; index < iterations; ++index) {
+        const double t = static_cast<double>(index) / denominator;
+        path.push_back(RenderPoint{static_cast<int>(std::lround(t * static_cast<double>(maxX))),
+            static_cast<int>(std::lround(t * static_cast<double>(maxY)))});
+    }
+    return path;
+}
+
 class BenchmarkHost : private LayoutEditHost {
 public:
     BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace)
@@ -350,6 +372,10 @@ public:
         telemetry.UpdateSnapshot();
         snapshot_ = &telemetry.Snapshot();
         RecordPhase(BenchPhase::TelemetryUpdate, Clock::now() - start);
+    }
+
+    void RecordHoverHitTest(std::chrono::nanoseconds elapsed) {
+        RecordPhase(BenchPhase::HoverHitTest, elapsed);
     }
 
     HWND WindowHandle() const {
@@ -557,8 +583,37 @@ BenchResult RunDragBenchmark(BenchmarkHost& host,
     return {total, total / static_cast<double>(weightSequence.size())};
 }
 
+BenchResult RunMouseHoverBenchmark(BenchmarkHost& host, const std::vector<RenderPoint>& path) {
+    if (path.empty()) {
+        return {};
+    }
+
+    LayoutEditController& controller = host.Controller();
+    controller.StartSession();
+    host.DrawCurrentSnapshot();
+    host.ResetPhaseTotals();
+
+    const auto start = Clock::now();
+    for (const RenderPoint point : path) {
+        const auto hitTestStart = Clock::now();
+        controller.HandleMouseMove(point);
+        host.RecordHoverHitTest(Clock::now() - hitTestStart);
+        host.DrawCurrentSnapshot();
+    }
+    const Duration total = Clock::now() - start;
+
+    controller.HandleMouseLeave();
+    controller.StopSession(true);
+    return {total, total / static_cast<double>(path.size())};
+}
+
 void PrintBenchResult(const BenchResult& result) {
     std::cout << std::left << std::setw(14) << "drag_loop" << " total_ms=" << std::fixed << std::setprecision(2)
+              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+}
+
+void PrintMouseHoverBenchResult(const BenchResult& result) {
+    std::cout << std::left << std::setw(14) << "hover_loop" << " total_ms=" << std::fixed << std::setprecision(2)
               << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
 }
 
@@ -669,6 +724,42 @@ int RunLayoutSwitchBenchmarkCommand(size_t iterations, double renderScale, Trace
     return 0;
 }
 
+int RunMouseHoverBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
+    if (telemetry == nullptr) {
+        std::cerr << "fake telemetry init failed\n";
+        return 1;
+    }
+
+    const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    BenchmarkHost host(runtimeConfig, renderScale, trace);
+    host.SetSnapshot(telemetry->Snapshot());
+    if (!host.Initialize()) {
+        std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
+        return 1;
+    }
+
+    const std::vector<RenderPoint> path =
+        BuildMouseHoverPath(host.LayoutRenderer().WindowWidth(), host.LayoutRenderer().WindowHeight(), iterations);
+    if (path.empty()) {
+        std::cerr << "mouse hover path generation failed\n";
+        return 1;
+    }
+
+    std::cout << "mouse_hover_benchmark path_points=" << path.size()
+              << " window=" << host.LayoutRenderer().WindowWidth() << "x" << host.LayoutRenderer().WindowHeight()
+              << " render_scale=" << renderScale << "\n";
+    const BenchResult result = RunMouseHoverBenchmark(host, path);
+    PrintMouseHoverBenchResult(result);
+
+    const auto& phases = host.PhaseTotals();
+    PrintPhaseResult(PhaseName(BenchPhase::HoverHitTest), phases[PhaseIndex(BenchPhase::HoverHitTest)]);
+    PrintPhaseResult(PhaseName(BenchPhase::PaintTotal), phases[PhaseIndex(BenchPhase::PaintTotal)]);
+    PrintPhaseResult(PhaseName(BenchPhase::PaintDraw), phases[PhaseIndex(BenchPhase::PaintDraw)]);
+    return 0;
+}
+
 int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
     const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
     std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkTelemetryCollector(config, trace);
@@ -702,6 +793,8 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunEditLayoutBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::LayoutSwitch:
             return RunLayoutSwitchBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::MouseHover:
+            return RunMouseHoverBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::UpdateTelemetry:
             return RunUpdateTelemetryBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
     }
