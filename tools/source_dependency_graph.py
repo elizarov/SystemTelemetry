@@ -25,6 +25,26 @@ class Module:
     name: str
     directory: str
     files: set[Path] = field(default_factory=set)
+    header_files: int = 0
+    header_loc: int = 0
+    cpp_files: int = 0
+    cpp_loc: int = 0
+
+    @property
+    def total_loc(self) -> int:
+        return self.header_loc + self.cpp_loc
+
+
+@dataclass
+class PackageLocSummary:
+    header_files: int = 0
+    header_loc: int = 0
+    cpp_files: int = 0
+    cpp_loc: int = 0
+
+    @property
+    def total_loc(self) -> int:
+        return self.header_loc + self.cpp_loc
 
 
 @dataclass(frozen=True)
@@ -87,6 +107,10 @@ def module_directory(module_name: str) -> str:
     return "." if directory == "." else directory
 
 
+def count_source_lines(path: Path) -> int:
+    return len(path.read_text(encoding="utf-8").splitlines())
+
+
 def collect_modules(files: list[Path], source_root: Path) -> tuple[dict[str, Module], dict[Path, str]]:
     modules: dict[str, Module] = {}
     module_by_file: dict[Path, str] = {}
@@ -94,6 +118,13 @@ def collect_modules(files: list[Path], source_root: Path) -> tuple[dict[str, Mod
         module_name = module_name_for(path, source_root)
         module = modules.setdefault(module_name, Module(name=module_name, directory=module_directory(module_name)))
         module.files.add(path)
+        line_count = count_source_lines(path)
+        if path.suffix in HEADER_SUFFIXES:
+            module.header_files += 1
+            module.header_loc += line_count
+        elif path.suffix == ".cpp":
+            module.cpp_files += 1
+            module.cpp_loc += line_count
         module_by_file[path.resolve()] = module_name
     return modules, module_by_file
 
@@ -255,8 +286,56 @@ def print_violations(violations: list[Violation]) -> None:
         print(f"{violation.source} -> {violation.target}: {violation.kind}: {violation.message}")
 
 
+def summarize_package_loc(modules: dict[str, Module]) -> dict[str, PackageLocSummary]:
+    summaries: dict[str, PackageLocSummary] = {}
+    for module in modules.values():
+        package = top_level_package(module.name)
+        summary = summaries.setdefault(package, PackageLocSummary())
+        summary.header_files += module.header_files
+        summary.header_loc += module.header_loc
+        summary.cpp_files += module.cpp_files
+        summary.cpp_loc += module.cpp_loc
+    return summaries
+
+
+def format_loc_count(value: int) -> str:
+    return f"{value:,}"
+
+
+def format_module_loc_annotation(module: Module) -> str:
+    return (
+        f".h {format_loc_count(module.header_loc)} LOC | "
+        f".cpp {format_loc_count(module.cpp_loc)} LOC | "
+        f"total {format_loc_count(module.total_loc)} LOC"
+    )
+
+
+def format_node_label(module: Module) -> str:
+    return f"{display_name(module.name)}\n{format_module_loc_annotation(module)}"
+
+
+def print_package_loc_summary(modules: dict[str, Module]) -> None:
+    print("LOC totals by top-level package:")
+    total = PackageLocSummary()
+    for package, summary in sorted(summarize_package_loc(modules).items()):
+        total.header_files += summary.header_files
+        total.header_loc += summary.header_loc
+        total.cpp_files += summary.cpp_files
+        total.cpp_loc += summary.cpp_loc
+        print(
+            f"  {package}: {format_loc_count(summary.total_loc)} total "
+            f"(.h {format_loc_count(summary.header_loc)} in {summary.header_files} file(s), "
+            f".cpp {format_loc_count(summary.cpp_loc)} in {summary.cpp_files} file(s))"
+        )
+    print(
+        f"  total: {format_loc_count(total.total_loc)} total "
+        f"(.h {format_loc_count(total.header_loc)} in {total.header_files} file(s), "
+        f".cpp {format_loc_count(total.cpp_loc)} in {total.cpp_files} file(s))"
+    )
+
+
 def dot_quote(text: str) -> str:
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
 
 
 def display_name(module_name: str) -> str:
@@ -295,7 +374,7 @@ def write_dot(modules: dict[str, Module], edges: dict[tuple[str, str], str], out
             ]
         )
         for module in sorted(modules_by_directory[directory], key=lambda item: item.name):
-            lines.append(f"    {dot_quote(module.name)} [label={dot_quote(display_name(module.name))}];")
+            lines.append(f"    {dot_quote(module.name)} [label={dot_quote(format_node_label(module))}];")
         lines.extend(["  }", ""])
 
     for (source, target), kind in sorted(edges.items()):
@@ -338,6 +417,30 @@ def write_graphml(modules: dict[str, Module], edges: dict[tuple[str, str], str],
     ET.SubElement(
         root,
         graphml_tag("key"),
+        id="node_header_loc",
+        **{"for": "node", "attr.name": "header_loc", "attr.type": "int"},
+    )
+    ET.SubElement(
+        root,
+        graphml_tag("key"),
+        id="node_cpp_loc",
+        **{"for": "node", "attr.name": "cpp_loc", "attr.type": "int"},
+    )
+    ET.SubElement(
+        root,
+        graphml_tag("key"),
+        id="node_total_loc",
+        **{"for": "node", "attr.name": "total_loc", "attr.type": "int"},
+    )
+    ET.SubElement(
+        root,
+        graphml_tag("key"),
+        id="node_loc_annotation",
+        **{"for": "node", "attr.name": "loc_annotation", "attr.type": "string"},
+    )
+    ET.SubElement(
+        root,
+        graphml_tag("key"),
         id="edge_label",
         **{"for": "edge", "attr.name": "label", "attr.type": "string"},
     )
@@ -354,8 +457,12 @@ def write_graphml(modules: dict[str, Module], edges: dict[tuple[str, str], str],
     for module_name in sorted(modules):
         module = modules[module_name]
         node = ET.SubElement(graph, graphml_tag("node"), id=module_ids[module_name])
-        add_graphml_data(node, "node_label", display_name(module.name))
+        add_graphml_data(node, "node_label", format_node_label(module))
         add_graphml_data(node, "node_directory", "src" if module.directory == "." else module.directory)
+        add_graphml_data(node, "node_header_loc", str(module.header_loc))
+        add_graphml_data(node, "node_cpp_loc", str(module.cpp_loc))
+        add_graphml_data(node, "node_total_loc", str(module.total_loc))
+        add_graphml_data(node, "node_loc_annotation", format_module_loc_annotation(module))
 
     for index, ((source, target), kind) in enumerate(sorted(edges.items())):
         edge = ET.SubElement(
@@ -413,6 +520,7 @@ def main() -> int:
         f"Wrote {args.output} and {graphml_output} with {len(modules)} modules, "
         f"{public_edges} public dependencies, and {private_edges} private dependencies."
     )
+    print_package_loc_summary(modules)
     if args.check:
         violations = check_graph_rules(edges)
         if violations:
