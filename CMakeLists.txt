@@ -67,11 +67,11 @@ if(NOT MSCOREE_LIB)
 endif()
 add_executable(SystemTelemetry WIN32
     resources/SystemTelemetry.rc
-    src/app_main.cpp
+    src/main/main.cpp
     src/diagnostics/diagnostics.cpp
-    src/autostart/autostart.cpp
+    src/main/autostart.cpp
     src/util/command_line.cpp
-    src/app_config_io.cpp
+    src/main/config_io.cpp
     src/display/display_config.cpp
     src/diagnostics/diagnostics_options.cpp
     src/display/monitor.cpp

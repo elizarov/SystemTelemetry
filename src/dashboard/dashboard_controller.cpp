@@ -5,8 +5,6 @@
 #include <fstream>
 #include <string_view>
 
-#include "app_config_io.h"
-#include "autostart/autostart.h"
 #include "config/config_resolution.h"
 #include "config/config_writer.h"
 #include "diagnostics/constants.h"
@@ -14,6 +12,8 @@
 #include "display/display_config.h"
 #include "layout_edit/layout_edit_parameter.h"
 #include "layout_edit/layout_edit_service.h"
+#include "main/autostart.h"
+#include "main/config_io.h"
 #include "util/paths.h"
 
 namespace {

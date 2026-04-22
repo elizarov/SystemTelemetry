@@ -18,11 +18,11 @@
 #include <string>
 
 #include "resource.h"
-#include "util/command_line.h"
-#include "app_config_io.h"
 #include "dashboard/constants.h"
 #include "display/constants.h"
 #include "display/monitor.h"
+#include "main/config_io.h"
+#include "util/command_line.h"
 #include "util/paths.h"
 #include "util/strings.h"
 #include "dashboard/dashboard_controller.h"

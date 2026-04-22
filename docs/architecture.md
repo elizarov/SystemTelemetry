@@ -6,10 +6,10 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ## Top-Level Map
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
-- `src/autostart/` contains login auto-start registry updates, elevation handoff, and auto-start constants.
 - `src/config/` contains the config model, parser, resolver, writer, and schema metadata.
 - `src/display/` contains monitor enumeration, DPI scaling, placement, configure-display, wallpaper application helpers, and display-owned constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
+- `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, elevation handoff, and main-process constants.
 - `src/widget/widget.*` and `src/widget/widget_class.h` own the widget interface, class enum, and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, UTF-8 conversion, localization catalog access, numeric safety, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
@@ -71,7 +71,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Startup and config flow
 
-- `app_main` initializes process-wide shell settings, parses command-line options, and chooses either the normal UI path or the headless diagnostics path.
+- `src/main/main.cpp` initializes process-wide shell settings, parses command-line options, and chooses either the normal UI path or the headless diagnostics path.
 - Config load starts from embedded `resources/config.ini`, applies the executable-side overlay unless suppressed, and resolves the active layout plus runtime selections before telemetry and rendering start.
 - The executable manifest disables file virtualization and keeps config reads and writes pointed at the executable-side location.
 

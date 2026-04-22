@@ -1,11 +1,11 @@
-#include "app_config_io.h"
+#include "main/config_io.h"
 
 #include <shellapi.h>
 
-#include "diagnostics/diagnostics.h"
-#include "util/paths.h"
 #include "config/config_parser.h"
 #include "config/config_writer.h"
+#include "diagnostics/diagnostics.h"
+#include "util/paths.h"
 
 std::filesystem::path GetRuntimeConfigPath() {
     return GetExecutableDirectory() / L"config.ini";

@@ -1,8 +1,8 @@
-#include "autostart/autostart.h"
+#include "main/autostart.h"
 
 #include <shellapi.h>
 
-#include "autostart/constants.h"
+#include "main/constants.h"
 #include "util/command_line.h"
 #include "util/paths.h"
 

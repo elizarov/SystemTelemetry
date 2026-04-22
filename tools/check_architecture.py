@@ -17,7 +17,7 @@ HEADER_BODY_ALLOWLIST = {
     "src/config/config_schema.h",
 }
 CPP_WITHOUT_HEADER_ALLOWLIST = {
-    "src/app_main.cpp",
+    "src/main/main.cpp",
     "src/telemetry/board/gigabyte/board_gigabyte_siv.cpp",
     "src/telemetry/gpu/amd/gpu_amd_adl.cpp",
     "src/telemetry_runtime_fake.cpp",
