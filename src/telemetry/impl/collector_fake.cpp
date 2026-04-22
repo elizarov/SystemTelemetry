@@ -8,7 +8,6 @@
 #include <fstream>
 
 #include "telemetry/impl/collector_storage_selection.h"
-#include "telemetry/impl/retained_history.h"
 #include "util/strings.h"
 #include "util/trace.h"
 #include "util/utf8.h"

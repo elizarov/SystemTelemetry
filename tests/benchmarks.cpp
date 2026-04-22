@@ -1,5 +1,3 @@
-#include <windows.h>
-
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -27,11 +25,6 @@
 #include "util/enum_string.h"
 #include "util/trace.h"
 
-namespace {
-
-using Clock = std::chrono::steady_clock;
-using Duration = std::chrono::duration<double, std::milli>;
-
 #define SYSTEM_TELEMETRY_BENCHMARK_ITEMS(X)                                                                            \
     X(EditLayout, "edit-layout")                                                                                       \
     X(LayoutSwitch, "layout-switch")                                                                                   \
@@ -41,6 +34,11 @@ using Duration = std::chrono::duration<double, std::milli>;
 ENUM_STRING_DECLARE(Benchmark, SYSTEM_TELEMETRY_BENCHMARK_ITEMS);
 
 #undef SYSTEM_TELEMETRY_BENCHMARK_ITEMS
+
+namespace {
+
+using Clock = std::chrono::steady_clock;
+using Duration = std::chrono::duration<double, std::milli>;
 
 enum class BenchPhase {
     TelemetryUpdate = 0,

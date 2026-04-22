@@ -22,6 +22,24 @@ $clangTidySkippedFiles = @(
     'src/diagnostics/snapshot_dump.cpp'
 )
 
+function ConvertTo-RepoSlashPath {
+    param(
+        [string]$Path
+    )
+
+    return $Path -replace '\\', '/'
+}
+
+function Test-ClangTidySkippedFile {
+    param(
+        [string]$RepoRoot,
+        [string]$FullPath
+    )
+
+    $relativePath = ConvertTo-RepoSlashPath -Path (Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $FullPath)
+    return $relativePath -in $clangTidySkippedFiles
+}
+
 function Resolve-ClangTidyPath {
     param(
         [string]$RepoRoot,
@@ -164,7 +182,7 @@ function Get-TrackedCppFiles {
             Where-Object {
                 $_.FullName -notmatch '[\\/]vendor[\\/]' -and
                 $_.Name -ne 'board_gigabyte_siv.cpp' -and
-                (Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $_.FullName) -notin $clangTidySkippedFiles
+                -not (Test-ClangTidySkippedFile -RepoRoot $RepoRoot -FullPath $_.FullName)
             }
     }
 
@@ -226,7 +244,7 @@ function Get-ChangedCppFiles {
         if ([System.IO.Path]::GetFileName($normalizedPath) -eq 'board_gigabyte_siv.cpp') {
             continue
         }
-        if ((Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $normalizedPath) -in $clangTidySkippedFiles) {
+        if (Test-ClangTidySkippedFile -RepoRoot $RepoRoot -FullPath $normalizedPath) {
             continue
         }
 
@@ -316,19 +334,28 @@ function Start-TidyProcess {
             }
         }) -join ' '
 
-    $process = Start-Process -FilePath $ClangTidyPath `
-        -ArgumentList $argumentString `
-        -WorkingDirectory $RepoRoot `
-        -NoNewWindow `
-        -RedirectStandardOutput $stdoutPath `
-        -RedirectStandardError $stderrPath `
-        -PassThru
+    $processStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $processStartInfo.FileName = $ClangTidyPath
+    $processStartInfo.Arguments = $argumentString
+    $processStartInfo.WorkingDirectory = $RepoRoot
+    $processStartInfo.UseShellExecute = $false
+    $processStartInfo.CreateNoWindow = $true
+    $processStartInfo.RedirectStandardOutput = $true
+    $processStartInfo.RedirectStandardError = $true
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $processStartInfo
+    [void]$process.Start()
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
 
     return @{
         Index = $Index
         RelativePath = $RelativePath
         StdoutPath = $stdoutPath
         StderrPath = $stderrPath
+        StdoutTask = $stdoutTask
+        StderrTask = $stderrTask
         Process = $process
         StartedAt = [System.DateTime]::UtcNow
     }
@@ -348,11 +375,23 @@ function Complete-TidyProcess {
     }
 
     $outputLines = @()
-    if (Test-Path -LiteralPath $state.StdoutPath) {
+    if ($null -ne $state.StdoutTask) {
+        [void]$state.StdoutTask.Wait(5000)
+        $stdoutText = $state.StdoutTask.Result
+        if (-not [string]::IsNullOrEmpty($stdoutText)) {
+            $outputLines += $stdoutText -split '\r?\n'
+        }
+    } elseif (Test-Path -LiteralPath $state.StdoutPath) {
         $outputLines += Get-Content -LiteralPath $state.StdoutPath
         Remove-Item -LiteralPath $state.StdoutPath -Force -ErrorAction SilentlyContinue
     }
-    if (Test-Path -LiteralPath $state.StderrPath) {
+    if ($null -ne $state.StderrTask) {
+        [void]$state.StderrTask.Wait(5000)
+        $stderrText = $state.StderrTask.Result
+        if (-not [string]::IsNullOrEmpty($stderrText)) {
+            $outputLines += $stderrText -split '\r?\n'
+        }
+    } elseif (Test-Path -LiteralPath $state.StderrPath) {
         $outputLines += Get-Content -LiteralPath $state.StderrPath
         Remove-Item -LiteralPath $state.StderrPath -Force -ErrorAction SilentlyContinue
     }
@@ -381,6 +420,7 @@ function Complete-TidyProcess {
     if ($timedOut) {
         $exitCode = -1
     }
+    $state.Process.Dispose()
 
     return @{
         Index = $state.Index

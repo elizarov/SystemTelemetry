@@ -14,7 +14,6 @@
 #include "layout_edit/layout_edit_service.h"
 #include "main/autostart.h"
 #include "main/config_io.h"
-#include "util/paths.h"
 
 namespace {
 
