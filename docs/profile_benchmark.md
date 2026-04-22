@@ -28,25 +28,25 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured `edit-layout` result reached during this workstream:
-  - `drag_loop per_iter_ms=2.45`
-  - `snap avg_ms=0.20`
-  - `apply avg_ms=0.22`
-  - `paint_draw avg_ms=1.98`
+  - `drag_loop per_iter_ms=2.41`
+  - `snap avg_ms=0.19`
+  - `apply avg_ms=0.13`
+  - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.48` to `2.68`
-  - `snap avg_ms=0.19` to `0.20`
-  - `apply avg_ms=0.12` to `0.13`
-  - `paint_draw avg_ms=2.17` to `2.35`
+  - `drag_loop per_iter_ms=2.41`
+  - `snap avg_ms=0.19`
+  - `apply avg_ms=0.13`
+  - `paint_draw avg_ms=2.09`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.05` to `4.14`
-  - `telemetry_update avg_ms=2.19` to `2.22`
-  - `paint_total avg_ms=1.86` to `1.92`
-  - `paint_draw avg_ms=1.86` to `1.92`
+  - `update_loop per_iter_ms=3.95` to `4.00`
+  - `telemetry_update avg_ms=2.11` to `2.12`
+  - `paint_total avg_ms=1.85` to `1.88`
+  - `paint_draw avg_ms=1.85` to `1.88`
 - Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=3.48` to `3.63`
-  - `switch_apply avg_ms=0.74` to `0.76`
-  - `dialog_refresh avg_ms=0.14` to `0.16`
-  - `switch_paint avg_ms=2.59` to `2.71`
+  - `switch_loop per_iter_ms=3.53` to `3.56`
+  - `switch_apply avg_ms=0.74`
+  - `dialog_refresh avg_ms=0.15`
+  - `switch_paint avg_ms=2.63` to `2.66`
 
 ## Current Confirmed Hotspots
 
@@ -63,8 +63,9 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.19` to `2.22 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.86` to `1.92 ms` in repaint on this machine.
-- The direct `layout-switch` benchmark is paint-bound on this machine: repaint sits around `2.59` to `2.71 ms` of the `3.48` to `3.63 ms` loop while the dialog refresh work stays around `0.14` to `0.16 ms`.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.11` to `2.12 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.85` to `1.88 ms` in repaint on this machine.
+- The direct `layout-switch` benchmark is paint-bound on this machine: repaint sits around `2.63` to `2.66 ms` of the `3.53` to `3.56 ms` loop while the dialog refresh work stays around `0.15 ms`.
+- Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs are within or faster than the previous current-tree ranges.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
 ## Kept Optimizations
