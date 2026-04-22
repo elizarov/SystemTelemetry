@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <istream>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -12,7 +13,6 @@
 #include <vector>
 
 #include "config/telemetry_settings.h"
-#include "diagnostics/diagnostics_options.h"
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/metric_types.h"
@@ -126,11 +126,19 @@ public:
     virtual void SetSelectedStorageDrives(std::vector<std::string> driveLetters) = 0;
     virtual void RefreshSelectionsAndSnapshot() = 0;
     virtual void UpdateSnapshot() = 0;
-    void WriteDump(std::ostream& output) const;
 
 protected:
     TelemetryCollector() = default;
 };
 
+using TelemetryDumpLoader = bool (*)(std::istream& input, TelemetryDump& dump, std::string* error);
+
+struct TelemetryCollectorOptions {
+    bool fake = false;
+    std::filesystem::path fakePath;
+    bool showDialogs = true;
+    TelemetryDumpLoader loadFakeDump = nullptr;
+};
+
 std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
-    const DiagnosticsOptions& options, const std::filesystem::path& workingDirectory);
+    const TelemetryCollectorOptions& options, const std::filesystem::path& workingDirectory);

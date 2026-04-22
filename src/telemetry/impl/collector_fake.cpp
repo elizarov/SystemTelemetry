@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <fstream>
 
-#include "diagnostics/snapshot_dump.h"
 #include "telemetry/impl/collector_storage_selection.h"
 #include "telemetry/impl/retained_history.h"
 #include "util/strings.h"
@@ -370,8 +369,9 @@ std::filesystem::path ResolveFakePath(
 
 class FakeTelemetryCollector : public TelemetryCollector {
 public:
-    FakeTelemetryCollector(std::filesystem::path fakePath, bool showDialogs)
-        : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), showDialogs_(showDialogs) {}
+    FakeTelemetryCollector(std::filesystem::path fakePath, bool showDialogs, TelemetryDumpLoader loadFakeDump)
+        : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), showDialogs_(showDialogs),
+          loadFakeDump_(loadFakeDump) {}
 
     bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream) override {
         selectionSettings_ = settings.selection;
@@ -486,9 +486,17 @@ private:
             return false;
         }
 
+        if (loadFakeDump_ == nullptr) {
+            trace_.Write("fake:load_failed reason=loader_unavailable");
+            if (required && showDialogs_) {
+                MessageBoxW(nullptr, L"Fake telemetry dump loading is unavailable.", L"System Telemetry", MB_ICONERROR);
+            }
+            return false;
+        }
+
         TelemetryDump loaded;
         std::string error;
-        if (!LoadTelemetryDump(input, loaded, &error)) {
+        if (!loadFakeDump_(input, loaded, &error)) {
             trace_.Write("fake:load_failed reason=parse error=\"" + error + "\"");
             if (required && showDialogs_) {
                 const std::wstring message = WideFromUtf8("Failed to parse fake telemetry file:\n" + error);
@@ -508,6 +516,7 @@ private:
     std::filesystem::path fakePath_;
     bool useSyntheticSource_ = false;
     bool showDialogs_ = true;
+    TelemetryDumpLoader loadFakeDump_ = nullptr;
     TelemetrySelectionSettings selectionSettings_{};
     ResolvedTelemetrySelections resolvedSelections_{};
     TelemetryDump sourceDump_{};
@@ -523,7 +532,10 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(
-    const std::filesystem::path& workingDirectory, const std::filesystem::path& configuredPath, bool showDialogs) {
-    return std::make_unique<FakeTelemetryCollector>(ResolveFakePath(workingDirectory, configuredPath), showDialogs);
+std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(const std::filesystem::path& workingDirectory,
+    const std::filesystem::path& configuredPath,
+    bool showDialogs,
+    TelemetryDumpLoader loadFakeDump) {
+    return std::make_unique<FakeTelemetryCollector>(
+        ResolveFakePath(workingDirectory, configuredPath), showDialogs, loadFakeDump);
 }

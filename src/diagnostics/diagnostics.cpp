@@ -570,6 +570,15 @@ std::filesystem::path CreateElevatedSaveConfigTempPath() {
     return CreateTempFilePath(L"stc");
 }
 
+TelemetryCollectorOptions BuildTelemetryCollectorOptions(const DiagnosticsOptions& diagnosticsOptions) {
+    TelemetryCollectorOptions options;
+    options.fake = diagnosticsOptions.fake;
+    options.fakePath = diagnosticsOptions.fakePath;
+    options.showDialogs = !diagnosticsOptions.trace;
+    options.loadFakeDump = &LoadTelemetryDump;
+    return options;
+}
+
 int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath) {
     if (sourcePath.empty() || targetPath.empty()) {
         return 2;
@@ -587,7 +596,8 @@ int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std
 
 std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(
     const AppConfig& runtimeConfig, const DiagnosticsOptions& diagnosticsOptions, std::ostream* traceStream) {
-    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(diagnosticsOptions, GetWorkingDirectory());
+    std::unique_ptr<TelemetryCollector> telemetry =
+        CreateTelemetryCollector(BuildTelemetryCollectorOptions(diagnosticsOptions), GetWorkingDirectory());
     if (telemetry == nullptr) {
         return nullptr;
     }

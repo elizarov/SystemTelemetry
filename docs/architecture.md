@@ -128,3 +128,4 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Files below package subdirectories are package-private implementation modules, so dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.
 - `src/util/` is the base layer, so util modules may depend on other util modules but must not depend on non-util project modules.
 - `src/config/` is the second layer, so config modules may depend on other config modules and util modules but must not depend on non-config, non-util project modules.
+- `src/telemetry/` is the third layer, so telemetry modules may depend on telemetry, config, and util modules but must not depend on higher-level project modules.

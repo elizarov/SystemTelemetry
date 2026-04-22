@@ -17,7 +17,6 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "dashboard_renderer/dashboard_renderer.h"
-#include "diagnostics/diagnostics_options.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_parameter.h"
 #include "layout_edit/layout_edit_service.h"
@@ -130,14 +129,9 @@ bool IsKnownBenchmarkName(const std::string& name) {
     return IsEditLayoutBenchmarkName(name) || IsUpdateTelemetryBenchmarkName(name) || IsLayoutSwitchBenchmarkName(name);
 }
 
-DiagnosticsOptions BenchmarkDiagnosticsOptions() {
-    DiagnosticsOptions options;
-    options.trace = true;
-    return options;
-}
-
 std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config) {
-    const DiagnosticsOptions options = BenchmarkDiagnosticsOptions();
+    TelemetryCollectorOptions options;
+    options.showDialogs = false;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, std::filesystem::current_path());
     if (telemetry == nullptr) {
         return nullptr;
@@ -149,8 +143,9 @@ std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppC
 }
 
 std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const AppConfig& config) {
-    DiagnosticsOptions options;
+    TelemetryCollectorOptions options;
     options.fake = true;
+    options.showDialogs = false;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, std::filesystem::current_path());
     if (telemetry == nullptr) {
         return nullptr;
