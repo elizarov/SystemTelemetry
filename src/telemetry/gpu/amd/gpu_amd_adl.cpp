@@ -13,13 +13,6 @@ namespace {
 
 using namespace adlx;
 
-std::string Utf8FromAnsi(const char* text) {
-    if (text == nullptr || text[0] == '\0') {
-        return {};
-    }
-    return Utf8FromCodePage(text, CP_ACP);
-}
-
 class AmdAdlxGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
     explicit AmdAdlxGpuTelemetryProvider(tracing::Trace* trace) : trace_(trace) {}

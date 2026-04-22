@@ -44,20 +44,7 @@ std::wstring WideFromCodePage(std::string_view text, unsigned int codePage, DWOR
     return result;
 }
 
-}  // namespace
-
-bool IsValidUtf8(std::string_view text) {
-    return CanDecodeCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
-}
-
-std::wstring WideFromUtf8(std::string_view text) {
-    if (!IsValidUtf8(text)) {
-        return {};
-    }
-    return WideFromCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
-}
-
-std::string Utf8FromWide(std::wstring_view text) {
+std::string Utf8FromWideChars(std::wstring_view text) {
     if (text.empty()) {
         return {};
     }
@@ -94,5 +81,29 @@ std::string Utf8FromCodePage(std::string_view text, unsigned int codePage) {
 
     std::wstring wide(static_cast<size_t>(wideLength), L'\0');
     MultiByteToWideChar(codePage, 0, text.data(), length, wide.data(), wideLength);
-    return Utf8FromWide(wide);
+    return Utf8FromWideChars(wide);
+}
+
+}  // namespace
+
+bool IsValidUtf8(std::string_view text) {
+    return CanDecodeCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
+}
+
+std::wstring WideFromUtf8(std::string_view text) {
+    if (!IsValidUtf8(text)) {
+        return {};
+    }
+    return WideFromCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
+}
+
+std::string Utf8FromWide(std::wstring_view text) {
+    return Utf8FromWideChars(text);
+}
+
+std::string Utf8FromAnsi(const char* text) {
+    if (text == nullptr || text[0] == '\0') {
+        return {};
+    }
+    return Utf8FromCodePage(text, CP_ACP);
 }
