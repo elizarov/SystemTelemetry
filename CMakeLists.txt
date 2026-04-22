@@ -102,6 +102,7 @@ add_executable(SystemTelemetry WIN32
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
     src/util/localization_catalog.cpp
+    src/util/resource_loader.cpp
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
@@ -280,6 +281,7 @@ add_executable(SystemTelemetryTests
     src/layout_edit/layout_edit_parameter.cpp
     src/layout_edit/layout_edit_tooltip.cpp
     src/util/localization_catalog.cpp
+    src/util/resource_loader.cpp
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
@@ -378,6 +380,7 @@ add_executable(SystemTelemetryBenchmarks
     src/widget/impl/clock_date.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
+    src/util/resource_loader.cpp
     src/util/utf8.cpp
     src/util/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp

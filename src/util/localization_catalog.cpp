@@ -1,10 +1,9 @@
 #include "util/localization_catalog.h"
 
-#include <windows.h>
 #include <algorithm>
 
 #include "resource.h"
-#include "util/utf8.h"
+#include "util/resource_loader.h"
 
 namespace {
 
@@ -19,43 +18,6 @@ std::string Trim(std::string value) {
     }
     const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
     return std::string(first, last);
-}
-
-std::string LoadUtf8Resource(WORD resourceId, const wchar_t* resourceType) {
-    HMODULE module = GetModuleHandleW(nullptr);
-    if (module == nullptr) {
-        return {};
-    }
-
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), resourceType);
-    if (resource == nullptr) {
-        return {};
-    }
-
-    HGLOBAL loadedResource = LoadResource(module, resource);
-    if (loadedResource == nullptr) {
-        return {};
-    }
-
-    const DWORD resourceSize = SizeofResource(module, resource);
-    if (resourceSize == 0) {
-        return {};
-    }
-
-    const void* resourceData = LockResource(loadedResource);
-    if (resourceData == nullptr) {
-        return {};
-    }
-
-    std::string text(static_cast<const char*>(resourceData), static_cast<size_t>(resourceSize));
-    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
-        static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
-        text.erase(0, 3);
-    }
-    if (!IsValidUtf8(text)) {
-        return {};
-    }
-    return text;
 }
 
 }  // namespace
@@ -94,7 +56,7 @@ void InitializeLocalizationCatalog() {
         return;
     }
 
-    g_localizationCatalog = ParseLocalizationCatalog(LoadUtf8Resource(IDR_LOCALIZATION_CATALOG, RT_RCDATA));
+    g_localizationCatalog = ParseLocalizationCatalog(LoadUtf8ResourceData(IDR_LOCALIZATION_CATALOG));
     g_localizationCatalogInitialized = true;
 }
 

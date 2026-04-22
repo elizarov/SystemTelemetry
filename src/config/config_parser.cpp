@@ -1,15 +1,5 @@
 #include "config/config_parser.h"
 
-#include "config/config_resolution.h"
-#include "config/widget_class.h"
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -17,7 +7,10 @@
 #include <sstream>
 #include <type_traits>
 
+#include "config/config_resolution.h"
+#include "config/widget_class.h"
 #include "resource.h"
+#include "util/resource_loader.h"
 #include "util/utf8.h"
 
 namespace {
@@ -296,43 +289,6 @@ std::string ReadFileUtf8(const std::filesystem::path& path) {
     return text;
 }
 
-std::string LoadUtf8Resource(WORD resourceId, const wchar_t* resourceType) {
-    HMODULE module = GetModuleHandleW(nullptr);
-    if (module == nullptr) {
-        return {};
-    }
-
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), resourceType);
-    if (resource == nullptr) {
-        return {};
-    }
-
-    HGLOBAL loadedResource = LoadResource(module, resource);
-    if (loadedResource == nullptr) {
-        return {};
-    }
-
-    const DWORD resourceSize = SizeofResource(module, resource);
-    if (resourceSize == 0) {
-        return {};
-    }
-
-    const void* resourceData = LockResource(loadedResource);
-    if (resourceData == nullptr) {
-        return {};
-    }
-
-    std::string text(static_cast<const char*>(resourceData), static_cast<size_t>(resourceSize));
-    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
-        static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
-        text.erase(0, 3);
-    }
-    if (!IsValidUtf8(text)) {
-        return {};
-    }
-    return text;
-}
-
 class LayoutExpressionParser {
 public:
     explicit LayoutExpressionParser(const std::string& text) : text_(text) {}
@@ -595,7 +551,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
 }  // namespace
 
 std::string LoadEmbeddedConfigTemplate() {
-    return LoadUtf8Resource(IDR_CONFIG_TEMPLATE, RT_RCDATA);
+    return LoadUtf8ResourceData(IDR_CONFIG_TEMPLATE);
 }
 
 AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay, const ConfigParseContext& context) {
