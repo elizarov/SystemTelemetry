@@ -21,6 +21,18 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
 
+## Layered Core
+
+- The core project layers are ordered `util` -> `config` -> `telemetry` -> application-facing packages such as dashboard, renderer, widget, diagnostics, display, layout-edit, and main.
+- Dependencies flow downward only. A higher layer may include lower-layer contracts, but a lower layer must not include or call into a higher layer.
+- `src/util/` is the base layer. It contains domain-neutral helpers for text, paths, resources, enum strings, UTF-8 conversion, localization catalog access, numeric safety, and trace emission. Util modules may depend on other util modules, but must not depend on config, telemetry, rendering, UI, diagnostics, or application packages.
+- `src/config/` is the second layer. It owns the persisted config model, parser, writer, resolver, schema metadata, and config-facing contract types such as widget class, metric display style, and telemetry settings DTOs. Config modules may depend only on config and util modules.
+- Config must not duplicate runtime catalogs or reach upward to validate runtime concepts. When config parsing needs runtime knowledge, it uses config-owned injection contracts such as `ConfigMetricCatalog`; production code supplies the telemetry-backed implementation from above.
+- `src/telemetry/` is the third layer. It owns live collection, fake collection, snapshot and dump-facing telemetry types, provider bridges, retained history, and the single production metric catalog. Telemetry modules may depend on telemetry, config, and util modules, but must not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main modules.
+- Telemetry is allowed to consume config contracts such as telemetry settings and metric display style, and it publishes runtime contracts such as `TelemetryCollector`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
+- Cross-layer shared types belong in the lowest layer that semantically owns them. Move config-language DTOs to config, runtime telemetry DTOs to telemetry, and domain-neutral helpers to util; do not copy catalogs or enums across layers to avoid a dependency violation.
+- `lint.cmd` enforces the util, config, and telemetry layer rules through the source dependency graph before reporting success.
+
 ## Major Subsystems
 
 ### App shell and session orchestration
