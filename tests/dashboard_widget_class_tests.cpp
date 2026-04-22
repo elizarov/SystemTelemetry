@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "widget/widget_class.h"
+#include "config/widget_class.h"
 
 #include <array>
 #include <set>

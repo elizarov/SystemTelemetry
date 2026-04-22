@@ -14,7 +14,7 @@
 #include "diagnostics/diagnostics_options.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/metric_types.h"
-#include "telemetry/telemetry_settings.h"
+#include "config/telemetry_settings.h"
 
 struct MemoryMetric {
     double usedGb = 0.0;

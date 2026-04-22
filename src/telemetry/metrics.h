@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "config/config.h"
+#include "config/metric_catalog.h"
 #include "telemetry/telemetry.h"
 
 struct MetricValue {
@@ -47,6 +48,7 @@ struct DriveRow {
 
 bool IsStaticTextMetric(std::string_view metricRef);
 std::optional<MetricDisplayStyle> FindMetricDisplayStyle(std::string_view metricRef);
+ConfigMetricCatalog TelemetryMetricCatalog();
 bool IsGenerallyAvailableMetric(std::string_view metricRef);
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef);
 

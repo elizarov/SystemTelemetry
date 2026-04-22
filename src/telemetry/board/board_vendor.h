@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "telemetry/metric_types.h"
-#include "telemetry/telemetry_settings.h"
+#include "config/telemetry_settings.h"
 
 namespace tracing {
 class Trace;

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "config/config_parser.h"
+#include "telemetry/metrics.h"
 #include "util/utf8.h"
 #include <fstream>
 
@@ -12,6 +13,10 @@ std::filesystem::path WriteTestConfig(const std::string& text) {
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     output << text;
     return path;
+}
+
+ConfigParseContext TestConfigParseContext() {
+    return ConfigParseContext{TelemetryMetricCatalog()};
 }
 
 }  // namespace
@@ -27,7 +32,7 @@ TEST(ConfigParser, ClampsParsedEditableValuesThroughSchemaPolicies) {
                                                        "sweep_degrees = 500\n"
                                                        "segment_gap_degrees = -12\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(config.layout.fonts.label.size, 1);
     EXPECT_EQ(config.layout.driveUsageList.activitySegmentGap, 0);
@@ -44,7 +49,7 @@ TEST(ConfigParser, ParsesRenamedCardStyleKeys) {
                                                        "header_content_gap = 5\n"
                                                        "row_gap = 4\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(config.layout.cardStyle.headerIconSize, 21);
     EXPECT_EQ(config.layout.cardStyle.headerIconGap, 7);
@@ -60,7 +65,7 @@ TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
                                                        "row_gap = 9\n"
                                                        "column_gap = 11\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(config.layout.dashboard.outerMargin, 8);
     EXPECT_EQ(config.layout.dashboard.rowGap, 9);
@@ -74,7 +79,7 @@ TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
                                                        "accent_color = #12345678\n"
                                                        "track_color = #ABCDEF\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
     const AppConfig defaults;
 
     EXPECT_EQ(config.layout.colors.accentColor.ToRgba(), 0x12345678u);
@@ -88,7 +93,7 @@ TEST(ConfigParser, ParsesMetricsSectionEntries) {
                                                        "cpu.load = *,%,Processor Load\n"
                                                        "gpu.temp = 110,C,GPU Temp\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.layout.metrics, "cpu.load");
     ASSERT_NE(loadMetric, nullptr);
@@ -113,7 +118,7 @@ TEST(ConfigParser, IgnoresRuntimePlaceholderMetricMetadataInMetricsSection) {
                                                        "nothing = 7,ignored,Overridden Placeholder\n"
                                                        "cpu.load = *,%,Processor Load\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(FindMetricDefinition(config.layout.metrics, "nothing"), nullptr);
     const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.layout.metrics, "cpu.load");
@@ -132,7 +137,7 @@ TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
                                                        "window = 480,800\n"
                                                        "cards = columns(cpu,gpu)\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     ASSERT_EQ(config.layout.layouts.size(), 1u);
     EXPECT_EQ(config.layout.layouts[0].name, "portrait");
@@ -151,7 +156,7 @@ TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
                                                        "cpu.load = *,%,Processor Load\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     const MetricDefinitionConfig* loadMetric = FindMetricDefinition(config.layout.metrics, "cpu.load");
     ASSERT_NE(loadMetric, nullptr);
@@ -167,7 +172,7 @@ TEST(ConfigParser, RejectsSerializedMetricStyleTokensInMetricsSection) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
                                                        "cpu.load = percent,*,%,Processor Load\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(FindMetricDefinition(config.layout.metrics, "cpu.load"), nullptr);
 
@@ -178,7 +183,7 @@ TEST(ConfigParser, RejectsUnknownMetricIdsWithoutMetadataStyle) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
                                                        "custom.metric = 100,U,Custom\n");
 
-    const AppConfig config = LoadConfig(path, true);
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(FindMetricDefinition(config.layout.metrics, "custom.metric"), nullptr);
 

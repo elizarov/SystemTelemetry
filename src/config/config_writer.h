@@ -4,6 +4,7 @@
 #include <string>
 
 #include "config/config.h"
+#include "config/metric_catalog.h"
 
 enum class ConfigSaveShape {
     UpdateOrAppend,
@@ -15,5 +16,5 @@ std::string BuildSavedConfigText(const std::string& initialText,
     const AppConfig& config,
     const AppConfig* compareConfig,
     ConfigSaveShape shape = ConfigSaveShape::UpdateOrAppend);
-bool SaveConfig(const std::filesystem::path& path, const AppConfig& config);
+bool SaveConfig(const std::filesystem::path& path, const AppConfig& config, const ConfigParseContext& context);
 bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config);

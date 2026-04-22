@@ -536,8 +536,8 @@ std::string BuildSavedConfigText(
     return JoinConfigLines(lines);
 }
 
-bool SaveConfig(const std::filesystem::path& path, const AppConfig& config) {
-    const AppConfig compareConfig = LoadConfig(path);
+bool SaveConfig(const std::filesystem::path& path, const AppConfig& config, const ConfigParseContext& context) {
+    const AppConfig compareConfig = LoadConfig(path, true, context);
     const std::string output = BuildSavedConfigText(ReadFileUtf8(path), config, &compareConfig);
     return WriteFileUtf8(path, output);
 }

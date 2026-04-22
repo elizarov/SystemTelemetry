@@ -6,17 +6,17 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ## Top-Level Map
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
-- `src/config/` contains the config model, parser, resolver, writer, and schema metadata.
+- `src/config/` contains the config model, parser, resolver, writer, schema metadata, config-facing enum and DTO contracts, and injected metric-catalog view.
 - `src/display/` contains monitor enumeration, DPI scaling, placement, configure-display, wallpaper application helpers, and display-owned constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, elevation handoff, and main-process constants.
-- `src/widget/widget.*` and `src/widget/widget_class.h` own the widget interface, class enum, and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
+- `src/widget/widget.*` owns the widget interface and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, UTF-8 conversion, localization catalog access, numeric safety, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
 - `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, `src/dashboard_renderer/render_types.*` owns shared render-space contract types, and `src/dashboard_renderer/impl/` contains helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
 - `src/layout_edit/` contains shared layout-edit interaction, parameter, tooltip, tree, trace-session, and snap-solver modules.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
-- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h`, `src/telemetry/metric_display_style.h`, and `src/telemetry/telemetry_settings.h` own shared telemetry and metric enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
+- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
@@ -35,6 +35,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `LayoutConfig` is the layout-edit session boundary and includes layout-owned sections such as widget geometry, shared styling, board bindings, and metric definitions.
 - `AppConfig` layers runtime display, network, storage, and active-layout selection around the shared layout-owned state.
 - Runtime-only placeholder metric metadata stays synthesized outside persisted config so `[metrics]` remains limited to configurable metric definitions.
+- Config metric validation uses an injected catalog view; the metric id and display-style source of truth lives in telemetry metrics.
 - Parser and writer code keep UTF-8 I/O, overlay behavior, and text-preserving saves separate from higher-level config resolution.
 
 ### Telemetry
@@ -126,3 +127,4 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - A dependency from an including module to an included module is `public` when it appears in a header and `private` when it appears only in an implementation file.
 - Files below package subdirectories are package-private implementation modules, so dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.
 - `src/util/` is the base layer, so util modules may depend on other util modules but must not depend on non-util project modules.
+- `src/config/` is the second layer, so config modules may depend on other config modules and util modules but must not depend on non-config, non-util project modules.

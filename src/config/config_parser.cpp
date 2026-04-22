@@ -1,7 +1,6 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
-#include "telemetry/metrics.h"
-#include "widget/widget_class.h"
+#include "config/widget_class.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -9,6 +8,8 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#include <windows.h>
+
 #include "resource.h"
 
 #include <algorithm>
@@ -118,9 +119,10 @@ bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
     return ParseIntPair(value, size.width, size.height);
 }
 
-bool ParseMetricDefinition(const std::string& value, MetricDefinitionConfig& definition) {
+bool ParseMetricDefinition(
+    const std::string& value, MetricDefinitionConfig& definition, const ConfigParseContext& context) {
     const std::vector<std::string> parts = SplitPreservingEmpty(value, ',');
-    const std::optional<MetricDisplayStyle> metadataStyle = FindMetricDisplayStyle(definition.id);
+    const std::optional<MetricDisplayStyle> metadataStyle = context.metricCatalog.FindMetricDisplayStyle(definition.id);
     if (!metadataStyle.has_value()) {
         return false;
     }
@@ -222,18 +224,21 @@ bool ApplyStructuredSectionFields(
 }
 
 template <typename Codec, typename Owner> struct CustomSectionHandler {
-    static bool Apply(Owner&, const std::string&, const std::string&) {
+    static bool Apply(Owner&, const std::string&, const std::string&, const ConfigParseContext&) {
         return false;
     }
 };
 
 template <typename Section>
-bool ApplySectionValue(typename Section::owner_type& owner, const std::string& key, const std::string& value) {
+bool ApplySectionValue(typename Section::owner_type& owner,
+    const std::string& key,
+    const std::string& value,
+    const ConfigParseContext& context) {
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
         return ApplyStructuredSectionFields<Section>(owner, key, value);
     } else {
         return CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::Apply(
-            owner, key, value);
+            owner, key, value, context);
     }
 }
 
@@ -242,26 +247,29 @@ template <typename BindingList, typename Owner, typename Fn> void ForEachKnownBi
 }
 
 template <typename BindingList, typename Owner>
-bool DispatchKnownBindingSection(
-    Owner& owner, const std::string& section, const std::string& key, const std::string& value) {
+bool DispatchKnownBindingSection(Owner& owner,
+    const std::string& section,
+    const std::string& key,
+    const std::string& value,
+    const ConfigParseContext& context) {
     bool handled = false;
     ForEachKnownBinding<BindingList>(owner, [&](auto binding, auto& currentOwner) {
         using Binding = decltype(binding);
         if (!handled) {
             if constexpr (Binding::is_recursive) {
                 handled = DispatchKnownBindingSection<typename Binding::nested_owner_type::BindingList>(
-                    Binding::Get(currentOwner), section, key, value);
+                    Binding::Get(currentOwner), section, key, value, context);
             } else if constexpr (Binding::is_dynamic) {
                 using Section = typename Binding::section_type;
                 if (Section::Matches(section)) {
                     typename Section::owner_type& item = Binding::Ensure(currentOwner, Section::Suffix(section));
-                    ApplySectionValue<Section>(item, key, value);
+                    ApplySectionValue<Section>(item, key, value, context);
                     handled = true;
                 }
             } else {
                 using Section = typename Binding::section_type;
                 if (section == Section::name.view()) {
-                    ApplySectionValue<Section>(Binding::Get(currentOwner), key, value);
+                    ApplySectionValue<Section>(Binding::Get(currentOwner), key, value, context);
                     handled = true;
                 }
             }
@@ -515,7 +523,7 @@ void DecodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(
 }
 
 template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardConfig> {
-    static bool Apply(BoardConfig& board, const std::string& key, const std::string& value) {
+    static bool Apply(BoardConfig& board, const std::string& key, const std::string& value, const ConfigParseContext&) {
         if (key.rfind("board.temp.", 0) == 0) {
             board.temperatureSensorNames[key.substr(std::string("board.temp.").size())] = value;
             return true;
@@ -529,7 +537,10 @@ template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardCo
 };
 
 template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, MetricsSectionConfig> {
-    static bool Apply(MetricsSectionConfig& metrics, const std::string& key, const std::string& value) {
+    static bool Apply(MetricsSectionConfig& metrics,
+        const std::string& key,
+        const std::string& value,
+        const ConfigParseContext& context) {
         if (key.empty()) {
             return false;
         }
@@ -540,10 +551,10 @@ template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, Metri
         MetricDefinitionConfig* definition = FindMetricDefinition(metrics, key);
         MetricDefinitionConfig candidate = definition != nullptr ? *definition : MetricDefinitionConfig{};
         candidate.id = key;
-        if (const auto style = FindMetricDisplayStyle(key); style.has_value()) {
+        if (const auto style = context.metricCatalog.FindMetricDisplayStyle(key); style.has_value()) {
             candidate.style = *style;
         }
-        if (!ParseMetricDefinition(value, candidate)) {
+        if (!ParseMetricDefinition(value, candidate, context)) {
             return false;
         }
         if (definition != nullptr) {
@@ -555,7 +566,7 @@ template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, Metri
     }
 };
 
-void ApplyConfigText(const std::string& text, AppConfig& config) {
+void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigParseContext& context) {
     std::string section;
     std::stringstream stream(text);
     std::string line;
@@ -578,7 +589,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config) {
         const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
 
-        DispatchKnownBindingSection<AppConfig::BindingList>(config, section, key, value);
+        DispatchKnownBindingSection<AppConfig::BindingList>(config, section, key, value, context);
     }
 }
 
@@ -588,11 +599,11 @@ std::string LoadEmbeddedConfigTemplate() {
     return LoadUtf8Resource(IDR_CONFIG_TEMPLATE, RT_RCDATA);
 }
 
-AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay) {
+AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay, const ConfigParseContext& context) {
     AppConfig config;
-    ApplyConfigText(LoadEmbeddedConfigTemplate(), config);
+    ApplyConfigText(LoadEmbeddedConfigTemplate(), config, context);
     if (includeOverlay) {
-        ApplyConfigText(ReadFileUtf8(path), config);
+        ApplyConfigText(ReadFileUtf8(path), config, context);
     }
     MarkCardLayoutReferences(config.layout);
     SelectResolvedLayout(config, config.display.layout);

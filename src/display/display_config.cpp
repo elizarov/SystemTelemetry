@@ -117,7 +117,8 @@ bool ConfigureDisplay(
             std::nullopt,
             traceStream,
             &screenshotError);
-        return imageSaved && SaveConfig(configPath, config) && ApplyConfiguredWallpaper(config, traceStream);
+        return imageSaved && SaveConfig(configPath, config, RuntimeConfigParseContext()) &&
+               ApplyConfiguredWallpaper(config, traceStream);
     }
 
     const std::filesystem::path tempConfigPath = CreateTempFilePath(L"SystemTelemetryConfigureDisplayConfig");
@@ -126,7 +127,7 @@ bool ConfigureDisplay(
         return false;
     }
 
-    bool prepared = SaveConfig(tempConfigPath, config);
+    bool prepared = SaveConfig(tempConfigPath, config, RuntimeConfigParseContext());
     if (prepared) {
         std::ofstream output(tempDumpPath, std::ios::binary | std::ios::trunc);
         prepared = output.is_open() && WriteTelemetryDump(output, dump);
@@ -189,7 +190,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         return 2;
     }
 
-    const AppConfig config = LoadConfig(sourceConfigPath);
+    const AppConfig config = LoadConfig(sourceConfigPath, true, RuntimeConfigParseContext());
     TelemetryDump dump;
     {
         std::ifstream input(sourceDumpPath, std::ios::binary);
@@ -225,7 +226,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         std::nullopt,
         nullptr,
         &screenshotError);
-    const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config);
+    const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config, RuntimeConfigParseContext());
     const bool wallpaperApplied = configSaved && ApplyConfiguredWallpaper(config, nullptr);
 
     std::error_code ignored;

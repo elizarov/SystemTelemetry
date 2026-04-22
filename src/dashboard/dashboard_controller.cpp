@@ -57,7 +57,7 @@ std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOp
 
 bool SaveRuntimeConfig(const std::filesystem::path& path, const AppConfig& config, HWND owner) {
     if (CanWriteRuntimeConfig(path)) {
-        return SaveConfig(path, config);
+        return SaveConfig(path, config, RuntimeConfigParseContext());
     }
     return SaveConfigElevated(path, config, owner);
 }

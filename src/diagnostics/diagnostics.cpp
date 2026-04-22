@@ -453,7 +453,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
         return false;
     }
 
-    if (options_.saveConfig && !SaveConfig(saveConfigPath_, config)) {
+    if (options_.saveConfig && !SaveConfig(saveConfigPath_, config, RuntimeConfigParseContext())) {
         const std::wstring message =
             WideFromUtf8("Failed to save config file:\n" + Utf8FromWide(saveConfigPath_.wstring()));
         ReportError("diagnostics:config_save_failed path=\"" + Utf8FromWide(saveConfigPath_.wstring()) + "\"", message);
@@ -574,8 +574,8 @@ int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std
         return 2;
     }
 
-    const AppConfig config = LoadConfig(sourcePath);
-    if (!SaveConfig(targetPath, config)) {
+    const AppConfig config = LoadConfig(sourcePath, true, RuntimeConfigParseContext());
+    if (!SaveConfig(targetPath, config, RuntimeConfigParseContext())) {
         return 1;
     }
 
@@ -601,7 +601,8 @@ bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
     DiagnosticsSession* diagnostics) {
-    const AppConfig reloadedConfig = LoadConfig(configPath, !diagnosticsOptions.defaultConfig);
+    const AppConfig reloadedConfig =
+        LoadConfig(configPath, !diagnosticsOptions.defaultConfig, RuntimeConfigParseContext());
     AppConfig effectiveReloadedConfig = reloadedConfig;
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarker("diagnostics:reload_config_begin");

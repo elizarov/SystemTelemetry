@@ -3,6 +3,7 @@
 
 #include "config/config_parser.h"
 #include "config/config_writer.h"
+#include "telemetry/metrics.h"
 
 #include <fstream>
 #include <sstream>
@@ -20,6 +21,10 @@ std::string ReadConfigTemplateFromSourceTree() {
 
 std::filesystem::path SourceConfigPath() {
     return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+}
+
+ConfigParseContext TestConfigParseContext() {
+    return ConfigParseContext{TelemetryMetricCatalog()};
 }
 
 }  // namespace
@@ -84,7 +89,7 @@ TEST(ConfigWriter, WritesColorAlphaInHexColorValues) {
 }
 
 TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
-    AppConfig config = LoadConfig(SourceConfigPath(), true);
+    AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
 
     const MetricDefinitionConfig* cpuLoad = FindMetricDefinition(config.layout.metrics, "cpu.load");
     ASSERT_NE(cpuLoad, nullptr);
@@ -100,7 +105,7 @@ TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
 }
 
 TEST(ConfigWriter, FullExportOmitsRuntimePlaceholderMetricDefinition) {
-    AppConfig config = LoadConfig(SourceConfigPath(), true);
+    AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     config.layout.metrics.definitions.insert(config.layout.metrics.definitions.begin(),
         MetricDefinitionConfig{"nothing", MetricDisplayStyle::Scalar, false, 1.0, "", "Nothing Override"});
 
@@ -112,7 +117,7 @@ TEST(ConfigWriter, FullExportOmitsRuntimePlaceholderMetricDefinition) {
 }
 
 TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {
-    AppConfig compareConfig = LoadConfig(SourceConfigPath(), true);
+    AppConfig compareConfig = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     AppConfig currentConfig = compareConfig;
 
     MetricDefinitionConfig* gpuTemp = FindMetricDefinition(currentConfig.layout.metrics, "gpu.temp");
@@ -127,7 +132,7 @@ TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {
 }
 
 TEST(ConfigWriter, SerializedMetricStyleComesFromMetadataInsteadOfStructValue) {
-    AppConfig config = LoadConfig(SourceConfigPath(), true);
+    AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
 
     MetricDefinitionConfig* gpuTemp = FindMetricDefinition(config.layout.metrics, "gpu.temp");
     ASSERT_NE(gpuTemp, nullptr);
@@ -144,7 +149,7 @@ TEST(ConfigWriter, SerializedMetricStyleComesFromMetadataInsteadOfStructValue) {
 }
 
 TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughReflectedDynamicBindings) {
-    AppConfig compareConfig = LoadConfig(SourceConfigPath(), true);
+    AppConfig compareConfig = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     AppConfig currentConfig = compareConfig;
 
     const auto it = std::find_if(currentConfig.layout.layouts.begin(),

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "telemetry/telemetry_settings.h"
+#include "config/telemetry_settings.h"
 
 struct RealTelemetryCollectorState;
 

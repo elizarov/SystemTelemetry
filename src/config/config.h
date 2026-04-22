@@ -1,8 +1,8 @@
 #pragma once
 
 #include "config/config_schema.h"
-#include "telemetry/metric_display_style.h"
-#include "telemetry/telemetry_settings.h"
+#include "config/metric_display_style.h"
+#include "config/telemetry_settings.h"
 
 #include <cstdint>
 #include <filesystem>

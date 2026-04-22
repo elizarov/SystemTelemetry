@@ -26,6 +26,7 @@
 #include "layout_edit/layout_edit_parameter.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_trace_session.h"
+#include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
 
 namespace {
@@ -56,6 +57,10 @@ struct BenchResult {
 
 std::filesystem::path SourceConfigPath() {
     return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+}
+
+ConfigParseContext BenchmarkConfigParseContext() {
+    return ConfigParseContext{TelemetryMetricCatalog()};
 }
 
 size_t PhaseIndex(BenchPhase phase) {
@@ -574,7 +579,7 @@ int main(int argc, char** argv) {
     }
 
     if (benchmarkName == "edit-layout") {
-        const AppConfig config = LoadConfig(SourceConfigPath(), false);
+        const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
         std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config);
         if (telemetry == nullptr) {
             std::cerr << "fake telemetry init failed\n";
@@ -620,7 +625,7 @@ int main(int argc, char** argv) {
     }
 
     if (benchmarkName == "layout-switch") {
-        const AppConfig config = LoadConfig(SourceConfigPath(), false);
+        const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
         std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config);
         if (telemetry == nullptr) {
             std::cerr << "fake telemetry init failed\n";
@@ -651,7 +656,7 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    const AppConfig config = LoadConfig(SourceConfigPath(), false);
+    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
     std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkTelemetryCollector(config);
     if (telemetry == nullptr) {
         std::cerr << "telemetry init failed\n";

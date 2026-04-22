@@ -636,6 +636,10 @@ std::optional<MetricDisplayStyle> FindMetricDisplayStyle(std::string_view metric
     return match.binding != nullptr ? match.binding->metricStyle : std::nullopt;
 }
 
+ConfigMetricCatalog TelemetryMetricCatalog() {
+    return ConfigMetricCatalog{&FindMetricDisplayStyle};
+}
+
 bool IsGenerallyAvailableMetric(std::string_view metricRef) {
     const MetricBindingMatch match = FindMetricBinding(metricRef);
     return match.binding != nullptr && match.binding->generallyAvailable;

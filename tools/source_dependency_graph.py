@@ -197,10 +197,33 @@ def check_util_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     return violations
 
 
+def check_config_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    allowed_targets = {"config", "util"}
+    for source, target in sorted(edges):
+        if top_level_package(source) != "config":
+            continue
+        if top_level_package(target) in allowed_targets:
+            continue
+        violations.append(
+            Violation(
+                kind="layer-config",
+                source=source,
+                target=target,
+                message=(
+                    f"{source} is in the config layer and must depend only on config or util modules, "
+                    f"not project module {target}."
+                ),
+            )
+        )
+    return violations
+
+
 def check_graph_rules(edges: dict[tuple[str, str], str]) -> list[Violation]:
     return [
         *check_package_encapsulation(edges),
         *check_util_layer(edges),
+        *check_config_layer(edges),
     ]
 
 

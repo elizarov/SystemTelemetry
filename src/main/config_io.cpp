@@ -5,14 +5,19 @@
 #include "config/config_parser.h"
 #include "config/config_writer.h"
 #include "diagnostics/diagnostics.h"
+#include "telemetry/metrics.h"
 #include "util/paths.h"
 
 std::filesystem::path GetRuntimeConfigPath() {
     return GetExecutableDirectory() / L"config.ini";
 }
 
+ConfigParseContext RuntimeConfigParseContext() {
+    return ConfigParseContext{TelemetryMetricCatalog()};
+}
+
 AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) {
-    AppConfig config = LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig);
+    AppConfig config = LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig, RuntimeConfigParseContext());
     ApplyDiagnosticsScaleOverride(config, options);
     return config;
 }
@@ -23,7 +28,7 @@ bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig
         return false;
     }
 
-    if (!SaveConfig(tempPath, config)) {
+    if (!SaveConfig(tempPath, config, RuntimeConfigParseContext())) {
         std::error_code ignored;
         std::filesystem::remove(tempPath, ignored);
         return false;
