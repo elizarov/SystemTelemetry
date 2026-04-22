@@ -47,24 +47,6 @@ std::string Trace::BoolText(bool value) {
     return value ? "yes" : "no";
 }
 
-std::string Trace::FormatAdlxResult(const char* label, int result) {
-    char buffer[64];
-    sprintf_s(buffer, "%s=%d", label, result);
-    return buffer;
-}
-
-std::string Trace::FormatPdhStatus(const char* label, long status) {
-    char buffer[64];
-    sprintf_s(buffer, "%s=%ld", label, status);
-    return buffer;
-}
-
-std::string Trace::FormatWin32Status(const char* label, unsigned long status) {
-    char buffer[64];
-    sprintf_s(buffer, "%s=%lu", label, status);
-    return buffer;
-}
-
 std::string Trace::FormatValueDouble(const char* label, double value, int precision) {
     char buffer[96];
     sprintf_s(buffer, "%s=%.*f", label, precision, value);

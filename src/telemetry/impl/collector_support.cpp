@@ -70,6 +70,12 @@ std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
     return buffer;
 }
 
+std::string PdhStatusCodeString(PDH_STATUS status) {
+    char buffer[32];
+    sprintf_s(buffer, "%ld", static_cast<long>(status));
+    return buffer;
+}
+
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
 
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, const wchar_t* path, PDH_HCOUNTER* counter) {

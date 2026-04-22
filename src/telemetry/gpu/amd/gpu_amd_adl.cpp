@@ -16,6 +16,10 @@ namespace {
 
 using namespace adlx;
 
+std::string AdlxResultCodeString(ADLX_RESULT result) {
+    return std::to_string(static_cast<int>(result));
+}
+
 class AmdAdlxGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
     explicit AmdAdlxGpuTelemetryProvider(Trace& trace) : trace_(trace) {}
@@ -30,28 +34,24 @@ public:
     bool Initialize() override {
         trace().Write("amd_adlx:initialize_begin");
         ADLX_RESULT result = helper_.Initialize();
-        trace().Write("amd_adlx:helper_initialize " + Trace::FormatAdlxResult("result", static_cast<int>(result)));
+        trace().Write("amd_adlx:helper_initialize result=" + AdlxResultCodeString(result));
         if (ADLX_FAILED(result)) {
-            trace().Write("amd_adlx:helper_initialize_incompatible_begin " +
-                          Trace::FormatAdlxResult("result", static_cast<int>(result)));
+            trace().Write("amd_adlx:helper_initialize_incompatible_begin result=" + AdlxResultCodeString(result));
             result = helper_.InitializeWithIncompatibleDriver();
-            trace().Write("amd_adlx:helper_initialize_incompatible_done " +
-                          Trace::FormatAdlxResult("result", static_cast<int>(result)));
+            trace().Write("amd_adlx:helper_initialize_incompatible_done result=" + AdlxResultCodeString(result));
         }
         if (ADLX_FAILED(result) || helper_.GetSystemServices() == nullptr) {
-            diagnostics_ = "ADLX initialization failed: " + Trace::FormatAdlxResult("init", static_cast<int>(result));
+            diagnostics_ = "ADLX initialization failed: init=" + AdlxResultCodeString(result);
             trace().Write("amd_adlx:initialize_failed " + diagnostics_);
             return false;
         }
 
         trace().Write("amd_adlx:get_performance_monitoring_begin");
         result = helper_.GetSystemServices()->GetPerformanceMonitoringServices(&performanceMonitoring_);
-        trace().Write("amd_adlx:get_performance_monitoring_done " +
-                      Trace::FormatAdlxResult("result", static_cast<int>(result)) +
+        trace().Write("amd_adlx:get_performance_monitoring_done result=" + AdlxResultCodeString(result) +
                       " available=" + Trace::BoolText(performanceMonitoring_ != nullptr));
         if (ADLX_FAILED(result) || !performanceMonitoring_) {
-            diagnostics_ = "Failed to get ADLX performance monitoring services: " +
-                           Trace::FormatAdlxResult("perf", static_cast<int>(result));
+            diagnostics_ = "Failed to get ADLX performance monitoring services: perf=" + AdlxResultCodeString(result);
             trace().Write("amd_adlx:get_performance_monitoring_failed " + diagnostics_);
             return false;
         }
@@ -59,27 +59,27 @@ public:
         IADLXGPUListPtr gpus;
         trace().Write("amd_adlx:get_gpus_begin");
         result = helper_.GetSystemServices()->GetGPUs(&gpus);
-        trace().Write("amd_adlx:get_gpus_done " + Trace::FormatAdlxResult("result", static_cast<int>(result)) +
+        trace().Write("amd_adlx:get_gpus_done result=" + AdlxResultCodeString(result) +
                       " available=" + Trace::BoolText(gpus != nullptr));
         if (ADLX_FAILED(result) || !gpus || gpus->Empty()) {
-            diagnostics_ = "Failed to get AMD GPU list: " + Trace::FormatAdlxResult("gpus", static_cast<int>(result));
+            diagnostics_ = "Failed to get AMD GPU list: gpus=" + AdlxResultCodeString(result);
             trace().Write("amd_adlx:get_gpus_failed " + diagnostics_);
             return false;
         }
 
         trace().Write("amd_adlx:get_first_gpu_begin");
         result = gpus->At(gpus->Begin(), &gpu_);
-        trace().Write("amd_adlx:get_first_gpu_done " + Trace::FormatAdlxResult("result", static_cast<int>(result)) +
+        trace().Write("amd_adlx:get_first_gpu_done result=" + AdlxResultCodeString(result) +
                       " available=" + Trace::BoolText(gpu_ != nullptr));
         if (ADLX_FAILED(result) || !gpu_) {
-            diagnostics_ = "Failed to open first AMD GPU: " + Trace::FormatAdlxResult("gpu", static_cast<int>(result));
+            diagnostics_ = "Failed to open first AMD GPU: gpu=" + AdlxResultCodeString(result);
             trace().Write("amd_adlx:get_first_gpu_failed " + diagnostics_);
             return false;
         }
 
         const char* name = nullptr;
         const ADLX_RESULT nameResult = gpu_->Name(&name);
-        trace().Write("amd_adlx:get_gpu_name " + Trace::FormatAdlxResult("result", static_cast<int>(nameResult)) +
+        trace().Write("amd_adlx:get_gpu_name result=" + AdlxResultCodeString(nameResult) +
                       " has_name=" + Trace::BoolText(name != nullptr && name[0] != '\0'));
         if (ADLX_SUCCEEDED(nameResult)) {
             gpuName_ = Utf8FromAnsi(name);
@@ -90,8 +90,7 @@ public:
 
         adlx_uint totalVramMb = 0;
         const ADLX_RESULT totalVramResult = gpu_->TotalVRAM(&totalVramMb);
-        trace().Write("amd_adlx:get_total_vram " +
-                      Trace::FormatAdlxResult("result", static_cast<int>(totalVramResult)) +
+        trace().Write("amd_adlx:get_total_vram result=" + AdlxResultCodeString(totalVramResult) +
                       " mb=" + std::to_string(totalVramMb));
         if (ADLX_SUCCEEDED(totalVramResult) && totalVramMb > 0) {
             totalVramGb_ = static_cast<double>(totalVramMb) / 1024.0;
@@ -99,12 +98,10 @@ public:
 
         trace().Write("amd_adlx:get_supported_metrics_begin");
         result = performanceMonitoring_->GetSupportedGPUMetrics(gpu_, &metricsSupport_);
-        trace().Write("amd_adlx:get_supported_metrics_done " +
-                      Trace::FormatAdlxResult("result", static_cast<int>(result)) +
+        trace().Write("amd_adlx:get_supported_metrics_done result=" + AdlxResultCodeString(result) +
                       " available=" + Trace::BoolText(metricsSupport_ != nullptr));
         if (ADLX_FAILED(result) || !metricsSupport_) {
-            diagnostics_ = "Failed to query supported AMD GPU metrics: " +
-                           Trace::FormatAdlxResult("support", static_cast<int>(result));
+            diagnostics_ = "Failed to query supported AMD GPU metrics: support=" + AdlxResultCodeString(result);
             trace().Write("amd_adlx:get_supported_metrics_failed " + diagnostics_);
             return false;
         }
@@ -155,13 +152,11 @@ public:
         trace().Write("amd_adlx:get_current_metrics_begin");
         const ADLX_RESULT metricsResult = performanceMonitoring_->GetCurrentGPUMetrics(gpu_, &metrics);
         trace().WriteLazy([&] {
-            return "amd_adlx:get_current_metrics_done " +
-                   Trace::FormatAdlxResult("result", static_cast<int>(metricsResult)) +
+            return "amd_adlx:get_current_metrics_done result=" + AdlxResultCodeString(metricsResult) +
                    " available=" + Trace::BoolText(metrics != nullptr);
         });
         if (ADLX_FAILED(metricsResult) || !metrics) {
-            sample.diagnostics =
-                diagnostics_ + " " + Trace::FormatAdlxResult("current_metrics", static_cast<int>(metricsResult));
+            sample.diagnostics = diagnostics_ + " current_metrics=" + AdlxResultCodeString(metricsResult);
             sample.available = false;
             trace().WriteLazy(
                 [&] { return "amd_adlx:get_current_metrics_failed diagnostics=\"" + sample.diagnostics + "\""; });

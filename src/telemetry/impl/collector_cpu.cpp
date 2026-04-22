@@ -39,28 +39,29 @@ void InitializeCpuCollector(RealTelemetryCollectorState& state) {
     state.trace_.Write("telemetry:cpu_name value=\"" + state.snapshot_.cpu.name + "\"");
 
     const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.cpu_.query);
-    state.trace_.Write(("telemetry:pdh_open cpu_query " + Trace::FormatPdhStatus("status", queryStatus)).c_str());
+    state.trace_.Write(("telemetry:pdh_open cpu_query status=" + PdhStatusCodeString(queryStatus)).c_str());
     const PDH_STATUS loadStatus = AddCounterCompat(
         state.cpu_.query, L"\\Processor Information(_Total)\\% Processor Utility", &state.cpu_.loadCounter);
     state.trace_.Write(
-        ("telemetry:pdh_add cpu_load path=\"\\\\Processor Information(_Total)\\\\% Processor Utility\" " +
-            Trace::FormatPdhStatus("status", loadStatus))
+        ("telemetry:pdh_add cpu_load path=\"\\\\Processor Information(_Total)\\\\% Processor Utility\" status=" +
+            PdhStatusCodeString(loadStatus))
             .c_str());
     if (state.cpu_.loadCounter == nullptr) {
         const PDH_STATUS fallbackStatus =
             AddCounterCompat(state.cpu_.query, L"\\Processor(_Total)\\% Processor Time", &state.cpu_.loadCounter);
-        state.trace_.Write(("telemetry:pdh_add cpu_load_fallback path=\"\\\\Processor(_Total)\\\\% Processor Time\" " +
-                            Trace::FormatPdhStatus("status", fallbackStatus))
+        state.trace_.Write(("telemetry:pdh_add cpu_load_fallback path=\"\\\\Processor(_Total)\\\\% Processor Time\" "
+                            "status=" +
+                            PdhStatusCodeString(fallbackStatus))
                 .c_str());
     }
     const PDH_STATUS frequencyStatus = AddCounterCompat(
         state.cpu_.query, L"\\Processor Information(_Total)\\Processor Frequency", &state.cpu_.frequencyCounter);
     state.trace_.Write(
-        ("telemetry:pdh_add cpu_frequency path=\"\\\\Processor Information(_Total)\\\\Processor Frequency\" " +
-            Trace::FormatPdhStatus("status", frequencyStatus))
+        ("telemetry:pdh_add cpu_frequency path=\"\\\\Processor Information(_Total)\\\\Processor Frequency\" status=" +
+            PdhStatusCodeString(frequencyStatus))
             .c_str());
     const PDH_STATUS collectStatus = PdhCollectQueryData(state.cpu_.query);
-    state.trace_.Write(("telemetry:pdh_collect cpu_query " + Trace::FormatPdhStatus("status", collectStatus)).c_str());
+    state.trace_.Write(("telemetry:pdh_collect cpu_query status=" + PdhStatusCodeString(collectStatus)).c_str());
 }
 
 void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
@@ -71,7 +72,7 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
     }
 
     const PDH_STATUS collectStatus = PdhCollectQueryData(state.cpu_.query);
-    state.trace_.WriteLazy([&] { return "telemetry:cpu_collect " + Trace::FormatPdhStatus("status", collectStatus); });
+    state.trace_.WriteLazy([&] { return "telemetry:cpu_collect status=" + PdhStatusCodeString(collectStatus); });
 
     PDH_FMT_COUNTERVALUE value{};
     PDH_STATUS loadStatus = PDH_INVALID_DATA;
@@ -81,7 +82,7 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
         state.snapshot_.cpu.loadPercent = ClampFinite(value.doubleValue, 0.0, 100.0);
     }
     state.trace_.WriteLazy([&] {
-        return "telemetry:cpu_load " + Trace::FormatPdhStatus("status", loadStatus) + " " +
+        return "telemetry:cpu_load status=" + PdhStatusCodeString(loadStatus) + " " +
                Trace::FormatValueDouble("value", state.snapshot_.cpu.loadPercent, 2);
     });
     state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.load", state.snapshot_.cpu.loadPercent);
@@ -94,7 +95,7 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
         state.snapshot_.cpu.clock.unit = ScalarMetricUnit::Gigahertz;
     }
     state.trace_.WriteLazy([&] {
-        return "telemetry:cpu_clock " + Trace::FormatPdhStatus("status", clockStatus) + " value=" +
+        return "telemetry:cpu_clock status=" + PdhStatusCodeString(clockStatus) + " value=" +
                (state.snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(state.snapshot_.cpu.clock, 2)
                                                             : std::string("N/A"));
     });

@@ -64,7 +64,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Diagnostics
 
 - The diagnostics subsystem parses diagnostics CLI switches, manages headless `/exit` runs, owns requested output exports, creates the top-level trace session when trace is enabled, and decides whether telemetry initialization failures are reported through trace or modal UI.
-- `src/util/trace.*` owns trace line emission plus shared trace value formatting and quoting helpers. Runtime flows create a top-level `Trace` object and pass it by non-null reference; disabled output and stream-null handling stay inside `Trace`.
+- `src/util/trace.*` owns trace line emission plus generic trace value formatting and quoting helpers. Runtime flows create a top-level `Trace` object and pass it by non-null reference; disabled output and stream-null handling stay inside `Trace`.
 - Snapshot dumps and fake-runtime imports share the same dump serializer and parser.
 - Diagnostics screenshot export uses the same renderer scene, layout-edit hover resolver, and tooltip text builder as the live window path instead of a separate rendering implementation.
 
