@@ -73,7 +73,7 @@ add_executable(SystemTelemetry WIN32
     src/util/command_line.cpp
     src/app_config_io.cpp
     src/app_display_config.cpp
-    src/diagnostics_options.cpp
+    src/diagnostics/diagnostics_options.cpp
     src/app_monitor.cpp
     src/util/paths.cpp
     src/util/strings.cpp

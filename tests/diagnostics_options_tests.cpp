@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "diagnostics_options.h"
+#include "diagnostics/diagnostics_options.h"
 
 TEST(DiagnosticsOptions, ParsesBackgroundOnlyModeWithoutSeed) {
     std::string error;

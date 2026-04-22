@@ -8,7 +8,7 @@
 #include <windows.h>
 
 #include "config/config.h"
-#include "diagnostics_options.h"
+#include "diagnostics/diagnostics_options.h"
 
 std::filesystem::path GetRuntimeConfigPath();
 AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options);

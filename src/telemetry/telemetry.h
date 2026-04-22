@@ -11,7 +11,7 @@
 #include <windows.h>
 
 #include "telemetry/board/board_vendor.h"
-#include "diagnostics_options.h"
+#include "diagnostics/diagnostics_options.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/metric_types.h"
 #include "telemetry/telemetry_settings.h"

@@ -19,7 +19,7 @@
 
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
-#include "diagnostics_options.h"
+#include "diagnostics/diagnostics_options.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tree.h"

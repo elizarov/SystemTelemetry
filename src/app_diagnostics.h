@@ -18,7 +18,7 @@
 #include "app_constants.h"
 #include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"
-#include "diagnostics_options.h"
+#include "diagnostics/diagnostics_options.h"
 #include "telemetry/snapshot_dump.h"
 #include "util/trace.h"
 #include "util/utf8.h"
