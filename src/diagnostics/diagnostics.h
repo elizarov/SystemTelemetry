@@ -15,7 +15,6 @@
 #include <commdlg.h>
 #include <shellapi.h>
 
-#include "app_constants.h"
 #include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "diagnostics/diagnostics_options.h"

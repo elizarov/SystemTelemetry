@@ -6,6 +6,7 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "config/config_writer.h"
+#include "diagnostics/constants.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "telemetry/telemetry.h"

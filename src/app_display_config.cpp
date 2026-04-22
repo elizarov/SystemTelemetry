@@ -5,13 +5,14 @@
 #include <shobjidl.h>
 
 #include "app_config_io.h"
-#include "util/command_line.h"
-#include "diagnostics/diagnostics.h"
+#include "app_constants.h"
 #include "app_monitor.h"
-#include "util/paths.h"
-#include "util/strings.h"
 #include "config/config_parser.h"
 #include "config/config_writer.h"
+#include "diagnostics/diagnostics.h"
+#include "util/command_line.h"
+#include "util/paths.h"
+#include "util/strings.h"
 #include "util/trace.h"
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) {

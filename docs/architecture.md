@@ -7,7 +7,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
 - `src/config/` contains the config model, parser, resolver, writer, and schema metadata.
-- `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, snapshot dump I/O, and diagnostics-owned support modules.
+- `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/widget/widget.*` and `src/widget/widget_class.h` own the widget interface, class enum, and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, UTF-8 conversion, localization catalog access, numeric safety, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, menu types, and shared layout-edit overlay state.
