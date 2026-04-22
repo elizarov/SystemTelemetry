@@ -128,7 +128,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and the mixed-mode Gigabyte board-provider object library.
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` builds as a CLR-enabled unit so it can bridge to the vendor .NET assemblies.
-- The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, and telemetry-refresh paths through the same runtime subsystems used by the app.
+- The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, and telemetry-refresh paths through the same runtime subsystems used by the app. Its supported benchmark names are held in an `enum_string`-backed selector, and each named benchmark owns its top-level command flow in a separate function.
 
 ## Source Dependency Graph
 

@@ -13,6 +13,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - Measure the repeatable layout-edit benchmark with `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`.
 - Measure the repeatable layout-switch benchmark with `build\SystemTelemetryBenchmarks.exe layout-switch 240 2`.
 - Measure the repeatable telemetry-refresh benchmark with `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`.
+- `SystemTelemetryBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-switch`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Capture a full profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
@@ -295,9 +296,9 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Neutral to slightly helpful, and kept.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe 240 2` ran at `drag_loop per_iter_ms=2.48`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=2.00`.
-  - `build\SystemTelemetryBenchmarks.exe 480 2` ran at `drag_loop per_iter_ms=2.45`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=1.98`.
-  - `profile_benchmark.cmd 240 2` kept the benchmark hotspot shape in `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, the display driver, and `win32kfull.sys`, with no new GDI text hotspot.
+  - `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` ran at `drag_loop per_iter_ms=2.48`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=2.00`.
+  - `build\SystemTelemetryBenchmarks.exe edit-layout 480 2` ran at `drag_loop per_iter_ms=2.45`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=1.98`.
+  - `profile_benchmark.cmd edit-layout 240 2` kept the benchmark hotspot shape in `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, the display driver, and `win32kfull.sys`, with no new GDI text hotspot.
 - Conclusion:
   - The type migration is safe to keep. It simplifies the Direct2D renderer boundary without costing measurable draw-path time and keeps raw Win32 types confined to the shell message-handling and placement-tracking edge.
 
@@ -383,8 +384,8 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe 240 2` reruns improved from about `drag_loop per_iter_ms=2.60-2.68`, `snap avg_ms=0.19-0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.28-2.35` down to about `drag_loop per_iter_ms=2.54-2.57`, `snap avg_ms=0.18-0.19`, `apply avg_ms=0.12`, and `paint_draw avg_ms=2.22-2.27`.
-  - `profile_benchmark.cmd 240 2` stayed on the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape, with no new app-owned hotspot overtaking the frame.
+  - `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` reruns improved from about `drag_loop per_iter_ms=2.60-2.68`, `snap avg_ms=0.19-0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.28-2.35` down to about `drag_loop per_iter_ms=2.54-2.57`, `snap avg_ms=0.18-0.19`, `apply avg_ms=0.12`, and `paint_draw avg_ms=2.22-2.27`.
+  - `profile_benchmark.cmd edit-layout 240 2` stayed on the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape, with no new app-owned hotspot overtaking the frame.
 - Conclusion:
   - Single-line labels that only need placement width should stay on the cheaper `DrawText` path; using `DrawTextBlock` for those labels adds measurable DirectWrite layout work without paying for any anchor or wrapped-layout benefit.
 

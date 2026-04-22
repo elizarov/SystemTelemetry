@@ -24,12 +24,22 @@
 #include "layout_edit/layout_edit_tree.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
+#include "util/enum_string.h"
 #include "util/trace.h"
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
 using Duration = std::chrono::duration<double, std::milli>;
+
+#define SYSTEM_TELEMETRY_BENCHMARK_ITEMS(X)                                                                            \
+    X(EditLayout, "edit-layout")                                                                                       \
+    X(LayoutSwitch, "layout-switch")                                                                                   \
+    X(UpdateTelemetry, "update-telemetry")
+
+ENUM_STRING_DECLARE(Benchmark, SYSTEM_TELEMETRY_BENCHMARK_ITEMS);
+
+#undef SYSTEM_TELEMETRY_BENCHMARK_ITEMS
 
 enum class BenchPhase {
     TelemetryUpdate = 0,
@@ -50,6 +60,12 @@ struct PhaseStats {
 struct BenchResult {
     Duration total{};
     Duration perIteration{};
+};
+
+struct BenchmarkCommandLine {
+    Benchmark benchmark;
+    size_t iterations = 240;
+    double renderScale = 2.0;
 };
 
 std::filesystem::path SourceConfigPath() {
@@ -100,34 +116,73 @@ size_t PhaseIndex(LayoutEditHost::TracePhase phase) {
     return 0;
 }
 
-const char* PhaseName(LayoutEditHost::TracePhase phase) {
-    switch (phase) {
-        case LayoutEditHost::TracePhase::Snap:
-            return "snap";
-        case LayoutEditHost::TracePhase::Apply:
-            return "apply";
-        case LayoutEditHost::TracePhase::PaintTotal:
-            return "paint_total";
-        case LayoutEditHost::TracePhase::PaintDraw:
-            return "paint_draw";
+std::optional<Benchmark> ParseBenchmarkName(std::string_view name) {
+    return EnumFromString<Benchmark>(name);
+}
+
+std::string SupportedBenchmarkNames() {
+    std::ostringstream names;
+    bool first = true;
+    for (const std::string_view name : EnumStringTraits<Benchmark>::names) {
+        if (!first) {
+            names << ", ";
+        }
+        names << name;
+        first = false;
     }
-    return "unknown";
+    return names.str();
 }
 
-bool IsEditLayoutBenchmarkName(const std::string& name) {
-    return name == "edit-layout" || name == "eidt-layout";
+bool TryParsePositiveSize(const char* text, size_t& value) {
+    char* end = nullptr;
+    const long long parsed = std::strtoll(text, &end, 10);
+    if (end == text || *end != '\0' || parsed <= 0) {
+        return false;
+    }
+    value = static_cast<size_t>(parsed);
+    return true;
 }
 
-bool IsUpdateTelemetryBenchmarkName(const std::string& name) {
-    return name == "update-telemetry";
+bool TryParsePositiveDouble(const char* text, double& value) {
+    char* end = nullptr;
+    const double parsed = std::strtod(text, &end);
+    if (end == text || *end != '\0' || !std::isfinite(parsed) || parsed <= 0.0) {
+        return false;
+    }
+    value = parsed;
+    return true;
 }
 
-bool IsLayoutSwitchBenchmarkName(const std::string& name) {
-    return name == "layout-switch";
-}
+std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** argv) {
+    if (argc < 2) {
+        std::cerr << "supported benchmarks: " << SupportedBenchmarkNames() << "\n";
+        return std::nullopt;
+    }
 
-bool IsKnownBenchmarkName(const std::string& name) {
-    return IsEditLayoutBenchmarkName(name) || IsUpdateTelemetryBenchmarkName(name) || IsLayoutSwitchBenchmarkName(name);
+    const std::string_view firstArg = argv[1];
+    const std::optional<Benchmark> parsedBenchmark = ParseBenchmarkName(firstArg);
+    if (!parsedBenchmark.has_value()) {
+        std::cerr << "unknown benchmark \"" << firstArg << "\"; supported benchmarks: " << SupportedBenchmarkNames()
+                  << "\n";
+        return std::nullopt;
+    }
+
+    BenchmarkCommandLine commandLine{*parsedBenchmark};
+    int nextArgument = 2;
+    if (argc > nextArgument) {
+        size_t parsedIterations = commandLine.iterations;
+        if (TryParsePositiveSize(argv[nextArgument], parsedIterations)) {
+            commandLine.iterations = parsedIterations;
+        }
+        ++nextArgument;
+    }
+    if (argc > nextArgument) {
+        double parsedRenderScale = commandLine.renderScale;
+        if (TryParsePositiveDouble(argv[nextArgument], parsedRenderScale)) {
+            commandLine.renderScale = parsedRenderScale;
+        }
+    }
+    return commandLine;
 }
 
 std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config, Trace& trace) {
@@ -536,119 +591,85 @@ void PrintPhaseResult(const char* name, const PhaseStats& stats) {
               << " avg_ms=" << averageMs << " samples=" << stats.samples << "\n";
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
-    std::string benchmarkName = "edit-layout";
-    size_t iterations = 240;
-    double renderScale = 2.0;
-    std::ostringstream traceStream;
-    Trace trace(&traceStream);
-    if (argc >= 2) {
-        const std::string firstArg = argv[1];
-        int nextArgument = 1;
-        if (IsKnownBenchmarkName(firstArg)) {
-            benchmarkName = IsEditLayoutBenchmarkName(firstArg) ? "edit-layout" : firstArg;
-            ++nextArgument;
-        }
-
-        if (argc > nextArgument) {
-            const long long parsed = std::atoll(argv[nextArgument]);
-            if (parsed > 0) {
-                iterations = static_cast<size_t>(parsed);
-            }
-        }
-        if (argc > nextArgument + 1) {
-            const double parsed = std::atof(argv[nextArgument + 1]);
-            if (std::isfinite(parsed) && parsed > 0.0) {
-                renderScale = parsed;
-            }
-        }
-    }
-
-    if (!IsKnownBenchmarkName(benchmarkName)) {
-        std::cerr << "unknown benchmark \"" << benchmarkName << "\"\n";
+int RunEditLayoutBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
+    if (telemetry == nullptr) {
+        std::cerr << "fake telemetry init failed\n";
         return 1;
     }
 
-    if (benchmarkName == "edit-layout") {
-        const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
-        std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
-        if (telemetry == nullptr) {
-            std::cerr << "fake telemetry init failed\n";
-            return 1;
-        }
-
-        const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
-        BenchmarkHost host(runtimeConfig, renderScale, trace);
-        host.SetSnapshot(telemetry->Snapshot());
-        if (!host.Initialize()) {
-            std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
-            return 1;
-        }
-
-        const std::optional<LayoutEditGuide> guide = FindTopLevelGuide(host.LayoutRenderer());
-        if (!guide.has_value()) {
-            std::cerr << "no top-level layout guide found\n";
-            return 1;
-        }
-
-        const LayoutEditHost::LayoutTarget target = LayoutEditHost::LayoutTarget::ForGuide(*guide);
-        const LayoutNodeConfig* node = FindGuideNode(runtimeConfig, target);
-        const std::vector<int> initialWeights = SeedGuideWeights(*guide, node);
-        const std::vector<std::vector<int>> weightSequence = BuildWeightSequence(initialWeights, iterations);
-        if (weightSequence.empty()) {
-            std::cerr << "weight sequence generation failed\n";
-            return 1;
-        }
-
-        std::cout << "layout_edit_drag_benchmark guide_children=" << initialWeights.size()
-                  << " separator_index=" << guide->separatorIndex << " iterations=" << weightSequence.size()
-                  << " render_scale=" << renderScale << "\n";
-
-        const BenchResult result = RunDragBenchmark(host, *guide, initialWeights, weightSequence);
-        PrintBenchResult(result);
-
-        const auto& phases = host.PhaseTotals();
-        PrintPhaseResult(PhaseName(BenchPhase::Snap), phases[PhaseIndex(BenchPhase::Snap)]);
-        PrintPhaseResult(PhaseName(BenchPhase::Apply), phases[PhaseIndex(BenchPhase::Apply)]);
-        PrintPhaseResult(PhaseName(BenchPhase::PaintTotal), phases[PhaseIndex(BenchPhase::PaintTotal)]);
-        PrintPhaseResult(PhaseName(BenchPhase::PaintDraw), phases[PhaseIndex(BenchPhase::PaintDraw)]);
-        return 0;
+    const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    BenchmarkHost host(runtimeConfig, renderScale, trace);
+    host.SetSnapshot(telemetry->Snapshot());
+    if (!host.Initialize()) {
+        std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
+        return 1;
     }
 
-    if (benchmarkName == "layout-switch") {
-        const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
-        std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
-        if (telemetry == nullptr) {
-            std::cerr << "fake telemetry init failed\n";
-            return 1;
-        }
-
-        const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
-        const std::vector<std::string> layoutNames = CollectLayoutNames(runtimeConfig);
-        if (layoutNames.size() < 2) {
-            std::cerr << "layout-switch benchmark requires at least two named layouts\n";
-            return 1;
-        }
-
-        BenchmarkHost host(runtimeConfig, renderScale, trace);
-        host.SetSnapshot(telemetry->Snapshot());
-        if (!host.Initialize()) {
-            std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
-            return 1;
-        }
-
-        std::cout << "layout_switch_benchmark layouts=" << layoutNames.size() << " iterations=" << iterations
-                  << " render_scale=" << renderScale << "\n";
-        const LayoutSwitchBenchTotals totals = RunLayoutSwitchBenchmark(host, layoutNames, iterations);
-        PrintBenchLoopResult("switch_loop", totals.switchLoop);
-        PrintPhaseResult("switch_apply", totals.phases.switchApply);
-        PrintPhaseResult("dialog_refresh", totals.phases.dialogRefresh);
-        PrintPhaseResult("switch_paint", totals.phases.paint);
-        return 0;
+    const std::optional<LayoutEditGuide> guide = FindTopLevelGuide(host.LayoutRenderer());
+    if (!guide.has_value()) {
+        std::cerr << "no top-level layout guide found\n";
+        return 1;
     }
 
+    const LayoutEditHost::LayoutTarget target = LayoutEditHost::LayoutTarget::ForGuide(*guide);
+    const LayoutNodeConfig* node = FindGuideNode(runtimeConfig, target);
+    const std::vector<int> initialWeights = SeedGuideWeights(*guide, node);
+    const std::vector<std::vector<int>> weightSequence = BuildWeightSequence(initialWeights, iterations);
+    if (weightSequence.empty()) {
+        std::cerr << "weight sequence generation failed\n";
+        return 1;
+    }
+
+    std::cout << "layout_edit_drag_benchmark guide_children=" << initialWeights.size()
+              << " separator_index=" << guide->separatorIndex << " iterations=" << weightSequence.size()
+              << " render_scale=" << renderScale << "\n";
+
+    const BenchResult result = RunDragBenchmark(host, *guide, initialWeights, weightSequence);
+    PrintBenchResult(result);
+
+    const auto& phases = host.PhaseTotals();
+    PrintPhaseResult(PhaseName(BenchPhase::Snap), phases[PhaseIndex(BenchPhase::Snap)]);
+    PrintPhaseResult(PhaseName(BenchPhase::Apply), phases[PhaseIndex(BenchPhase::Apply)]);
+    PrintPhaseResult(PhaseName(BenchPhase::PaintTotal), phases[PhaseIndex(BenchPhase::PaintTotal)]);
+    PrintPhaseResult(PhaseName(BenchPhase::PaintDraw), phases[PhaseIndex(BenchPhase::PaintDraw)]);
+    return 0;
+}
+
+int RunLayoutSwitchBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
+    if (telemetry == nullptr) {
+        std::cerr << "fake telemetry init failed\n";
+        return 1;
+    }
+
+    const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    const std::vector<std::string> layoutNames = CollectLayoutNames(runtimeConfig);
+    if (layoutNames.size() < 2) {
+        std::cerr << "layout-switch benchmark requires at least two named layouts\n";
+        return 1;
+    }
+
+    BenchmarkHost host(runtimeConfig, renderScale, trace);
+    host.SetSnapshot(telemetry->Snapshot());
+    if (!host.Initialize()) {
+        std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
+        return 1;
+    }
+
+    std::cout << "layout_switch_benchmark layouts=" << layoutNames.size() << " iterations=" << iterations
+              << " render_scale=" << renderScale << "\n";
+    const LayoutSwitchBenchTotals totals = RunLayoutSwitchBenchmark(host, layoutNames, iterations);
+    PrintBenchLoopResult("switch_loop", totals.switchLoop);
+    PrintPhaseResult("switch_apply", totals.phases.switchApply);
+    PrintPhaseResult("dialog_refresh", totals.phases.dialogRefresh);
+    PrintPhaseResult("switch_paint", totals.phases.paint);
+    return 0;
+}
+
+int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
     const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
     std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkTelemetryCollector(config, trace);
     if (telemetry == nullptr) {
@@ -673,4 +694,30 @@ int main(int argc, char** argv) {
     PrintPhaseResult(PhaseName(BenchPhase::PaintTotal), phases[PhaseIndex(BenchPhase::PaintTotal)]);
     PrintPhaseResult(PhaseName(BenchPhase::PaintDraw), phases[PhaseIndex(BenchPhase::PaintDraw)]);
     return 0;
+}
+
+int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
+    switch (commandLine.benchmark) {
+        case Benchmark::EditLayout:
+            return RunEditLayoutBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::LayoutSwitch:
+            return RunLayoutSwitchBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::UpdateTelemetry:
+            return RunUpdateTelemetryBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+    }
+    std::cerr << "unknown benchmark \"" << EnumToString(commandLine.benchmark) << "\"\n";
+    return 1;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    const std::optional<BenchmarkCommandLine> commandLine = ParseBenchmarkCommandLine(argc, argv);
+    if (!commandLine.has_value()) {
+        return 1;
+    }
+
+    std::ostringstream traceStream;
+    Trace trace(&traceStream);
+    return RunBenchmarkCommand(*commandLine, trace);
 }

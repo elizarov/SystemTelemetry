@@ -90,7 +90,7 @@ try {
 
             Set-Content -LiteralPath $lockFile -Value "running" -Encoding ascii
 
-            $benchmark = Read-RequestValue -RequestPath $requestFile -Name "benchmark" -DefaultValue "edit-layout"
+            $benchmark = Read-RequestValue -RequestPath $requestFile -Name "benchmark" -DefaultValue ""
             $iterations = Read-RequestValue -RequestPath $requestFile -Name "iterations" -DefaultValue "600"
             $renderScale = Read-RequestValue -RequestPath $requestFile -Name "render_scale" -DefaultValue "2"
             $benchmarkStem = $benchmark.Replace("-", "_")

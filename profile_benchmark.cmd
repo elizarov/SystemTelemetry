@@ -9,6 +9,8 @@ set "ITERATIONS="
 set "RENDER_SCALE="
 set "BENCHMARK_NAME="
 set "BENCHMARK_STEM="
+set "ARGUMENT_ERROR="
+set "SUPPORTED_BENCHMARKS=edit-layout, layout-switch, update-telemetry"
 set "COMMAND=run"
 set "REQUEST_ELEVATION=0"
 set "IS_ELEVATED_RELAUNCH=0"
@@ -59,11 +61,6 @@ if not defined BENCHMARK_NAME if /i "%~1"=="edit-layout" (
     shift
     goto parse_args
 )
-if not defined BENCHMARK_NAME if /i "%~1"=="eidt-layout" (
-    set "BENCHMARK_NAME=edit-layout"
-    shift
-    goto parse_args
-)
 if not defined BENCHMARK_NAME if /i "%~1"=="update-telemetry" (
     set "BENCHMARK_NAME=update-telemetry"
     shift
@@ -71,6 +68,11 @@ if not defined BENCHMARK_NAME if /i "%~1"=="update-telemetry" (
 )
 if not defined BENCHMARK_NAME if /i "%~1"=="layout-switch" (
     set "BENCHMARK_NAME=layout-switch"
+    shift
+    goto parse_args
+)
+if not defined BENCHMARK_NAME (
+    if not defined ARGUMENT_ERROR set "ARGUMENT_ERROR=Unknown benchmark '%~1'. Supported benchmarks: %SUPPORTED_BENCHMARKS%"
     shift
     goto parse_args
 )
@@ -83,15 +85,22 @@ shift
 goto parse_args
 
 :args_done
-if not defined BENCHMARK_NAME set "BENCHMARK_NAME=edit-layout"
+if defined ARGUMENT_ERROR (
+    echo %ARGUMENT_ERROR%
+    exit /b 1
+)
 if not defined ITERATIONS set "ITERATIONS=600"
 if not defined RENDER_SCALE set "RENDER_SCALE=2"
-call :set_benchmark_stem
 
 if /i "%COMMAND%"=="daemon_start" goto daemon_start
 if /i "%COMMAND%"=="daemon_stop" goto daemon_stop
 if /i "%COMMAND%"=="daemon_status" goto daemon_status
 if /i "%COMMAND%"=="run_request" goto run_request
+if not defined BENCHMARK_NAME (
+    echo supported benchmarks: %SUPPORTED_BENCHMARKS%
+    exit /b 1
+)
+call :set_benchmark_stem
 goto run_default
 
 :daemon_start
@@ -162,9 +171,14 @@ if exist "%REQUEST_DIR%\request.env" (
     for /f "usebackq tokens=1,* delims==" %%A in ("%REQUEST_DIR%\request.env") do (
         if /i "%%A"=="benchmark" set "BENCHMARK_NAME=%%B"
     )
-    if not defined BENCHMARK_NAME set "BENCHMARK_NAME=edit-layout"
-    call :set_benchmark_stem
 )
+if not defined BENCHMARK_NAME (
+    echo Missing benchmark in request file. Supported benchmarks: %SUPPORTED_BENCHMARKS%
+    exit /b 1
+)
+call :validate_benchmark_name
+if errorlevel 1 exit /b %errorlevel%
+call :set_benchmark_stem
 set "TRACE_ETL=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr.etl"
 set "TRACE_TXT=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr.txt"
 set "TRACE_CALLTREE_HTML=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr_calltree.html"
@@ -422,3 +436,10 @@ exit /b %REQUEST_RESULT_CODE%
 :set_benchmark_stem
 set "BENCHMARK_STEM=%BENCHMARK_NAME:-=_%"
 exit /b 0
+
+:validate_benchmark_name
+if /i "%BENCHMARK_NAME%"=="edit-layout" exit /b 0
+if /i "%BENCHMARK_NAME%"=="layout-switch" exit /b 0
+if /i "%BENCHMARK_NAME%"=="update-telemetry" exit /b 0
+echo Unknown benchmark '%BENCHMARK_NAME%'. Supported benchmarks: %SUPPORTED_BENCHMARKS%
+exit /b 1
