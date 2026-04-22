@@ -1,4 +1,3 @@
-#define NOMINMAX
 #include "telemetry/telemetry.h"
 
 #include "diagnostics/snapshot_dump.h"

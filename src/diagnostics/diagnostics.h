@@ -1,19 +1,16 @@
 #pragma once
 
+#include <windows.h>
+
+#include <commdlg.h>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <shellapi.h>
 #include <string>
 #include <vector>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#include <commdlg.h>
-#include <shellapi.h>
 
 #include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"

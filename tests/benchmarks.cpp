@@ -1,3 +1,5 @@
+#include <windows.h>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -11,11 +13,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 
 #include "config/config_parser.h"
 #include "config/config_resolution.h"

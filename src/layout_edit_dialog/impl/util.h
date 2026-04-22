@@ -1,16 +1,13 @@
 #pragma once
 
+#include <windows.h>
+
 #include <array>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 
 #include "config/config.h"
 #include "layout_edit/layout_edit_tree.h"

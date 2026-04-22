@@ -1,12 +1,9 @@
 #pragma once
 
+#include <windows.h>
+
 #include <string>
 #include <vector>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 
 #include "telemetry/telemetry.h"
 

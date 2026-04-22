@@ -1,12 +1,9 @@
 #pragma once
 
+#include <windows.h>
+
 #include <optional>
 #include <string>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 
 std::optional<std::wstring> ReadAutoStartCommand();
 bool IsAutoStartEnabledForCurrentExecutable();

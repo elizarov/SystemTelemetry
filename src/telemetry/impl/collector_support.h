@@ -1,6 +1,5 @@
 #pragma once
 
-#define NOMINMAX
 #include <pdh.h>
 #include <string>
 

@@ -1,14 +1,11 @@
 #pragma once
 
+#include <windows.h>
+
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 
 #include "dashboard/dashboard_menu_types.h"
 #include "display/monitor.h"

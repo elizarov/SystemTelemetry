@@ -1,14 +1,11 @@
 #pragma once
 
+#include <windows.h>
+
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 
 #include "config/config.h"
 #include "layout_edit/layout_edit_controller.h"

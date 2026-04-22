@@ -168,6 +168,7 @@ target_include_directories(SystemTelemetryGigabyte PRIVATE
 target_compile_definitions(SystemTelemetryGigabyte PRIVATE
     UNICODE
     _UNICODE
+    NOMINMAX
     WIN32_LEAN_AND_MEAN
 )
 
@@ -191,6 +192,7 @@ target_include_directories(SystemTelemetry PRIVATE
 target_compile_definitions(SystemTelemetry PRIVATE
     UNICODE
     _UNICODE
+    NOMINMAX
     WIN32_LEAN_AND_MEAN
 )
 
@@ -298,6 +300,7 @@ target_include_directories(SystemTelemetryTests PRIVATE
 target_compile_definitions(SystemTelemetryTests PRIVATE
     UNICODE
     _UNICODE
+    NOMINMAX
     WIN32_LEAN_AND_MEAN
     SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
@@ -397,6 +400,7 @@ target_include_directories(SystemTelemetryBenchmarks PRIVATE
 target_compile_definitions(SystemTelemetryBenchmarks PRIVATE
     UNICODE
     _UNICODE
+    NOMINMAX
     WIN32_LEAN_AND_MEAN
     SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )

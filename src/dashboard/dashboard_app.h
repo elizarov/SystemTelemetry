@@ -1,7 +1,7 @@
 #pragma once
 
-#define NOMINMAX
 #include <windows.h>
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>

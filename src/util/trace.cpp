@@ -1,6 +1,7 @@
 #include "util/trace.h"
 
 #include <windows.h>
+
 #include <cstdio>
 
 namespace tracing {

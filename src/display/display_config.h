@@ -1,12 +1,9 @@
 #pragma once
 
+#include <windows.h>
+
 #include <filesystem>
 #include <ostream>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
 
 #include "config/config.h"
 #include "diagnostics/snapshot_dump.h"

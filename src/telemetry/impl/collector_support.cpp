@@ -1,6 +1,5 @@
 #include "telemetry/impl/collector_support.h"
 
-#define NOMINMAX
 #include <array>
 #include <cctype>
 #include <cstdio>

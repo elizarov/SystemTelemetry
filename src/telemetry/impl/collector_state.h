@@ -1,9 +1,10 @@
 #pragma once
 
-#define NOMINMAX
-#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+
+#include <windows.h>
+
 #include <chrono>
 #include <cstdint>
 #include <dxgi.h>

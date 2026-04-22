@@ -1,11 +1,8 @@
 #pragma once
 
-#include <filesystem>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <windows.h>
+
+#include <filesystem>
 
 #include "config/config.h"
 #include "config/metric_catalog.h"

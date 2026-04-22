@@ -1,11 +1,8 @@
 #pragma once
 
-#include <string>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <windows.h>
+
+#include <string>
 
 struct LayoutMenuOption {
     UINT commandId = 0;
