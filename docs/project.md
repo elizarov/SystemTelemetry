@@ -22,7 +22,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories.
 - Keep C++ includes ordered by `format.cmd`: matching `.cpp` header first, then sorted angle/system includes, quoted `vendor/` includes, and sorted quoted project includes; WinSock and `windows.h` stay ahead of dependent Win32 headers.
 - Keep Win32 hygiene macros such as `NOMINMAX` and `WIN32_LEAN_AND_MEAN` in target compile definitions instead of local include preambles.
-- Keep each non-allowlisted project `.cpp` paired with a matching header that owns its out-of-line declarations.
+- Keep each project `.cpp` paired with a matching header that owns its out-of-line declarations; `src/main/main.cpp` is the only headerless translation unit.
 - Keep third-party source vendoring narrow and prefer package-managed dependencies where practical.
 
 ## Engineering Constraints

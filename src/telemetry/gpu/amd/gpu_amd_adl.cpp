@@ -1,3 +1,5 @@
+#include "telemetry/gpu/amd/gpu_amd_adl.h"
+
 #include <memory>
 #include <optional>
 #include <sstream>

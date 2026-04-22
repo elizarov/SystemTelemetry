@@ -4,9 +4,7 @@
 #include <optional>
 #include <string>
 
-namespace tracing {
-class Trace;
-}
+#include "util/trace.h"
 
 struct GpuVendorTelemetrySample {
     std::optional<std::string> name;

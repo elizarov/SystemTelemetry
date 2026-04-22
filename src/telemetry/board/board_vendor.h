@@ -7,10 +7,7 @@
 
 #include "config/telemetry_settings.h"
 #include "telemetry/metric_types.h"
-
-namespace tracing {
-class Trace;
-}
+#include "util/trace.h"
 
 struct BoardVendorTelemetrySample {
     std::string boardManufacturer;

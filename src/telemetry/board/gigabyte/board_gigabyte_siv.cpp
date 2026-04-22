@@ -1,3 +1,5 @@
+#include "telemetry/board/gigabyte/board_gigabyte_siv.h"
+
 #include <windows.h>
 
 #include <algorithm>
