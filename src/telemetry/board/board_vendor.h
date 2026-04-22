@@ -31,4 +31,4 @@ public:
     virtual BoardVendorTelemetrySample Sample() = 0;
 };
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace* trace);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace);

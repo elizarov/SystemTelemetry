@@ -44,6 +44,7 @@ public:
     bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
     bool WriteDiagnosticsOutputs();
     HWND WindowHandle() const override;
+    Trace& TraceLog() override;
     DashboardRenderer& Renderer() override;
     const DashboardRenderer& Renderer() const override;
     DashboardOverlayState& RendererDashboardOverlayState() override;
@@ -118,6 +119,7 @@ private:
 
     HINSTANCE instance_ = nullptr;
     HWND hwnd_ = nullptr;
+    Trace trace_;
     DashboardRenderer renderer_;
     DashboardOverlayState rendererDashboardOverlayState_{};
     DashboardController controller_{};

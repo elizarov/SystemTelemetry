@@ -68,7 +68,7 @@ std::string FormatTracePoint(RenderPoint point) {
 }  // namespace
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
-    : diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this),
+    : renderer_(trace_), diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this),
       shellUi_(std::make_unique<DashboardShellUi>(*this)) {}
 
 DashboardApp::~DashboardApp() = default;
@@ -289,8 +289,6 @@ void DashboardApp::RetryConfigPlacementIfPending() {
 
 bool DashboardApp::InitializeFonts() {
     renderer_.SetConfig(controller_.State().config);
-    renderer_.SetTraceOutput(
-        controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
     return renderer_.Initialize(hwnd_);
 }
 
@@ -308,8 +306,6 @@ bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const
     rendererDashboardOverlayState_.showLayoutEditGuides =
         controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
     SyncDashboardMoveOverlayState();
-    renderer_.SetTraceOutput(
-        controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
     if (!renderer_.Initialize(hwnd_)) {
         return false;
     }
@@ -359,8 +355,7 @@ void DashboardApp::BringOnTop() {
 }
 
 bool DashboardApp::ApplyConfiguredWallpaper() {
-    return ::ApplyConfiguredWallpaper(controller_.State().config,
-        controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr);
+    return ::ApplyConfiguredWallpaper(controller_.State().config, trace_);
 }
 
 bool DashboardApp::ApplyLayoutGuideWeights(
@@ -478,6 +473,10 @@ void DashboardApp::SyncDashboardMoveOverlayState() {
 
 HWND DashboardApp::WindowHandle() const {
     return hwnd_;
+}
+
+Trace& DashboardApp::TraceLog() {
+    return trace_;
 }
 
 DashboardRenderer& DashboardApp::Renderer() {
@@ -1214,10 +1213,7 @@ void DashboardApp::Paint() {
 }
 
 void DashboardApp::BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) {
-    layoutEditTraceSession_.Begin(
-        controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr,
-        kind,
-        detail);
+    layoutEditTraceSession_.Begin(trace_, kind, detail);
 }
 
 void DashboardApp::RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) {
@@ -1225,6 +1221,5 @@ void DashboardApp::RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nan
 }
 
 void DashboardApp::EndLayoutEditTraceSession(const std::string& reason) {
-    layoutEditTraceSession_.End(
-        controller_.State().diagnostics != nullptr ? controller_.State().diagnostics->TraceStream() : nullptr, reason);
+    layoutEditTraceSession_.End(trace_, reason);
 }

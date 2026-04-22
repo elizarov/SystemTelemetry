@@ -7,7 +7,6 @@
 #include <istream>
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -16,6 +15,7 @@
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/metric_types.h"
+#include "util/trace.h"
 
 struct MemoryMetric {
     double usedGb = 0.0;
@@ -115,8 +115,7 @@ public:
     TelemetryCollector(TelemetryCollector&&) = delete;
     TelemetryCollector& operator=(TelemetryCollector&&) = delete;
 
-    virtual bool Initialize(
-        const TelemetrySettings& settings, std::ostream* traceStream = nullptr, std::string* errorText = nullptr) = 0;
+    virtual bool Initialize(const TelemetrySettings& settings, std::string* errorText = nullptr) = 0;
     virtual const SystemSnapshot& Snapshot() const = 0;
     virtual TelemetryDump Dump() const = 0;
     virtual const ResolvedTelemetrySelections& ResolvedSelections() const = 0;
@@ -141,4 +140,4 @@ struct TelemetryCollectorOptions {
 };
 
 std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
-    const TelemetryCollectorOptions& options, const std::filesystem::path& workingDirectory);
+    const TelemetryCollectorOptions& options, const std::filesystem::path& workingDirectory, Trace& trace);

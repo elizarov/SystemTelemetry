@@ -9,8 +9,6 @@ public:
     explicit Trace(std::ostream* output = nullptr);
 
     void SetOutput(std::ostream* output);
-    std::ostream* Output() const;
-    bool Enabled() const;
 
     void Write(const char* text) const;
     void Write(const std::string& text) const;

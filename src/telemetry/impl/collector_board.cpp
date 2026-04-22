@@ -39,7 +39,7 @@ void InitializeRequestedBoardMetrics(RealTelemetryCollectorState& state, const B
 void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
     InitializeRequestedBoardMetrics(state, settings);
 
-    state.board_.provider = CreateBoardVendorTelemetryProvider(&state.trace_);
+    state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_);
     if (state.board_.provider != nullptr) {
         state.trace_.Write("telemetry:board_provider_initialize_begin");
         if (state.board_.provider->Initialize(settings)) {

@@ -15,8 +15,7 @@
 #include "util/strings.h"
 #include "util/trace.h"
 
-bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) {
-    const Trace trace(traceStream);
+bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     if (config.display.wallpaper.empty()) {
         return true;
     }
@@ -100,7 +99,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream
 }
 
 bool ConfigureDisplay(
-    const AppConfig& config, const TelemetryDump& dump, double targetScale, std::ostream* traceStream, HWND owner) {
+    const AppConfig& config, const TelemetryDump& dump, double targetScale, Trace& trace, HWND owner) {
     const std::filesystem::path configPath = GetRuntimeConfigPath();
     const std::filesystem::path imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
 
@@ -114,11 +113,11 @@ bool ConfigureDisplay(
             false,
             LayoutSimilarityIndicatorMode::ActiveGuide,
             std::string{},
+            trace,
             std::nullopt,
-            traceStream,
             &screenshotError);
         return imageSaved && SaveConfig(configPath, config, RuntimeConfigParseContext()) &&
-               ApplyConfiguredWallpaper(config, traceStream);
+               ApplyConfiguredWallpaper(config, trace);
     }
 
     const std::filesystem::path tempConfigPath = CreateTempFilePath(L"SystemTelemetryConfigureDisplayConfig");
@@ -206,6 +205,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
     }
 
     std::string screenshotError;
+    Trace trace;
     const double targetScale = HasExplicitDisplayScale(config.display.scale)
                                    ? config.display.scale
                                    : ComputeMonitorFittedScale(config,
@@ -223,11 +223,11 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         false,
         LayoutSimilarityIndicatorMode::ActiveGuide,
         std::string{},
+        trace,
         std::nullopt,
-        nullptr,
         &screenshotError);
     const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config, RuntimeConfigParseContext());
-    const bool wallpaperApplied = configSaved && ApplyConfiguredWallpaper(config, nullptr);
+    const bool wallpaperApplied = configSaved && ApplyConfiguredWallpaper(config, trace);
 
     std::error_code ignored;
     std::filesystem::remove(sourceConfigPath, ignored);

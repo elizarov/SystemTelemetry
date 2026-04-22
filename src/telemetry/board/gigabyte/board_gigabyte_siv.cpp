@@ -373,7 +373,7 @@ void ResetMetricValues(std::vector<NamedScalarMetric>& metrics) {
 
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    explicit GigabyteSivBoardTelemetryProvider(Trace* trace)
+    explicit GigabyteSivBoardTelemetryProvider(Trace& trace)
         : trace_(trace), runtime_(gcnew GigabyteRuntimeContext()) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
@@ -492,11 +492,10 @@ private:
     }
 
     Trace& trace() {
-        static Trace nullTrace;
-        return trace_ != nullptr ? *trace_ : nullTrace;
+        return trace_;
     }
 
-    Trace* trace_ = nullptr;
+    Trace& trace_;
     BoardTelemetrySettings settings_{};
     gcroot<GigabyteRuntimeContext ^> runtime_;
     std::string boardManufacturer_;
@@ -515,6 +514,6 @@ private:
 
 }  // namespace
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(Trace* trace) {
+std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(Trace& trace) {
     return std::make_unique<GigabyteSivBoardTelemetryProvider>(trace);
 }

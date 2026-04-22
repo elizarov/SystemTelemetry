@@ -360,7 +360,8 @@ double ResolveSavedScreenshotScale(const AppConfig& config) {
     return HasExplicitDisplayScale(config.display.scale) ? config.display.scale : 1.0;
 }
 
-DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options) : options_(options) {}
+DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options, Trace& trace)
+    : options_(options), trace_(trace) {}
 
 bool DiagnosticsSession::Initialize() {
     const std::filesystem::path workingDirectory = GetWorkingDirectory();
@@ -371,6 +372,7 @@ bool DiagnosticsSession::Initialize() {
             ShowFileOpenError("trace file", tracePath_);
             return false;
         }
+        trace_.SetOutput(&traceStream_);
     }
     if (options_.dump) {
         dumpPath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.dumpPath, kDefaultDumpFileName);
@@ -394,16 +396,8 @@ bool DiagnosticsSession::ShouldShowDialogs() const {
     return !options_.trace;
 }
 
-std::ostream* DiagnosticsSession::TraceStream() {
-    return traceStream_.is_open() ? &traceStream_ : nullptr;
-}
-
 void DiagnosticsSession::WriteTraceMarker(const std::string& text) {
-    if (!traceStream_.is_open()) {
-        return;
-    }
-    Trace trace(&traceStream_);
-    trace.Write(text);
+    trace_.Write(text);
 }
 
 void DiagnosticsSession::ReportError(const std::string& traceText, const std::wstring& message) {
@@ -438,10 +432,10 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
             options_.editLayout,
             GetSimilarityIndicatorMode(options_),
             options_.editLayoutWidgetName,
+            trace_,
             options_.hoverPoint.has_value()
                 ? std::optional<RenderPoint>(RenderPoint{options_.hoverPoint->x, options_.hoverPoint->y})
                 : std::nullopt,
-            TraceStream(),
             &screenshotError)) {
         const std::wstring message =
             WideFromUtf8("Failed to save screenshot:\n" + Utf8FromWide(screenshotPath_.wstring()));
@@ -604,17 +598,17 @@ std::wstring FormatTelemetryInitializeError(std::string_view errorText) {
 
 std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
-    std::ostream* traceStream,
+    Trace& trace,
     std::string* errorText) {
     if (errorText != nullptr) {
         errorText->clear();
     }
     std::unique_ptr<TelemetryCollector> telemetry =
-        CreateTelemetryCollector(BuildTelemetryCollectorOptions(diagnosticsOptions), GetWorkingDirectory());
+        CreateTelemetryCollector(BuildTelemetryCollectorOptions(diagnosticsOptions), GetWorkingDirectory(), trace);
     if (telemetry == nullptr) {
         return nullptr;
     }
-    if (!telemetry->Initialize(ExtractTelemetrySettings(runtimeConfig), traceStream, errorText)) {
+    if (!telemetry->Initialize(ExtractTelemetrySettings(runtimeConfig), errorText)) {
         return nullptr;
     }
     return telemetry;
@@ -624,6 +618,7 @@ bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
+    Trace& trace,
     DiagnosticsSession* diagnostics,
     std::string* errorText) {
     if (errorText != nullptr) {
@@ -646,13 +641,9 @@ bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     telemetry.reset();
     std::string reloadError;
     std::unique_ptr<TelemetryCollector> reloadedTelemetry =
-        InitializeTelemetryCollectorInstance(effectiveReloadedConfig,
-            diagnosticsOptions,
-            diagnostics != nullptr ? diagnostics->TraceStream() : nullptr,
-            &reloadError);
+        InitializeTelemetryCollectorInstance(effectiveReloadedConfig, diagnosticsOptions, trace, &reloadError);
     if (reloadedTelemetry == nullptr) {
-        telemetry = InitializeTelemetryCollectorInstance(
-            activeConfig, diagnosticsOptions, diagnostics != nullptr ? diagnostics->TraceStream() : nullptr);
+        telemetry = InitializeTelemetryCollectorInstance(activeConfig, diagnosticsOptions, trace);
         if (errorText != nullptr) {
             *errorText = reloadError;
         }
@@ -683,10 +674,10 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     bool showLayoutEditGuides,
     LayoutSimilarityIndicatorMode similarityIndicatorMode,
     const std::string& editLayoutWidgetName,
+    Trace& trace,
     std::optional<RenderPoint> hoverPoint,
-    std::ostream* traceStream,
     std::string* errorText) {
-    DashboardRenderer renderer;
+    DashboardRenderer renderer(trace);
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = showLayoutEditGuides || hoverPoint.has_value();
     overlayState.forceLayoutEditAffordances = showLayoutEditGuides && !hoverPoint.has_value();
@@ -694,7 +685,6 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     renderer.SetRenderScale(scale);
     renderer.SetConfig(config);
     renderer.SetRenderMode(renderMode);
-    renderer.SetTraceOutput(traceStream);
     if (!renderer.Initialize()) {
         if (errorText != nullptr) {
             *errorText = renderer.LastError();
@@ -710,7 +700,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
             return false;
         }
         overlayState.SetPreviewWidget(*widget);
-        Trace(traceStream).Write("diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
+        trace.Write("diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
     }
     if (hoverPoint.has_value()) {
         if (!renderer.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
@@ -734,11 +724,10 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
                 traceText +=
                     " tooltip_error=" + QuoteTraceText(tooltipError.empty() ? "unsupported_target" : tooltipError);
             }
-            Trace(traceStream).Write(traceText);
+            trace.Write(traceText);
         } else {
-            Trace(traceStream)
-                .Write("diagnostics:hover point=" + QuoteTraceText(FormatTracePoint(*hoverPoint)) +
-                       " target=" + QuoteTraceText("none"));
+            trace.Write("diagnostics:hover point=" + QuoteTraceText(FormatTracePoint(*hoverPoint)) +
+                        " target=" + QuoteTraceText("none"));
         }
     }
     const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot, overlayState);
@@ -750,7 +739,8 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
 
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     AppConfig config = LoadRuntimeConfig(diagnosticsOptions);
-    DiagnosticsSession diagnostics(diagnosticsOptions);
+    Trace trace;
+    DiagnosticsSession diagnostics(diagnosticsOptions, trace);
     if (!diagnostics.Initialize()) {
         return 1;
     }
@@ -764,7 +754,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
 
     std::string telemetryError;
     std::unique_ptr<TelemetryCollector> telemetry =
-        InitializeTelemetryCollectorInstance(config, diagnosticsOptions, diagnostics.TraceStream(), &telemetryError);
+        InitializeTelemetryCollectorInstance(config, diagnosticsOptions, trace, &telemetryError);
     if (telemetry == nullptr) {
         std::string traceText = "diagnostics:telemetry_initialize_failed";
         if (!telemetryError.empty()) {
@@ -786,7 +776,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     if (diagnosticsOptions.reload) {
         std::string reloadError;
         if (!ReloadTelemetryCollectorFromDisk(
-                GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, &diagnostics, &reloadError)) {
+                GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, trace, &diagnostics, &reloadError)) {
             if (diagnostics.ShouldShowDialogs() && !reloadError.empty()) {
                 const std::wstring message = FormatTelemetryInitializeError(reloadError);
                 MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);

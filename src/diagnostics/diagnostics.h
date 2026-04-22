@@ -7,7 +7,6 @@
 #include <fstream>
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <shellapi.h>
 #include <string>
 #include <string_view>
@@ -28,8 +27,8 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     bool showLayoutEditGuides,
     LayoutSimilarityIndicatorMode similarityIndicatorMode,
     const std::string& editLayoutWidgetName,
+    Trace& trace,
     std::optional<RenderPoint> hoverPoint = std::nullopt,
-    std::ostream* traceStream = nullptr,
     std::string* errorText = nullptr);
 
 DiagnosticsOptions GetDiagnosticsOptions();
@@ -40,11 +39,10 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions);
 
 class DiagnosticsSession {
 public:
-    explicit DiagnosticsSession(const DiagnosticsOptions& options);
+    DiagnosticsSession(const DiagnosticsOptions& options, Trace& trace);
 
     bool Initialize();
     bool ShouldShowDialogs() const;
-    std::ostream* TraceStream();
     void WriteTraceMarker(const std::string& text);
     bool WriteOutputs(const TelemetryDump& dump, const AppConfig& config);
 
@@ -53,6 +51,7 @@ private:
     void ShowFileOpenError(const char* label, const std::filesystem::path& path);
 
     DiagnosticsOptions options_;
+    Trace& trace_;
     std::filesystem::path tracePath_;
     std::filesystem::path dumpPath_;
     std::filesystem::path screenshotPath_;
@@ -87,11 +86,12 @@ std::wstring FormatTelemetryInitializeError(std::string_view errorText);
 
 std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
-    std::ostream* traceStream,
+    Trace& trace,
     std::string* errorText = nullptr);
 bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
+    Trace& trace,
     DiagnosticsSession* diagnostics,
     std::string* errorText = nullptr);

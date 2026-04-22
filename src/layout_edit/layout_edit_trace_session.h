@@ -1,16 +1,16 @@
 #pragma once
 
 #include <chrono>
-#include <ostream>
 #include <string>
 
 #include "layout_edit/layout_edit_controller.h"
+#include "util/trace.h"
 
 class LayoutEditTraceSession {
 public:
-    void Begin(std::ostream* traceStream, const std::string& kind, const std::string& detail);
+    void Begin(Trace& trace, const std::string& kind, const std::string& detail);
     void Record(LayoutEditHost::TracePhase phase, std::chrono::nanoseconds elapsed);
-    void End(std::ostream* traceStream, const std::string& reason);
+    void End(Trace& trace, const std::string& reason);
 
 private:
     struct Stats {

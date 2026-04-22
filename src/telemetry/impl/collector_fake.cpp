@@ -369,15 +369,15 @@ std::filesystem::path ResolveFakePath(
 
 class FakeTelemetryCollector : public TelemetryCollector {
 public:
-    FakeTelemetryCollector(std::filesystem::path fakePath, TelemetryDumpLoader loadFakeDump)
-        : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), loadFakeDump_(loadFakeDump) {}
+    FakeTelemetryCollector(std::filesystem::path fakePath, TelemetryDumpLoader loadFakeDump, Trace& trace)
+        : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), loadFakeDump_(loadFakeDump),
+          trace_(trace) {}
 
-    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream, std::string* errorText) override {
+    bool Initialize(const TelemetrySettings& settings, std::string* errorText) override {
         if (errorText != nullptr) {
             errorText->clear();
         }
         selectionSettings_ = settings.selection;
-        trace_.SetOutput(traceStream);
         trace_.Write(useSyntheticSource_ ? std::string("fake:initialize_begin source=synthetic")
                                          : "fake:initialize_begin path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
         if (!ReloadFakeDump(true, errorText)) {
@@ -523,7 +523,7 @@ private:
     std::vector<StorageDriveCandidate> storageDrives_{};
     ResolvedNetworkCandidate resolvedNetwork_{};
     std::vector<std::string> resolvedStorageDrives_{};
-    Trace trace_;
+    Trace& trace_;
     std::chrono::steady_clock::time_point lastReload_{};
     uint64_t syntheticTick_ = 0;
 };
@@ -532,6 +532,8 @@ private:
 
 std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(const std::filesystem::path& workingDirectory,
     const std::filesystem::path& configuredPath,
-    TelemetryDumpLoader loadFakeDump) {
-    return std::make_unique<FakeTelemetryCollector>(ResolveFakePath(workingDirectory, configuredPath), loadFakeDump);
+    TelemetryDumpLoader loadFakeDump,
+    Trace& trace) {
+    return std::make_unique<FakeTelemetryCollector>(
+        ResolveFakePath(workingDirectory, configuredPath), loadFakeDump, trace);
 }

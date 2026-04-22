@@ -26,4 +26,4 @@ public:
     virtual GpuVendorTelemetrySample Sample() = 0;
 };
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace* trace);
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace& trace);

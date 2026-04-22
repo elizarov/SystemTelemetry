@@ -3,7 +3,6 @@
 #include <winsock2.h>
 
 #include <memory>
-#include <ostream>
 
 #include "telemetry/impl/collector_board.h"
 #include "telemetry/impl/collector_cpu.h"
@@ -17,12 +16,13 @@ namespace {
 
 class RealTelemetryCollector : public TelemetryCollector {
 public:
-    bool Initialize(const TelemetrySettings& settings, std::ostream* traceStream, std::string* errorText) override {
+    explicit RealTelemetryCollector(Trace& trace) : state_(std::make_unique<RealTelemetryCollectorState>(trace)) {}
+
+    bool Initialize(const TelemetrySettings& settings, std::string* errorText) override {
         if (errorText != nullptr) {
             errorText->clear();
         }
         state_->settings_ = settings;
-        state_->trace_.SetOutput(traceStream);
         state_->retainedHistoryStore_.Reset(state_->snapshot_);
 
         WSADATA wsaData{};
@@ -139,11 +139,11 @@ public:
     }
 
 private:
-    std::unique_ptr<RealTelemetryCollectorState> state_ = std::make_unique<RealTelemetryCollectorState>();
+    std::unique_ptr<RealTelemetryCollectorState> state_;
 };
 
 }  // namespace
 
-std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector() {
-    return std::make_unique<RealTelemetryCollector>();
+std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace) {
+    return std::make_unique<RealTelemetryCollector>(trace);
 }

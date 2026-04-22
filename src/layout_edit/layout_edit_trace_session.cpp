@@ -3,8 +3,6 @@
 #include <iomanip>
 #include <sstream>
 
-#include "util/trace.h"
-
 namespace {
 
 std::string FormatMilliseconds(double value) {
@@ -17,27 +15,15 @@ double DurationMilliseconds(std::chrono::nanoseconds value) {
     return std::chrono::duration<double, std::milli>(value).count();
 }
 
-void WriteTrace(std::ostream* traceStream, const std::string& text) {
-    if (traceStream == nullptr) {
-        return;
-    }
-    Trace trace(traceStream);
-    trace.Write(text);
-}
-
 }  // namespace
 
-void LayoutEditTraceSession::Begin(std::ostream* traceStream, const std::string& kind, const std::string& detail) {
-    if (traceStream == nullptr) {
-        return;
-    }
-
+void LayoutEditTraceSession::Begin(Trace& trace, const std::string& kind, const std::string& detail) {
     *this = {};
     active_ = true;
     kind_ = kind;
     detail_ = detail;
     startedAt_ = std::chrono::steady_clock::now();
-    WriteTrace(traceStream, "layout_edit_drag:start kind=\"" + kind + "\" detail=\"" + detail + "\"");
+    trace.Write("layout_edit_drag:start kind=\"" + kind + "\" detail=\"" + detail + "\"");
 }
 
 void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chrono::nanoseconds elapsed) {
@@ -68,7 +54,7 @@ void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chron
     ++stats->samples;
 }
 
-void LayoutEditTraceSession::End(std::ostream* traceStream, const std::string& reason) {
+void LayoutEditTraceSession::End(Trace& trace, const std::string& reason) {
     if (!active_) {
         *this = {};
         return;
@@ -93,6 +79,6 @@ void LayoutEditTraceSession::End(std::ostream* traceStream, const std::string& r
     appendAverage(summary, "apply", apply_);
     appendAverage(summary, "paint_total", paintTotal_);
     appendAverage(summary, "paint_draw", paintDraw_);
-    WriteTrace(traceStream, summary);
+    trace.Write(summary);
     *this = {};
 }

@@ -415,8 +415,8 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
 
 }  // namespace
 
-DashboardRenderer::DashboardRenderer()
-    : palette_(std::make_unique<DashboardPalette>(config_.layout.colors)),
+DashboardRenderer::DashboardRenderer(Trace& trace)
+    : trace_(trace), palette_(std::make_unique<DashboardPalette>(config_.layout.colors)),
       layoutResolver_(std::make_unique<DashboardLayoutResolver>()), d2dCache_(std::make_unique<DashboardD2DCache>()),
       textWidthCache_(std::make_unique<DashboardTextWidthCache>()) {}
 
@@ -530,10 +530,6 @@ int DashboardRenderer::WindowWidth() const {
 
 int DashboardRenderer::WindowHeight() const {
     return std::max(1, ScaleLogical(config_.layout.structure.window.height));
-}
-
-void DashboardRenderer::SetTraceOutput(std::ostream* traceOutput) {
-    traceOutput_ = traceOutput;
 }
 
 const std::vector<LayoutEditGuide>& DashboardRenderer::LayoutEditGuides() const {
@@ -1698,12 +1694,10 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlaySta
         return;
     }
 
-    if (traceOutput_ != nullptr) {
-        for (const auto& entry : exactTypeOrdinals) {
-            WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
-                       "\" class=" + std::to_string(static_cast<int>(entry.first.widgetClass)) +
-                       " extent=" + std::to_string(entry.first.extent) + " ordinal=" + std::to_string(entry.second));
-        }
+    for (const auto& entry : exactTypeOrdinals) {
+        WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
+                   "\" class=" + std::to_string(static_cast<int>(entry.first.widgetClass)) +
+                   " extent=" + std::to_string(entry.first.extent) + " ordinal=" + std::to_string(entry.second));
     }
 
     const RenderColorId color = RenderColorId::LayoutGuide;
@@ -2085,10 +2079,6 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
 }
 
 void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const DashboardOverlayState& overlayState) const {
-    if (traceOutput_ == nullptr) {
-        return;
-    }
-
     size_t count = 0;
     const auto appendRegion =
         [&](const RenderRect& box, std::string_view visualType, const std::string& path, const std::string& detail) {
@@ -3144,14 +3134,10 @@ void DashboardRenderer::ReleasePanelIcons() {
 }
 
 void DashboardRenderer::WriteTrace(const std::string& text) const {
-    if (traceOutput_ == nullptr) {
-        return;
-    }
     if (interactiveDragTraceActive_ && text.rfind("renderer:", 0) == 0) {
         return;
     }
-    Trace trace(traceOutput_);
-    trace.Write(text);
+    trace_.Write(text);
 }
 
 bool DashboardRenderer::RebuildTextFormatsAndMetrics() {

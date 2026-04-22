@@ -37,6 +37,7 @@ class DashboardShellHost {
 public:
     virtual ~DashboardShellHost() = default;
     virtual HWND WindowHandle() const = 0;
+    virtual Trace& TraceLog() = 0;
     virtual DashboardRenderer& Renderer() = 0;
     virtual const DashboardRenderer& Renderer() const = 0;
     virtual DashboardOverlayState& RendererDashboardOverlayState() = 0;
@@ -105,7 +106,7 @@ private:
     void MarkLayoutEditSessionSaved();
     void SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides);
     void SyncRuntimeAndRenderer(DashboardShellHost& shell, bool showLayoutEditGuides);
-    bool ApplyConfiguredWallpaper();
+    bool ApplyConfiguredWallpaper(Trace& trace);
 
     DashboardSessionState state_{};
 };

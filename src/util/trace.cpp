@@ -31,14 +31,6 @@ void Trace::SetOutput(std::ostream* output) {
     output_ = output;
 }
 
-std::ostream* Trace::Output() const {
-    return output_;
-}
-
-bool Trace::Enabled() const {
-    return output_ != nullptr;
-}
-
 void Trace::Write(const char* text) const {
     if (output_ == nullptr) {
         return;

@@ -47,8 +47,8 @@ std::string QuoteTraceText(std::string_view text) {
     return "\"" + EscapeTraceText(text) + "\"";
 }
 
-std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOptions& options) {
-    auto session = std::make_unique<DiagnosticsSession>(options);
+std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOptions& options, Trace& trace) {
+    auto session = std::make_unique<DiagnosticsSession>(options, trace);
     if (!session->Initialize()) {
         return nullptr;
     }
@@ -137,9 +137,8 @@ void DashboardController::SyncRuntimeAndRenderer(DashboardShellHost& shell, bool
     SyncRenderer(shell, showLayoutEditGuides);
 }
 
-bool DashboardController::ApplyConfiguredWallpaper() {
-    return ::ApplyConfiguredWallpaper(
-        state_.config, state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr);
+bool DashboardController::ApplyConfiguredWallpaper(Trace& trace) {
+    return ::ApplyConfiguredWallpaper(state_.config, trace);
 }
 
 bool DashboardController::InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
@@ -149,10 +148,9 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         return false;
     }
     shell.RendererDashboardOverlayState().similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions);
-    shell.Renderer().SetTraceOutput(nullptr);
 
     if (diagnosticsOptions.HasAnyOutput()) {
-        state_.diagnostics = CreateDiagnosticsSession(diagnosticsOptions);
+        state_.diagnostics = CreateDiagnosticsSession(diagnosticsOptions, shell.TraceLog());
         if (state_.diagnostics == nullptr) {
             return false;
         }
@@ -161,10 +159,8 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     }
 
     std::string telemetryError;
-    state_.telemetry = InitializeTelemetryCollectorInstance(state_.config,
-        diagnosticsOptions,
-        state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr,
-        &telemetryError);
+    state_.telemetry =
+        InitializeTelemetryCollectorInstance(state_.config, diagnosticsOptions, shell.TraceLog(), &telemetryError);
     if (state_.telemetry == nullptr) {
         if (state_.diagnostics != nullptr) {
             std::string traceText = "diagnostics:telemetry_initialize_failed";
@@ -179,7 +175,6 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
 
     if (state_.diagnostics != nullptr) {
         state_.diagnostics->WriteTraceMarker("diagnostics:telemetry_initialized");
-        shell.Renderer().SetTraceOutput(state_.diagnostics->TraceStream());
         state_.lastDiagnosticsOutput = std::chrono::steady_clock::now();
     }
 
@@ -189,7 +184,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     if (state_.isEditingLayout) {
         BeginLayoutEditSessionTracking();
     }
-    ApplyConfiguredWallpaper();
+    ApplyConfiguredWallpaper(shell.TraceLog());
     return true;
 }
 
@@ -227,6 +222,7 @@ bool DashboardController::ReloadConfigFromDisk(
             state_.config,
             state_.telemetry,
             diagnosticsOptions,
+            shell.TraceLog(),
             state_.diagnostics.get(),
             &telemetryError)) {
         if (!telemetryError.empty() && (state_.diagnostics == nullptr || state_.diagnostics->ShouldShowDialogs())) {
@@ -237,14 +233,13 @@ bool DashboardController::ReloadConfigFromDisk(
         return false;
     }
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsOptions.editLayout);
-    shell.Renderer().SetTraceOutput(state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr);
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
             state_.diagnostics->WriteTraceMarker("diagnostics:reload_config_failed");
         }
         return false;
     }
-    ApplyConfiguredWallpaper();
+    ApplyConfiguredWallpaper(shell.TraceLog());
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();
@@ -291,11 +286,11 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
             state_.isEditingLayout || diagnosticsOptions.editLayout,
             GetSimilarityIndicatorMode(diagnosticsOptions),
             diagnosticsOptions.editLayoutWidgetName,
+            shell.TraceLog(),
             diagnosticsOptions.hoverPoint.has_value()
                 ? std::optional<RenderPoint>(
                       RenderPoint{diagnosticsOptions.hoverPoint->x, diagnosticsOptions.hoverPoint->y})
                 : std::nullopt,
-            state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr,
             &errorText)) {
         std::string message = "Failed to save screenshot:\n" + Utf8FromWide(path->wstring());
         if (!errorText.empty()) {
@@ -340,18 +335,15 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
     updatedConfig.display.position = {};
     updatedConfig.display.scale = option.fittedScale;
     updatedConfig.display.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
-    if (!::ConfigureDisplay(updatedConfig,
-            state_.telemetry->Dump(),
-            option.fittedScale,
-            state_.diagnostics != nullptr ? state_.diagnostics->TraceStream() : nullptr,
-            shell.WindowHandle())) {
+    if (!::ConfigureDisplay(
+            updatedConfig, state_.telemetry->Dump(), option.fittedScale, shell.TraceLog(), shell.WindowHandle())) {
         shell.ShowError(L"Failed to configure the selected display.");
         return false;
     }
 
     state_.config = updatedConfig;
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    ApplyConfiguredWallpaper();
+    ApplyConfiguredWallpaper(shell.TraceLog());
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();

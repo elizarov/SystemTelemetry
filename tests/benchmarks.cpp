@@ -24,6 +24,7 @@
 #include "layout_edit/layout_edit_tree.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
+#include "util/trace.h"
 
 namespace {
 
@@ -129,26 +130,28 @@ bool IsKnownBenchmarkName(const std::string& name) {
     return IsEditLayoutBenchmarkName(name) || IsUpdateTelemetryBenchmarkName(name) || IsLayoutSwitchBenchmarkName(name);
 }
 
-std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config) {
+std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config, Trace& trace) {
     TelemetryCollectorOptions options;
-    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, std::filesystem::current_path());
+    std::unique_ptr<TelemetryCollector> telemetry =
+        CreateTelemetryCollector(options, std::filesystem::current_path(), trace);
     if (telemetry == nullptr) {
         return nullptr;
     }
-    if (!telemetry->Initialize(ExtractTelemetrySettings(config), nullptr)) {
+    if (!telemetry->Initialize(ExtractTelemetrySettings(config))) {
         return nullptr;
     }
     return telemetry;
 }
 
-std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const AppConfig& config) {
+std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const AppConfig& config, Trace& trace) {
     TelemetryCollectorOptions options;
     options.fake = true;
-    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, std::filesystem::current_path());
+    std::unique_ptr<TelemetryCollector> telemetry =
+        CreateTelemetryCollector(options, std::filesystem::current_path(), trace);
     if (telemetry == nullptr) {
         return nullptr;
     }
-    if (!telemetry->Initialize(ExtractTelemetrySettings(config), nullptr)) {
+    if (!telemetry->Initialize(ExtractTelemetrySettings(config))) {
         return nullptr;
     }
     return telemetry;
@@ -205,8 +208,8 @@ RenderPoint DragPointForWeights(
 
 class BenchmarkHost : private LayoutEditHost {
 public:
-    BenchmarkHost(const AppConfig& config, double renderScale)
-        : config_(config), renderScale_(renderScale), layoutEditController_(*this) {
+    BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace)
+        : config_(config), trace_(trace), renderer_(trace_), renderScale_(renderScale), layoutEditController_(*this) {
         renderer_.SetConfig(config_);
         renderer_.SetRenderScale(renderScale_);
         renderer_.SetImmediatePresent(true);
@@ -371,9 +374,7 @@ private:
 
     void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override {
         phaseTotals_ = {};
-        traceStream_.str({});
-        traceStream_.clear();
-        traceSession_.Begin(&traceStream_, kind, detail);
+        traceSession_.Begin(trace_, kind, detail);
     }
 
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override {
@@ -382,12 +383,13 @@ private:
     }
 
     void EndLayoutEditTraceSession(const std::string& reason) override {
-        traceSession_.End(&traceStream_, reason);
+        traceSession_.End(trace_, reason);
     }
 
     HWND hwnd_ = nullptr;
     AppConfig config_{};
-    DashboardRenderer renderer_{};
+    Trace& trace_;
+    DashboardRenderer renderer_;
     DashboardOverlayState overlayState_{};
 
     void RecordPhase(BenchPhase phase, std::chrono::nanoseconds elapsed) {
@@ -401,7 +403,6 @@ private:
     bool dirty_ = false;
     LayoutEditController layoutEditController_;
     LayoutEditTraceSession traceSession_{};
-    std::ostringstream traceStream_{};
     std::array<PhaseStats, kBenchPhaseCount> phaseTotals_{};
 };
 
@@ -541,6 +542,8 @@ int main(int argc, char** argv) {
     std::string benchmarkName = "edit-layout";
     size_t iterations = 240;
     double renderScale = 2.0;
+    std::ostringstream traceStream;
+    Trace trace(&traceStream);
     if (argc >= 2) {
         const std::string firstArg = argv[1];
         int nextArgument = 1;
@@ -570,14 +573,14 @@ int main(int argc, char** argv) {
 
     if (benchmarkName == "edit-layout") {
         const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
-        std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config);
+        std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
         if (telemetry == nullptr) {
             std::cerr << "fake telemetry init failed\n";
             return 1;
         }
 
         const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
-        BenchmarkHost host(runtimeConfig, renderScale);
+        BenchmarkHost host(runtimeConfig, renderScale, trace);
         host.SetSnapshot(telemetry->Snapshot());
         if (!host.Initialize()) {
             std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
@@ -616,7 +619,7 @@ int main(int argc, char** argv) {
 
     if (benchmarkName == "layout-switch") {
         const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
-        std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config);
+        std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
         if (telemetry == nullptr) {
             std::cerr << "fake telemetry init failed\n";
             return 1;
@@ -629,7 +632,7 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        BenchmarkHost host(runtimeConfig, renderScale);
+        BenchmarkHost host(runtimeConfig, renderScale, trace);
         host.SetSnapshot(telemetry->Snapshot());
         if (!host.Initialize()) {
             std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
@@ -647,14 +650,14 @@ int main(int argc, char** argv) {
     }
 
     const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
-    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkTelemetryCollector(config);
+    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkTelemetryCollector(config, trace);
     if (telemetry == nullptr) {
         std::cerr << "telemetry init failed\n";
         return 1;
     }
 
     const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
-    BenchmarkHost host(runtimeConfig, renderScale);
+    BenchmarkHost host(runtimeConfig, renderScale, trace);
     host.SetSnapshot(telemetry->Snapshot());
     if (!host.Initialize()) {
         std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";

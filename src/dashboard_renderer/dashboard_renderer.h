@@ -24,6 +24,7 @@
 #include "layout_edit/layout_edit_parameter_id.h"
 #include "layout_edit/layout_edit_types.h"
 #include "telemetry/metrics.h"
+#include "util/trace.h"
 #include "widget/widget.h"
 
 class DashboardLayoutResolver;
@@ -56,7 +57,7 @@ public:
         RenderRect textRect{};
     };
 
-    DashboardRenderer();
+    explicit DashboardRenderer(Trace& trace);
     ~DashboardRenderer();
 
     void SetConfig(const AppConfig& config);
@@ -69,7 +70,6 @@ public:
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
-    void SetTraceOutput(std::ostream* traceOutput);
     const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
     const std::vector<LayoutEditWidgetGuide>& WidgetEditGuides() const;
     const std::vector<LayoutEditGapAnchor>& GapEditAnchors() const;
@@ -288,7 +288,7 @@ private:
 
     AppConfig config_;
     HWND hwnd_ = nullptr;
-    std::ostream* traceOutput_ = nullptr;
+    Trace& trace_;
     std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>> panelIcons_;
     std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
     TextStyleMetrics textStyleMetrics_{};

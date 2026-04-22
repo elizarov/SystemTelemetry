@@ -18,7 +18,7 @@ using namespace adlx;
 
 class AmdAdlxGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
-    explicit AmdAdlxGpuTelemetryProvider(Trace* trace) : trace_(trace) {}
+    explicit AmdAdlxGpuTelemetryProvider(Trace& trace) : trace_(trace) {}
 
     ~AmdAdlxGpuTelemetryProvider() override {
         metricsSupport_ = nullptr;
@@ -266,15 +266,14 @@ public:
 
 private:
     Trace& trace() {
-        static Trace nullTrace;
-        return trace_ != nullptr ? *trace_ : nullTrace;
+        return trace_;
     }
 
     ADLXHelper helper_;
     IADLXGPUPtr gpu_;
     IADLXPerformanceMonitoringServicesPtr performanceMonitoring_;
     IADLXGPUMetricsSupportPtr metricsSupport_;
-    Trace* trace_ = nullptr;
+    Trace& trace_;
     std::string gpuName_;
     std::string diagnostics_ = "ADLX provider not initialized.";
     std::optional<double> totalVramGb_;
@@ -288,6 +287,6 @@ private:
 
 }  // namespace
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateAmdGpuTelemetryProvider(Trace* trace) {
+std::unique_ptr<GpuVendorTelemetryProvider> CreateAmdGpuTelemetryProvider(Trace& trace) {
     return std::make_unique<AmdAdlxGpuTelemetryProvider>(trace);
 }

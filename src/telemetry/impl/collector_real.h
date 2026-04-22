@@ -4,4 +4,4 @@
 
 #include "telemetry/telemetry.h"
 
-std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector();
+std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace);

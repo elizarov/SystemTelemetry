@@ -168,7 +168,7 @@ void InitializeGpuAdapterInfo(RealTelemetryCollectorState& state) {
 }  // namespace
 
 void InitializeGpuCollector(RealTelemetryCollectorState& state) {
-    state.gpu_.provider = CreateGpuVendorTelemetryProvider(&state.trace_);
+    state.gpu_.provider = CreateGpuVendorTelemetryProvider(state.trace_);
     if (state.gpu_.provider != nullptr) {
         state.trace_.Write("telemetry:gpu_provider_initialize_begin");
         if (state.gpu_.provider->Initialize()) {
