@@ -19,7 +19,7 @@
 #include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "diagnostics/diagnostics_options.h"
-#include "telemetry/snapshot_dump.h"
+#include "diagnostics/snapshot_dump.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 

@@ -116,7 +116,7 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/impl/collector_network.cpp
     src/telemetry/impl/collector_real.cpp
     src/telemetry/impl/collector_fake.cpp
-    src/telemetry/snapshot_dump.cpp
+    src/diagnostics/snapshot_dump.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
@@ -283,7 +283,7 @@ add_executable(SystemTelemetryTests
     src/telemetry/impl/system_info_support.cpp
     src/dashboard_metrics.cpp
     src/dashboard_renderer/render_types.cpp
-    src/telemetry/snapshot_dump.cpp
+    src/diagnostics/snapshot_dump.cpp
     src/telemetry/impl/retained_history.cpp
     src/util/utf8.cpp
   )
@@ -344,7 +344,7 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/impl/collector_network.cpp
     src/telemetry/impl/collector_real.cpp
     src/telemetry/impl/collector_fake.cpp
-    src/telemetry/snapshot_dump.cpp
+    src/diagnostics/snapshot_dump.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp

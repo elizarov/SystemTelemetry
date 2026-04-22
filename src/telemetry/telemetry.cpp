@@ -1,7 +1,7 @@
 #define NOMINMAX
 #include "telemetry/telemetry.h"
 
-#include "telemetry/snapshot_dump.h"
+#include "diagnostics/snapshot_dump.h"
 #include "telemetry/impl/collector_fake.h"
 #include "telemetry/impl/collector_real.h"
 

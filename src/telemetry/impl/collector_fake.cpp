@@ -8,7 +8,7 @@
 #include <fstream>
 
 #include "util/strings.h"
-#include "telemetry/snapshot_dump.h"
+#include "diagnostics/snapshot_dump.h"
 #include "telemetry/impl/retained_history.h"
 #include "telemetry/impl/collector_storage_selection.h"
 #include "util/trace.h"

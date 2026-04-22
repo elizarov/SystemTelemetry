@@ -19,7 +19,7 @@ $clangTidySkippedFiles = @(
     # clang-tidy is intentionally skipped for snapshot_dump.cpp because isolated timings show
     # that Clang diagnostics, clang-analyzer, and misc-include-cleaner all go pathological on
     # this translation unit, turning the optional tidy sweep into a multi-minute stall.
-    'src/telemetry/snapshot_dump.cpp'
+    'src/diagnostics/snapshot_dump.cpp'
 )
 
 function Resolve-ClangTidyPath {
