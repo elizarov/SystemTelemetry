@@ -1,4 +1,3 @@
-#include "config/config_parser.h"
 #include "config/config_writer.h"
 
 #include <algorithm>
@@ -8,6 +7,7 @@
 #include <sstream>
 #include <type_traits>
 
+#include "config/config_parser.h"
 #include "util/utf8.h"
 
 namespace {

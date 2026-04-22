@@ -7,30 +7,29 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
-#include <cstdint>
+#include <windows.h>
 #include <array>
+#include <cstdint>
+#include <d2d1.h>
+#include <dwrite.h>
 #include <filesystem>
 #include <memory>
 #include <optional>
-#include <span>
 #include <ostream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
-
-#include <d2d1.h>
-#include <dwrite.h>
 #include <wincodec.h>
-#include <windows.h>
 #include <wrl/client.h>
 
 #include "config/config.h"
-#include "telemetry/metrics.h"
 #include "dashboard/dashboard_overlay_state.h"
+#include "dashboard_renderer/render_types.h"
 #include "layout_edit/layout_edit_parameter_id.h"
 #include "layout_edit/layout_edit_types.h"
-#include "dashboard_renderer/render_types.h"
+#include "telemetry/metrics.h"
 #include "widget/widget.h"
 
 class DashboardLayoutResolver;

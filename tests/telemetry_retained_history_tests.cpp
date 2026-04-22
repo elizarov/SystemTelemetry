@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-
 #include <limits>
 
 #include "telemetry/impl/retained_history.h"

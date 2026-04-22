@@ -1,9 +1,8 @@
 #pragma once
 
+#include <d2d1.h>
 #include <memory>
 #include <vector>
-
-#include <d2d1.h>
 #include <wrl/client.h>
 
 #include "widget/widget.h"

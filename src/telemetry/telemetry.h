@@ -1,5 +1,6 @@
 #pragma once
 
+#include <windows.h>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -8,13 +9,12 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <windows.h>
 
-#include "telemetry/board/board_vendor.h"
+#include "config/telemetry_settings.h"
 #include "diagnostics/diagnostics_options.h"
+#include "telemetry/board/board_vendor.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/metric_types.h"
-#include "config/telemetry_settings.h"
 
 struct MemoryMetric {
     double usedGb = 0.0;

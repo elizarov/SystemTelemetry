@@ -1,10 +1,11 @@
+#include "vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.h"
+#include "vendor/adlx/SDK/Include/IPerformanceMonitoring.h"
+
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
 
-#include "vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.h"
-#include "vendor/adlx/SDK/Include/IPerformanceMonitoring.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "util/trace.h"
 #include "util/utf8.h"

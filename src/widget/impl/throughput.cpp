@@ -4,8 +4,8 @@
 #include <cmath>
 #include <cstdio>
 
-#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "telemetry/metrics.h"
 #include "util/numeric_safety.h"
 
 namespace {

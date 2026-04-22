@@ -4,12 +4,12 @@
 #include <functional>
 #include <sstream>
 
-#include "util/strings.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip.h"
 #include "layout_edit_dialog/impl/pane.h"
 #include "layout_edit_dialog/impl/trace.h"
 #include "layout_edit_dialog/impl/util.h"
+#include "util/strings.h"
 #include "util/utf8.h"
 
 namespace {

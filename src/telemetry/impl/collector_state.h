@@ -1,26 +1,25 @@
 #pragma once
 
 #define NOMINMAX
+#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <windows.h>
-#include <iphlpapi.h>
-#include <netioapi.h>
-#include <dxgi.h>
-#include <pdh.h>
-#include <pdhmsg.h>
-
 #include <chrono>
 #include <cstdint>
+#include <dxgi.h>
+#include <iphlpapi.h>
 #include <memory>
+#include <netioapi.h>
 #include <ostream>
+#include <pdh.h>
+#include <pdhmsg.h>
 #include <string>
 #include <vector>
 
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/gpu/gpu_vendor.h"
-#include "telemetry/telemetry.h"
 #include "telemetry/impl/retained_history.h"
+#include "telemetry/telemetry.h"
 #include "util/trace.h"
 
 struct DriveCounterState {

@@ -2,7 +2,6 @@
 
 #define NOMINMAX
 #include <pdh.h>
-
 #include <string>
 
 #include "telemetry/metric_types.h"

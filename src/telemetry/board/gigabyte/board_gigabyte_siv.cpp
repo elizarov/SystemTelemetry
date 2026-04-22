@@ -1,28 +1,26 @@
 #define NOMINMAX
 #include <windows.h>
-#include <winreg.h>
-
 #include <algorithm>
 #include <cctype>
 #include <cwctype>
 #include <filesystem>
 #include <memory>
+#include <msclr\marshal_cppstd.h>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <utility>
-#include <vector>
-
 #include <vcclr.h>
-#include <msclr\marshal_cppstd.h>
+#include <vector>
+#include <winreg.h>
 
 #using < mscorlib.dll>
 #using < System.dll>
 
-#include "util/strings.h"
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/impl/system_info_support.h"
+#include "util/strings.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 

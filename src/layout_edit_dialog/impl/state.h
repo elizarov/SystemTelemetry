@@ -1,12 +1,19 @@
 #pragma once
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <commctrl.h>
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "layout_edit_dialog/layout_edit_dialog.h"
-#include <commctrl.h>
 #include "layout_edit/layout_edit_tree.h"
+#include "layout_edit_dialog/layout_edit_dialog.h"
 
 struct LayoutEditTreeItemBinding {
     const LayoutEditTreeNode* node = nullptr;

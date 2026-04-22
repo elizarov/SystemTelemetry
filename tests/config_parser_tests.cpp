@@ -1,9 +1,9 @@
+#include <fstream>
 #include <gtest/gtest.h>
 
 #include "config/config_parser.h"
 #include "telemetry/metrics.h"
 #include "util/utf8.h"
-#include <fstream>
 
 namespace {
 

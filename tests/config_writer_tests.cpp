@@ -1,12 +1,11 @@
-#include <gtest/gtest.h>
+#include <fstream>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#include <sstream>
 
 #include "config/config_parser.h"
 #include "config/config_writer.h"
 #include "telemetry/metrics.h"
-
-#include <fstream>
-#include <sstream>
 
 namespace {
 

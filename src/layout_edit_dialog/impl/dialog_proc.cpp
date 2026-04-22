@@ -3,12 +3,12 @@
 #include <commctrl.h>
 #include <commdlg.h>
 
-#include "resource.h"
 #include "layout_edit_dialog/impl/editors.h"
 #include "layout_edit_dialog/impl/pane.h"
 #include "layout_edit_dialog/impl/trace.h"
 #include "layout_edit_dialog/impl/tree.h"
 #include "layout_edit_dialog/impl/util.h"
+#include "resource.h"
 #include "util/utf8.h"
 
 namespace {

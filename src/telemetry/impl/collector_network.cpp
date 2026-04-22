@@ -3,9 +3,9 @@
 #include <cstring>
 #include <vector>
 
-#include "util/strings.h"
-#include "util/numeric_safety.h"
 #include "telemetry/impl/collector_state.h"
+#include "util/numeric_safety.h"
+#include "util/strings.h"
 #include "util/utf8.h"
 
 namespace {

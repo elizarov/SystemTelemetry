@@ -27,8 +27,24 @@ AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 
-IncludeBlocks: Preserve
-SortIncludes: false
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<(winsock2|ws2tcpip)\.h>$'
+    Priority: 1
+    SortPriority: 0
+  - Regex: '^<windows\.h>$'
+    Priority: 1
+    SortPriority: 1
+  - Regex: '^<.*>$'
+    Priority: 1
+    SortPriority: 2
+  - Regex: '^"vendor/.*"$'
+    Priority: 2
+  - Regex: '^".*"$'
+    Priority: 3
+MainIncludeChar: Quote
+IncludeIsMainRegex: '(Test)?$'
+SortIncludes: CaseInsensitive
 SeparateDefinitionBlocks: Always
 ReflowComments: false
 SpacesBeforeTrailingComments: 2

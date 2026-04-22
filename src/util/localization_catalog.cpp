@@ -1,10 +1,9 @@
 #include "util/localization_catalog.h"
 
-#include <algorithm>
 #include <windows.h>
+#include <algorithm>
 
 #include "resource.h"
-
 #include "util/utf8.h"
 
 namespace {

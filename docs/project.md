@@ -20,6 +20,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
 - Keep generated build outputs inside `build\`, with the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories.
+- Keep C++ includes ordered by `format.cmd`: matching `.cpp` header first, then sorted angle/system includes, quoted `vendor/` includes, and sorted quoted project includes; WinSock and `windows.h` stay ahead of dependent Win32 headers.
 - Keep each non-allowlisted project `.cpp` paired with a matching header that owns its out-of-line declarations.
 - Keep third-party source vendoring narrow and prefer package-managed dependencies where practical.
 

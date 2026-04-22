@@ -1,10 +1,9 @@
-#include <gtest/gtest.h>
-
-#include "config/widget_class.h"
-
 #include <array>
+#include <gtest/gtest.h>
 #include <set>
 #include <string>
+
+#include "config/widget_class.h"
 
 TEST(DashboardWidgetClass, EnumStringMappingsStayUniqueAndRoundTrip) {
     constexpr std::array<DashboardWidgetClass, 10> kKnownClasses{

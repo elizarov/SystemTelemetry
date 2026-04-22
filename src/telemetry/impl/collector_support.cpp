@@ -1,15 +1,14 @@
 #include "telemetry/impl/collector_support.h"
 
 #define NOMINMAX
-#include <intrin.h>
-
 #include <array>
 #include <cctype>
 #include <cstdio>
+#include <intrin.h>
 #include <string_view>
 
-#include "util/strings.h"
 #include "telemetry/impl/system_info_support.h"
+#include "util/strings.h"
 
 namespace {
 

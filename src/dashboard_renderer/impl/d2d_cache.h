@@ -1,12 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <d2d1.h>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#include <d2d1.h>
 #include <wincodec.h>
 #include <wrl/client.h>
 

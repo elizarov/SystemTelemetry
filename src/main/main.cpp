@@ -1,9 +1,9 @@
 #include <cwchar>
 #include <filesystem>
 
-#include "diagnostics/diagnostics.h"
 #include "dashboard/constants.h"
 #include "dashboard/dashboard_app.h"
+#include "diagnostics/diagnostics.h"
 #include "display/display_config.h"
 #include "main/autostart.h"
 

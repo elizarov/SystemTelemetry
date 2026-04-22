@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-
 #include <sstream>
 
 #include "diagnostics/snapshot_dump.h"

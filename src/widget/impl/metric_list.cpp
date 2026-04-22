@@ -4,9 +4,9 @@
 #include <optional>
 #include <sstream>
 
-#include "util/strings.h"
-#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "telemetry/metrics.h"
+#include "util/strings.h"
 
 namespace {
 

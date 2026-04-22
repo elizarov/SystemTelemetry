@@ -5,10 +5,10 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
-#include <type_traits>
 #include <tuple>
-#include <vector>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace configschema {
 

@@ -1,9 +1,9 @@
 #include "telemetry/impl/collector_board.h"
 
 #include "telemetry/board/board_vendor.h"
-#include "util/numeric_safety.h"
-#include "telemetry/impl/system_info_support.h"
 #include "telemetry/impl/collector_state.h"
+#include "telemetry/impl/system_info_support.h"
+#include "util/numeric_safety.h"
 
 namespace {
 

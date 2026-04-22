@@ -2,7 +2,6 @@
 
 #include <array>
 #include <cstdint>
-
 #include <d2d1.h>
 
 #include "config/config.h"

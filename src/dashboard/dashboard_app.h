@@ -2,33 +2,32 @@
 
 #define NOMINMAX
 #include <windows.h>
-#include <windowsx.h>
-#include <commctrl.h>
-#include <commdlg.h>
-#include <shellapi.h>
-#include <shobjidl.h>
-
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <commctrl.h>
+#include <commdlg.h>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <optional>
+#include <shellapi.h>
+#include <shobjidl.h>
 #include <string>
+#include <windowsx.h>
 
-#include "resource.h"
 #include "dashboard/constants.h"
+#include "dashboard/dashboard_controller.h"
+#include "diagnostics/diagnostics_options.h"
 #include "display/constants.h"
 #include "display/monitor.h"
+#include "layout_edit/layout_edit_controller.h"
+#include "layout_edit/layout_edit_trace_session.h"
 #include "main/config_io.h"
+#include "resource.h"
 #include "util/command_line.h"
 #include "util/paths.h"
 #include "util/strings.h"
-#include "dashboard/dashboard_controller.h"
-#include "diagnostics/diagnostics_options.h"
-#include "layout_edit/layout_edit_controller.h"
-#include "layout_edit/layout_edit_trace_session.h"
 
 class DashboardShellUi;
 

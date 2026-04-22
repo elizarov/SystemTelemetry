@@ -1,13 +1,12 @@
 #include "layout_edit_dialog/impl/pane.h"
 
 #include <algorithm>
-
 #include <commctrl.h>
 
-#include "resource.h"
 #include "layout_edit_dialog/impl/editors.h"
-#include "util/localization_catalog.h"
 #include "layout_edit_dialog/impl/util.h"
+#include "resource.h"
+#include "util/localization_catalog.h"
 #include "util/utf8.h"
 
 namespace {

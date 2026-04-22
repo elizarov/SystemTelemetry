@@ -2,8 +2,8 @@
 
 #include <algorithm>
 
-#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "telemetry/metrics.h"
 
 DashboardWidgetClass TextWidget::Class() const {
     return DashboardWidgetClass::Text;

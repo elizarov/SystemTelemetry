@@ -1,9 +1,9 @@
 #pragma once
 
-#include "util/enum_string.h"
-
 #include <optional>
 #include <string>
+
+#include "util/enum_string.h"
 
 #define SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS(X)                                                                   \
     X(None, "")                                                                                                        \

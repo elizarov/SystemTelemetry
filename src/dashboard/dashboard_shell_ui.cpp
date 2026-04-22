@@ -7,14 +7,14 @@
 #include <sstream>
 
 #include "dashboard/constants.h"
+#include "dashboard/dashboard_app.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
-#include "util/strings.h"
-#include "dashboard/dashboard_app.h"
-#include "layout_edit_dialog/layout_edit_dialog.h"
 #include "layout_edit/layout_edit_parameter.h"
-#include "layout_edit/layout_edit_tree.h"
 #include "layout_edit/layout_edit_service.h"
+#include "layout_edit/layout_edit_tree.h"
+#include "layout_edit_dialog/layout_edit_dialog.h"
+#include "util/strings.h"
 
 namespace {
 

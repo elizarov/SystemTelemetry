@@ -1,9 +1,9 @@
 #define NOMINMAX
+#include "telemetry/impl/collector_real.h"
+
 #include <winsock2.h>
 #include <memory>
 #include <ostream>
-
-#include "telemetry/impl/collector_real.h"
 
 #include "telemetry/impl/collector_board.h"
 #include "telemetry/impl/collector_cpu.h"

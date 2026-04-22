@@ -1,13 +1,12 @@
+#include <filesystem>
+#include <fstream>
+#include <functional>
 #include <gtest/gtest.h>
+#include <sstream>
+#include <vector>
 
 #include "layout_edit/layout_edit_tree.h"
 #include "util/localization_catalog.h"
-
-#include <filesystem>
-#include <fstream>
-#include <sstream>
-#include <functional>
-#include <vector>
 
 namespace {
 

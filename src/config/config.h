@@ -1,9 +1,5 @@
 #pragma once
 
-#include "config/config_schema.h"
-#include "config/metric_display_style.h"
-#include "config/telemetry_settings.h"
-
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -11,6 +7,10 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "config/config_schema.h"
+#include "config/metric_display_style.h"
+#include "config/telemetry_settings.h"
 
 struct ColorConfig {
     std::uint32_t rgba = 0x000000FFu;

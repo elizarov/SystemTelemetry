@@ -6,9 +6,9 @@
 #include "widget/impl/gauge.h"
 #include "widget/impl/metric_list.h"
 #include "widget/impl/network_footer.h"
-#include "widget/impl/vertical_spacer.h"
 #include "widget/impl/text.h"
 #include "widget/impl/throughput.h"
+#include "widget/impl/vertical_spacer.h"
 #include "widget/impl/vertical_spring.h"
 
 bool DashboardWidget::UsesFixedPreferredHeightInRows() const {

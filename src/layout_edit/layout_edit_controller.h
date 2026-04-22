@@ -1,13 +1,12 @@
 #pragma once
 
+#include <windows.h>
 #include <chrono>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <variant>
 #include <vector>
-
-#include <windows.h>
 
 #include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"

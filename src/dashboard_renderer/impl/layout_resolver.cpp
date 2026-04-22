@@ -1,10 +1,10 @@
 #include "dashboard_renderer/impl/layout_resolver.h"
 
-#include "dashboard_renderer/dashboard_renderer.h"
-
 #include <algorithm>
 #include <functional>
 #include <map>
+
+#include "dashboard_renderer/dashboard_renderer.h"
 
 namespace {
 

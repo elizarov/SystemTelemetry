@@ -1,16 +1,12 @@
 #include "dashboard_renderer/dashboard_renderer.h"
-#include "dashboard_renderer/impl/d2d_cache.h"
-#include "dashboard_renderer/impl/layout_resolver.h"
-#include "dashboard_renderer/impl/palette.h"
-#include "dashboard_renderer/impl/text_width_cache.h"
-#include "layout_edit/layout_edit_service.h"
-#include "layout_edit/layout_edit_parameter.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <d2d1.h>
+#include <dwrite.h>
 #include <functional>
 #include <map>
 #include <memory>
@@ -20,14 +16,17 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
-#include <d2d1.h>
-#include <dwrite.h>
 #include <wincodec.h>
 
-#include "util/strings.h"
+#include "dashboard_renderer/impl/d2d_cache.h"
+#include "dashboard_renderer/impl/layout_resolver.h"
+#include "dashboard_renderer/impl/palette.h"
+#include "dashboard_renderer/impl/text_width_cache.h"
+#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_service.h"
 #include "resource.h"
 #include "util/numeric_safety.h"
+#include "util/strings.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 

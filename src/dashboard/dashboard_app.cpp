@@ -4,7 +4,6 @@
 #include <sstream>
 #include <string_view>
 #include <vector>
-
 #include <wtsapi32.h>
 
 #include "dashboard/dashboard_shell_ui.h"
