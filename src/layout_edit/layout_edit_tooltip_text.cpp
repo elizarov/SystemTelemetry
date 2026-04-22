@@ -5,7 +5,7 @@
 #include "layout_edit/layout_edit_parameter.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip.h"
-#include "localization_catalog.h"
+#include "util/localization_catalog.h"
 #include "util/utf8.h"
 
 namespace {

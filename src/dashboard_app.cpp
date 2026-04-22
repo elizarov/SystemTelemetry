@@ -10,7 +10,7 @@
 #include "dashboard_shell_ui.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
-#include "localization_catalog.h"
+#include "util/localization_catalog.h"
 #include "util/trace.h"
 
 namespace {

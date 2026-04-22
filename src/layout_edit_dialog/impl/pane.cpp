@@ -6,7 +6,7 @@
 
 #include "resource.h"
 #include "layout_edit_dialog/impl/editors.h"
-#include "localization_catalog.h"
+#include "util/localization_catalog.h"
 #include "layout_edit_dialog/impl/util.h"
 #include "util/utf8.h"
 

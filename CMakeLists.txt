@@ -100,7 +100,7 @@ add_executable(SystemTelemetry WIN32
     src/config/config_parser.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
-    src/localization_catalog.cpp
+    src/util/localization_catalog.cpp
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
@@ -277,7 +277,7 @@ add_executable(SystemTelemetryTests
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit/layout_edit_parameter.cpp
     src/layout_edit/layout_edit_tooltip.cpp
-    src/localization_catalog.cpp
+    src/util/localization_catalog.cpp
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
