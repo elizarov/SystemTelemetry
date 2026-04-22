@@ -8,7 +8,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
 - `src/autostart/` contains login auto-start registry updates, elevation handoff, and auto-start constants.
 - `src/config/` contains the config model, parser, resolver, writer, and schema metadata.
-- `src/display/` contains configure-display and wallpaper application helpers plus display-owned command, filename, and DPI constants.
+- `src/display/` contains monitor enumeration, DPI scaling, placement, configure-display, wallpaper application helpers, and display-owned constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/widget/widget.*` and `src/widget/widget_class.h` own the widget interface, class enum, and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, UTF-8 conversion, localization catalog access, numeric safety, and trace emission.

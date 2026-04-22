@@ -1,6 +1,5 @@
 #include "diagnostics/diagnostics.h"
 #include "app_config_io.h"
-#include "app_monitor.h"
 #include "util/paths.h"
 #include "util/strings.h"
 #include "config/config_parser.h"
@@ -9,6 +8,7 @@
 #include "diagnostics/constants.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
+#include "display/monitor.h"
 #include "telemetry/telemetry.h"
 
 #include <cmath>

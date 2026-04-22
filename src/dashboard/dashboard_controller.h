@@ -5,11 +5,11 @@
 #include <memory>
 #include <vector>
 
-#include "app_monitor.h"
 #include "dashboard/dashboard_menu_types.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
 #include "display/display_config.h"
+#include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 
 struct DashboardSessionState {
