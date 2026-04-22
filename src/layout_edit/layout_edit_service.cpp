@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 
 namespace {
 
@@ -114,7 +114,7 @@ std::vector<std::string> AvailableMetricListMetricIds(const AppConfig& config) {
             case MetricDisplayStyle::Scalar:
             case MetricDisplayStyle::Percent:
             case MetricDisplayStyle::Memory:
-                if (IsGenerallyAvailableDashboardMetric(definition.id)) {
+                if (IsGenerallyAvailableMetric(definition.id)) {
                     hasPlaceholder = hasPlaceholder || definition.id == kMetricListPlaceholderId;
                     metricIds.push_back(definition.id);
                 }
@@ -125,7 +125,7 @@ std::vector<std::string> AvailableMetricListMetricIds(const AppConfig& config) {
                 break;
         }
     }
-    if (!hasPlaceholder && FindDashboardMetricDisplayStyle(kMetricListPlaceholderId).has_value()) {
+    if (!hasPlaceholder && FindMetricDisplayStyle(kMetricListPlaceholderId).has_value()) {
         metricIds.insert(metricIds.begin(), std::string(kMetricListPlaceholderId));
     }
     return metricIds;

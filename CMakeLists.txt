@@ -120,7 +120,7 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
-    src/dashboard/dashboard_metrics.cpp
+    src/telemetry/metrics.cpp
     src/dashboard/dashboard_overlay_state.cpp
     src/dashboard_renderer/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
@@ -255,7 +255,7 @@ find_package(GTest CONFIG REQUIRED)
 
 add_executable(SystemTelemetryTests
     tests/enum_string_tests.cpp
-    tests/dashboard_metrics_tests.cpp
+    tests/metrics_tests.cpp
     tests/snapshot_dump_tests.cpp
     tests/dashboard_widget_class_tests.cpp
     tests/layout_snap_solver_tests.cpp
@@ -281,7 +281,7 @@ add_executable(SystemTelemetryTests
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
-    src/dashboard/dashboard_metrics.cpp
+    src/telemetry/metrics.cpp
     src/dashboard_renderer/render_types.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/impl/retained_history.cpp
@@ -356,7 +356,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
-    src/dashboard/dashboard_metrics.cpp
+    src/telemetry/metrics.cpp
     src/dashboard/dashboard_overlay_state.cpp
     src/dashboard_renderer/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp

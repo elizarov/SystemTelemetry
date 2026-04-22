@@ -26,7 +26,7 @@
 #include <wrl/client.h>
 
 #include "config/config.h"
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "dashboard/dashboard_overlay_state.h"
 #include "layout_edit/layout_edit_parameter_id.h"
 #include "layout_edit/layout_edit_types.h"
@@ -211,7 +211,7 @@ private:
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawPanel(size_t cardIndex);
     void DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect);
-    void DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics);
+    void DrawResolvedWidget(const DashboardWidgetLayout& widget, const MetricSource& metrics);
     bool UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
@@ -289,7 +289,7 @@ private:
         const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable);
     bool IsDrawActive() const;
-    const DashboardMetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
+    const MetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();
     void WriteTrace(const std::string& text) const;
 
@@ -303,7 +303,7 @@ private:
     std::unique_ptr<DashboardLayoutResolver> layoutResolver_;
     std::unique_ptr<DashboardD2DCache> d2dCache_;
     std::unique_ptr<DashboardTextWidthCache> textWidthCache_;
-    std::unique_ptr<DashboardMetricSource> cachedMetricSource_;
+    std::unique_ptr<MetricSource> cachedMetricSource_;
     const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
     uint64_t cachedMetricSnapshotRevision_ = 0;
     mutable std::unordered_map<std::string, const MetricDefinitionConfig*> metricDefinitionCache_;

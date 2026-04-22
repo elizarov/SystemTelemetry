@@ -1954,7 +1954,7 @@ std::optional<RenderRect> DashboardRenderer::DrawPillBar(
     return std::nullopt;
 }
 
-void DashboardRenderer::DrawResolvedWidget(const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) {
+void DashboardRenderer::DrawResolvedWidget(const DashboardWidgetLayout& widget, const MetricSource& metrics) {
     if (widget.widget == nullptr) {
         return;
     }
@@ -1982,7 +1982,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
 
     layoutResolver_->ClearDynamicEditArtifacts();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
-    const DashboardMetricSource& metrics = ResolveMetrics(snapshot);
+    const MetricSource& metrics = ResolveMetrics(snapshot);
     d2dActiveRenderTarget_->Clear(palette_->Get(RenderColorId::Background).ToD2DColorF());
     for (size_t cardIndex = 0; cardIndex < layoutResolver_->resolvedLayout_.cards.size(); ++cardIndex) {
         DrawPanel(cardIndex);
@@ -2622,10 +2622,10 @@ void DashboardRenderer::DiscardWindowRenderTarget(std::string_view reason) {
     d2dCache_->ResetTarget();
 }
 
-const DashboardMetricSource& DashboardRenderer::ResolveMetrics(const SystemSnapshot& snapshot) {
+const MetricSource& DashboardRenderer::ResolveMetrics(const SystemSnapshot& snapshot) {
     if (cachedMetricSource_ == nullptr || cachedMetricSnapshot_ != &snapshot ||
         cachedMetricSnapshotRevision_ != snapshot.revision) {
-        cachedMetricSource_ = std::make_unique<DashboardMetricSource>(snapshot, config_.layout.metrics);
+        cachedMetricSource_ = std::make_unique<MetricSource>(snapshot, config_.layout.metrics);
         cachedMetricSnapshot_ = &snapshot;
         cachedMetricSnapshotRevision_ = snapshot.revision;
     }

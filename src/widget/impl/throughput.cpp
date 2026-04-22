@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstdio>
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "util/numeric_safety.h"
 
@@ -199,8 +199,8 @@ void ThroughputWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
 }
 
 void ThroughputWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
-    const DashboardThroughputMetric& metric = metrics.ResolveThroughput(metric_);
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+    const ThroughputMetric& metric = metrics.ResolveThroughput(metric_);
     renderer.DrawText(layoutState_.valueRect,
         metric.label,
         TextStyleId::Small,

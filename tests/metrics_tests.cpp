@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 
 namespace {
 
@@ -59,70 +59,70 @@ void AddHistorySeries(SystemSnapshot& snapshot, const std::string& metricRef, st
 
 }  // namespace
 
-TEST(DashboardMetrics, ResolvesTextMetricsAndStaticTextTraitsFromBindingRegistry) {
+TEST(Metrics, ResolvesTextMetricsAndStaticTextTraitsFromBindingRegistry) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.cpu.name = "Ryzen 7";
     snapshot.gpu.name = "Radeon";
 
-    DashboardMetricSource source(snapshot, metrics);
+    MetricSource source(snapshot, metrics);
 
     EXPECT_EQ(source.ResolveText("cpu.name"), "Ryzen 7");
     EXPECT_EQ(source.ResolveText("gpu.name"), "Radeon");
     EXPECT_EQ(source.ResolveText("unknown.metric"), "N/A");
 
-    EXPECT_TRUE(IsStaticDashboardTextMetric("cpu.name"));
-    EXPECT_TRUE(IsStaticDashboardTextMetric("gpu.name"));
-    EXPECT_FALSE(IsStaticDashboardTextMetric("cpu.load"));
-    EXPECT_FALSE(IsStaticDashboardTextMetric("board.temp.cpu"));
-    EXPECT_FALSE(IsStaticDashboardTextMetric("unknown.metric"));
+    EXPECT_TRUE(IsStaticTextMetric("cpu.name"));
+    EXPECT_TRUE(IsStaticTextMetric("gpu.name"));
+    EXPECT_FALSE(IsStaticTextMetric("cpu.load"));
+    EXPECT_FALSE(IsStaticTextMetric("board.temp.cpu"));
+    EXPECT_FALSE(IsStaticTextMetric("unknown.metric"));
 }
 
-TEST(DashboardMetrics, KeepsDisplayOnlyDriveBindingsMetadataOnly) {
+TEST(Metrics, KeepsDisplayOnlyDriveBindingsMetadataOnly) {
     MetricsSectionConfig metrics = BuildMetricsConfig();
     metrics.definitions.push_back(
         MetricDefinitionConfig{"drive.activity.read", MetricDisplayStyle::LabelOnly, true, 0.0, "", "R"});
     SystemSnapshot snapshot;
 
-    DashboardMetricSource source(snapshot, metrics);
+    MetricSource source(snapshot, metrics);
 
-    ASSERT_EQ(FindDashboardMetricDisplayStyle("drive.activity.read"), MetricDisplayStyle::LabelOnly);
-    ASSERT_EQ(FindDashboardMetricDisplayStyle("drive.usage"), MetricDisplayStyle::Percent);
-    EXPECT_FALSE(IsStaticDashboardTextMetric("drive.activity.read"));
+    ASSERT_EQ(FindMetricDisplayStyle("drive.activity.read"), MetricDisplayStyle::LabelOnly);
+    ASSERT_EQ(FindMetricDisplayStyle("drive.usage"), MetricDisplayStyle::Percent);
+    EXPECT_FALSE(IsStaticTextMetric("drive.activity.read"));
     EXPECT_EQ(ResolveMetricSampleValueText(metrics, "drive.activity.read"), "");
     EXPECT_EQ(ResolveMetricSampleValueText(metrics, "drive.usage"), "");
 
-    const DashboardMetricValue& metric = source.ResolveMetric("drive.activity.read");
+    const MetricValue& metric = source.ResolveMetric("drive.activity.read");
     EXPECT_TRUE(metric.label.empty());
     EXPECT_TRUE(metric.valueText.empty());
     EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.0);
 }
 
-TEST(DashboardMetrics, MarksDriveMetricsAsSpecialAndNotGenerallyAvailable) {
-    EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("nothing"));
-    EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("cpu.load"));
-    EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("gpu.vram"));
-    EXPECT_TRUE(IsGenerallyAvailableDashboardMetric("board.temp.cpu"));
-    EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.activity.read"));
-    EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.usage"));
-    EXPECT_FALSE(IsGenerallyAvailableDashboardMetric("drive.free"));
+TEST(Metrics, MarksDriveMetricsAsSpecialAndNotGenerallyAvailable) {
+    EXPECT_TRUE(IsGenerallyAvailableMetric("nothing"));
+    EXPECT_TRUE(IsGenerallyAvailableMetric("cpu.load"));
+    EXPECT_TRUE(IsGenerallyAvailableMetric("gpu.vram"));
+    EXPECT_TRUE(IsGenerallyAvailableMetric("board.temp.cpu"));
+    EXPECT_FALSE(IsGenerallyAvailableMetric("drive.activity.read"));
+    EXPECT_FALSE(IsGenerallyAvailableMetric("drive.usage"));
+    EXPECT_FALSE(IsGenerallyAvailableMetric("drive.free"));
 }
 
-TEST(DashboardMetrics, ResolvesNothingPlaceholderMetricAsUnavailableValue) {
+TEST(Metrics, ResolvesNothingPlaceholderMetricAsUnavailableValue) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
 
-    DashboardMetricSource source(snapshot, metrics);
+    MetricSource source(snapshot, metrics);
 
-    const DashboardMetricValue& metric = source.ResolveMetric("nothing");
+    const MetricValue& metric = source.ResolveMetric("nothing");
     EXPECT_EQ(metric.label, "Nothing");
     EXPECT_EQ(metric.valueText, "N/A");
     EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.0);
 }
 
-TEST(DashboardMetrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
+TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.cpu.loadPercent = 63.0;
@@ -134,80 +134,80 @@ TEST(DashboardMetrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     AddHistorySeries(snapshot, "cpu.ram", {3.2, 9.6, 18.5});
     AddHistorySeries(snapshot, "gpu.vram", {3.2, 8.32, 6.4});
 
-    DashboardMetricSource source(snapshot, metrics);
+    MetricSource source(snapshot, metrics);
 
-    const DashboardMetricValue& load = source.ResolveMetric("cpu.load");
+    const MetricValue& load = source.ResolveMetric("cpu.load");
     EXPECT_EQ(load.label, "Load");
     EXPECT_EQ(load.valueText, "63%");
     EXPECT_EQ(load.sampleValueText, "100%");
     EXPECT_DOUBLE_EQ(load.ratio, 0.63);
     EXPECT_DOUBLE_EQ(load.peakRatio, 0.91);
 
-    const DashboardMetricValue& ram = source.ResolveMetric("cpu.ram");
+    const MetricValue& ram = source.ResolveMetric("cpu.ram");
     EXPECT_EQ(ram.label, "RAM");
     EXPECT_EQ(ram.valueText, "18.5 / 32 GB");
     EXPECT_DOUBLE_EQ(ram.ratio, 18.5 / 32.0);
 
-    const DashboardMetricValue& vram = source.ResolveMetric("gpu.vram");
+    const MetricValue& vram = source.ResolveMetric("gpu.vram");
     EXPECT_EQ(vram.label, "VRAM");
     EXPECT_EQ(vram.valueText, "8.4 / 16 GB");
     EXPECT_DOUBLE_EQ(vram.ratio, 8.4 / 16.0);
 
-    const std::vector<DashboardMetricValue>& metricList = source.ResolveMetricList({"cpu.load", "gpu.vram"});
+    const std::vector<MetricValue>& metricList = source.ResolveMetricList({"cpu.load", "gpu.vram"});
     ASSERT_EQ(metricList.size(), 2u);
     EXPECT_EQ(metricList[0].label, "Load");
     EXPECT_EQ(metricList[1].label, "VRAM");
 }
 
-TEST(DashboardMetrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
+TEST(Metrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
     AddHistorySeries(snapshot, "board.temp.cpu", {10.0, 55.0, 40.0});
 
-    DashboardMetricSource source(snapshot, metrics);
+    MetricSource source(snapshot, metrics);
 
-    const DashboardMetricValue& metric = source.ResolveMetric("board.temp.cpu");
+    const MetricValue& metric = source.ResolveMetric("board.temp.cpu");
     EXPECT_EQ(metric.label, "Temp");
     EXPECT_EQ(metric.valueText, "55 C");
     EXPECT_DOUBLE_EQ(metric.ratio, 0.55);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.55);
 }
 
-TEST(DashboardMetrics, ResolvesBoardFanMetricsThroughPrefixBinding) {
+TEST(Metrics, ResolvesBoardFanMetricsThroughPrefixBinding) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.boardFans.push_back({"system", ScalarMetric{1200.0, ScalarMetricUnit::Rpm}});
     AddHistorySeries(snapshot, "board.fan.system", {500.0, 1200.0, 1100.0});
 
-    DashboardMetricSource source(snapshot, metrics);
+    MetricSource source(snapshot, metrics);
 
-    const DashboardMetricValue& metric = source.ResolveMetric("board.fan.system");
+    const MetricValue& metric = source.ResolveMetric("board.fan.system");
     EXPECT_EQ(metric.label, "System Fan");
     EXPECT_EQ(metric.valueText, "1200 RPM");
     EXPECT_DOUBLE_EQ(metric.ratio, 0.4);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.4);
 }
 
-TEST(DashboardMetrics, RenormalizesPeakGhostWhenMetricScaleChanges) {
+TEST(Metrics, RenormalizesPeakGhostWhenMetricScaleChanges) {
     MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
     AddHistorySeries(snapshot, "board.temp.cpu", {10.0, 55.0, 40.0});
 
-    DashboardMetricSource defaultScaleSource(snapshot, metrics);
+    MetricSource defaultScaleSource(snapshot, metrics);
     EXPECT_DOUBLE_EQ(defaultScaleSource.ResolveMetric("board.temp.cpu").peakRatio, 0.55);
 
     MetricDefinitionConfig* definition = FindMetricDefinition(metrics, "board.temp.cpu");
     ASSERT_NE(definition, nullptr);
     definition->scale = 200.0;
 
-    DashboardMetricSource updatedScaleSource(snapshot, metrics);
+    MetricSource updatedScaleSource(snapshot, metrics);
     EXPECT_DOUBLE_EQ(updatedScaleSource.ResolveMetric("board.temp.cpu").ratio, 0.275);
     EXPECT_DOUBLE_EQ(updatedScaleSource.ResolveMetric("board.temp.cpu").peakRatio, 0.275);
 }
 
-TEST(DashboardMetrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
+TEST(Metrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.network.uploadMbps = 78.4;
@@ -223,31 +223,31 @@ TEST(DashboardMetrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
 
     AddHistorySeries(snapshot, "network.upload", {55.0, 70.0, 78.4});
 
-    DashboardMetricSource source(snapshot, metrics);
+    MetricSource source(snapshot, metrics);
 
-    const DashboardThroughputMetric& throughput = source.ResolveThroughput("network.upload");
+    const ThroughputMetric& throughput = source.ResolveThroughput("network.upload");
     EXPECT_EQ(throughput.label, "Up");
     EXPECT_EQ(throughput.valueText, "74.2 MB/s");
 
-    const std::vector<DashboardDriveRow>& rows = source.ResolveDriveRows();
+    const std::vector<DriveRow>& rows = source.ResolveDriveRows();
     ASSERT_EQ(rows.size(), 1u);
     EXPECT_EQ(rows[0].usedText, "42%");
     EXPECT_EQ(rows[0].freeText, "1.5 TB");
 }
 
-TEST(DashboardMetrics, KeepsUnknownMetricFallbacksUnchanged) {
+TEST(Metrics, KeepsUnknownMetricFallbacksUnchanged) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
 
-    DashboardMetricSource source(snapshot, metrics);
+    MetricSource source(snapshot, metrics);
 
-    const DashboardMetricValue& metric = source.ResolveMetric("unknown.metric");
+    const MetricValue& metric = source.ResolveMetric("unknown.metric");
     EXPECT_TRUE(metric.label.empty());
     EXPECT_TRUE(metric.valueText.empty());
     EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.0);
 
-    const DashboardThroughputMetric& throughput = source.ResolveThroughput("unknown.metric");
+    const ThroughputMetric& throughput = source.ResolveThroughput("unknown.metric");
     EXPECT_TRUE(throughput.label.empty());
     EXPECT_TRUE(throughput.valueText.empty());
     EXPECT_DOUBLE_EQ(throughput.valueMbps, 0.0);

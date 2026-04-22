@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 
 DashboardWidgetClass TextWidget::Class() const {
@@ -46,7 +46,7 @@ void TextWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWid
 }
 
 void TextWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
     const std::string text = metrics.ResolveText(metric_);
     const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
@@ -55,7 +55,7 @@ void TextWidget::Draw(
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     const auto binding = renderer.MakeEditableTextBinding(
         widget, DashboardRenderer::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
-    if (IsStaticDashboardTextMetric(metric_)) {
+    if (IsStaticTextMetric(metric_)) {
         if (!staticAnchorRegistered_) {
             cachedStaticText_ = text;
             renderer.RegisterStaticTextAnchor(widget.rect,

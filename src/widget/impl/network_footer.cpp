@@ -1,6 +1,6 @@
 #include "widget/impl/network_footer.h"
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 
 DashboardWidgetClass NetworkFooterWidget::Class() const {
@@ -41,7 +41,7 @@ void NetworkFooterWidget::BuildEditGuides(DashboardRenderer& renderer, const Das
 }
 
 void NetworkFooterWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
         return;
     }

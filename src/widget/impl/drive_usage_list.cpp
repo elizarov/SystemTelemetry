@@ -3,7 +3,7 @@
 #include <cmath>
 #include <limits>
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 
 namespace {
@@ -279,7 +279,7 @@ void DriveUsageListWidget::ResolveLayoutState(const DashboardRenderer& renderer,
 }
 
 void DriveUsageListWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
     const std::string readLabel = ResolveDriveMetricLabel(renderer, "drive.activity.read", "R");
     const std::string writeLabel = ResolveDriveMetricLabel(renderer, "drive.activity.write", "W");
     const std::string usageLabel = ResolveDriveMetricLabel(renderer, "drive.usage", "Usage");

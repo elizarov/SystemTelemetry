@@ -10,11 +10,11 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/diagnostics/` contains diagnostics command-line option parsing, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/widget/widget.*` and `src/widget/widget_class.h` own the widget interface, class enum, and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, UTF-8 conversion, localization catalog access, numeric safety, and trace emission.
-- `src/dashboard/` contains the dashboard application, controller, shell UI, menu types, metrics adapter, and shared layout-edit overlay state.
+- `src/dashboard/` contains the dashboard application, controller, shell UI, menu types, and shared layout-edit overlay state.
 - `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, `src/dashboard_renderer/render_types.*` owns shared render-space contract types, and `src/dashboard_renderer/impl/` contains helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
 - `src/layout_edit/` contains shared layout-edit interaction, parameter, tooltip, tree, trace-session, and snap-solver modules.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
-- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metric_types.h`, `src/telemetry/metric_display_style.h`, and `src/telemetry/telemetry_settings.h` own shared telemetry and metric enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
+- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h`, `src/telemetry/metric_display_style.h`, and `src/telemetry/telemetry_settings.h` own shared telemetry and metric enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
@@ -49,7 +49,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Shared render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
 - Widget draw modules refer to colors by render color id; `DashboardRenderer` keeps the resolved RGBA palette private and maps ids to colors internally.
 - Widget modules own widget-local preferred-size logic, draw behavior, and layout-edit artifact registration.
-- `DashboardMetricSource` adapts `SystemSnapshot` into widget-facing values, histories, drive rows, and formatted text while caching per-frame derived results.
+- `MetricSource` adapts `SystemSnapshot` into widget-facing values, histories, drive rows, and formatted text while caching per-frame derived results.
 
 ### Layout editing
 

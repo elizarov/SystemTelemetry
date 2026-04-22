@@ -75,7 +75,7 @@ These changes produced real wins and remain in the codebase:
 - Build only the one live gauge usage-fill path that the current metric needs instead of prebuilding every cumulative gauge fill path during each relayout.
 - Resolve snap-preview guide probes through an extent-only layout pass that skips widget instantiation, widget layout-state caching, and edit-artifact rebuilds.
 - Reuse draw-time text layout results for dynamic text anchors and keep all text-anchor measurement on the renderer's shared DirectWrite layout path.
-- Reuse one cached `DashboardMetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse smoothed throughput history and formatted metric payloads until telemetry publishes a newer snapshot.
+- Reuse one cached `MetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse smoothed throughput history and formatted metric payloads until telemetry publishes a newer snapshot.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 - Remove the legacy renderer GDI fallback path and keep both live repaint and screenshot export on the same Direct2D and DirectWrite scene.
 - Decode embedded panel icons through WIC and scale them with `IWICBitmapScaler` before upload into render-target-local Direct2D bitmaps, so the renderer no longer depends on GDI+ for icon resources.
@@ -268,7 +268,7 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Reuse resolved widget metrics across unchanged snapshots
 
 - Change:
-  - Keep one renderer-owned `DashboardMetricSource` alive across draw calls and invalidate it only when the incoming `SystemSnapshot` revision changes, instead of rebuilding throughput smoothing and per-widget metric caches on every drag repaint.
+  - Keep one renderer-owned `MetricSource` alive across draw calls and invalidate it only when the incoming `SystemSnapshot` revision changes, instead of rebuilding throughput smoothing and per-widget metric caches on every drag repaint.
 - Result:
   - Helped modestly.
 - Observed effect:
@@ -312,7 +312,7 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Short-lived overlay pen churn is not a dominant limiter after the larger draw-path fixes, so this cleanup is acceptable to keep but is not a major benchmark lever by itself.
 
-### Hypothesis: Pre-resolve throughput and gauge display payloads inside `DashboardMetricSource`
+### Hypothesis: Pre-resolve throughput and gauge display payloads inside `MetricSource`
 
 - Change:
   - Preformat throughput and gauge value strings, pre-normalize throughput history, and precompute throughput guide ratios and marker offsets inside the cached metric source so draw no longer performs that preparation work per frame.

@@ -993,7 +993,7 @@ bool DashboardShellUi::ApplyMetricListAddRowPreview(const LayoutEditController::
         return false;
     }
 
-    if (!FindDashboardMetricDisplayStyle(kMetricListPlaceholderId).has_value()) {
+    if (!FindMetricDisplayStyle(kMetricListPlaceholderId).has_value()) {
         return false;
     }
 

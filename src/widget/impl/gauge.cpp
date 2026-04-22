@@ -4,7 +4,7 @@
 #include <cmath>
 #include <optional>
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "util/numeric_safety.h"
 
@@ -263,8 +263,8 @@ void GaugeWidget::ResolveLayoutState(const DashboardRenderer& renderer, const Re
 }
 
 void GaugeWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
-    const DashboardMetricValue& metric = metrics.ResolveMetric(metric_);
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+    const MetricValue& metric = metrics.ResolveMetric(metric_);
     const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
     const double clampedRatio = ClampFinite(metric.ratio, 0.0, 1.0);
     const int filledSegments =

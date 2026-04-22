@@ -5,7 +5,7 @@
 #include <sstream>
 
 #include "util/strings.h"
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 
 namespace {
@@ -123,7 +123,7 @@ void MetricListWidget::ResolveLayoutState(const DashboardRenderer& renderer, con
 }
 
 void MetricListWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
     renderer.PushClipRect(widget.rect);
     int rowIndex = 0;
     for (const auto& row : metrics.ResolveMetricList(metricRefs_)) {

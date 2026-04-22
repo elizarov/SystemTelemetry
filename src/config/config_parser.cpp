@@ -1,6 +1,6 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "widget/widget_class.h"
 
 #ifndef NOMINMAX
@@ -120,7 +120,7 @@ bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
 
 bool ParseMetricDefinition(const std::string& value, MetricDefinitionConfig& definition) {
     const std::vector<std::string> parts = SplitPreservingEmpty(value, ',');
-    const std::optional<MetricDisplayStyle> metadataStyle = FindDashboardMetricDisplayStyle(definition.id);
+    const std::optional<MetricDisplayStyle> metadataStyle = FindMetricDisplayStyle(definition.id);
     if (!metadataStyle.has_value()) {
         return false;
     }
@@ -540,7 +540,7 @@ template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, Metri
         MetricDefinitionConfig* definition = FindMetricDefinition(metrics, key);
         MetricDefinitionConfig candidate = definition != nullptr ? *definition : MetricDefinitionConfig{};
         candidate.id = key;
-        if (const auto style = FindDashboardMetricDisplayStyle(key); style.has_value()) {
+        if (const auto style = FindMetricDisplayStyle(key); style.has_value()) {
             candidate.style = *style;
         }
         if (!ParseMetricDefinition(value, candidate)) {

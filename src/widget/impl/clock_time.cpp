@@ -1,6 +1,6 @@
 #include "widget/impl/clock_time.h"
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 
 DashboardWidgetClass ClockTimeWidget::Class() const {
@@ -22,7 +22,7 @@ bool ClockTimeWidget::UsesFixedPreferredHeightInRows() const {
 }
 
 void ClockTimeWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const DashboardMetricSource& metrics) const {
+    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
         return;
     }

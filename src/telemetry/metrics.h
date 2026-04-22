@@ -16,7 +16,7 @@
 #include "config/config.h"
 #include "telemetry/telemetry.h"
 
-struct DashboardMetricValue {
+struct MetricValue {
     std::string label;
     std::string valueText;
     std::string sampleValueText;
@@ -25,7 +25,7 @@ struct DashboardMetricValue {
     double peakRatio = 0.0;
 };
 
-struct DashboardThroughputMetric {
+struct ThroughputMetric {
     std::string label;
     std::string valueText;
     double valueMbps = 0.0;
@@ -36,7 +36,7 @@ struct DashboardThroughputMetric {
     double timeMarkerIntervalSamples = 20.0;
 };
 
-struct DashboardDriveRow {
+struct DriveRow {
     std::string label;
     double readActivity = 0.0;
     double writeActivity = 0.0;
@@ -45,15 +45,15 @@ struct DashboardDriveRow {
     std::string freeText;
 };
 
-bool IsStaticDashboardTextMetric(std::string_view metricRef);
-std::optional<MetricDisplayStyle> FindDashboardMetricDisplayStyle(std::string_view metricRef);
-bool IsGenerallyAvailableDashboardMetric(std::string_view metricRef);
+bool IsStaticTextMetric(std::string_view metricRef);
+std::optional<MetricDisplayStyle> FindMetricDisplayStyle(std::string_view metricRef);
+bool IsGenerallyAvailableMetric(std::string_view metricRef);
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef);
 
-class DashboardMetricSource {
+class MetricSource {
 public:
     struct ThroughputCacheEntry {
-        DashboardThroughputMetric metric;
+        ThroughputMetric metric;
     };
 
     struct ThroughputSharedState {
@@ -63,14 +63,14 @@ public:
         double timeMarkerOffsetSamples = 0.0;
     };
 
-    DashboardMetricSource(const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics);
+    MetricSource(const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics);
 
     const std::string& ResolveText(const std::string& metricRef) const;
-    const DashboardMetricValue& ResolveMetric(const std::string& metricRef) const;
-    const std::vector<DashboardMetricValue>& ResolveMetricList(const std::vector<std::string>& metricRefs) const;
-    const DashboardThroughputMetric& ResolveThroughput(const std::string& metricRef) const;
+    const MetricValue& ResolveMetric(const std::string& metricRef) const;
+    const std::vector<MetricValue>& ResolveMetricList(const std::vector<std::string>& metricRefs) const;
+    const ThroughputMetric& ResolveThroughput(const std::string& metricRef) const;
     const std::string& ResolveNetworkFooter() const;
-    const std::vector<DashboardDriveRow>& ResolveDriveRows() const;
+    const std::vector<DriveRow>& ResolveDriveRows() const;
     const std::string& ResolveClockTime() const;
     const std::string& ResolveClockDate() const;
 
@@ -78,12 +78,12 @@ private:
     const SystemSnapshot& snapshot_;
     const MetricsSectionConfig& metrics_;
     mutable std::unordered_map<std::string, std::string> textCache_;
-    mutable std::unordered_map<std::string, DashboardMetricValue> metricCache_;
-    mutable std::unordered_map<std::string, std::vector<DashboardMetricValue>> metricListCache_;
+    mutable std::unordered_map<std::string, MetricValue> metricCache_;
+    mutable std::unordered_map<std::string, std::vector<MetricValue>> metricListCache_;
     mutable std::unordered_map<std::string, ThroughputCacheEntry> throughputCache_;
     mutable std::optional<ThroughputSharedState> throughputSharedState_;
     mutable std::optional<std::string> networkFooterCache_;
-    mutable std::optional<std::vector<DashboardDriveRow>> driveRowsCache_;
+    mutable std::optional<std::vector<DriveRow>> driveRowsCache_;
     mutable std::optional<std::string> clockTimeCache_;
     mutable std::optional<std::string> clockDateCache_;
 };

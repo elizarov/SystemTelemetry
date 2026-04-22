@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "dashboard/dashboard_metrics.h"
+#include "telemetry/metrics.h"
 #include "widget/widget.h"
 
 class MetricListWidget final : public DashboardWidget {
@@ -31,9 +31,8 @@ public:
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const DashboardRenderer& renderer) const override;
     void ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) override;
-    void Draw(DashboardRenderer& renderer,
-        const DashboardWidgetLayout& widget,
-        const DashboardMetricSource& metrics) const override;
+    void Draw(
+        DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const override;
     void BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
     void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
 
