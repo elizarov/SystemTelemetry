@@ -26,8 +26,8 @@
 #include <wrl/client.h>
 
 #include "config/config.h"
-#include "dashboard_metrics.h"
-#include "dashboard_overlay_state.h"
+#include "dashboard/dashboard_metrics.h"
+#include "dashboard/dashboard_overlay_state.h"
 #include "layout_edit/layout_edit_parameter_id.h"
 #include "layout_edit/layout_edit_types.h"
 #include "dashboard_renderer/render_types.h"

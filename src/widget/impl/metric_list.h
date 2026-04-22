@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "dashboard_metrics.h"
+#include "dashboard/dashboard_metrics.h"
 #include "widget/widget.h"
 
 class MetricListWidget final : public DashboardWidget {

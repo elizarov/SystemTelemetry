@@ -1,6 +1,6 @@
 #include "widget/impl/clock_time.h"
 
-#include "dashboard_metrics.h"
+#include "dashboard/dashboard_metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 
 DashboardWidgetClass ClockTimeWidget::Class() const {

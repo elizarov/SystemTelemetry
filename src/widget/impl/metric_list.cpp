@@ -5,7 +5,7 @@
 #include <sstream>
 
 #include "util/strings.h"
-#include "dashboard_metrics.h"
+#include "dashboard/dashboard_metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 
 namespace {

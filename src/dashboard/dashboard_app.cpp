@@ -1,4 +1,4 @@
-#include "dashboard_app.h"
+#include "dashboard/dashboard_app.h"
 
 #include <cmath>
 #include <sstream>
@@ -7,7 +7,7 @@
 
 #include <wtsapi32.h>
 
-#include "dashboard_shell_ui.h"
+#include "dashboard/dashboard_shell_ui.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "util/localization_catalog.h"

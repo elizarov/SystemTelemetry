@@ -77,9 +77,9 @@ add_executable(SystemTelemetry WIN32
     src/app_monitor.cpp
     src/util/paths.cpp
     src/util/strings.cpp
-    src/dashboard_controller.cpp
-    src/dashboard_app.cpp
-    src/dashboard_shell_ui.cpp
+    src/dashboard/dashboard_controller.cpp
+    src/dashboard/dashboard_app.cpp
+    src/dashboard/dashboard_shell_ui.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
     src/layout_edit_dialog/impl/dialog_proc.cpp
     src/layout_edit_dialog/impl/editors.cpp
@@ -120,8 +120,8 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
-    src/dashboard_metrics.cpp
-    src/dashboard_overlay_state.cpp
+    src/dashboard/dashboard_metrics.cpp
+    src/dashboard/dashboard_overlay_state.cpp
     src/dashboard_renderer/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
     src/dashboard_renderer/impl/palette.cpp
@@ -281,7 +281,7 @@ add_executable(SystemTelemetryTests
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
-    src/dashboard_metrics.cpp
+    src/dashboard/dashboard_metrics.cpp
     src/dashboard_renderer/render_types.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/impl/retained_history.cpp
@@ -356,8 +356,8 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
-    src/dashboard_metrics.cpp
-    src/dashboard_overlay_state.cpp
+    src/dashboard/dashboard_metrics.cpp
+    src/dashboard/dashboard_overlay_state.cpp
     src/dashboard_renderer/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
     src/dashboard_renderer/impl/palette.cpp

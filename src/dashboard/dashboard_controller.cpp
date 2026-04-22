@@ -1,4 +1,4 @@
-#include "dashboard_controller.h"
+#include "dashboard/dashboard_controller.h"
 
 #include <algorithm>
 #include <cmath>

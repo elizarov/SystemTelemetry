@@ -3,7 +3,7 @@
 #include <cmath>
 #include <limits>
 
-#include "dashboard_metrics.h"
+#include "dashboard/dashboard_metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 
 namespace {

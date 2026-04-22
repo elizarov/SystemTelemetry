@@ -10,7 +10,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/diagnostics/` contains diagnostics command-line option parsing, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/widget/widget.*` and `src/widget/widget_class.h` own the widget interface, class enum, and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, UTF-8 conversion, localization catalog access, numeric safety, and trace emission.
-- `src/dashboard_overlay_state.*` contains the shared layout-edit overlay state consumed by the renderer and layout-edit hosts.
+- `src/dashboard/` contains the dashboard application, controller, shell UI, menu types, metrics adapter, and shared layout-edit overlay state.
 - `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, `src/dashboard_renderer/render_types.*` owns shared render-space contract types, and `src/dashboard_renderer/impl/` contains helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
 - `src/layout_edit/` contains shared layout-edit interaction, parameter, tooltip, tree, trace-session, and snap-solver modules.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.

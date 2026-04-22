@@ -1,6 +1,6 @@
 #include "app_diagnostics.h"
 #include "app_constants.h"
-#include "dashboard_app.h"
+#include "dashboard/dashboard_app.h"
 
 namespace {
 

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "dashboard_metrics.h"
+#include "dashboard/dashboard_metrics.h"
 
 namespace {
 

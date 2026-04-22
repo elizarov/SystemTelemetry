@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-#include "dashboard_metrics.h"
+#include "dashboard/dashboard_metrics.h"
 
 namespace {
 

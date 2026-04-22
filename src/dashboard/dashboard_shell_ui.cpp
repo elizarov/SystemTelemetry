@@ -1,4 +1,4 @@
-#include "dashboard_shell_ui.h"
+#include "dashboard/dashboard_shell_ui.h"
 
 #include <algorithm>
 #include <cmath>
@@ -8,7 +8,7 @@
 
 #include "app_diagnostics.h"
 #include "util/strings.h"
-#include "dashboard_app.h"
+#include "dashboard/dashboard_app.h"
 #include "layout_edit_dialog/layout_edit_dialog.h"
 #include "layout_edit/layout_edit_parameter.h"
 #include "layout_edit/layout_edit_tree.h"

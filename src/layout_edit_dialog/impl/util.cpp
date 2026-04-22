@@ -6,7 +6,7 @@
 #include <cwchar>
 #include <cwctype>
 
-#include "dashboard_metrics.h"
+#include "dashboard/dashboard_metrics.h"
 #include "resource.h"
 #include "layout_edit/layout_edit_service.h"
 #include "util/utf8.h"

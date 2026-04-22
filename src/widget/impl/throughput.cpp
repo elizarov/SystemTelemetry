@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstdio>
 
-#include "dashboard_metrics.h"
+#include "dashboard/dashboard_metrics.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "util/numeric_safety.h"
 

@@ -11,7 +11,7 @@
 #include <windows.h>
 
 #include "app_monitor.h"
-#include "dashboard_menu_types.h"
+#include "dashboard/dashboard_menu_types.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_parameter.h"
 
