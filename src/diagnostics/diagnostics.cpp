@@ -1,4 +1,4 @@
-#include "app_diagnostics.h"
+#include "diagnostics/diagnostics.h"
 #include "app_config_io.h"
 #include "app_monitor.h"
 #include "util/paths.h"

@@ -68,7 +68,7 @@ endif()
 add_executable(SystemTelemetry WIN32
     resources/SystemTelemetry.rc
     src/app_main.cpp
-    src/app_diagnostics.cpp
+    src/diagnostics/diagnostics.cpp
     src/app_autostart.cpp
     src/util/command_line.cpp
     src/app_config_io.cpp

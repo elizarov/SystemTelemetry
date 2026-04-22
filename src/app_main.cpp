@@ -1,4 +1,4 @@
-#include "app_diagnostics.h"
+#include "diagnostics/diagnostics.h"
 #include "app_constants.h"
 #include "dashboard/dashboard_app.h"
 

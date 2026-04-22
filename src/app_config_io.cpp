@@ -2,7 +2,7 @@
 
 #include <shellapi.h>
 
-#include "app_diagnostics.h"
+#include "diagnostics/diagnostics.h"
 #include "util/paths.h"
 #include "config/config_parser.h"
 #include "config/config_writer.h"

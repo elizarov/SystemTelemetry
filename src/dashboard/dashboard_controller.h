@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-#include "app_diagnostics.h"
+#include "diagnostics/diagnostics.h"
 #include "app_display_config.h"
 #include "app_monitor.h"
 #include "dashboard/dashboard_menu_types.h"
