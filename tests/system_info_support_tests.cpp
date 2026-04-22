@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "system_info_support.h"
+#include "telemetry/impl/system_info_support.h"
 
 TEST(SystemInfoSupport, KeepsCachedBoardSensorNamesWhenLatestSampleOmitsThem) {
     std::vector<std::string> cachedNames = {"CPU", "System 1"};

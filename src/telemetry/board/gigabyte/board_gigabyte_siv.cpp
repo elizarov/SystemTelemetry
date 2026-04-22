@@ -22,7 +22,7 @@
 
 #include "util/strings.h"
 #include "telemetry/board/board_vendor.h"
-#include "system_info_support.h"
+#include "telemetry/impl/system_info_support.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 

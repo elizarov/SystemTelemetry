@@ -103,7 +103,7 @@ add_executable(SystemTelemetry WIN32
     src/localization_catalog.cpp
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
-    src/system_info_support.cpp
+    src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector_state.cpp
     src/telemetry/impl/collector_board.cpp
@@ -280,7 +280,7 @@ add_executable(SystemTelemetryTests
     src/localization_catalog.cpp
     src/layout_edit/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
-    src/system_info_support.cpp
+    src/telemetry/impl/system_info_support.cpp
     src/dashboard_metrics.cpp
     src/dashboard_renderer/render_types.cpp
     src/snapshot_dump.cpp
@@ -331,7 +331,7 @@ add_executable(SystemTelemetryBenchmarks
     src/config/config.cpp
     src/config/config_parser.cpp
     src/config/config_resolution.cpp
-    src/system_info_support.cpp
+    src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector_state.cpp
     src/telemetry/impl/collector_board.cpp

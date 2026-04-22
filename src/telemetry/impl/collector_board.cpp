@@ -2,7 +2,7 @@
 
 #include "telemetry/board/board_vendor.h"
 #include "util/numeric_safety.h"
-#include "system_info_support.h"
+#include "telemetry/impl/system_info_support.h"
 #include "telemetry/impl/collector_state.h"
 
 namespace {
