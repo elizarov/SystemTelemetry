@@ -1,15 +1,15 @@
-#include "app_display_config.h"
+#include "display/display_config.h"
 
 #include <fstream>
 #include <shellapi.h>
 #include <shobjidl.h>
 
 #include "app_config_io.h"
-#include "app_constants.h"
 #include "app_monitor.h"
 #include "config/config_parser.h"
 #include "config/config_writer.h"
 #include "diagnostics/diagnostics.h"
+#include "display/constants.h"
 #include "util/command_line.h"
 #include "util/paths.h"
 #include "util/strings.h"

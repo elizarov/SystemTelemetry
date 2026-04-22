@@ -1,6 +1,11 @@
+#include <cwchar>
+#include <filesystem>
+
+#include "autostart/autostart.h"
 #include "diagnostics/diagnostics.h"
-#include "app_constants.h"
+#include "dashboard/constants.h"
 #include "dashboard/dashboard_app.h"
+#include "display/display_config.h"
 
 namespace {
 

@@ -5,12 +5,13 @@
 #include <fstream>
 #include <string_view>
 
-#include "app_autostart.h"
 #include "app_config_io.h"
-#include "app_display_config.h"
+#include "autostart/autostart.h"
 #include "config/config_resolution.h"
 #include "config/config_writer.h"
 #include "diagnostics/constants.h"
+#include "display/constants.h"
+#include "display/display_config.h"
 #include "layout_edit/layout_edit_parameter.h"
 #include "layout_edit/layout_edit_service.h"
 #include "util/paths.h"

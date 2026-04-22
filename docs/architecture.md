@@ -6,11 +6,13 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ## Top-Level Map
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
+- `src/autostart/` contains login auto-start registry updates, elevation handoff, and auto-start constants.
 - `src/config/` contains the config model, parser, resolver, writer, and schema metadata.
+- `src/display/` contains configure-display and wallpaper application helpers plus display-owned command, filename, and DPI constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/widget/widget.*` and `src/widget/widget_class.h` own the widget interface, class enum, and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string helpers, enum string conversion, UTF-8 conversion, localization catalog access, numeric safety, and trace emission.
-- `src/dashboard/` contains the dashboard application, controller, shell UI, menu types, and shared layout-edit overlay state.
+- `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
 - `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, `src/dashboard_renderer/render_types.*` owns shared render-space contract types, and `src/dashboard_renderer/impl/` contains helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
 - `src/layout_edit/` contains shared layout-edit interaction, parameter, tooltip, tree, trace-session, and snap-solver modules.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
@@ -104,6 +106,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Minimal saves diff live state against the loaded target INI text and preserve unrelated lines.
 - Full exports start from the embedded template text.
 - When the executable-side config file is not writable, the save path relaunches the executable through the maintained elevated helper route and hands off the write through a temporary file.
+- Auto-start registration and configure-display writes use their package-owned elevated helper paths when the current process cannot write the target registry value or executable-side files directly.
 
 ## Resources And Build Graph
 

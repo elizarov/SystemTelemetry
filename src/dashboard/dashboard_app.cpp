@@ -8,6 +8,7 @@
 #include <wtsapi32.h>
 
 #include "dashboard/dashboard_shell_ui.h"
+#include "display/display_config.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "util/localization_catalog.h"

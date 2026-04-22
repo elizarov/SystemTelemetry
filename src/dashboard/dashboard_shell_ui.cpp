@@ -6,7 +6,9 @@
 #include <cwchar>
 #include <sstream>
 
+#include "dashboard/constants.h"
 #include "diagnostics/diagnostics.h"
+#include "display/constants.h"
 #include "util/strings.h"
 #include "dashboard/dashboard_app.h"
 #include "layout_edit_dialog/layout_edit_dialog.h"

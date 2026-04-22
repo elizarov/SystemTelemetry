@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "app_constants.h"
+#include "display/constants.h"
 #include "util/strings.h"
 #include "util/utf8.h"
 

@@ -1,9 +1,9 @@
-#include "app_autostart.h"
+#include "autostart/autostart.h"
 
 #include <shellapi.h>
 
+#include "autostart/constants.h"
 #include "util/command_line.h"
-#include "app_constants.h"
 #include "util/paths.h"
 
 std::optional<std::wstring> ReadAutoStartCommand() {
