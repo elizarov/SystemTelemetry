@@ -10,7 +10,7 @@ param(
 
     [int]$MaxParallel = 0,
 
-    [int]$TimeoutSeconds = 180
+    [int]$TimeoutSeconds = 60
 )
 
 $ErrorActionPreference = 'Stop'
@@ -20,6 +20,13 @@ $clangTidySkippedFiles = @(
     # that Clang diagnostics, clang-analyzer, and misc-include-cleaner all go pathological on
     # this translation unit, turning the optional tidy sweep into a multi-minute stall.
     'src/diagnostics/snapshot_dump.cpp'
+)
+
+$clangTidyIgnoredUnusedIncludeWarnings = @(
+    # The active include-cleaner build does not model these Win32 interface headers correctly.
+    'src/display/display_config.cpp|shobjidl.h',
+    'src/util/resource_loader.cpp|windows.h',
+    'src/util/utf8.cpp|windows.h'
 )
 
 function ConvertTo-RepoSlashPath {
@@ -38,6 +45,37 @@ function Test-ClangTidySkippedFile {
 
     $relativePath = ConvertTo-RepoSlashPath -Path (Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $FullPath)
     return $relativePath -in $clangTidySkippedFiles
+}
+
+function Test-IgnoredUnusedIncludeWarning {
+    param(
+        [string]$RepoRoot,
+        [string]$Text
+    )
+
+    $match = [regex]::Match(
+        $Text,
+        '^(?<file>.*\.(?:cpp|h)):\d+:\d+: warning: included header (?<header>\S+) is not used directly \[misc-include-cleaner\]$')
+    if (-not $match.Success) {
+        return $false
+    }
+
+    $relativePath = ConvertTo-RepoSlashPath -Path (Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $match.Groups['file'].Value)
+    $key = "$relativePath|$($match.Groups['header'].Value)"
+    return $key -in $clangTidyIgnoredUnusedIncludeWarnings
+}
+
+function Test-TidyStateReady {
+    param(
+        [hashtable]$State,
+        [int]$TimeoutSeconds
+    )
+
+    if ($State.Process.HasExited) {
+        return $true
+    }
+
+    return ([System.DateTime]::UtcNow - $State.StartedAt).TotalSeconds -ge $TimeoutSeconds
 }
 
 function Resolve-ClangTidyPath {
@@ -364,11 +402,14 @@ function Start-TidyProcess {
 function Complete-TidyProcess {
     param(
         [hashtable]$State,
-        [int]$TimeoutSeconds
+        [int]$TimeoutSeconds,
+        [string]$RepoRoot
     )
 
     $timedOut = $false
-    if (-not $state.Process.WaitForExit($TimeoutSeconds * 1000)) {
+    $elapsedMilliseconds = ([System.DateTime]::UtcNow - $state.StartedAt).TotalMilliseconds
+    $remainingMilliseconds = [Math]::Max(0, [int](($TimeoutSeconds * 1000) - $elapsedMilliseconds))
+    if (-not $state.Process.HasExited -and -not $state.Process.WaitForExit($remainingMilliseconds)) {
         $timedOut = $true
         Stop-Process -Id $state.Process.Id -Force -ErrorAction SilentlyContinue
         $null = $state.Process.WaitForExit(5000)
@@ -377,7 +418,7 @@ function Complete-TidyProcess {
     $outputLines = @()
     if ($null -ne $state.StdoutTask) {
         [void]$state.StdoutTask.Wait(5000)
-        $stdoutText = $state.StdoutTask.Result
+        $stdoutText = if ($state.StdoutTask.IsCompleted) { $state.StdoutTask.Result } else { '' }
         if (-not [string]::IsNullOrEmpty($stdoutText)) {
             $outputLines += $stdoutText -split '\r?\n'
         }
@@ -387,7 +428,7 @@ function Complete-TidyProcess {
     }
     if ($null -ne $state.StderrTask) {
         [void]$state.StderrTask.Wait(5000)
-        $stderrText = $state.StderrTask.Result
+        $stderrText = if ($state.StderrTask.IsCompleted) { $state.StderrTask.Result } else { '' }
         if (-not [string]::IsNullOrEmpty($stderrText)) {
             $outputLines += $stderrText -split '\r?\n'
         }
@@ -398,8 +439,16 @@ function Complete-TidyProcess {
 
     $filteredOutputLines = [System.Collections.Generic.List[string]]::new()
     $skipIncludeCleanerMissingBlock = $false
+    $skipIgnoredUnusedIncludeBlock = $false
     foreach ($line in $outputLines) {
         $text = if ($null -eq $line) { '' } else { $line.ToString() }
+
+        if ($skipIgnoredUnusedIncludeBlock) {
+            if ($text -match '^\s' -or [string]::IsNullOrWhiteSpace($text)) {
+                continue
+            }
+            $skipIgnoredUnusedIncludeBlock = $false
+        }
 
         if ($skipIncludeCleanerMissingBlock) {
             if ($text -match '^\s' -or [string]::IsNullOrWhiteSpace($text)) {
@@ -410,6 +459,15 @@ function Complete-TidyProcess {
 
         if ($text -match 'warning: no header providing ".+" is directly included \[misc-include-cleaner\]') {
             $skipIncludeCleanerMissingBlock = $true
+            continue
+        }
+
+        if (Test-IgnoredUnusedIncludeWarning -RepoRoot $RepoRoot -Text $text) {
+            $skipIgnoredUnusedIncludeBlock = $true
+            continue
+        }
+
+        if ($text -match '^\d+ warnings generated\.$') {
             continue
         }
 
@@ -543,7 +601,7 @@ try {
         while ($active.Count -ge $parallelism) {
             $finishedState = $null
             foreach ($state in @($active)) {
-                if ($state.Process.HasExited) {
+                if (Test-TidyStateReady -State $state -TimeoutSeconds $TimeoutSeconds) {
                     $finishedState = $state
                     break
                 }
@@ -555,7 +613,7 @@ try {
             }
 
             [void]$active.Remove($finishedState)
-            $result = Complete-TidyProcess -State $finishedState -TimeoutSeconds $TimeoutSeconds
+            $result = Complete-TidyProcess -State $finishedState -TimeoutSeconds $TimeoutSeconds -RepoRoot $resolvedRoot
             Write-TidyResult -Writer $writer -Result $result -FileCount $files.Count -TimeoutSeconds $TimeoutSeconds -TidyFailed ([ref]$tidyFailed)
         }
     }
@@ -563,7 +621,7 @@ try {
     while ($active.Count -gt 0) {
         $finishedState = $null
         foreach ($state in @($active)) {
-            if ($state.Process.HasExited) {
+            if (Test-TidyStateReady -State $state -TimeoutSeconds $TimeoutSeconds) {
                 $finishedState = $state
                 break
             }
@@ -575,7 +633,7 @@ try {
         }
 
         [void]$active.Remove($finishedState)
-        $result = Complete-TidyProcess -State $finishedState -TimeoutSeconds $TimeoutSeconds
+        $result = Complete-TidyProcess -State $finishedState -TimeoutSeconds $TimeoutSeconds -RepoRoot $resolvedRoot
         Write-TidyResult -Writer $writer -Result $result -FileCount $files.Count -TimeoutSeconds $TimeoutSeconds -TidyFailed ([ref]$tidyFailed)
     }
 

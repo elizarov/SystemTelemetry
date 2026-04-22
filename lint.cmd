@@ -21,12 +21,12 @@ if errorlevel 1 set "failed=1"
 
 if /I "%~1"=="tidy" (
     call :run_clang_tidy %~2 %~3
-    set "tidy_result=%errorlevel%"
-    if "%tidy_result%"=="2" (
+    set "tidy_result=!errorlevel!"
+    if "!tidy_result!"=="2" (
         popd >nul
         exit /b 2
     )
-    if not "%tidy_result%"=="0" set "failed=1"
+    if not "!tidy_result!"=="0" set "failed=1"
 ) else if not "%~1"=="" (
     goto :usage
 )
@@ -62,7 +62,7 @@ goto :usage
 :clang_tidy_args_done
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%root%tools\run_clang_tidy.ps1" -Root "%root_arg%" -Mode "%mode%" -Scope "%scope%"
-exit /b %errorlevel%
+exit /b !errorlevel!
 
 :usage
 echo Usage:
