@@ -3,6 +3,6 @@
 #include "telemetry/gpu/amd/gpu_amd_adl.h"
 #include "util/trace.h"
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(tracing::Trace* trace) {
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace* trace) {
     return CreateAmdGpuTelemetryProvider(trace);
 }

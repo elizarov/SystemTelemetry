@@ -4,8 +4,6 @@
 
 #include <cstdio>
 
-namespace tracing {
-
 namespace {
 
 std::string FormatTraceTimestamp() {
@@ -109,5 +107,3 @@ std::string Trace::EscapeText(std::string_view text) {
 std::string Trace::QuoteText(std::string_view text) {
     return "\"" + EscapeText(text) + "\"";
 }
-
-}  // namespace tracing

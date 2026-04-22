@@ -402,7 +402,7 @@ void DiagnosticsSession::WriteTraceMarker(const std::string& text) {
     if (!traceStream_.is_open()) {
         return;
     }
-    tracing::Trace trace(&traceStream_);
+    Trace trace(&traceStream_);
     trace.Write(text);
 }
 
@@ -710,7 +710,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
             return false;
         }
         overlayState.SetPreviewWidget(*widget);
-        tracing::Trace(traceStream).Write("diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
+        Trace(traceStream).Write("diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
     }
     if (hoverPoint.has_value()) {
         if (!renderer.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
@@ -734,9 +734,9 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
                 traceText +=
                     " tooltip_error=" + QuoteTraceText(tooltipError.empty() ? "unsupported_target" : tooltipError);
             }
-            tracing::Trace(traceStream).Write(traceText);
+            Trace(traceStream).Write(traceText);
         } else {
-            tracing::Trace(traceStream)
+            Trace(traceStream)
                 .Write("diagnostics:hover point=" + QuoteTraceText(FormatTracePoint(*hoverPoint)) +
                        " target=" + QuoteTraceText("none"));
         }

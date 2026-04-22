@@ -523,7 +523,7 @@ private:
     std::vector<StorageDriveCandidate> storageDrives_{};
     ResolvedNetworkCandidate resolvedNetwork_{};
     std::vector<std::string> resolvedStorageDrives_{};
-    tracing::Trace trace_;
+    Trace trace_;
     std::chrono::steady_clock::time_point lastReload_{};
     uint64_t syntheticTick_ = 0;
 };

@@ -170,7 +170,7 @@ public:
     bool loaded = false;
 };
 
-bool InitializeGigabyteRuntime(GigabyteRuntimeContext ^ context, tracing::Trace& trace, std::string& diagnostics) {
+bool InitializeGigabyteRuntime(GigabyteRuntimeContext ^ context, Trace& trace, std::string& diagnostics) {
     if (context->loaded) {
         return true;
     }
@@ -306,7 +306,7 @@ void CollectManagedSensors(GigabyteRuntimeContext ^ context,
 }
 
 bool CaptureGigabyteSnapshot(
-    GigabyteRuntimeContext ^ context, GigabyteSnapshot& snapshot, tracing::Trace& trace, std::string& diagnostics) {
+    GigabyteRuntimeContext ^ context, GigabyteSnapshot& snapshot, Trace& trace, std::string& diagnostics) {
     snapshot = GigabyteSnapshot{};
 
     if (!InitializeGigabyteRuntime(context, trace, diagnostics)) {
@@ -373,7 +373,7 @@ void ResetMetricValues(std::vector<NamedScalarMetric>& metrics) {
 
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    explicit GigabyteSivBoardTelemetryProvider(tracing::Trace* trace)
+    explicit GigabyteSivBoardTelemetryProvider(Trace* trace)
         : trace_(trace), runtime_(gcnew GigabyteRuntimeContext()) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
@@ -491,12 +491,12 @@ private:
         return ResolveMappedSensorName(settings_.fanSensorNames, logicalName);
     }
 
-    tracing::Trace& trace() {
-        static tracing::Trace nullTrace;
+    Trace& trace() {
+        static Trace nullTrace;
         return trace_ != nullptr ? *trace_ : nullTrace;
     }
 
-    tracing::Trace* trace_ = nullptr;
+    Trace* trace_ = nullptr;
     BoardTelemetrySettings settings_{};
     gcroot<GigabyteRuntimeContext ^> runtime_;
     std::string boardManufacturer_;
@@ -515,6 +515,6 @@ private:
 
 }  // namespace
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(tracing::Trace* trace) {
+std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(Trace* trace) {
     return std::make_unique<GigabyteSivBoardTelemetryProvider>(trace);
 }

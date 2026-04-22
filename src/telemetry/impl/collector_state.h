@@ -93,5 +93,5 @@ struct RealTelemetryCollectorState {
     StorageState storage_;
     NetworkState network_;
     RetainedHistoryStore retainedHistoryStore_;
-    tracing::Trace trace_;
+    Trace trace_;
 };

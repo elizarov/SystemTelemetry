@@ -592,14 +592,14 @@ std::string DashboardApp::BuildLayoutEditUiTraceState() const {
     const auto& state = controller_.State();
     std::ostringstream trace;
     trace << "layout=" << QuoteTraceText(state.config.display.layout);
-    trace << " editing=" << tracing::Trace::BoolText(state.isEditingLayout);
-    trace << " moving=" << tracing::Trace::BoolText(state.isMoving);
+    trace << " editing=" << Trace::BoolText(state.isEditingLayout);
+    trace << " moving=" << Trace::BoolText(state.isMoving);
     trace << " modal_depth=" << layoutEditModalUiDepth_;
-    trace << " tooltip_visible=" << tracing::Trace::BoolText(layoutEditTooltipVisible_);
-    trace << " tooltip_suppressed=" << tracing::Trace::BoolText(layoutEditTooltipRefreshSuppressed_);
-    trace << " tooltip_rect_valid=" << tracing::Trace::BoolText(layoutEditTooltipRectValid_);
-    trace << " mouse_tracking=" << tracing::Trace::BoolText(layoutEditMouseTracking_);
-    trace << " drag_active=" << tracing::Trace::BoolText(layoutEditController_.HasActiveDrag());
+    trace << " tooltip_visible=" << Trace::BoolText(layoutEditTooltipVisible_);
+    trace << " tooltip_suppressed=" << Trace::BoolText(layoutEditTooltipRefreshSuppressed_);
+    trace << " tooltip_rect_valid=" << Trace::BoolText(layoutEditTooltipRectValid_);
+    trace << " mouse_tracking=" << Trace::BoolText(layoutEditMouseTracking_);
+    trace << " drag_active=" << Trace::BoolText(layoutEditController_.HasActiveDrag());
 
     const HWND capture = GetCapture();
     trace << " capture=";

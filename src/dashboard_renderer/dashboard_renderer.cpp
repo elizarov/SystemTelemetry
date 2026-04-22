@@ -2097,8 +2097,8 @@ void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const DashboardOverlay
             }
             ++count;
             WriteTrace("diagnostics:active_region box=" + FormatTraceRect(box) +
-                       " visual_type=" + tracing::Trace::QuoteText(visualType) +
-                       " path=" + tracing::Trace::QuoteText(path) + " detail=" + tracing::Trace::QuoteText(detail));
+                       " visual_type=" + Trace::QuoteText(visualType) + " path=" + Trace::QuoteText(path) +
+                       " detail=" + Trace::QuoteText(detail));
         };
 
     if (overlayState.showLayoutEditGuides) {
@@ -2171,7 +2171,7 @@ void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const DashboardOverlay
     }
 
     WriteTrace("diagnostics:active_regions count=" + std::to_string(count) +
-               " layout_edit=" + tracing::Trace::BoolText(overlayState.showLayoutEditGuides));
+               " layout_edit=" + Trace::BoolText(overlayState.showLayoutEditGuides));
 }
 
 bool DashboardRenderer::SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath) {
@@ -3150,7 +3150,7 @@ void DashboardRenderer::WriteTrace(const std::string& text) const {
     if (interactiveDragTraceActive_ && text.rfind("renderer:", 0) == 0) {
         return;
     }
-    tracing::Trace trace(traceOutput_);
+    Trace trace(traceOutput_);
     trace.Write(text);
 }
 

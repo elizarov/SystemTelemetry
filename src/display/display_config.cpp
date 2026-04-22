@@ -16,7 +16,7 @@
 #include "util/trace.h"
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream) {
-    const tracing::Trace trace(traceStream);
+    const Trace trace(traceStream);
     if (config.display.wallpaper.empty()) {
         return true;
     }

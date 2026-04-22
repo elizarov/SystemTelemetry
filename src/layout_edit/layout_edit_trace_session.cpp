@@ -21,7 +21,7 @@ void WriteTrace(std::ostream* traceStream, const std::string& text) {
     if (traceStream == nullptr) {
         return;
     }
-    tracing::Trace trace(traceStream);
+    Trace trace(traceStream);
     trace.Write(text);
 }
 

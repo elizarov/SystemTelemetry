@@ -4,8 +4,6 @@
 #include <string>
 #include <string_view>
 
-namespace tracing {
-
 class Trace {
 public:
     explicit Trace(std::ostream* output = nullptr);
@@ -35,5 +33,3 @@ public:
 private:
     std::ostream* output_ = nullptr;
 };
-
-}  // namespace tracing
