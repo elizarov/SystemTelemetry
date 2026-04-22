@@ -1,4 +1,4 @@
-#include "snapshot_dump.h"
+#include "telemetry/snapshot_dump.h"
 
 #include <cerrno>
 #include <cstdio>

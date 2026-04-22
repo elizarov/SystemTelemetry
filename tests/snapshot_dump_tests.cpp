@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-#include "snapshot_dump.h"
+#include "telemetry/snapshot_dump.h"
 
 namespace {
 

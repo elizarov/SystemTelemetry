@@ -4,7 +4,7 @@
 #include <ostream>
 
 #include "config/config.h"
-#include "snapshot_dump.h"
+#include "telemetry/snapshot_dump.h"
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, std::ostream* traceStream);
 bool ConfigureDisplay(
