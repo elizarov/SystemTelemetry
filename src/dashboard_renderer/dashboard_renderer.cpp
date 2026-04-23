@@ -244,14 +244,14 @@ RenderRect TextAnchorRectForShape(const DashboardRenderer& renderer, const Rende
     const int anchorSize = std::max(4, renderer.ScaleLogical(6));
     const int anchorHalf = anchorSize / 2;
     if (shape == AnchorShape::Wedge) {
-        const int wedgeHeight = std::max(6, renderer.ScaleLogical(8));
-        const int wedgeHalfHeight = wedgeHeight / 2;
-        const int protrusion = std::max(4, renderer.ScaleLogical(7));
-        const int inset = std::max(4, renderer.ScaleLogical(5));
-        return RenderRect{textRect.left - protrusion,
-            textRect.top - wedgeHalfHeight,
-            textRect.left + inset,
-            textRect.top - wedgeHalfHeight + wedgeHeight};
+        const int outsideLeft = std::max(1, renderer.ScaleLogical(2));
+        const int outsideTop = std::max(1, renderer.ScaleLogical(1));
+        const int insideWidth = std::max(4, renderer.ScaleLogical(5));
+        const int insideHeight = std::max(5, renderer.ScaleLogical(6));
+        return RenderRect{textRect.left - outsideLeft,
+            textRect.top - outsideTop,
+            textRect.left + insideWidth,
+            textRect.top - outsideTop + insideHeight};
     }
 
     const int anchorCenterX = textRect.right;
@@ -1400,7 +1400,7 @@ void DashboardRenderer::RegisterEditableAnchorRegion(std::vector<LayoutEditAncho
     region.anchorRect = anchorRect;
     region.shape = shape;
     const int anchorHitInset =
-        shape == AnchorShape::Wedge ? std::max(4, ScaleLogical(5)) : std::max(3, ScaleLogical(4));
+        shape == AnchorShape::Wedge ? std::max(1, ScaleLogical(2)) : std::max(3, ScaleLogical(4));
     region.anchorHitPadding = anchorHitInset;
     region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
         region.anchorRect.top - anchorHitInset,
@@ -2403,6 +2403,15 @@ std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandl
     }
     const LayoutEditAnchorRegion* bestRegion = nullptr;
     int bestPriority = 0;
+    const auto hoverPriority = [](const LayoutEditAnchorRegion& region) {
+        if (region.shape == AnchorShape::Square) {
+            return -2;
+        }
+        if (region.shape == AnchorShape::Wedge) {
+            return 2;
+        }
+        return LayoutEditAnchorHitPriority(region.key);
+    };
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
         const LayoutEditAnchorRegion& region = *(*it);
         bool hit = false;
@@ -2423,7 +2432,7 @@ std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandl
             continue;
         }
 
-        const int priority = LayoutEditAnchorHitPriority(region.key);
+        const int priority = hoverPriority(region);
         if (bestRegion == nullptr || priority < bestPriority) {
             bestRegion = &region;
             bestPriority = priority;
