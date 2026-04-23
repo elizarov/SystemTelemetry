@@ -866,7 +866,9 @@ std::optional<RenderRect> DashboardRenderer::FindHoveredWidgetOutlineRect(
                 card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
             if (MatchesCardChromeSelectionIdentity(*overlayState.hoveredEditableCard, cardIdentity) &&
                 !card.chromeLayout.titleRect.IsEmpty()) {
-                return card.chromeLayout.titleRect;
+                return card.chromeLayout.iconRect.IsEmpty()
+                           ? card.chromeLayout.titleRect
+                           : UnionRect(card.chromeLayout.iconRect, card.chromeLayout.titleRect);
             }
         }
     }
