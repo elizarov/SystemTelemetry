@@ -23,15 +23,15 @@ bool DashboardWidget::IsVerticalSpring() const {
     return false;
 }
 
-void DashboardWidget::ResolveLayoutState(const DashboardRenderer&, const RenderRect&) {}
+void DashboardWidget::ResolveLayoutState(const WidgetRenderer&, const RenderRect&) {}
 
-void DashboardWidget::Draw(DashboardRenderer&, const DashboardWidgetLayout&, const MetricSource&) const {}
+void DashboardWidget::Draw(WidgetRenderer&, const DashboardWidgetLayout&, const MetricSource&) const {}
 
-void DashboardWidget::FinalizeLayoutGroup(DashboardRenderer&, const std::vector<DashboardWidgetLayout*>&) {}
+void DashboardWidget::FinalizeLayoutGroup(WidgetRenderer&, const std::vector<DashboardWidgetLayout*>&) {}
 
-void DashboardWidget::BuildEditGuides(DashboardRenderer&, const DashboardWidgetLayout&) const {}
+void DashboardWidget::BuildEditGuides(WidgetRenderer&, const DashboardWidgetLayout&) const {}
 
-void DashboardWidget::BuildStaticAnchors(DashboardRenderer&, const DashboardWidgetLayout&) const {}
+void DashboardWidget::BuildStaticAnchors(WidgetRenderer&, const DashboardWidgetLayout&) const {}
 
 std::unique_ptr<DashboardWidget> CreateDashboardWidget(DashboardWidgetClass widgetClass) {
     switch (widgetClass) {

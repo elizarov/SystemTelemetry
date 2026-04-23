@@ -34,12 +34,12 @@ public:
     DashboardWidgetClass Class() const override;
     std::unique_ptr<DashboardWidget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
-    int PreferredHeight(const DashboardRenderer& renderer) const override;
-    void ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) override;
+    int PreferredHeight(const WidgetRenderer& renderer) const override;
+    void ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect) override;
     void Draw(
-        DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const override;
-    void BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
-    void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
+        WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const override;
+    void BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const override;
+    void BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const override;
 
 private:
     std::string metric_;

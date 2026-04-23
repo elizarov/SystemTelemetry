@@ -5,7 +5,8 @@
 #include <string_view>
 
 #include "config/config.h"
-#include "layout_edit/layout_edit_parameter_id.h"
+#include "widget/layout_edit_parameter_id.h"
+#include "widget/layout_edit_types.h"
 
 struct LayoutEditTooltipDescriptor {
     std::string configKey;
@@ -35,6 +36,7 @@ struct LayoutEditParameterInfo {
 const LayoutEditParameterInfo& GetLayoutEditParameterInfo(LayoutEditParameter parameter);
 const LayoutEditConfigFieldMetadata& GetLayoutEditConfigFieldMetadata(LayoutEditParameter parameter);
 int GetLayoutEditParameterHitPriority(LayoutEditParameter parameter);
+int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key);
 bool IsFontLayoutEditParameter(LayoutEditParameter parameter);
 std::string GetLayoutEditParameterDisplayName(LayoutEditParameter parameter);
 std::optional<LayoutEditParameter> FindLayoutEditParameterByConfigField(

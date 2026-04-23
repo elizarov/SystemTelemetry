@@ -4,7 +4,7 @@
 #include <string>
 
 #include "config/config.h"
-#include "layout_edit/layout_edit_types.h"
+#include "widget/layout_edit_types.h"
 
 const char* LayoutEditTooltipPayloadTraceKind(const TooltipPayload& payload);
 std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(

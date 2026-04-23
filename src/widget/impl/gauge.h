@@ -1,9 +1,7 @@
 #pragma once
 
-#include <d2d1.h>
 #include <memory>
 #include <vector>
-#include <wrl/client.h>
 
 #include "widget/widget.h"
 
@@ -45,22 +43,19 @@ public:
         RenderRect ringThicknessAnchorRect{};
         RenderRect valueRect{};
         RenderRect labelRect{};
-        std::vector<Microsoft::WRL::ComPtr<ID2D1PathGeometry>> d2dSegmentPaths;
-        Microsoft::WRL::ComPtr<ID2D1GeometryGroup> d2dTrackPath;
-        mutable int cachedUsageSegmentCount = -1;
-        mutable Microsoft::WRL::ComPtr<ID2D1GeometryGroup> d2dCachedUsagePath;
+        std::vector<RenderRingSegment> ringSegments;
     };
 
     DashboardWidgetClass Class() const override;
     std::unique_ptr<DashboardWidget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
-    int PreferredHeight(const DashboardRenderer& renderer) const override;
-    void ResolveLayoutState(const DashboardRenderer& renderer, const RenderRect& rect) override;
+    int PreferredHeight(const WidgetRenderer& renderer) const override;
+    void ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect) override;
     void Draw(
-        DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const override;
-    void FinalizeLayoutGroup(DashboardRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) override;
-    void BuildStaticAnchors(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
-    void BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const override;
+        WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const override;
+    void FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) override;
+    void BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const override;
+    void BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const override;
 
 private:
     std::string metric_;

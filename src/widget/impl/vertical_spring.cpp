@@ -10,7 +10,7 @@ std::unique_ptr<DashboardWidget> VerticalSpringWidget::Clone() const {
 
 void VerticalSpringWidget::Initialize(const LayoutNodeConfig&) {}
 
-int VerticalSpringWidget::PreferredHeight(const DashboardRenderer&) const {
+int VerticalSpringWidget::PreferredHeight(const WidgetRenderer&) const {
     return 0;
 }
 

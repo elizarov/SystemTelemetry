@@ -1,4 +1,4 @@
-#include "layout_edit/layout_edit_types.h"
+#include "widget/layout_edit_types.h"
 
 #include <algorithm>
 #include <type_traits>
@@ -170,13 +170,6 @@ std::optional<LayoutMetricListOrderEditKey> LayoutEditAnchorMetricListOrderKey(c
                                          : std::nullopt;
 }
 
-int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key) {
-    if (const auto parameter = LayoutEditAnchorParameter(key); parameter.has_value()) {
-        return GetLayoutEditParameterHitPriority(*parameter);
-    }
-    return -1;
-}
-
 bool IsLayoutGuidePayload(const TooltipPayload& payload) {
     return std::holds_alternative<LayoutEditGuide>(payload);
 }
@@ -238,20 +231,20 @@ RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload) {
             using T = std::decay_t<decltype(value)>;
             if constexpr (std::is_same_v<T, LayoutEditGuide>) {
                 return RenderPoint{
-                    value.lineRect.left + (std::max<LONG>(0, value.lineRect.right - value.lineRect.left) / 2),
-                    value.lineRect.top + (std::max<LONG>(0, value.lineRect.bottom - value.lineRect.top) / 2)};
+                    value.lineRect.left + (std::max<int>(0, value.lineRect.right - value.lineRect.left) / 2),
+                    value.lineRect.top + (std::max<int>(0, value.lineRect.bottom - value.lineRect.top) / 2)};
             } else if constexpr (std::is_same_v<T, LayoutEditGapAnchor>) {
                 return RenderPoint{
-                    value.handleRect.left + (std::max<LONG>(0, value.handleRect.right - value.handleRect.left) / 2),
-                    value.handleRect.top + (std::max<LONG>(0, value.handleRect.bottom - value.handleRect.top) / 2)};
+                    value.handleRect.left + (std::max<int>(0, value.handleRect.right - value.handleRect.left) / 2),
+                    value.handleRect.top + (std::max<int>(0, value.handleRect.bottom - value.handleRect.top) / 2)};
             } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide>) {
                 return value.drawEnd;
             } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
                 return value.targetRect.Center();
             } else {
                 return RenderPoint{
-                    value.anchorRect.left + (std::max<LONG>(0, value.anchorRect.right - value.anchorRect.left) / 2),
-                    value.anchorRect.top + (std::max<LONG>(0, value.anchorRect.bottom - value.anchorRect.top) / 2)};
+                    value.anchorRect.left + (std::max<int>(0, value.anchorRect.right - value.anchorRect.left) / 2),
+                    value.anchorRect.top + (std::max<int>(0, value.anchorRect.bottom - value.anchorRect.top) / 2)};
             }
         },
         payload);

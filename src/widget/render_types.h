@@ -1,13 +1,10 @@
 #pragma once
 
 #include <cstdint>
-#include <d2d1.h>
 
 struct RenderPoint {
     int x = 0;
     int y = 0;
-
-    D2D1_POINT_2F ToD2DPoint2F() const;
 };
 
 struct RenderRect {
@@ -27,8 +24,6 @@ struct RenderRect {
     RenderRect Inflate(int dx, int dy) const;
 
     RenderPoint Center() const;
-
-    D2D1_RECT_F ToD2DRectF() const;
 };
 
 enum class RenderColorId {
@@ -68,6 +63,15 @@ struct RenderStroke {
     static RenderStroke Solid(RenderColorId color, float width = 1.0f);
 
     static RenderStroke Dotted(RenderColorId color, float width = 1.0f);
+};
+
+struct RenderRingSegment {
+    int centerX = 0;
+    int centerY = 0;
+    int outerRadius = 0;
+    int thickness = 0;
+    double startAngleDegrees = 0.0;
+    double sweepAngleDegrees = 0.0;
 };
 
 enum class TextStyleId {

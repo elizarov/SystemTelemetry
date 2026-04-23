@@ -1,7 +1,7 @@
 #include "widget/impl/clock_date.h"
 
-#include "dashboard_renderer/dashboard_renderer.h"
 #include "telemetry/metrics.h"
+#include "widget/widget_renderer.h"
 
 DashboardWidgetClass ClockDateWidget::Class() const {
     return DashboardWidgetClass::ClockDate;
@@ -13,7 +13,7 @@ std::unique_ptr<DashboardWidget> ClockDateWidget::Clone() const {
 
 void ClockDateWidget::Initialize(const LayoutNodeConfig&) {}
 
-int ClockDateWidget::PreferredHeight(const DashboardRenderer& renderer) const {
+int ClockDateWidget::PreferredHeight(const WidgetRenderer& renderer) const {
     return renderer.TextMetrics().clockDate;
 }
 
@@ -22,21 +22,21 @@ bool ClockDateWidget::UsesFixedPreferredHeightInRows() const {
 }
 
 void ClockDateWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
-    if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
+    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+    if (renderer.CurrentRenderMode() == WidgetRenderer::RenderMode::Blank) {
         return;
     }
 
     const std::string text = metrics.ResolveClockDate();
-    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
+    const WidgetRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         TextStyleId::ClockDate,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::LayoutEditParameter::FontClockDate,
+            WidgetRenderer::LayoutEditParameter::FontClockDate,
             0,
             renderer.Config().layout.fonts.clockDate.size),
-        DashboardRenderer::LayoutEditParameter::ColorMutedText);
+        WidgetRenderer::LayoutEditParameter::ColorMutedText);
 }

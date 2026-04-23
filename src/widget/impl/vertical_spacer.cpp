@@ -1,6 +1,6 @@
 #include "widget/impl/vertical_spacer.h"
 
-#include "dashboard_renderer/dashboard_renderer.h"
+#include "widget/widget_renderer.h"
 
 DashboardWidgetClass VerticalSpacerWidget::Class() const {
     return DashboardWidgetClass::VerticalSpacer;
@@ -37,7 +37,7 @@ void VerticalSpacerWidget::Initialize(const LayoutNodeConfig& node) {
     referencedWidget_->Initialize(referencedNode);
 }
 
-int VerticalSpacerWidget::PreferredHeight(const DashboardRenderer& renderer) const {
+int VerticalSpacerWidget::PreferredHeight(const WidgetRenderer& renderer) const {
     return referencedWidget_ != nullptr ? referencedWidget_->PreferredHeight(renderer) : 0;
 }
 

@@ -18,6 +18,13 @@ SOURCE_SUFFIXES = {".cpp", ".h"}
 HEADER_SUFFIXES = {".h"}
 INCLUDE_RE = re.compile(r'^\s*#include\s+(?:"([^"]+)"|<([^>]+)>)')
 GRAPHML_NS = "http://graphml.graphdrawing.org/xmlns"
+EXTERNAL_D2D_MODULE = "d2d"
+D2D_INCLUDE_NAMES = {
+    "d2d1.h",
+    "dwrite.h",
+    "wincodec.h",
+    "wrl/client.h",
+}
 
 
 @dataclass
@@ -161,6 +168,10 @@ def collect_include_uses(files: list[Path], source_root: Path, module_by_file: d
             if not match:
                 continue
             include_text = match.group(1) or match.group(2)
+            normalized = normalize_include(include_text).lower()
+            if normalized in D2D_INCLUDE_NAMES:
+                uses.append(IncludeUse(source=source_module, target=EXTERNAL_D2D_MODULE, kind=kind))
+                continue
             target_module = resolve_include(path, include_text, source_root, module_by_file)
             if target_module is None or target_module == source_module:
                 continue
@@ -272,12 +283,55 @@ def check_telemetry_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     return violations
 
 
+def check_widget_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    allowed_targets = {"widget", "telemetry", "config", "util"}
+    for source, target in sorted(edges):
+        if top_level_package(source) != "widget":
+            continue
+        if top_level_package(target) in allowed_targets:
+            continue
+        violations.append(
+            Violation(
+                kind="layer-widget",
+                source=source,
+                target=target,
+                message=(
+                    f"{source} is in the widget layer and must depend only on widget, telemetry, config, or util "
+                    f"modules, not project module {target}."
+                ),
+            )
+        )
+    return violations
+
+
+def check_d2d_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    lower_layers = {"util", "config", "telemetry", "widget"}
+    for source, target in sorted(edges):
+        if target != EXTERNAL_D2D_MODULE:
+            continue
+        if top_level_package(source) not in lower_layers:
+            continue
+        violations.append(
+            Violation(
+                kind="layer-d2d",
+                source=source,
+                target=target,
+                message=f"{source} is in a lower core layer and must not depend on Direct2D/WRL module {target}.",
+            )
+        )
+    return violations
+
+
 def check_graph_rules(edges: dict[tuple[str, str], str]) -> list[Violation]:
     return [
         *check_package_encapsulation(edges),
         *check_util_layer(edges),
         *check_config_layer(edges),
         *check_telemetry_layer(edges),
+        *check_widget_layer(edges),
+        *check_d2d_layer(edges),
     ]
 
 
@@ -541,6 +595,8 @@ def main() -> int:
     modules, module_by_file = collect_modules(files, SOURCE_ROOT)
     uses = collect_include_uses(files, SOURCE_ROOT, module_by_file)
     edges = merge_edges(uses)
+    if any(target == EXTERNAL_D2D_MODULE for _, target in edges):
+        modules.setdefault(EXTERNAL_D2D_MODULE, Module(name=EXTERNAL_D2D_MODULE, directory="external"))
     graphml_output = args.graphml_output or args.output.with_suffix(".graphml")
     svg_output = args.svg_output or args.output.with_suffix(".svg")
     write_dot(modules, edges, args.output)

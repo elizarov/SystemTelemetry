@@ -10,10 +10,10 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/display/` contains monitor enumeration, DPI scaling, placement, configure-display, wallpaper application helpers, and display-owned constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, elevation handoff, and main-process constants.
-- `src/widget/widget.*` owns the widget interface and factory, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
+- `src/widget/widget.*` owns the widget interface and factory, `src/widget/widget_renderer.h` owns the D2D-free widget-facing renderer boundary, `src/widget/render_types.*` owns shared render-space contract types, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string trimming, splitting, case folding, whitespace normalization, enum string conversion, UTF-8 conversion, embedded resource loading, localization catalog access, numeric safety, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
-- `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, `src/dashboard_renderer/render_types.*` owns shared render-space contract types, and `src/dashboard_renderer/impl/` contains helper modules such as palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
+- `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, implements `WidgetRenderer`, and keeps Direct2D, DirectWrite, WIC, and WRL details private to the renderer package. `src/dashboard_renderer/impl/` contains helper modules such as render-to-D2D conversions, palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
 - `src/layout_edit/` contains shared layout-edit interaction, parameter, tooltip, tree, trace-session, and snap-solver modules.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
 - `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
@@ -23,15 +23,16 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ## Layered Core
 
-- The core project layers are ordered `util` -> `config` -> `telemetry` -> application-facing packages such as dashboard, renderer, widget, diagnostics, display, layout-edit, and main.
+- The core project layers are ordered `util` -> `config` -> `telemetry` -> `widget` -> application-facing packages such as dashboard, renderer, diagnostics, display, layout-edit, and main.
 - Dependencies flow downward only. A higher layer may include lower-layer contracts, but a lower layer must not include or call into a higher layer.
 - `src/util/` is the base layer. It contains domain-neutral helpers for text, paths, resources, enum strings, UTF-8 conversion, localization catalog access, numeric safety, and trace emission. Util modules may depend on other util modules, but must not depend on config, telemetry, rendering, UI, diagnostics, or application packages.
 - `src/config/` is the second layer. It owns the persisted config model, parser, writer, resolver, schema metadata, and config-facing contract types such as widget class, metric display style, and telemetry settings DTOs. Config modules may depend only on config and util modules.
 - Config must not duplicate runtime catalogs or reach upward to validate runtime concepts. When config parsing needs runtime knowledge, it uses config-owned injection contracts such as `ConfigMetricCatalog`; production code supplies the telemetry-backed implementation from above.
 - `src/telemetry/` is the third layer. It owns live collection, fake collection, snapshot and dump-facing telemetry types, provider bridges, retained history, and the single production metric catalog. Telemetry modules may depend on telemetry, config, and util modules, but must not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main modules.
 - Telemetry is allowed to consume config contracts such as telemetry settings and metric display style, and it publishes runtime contracts such as `TelemetryCollector`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
+- `src/widget/` is the fourth layer. It owns widget contracts, widget-local layout and drawing behavior, render-space DTOs, widget-facing layout-edit DTOs, and the D2D-free `WidgetRenderer` interface. Widget modules may depend on widget, telemetry, config, and util modules, but must not depend on renderer, dashboard, diagnostics, display, layout-edit, main, Direct2D, DirectWrite, WIC, or WRL modules.
 - Cross-layer shared types belong in the lowest layer that semantically owns them. Move config-language DTOs to config, runtime telemetry DTOs to telemetry, and domain-neutral helpers to util; do not copy catalogs or enums across layers to avoid a dependency violation.
-- `lint.cmd` enforces the util, config, and telemetry layer rules through the source dependency graph before reporting success.
+- `lint.cmd` enforces the util, config, telemetry, widget, and lower-layer D2D rules through the source dependency graph before reporting success.
 
 ## Major Subsystems
 
@@ -61,7 +62,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Rendering and layout resolution
 
 - `DashboardRenderer` owns static layout resolution, renderer resource lifetime, icon loading, text measurement, live window rendering, and screenshot export rendering.
-- Shared render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
+- Shared widget-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
+- `WidgetRenderer` is the renderer-neutral interface consumed by widgets; `DashboardRenderer` implements it and translates widget draw requests into Direct2D internally.
 - Widget draw modules refer to colors by render color id; `DashboardRenderer` keeps the resolved RGBA palette private and maps ids to colors internally.
 - Widget modules own widget-local preferred-size logic, draw behavior, and layout-edit artifact registration.
 - `MetricSource` adapts `SystemSnapshot` into widget-facing values, histories, drive rows, and formatted text while caching per-frame derived results.
@@ -135,6 +137,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `lint.cmd` writes the maintained DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
 - Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
 - Graph generation counts physical source lines in each non-vendored `.h` and `.cpp` file, annotates each node with header, implementation, and total LOC, and prints LOC totals for each top-level `src` package plus an overall total.
+- The graph includes a synthetic `d2d` package for Direct2D, DirectWrite, WIC, and WRL includes so lower core layers can reject accidental graphics-stack coupling.
 - DOT clusters group nodes by their containing source directory, and the optional SVG graph is rendered from the DOT graph with Graphviz `dot` when `tools\source_dependency_graph.py` runs without `--skip-svg`.
 - GraphML nodes include `label`, `directory`, `header_loc`, `cpp_loc`, `total_loc`, and `loc_annotation` data, and GraphML edges include `label` and `kind` data.
 - A dependency from an including module to an included module is `public` when it appears in a header and `private` when it appears only in an implementation file.
@@ -142,3 +145,4 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/util/` is the base layer, so util modules may depend on other util modules but must not depend on non-util project modules.
 - `src/config/` is the second layer, so config modules may depend on other config modules and util modules but must not depend on non-config, non-util project modules.
 - `src/telemetry/` is the third layer, so telemetry modules may depend on telemetry, config, and util modules but must not depend on higher-level project modules.
+- `src/widget/` is the fourth layer, so widget modules may depend on widget, telemetry, config, and util modules but must not depend on higher-level project modules or the synthetic `d2d` package.

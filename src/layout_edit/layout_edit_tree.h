@@ -7,7 +7,7 @@
 
 #include "config/config.h"
 #include "config/config_schema.h"
-#include "layout_edit/layout_edit_types.h"
+#include "widget/layout_edit_types.h"
 
 enum class LayoutEditTreeNodeKind {
     Section,

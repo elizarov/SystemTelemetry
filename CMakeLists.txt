@@ -90,7 +90,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_dialog/impl/util.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_trace_session.cpp
-    src/layout_edit/layout_edit_types.cpp
+    src/widget/layout_edit_types.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit/layout_edit_parameter.cpp
     src/layout_edit/layout_edit_tooltip.cpp
@@ -124,8 +124,9 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/board/board_vendor.cpp
     src/telemetry/metrics.cpp
     src/dashboard/dashboard_overlay_state.cpp
-    src/dashboard_renderer/render_types.cpp
+    src/widget/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
+    src/dashboard_renderer/impl/d2d_render_conversions.cpp
     src/dashboard_renderer/impl/palette.cpp
     src/dashboard_renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
@@ -278,7 +279,7 @@ add_executable(SystemTelemetryTests
     src/config/config_parser.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
-    src/layout_edit/layout_edit_types.cpp
+    src/widget/layout_edit_types.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit/layout_edit_parameter.cpp
     src/layout_edit/layout_edit_tooltip.cpp
@@ -289,7 +290,7 @@ add_executable(SystemTelemetryTests
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/metrics.cpp
-    src/dashboard_renderer/render_types.cpp
+    src/widget/render_types.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/impl/retained_history.cpp
     src/util/utf8.cpp
@@ -357,7 +358,7 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
-    src/layout_edit/layout_edit_types.cpp
+    src/widget/layout_edit_types.cpp
     src/layout_edit/layout_edit_parameter.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit/layout_edit_controller.cpp
@@ -367,8 +368,9 @@ add_executable(SystemTelemetryBenchmarks
     src/util/numeric_safety.cpp
     src/telemetry/metrics.cpp
     src/dashboard/dashboard_overlay_state.cpp
-    src/dashboard_renderer/render_types.cpp
+    src/widget/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
+    src/dashboard_renderer/impl/d2d_render_conversions.cpp
     src/dashboard_renderer/impl/palette.cpp
     src/dashboard_renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "dashboard_renderer/impl/d2d_render_conversions.h"
+
 size_t DashboardD2DCache::PanelIconCacheKeyHash::operator()(const PanelIconCacheKey& key) const {
     size_t hash = std::hash<std::string>{}(key.name);
     hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
@@ -94,11 +96,6 @@ void DashboardD2DCache::DrawPanelIcon(IWICImagingFactory* wicFactory,
         scaled = panelIconBitmaps_.emplace(cacheKey, std::move(bitmap)).first;
     }
 
-    target->DrawBitmap(scaled->second.Get(),
-        D2D1::RectF(static_cast<float>(iconRect.left),
-            static_cast<float>(iconRect.top),
-            static_cast<float>(iconRect.right),
-            static_cast<float>(iconRect.bottom)),
-        1.0f,
-        D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    target->DrawBitmap(
+        scaled->second.Get(), D2DRectFromRenderRect(iconRect), 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 }

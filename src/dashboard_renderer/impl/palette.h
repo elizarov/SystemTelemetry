@@ -5,7 +5,7 @@
 #include <d2d1.h>
 
 #include "config/config.h"
-#include "dashboard_renderer/render_types.h"
+#include "widget/render_types.h"
 
 struct RenderColor {
     std::uint8_t r = 0;

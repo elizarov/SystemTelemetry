@@ -19,6 +19,7 @@
 #include <wincodec.h>
 
 #include "dashboard_renderer/impl/d2d_cache.h"
+#include "dashboard_renderer/impl/d2d_render_conversions.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
 #include "dashboard_renderer/impl/palette.h"
 #include "dashboard_renderer/impl/text_width_cache.h"
@@ -619,8 +620,12 @@ DashboardRenderer::TextLayoutResult DashboardRenderer::DrawTextBlock(const Rende
         return result;
     }
     const D2D1_DRAW_TEXT_OPTIONS drawOptions = options.clip ? D2D1_DRAW_TEXT_OPTIONS_CLIP : D2D1_DRAW_TEXT_OPTIONS_NONE;
-    d2dActiveRenderTarget_->DrawText(
-        wideText.c_str(), static_cast<UINT32>(wideText.size()), textFormat, rect.ToD2DRectF(), brush, drawOptions);
+    d2dActiveRenderTarget_->DrawText(wideText.c_str(),
+        static_cast<UINT32>(wideText.size()),
+        textFormat,
+        D2DRectFromRenderRect(rect),
+        brush,
+        drawOptions);
     return result;
 }
 
@@ -643,8 +648,12 @@ void DashboardRenderer::DrawText(const RenderRect& rect,
         return;
     }
     const D2D1_DRAW_TEXT_OPTIONS drawOptions = options.clip ? D2D1_DRAW_TEXT_OPTIONS_CLIP : D2D1_DRAW_TEXT_OPTIONS_NONE;
-    d2dActiveRenderTarget_->DrawText(
-        wideText.c_str(), static_cast<UINT32>(wideText.size()), textFormat, rect.ToD2DRectF(), brush, drawOptions);
+    d2dActiveRenderTarget_->DrawText(wideText.c_str(),
+        static_cast<UINT32>(wideText.size()),
+        textFormat,
+        D2DRectFromRenderRect(rect),
+        brush,
+        drawOptions);
 }
 
 void DashboardRenderer::DrawHoveredWidgetHighlight(const DashboardOverlayState& overlayState) const {
@@ -1805,8 +1814,8 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
 
     ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(RenderColorId::Background);
     ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(RenderColorId::Accent);
-    const D2D1_ROUNDED_RECT roundedRect =
-        D2D1::RoundedRect(overlayRect.ToD2DRectF(), static_cast<float>(cornerRadius), static_cast<float>(cornerRadius));
+    const D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(
+        D2DRectFromRenderRect(overlayRect), static_cast<float>(cornerRadius), static_cast<float>(cornerRadius));
     if (fillBrush != nullptr) {
         d2dActiveRenderTarget_->FillRoundedRectangle(roundedRect, fillBrush);
     }
@@ -1850,12 +1859,7 @@ void DashboardRenderer::DrawPanel(size_t cardIndex) {
     }
     const auto& card = layoutResolver_->resolvedLayout_.cards[cardIndex];
     const float radius = static_cast<float>(std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius)));
-    const D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(D2D1::RectF(static_cast<float>(card.rect.left),
-                                                                static_cast<float>(card.rect.top),
-                                                                static_cast<float>(card.rect.right),
-                                                                static_cast<float>(card.rect.bottom)),
-        radius,
-        radius);
+    const D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(D2DRectFromRenderRect(card.rect), radius, radius);
     ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(RenderColorId::PanelFill);
     ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(RenderColorId::PanelBorder);
     if (fillBrush != nullptr) {
@@ -1904,13 +1908,7 @@ std::optional<RenderRect> DashboardRenderer::DrawPillBar(
         } else {
             const float radius = static_cast<float>(capsuleHeight) / 2.0f;
             d2dActiveRenderTarget_->FillRoundedRectangle(
-                D2D1::RoundedRect(D2D1::RectF(static_cast<float>(capsuleRect.left),
-                                      static_cast<float>(capsuleRect.top),
-                                      static_cast<float>(capsuleRect.right),
-                                      static_cast<float>(capsuleRect.bottom)),
-                    radius,
-                    radius),
-                brush);
+                D2D1::RoundedRect(D2DRectFromRenderRect(capsuleRect), radius, radius), brush);
         }
     };
 
@@ -2812,7 +2810,7 @@ ID2D1SolidColorBrush* DashboardRenderer::D2DSolidBrush(RenderColorId colorId) {
 
 void DashboardRenderer::PushClipRect(const RenderRect& rect) {
     if (IsDrawActive()) {
-        d2dActiveRenderTarget_->PushAxisAlignedClip(rect.ToD2DRectF(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        d2dActiveRenderTarget_->PushAxisAlignedClip(D2DRectFromRenderRect(rect), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
         ++d2dClipDepth_;
     }
 }
@@ -2832,7 +2830,7 @@ bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColorId colo
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->FillRectangle(rect.ToD2DRectF(), brush);
+    d2dActiveRenderTarget_->FillRectangle(D2DRectFromRenderRect(rect), brush);
     return true;
 }
 
@@ -2845,7 +2843,7 @@ bool DashboardRenderer::FillSolidEllipse(RenderPoint center, int diameter, Rende
         return false;
     }
     const float radius = static_cast<float>(diameter) / 2.0f;
-    d2dActiveRenderTarget_->FillEllipse(D2D1::Ellipse(center.ToD2DPoint2F(), radius, radius), brush);
+    d2dActiveRenderTarget_->FillEllipse(D2D1::Ellipse(D2DPointFromRenderPoint(center), radius, radius), brush);
     return true;
 }
 
@@ -2886,7 +2884,7 @@ bool DashboardRenderer::DrawSolidRect(const RenderRect& rect, const RenderStroke
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawRectangle(rect.ToD2DRectF(),
+    d2dActiveRenderTarget_->DrawRectangle(D2DRectFromRenderRect(rect),
         brush,
         (std::max)(1.0f, stroke.width),
         stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
@@ -2903,7 +2901,7 @@ bool DashboardRenderer::DrawSolidEllipse(const RenderRect& rect, const RenderStr
     }
     const float radiusX = static_cast<float>((std::max)(1, rect.Width())) / 2.0f;
     const float radiusY = static_cast<float>((std::max)(1, rect.Height())) / 2.0f;
-    d2dActiveRenderTarget_->DrawEllipse(D2D1::Ellipse(rect.Center().ToD2DPoint2F(), radiusX, radiusY),
+    d2dActiveRenderTarget_->DrawEllipse(D2D1::Ellipse(D2DPointFromRenderPoint(rect.Center()), radiusX, radiusY),
         brush,
         (std::max)(1.0f, stroke.width),
         d2dSolidStrokeStyle_.Get());
@@ -2918,8 +2916,8 @@ bool DashboardRenderer::DrawSolidLine(RenderPoint start, RenderPoint end, const 
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawLine(start.ToD2DPoint2F(),
-        end.ToD2DPoint2F(),
+    d2dActiveRenderTarget_->DrawLine(D2DPointFromRenderPoint(start),
+        D2DPointFromRenderPoint(end),
         brush,
         (std::max)(1.0f, stroke.width),
         stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
@@ -2966,7 +2964,40 @@ bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId c
     return true;
 }
 
-bool DashboardRenderer::DrawD2DPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) {
+Microsoft::WRL::ComPtr<ID2D1PathGeometry> DashboardRenderer::BuildRingSegmentPath(
+    const RenderRingSegment& segment) const {
+    return CreateD2DRingSegmentPath(d2dFactory_.Get(), segment);
+}
+
+bool DashboardRenderer::FillRingSegments(std::span<const RenderRingSegment> segments, RenderColorId color) {
+    if (!IsDrawActive() || segments.empty()) {
+        return false;
+    }
+
+    std::vector<Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries;
+    geometries.reserve(segments.size());
+    for (const RenderRingSegment& segment : segments) {
+        Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = BuildRingSegmentPath(segment);
+        if (geometry != nullptr) {
+            geometries.push_back(std::move(geometry));
+        }
+    }
+    if (geometries.empty()) {
+        return false;
+    }
+    if (geometries.size() == 1) {
+        return FillD2DGeometry(geometries.front().Get(), color);
+    }
+    Microsoft::WRL::ComPtr<ID2D1GeometryGroup> group = CreateD2DGeometryGroup(geometries, geometries.size());
+    return FillD2DGeometry(group.Get(), color);
+}
+
+std::optional<RenderRect> DashboardRenderer::RingSegmentBounds(const RenderRingSegment& segment) const {
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = BuildRingSegmentPath(segment);
+    return RenderRectFromD2DGeometryBounds(geometry.Get());
+}
+
+bool DashboardRenderer::DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) {
     if (!IsDrawActive() || points.size() < 2) {
         return false;
     }
@@ -2978,9 +3009,9 @@ bool DashboardRenderer::DrawD2DPolyline(std::span<const RenderPoint> points, con
     if (FAILED(geometry->Open(sink.GetAddressOf())) || sink == nullptr) {
         return false;
     }
-    sink->BeginFigure(points.front().ToD2DPoint2F(), D2D1_FIGURE_BEGIN_HOLLOW);
+    sink->BeginFigure(D2DPointFromRenderPoint(points.front()), D2D1_FIGURE_BEGIN_HOLLOW);
     for (size_t i = 1; i < points.size(); ++i) {
-        sink->AddLine(points[i].ToD2DPoint2F());
+        sink->AddLine(D2DPointFromRenderPoint(points[i]));
     }
     sink->EndFigure(D2D1_FIGURE_END_OPEN);
     if (FAILED(sink->Close())) {

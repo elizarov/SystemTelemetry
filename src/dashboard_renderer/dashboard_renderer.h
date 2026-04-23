@@ -20,42 +20,22 @@
 
 #include "config/config.h"
 #include "dashboard/dashboard_overlay_state.h"
-#include "dashboard_renderer/render_types.h"
-#include "layout_edit/layout_edit_parameter_id.h"
-#include "layout_edit/layout_edit_types.h"
 #include "telemetry/metrics.h"
 #include "util/trace.h"
 #include "widget/widget.h"
+#include "widget/widget_renderer.h"
 
 class DashboardLayoutResolver;
 class DashboardD2DCache;
 class DashboardPalette;
 class DashboardTextWidthCache;
 
-class DashboardRenderer {
+class DashboardRenderer : public WidgetRenderer {
 public:
+    using RenderMode = WidgetRenderer::RenderMode;
+    using TextLayoutResult = WidgetRenderer::TextLayoutResult;
+    using TextStyleMetrics = WidgetRenderer::TextStyleMetrics;
     using LayoutEditParameter = ::LayoutEditParameter;
-
-    enum class RenderMode {
-        Normal,
-        Blank,
-    };
-
-    struct TextStyleMetrics {
-        int title = 0;
-        int big = 0;
-        int value = 0;
-        int label = 0;
-        int text = 0;
-        int smallText = 0;
-        int footer = 0;
-        int clockTime = 0;
-        int clockDate = 0;
-    };
-
-    struct TextLayoutResult {
-        RenderRect textRect{};
-    };
 
     explicit DashboardRenderer(Trace& trace);
     ~DashboardRenderer();
@@ -79,8 +59,8 @@ public:
     std::optional<LayoutEditWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
     bool ApplyLayoutGuideWeightsPreview(
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
-    const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const;
-    const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const;
+    const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const override;
+    const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const override;
     std::optional<LayoutEditWidgetIdentity> HitTestLayoutCard(RenderPoint clientPoint) const;
     std::optional<LayoutEditWidgetIdentity> HitTestEditableCard(RenderPoint clientPoint) const;
     std::optional<LayoutEditWidgetIdentity> HitTestEditableWidget(RenderPoint clientPoint) const;
@@ -103,40 +83,40 @@ public:
     bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DiscardWindowRenderTarget(std::string_view reason = {});
     const std::string& LastError() const;
-    const AppConfig& Config() const;
-    const TextStyleMetrics& TextMetrics() const;
-    RenderMode CurrentRenderMode() const;
-    TextLayoutResult MeasureTextBlock(
-        const RenderRect& rect, const std::string& text, TextStyleId style, const TextLayoutOptions& options) const;
+    const AppConfig& Config() const override;
+    const TextStyleMetrics& TextMetrics() const override;
+    RenderMode CurrentRenderMode() const override;
+    TextLayoutResult MeasureTextBlock(const RenderRect& rect,
+        const std::string& text,
+        TextStyleId style,
+        const TextLayoutOptions& options) const override;
     void DrawText(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         RenderColorId color,
-        const TextLayoutOptions& options) const;
+        const TextLayoutOptions& options) const override;
     TextLayoutResult DrawTextBlock(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         RenderColorId color,
-        const TextLayoutOptions& options);
+        const TextLayoutOptions& options) override;
     std::optional<RenderRect> DrawPillBar(
-        const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true);
-    void PushClipRect(const RenderRect& rect);
-    void PopClipRect();
-    bool FillSolidRect(const RenderRect& rect, RenderColorId color);
-    bool FillSolidEllipse(RenderPoint center, int diameter, RenderColorId color);
-    bool FillSolidDiamond(const RenderRect& rect, RenderColorId color);
-    bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke);
-    bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke);
-    bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke);
-    Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DPathGeometry() const;
-    Microsoft::WRL::ComPtr<ID2D1GeometryGroup> CreateD2DGeometryGroup(
-        std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
-    bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId color);
-    bool DrawD2DPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke);
+        const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true) override;
+    void PushClipRect(const RenderRect& rect) override;
+    void PopClipRect() override;
+    bool FillSolidRect(const RenderRect& rect, RenderColorId color) override;
+    bool FillSolidEllipse(RenderPoint center, int diameter, RenderColorId color) override;
+    bool FillSolidDiamond(const RenderRect& rect, RenderColorId color) override;
+    bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) override;
+    bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) override;
+    bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) override;
+    bool DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) override;
+    bool FillRingSegments(std::span<const RenderRingSegment> segments, RenderColorId color) override;
+    std::optional<RenderRect> RingSegmentBounds(const RenderRingSegment& segment) const override;
     LayoutEditAnchorBinding MakeEditableTextBinding(
-        const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const;
+        const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const override;
     LayoutEditAnchorBinding MakeMetricTextBinding(
-        const DashboardWidgetLayout& widget, std::string_view metricId, int anchorId) const;
+        const DashboardWidgetLayout& widget, std::string_view metricId, int anchorId) const override;
     void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,
@@ -148,7 +128,7 @@ public:
         bool draggable,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
-        int value);
+        int value) override;
     void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,
@@ -160,28 +140,28 @@ public:
         bool draggable,
         bool showWhenWidgetHovered,
         bool drawTargetOutline,
-        int value);
+        int value) override;
     void RegisterStaticTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt);
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt) override;
     void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt);
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt) override;
     void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt);
-    void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect);
-    void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect);
-    std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable();
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt) override;
+    void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
+    void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
+    std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable() override;
     std::vector<LayoutEditGapAnchor>& GapEditAnchorsMutable();
-    int ScaleLogical(int value) const;
-    int MeasureTextWidth(TextStyleId style, std::string_view text) const;
+    int ScaleLogical(int value) const override;
+    int MeasureTextWidth(TextStyleId style, std::string_view text) const override;
 
 private:
     friend class DashboardLayoutResolver;
@@ -248,6 +228,11 @@ private:
         TextStyleId style,
         const TextLayoutOptions& options,
         Microsoft::WRL::ComPtr<IDWriteTextLayout>* layout = nullptr) const;
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DPathGeometry() const;
+    Microsoft::WRL::ComPtr<ID2D1GeometryGroup> CreateD2DGeometryGroup(
+        std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
+    bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId color);
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> BuildRingSegmentPath(const RenderRingSegment& segment) const;
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,

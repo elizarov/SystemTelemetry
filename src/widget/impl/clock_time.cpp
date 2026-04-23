@@ -1,7 +1,7 @@
 #include "widget/impl/clock_time.h"
 
-#include "dashboard_renderer/dashboard_renderer.h"
 #include "telemetry/metrics.h"
+#include "widget/widget_renderer.h"
 
 DashboardWidgetClass ClockTimeWidget::Class() const {
     return DashboardWidgetClass::ClockTime;
@@ -13,7 +13,7 @@ std::unique_ptr<DashboardWidget> ClockTimeWidget::Clone() const {
 
 void ClockTimeWidget::Initialize(const LayoutNodeConfig&) {}
 
-int ClockTimeWidget::PreferredHeight(const DashboardRenderer& renderer) const {
+int ClockTimeWidget::PreferredHeight(const WidgetRenderer& renderer) const {
     return renderer.TextMetrics().clockTime;
 }
 
@@ -22,21 +22,21 @@ bool ClockTimeWidget::UsesFixedPreferredHeightInRows() const {
 }
 
 void ClockTimeWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
-    if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
+    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+    if (renderer.CurrentRenderMode() == WidgetRenderer::RenderMode::Blank) {
         return;
     }
 
     const std::string text = metrics.ResolveClockTime();
-    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
+    const WidgetRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         TextStyleId::ClockTime,
         RenderColorId::Foreground,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(widget,
-            DashboardRenderer::LayoutEditParameter::FontClockTime,
+            WidgetRenderer::LayoutEditParameter::FontClockTime,
             0,
             renderer.Config().layout.fonts.clockTime.size),
-        DashboardRenderer::LayoutEditParameter::ColorForeground);
+        WidgetRenderer::LayoutEditParameter::ColorForeground);
 }

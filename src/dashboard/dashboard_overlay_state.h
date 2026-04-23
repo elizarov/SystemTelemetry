@@ -3,8 +3,8 @@
 #include <optional>
 #include <string>
 
-#include "dashboard_renderer/render_types.h"
-#include "layout_edit/layout_edit_types.h"
+#include "widget/layout_edit_types.h"
+#include "widget/render_types.h"
 
 struct DashboardMoveOverlayState {
     bool visible = false;

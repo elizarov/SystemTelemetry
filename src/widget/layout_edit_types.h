@@ -5,9 +5,9 @@
 #include <variant>
 #include <vector>
 
-#include "dashboard_renderer/render_types.h"
-#include "layout_edit/layout_edit_parameter.h"
-#include "widget/widget.h"
+#include "config/widget_class.h"
+#include "widget/layout_edit_parameter_id.h"
+#include "widget/render_types.h"
 
 enum class LayoutGuideAxis {
     Horizontal,
@@ -231,7 +231,6 @@ std::optional<LayoutEditParameter> LayoutEditAnchorParameter(const LayoutEditAnc
 std::optional<LayoutMetricEditKey> LayoutEditAnchorMetricKey(const LayoutEditAnchorKey& key);
 std::optional<LayoutCardTitleEditKey> LayoutEditAnchorCardTitleKey(const LayoutEditAnchorKey& key);
 std::optional<LayoutMetricListOrderEditKey> LayoutEditAnchorMetricListOrderKey(const LayoutEditAnchorKey& key);
-int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key);
 bool IsLayoutGuidePayload(const TooltipPayload& payload);
 std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload& payload);
 std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload);

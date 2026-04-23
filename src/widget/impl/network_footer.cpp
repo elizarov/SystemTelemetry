@@ -1,7 +1,7 @@
 #include "widget/impl/network_footer.h"
 
-#include "dashboard_renderer/dashboard_renderer.h"
 #include "telemetry/metrics.h"
+#include "widget/widget_renderer.h"
 
 DashboardWidgetClass NetworkFooterWidget::Class() const {
     return DashboardWidgetClass::NetworkFooter;
@@ -13,7 +13,7 @@ std::unique_ptr<DashboardWidget> NetworkFooterWidget::Clone() const {
 
 void NetworkFooterWidget::Initialize(const LayoutNodeConfig&) {}
 
-int NetworkFooterWidget::PreferredHeight(const DashboardRenderer& renderer) const {
+int NetworkFooterWidget::PreferredHeight(const WidgetRenderer& renderer) const {
     return renderer.TextMetrics().footer +
            (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
 }
@@ -22,14 +22,14 @@ bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void NetworkFooterWidget::BuildEditGuides(DashboardRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void NetworkFooterWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     const int y = widget.rect.top + renderer.TextMetrics().footer;
 
     LayoutEditWidgetGuide guide;
     guide.axis = LayoutGuideAxis::Horizontal;
     guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = DashboardRenderer::LayoutEditParameter::NetworkFooterBottomGap;
+    guide.parameter = WidgetRenderer::LayoutEditParameter::NetworkFooterBottomGap;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
     guide.drawStart = RenderPoint{widget.rect.left, y};
@@ -41,19 +41,19 @@ void NetworkFooterWidget::BuildEditGuides(DashboardRenderer& renderer, const Das
 }
 
 void NetworkFooterWidget::Draw(
-    DashboardRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
-    if (renderer.CurrentRenderMode() == DashboardRenderer::RenderMode::Blank) {
+    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+    if (renderer.CurrentRenderMode() == WidgetRenderer::RenderMode::Blank) {
         return;
     }
 
     const std::string text = metrics.ResolveNetworkFooter();
-    const DashboardRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
+    const WidgetRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,
         TextStyleId::Footer,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(
-            widget, DashboardRenderer::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size),
-        DashboardRenderer::LayoutEditParameter::ColorMutedText);
+            widget, WidgetRenderer::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size),
+        WidgetRenderer::LayoutEditParameter::ColorMutedText);
 }
