@@ -10,7 +10,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/display/` contains monitor enumeration, DPI scaling, placement, configure-display, wallpaper application helpers, and display-owned constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, elevation handoff, and main-process constants.
-- `src/widget/widget.*` owns the widget interface and factory, `src/widget/widget_renderer.h` owns the D2D-free widget-facing renderer boundary, `src/widget/render_types.*` owns shared render-space contract types, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
+- `src/widget/widget.*` owns the widget interface plus the enum-backed and special widget factories, `src/widget/widget_renderer.h` owns the D2D-free widget-facing renderer boundary, `src/widget/render_types.*` owns shared render-space contract types, `src/widget/card_chrome_layout.*` owns shared card-chrome layout geometry, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string trimming, splitting, case folding, whitespace normalization, enum string conversion, UTF-8 conversion, embedded resource loading, localization catalog access, numeric safety, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
 - `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, implements `WidgetRenderer`, and keeps Direct2D, DirectWrite, WIC, and WRL details private to the renderer package. `src/dashboard_renderer/impl/` contains helper modules such as render-to-D2D conversions, palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
@@ -63,9 +63,9 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `DashboardRenderer` owns static layout resolution, renderer resource lifetime, icon loading, text measurement, live window rendering, and screenshot export rendering.
 - Shared widget-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
-- `WidgetRenderer` is the renderer-neutral interface consumed by widgets; it exposes text operations and primitive render geometry such as rectangles, ellipses, rounded rectangles, lines, arcs, polylines, and filled paths. Widgets own widget-specific spaces and geometry such as gauges and capsule bars, and `DashboardRenderer` translates primitive draw requests into Direct2D internally.
+- `WidgetRenderer` is the renderer-neutral interface consumed by widgets; it exposes text operations, icon drawing, and primitive render geometry such as rectangles, rounded-rectangle fills and outlines, ellipses, lines, arcs, polylines, and filled paths. Widgets own widget-specific spaces and geometry such as card chrome, gauges, and capsule bars, and `DashboardRenderer` translates those neutral draw requests into Direct2D internally.
 - Widget draw modules refer to colors by render color id; `DashboardRenderer` keeps the resolved RGBA palette private and maps ids to colors internally.
-- Widget modules own widget-local preferred-size logic, draw behavior, and layout-edit artifact registration.
+- Widget modules own widget-local preferred-size logic, draw behavior, layout-edit artifact registration, and shared card-chrome geometry used both by layout resolution and by the special card-chrome widget.
 - `MetricSource` adapts `SystemSnapshot` into widget-facing values, histories, drive rows, and formatted text while caching per-frame derived results.
 
 ### Layout editing

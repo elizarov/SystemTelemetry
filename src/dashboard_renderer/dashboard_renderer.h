@@ -102,11 +102,13 @@ public:
         const TextLayoutOptions& options) override;
     void PushClipRect(const RenderRect& rect) override;
     void PopClipRect() override;
+    bool DrawIcon(std::string_view iconName, const RenderRect& rect) override;
     bool FillSolidRect(const RenderRect& rect, RenderColorId color) override;
     bool FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) override;
     bool FillSolidEllipse(const RenderRect& rect, RenderColorId color) override;
     bool FillSolidDiamond(const RenderRect& rect, RenderColorId color) override;
     bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) override;
+    bool DrawSolidRoundedRect(const RenderRect& rect, int radius, const RenderStroke& stroke) override;
     bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) override;
     bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) override;
     bool DrawArc(const RenderArc& arc, const RenderStroke& stroke) override;
@@ -183,8 +185,6 @@ private:
     void DrawDottedHighlightRect(const RenderRect& rect, RenderColorId color, bool active, bool outside = true) const;
     void DrawLayoutSimilarityIndicators(const DashboardOverlayState& overlayState) const;
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
-    void DrawPanel(size_t cardIndex);
-    void DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect);
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
     bool UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
@@ -209,8 +209,8 @@ private:
     bool InitializeWic();
     void ShutdownDirect2D();
     void RebuildPalette();
-    bool LoadPanelIcons();
-    void ReleasePanelIcons();
+    bool LoadIcons();
+    void ReleaseIcons();
     bool RebuildTextFormatsAndMetrics();
     bool EnsureWindowRenderTarget();
     bool BeginDirect2DDraw(ID2D1RenderTarget* target, bool allowDeferredWarmup = true);
@@ -275,7 +275,7 @@ private:
     AppConfig config_;
     HWND hwnd_ = nullptr;
     Trace& trace_;
-    std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>> panelIcons_;
+    std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>> icons_;
     std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
     TextStyleMetrics textStyleMetrics_{};
     std::unique_ptr<DashboardPalette> palette_;

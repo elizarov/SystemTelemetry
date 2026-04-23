@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "config/config.h"
@@ -39,3 +40,4 @@ struct WidgetLayout {
 
 std::unique_ptr<Widget> CreateWidget(WidgetClass widgetClass);
 std::unique_ptr<Widget> CreateWidget(std::string_view name);
+std::unique_ptr<Widget> CreateCardChromeWidget(const LayoutCardConfig& card);

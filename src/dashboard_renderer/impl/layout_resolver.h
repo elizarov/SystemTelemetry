@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "config/config.h"
+#include "widget/card_chrome_layout.h"
 #include "widget/layout_edit_types.h"
 #include "widget/render_types.h"
 #include "widget/widget.h"
@@ -19,12 +20,10 @@ public:
         std::string id;
         std::string title;
         std::string iconName;
-        bool hasHeader = true;
         std::vector<size_t> nodePath;
         RenderRect rect{};
-        RenderRect titleRect{};
-        RenderRect iconRect{};
-        RenderRect contentRect{};
+        CardChromeLayout chromeLayout{};
+        WidgetLayout chrome;
         std::vector<WidgetLayout> widgets;
     };
 

@@ -38,7 +38,7 @@ std::size_t TextStyleSlot(TextStyleId style) {
     return static_cast<std::size_t>(style);
 }
 
-bool SamePanelIconInputs(const std::vector<LayoutCardConfig>& left, const std::vector<LayoutCardConfig>& right) {
+bool SameIconInputs(const std::vector<LayoutCardConfig>& left, const std::vector<LayoutCardConfig>& right) {
     std::set<std::string> leftIcons;
     for (const auto& card : left) {
         if (!card.icon.empty()) {
@@ -258,7 +258,7 @@ RenderRect TextAnchorRectForShape(const DashboardRenderer& renderer, const Rende
         anchorCenterY - anchorHalf + anchorSize};
 }
 
-UINT GetPanelIconResourceId(const std::string& iconName) {
+UINT GetIconResourceId(std::string_view iconName) {
     if (iconName == "cpu")
         return IDR_PANEL_ICON_CPU;
     if (iconName == "gpu")
@@ -430,7 +430,7 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     lastError_.clear();
     const bool paletteChanged = config_.layout.colors != config.layout.colors;
     const bool iconInputsChanged = config_.layout.colors.iconColor != config.layout.colors.iconColor ||
-                                   !SamePanelIconInputs(config_.layout.cards, config.layout.cards);
+                                   !SameIconInputs(config_.layout.cards, config.layout.cards);
     const bool textFormatsChanged = config_.layout.fonts != config.layout.fonts;
     const bool metricsChanged = config_.layout.metrics != config.layout.metrics;
     if (metricsChanged) {
@@ -443,7 +443,7 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
         RebuildPalette();
     }
     if (dwriteFactory_ != nullptr) {
-        const bool iconsReady = !iconInputsChanged || LoadPanelIcons();
+        const bool iconsReady = !iconInputsChanged || LoadIcons();
         const bool textReady = !textFormatsChanged || RebuildTextFormatsAndMetrics();
         if (!iconsReady || !textReady || !ResolveLayout()) {
             lastError_ = lastError_.empty() ? "renderer:reconfigure_failed" : lastError_;
@@ -1847,41 +1847,6 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
         TextLayoutOptions::Wrapped());
 }
 
-void DashboardRenderer::DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect) {
-    d2dCache_->DrawPanelIcon(wicFactory_.Get(), d2dActiveRenderTarget_, panelIcons_, iconName, iconRect);
-}
-
-void DashboardRenderer::DrawPanel(size_t cardIndex) {
-    if (cardIndex >= layoutResolver_->resolvedLayout_.cards.size()) {
-        return;
-    }
-    const auto& card = layoutResolver_->resolvedLayout_.cards[cardIndex];
-    const float radius = static_cast<float>(std::max(1, ScaleLogical(config_.layout.cardStyle.cardRadius)));
-    const D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(D2DRectFromRenderRect(card.rect), radius, radius);
-    ID2D1SolidColorBrush* fillBrush = D2DSolidBrush(RenderColorId::PanelFill);
-    ID2D1SolidColorBrush* borderBrush = D2DSolidBrush(RenderColorId::PanelBorder);
-    if (fillBrush != nullptr) {
-        d2dActiveRenderTarget_->FillRoundedRectangle(roundedRect, fillBrush);
-    }
-    if (borderBrush != nullptr) {
-        d2dActiveRenderTarget_->DrawRoundedRectangle(roundedRect,
-            borderBrush,
-            static_cast<float>(std::max(1, ScaleLogical(config_.layout.cardStyle.cardBorderWidth))));
-    }
-    if (!card.iconName.empty()) {
-        DrawPanelIcon(card.iconName, card.iconRect);
-        RegisterDynamicColorEditRegion(LayoutEditParameter::ColorIcon, card.iconRect);
-    }
-    if (!card.title.empty()) {
-        const TextLayoutResult titleLayout = DrawTextBlock(card.titleRect,
-            card.title,
-            TextStyleId::Title,
-            RenderColorId::Foreground,
-            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
-        RegisterDynamicColorEditRegion(LayoutEditParameter::ColorForeground, titleLayout.textRect);
-    }
-}
-
 void DashboardRenderer::DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics) {
     if (widget.widget == nullptr) {
         return;
@@ -1912,9 +1877,8 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
     const MetricSource& metrics = ResolveMetrics(snapshot);
     d2dActiveRenderTarget_->Clear(palette_->Get(RenderColorId::Background).ToD2DColorF());
-    for (size_t cardIndex = 0; cardIndex < layoutResolver_->resolvedLayout_.cards.size(); ++cardIndex) {
-        DrawPanel(cardIndex);
-        const auto& card = layoutResolver_->resolvedLayout_.cards[cardIndex];
+    for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
+        DrawResolvedWidget(card.chrome, metrics);
         for (const auto& widget : card.widgets) {
             DrawResolvedWidget(widget, metrics);
         }
@@ -2031,8 +1995,9 @@ void DashboardRenderer::WriteScreenshotActiveRegionsTrace(const DashboardOverlay
             const std::string cardPath =
                 ActiveLayoutSectionName(config_) + ".cards/" + FormatNodePath(card.nodePath) + "/card[" + card.id + "]";
             appendRegion(card.rect, "card", cardPath, "card chrome " + card.id);
-            if (card.hasHeader) {
-                appendRegion(card.titleRect, "card-header", cardPath + "/header", "card header " + card.id);
+            if (card.chromeLayout.hasHeader) {
+                appendRegion(
+                    card.chromeLayout.titleRect, "card-header", cardPath + "/header", "card header " + card.id);
             }
             for (const auto& widget : card.widgets) {
                 if (widget.widget == nullptr || !widget.widget->IsHoverable()) {
@@ -2332,7 +2297,7 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestLayoutCard(Ren
 
 std::optional<LayoutEditWidgetIdentity> DashboardRenderer::HitTestEditableCard(RenderPoint clientPoint) const {
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
-        if (!card.rect.Contains(clientPoint) || clientPoint.y > card.contentRect.top) {
+        if (!card.rect.Contains(clientPoint) || clientPoint.y > card.chromeLayout.contentRect.top) {
             continue;
         }
         return LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
@@ -2509,7 +2474,7 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
     hwnd_ = hwnd;
     lastError_.clear();
     RebuildPalette();
-    if (!InitializeDirect2D() || !LoadPanelIcons()) {
+    if (!InitializeDirect2D() || !LoadIcons()) {
         return false;
     }
     if (!RebuildTextFormatsAndMetrics() || !ResolveLayout()) {
@@ -2529,7 +2494,7 @@ void DashboardRenderer::Shutdown() {
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
     d2dFirstDrawWarmupPending_ = false;
     d2dCache_->Clear();
-    ReleasePanelIcons();
+    ReleaseIcons();
     ShutdownDirect2D();
 }
 
@@ -2758,6 +2723,14 @@ void DashboardRenderer::PopClipRect() {
     }
 }
 
+bool DashboardRenderer::DrawIcon(std::string_view iconName, const RenderRect& rect) {
+    if (!IsDrawActive() || iconName.empty() || rect.IsEmpty()) {
+        return false;
+    }
+    d2dCache_->DrawIcon(wicFactory_.Get(), d2dActiveRenderTarget_, icons_, iconName, rect);
+    return true;
+}
+
 bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColorId color) {
     if (!IsDrawActive() || rect.IsEmpty()) {
         return false;
@@ -2840,6 +2813,23 @@ bool DashboardRenderer::DrawSolidRect(const RenderRect& rect, const RenderStroke
         return false;
     }
     d2dActiveRenderTarget_->DrawRectangle(D2DRectFromRenderRect(rect),
+        brush,
+        (std::max)(1.0f, stroke.width),
+        stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
+    return true;
+}
+
+bool DashboardRenderer::DrawSolidRoundedRect(const RenderRect& rect, int radius, const RenderStroke& stroke) {
+    if (!IsDrawActive()) {
+        return false;
+    }
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
+    if (brush == nullptr) {
+        return false;
+    }
+    const float clampedRadius = static_cast<float>(std::max(0, radius));
+    d2dActiveRenderTarget_->DrawRoundedRectangle(
+        D2D1::RoundedRect(D2DRectFromRenderRect(rect), clampedRadius, clampedRadius),
         brush,
         (std::max)(1.0f, stroke.width),
         stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
@@ -3111,8 +3101,8 @@ void DashboardRenderer::RebuildPalette() {
     palette_->Rebuild(config_.layout.colors);
 }
 
-bool DashboardRenderer::LoadPanelIcons() {
-    ReleasePanelIcons();
+bool DashboardRenderer::LoadIcons() {
+    ReleaseIcons();
     if (wicFactory_ == nullptr && !InitializeWic()) {
         return false;
     }
@@ -3123,33 +3113,33 @@ bool DashboardRenderer::LoadPanelIcons() {
         }
     }
     for (const auto& iconName : uniqueIcons) {
-        const UINT resourceId = GetPanelIconResourceId(iconName);
+        const UINT resourceId = GetIconResourceId(iconName);
         if (resourceId == 0) {
             lastError_ = "renderer:icon_unknown name=\"" + iconName + "\"";
-            ReleasePanelIcons();
+            ReleaseIcons();
             return false;
         }
         auto bitmap = LoadPngResourceBitmap(wicFactory_.Get(), resourceId);
         if (bitmap == nullptr) {
             lastError_ = "renderer:icon_load_failed name=\"" + iconName + "\" resource=" + std::to_string(resourceId);
-            ReleasePanelIcons();
+            ReleaseIcons();
             return false;
         }
         auto tintedBitmap =
             TintMonochromeBitmapSource(wicFactory_.Get(), bitmap.Get(), palette_->Get(RenderColorId::Icon));
         if (tintedBitmap == nullptr) {
             lastError_ = "renderer:icon_tint_failed name=\"" + iconName + "\" resource=" + std::to_string(resourceId);
-            ReleasePanelIcons();
+            ReleaseIcons();
             return false;
         }
-        panelIcons_.push_back({iconName, std::move(tintedBitmap)});
+        icons_.push_back({iconName, std::move(tintedBitmap)});
     }
     return true;
 }
 
-void DashboardRenderer::ReleasePanelIcons() {
-    d2dCache_->ClearPanelIconBitmaps();
-    panelIcons_.clear();
+void DashboardRenderer::ReleaseIcons() {
+    d2dCache_->ClearIconBitmaps();
+    icons_.clear();
 }
 
 void DashboardRenderer::WriteTrace(const std::string& text) const {

@@ -4,7 +4,7 @@
 
 #include "dashboard_renderer/impl/d2d_render_conversions.h"
 
-size_t DashboardD2DCache::PanelIconCacheKeyHash::operator()(const PanelIconCacheKey& key) const {
+size_t DashboardD2DCache::IconCacheKeyHash::operator()(const IconCacheKey& key) const {
     size_t hash = std::hash<std::string>{}(key.name);
     hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
     hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
@@ -17,7 +17,7 @@ size_t DashboardD2DCache::BrushCacheKeyHash::operator()(const BrushCacheKey& key
 
 void DashboardD2DCache::Clear() {
     solidBrushes_.clear();
-    panelIconBitmaps_.clear();
+    iconBitmaps_.clear();
 }
 
 void DashboardD2DCache::ResetTarget() {
@@ -33,8 +33,8 @@ void DashboardD2DCache::AttachTarget(ID2D1RenderTarget* target) {
     ownerTarget_ = target;
 }
 
-void DashboardD2DCache::ClearPanelIconBitmaps() {
-    panelIconBitmaps_.clear();
+void DashboardD2DCache::ClearIconBitmaps() {
+    iconBitmaps_.clear();
 }
 
 ID2D1SolidColorBrush* DashboardD2DCache::SolidBrush(ID2D1RenderTarget* target, RenderColor color) {
@@ -53,25 +53,25 @@ ID2D1SolidColorBrush* DashboardD2DCache::SolidBrush(ID2D1RenderTarget* target, R
     return solidBrushes_.emplace(key, std::move(brush)).first->second.Get();
 }
 
-void DashboardD2DCache::DrawPanelIcon(IWICImagingFactory* wicFactory,
+void DashboardD2DCache::DrawIcon(IWICImagingFactory* wicFactory,
     ID2D1RenderTarget* target,
-    const PanelIconSources& panelIcons,
-    const std::string& iconName,
-    const RenderRect& iconRect) {
+    const IconSources& icons,
+    std::string_view iconName,
+    const RenderRect& rect) {
     const auto it =
-        std::find_if(panelIcons.begin(), panelIcons.end(), [&](const auto& entry) { return entry.first == iconName; });
-    if (it == panelIcons.end() || it->second == nullptr || target == nullptr) {
+        std::find_if(icons.begin(), icons.end(), [&](const auto& entry) { return entry.first == iconName; });
+    if (it == icons.end() || it->second == nullptr || target == nullptr) {
         return;
     }
-    const int width = (std::max)(0, iconRect.Width());
-    const int height = (std::max)(0, iconRect.Height());
+    const int width = (std::max)(0, rect.Width());
+    const int height = (std::max)(0, rect.Height());
     if (width <= 0 || height <= 0) {
         return;
     }
 
-    const PanelIconCacheKey cacheKey{iconName, width, height};
-    auto scaled = panelIconBitmaps_.find(cacheKey);
-    if (scaled == panelIconBitmaps_.end()) {
+    const IconCacheKey cacheKey{std::string(iconName), width, height};
+    auto scaled = iconBitmaps_.find(cacheKey);
+    if (scaled == iconBitmaps_.end()) {
         if (wicFactory == nullptr) {
             return;
         }
@@ -93,9 +93,8 @@ void DashboardD2DCache::DrawPanelIcon(IWICImagingFactory* wicFactory,
         if (FAILED(hr) || bitmap == nullptr) {
             return;
         }
-        scaled = panelIconBitmaps_.emplace(cacheKey, std::move(bitmap)).first;
+        scaled = iconBitmaps_.emplace(cacheKey, std::move(bitmap)).first;
     }
 
-    target->DrawBitmap(
-        scaled->second.Get(), D2DRectFromRenderRect(iconRect), 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+    target->DrawBitmap(scaled->second.Get(), D2DRectFromRenderRect(rect), 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 }

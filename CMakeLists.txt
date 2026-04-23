@@ -125,12 +125,14 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/board/board_vendor.cpp
     src/telemetry/metrics.cpp
     src/dashboard/dashboard_overlay_state.cpp
+    src/widget/card_chrome_layout.cpp
     src/widget/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
     src/dashboard_renderer/impl/d2d_render_conversions.cpp
     src/dashboard_renderer/impl/palette.cpp
     src/dashboard_renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
+    src/widget/impl/card_chrome.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
     src/widget/impl/metric_list.cpp
@@ -263,7 +265,9 @@ add_executable(SystemTelemetryTests
     tests/enum_string_tests.cpp
     tests/metrics_tests.cpp
     tests/snapshot_dump_tests.cpp
+    tests/widget_factory_tests.cpp
     tests/widget_class_tests.cpp
+    tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
     tests/layout_edit_types_tests.cpp
@@ -292,6 +296,19 @@ add_executable(SystemTelemetryTests
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/metrics.cpp
+    src/widget/card_chrome_layout.cpp
+    src/widget/widget.cpp
+    src/widget/impl/card_chrome.cpp
+    src/widget/impl/text.cpp
+    src/widget/impl/gauge.cpp
+    src/widget/impl/metric_list.cpp
+    src/widget/impl/throughput.cpp
+    src/widget/impl/network_footer.cpp
+    src/widget/impl/vertical_spacer.cpp
+    src/widget/impl/vertical_spring.cpp
+    src/widget/impl/drive_usage_list.cpp
+    src/widget/impl/clock_time.cpp
+    src/widget/impl/clock_date.cpp
     src/widget/render_types.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/impl/retained_history.cpp
@@ -371,12 +388,14 @@ add_executable(SystemTelemetryBenchmarks
     src/util/numeric_safety.cpp
     src/telemetry/metrics.cpp
     src/dashboard/dashboard_overlay_state.cpp
+    src/widget/card_chrome_layout.cpp
     src/widget/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
     src/dashboard_renderer/impl/d2d_render_conversions.cpp
     src/dashboard_renderer/impl/palette.cpp
     src/dashboard_renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
+    src/widget/impl/card_chrome.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
     src/widget/impl/metric_list.cpp

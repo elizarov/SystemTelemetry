@@ -24,12 +24,6 @@ RenderRect MakeSquareAnchorRect(int centerX, int centerY, int size) {
         centerX - radius, centerY - radius, centerX - radius + clampedSize, centerY - radius + clampedSize};
 }
 
-RenderRect MakeCircleAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
-    const int diameter = (std::max)(4, representedDiameter + extraDiameter);
-    const int radius = diameter / 2;
-    return RenderRect{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
-}
-
 }  // namespace
 
 void DashboardLayoutResolver::Clear() {
@@ -61,73 +55,9 @@ void DashboardLayoutResolver::ResolveNodeWidgets(DashboardRenderer& renderer,
 
 void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer) {
     widgetEditGuides_.clear();
-    const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     for (const auto& card : resolvedLayout_.cards) {
-        const LayoutEditWidgetIdentity cardIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
-        auto addCardGuide = [&](LayoutGuideAxis axis,
-                                int guideId,
-                                DashboardRenderer::LayoutEditParameter parameter,
-                                int value,
-                                int dragDirection,
-                                RenderPoint start,
-                                RenderPoint end) {
-            LayoutEditWidgetGuide guide;
-            guide.axis = axis;
-            guide.widget = cardIdentity;
-            guide.parameter = parameter;
-            guide.guideId = guideId;
-            guide.widgetRect = card.rect;
-            guide.drawStart = start;
-            guide.drawEnd = end;
-            if (axis == LayoutGuideAxis::Vertical) {
-                guide.hitRect = RenderRect{
-                    start.x - hitInset, (std::min)(start.y, end.y), start.x + hitInset + 1, (std::max)(start.y, end.y)};
-            } else {
-                guide.hitRect = RenderRect{
-                    (std::min)(start.x, end.x), start.y - hitInset, (std::max)(start.x, end.x), start.y + hitInset + 1};
-            }
-            guide.value = value;
-            guide.dragDirection = dragDirection;
-            widgetEditGuides_.push_back(std::move(guide));
-        };
-
-        const int contentLeft =
-            std::clamp(card.contentRect.left, static_cast<int>(card.rect.left), static_cast<int>(card.rect.right));
-        const int contentRight = std::clamp(card.contentRect.right, contentLeft, static_cast<int>(card.rect.right));
-        const int paddingY =
-            std::clamp(card.rect.top + renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardPadding),
-                static_cast<int>(card.rect.top),
-                static_cast<int>(card.rect.bottom));
-        addCardGuide(LayoutGuideAxis::Horizontal,
-            0,
-            DashboardRenderer::LayoutEditParameter::CardPadding,
-            renderer.Config().layout.cardStyle.cardPadding,
-            1,
-            RenderPoint{contentLeft, paddingY},
-            RenderPoint{contentRight, paddingY});
-
-        if (!card.iconName.empty() && !card.title.empty()) {
-            const int guideX =
-                std::clamp(card.titleRect.left, static_cast<int>(card.rect.left), static_cast<int>(card.rect.right));
-            addCardGuide(LayoutGuideAxis::Vertical,
-                1,
-                DashboardRenderer::LayoutEditParameter::CardHeaderIconGap,
-                renderer.Config().layout.cardStyle.headerIconGap,
-                1,
-                RenderPoint{guideX, card.titleRect.top},
-                RenderPoint{guideX, card.titleRect.bottom});
-        }
-
-        if (card.hasHeader) {
-            const int guideY =
-                std::clamp(card.contentRect.top, static_cast<int>(card.rect.top), static_cast<int>(card.rect.bottom));
-            addCardGuide(LayoutGuideAxis::Horizontal,
-                2,
-                DashboardRenderer::LayoutEditParameter::CardHeaderContentGap,
-                renderer.Config().layout.cardStyle.headerContentGap,
-                1,
-                RenderPoint{contentLeft, guideY},
-                RenderPoint{contentRight, guideY});
+        if (card.chrome.widget != nullptr) {
+            card.chrome.widget->BuildEditGuides(renderer, card.chrome);
         }
 
         for (const auto& widget : card.widgets) {
@@ -142,91 +72,8 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
     staticEditableAnchorRegions_.clear();
     staticColorEditRegions_.clear();
     for (const auto& card : resolvedLayout_.cards) {
-        const LayoutEditWidgetIdentity cardIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
-        const int squareAnchorSize = (std::max)(4, renderer.ScaleLogical(6));
-        const int radiusLogical = renderer.Config().layout.cardStyle.cardRadius;
-        const int radiusScaled = renderer.ScaleLogical(radiusLogical);
-        renderer.RegisterStaticEditableAnchorRegion(
-            LayoutEditAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardRadius, 0},
-            {},
-            MakeSquareAnchorRect(card.rect.left + radiusScaled, card.rect.top, squareAnchorSize),
-            AnchorShape::Square,
-            AnchorDragAxis::Vertical,
-            AnchorDragMode::AxisDelta,
-            RenderPoint{card.rect.left + radiusScaled, card.rect.top},
-            1.0,
-            true,
-            true,
-            false,
-            radiusLogical);
-
-        const int borderScaled =
-            (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth));
-        const int borderAnchorPadding = (std::max)(1, renderer.ScaleLogical(1));
-        const int borderCenterX = card.rect.left + (std::max)(0, (card.rect.right - card.rect.left) / 2);
-        const int borderCenterY = card.rect.top;
-        renderer.RegisterStaticEditableAnchorRegion(
-            LayoutEditAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardBorder, 0},
-            {},
-            MakeCircleAnchorRect(borderCenterX, borderCenterY, borderScaled, borderAnchorPadding),
-            AnchorShape::Circle,
-            AnchorDragAxis::Both,
-            AnchorDragMode::RadialDistance,
-            RenderPoint{borderCenterX, borderCenterY},
-            2.0,
-            true,
-            true,
-            false,
-            renderer.Config().layout.cardStyle.cardBorderWidth);
-
-        if (!card.iconName.empty()) {
-            const int anchorCenterX = card.iconRect.right;
-            const int anchorCenterY = card.iconRect.top;
-            renderer.RegisterStaticEditableAnchorRegion(
-                LayoutEditAnchorKey{cardIdentity, DashboardRenderer::LayoutEditParameter::CardHeaderIconSize, 0},
-                card.iconRect,
-                MakeSquareAnchorRect(anchorCenterX, anchorCenterY, squareAnchorSize),
-                AnchorShape::Square,
-                AnchorDragAxis::Vertical,
-                AnchorDragMode::AxisDelta,
-                RenderPoint{anchorCenterX, anchorCenterY},
-                1.0,
-                true,
-                false,
-                true,
-                renderer.Config().layout.cardStyle.headerIconSize);
-        }
-
-        if (!card.title.empty()) {
-            renderer.RegisterStaticTextAnchor(card.titleRect,
-                card.title,
-                TextStyleId::Title,
-                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
-                LayoutEditAnchorBinding{
-                    LayoutEditAnchorKey{LayoutEditWidgetIdentity{card.id, card.id, {}},
-                        DashboardRenderer::LayoutEditParameter::FontTitle,
-                        0},
-                    renderer.Config().layout.fonts.title.size,
-                    AnchorShape::Circle,
-                    AnchorDragAxis::Vertical,
-                    AnchorDragMode::AxisDelta,
-                });
-            renderer.RegisterStaticTextAnchor(card.titleRect,
-                card.title,
-                TextStyleId::Title,
-                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
-                LayoutEditAnchorBinding{
-                    LayoutEditAnchorKey{
-                        LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome},
-                        LayoutCardTitleEditKey{card.id},
-                        1,
-                    },
-                    0,
-                    AnchorShape::Wedge,
-                    AnchorDragAxis::Vertical,
-                    AnchorDragMode::AxisDelta,
-                    false,
-                });
+        if (card.chrome.widget != nullptr) {
+            card.chrome.widget->BuildStaticAnchors(renderer, card.chrome);
         }
         for (const auto& widget : card.widgets) {
             if (widget.widget != nullptr) {
@@ -607,63 +454,43 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         gapEditAnchors_.push_back(std::move(anchor));
     }
 
-    const auto resolveCard = [&](const LayoutNodeConfig& node,
-                                 const RenderRect& rect,
-                                 const std::vector<size_t>& nodePath) {
-        const auto cardIt = std::find_if(renderer.config_.layout.cards.begin(),
-            renderer.config_.layout.cards.end(),
-            [&](const auto& card) { return card.id == node.name; });
-        if (cardIt == renderer.config_.layout.cards.end()) {
-            return;
-        }
+    const auto resolveCard =
+        [&](const LayoutNodeConfig& node, const RenderRect& rect, const std::vector<size_t>& nodePath) {
+            const auto cardIt = std::find_if(renderer.config_.layout.cards.begin(),
+                renderer.config_.layout.cards.end(),
+                [&](const auto& card) { return card.id == node.name; });
+            if (cardIt == renderer.config_.layout.cards.end()) {
+                return;
+            }
 
-        DashboardLayoutResolver::ResolvedCardLayout card;
-        card.id = cardIt->id;
-        card.title = cardIt->title;
-        card.iconName = cardIt->icon;
-        card.hasHeader = !card.title.empty() || !card.iconName.empty();
-        card.nodePath = nodePath;
-        card.rect = rect;
+            DashboardLayoutResolver::ResolvedCardLayout card;
+            card.id = cardIt->id;
+            card.title = cardIt->title;
+            card.iconName = cardIt->icon;
+            card.nodePath = nodePath;
+            card.rect = rect;
+            card.chromeLayout = ResolveCardChromeLayout(*cardIt, card.rect, ResolveCardChromeLayoutMetrics(renderer));
+            card.chrome.rect = card.rect;
+            card.chrome.cardId = card.id;
+            card.chrome.editCardId = card.id;
+            card.chrome.widget = includeWidgetState ? CreateCardChromeWidget(*cardIt) : nullptr;
 
-        const int padding = renderer.ScaleLogical(renderer.config_.layout.cardStyle.cardPadding);
-        const int iconSize = renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerIconSize);
-        const int headerHeight = card.hasHeader ? (std::max)(renderer.TextMetrics().title, iconSize) : 0;
-        if (!card.iconName.empty()) {
-            card.iconRect = RenderRect{card.rect.left + padding,
-                card.rect.top + padding + (std::max)(0, (headerHeight - iconSize) / 2),
-                card.rect.left + padding + iconSize,
-                card.rect.top + padding + (std::max)(0, (headerHeight - iconSize) / 2) + iconSize};
-        } else {
-            card.iconRect = RenderRect{
-                card.rect.left + padding, card.rect.top + padding, card.rect.left + padding, card.rect.top + padding};
-        }
-        const int titleLeft =
-            !card.iconName.empty()
-                ? card.iconRect.right + renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerIconGap)
-                : card.rect.left + padding;
-        card.titleRect = RenderRect{
-            titleLeft, card.rect.top + padding, card.rect.right - padding, card.rect.top + padding + headerHeight};
-        card.contentRect = RenderRect{card.rect.left + padding,
-            card.rect.top + padding + headerHeight +
-                (card.hasHeader ? renderer.ScaleLogical(renderer.config_.layout.cardStyle.headerContentGap) : 0),
-            card.rect.right - padding,
-            card.rect.bottom - padding};
-
-        renderer.WriteTrace("renderer:layout_card id=\"" + card.id + "\" " + FormatRect(card.rect) +
-                            " title=" + FormatRect(card.titleRect) + " icon=" + FormatRect(card.iconRect) +
-                            " content=" + FormatRect(card.contentRect));
-        std::vector<std::string> cardReferenceStack;
-        ResolveNodeWidgetsInternal(renderer,
-            cardIt->layout,
-            card.contentRect,
-            card.widgets,
-            cardReferenceStack,
-            card.id,
-            card.id,
-            {},
-            includeWidgetState);
-        resolvedLayout_.cards.push_back(std::move(card));
-    };
+            renderer.WriteTrace("renderer:layout_card id=\"" + card.id + "\" " + FormatRect(card.rect) +
+                                " title=" + FormatRect(card.chromeLayout.titleRect) +
+                                " icon=" + FormatRect(card.chromeLayout.iconRect) +
+                                " content=" + FormatRect(card.chromeLayout.contentRect));
+            std::vector<std::string> cardReferenceStack;
+            ResolveNodeWidgetsInternal(renderer,
+                cardIt->layout,
+                card.chromeLayout.contentRect,
+                card.widgets,
+                cardReferenceStack,
+                card.id,
+                card.id,
+                {},
+                includeWidgetState);
+            resolvedLayout_.cards.push_back(std::move(card));
+        };
 
     std::function<void(const LayoutNodeConfig&, const RenderRect&, const std::vector<size_t>&)> resolveDashboardNode =
         [&](const LayoutNodeConfig& node, const RenderRect& rect, const std::vector<size_t>& nodePath) {
@@ -748,6 +575,9 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             }
         }
         for (auto& card : resolvedLayout_.cards) {
+            if (card.chrome.widget != nullptr) {
+                card.chrome.widget->ResolveLayoutState(renderer, card.chrome.rect);
+            }
             for (auto& widget : card.widgets) {
                 if (widget.widget != nullptr) {
                     widget.widget->ResolveLayoutState(renderer, widget.rect);

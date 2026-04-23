@@ -59,11 +59,13 @@ public:
         const TextLayoutOptions& options) = 0;
     virtual void PushClipRect(const RenderRect& rect) = 0;
     virtual void PopClipRect() = 0;
+    virtual bool DrawIcon(std::string_view iconName, const RenderRect& rect) = 0;
     virtual bool FillSolidRect(const RenderRect& rect, RenderColorId color) = 0;
     virtual bool FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) = 0;
     virtual bool FillSolidEllipse(const RenderRect& rect, RenderColorId color) = 0;
     virtual bool FillSolidDiamond(const RenderRect& rect, RenderColorId color) = 0;
     virtual bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) = 0;
+    virtual bool DrawSolidRoundedRect(const RenderRect& rect, int radius, const RenderStroke& stroke) = 0;
     virtual bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) = 0;
     virtual bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) = 0;
     virtual bool DrawArc(const RenderArc& arc, const RenderStroke& stroke) = 0;

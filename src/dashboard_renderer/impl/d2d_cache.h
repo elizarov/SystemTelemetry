@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <d2d1.h>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -14,33 +15,33 @@
 
 class DashboardD2DCache {
 public:
-    using PanelIconSources = std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>>;
+    using IconSources = std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>>;
 
     void Clear();
     void ResetTarget();
     void AttachTarget(ID2D1RenderTarget* target);
-    void ClearPanelIconBitmaps();
+    void ClearIconBitmaps();
 
     ID2D1SolidColorBrush* SolidBrush(ID2D1RenderTarget* target, RenderColor color);
-    void DrawPanelIcon(IWICImagingFactory* wicFactory,
+    void DrawIcon(IWICImagingFactory* wicFactory,
         ID2D1RenderTarget* target,
-        const PanelIconSources& panelIcons,
-        const std::string& iconName,
-        const RenderRect& iconRect);
+        const IconSources& icons,
+        std::string_view iconName,
+        const RenderRect& rect);
 
 private:
-    struct PanelIconCacheKey {
+    struct IconCacheKey {
         std::string name;
         int width = 0;
         int height = 0;
 
-        bool operator==(const PanelIconCacheKey& other) const {
+        bool operator==(const IconCacheKey& other) const {
             return name == other.name && width == other.width && height == other.height;
         }
     };
 
-    struct PanelIconCacheKeyHash {
-        size_t operator()(const PanelIconCacheKey& key) const;
+    struct IconCacheKeyHash {
+        size_t operator()(const IconCacheKey& key) const;
     };
 
     struct BrushCacheKey {
@@ -57,5 +58,5 @@ private:
 
     ID2D1RenderTarget* ownerTarget_ = nullptr;
     std::unordered_map<BrushCacheKey, Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>, BrushCacheKeyHash> solidBrushes_;
-    std::unordered_map<PanelIconCacheKey, Microsoft::WRL::ComPtr<ID2D1Bitmap>, PanelIconCacheKeyHash> panelIconBitmaps_;
+    std::unordered_map<IconCacheKey, Microsoft::WRL::ComPtr<ID2D1Bitmap>, IconCacheKeyHash> iconBitmaps_;
 };

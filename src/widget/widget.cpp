@@ -1,5 +1,6 @@
 #include "widget/widget.h"
 
+#include "widget/impl/card_chrome.h"
 #include "widget/impl/clock_date.h"
 #include "widget/impl/clock_time.h"
 #include "widget/impl/drive_usage_list.h"
@@ -67,4 +68,8 @@ std::unique_ptr<Widget> CreateWidget(std::string_view name) {
         return nullptr;
     }
     return CreateWidget(*widgetClass);
+}
+
+std::unique_ptr<Widget> CreateCardChromeWidget(const LayoutCardConfig& card) {
+    return std::make_unique<CardChromeWidget>(card);
 }
