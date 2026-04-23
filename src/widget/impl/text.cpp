@@ -5,11 +5,11 @@
 #include "telemetry/metrics.h"
 #include "widget/widget_renderer.h"
 
-DashboardWidgetClass TextWidget::Class() const {
-    return DashboardWidgetClass::Text;
+WidgetClass TextWidget::Class() const {
+    return WidgetClass::Text;
 }
 
-std::unique_ptr<DashboardWidget> TextWidget::Clone() const {
+std::unique_ptr<Widget> TextWidget::Clone() const {
     return std::make_unique<TextWidget>(*this);
 }
 
@@ -27,7 +27,7 @@ bool TextWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void TextWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void TextWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     const int y = widget.rect.bottom;
 
@@ -45,8 +45,7 @@ void TextWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidget
     renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
 }
 
-void TextWidget::Draw(
-    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+void TextWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     const std::string text = metrics.ResolveText(metric_);
     const WidgetRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
         text,

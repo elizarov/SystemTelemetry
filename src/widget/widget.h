@@ -11,33 +11,31 @@
 class MetricSource;
 class WidgetRenderer;
 
-class DashboardWidget {
+class Widget {
 public:
-    virtual ~DashboardWidget() = default;
+    virtual ~Widget() = default;
 
-    virtual DashboardWidgetClass Class() const = 0;
-    virtual std::unique_ptr<DashboardWidget> Clone() const = 0;
+    virtual WidgetClass Class() const = 0;
+    virtual std::unique_ptr<Widget> Clone() const = 0;
     virtual void Initialize(const LayoutNodeConfig& node) = 0;
     virtual int PreferredHeight(const WidgetRenderer& renderer) const = 0;
     virtual bool UsesFixedPreferredHeightInRows() const;
     virtual bool IsHoverable() const;
     virtual bool IsVerticalSpring() const;
     virtual void ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect);
-    virtual void Draw(
-        WidgetRenderer& renderer, const struct DashboardWidgetLayout& widget, const MetricSource& metrics) const;
-    virtual void FinalizeLayoutGroup(
-        WidgetRenderer& renderer, const std::vector<struct DashboardWidgetLayout*>& widgets);
-    virtual void BuildEditGuides(WidgetRenderer& renderer, const struct DashboardWidgetLayout& widget) const;
-    virtual void BuildStaticAnchors(WidgetRenderer& renderer, const struct DashboardWidgetLayout& widget) const;
+    virtual void Draw(WidgetRenderer& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
+    virtual void FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vector<struct WidgetLayout*>& widgets);
+    virtual void BuildEditGuides(WidgetRenderer& renderer, const struct WidgetLayout& widget) const;
+    virtual void BuildStaticAnchors(WidgetRenderer& renderer, const struct WidgetLayout& widget) const;
 };
 
-struct DashboardWidgetLayout {
+struct WidgetLayout {
     RenderRect rect{};
     std::string cardId;
     std::string editCardId;
     std::vector<size_t> nodePath;
-    std::unique_ptr<DashboardWidget> widget;
+    std::unique_ptr<Widget> widget;
 };
 
-std::unique_ptr<DashboardWidget> CreateDashboardWidget(DashboardWidgetClass widgetClass);
-std::unique_ptr<DashboardWidget> CreateDashboardWidget(std::string_view name);
+std::unique_ptr<Widget> CreateWidget(WidgetClass widgetClass);
+std::unique_ptr<Widget> CreateWidget(std::string_view name);

@@ -99,7 +99,7 @@ std::optional<LayoutEditSelectionHighlight> SectionSelectionHighlight(std::strin
     if (sectionName == "dashboard") {
         return LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
     }
-    const auto widgetClass = sectionName.empty() ? std::nullopt : EnumFromString<DashboardWidgetClass>(sectionName);
+    const auto widgetClass = sectionName.empty() ? std::nullopt : EnumFromString<WidgetClass>(sectionName);
     if (!widgetClass.has_value()) {
         return std::nullopt;
     }

@@ -25,7 +25,7 @@ public:
         RenderRect titleRect{};
         RenderRect iconRect{};
         RenderRect contentRect{};
-        std::vector<DashboardWidgetLayout> widgets;
+        std::vector<WidgetLayout> widgets;
     };
 
     struct ResolvedDashboardLayout {
@@ -35,7 +35,7 @@ public:
     };
 
     struct ParsedWidgetInfo {
-        std::unique_ptr<DashboardWidget> widgetPrototype;
+        std::unique_ptr<Widget> widgetPrototype;
         int preferredHeight = 0;
         bool fixedPreferredHeightInRows = false;
         bool verticalSpring = false;
@@ -46,7 +46,7 @@ public:
     void ResolveNodeWidgets(DashboardRenderer& renderer,
         const LayoutNodeConfig& node,
         const RenderRect& rect,
-        std::vector<DashboardWidgetLayout>& widgets,
+        std::vector<WidgetLayout>& widgets,
         bool instantiateWidgets);
     void BuildWidgetEditGuides(DashboardRenderer& renderer);
     void BuildStaticEditableAnchors(DashboardRenderer& renderer);
@@ -61,7 +61,7 @@ public:
     void ResolveNodeWidgetsInternal(DashboardRenderer& renderer,
         const LayoutNodeConfig& node,
         const RenderRect& rect,
-        std::vector<DashboardWidgetLayout>& widgets,
+        std::vector<WidgetLayout>& widgets,
         std::vector<std::string>& cardReferenceStack,
         const std::string& renderCardId,
         const std::string& editCardId,
@@ -70,7 +70,7 @@ public:
     bool ResolveLayout(DashboardRenderer& renderer, bool includeWidgetState);
     int PreferredNodeHeight(const DashboardRenderer& renderer, const LayoutNodeConfig& node, int width) const;
     const ParsedWidgetInfo* FindParsedWidgetInfo(const DashboardRenderer& renderer, const LayoutNodeConfig& node) const;
-    DashboardWidgetLayout ResolveWidgetLayout(const DashboardRenderer& renderer,
+    WidgetLayout ResolveWidgetLayout(const DashboardRenderer& renderer,
         const LayoutNodeConfig& node,
         const RenderRect& rect,
         bool instantiateWidget) const;

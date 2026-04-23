@@ -10,7 +10,7 @@
 #include "widget/layout_edit_types.h"
 #include "widget/render_types.h"
 
-struct DashboardWidgetLayout;
+struct WidgetLayout;
 struct MetricDefinitionConfig;
 
 class WidgetRenderer {
@@ -72,9 +72,9 @@ public:
     virtual bool FillPath(const RenderPath& path, RenderColorId color) = 0;
     virtual bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) = 0;
     virtual LayoutEditAnchorBinding MakeEditableTextBinding(
-        const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const = 0;
+        const WidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const = 0;
     virtual LayoutEditAnchorBinding MakeMetricTextBinding(
-        const DashboardWidgetLayout& widget, std::string_view metricId, int anchorId) const = 0;
+        const WidgetLayout& widget, std::string_view metricId, int anchorId) const = 0;
     virtual void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,

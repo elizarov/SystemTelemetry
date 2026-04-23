@@ -182,11 +182,11 @@ int EffectiveGaugePreferredRadius(const WidgetRenderer& renderer, const std::str
 
 }  // namespace
 
-DashboardWidgetClass GaugeWidget::Class() const {
-    return DashboardWidgetClass::Gauge;
+WidgetClass GaugeWidget::Class() const {
+    return WidgetClass::Gauge;
 }
 
-std::unique_ptr<DashboardWidget> GaugeWidget::Clone() const {
+std::unique_ptr<Widget> GaugeWidget::Clone() const {
     return std::make_unique<GaugeWidget>(*this);
 }
 
@@ -259,8 +259,7 @@ void GaugeWidget::ResolveLayoutState(const WidgetRenderer& renderer, const Rende
     }
 }
 
-void GaugeWidget::Draw(
-    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+void GaugeWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     const MetricValue& metric = metrics.ResolveMetric(metric_);
     const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
     const double clampedRatio = ClampFinite(metric.ratio, 0.0, 1.0);
@@ -328,7 +327,7 @@ void GaugeWidget::Draw(
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
 }
 
-void GaugeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void GaugeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const int cx = layoutState_.cx;
     const int cy = layoutState_.cy;
     const int outerRadius = layoutState_.outerRadius;
@@ -396,7 +395,7 @@ void GaugeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWi
     }
 }
 
-void GaugeWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void GaugeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const int outerRadius = layoutState_.outerRadius;
     if (outerRadius <= 0) {
         return;
@@ -472,10 +471,10 @@ void GaugeWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidge
         WidgetRenderer::LayoutEditParameter::GaugeLabelBottom, 101, renderer.Config().layout.gauge.labelBottom);
 }
 
-void GaugeWidget::FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) {
+void GaugeWidget::FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vector<WidgetLayout*>& widgets) {
     auto sharedLayout = std::make_shared<GaugeSharedLayout>();
     int gaugeCount = 0;
-    for (DashboardWidgetLayout* widget : widgets) {
+    for (WidgetLayout* widget : widgets) {
         if (widget == nullptr) {
             continue;
         }
@@ -488,7 +487,7 @@ void GaugeWidget::FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vecto
         ++gaugeCount;
     }
 
-    for (DashboardWidgetLayout* widget : widgets) {
+    for (WidgetLayout* widget : widgets) {
         if (widget == nullptr) {
             continue;
         }

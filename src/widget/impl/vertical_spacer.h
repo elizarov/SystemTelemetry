@@ -2,10 +2,10 @@
 
 #include "widget/widget.h"
 
-class VerticalSpacerWidget final : public DashboardWidget {
+class VerticalSpacerWidget final : public Widget {
 public:
-    DashboardWidgetClass Class() const override;
-    std::unique_ptr<DashboardWidget> Clone() const override;
+    WidgetClass Class() const override;
+    std::unique_ptr<Widget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const WidgetRenderer& renderer) const override;
     bool UsesFixedPreferredHeightInRows() const override;
@@ -13,5 +13,5 @@ public:
 
 private:
     std::string referencedWidgetName_;
-    std::unique_ptr<DashboardWidget> referencedWidget_;
+    std::unique_ptr<Widget> referencedWidget_;
 };

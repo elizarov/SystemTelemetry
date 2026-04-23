@@ -1,10 +1,10 @@
 #include "widget/impl/vertical_spring.h"
 
-DashboardWidgetClass VerticalSpringWidget::Class() const {
-    return DashboardWidgetClass::VerticalSpring;
+WidgetClass VerticalSpringWidget::Class() const {
+    return WidgetClass::VerticalSpring;
 }
 
-std::unique_ptr<DashboardWidget> VerticalSpringWidget::Clone() const {
+std::unique_ptr<Widget> VerticalSpringWidget::Clone() const {
     return std::make_unique<VerticalSpringWidget>(*this);
 }
 

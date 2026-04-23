@@ -11,60 +11,60 @@
 #include "widget/impl/vertical_spacer.h"
 #include "widget/impl/vertical_spring.h"
 
-bool DashboardWidget::UsesFixedPreferredHeightInRows() const {
+bool Widget::UsesFixedPreferredHeightInRows() const {
     return false;
 }
 
-bool DashboardWidget::IsHoverable() const {
+bool Widget::IsHoverable() const {
     return true;
 }
 
-bool DashboardWidget::IsVerticalSpring() const {
+bool Widget::IsVerticalSpring() const {
     return false;
 }
 
-void DashboardWidget::ResolveLayoutState(const WidgetRenderer&, const RenderRect&) {}
+void Widget::ResolveLayoutState(const WidgetRenderer&, const RenderRect&) {}
 
-void DashboardWidget::Draw(WidgetRenderer&, const DashboardWidgetLayout&, const MetricSource&) const {}
+void Widget::Draw(WidgetRenderer&, const WidgetLayout&, const MetricSource&) const {}
 
-void DashboardWidget::FinalizeLayoutGroup(WidgetRenderer&, const std::vector<DashboardWidgetLayout*>&) {}
+void Widget::FinalizeLayoutGroup(WidgetRenderer&, const std::vector<WidgetLayout*>&) {}
 
-void DashboardWidget::BuildEditGuides(WidgetRenderer&, const DashboardWidgetLayout&) const {}
+void Widget::BuildEditGuides(WidgetRenderer&, const WidgetLayout&) const {}
 
-void DashboardWidget::BuildStaticAnchors(WidgetRenderer&, const DashboardWidgetLayout&) const {}
+void Widget::BuildStaticAnchors(WidgetRenderer&, const WidgetLayout&) const {}
 
-std::unique_ptr<DashboardWidget> CreateDashboardWidget(DashboardWidgetClass widgetClass) {
+std::unique_ptr<Widget> CreateWidget(WidgetClass widgetClass) {
     switch (widgetClass) {
-        case DashboardWidgetClass::Text:
+        case WidgetClass::Text:
             return std::make_unique<TextWidget>();
-        case DashboardWidgetClass::Gauge:
+        case WidgetClass::Gauge:
             return std::make_unique<GaugeWidget>();
-        case DashboardWidgetClass::MetricList:
+        case WidgetClass::MetricList:
             return std::make_unique<MetricListWidget>();
-        case DashboardWidgetClass::Throughput:
+        case WidgetClass::Throughput:
             return std::make_unique<ThroughputWidget>();
-        case DashboardWidgetClass::NetworkFooter:
+        case WidgetClass::NetworkFooter:
             return std::make_unique<NetworkFooterWidget>();
-        case DashboardWidgetClass::VerticalSpacer:
+        case WidgetClass::VerticalSpacer:
             return std::make_unique<VerticalSpacerWidget>();
-        case DashboardWidgetClass::VerticalSpring:
+        case WidgetClass::VerticalSpring:
             return std::make_unique<VerticalSpringWidget>();
-        case DashboardWidgetClass::DriveUsageList:
+        case WidgetClass::DriveUsageList:
             return std::make_unique<DriveUsageListWidget>();
-        case DashboardWidgetClass::ClockTime:
+        case WidgetClass::ClockTime:
             return std::make_unique<ClockTimeWidget>();
-        case DashboardWidgetClass::ClockDate:
+        case WidgetClass::ClockDate:
             return std::make_unique<ClockDateWidget>();
-        case DashboardWidgetClass::Unknown:
+        case WidgetClass::Unknown:
         default:
             return nullptr;
     }
 }
 
-std::unique_ptr<DashboardWidget> CreateDashboardWidget(std::string_view name) {
-    const auto widgetClass = name.empty() ? std::nullopt : EnumFromString<DashboardWidgetClass>(name);
+std::unique_ptr<Widget> CreateWidget(std::string_view name) {
+    const auto widgetClass = name.empty() ? std::nullopt : EnumFromString<WidgetClass>(name);
     if (!widgetClass.has_value()) {
         return nullptr;
     }
-    return CreateDashboardWidget(*widgetClass);
+    return CreateWidget(*widgetClass);
 }

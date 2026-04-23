@@ -53,7 +53,7 @@ void DashboardLayoutResolver::ClearDynamicEditArtifacts() {
 void DashboardLayoutResolver::ResolveNodeWidgets(DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
-    std::vector<DashboardWidgetLayout>& widgets,
+    std::vector<WidgetLayout>& widgets,
     bool instantiateWidgets) {
     std::vector<std::string> cardReferenceStack;
     ResolveNodeWidgetsInternal(renderer, node, rect, widgets, cardReferenceStack, "", "", {}, instantiateWidgets);
@@ -375,11 +375,11 @@ const DashboardLayoutResolver::ParsedWidgetInfo* DashboardLayoutResolver::FindPa
         return &it->second;
     }
 
-    if (node.name.empty() || !EnumFromString<DashboardWidgetClass>(node.name).has_value()) {
+    if (node.name.empty() || !EnumFromString<WidgetClass>(node.name).has_value()) {
         return nullptr;
     }
 
-    auto widget = CreateDashboardWidget(node.name);
+    auto widget = CreateWidget(node.name);
     if (widget == nullptr) {
         return nullptr;
     }
@@ -393,11 +393,11 @@ const DashboardLayoutResolver::ParsedWidgetInfo* DashboardLayoutResolver::FindPa
     return &parsedWidgetInfoCache_.emplace(&node, std::move(info)).first->second;
 }
 
-DashboardWidgetLayout DashboardLayoutResolver::ResolveWidgetLayout(const DashboardRenderer& renderer,
+WidgetLayout DashboardLayoutResolver::ResolveWidgetLayout(const DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
     bool instantiateWidget) const {
-    DashboardWidgetLayout widget;
+    WidgetLayout widget;
     widget.rect = rect;
     const ParsedWidgetInfo* info = FindParsedWidgetInfo(renderer, node);
     if (instantiateWidget && info != nullptr) {
@@ -409,7 +409,7 @@ DashboardWidgetLayout DashboardLayoutResolver::ResolveWidgetLayout(const Dashboa
 void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
-    std::vector<DashboardWidgetLayout>& widgets,
+    std::vector<WidgetLayout>& widgets,
     std::vector<std::string>& cardReferenceStack,
     const std::string& renderCardId,
     const std::string& editCardId,
@@ -443,7 +443,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         return;
     }
     if (!DashboardRenderer::IsContainerNode(node)) {
-        DashboardWidgetLayout widget = ResolveWidgetLayout(renderer, node, rect, instantiateWidgets);
+        WidgetLayout widget = ResolveWidgetLayout(renderer, node, rect, instantiateWidgets);
         widget.cardId = renderCardId;
         widget.editCardId = editCardId;
         widget.nodePath = nodePath;
@@ -733,7 +733,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     }
 
     if (includeWidgetState) {
-        std::map<DashboardWidgetClass, std::vector<DashboardWidgetLayout*>> widgetGroups;
+        std::map<WidgetClass, std::vector<WidgetLayout*>> widgetGroups;
         for (auto& card : resolvedLayout_.cards) {
             for (auto& widget : card.widgets) {
                 if (widget.widget == nullptr) {

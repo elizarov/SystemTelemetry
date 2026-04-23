@@ -3,11 +3,11 @@
 #include "telemetry/metrics.h"
 #include "widget/widget_renderer.h"
 
-DashboardWidgetClass ClockDateWidget::Class() const {
-    return DashboardWidgetClass::ClockDate;
+WidgetClass ClockDateWidget::Class() const {
+    return WidgetClass::ClockDate;
 }
 
-std::unique_ptr<DashboardWidget> ClockDateWidget::Clone() const {
+std::unique_ptr<Widget> ClockDateWidget::Clone() const {
     return std::make_unique<ClockDateWidget>(*this);
 }
 
@@ -21,8 +21,7 @@ bool ClockDateWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void ClockDateWidget::Draw(
-    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+void ClockDateWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == WidgetRenderer::RenderMode::Blank) {
         return;
     }

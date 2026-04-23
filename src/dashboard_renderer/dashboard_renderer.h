@@ -115,9 +115,9 @@ public:
     bool FillPath(const RenderPath& path, RenderColorId color) override;
     bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) override;
     LayoutEditAnchorBinding MakeEditableTextBinding(
-        const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const override;
+        const WidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const override;
     LayoutEditAnchorBinding MakeMetricTextBinding(
-        const DashboardWidgetLayout& widget, std::string_view metricId, int anchorId) const override;
+        const WidgetLayout& widget, std::string_view metricId, int anchorId) const override;
     void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,
@@ -185,8 +185,8 @@ private:
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawPanel(size_t cardIndex);
     void DrawPanelIcon(const std::string& iconName, const RenderRect& iconRect);
-    void DrawResolvedWidget(const DashboardWidgetLayout& widget, const MetricSource& metrics);
-    bool UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const;
+    void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
+    bool UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -197,7 +197,7 @@ private:
         const std::vector<size_t>& nodePath);
     void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         const RenderRect& rect,
-        std::vector<DashboardWidgetLayout>& widgets,
+        std::vector<WidgetLayout>& widgets,
         std::vector<std::string>& cardReferenceStack,
         const std::string& renderCardId,
         const std::string& editCardId,
@@ -237,13 +237,13 @@ private:
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
-        std::vector<DashboardWidgetLayout>& widgets,
+        std::vector<WidgetLayout>& widgets,
         bool instantiateWidgets = true);
-    bool SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const;
-    std::vector<const DashboardWidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
-    int WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const;
-    bool IsWidgetAffectedByGuide(const DashboardWidgetLayout& widget, const LayoutEditGuide& guide) const;
-    bool MatchesWidgetIdentity(const DashboardWidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const;
+    bool SupportsLayoutSimilarityIndicator(const WidgetLayout& widget) const;
+    std::vector<const WidgetLayout*> CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const;
+    int WidgetExtentForAxis(const WidgetLayout& widget, LayoutGuideAxis axis) const;
+    bool IsWidgetAffectedByGuide(const WidgetLayout& widget, const LayoutEditGuide& guide) const;
+    bool MatchesWidgetIdentity(const WidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const;
     static bool IsContainerNode(const LayoutNodeConfig& node);
     void RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
         const LayoutEditAnchorKey& key,

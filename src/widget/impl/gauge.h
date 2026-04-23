@@ -7,7 +7,7 @@
 
 struct GaugeSharedLayout;
 
-class GaugeWidget final : public DashboardWidget {
+class GaugeWidget final : public Widget {
 public:
     struct SegmentLayout {
         int segmentCount = 1;
@@ -47,16 +47,15 @@ public:
         std::vector<RenderRect> ringSegmentBounds;
     };
 
-    DashboardWidgetClass Class() const override;
-    std::unique_ptr<DashboardWidget> Clone() const override;
+    WidgetClass Class() const override;
+    std::unique_ptr<Widget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const WidgetRenderer& renderer) const override;
     void ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect) override;
-    void Draw(
-        WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const override;
-    void FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vector<DashboardWidgetLayout*>& widgets) override;
-    void BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const override;
-    void BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const override;
+    void Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const override;
+    void FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vector<WidgetLayout*>& widgets) override;
+    void BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const override;
+    void BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const override;
 
 private:
     std::string metric_;

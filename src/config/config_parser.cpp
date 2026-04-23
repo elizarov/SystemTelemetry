@@ -404,8 +404,7 @@ bool ParseLayoutExpression(const std::string& text, LayoutNodeConfig& node) {
 namespace {
 
 bool IsWidgetOrContainerNodeName(const std::string& name) {
-    return name == "rows" || name == "columns" ||
-           (!name.empty() && EnumFromString<DashboardWidgetClass>(name).has_value());
+    return name == "rows" || name == "columns" || (!name.empty() && EnumFromString<WidgetClass>(name).has_value());
 }
 
 void MarkCardReferencesRecursive(LayoutNodeConfig& node, const std::set<std::string>& cardIds) {

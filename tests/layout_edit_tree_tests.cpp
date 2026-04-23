@@ -163,8 +163,8 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
     const LayoutEditTreeNode* gaugeRoot = FindRootNode(model, "gauge");
     ASSERT_NE(gaugeRoot, nullptr);
     ASSERT_TRUE(gaugeRoot->selectionHighlight.has_value());
-    ASSERT_TRUE(std::holds_alternative<DashboardWidgetClass>(*gaugeRoot->selectionHighlight));
-    EXPECT_EQ(std::get<DashboardWidgetClass>(*gaugeRoot->selectionHighlight), DashboardWidgetClass::Gauge);
+    ASSERT_TRUE(std::holds_alternative<WidgetClass>(*gaugeRoot->selectionHighlight));
+    EXPECT_EQ(std::get<WidgetClass>(*gaugeRoot->selectionHighlight), WidgetClass::Gauge);
 
     ExpectSpecialSelectionHighlight(
         FindRootNode(model, "dashboard"), LayoutEditSelectionHighlightSpecial::DashboardBounds);

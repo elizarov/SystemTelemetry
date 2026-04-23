@@ -156,11 +156,11 @@ int EffectiveThroughputPreferredHeight(const WidgetRenderer& renderer) {
 
 }  // namespace
 
-DashboardWidgetClass ThroughputWidget::Class() const {
-    return DashboardWidgetClass::Throughput;
+WidgetClass ThroughputWidget::Class() const {
+    return WidgetClass::Throughput;
 }
 
-std::unique_ptr<DashboardWidget> ThroughputWidget::Clone() const {
+std::unique_ptr<Widget> ThroughputWidget::Clone() const {
     return std::make_unique<ThroughputWidget>(*this);
 }
 
@@ -200,8 +200,7 @@ void ThroughputWidget::ResolveLayoutState(const WidgetRenderer& renderer, const 
     layoutState_ = graphLayout;
 }
 
-void ThroughputWidget::Draw(
-    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+void ThroughputWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     const ThroughputMetric& metric = metrics.ResolveThroughput(metric_);
     renderer.DrawText(layoutState_.valueRect,
         metric.label,
@@ -243,7 +242,7 @@ void ThroughputWidget::Draw(
             widget, WidgetRenderer::LayoutEditParameter::FontSmall, 2, renderer.Config().layout.fonts.smallText.size));
 }
 
-void ThroughputWidget::BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void ThroughputWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const ThroughputGraphLayout& layout = layoutState_;
     renderer.RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -312,7 +311,7 @@ void ThroughputWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Dashbo
     }
 }
 
-void ThroughputWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void ThroughputWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
 
     auto& guides = renderer.WidgetEditGuidesMutable();

@@ -2,15 +2,15 @@
 
 #include "widget/widget_renderer.h"
 
-DashboardWidgetClass VerticalSpacerWidget::Class() const {
-    return DashboardWidgetClass::VerticalSpacer;
+WidgetClass VerticalSpacerWidget::Class() const {
+    return WidgetClass::VerticalSpacer;
 }
 
-std::unique_ptr<DashboardWidget> VerticalSpacerWidget::Clone() const {
+std::unique_ptr<Widget> VerticalSpacerWidget::Clone() const {
     auto widget = std::make_unique<VerticalSpacerWidget>();
     widget->referencedWidgetName_ = referencedWidgetName_;
     if (!referencedWidgetName_.empty()) {
-        widget->referencedWidget_ = CreateDashboardWidget(referencedWidgetName_);
+        widget->referencedWidget_ = CreateWidget(referencedWidgetName_);
         if (widget->referencedWidget_ != nullptr) {
             LayoutNodeConfig node;
             node.name = referencedWidgetName_;
@@ -27,7 +27,7 @@ void VerticalSpacerWidget::Initialize(const LayoutNodeConfig& node) {
         return;
     }
 
-    referencedWidget_ = CreateDashboardWidget(referencedWidgetName_);
+    referencedWidget_ = CreateWidget(referencedWidgetName_);
     if (referencedWidget_ == nullptr) {
         return;
     }

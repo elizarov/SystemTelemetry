@@ -2,10 +2,10 @@
 
 #include "widget/widget.h"
 
-class VerticalSpringWidget final : public DashboardWidget {
+class VerticalSpringWidget final : public Widget {
 public:
-    DashboardWidgetClass Class() const override;
-    std::unique_ptr<DashboardWidget> Clone() const override;
+    WidgetClass Class() const override;
+    std::unique_ptr<Widget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const WidgetRenderer& renderer) const override;
     bool IsHoverable() const override;

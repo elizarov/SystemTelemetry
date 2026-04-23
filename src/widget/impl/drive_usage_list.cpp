@@ -196,11 +196,11 @@ int EffectiveDriveRowHeight(const WidgetRenderer& renderer) {
 
 }  // namespace
 
-DashboardWidgetClass DriveUsageListWidget::Class() const {
-    return DashboardWidgetClass::DriveUsageList;
+WidgetClass DriveUsageListWidget::Class() const {
+    return WidgetClass::DriveUsageList;
 }
 
-std::unique_ptr<DashboardWidget> DriveUsageListWidget::Clone() const {
+std::unique_ptr<Widget> DriveUsageListWidget::Clone() const {
     return std::make_unique<DriveUsageListWidget>(*this);
 }
 
@@ -327,7 +327,7 @@ void DriveUsageListWidget::ResolveLayoutState(const WidgetRenderer& renderer, co
 }
 
 void DriveUsageListWidget::Draw(
-    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+    WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     const std::string readLabel = ResolveDriveMetricLabel(renderer, "drive.activity.read", "R");
     const std::string writeLabel = ResolveDriveMetricLabel(renderer, "drive.activity.write", "W");
     const std::string usageLabel = ResolveDriveMetricLabel(renderer, "drive.usage", "Usage");
@@ -432,7 +432,7 @@ void DriveUsageListWidget::Draw(
     renderer.PopClipRect();
 }
 
-void DriveUsageListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void DriveUsageListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.driveUsageList;
     renderer.RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
@@ -523,7 +523,7 @@ void DriveUsageListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Da
     }
 }
 
-void DriveUsageListWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void DriveUsageListWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.driveUsageList;
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     const ColumnRects& columns = layoutState_.headerColumns;

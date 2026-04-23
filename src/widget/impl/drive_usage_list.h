@@ -2,7 +2,7 @@
 
 #include "widget/widget.h"
 
-class DriveUsageListWidget final : public DashboardWidget {
+class DriveUsageListWidget final : public Widget {
 public:
     struct ColumnRects {
         RenderRect label{};
@@ -53,15 +53,14 @@ public:
         std::vector<RenderRect> rowBarAnchorRects;
     };
 
-    DashboardWidgetClass Class() const override;
-    std::unique_ptr<DashboardWidget> Clone() const override;
+    WidgetClass Class() const override;
+    std::unique_ptr<Widget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const WidgetRenderer& renderer) const override;
     void ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect) override;
-    void Draw(
-        WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const override;
-    void BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const override;
-    void BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const override;
+    void Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const override;
+    void BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const override;
+    void BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const override;
 
 private:
     LayoutState layoutState_{};

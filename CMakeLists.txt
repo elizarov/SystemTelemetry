@@ -263,7 +263,7 @@ add_executable(SystemTelemetryTests
     tests/enum_string_tests.cpp
     tests/metrics_tests.cpp
     tests/snapshot_dump_tests.cpp
-    tests/dashboard_widget_class_tests.cpp
+    tests/widget_class_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
     tests/layout_edit_types_tests.cpp

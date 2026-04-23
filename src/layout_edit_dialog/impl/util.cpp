@@ -415,7 +415,7 @@ std::wstring BuildLayoutEditSummaryText(const LayoutEditTreeNode* node) {
                 return L"Highlights the dashboard bounds while this node is selected.";
         }
     }
-    if (std::holds_alternative<DashboardWidgetClass>(*node->selectionHighlight)) {
+    if (std::holds_alternative<WidgetClass>(*node->selectionHighlight)) {
         return L"Highlights every rendered widget of this type while this node is selected.";
     }
     if (std::holds_alternative<LayoutContainerEditKey>(*node->selectionHighlight)) {

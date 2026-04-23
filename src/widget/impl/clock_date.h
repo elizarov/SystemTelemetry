@@ -2,13 +2,12 @@
 
 #include "widget/widget.h"
 
-class ClockDateWidget final : public DashboardWidget {
+class ClockDateWidget final : public Widget {
 public:
-    DashboardWidgetClass Class() const override;
-    std::unique_ptr<DashboardWidget> Clone() const override;
+    WidgetClass Class() const override;
+    std::unique_ptr<Widget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const WidgetRenderer& renderer) const override;
     bool UsesFixedPreferredHeightInRows() const override;
-    void Draw(
-        WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const override;
+    void Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const override;
 };

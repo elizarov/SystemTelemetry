@@ -3,11 +3,11 @@
 #include "telemetry/metrics.h"
 #include "widget/widget_renderer.h"
 
-DashboardWidgetClass NetworkFooterWidget::Class() const {
-    return DashboardWidgetClass::NetworkFooter;
+WidgetClass NetworkFooterWidget::Class() const {
+    return WidgetClass::NetworkFooter;
 }
 
-std::unique_ptr<DashboardWidget> NetworkFooterWidget::Clone() const {
+std::unique_ptr<Widget> NetworkFooterWidget::Clone() const {
     return std::make_unique<NetworkFooterWidget>(*this);
 }
 
@@ -22,7 +22,7 @@ bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void NetworkFooterWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void NetworkFooterWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     const int y = widget.rect.top + renderer.TextMetrics().footer;
 
@@ -41,7 +41,7 @@ void NetworkFooterWidget::BuildEditGuides(WidgetRenderer& renderer, const Dashbo
 }
 
 void NetworkFooterWidget::Draw(
-    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+    WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == WidgetRenderer::RenderMode::Blank) {
         return;
     }

@@ -65,11 +65,11 @@ std::optional<RenderRect> DrawMetricCapsuleBar(
 
 }  // namespace
 
-DashboardWidgetClass MetricListWidget::Class() const {
-    return DashboardWidgetClass::MetricList;
+WidgetClass MetricListWidget::Class() const {
+    return WidgetClass::MetricList;
 }
 
-std::unique_ptr<DashboardWidget> MetricListWidget::Clone() const {
+std::unique_ptr<Widget> MetricListWidget::Clone() const {
     return std::make_unique<MetricListWidget>(*this);
 }
 
@@ -161,8 +161,7 @@ void MetricListWidget::ResolveLayoutState(const WidgetRenderer& renderer, const 
     }
 }
 
-void MetricListWidget::Draw(
-    WidgetRenderer& renderer, const DashboardWidgetLayout& widget, const MetricSource& metrics) const {
+void MetricListWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     renderer.PushClipRect(widget.rect);
     int rowIndex = 0;
     for (const auto& row : metrics.ResolveMetricList(metricRefs_)) {
@@ -214,7 +213,7 @@ void MetricListWidget::Draw(
     renderer.PopClipRect();
 }
 
-void MetricListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void MetricListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.metricList;
     for (int rowIndex = 0;
         rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.barRects.size()) &&
@@ -293,7 +292,7 @@ void MetricListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Dashbo
     }
 }
 
-void MetricListWidget::BuildEditGuides(WidgetRenderer& renderer, const DashboardWidgetLayout& widget) const {
+void MetricListWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
     const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
     const int x = std::clamp(static_cast<int>(widget.rect.left) + layoutState_.labelWidth,
         static_cast<int>(widget.rect.left),

@@ -550,10 +550,8 @@ int DashboardRenderer::LayoutSimilarityThreshold() const {
     return std::max(0, ScaleLogical(config_.layout.layoutEditor.sizeSimilarityThreshold));
 }
 
-void DashboardRenderer::ResolveNodeWidgets(const LayoutNodeConfig& node,
-    const RenderRect& rect,
-    std::vector<DashboardWidgetLayout>& widgets,
-    bool instantiateWidgets) {
+void DashboardRenderer::ResolveNodeWidgets(
+    const LayoutNodeConfig& node, const RenderRect& rect, std::vector<WidgetLayout>& widgets, bool instantiateWidgets) {
     layoutResolver_->ResolveNodeWidgets(*this, node, rect, widgets, instantiateWidgets);
 }
 
@@ -577,7 +575,7 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
 
 void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     const RenderRect& rect,
-    std::vector<DashboardWidgetLayout>& widgets,
+    std::vector<WidgetLayout>& widgets,
     std::vector<std::string>& cardReferenceStack,
     const std::string& renderCardId,
     const std::string& editCardId,
@@ -666,7 +664,7 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(const DashboardOverlayState& 
         return;
     }
 
-    const DashboardWidgetLayout* hoveredWidget = nullptr;
+    const WidgetLayout* hoveredWidget = nullptr;
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (MatchesWidgetIdentity(widget, *overlayState.hoveredEditableWidget)) {
@@ -988,7 +986,7 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const DashboardOverlayStat
             false);
     }
 
-    if (const auto* widgetClass = std::get_if<DashboardWidgetClass>(&*overlayState.selectedTreeHighlight)) {
+    if (const auto* widgetClass = std::get_if<WidgetClass>(&*overlayState.selectedTreeHighlight)) {
         for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
                 if (widget.widget != nullptr && widget.widget->Class() == *widgetClass) {
@@ -1063,7 +1061,7 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const DashboardOverlayStat
         if (*special == LayoutEditSelectionHighlightSpecial::AllTexts) {
             for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
                 for (const auto& widget : card.widgets) {
-                    if (widget.widget != nullptr && widget.widget->Class() == DashboardWidgetClass::Text) {
+                    if (widget.widget != nullptr && widget.widget->Class() == WidgetClass::Text) {
                         const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(widget.rect, color, true);
                     }
                 }
@@ -1311,13 +1309,12 @@ void DashboardRenderer::DrawDottedHighlightRect(
     drawVertical((std::max)(drawRect.left, drawRect.right - strokeWidth), drawRect.top, drawRect.bottom);
 }
 
-int DashboardRenderer::WidgetExtentForAxis(const DashboardWidgetLayout& widget, LayoutGuideAxis axis) const {
+int DashboardRenderer::WidgetExtentForAxis(const WidgetLayout& widget, LayoutGuideAxis axis) const {
     return axis == LayoutGuideAxis::Vertical ? std::max(0, static_cast<int>(widget.rect.right - widget.rect.left))
                                              : std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
 }
 
-bool DashboardRenderer::IsWidgetAffectedByGuide(
-    const DashboardWidgetLayout& widget, const LayoutEditGuide& guide) const {
+bool DashboardRenderer::IsWidgetAffectedByGuide(const WidgetLayout& widget, const LayoutEditGuide& guide) const {
     if (!guide.renderCardId.empty() && widget.cardId != guide.renderCardId) {
         return false;
     }
@@ -1326,13 +1323,13 @@ bool DashboardRenderer::IsWidgetAffectedByGuide(
 }
 
 bool DashboardRenderer::MatchesWidgetIdentity(
-    const DashboardWidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const {
+    const WidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const {
     return identity.kind == LayoutEditWidgetIdentity::Kind::Widget && widget.cardId == identity.renderCardId &&
            widget.editCardId == identity.editCardId && widget.nodePath == identity.nodePath;
 }
 
 LayoutEditAnchorBinding DashboardRenderer::MakeEditableTextBinding(
-    const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const {
+    const WidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const {
     LayoutEditAnchorBinding binding;
     binding.key.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
     binding.key.subject = parameter;
@@ -1346,7 +1343,7 @@ LayoutEditAnchorBinding DashboardRenderer::MakeEditableTextBinding(
 }
 
 LayoutEditAnchorBinding DashboardRenderer::MakeMetricTextBinding(
-    const DashboardWidgetLayout& widget, std::string_view metricId, int anchorId) const {
+    const WidgetLayout& widget, std::string_view metricId, int anchorId) const {
     LayoutEditAnchorBinding binding;
     binding.key.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
     binding.key.subject = LayoutMetricEditKey{std::string(metricId)};
@@ -1572,7 +1569,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlaySta
     }
 
     struct SimilarityTypeKey {
-        DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
+        WidgetClass widgetClass = WidgetClass::Unknown;
         int extent = 0;
 
         bool operator==(const SimilarityTypeKey& other) const {
@@ -1597,8 +1594,8 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlaySta
 
     LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
     const char* axisLabel = "horizontal";
-    std::vector<const DashboardWidgetLayout*> affectedWidgets;
-    std::vector<const DashboardWidgetLayout*> allWidgets;
+    std::vector<const WidgetLayout*> affectedWidgets;
+    std::vector<const WidgetLayout*> allWidgets;
     if (overlayState.similarityIndicatorMode == LayoutSimilarityIndicatorMode::AllHorizontal) {
         axis = LayoutGuideAxis::Vertical;
         axisLabel = "horizontal";
@@ -1617,7 +1614,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlaySta
         axis = guide.axis;
         axisLabel = axis == LayoutGuideAxis::Vertical ? "horizontal" : "vertical";
         allWidgets = CollectSimilarityIndicatorWidgets(axis);
-        for (const DashboardWidgetLayout* widget : allWidgets) {
+        for (const WidgetLayout* widget : allWidgets) {
             if (IsWidgetAffectedByGuide(*widget, guide)) {
                 affectedWidgets.push_back(widget);
             }
@@ -1627,20 +1624,20 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlaySta
         return;
     }
 
-    std::unordered_map<DashboardWidgetClass, std::vector<const DashboardWidgetLayout*>> widgetsByClass;
+    std::unordered_map<WidgetClass, std::vector<const WidgetLayout*>> widgetsByClass;
     widgetsByClass.reserve(allWidgets.size());
-    for (const DashboardWidgetLayout* widget : allWidgets) {
+    for (const WidgetLayout* widget : allWidgets) {
         if (widget->widget == nullptr) {
             continue;
         }
         widgetsByClass[widget->widget->Class()].push_back(widget);
     }
 
-    std::unordered_set<const DashboardWidgetLayout*> visibleWidgets;
+    std::unordered_set<const WidgetLayout*> visibleWidgets;
     visibleWidgets.reserve(allWidgets.size());
-    std::unordered_map<const DashboardWidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
+    std::unordered_map<const WidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
     exactTypeByWidget.reserve(allWidgets.size());
-    for (const DashboardWidgetLayout* affected : affectedWidgets) {
+    for (const WidgetLayout* affected : affectedWidgets) {
         const int affectedExtent = WidgetExtentForAxis(*affected, axis);
         if (affectedExtent <= 0 || affected->widget == nullptr) {
             continue;
@@ -1651,7 +1648,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlaySta
         if (classIt == widgetsByClass.end()) {
             continue;
         }
-        for (const DashboardWidgetLayout* candidate : classIt->second) {
+        for (const WidgetLayout* candidate : classIt->second) {
             if (candidate == affected || candidate->widget == nullptr ||
                 candidate->widget->Class() != affected->widget->Class()) {
                 continue;
@@ -1675,7 +1672,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlaySta
     std::unordered_map<SimilarityTypeKey, int, SimilarityTypeKeyHash> exactTypeOrdinals;
     exactTypeOrdinals.reserve(exactTypeByWidget.size());
     int nextOrdinal = 1;
-    for (const DashboardWidgetLayout* widget : allWidgets) {
+    for (const WidgetLayout* widget : allWidgets) {
         if (!visibleWidgets.contains(widget)) {
             continue;
         }
@@ -1688,7 +1685,7 @@ void DashboardRenderer::DrawLayoutSimilarityIndicators(const DashboardOverlaySta
 
     std::vector<SimilarityIndicator> indicators;
     indicators.reserve(visibleWidgets.size());
-    for (const DashboardWidgetLayout* widget : allWidgets) {
+    for (const WidgetLayout* widget : allWidgets) {
         if (!visibleWidgets.contains(widget)) {
             continue;
         }
@@ -1885,7 +1882,7 @@ void DashboardRenderer::DrawPanel(size_t cardIndex) {
     }
 }
 
-void DashboardRenderer::DrawResolvedWidget(const DashboardWidgetLayout& widget, const MetricSource& metrics) {
+void DashboardRenderer::DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics) {
     if (widget.widget == nullptr) {
         return;
     }
@@ -2225,7 +2222,7 @@ int DashboardRenderer::MeasureTextWidth(TextStyleId style, std::string_view text
 std::vector<LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapCandidates(
     const LayoutEditGuide& guide) const {
     struct SimilarityTypeKey {
-        DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
+        WidgetClass widgetClass = WidgetClass::Unknown;
         int extent = 0;
 
         bool operator<(const SimilarityTypeKey& other) const {
@@ -2236,23 +2233,23 @@ std::vector<LayoutGuideSnapCandidate> DashboardRenderer::CollectLayoutGuideSnapC
         }
     };
 
-    std::vector<const DashboardWidgetLayout*> allWidgets = CollectSimilarityIndicatorWidgets(guide.axis);
-    std::vector<const DashboardWidgetLayout*> affectedWidgets;
-    for (const DashboardWidgetLayout* widget : allWidgets) {
+    std::vector<const WidgetLayout*> allWidgets = CollectSimilarityIndicatorWidgets(guide.axis);
+    std::vector<const WidgetLayout*> affectedWidgets;
+    for (const WidgetLayout* widget : allWidgets) {
         if (IsWidgetAffectedByGuide(*widget, guide)) {
             affectedWidgets.push_back(widget);
         }
     }
 
     std::vector<LayoutGuideSnapCandidate> candidates;
-    for (const DashboardWidgetLayout* affected : affectedWidgets) {
+    for (const WidgetLayout* affected : affectedWidgets) {
         const int startExtent = WidgetExtentForAxis(*affected, guide.axis);
         if (startExtent <= 0 || affected->widget == nullptr) {
             continue;
         }
         std::set<SimilarityTypeKey> seenTargets;
         for (size_t i = 0; i < allWidgets.size(); ++i) {
-            const DashboardWidgetLayout* target = allWidgets[i];
+            const WidgetLayout* target = allWidgets[i];
             if (target == affected || target->widget == nullptr ||
                 target->widget->Class() != affected->widget->Class()) {
                 continue;
@@ -2492,8 +2489,7 @@ std::optional<LayoutEditGapAnchor> DashboardRenderer::FindGapEditAnchor(const La
 std::optional<LayoutEditWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPreviewWidget(
     const std::string& widgetTypeName) const {
     const std::string normalizedName = ToLower(Trim(widgetTypeName));
-    const auto widgetClass =
-        normalizedName.empty() ? std::nullopt : EnumFromString<DashboardWidgetClass>(normalizedName);
+    const auto widgetClass = normalizedName.empty() ? std::nullopt : EnumFromString<WidgetClass>(normalizedName);
     if (!widgetClass.has_value()) {
         return std::nullopt;
     }
@@ -3212,7 +3208,7 @@ bool DashboardRenderer::RebuildTextFormatsAndMetrics() {
     return true;
 }
 
-bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const DashboardWidgetLayout& widget) const {
+bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const WidgetLayout& widget) const {
     if (widget.widget == nullptr || widget.widget->IsVerticalSpring()) {
         return false;
     }
@@ -3222,11 +3218,10 @@ bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const DashboardWidgetL
     return true;
 }
 
-std::vector<const DashboardWidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWidgets(
-    LayoutGuideAxis axis) const {
+std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const {
     struct SimilarityRepresentativeKey {
         std::string cardId;
-        DashboardWidgetClass widgetClass = DashboardWidgetClass::Unknown;
+        WidgetClass widgetClass = WidgetClass::Unknown;
         int extent = 0;
         int edgeStart = 0;
         int edgeEnd = 0;
@@ -3248,7 +3243,7 @@ std::vector<const DashboardWidgetLayout*> DashboardRenderer::CollectSimilarityIn
         }
     };
 
-    std::vector<const DashboardWidgetLayout*> widgets;
+    std::vector<const WidgetLayout*> widgets;
     std::unordered_set<SimilarityRepresentativeKey, SimilarityRepresentativeKeyHash> seenKeys;
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
@@ -3285,7 +3280,7 @@ bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
     return node.name == "rows" || node.name == "columns";
 }
 
-bool DashboardRenderer::UsesFixedPreferredHeightInRows(const DashboardWidgetLayout& widget) const {
+bool DashboardRenderer::UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const {
     return widget.widget != nullptr && widget.widget->UsesFixedPreferredHeightInRows();
 }
 
