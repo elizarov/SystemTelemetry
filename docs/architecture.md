@@ -14,7 +14,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/util/` contains pure shared utilities for paths, command-line text, string trimming, splitting, case folding, whitespace normalization, enum string conversion, UTF-8 conversion, embedded resource loading, localization catalog access, numeric safety, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
 - `src/dashboard_renderer/dashboard_renderer.*` owns the renderer boundary, implements `WidgetRenderer`, and keeps Direct2D, DirectWrite, WIC, and WRL details private to the renderer package. `src/dashboard_renderer/impl/` contains helper modules such as render-to-D2D conversions, palette conversion, palette lookup, Direct2D caches, text measurement caches, and layout resolution state.
-- `src/layout_edit/` contains shared layout-edit interaction, edit-artifact helpers, parameter metadata, hit-priority policy, tooltip, tree, trace-session, and snap-solver modules.
+- `src/layout_edit/` contains shared layout-edit interaction, edit-artifact helpers, parameter metadata, hit-priority policy, tooltip, tree, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
 - `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
@@ -113,6 +113,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Layout-edit flow
 
 - The shell forwards pointer events into the layout-edit controller, which resolves actionable targets from renderer-provided guide and anchor data.
+- Package-private layout-edit helpers live under `src/layout_edit/impl/` when they have no incoming production dependencies from outside `src/layout_edit/`.
 - Edits preview through shared config mutation helpers and the same renderer resolution path used by ordinary runtime rendering.
 - The modeless editor window uses the same config mutation and preview path as drag-based editing so both interaction styles operate on the same session state, and post-menu hover recovery relies on explicit cursor refresh instead of rebuilding hover inside `WM_MOUSELEAVE`.
 
