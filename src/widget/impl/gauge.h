@@ -43,7 +43,7 @@ public:
         RenderRect ringThicknessAnchorRect{};
         RenderRect valueRect{};
         RenderRect labelRect{};
-        std::vector<RenderPath> ringSegments;
+        std::vector<RenderArc> ringSegments;
         std::vector<RenderRect> ringSegmentBounds;
     };
 

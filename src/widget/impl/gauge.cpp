@@ -104,28 +104,15 @@ RenderRect MakeCircleAnchorRect(int centerX, int centerY, int representedDiamete
     return RenderRect{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
 }
 
-RenderPath MakeRingSegmentPath(
+RenderArc MakeRingSegmentArc(
     int centerX, int centerY, int outerRadius, int thickness, double startAngleDegrees, double sweepAngleDegrees) {
-    RenderPath path;
+    RenderArc arc;
     const int innerRadius = (std::max)(0, outerRadius - thickness);
     if (outerRadius <= 0 || thickness <= 0 || innerRadius >= outerRadius || sweepAngleDegrees <= 0.0) {
-        return path;
+        return arc;
     }
-
-    const RenderPoint center{centerX, centerY};
-    const RenderPoint outerStart = PolarPoint(centerX, centerY, outerRadius, startAngleDegrees);
-    const RenderPoint innerEnd = PolarPoint(centerX, centerY, innerRadius, startAngleDegrees + sweepAngleDegrees);
-    path.MoveTo(outerStart);
-    path.ArcTo(center, outerRadius, outerRadius, startAngleDegrees, sweepAngleDegrees);
-    path.LineTo(innerEnd);
-    if (innerRadius > 0) {
-        path.ArcTo(center, innerRadius, innerRadius, startAngleDegrees + sweepAngleDegrees, -sweepAngleDegrees);
-    } else {
-        path.LineTo(center);
-    }
-    path.LineTo(outerStart);
-    path.Close();
-    return path;
+    const int radius = (std::max)(1, outerRadius - (thickness / 2));
+    return RenderArc{RenderPoint{centerX, centerY}, radius, radius, startAngleDegrees, sweepAngleDegrees};
 }
 
 RenderRect ComputeGaugeSegmentBounds(
@@ -257,7 +244,7 @@ void GaugeWidget::ResolveLayoutState(const WidgetRenderer& renderer, const Rende
     for (int i = 0; i < layoutState_.segmentLayout.segmentCount; ++i) {
         const double slotStart =
             layoutState_.segmentLayout.gaugeStart + layoutState_.segmentLayout.pitchSweep * static_cast<double>(i);
-        layoutState_.ringSegments.push_back(MakeRingSegmentPath(layoutState_.cx,
+        layoutState_.ringSegments.push_back(MakeRingSegmentArc(layoutState_.cx,
             layoutState_.cy,
             layoutState_.outerRadius,
             layoutState_.ringThickness,
@@ -292,16 +279,21 @@ void GaugeWidget::Draw(
                   0,
                   gaugeLayout.segmentCount - 1);
 
-    renderer.FillPaths(layoutState_.ringSegments, RenderColorId::Track);
+    const RenderStroke trackStroke =
+        RenderStroke::Solid(RenderColorId::Track, static_cast<float>(layoutState_.ringThickness));
+    renderer.DrawArcs(layoutState_.ringSegments, trackStroke);
     if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank && filledSegments > 0) {
-        renderer.FillPaths(
-            std::span<const RenderPath>(layoutState_.ringSegments.data(), static_cast<size_t>(filledSegments)),
-            RenderColorId::Accent);
+        const RenderStroke accentStroke =
+            RenderStroke::Solid(RenderColorId::Accent, static_cast<float>(layoutState_.ringThickness));
+        renderer.DrawArcs(
+            std::span<const RenderArc>(layoutState_.ringSegments.data(), static_cast<size_t>(filledSegments)),
+            accentStroke);
     }
     if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank && peakSegment >= 0 &&
         static_cast<size_t>(peakSegment) < layoutState_.ringSegments.size()) {
         const size_t peakSegmentIndex = static_cast<size_t>(peakSegment);
-        renderer.FillPath(layoutState_.ringSegments[peakSegmentIndex], RenderColorId::PeakGhost);
+        renderer.DrawArc(layoutState_.ringSegments[peakSegmentIndex],
+            RenderStroke::Solid(RenderColorId::PeakGhost, static_cast<float>(layoutState_.ringThickness)));
         if (peakSegmentIndex < layoutState_.ringSegmentBounds.size() &&
             !layoutState_.ringSegmentBounds[peakSegmentIndex].IsEmpty()) {
             renderer.RegisterDynamicColorEditRegion(

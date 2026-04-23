@@ -63,7 +63,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `DashboardRenderer` owns static layout resolution, renderer resource lifetime, icon loading, text measurement, live window rendering, and screenshot export rendering.
 - Shared widget-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
-- `WidgetRenderer` is the renderer-neutral interface consumed by widgets; it exposes text operations and primitive render geometry such as rectangles, ellipses, rounded rectangles, lines, polylines, and filled paths. Widgets own widget-specific spaces and geometry such as gauges and capsule bars, and `DashboardRenderer` translates primitive draw requests into Direct2D internally.
+- `WidgetRenderer` is the renderer-neutral interface consumed by widgets; it exposes text operations and primitive render geometry such as rectangles, ellipses, rounded rectangles, lines, arcs, polylines, and filled paths. Widgets own widget-specific spaces and geometry such as gauges and capsule bars, and `DashboardRenderer` translates primitive draw requests into Direct2D internally.
 - Widget draw modules refer to colors by render color id; `DashboardRenderer` keeps the resolved RGBA palette private and maps ids to colors internally.
 - Widget modules own widget-local preferred-size logic, draw behavior, and layout-edit artifact registration.
 - `MetricSource` adapts `SystemSnapshot` into widget-facing values, histories, drive rows, and formatted text while caching per-frame derived results.

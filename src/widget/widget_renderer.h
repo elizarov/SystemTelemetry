@@ -66,6 +66,8 @@ public:
     virtual bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) = 0;
     virtual bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) = 0;
     virtual bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) = 0;
+    virtual bool DrawArc(const RenderArc& arc, const RenderStroke& stroke) = 0;
+    virtual bool DrawArcs(std::span<const RenderArc> arcs, const RenderStroke& stroke) = 0;
     virtual bool DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) = 0;
     virtual bool FillPath(const RenderPath& path, RenderColorId color) = 0;
     virtual bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) = 0;

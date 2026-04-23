@@ -26,7 +26,7 @@ D2D1_SWEEP_DIRECTION ArcSweepDirection(double sweepAngleDegrees) {
     return sweepAngleDegrees >= 0.0 ? D2D1_SWEEP_DIRECTION_CLOCKWISE : D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE;
 }
 
-void AddArcSegments(ID2D1GeometrySink* sink, const RenderPathArc& arc) {
+void AddArcSegments(ID2D1GeometrySink* sink, const RenderPathArc& arc, D2D1_POINT_2F endPoint) {
     if (sink == nullptr || arc.radiusX <= 0 || arc.radiusY <= 0 || arc.sweepAngleDegrees == 0.0) {
         return;
     }
@@ -46,8 +46,7 @@ void AddArcSegments(ID2D1GeometrySink* sink, const RenderPathArc& arc) {
     }
 
     if (remaining != 0.0) {
-        const double end = start + remaining;
-        sink->AddArc(D2D1::ArcSegment(ArcPoint(arc, end),
+        sink->AddArc(D2D1::ArcSegment(endPoint,
             D2D1::SizeF(static_cast<float>(arc.radiusX), static_cast<float>(arc.radiusY)),
             0.0f,
             ArcSweepDirection(remaining),
@@ -55,7 +54,70 @@ void AddArcSegments(ID2D1GeometrySink* sink, const RenderPathArc& arc) {
     }
 }
 
+bool AddRenderArcFigure(ID2D1GeometrySink* sink, const RenderArc& arc) {
+    if (sink == nullptr || arc.radiusX <= 0 || arc.radiusY <= 0 || arc.sweepAngleDegrees == 0.0) {
+        return false;
+    }
+
+    const RenderPathArc pathArc{arc.center, arc.radiusX, arc.radiusY, arc.startAngleDegrees, arc.sweepAngleDegrees};
+    sink->BeginFigure(ArcPoint(pathArc, arc.startAngleDegrees), D2D1_FIGURE_BEGIN_HOLLOW);
+    AddArcSegments(sink, pathArc, ArcPoint(pathArc, arc.startAngleDegrees + arc.sweepAngleDegrees));
+    sink->EndFigure(D2D1_FIGURE_END_OPEN);
+    return true;
+}
+
 }  // namespace
+
+Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DRenderArcGeometry(ID2D1Factory* factory, const RenderArc& arc) {
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
+    if (factory == nullptr || arc.radiusX <= 0 || arc.radiusY <= 0 || arc.sweepAngleDegrees == 0.0) {
+        return geometry;
+    }
+
+    if (FAILED(factory->CreatePathGeometry(geometry.GetAddressOf())) || geometry == nullptr) {
+        return {};
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+    if (FAILED(geometry->Open(sink.GetAddressOf())) || sink == nullptr) {
+        return {};
+    }
+    AddRenderArcFigure(sink.Get(), arc);
+    if (FAILED(sink->Close())) {
+        return {};
+    }
+    return geometry;
+}
+
+Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DRenderArcsGeometry(
+    ID2D1Factory* factory, std::span<const RenderArc> arcs) {
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
+    if (factory == nullptr || arcs.empty()) {
+        return geometry;
+    }
+
+    if (FAILED(factory->CreatePathGeometry(geometry.GetAddressOf())) || geometry == nullptr) {
+        return {};
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+    if (FAILED(geometry->Open(sink.GetAddressOf())) || sink == nullptr) {
+        return {};
+    }
+
+    bool hasFigure = false;
+    for (const RenderArc& arc : arcs) {
+        hasFigure = AddRenderArcFigure(sink.Get(), arc) || hasFigure;
+    }
+    if (!hasFigure) {
+        sink->Close();
+        return {};
+    }
+    if (FAILED(sink->Close())) {
+        return {};
+    }
+    return geometry;
+}
 
 Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DRenderPathGeometry(ID2D1Factory* factory, const RenderPath& path) {
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
@@ -74,7 +136,7 @@ Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DRenderPathGeometry(ID2D1Facto
     sink->SetFillMode(D2D1_FILL_MODE_WINDING);
 
     bool figureOpen = false;
-    for (const RenderPathCommand& command : path.commands) {
+    for (const RenderPathCommand& command : path.Commands()) {
         switch (command.type) {
             case RenderPathCommandType::MoveTo:
                 if (figureOpen) {
@@ -90,7 +152,7 @@ Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DRenderPathGeometry(ID2D1Facto
                 break;
             case RenderPathCommandType::ArcTo:
                 if (figureOpen) {
-                    AddArcSegments(sink.Get(), command.arc);
+                    AddArcSegments(sink.Get(), command.arc, D2DPointFromRenderPoint(command.point));
                 }
                 break;
             case RenderPathCommandType::Close:

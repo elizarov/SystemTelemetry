@@ -1,6 +1,18 @@
 #include "widget/render_types.h"
 
 #include <algorithm>
+#include <cmath>
+
+namespace {
+
+RenderPoint PathArcEndPoint(const RenderPathArc& arc) {
+    const double radians = (arc.startAngleDegrees + arc.sweepAngleDegrees) * 3.14159265358979323846 / 180.0;
+    return RenderPoint{
+        arc.center.x + static_cast<int>(std::lround(std::cos(radians) * static_cast<double>(arc.radiusX))),
+        arc.center.y + static_cast<int>(std::lround(std::sin(radians) * static_cast<double>(arc.radiusY)))};
+}
+
+}  // namespace
 
 int RenderRect::Width() const {
     return (std::max)(0, right - left);
@@ -35,15 +47,22 @@ RenderStroke RenderStroke::Dotted(RenderColorId color, float width) {
 }
 
 bool RenderPath::IsEmpty() const {
-    return commands.empty();
+    return commandCount_ == 0;
+}
+
+std::span<const RenderPathCommand> RenderPath::Commands() const {
+    if (!overflowCommands_.empty()) {
+        return overflowCommands_;
+    }
+    return std::span<const RenderPathCommand>(inlineCommands_.data(), commandCount_);
 }
 
 void RenderPath::MoveTo(RenderPoint point) {
-    commands.push_back(RenderPathCommand{RenderPathCommandType::MoveTo, point, {}});
+    PushCommand(RenderPathCommand{RenderPathCommandType::MoveTo, point, {}});
 }
 
 void RenderPath::LineTo(RenderPoint point) {
-    commands.push_back(RenderPathCommand{RenderPathCommandType::LineTo, point, {}});
+    PushCommand(RenderPathCommand{RenderPathCommandType::LineTo, point, {}});
 }
 
 void RenderPath::ArcTo(
@@ -51,11 +70,25 @@ void RenderPath::ArcTo(
     RenderPathCommand command;
     command.type = RenderPathCommandType::ArcTo;
     command.arc = RenderPathArc{center, radiusX, radiusY, startAngleDegrees, sweepAngleDegrees};
-    commands.push_back(command);
+    command.point = PathArcEndPoint(command.arc);
+    PushCommand(command);
 }
 
 void RenderPath::Close() {
-    commands.push_back(RenderPathCommand{RenderPathCommandType::Close, {}, {}});
+    PushCommand(RenderPathCommand{RenderPathCommandType::Close, {}, {}});
+}
+
+void RenderPath::PushCommand(const RenderPathCommand& command) {
+    if (overflowCommands_.empty() && commandCount_ < inlineCommands_.size()) {
+        inlineCommands_[commandCount_] = command;
+    } else {
+        if (overflowCommands_.empty()) {
+            overflowCommands_.reserve(inlineCommands_.size() * 2);
+            overflowCommands_.insert(overflowCommands_.end(), inlineCommands_.begin(), inlineCommands_.end());
+        }
+        overflowCommands_.push_back(command);
+    }
+    ++commandCount_;
 }
 
 TextLayoutOptions TextLayoutOptions::SingleLine(

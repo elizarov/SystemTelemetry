@@ -2883,6 +2883,23 @@ bool DashboardRenderer::DrawSolidLine(RenderPoint start, RenderPoint end, const 
     return true;
 }
 
+bool DashboardRenderer::DrawArc(const RenderArc& arc, const RenderStroke& stroke) {
+    if (!IsDrawActive()) {
+        return false;
+    }
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = CreateD2DRenderArcGeometry(d2dFactory_.Get(), arc);
+    return DrawD2DGeometry(geometry.Get(), stroke);
+}
+
+bool DashboardRenderer::DrawArcs(std::span<const RenderArc> arcs, const RenderStroke& stroke) {
+    if (!IsDrawActive() || arcs.empty()) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = CreateD2DRenderArcsGeometry(d2dFactory_.Get(), arcs);
+    return DrawD2DGeometry(geometry.Get(), stroke);
+}
+
 Microsoft::WRL::ComPtr<ID2D1PathGeometry> DashboardRenderer::CreateD2DPathGeometry() const {
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
     if (d2dFactory_ != nullptr) {
@@ -2920,6 +2937,21 @@ bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId c
         return false;
     }
     d2dActiveRenderTarget_->FillGeometry(geometry, brush);
+    return true;
+}
+
+bool DashboardRenderer::DrawD2DGeometry(ID2D1Geometry* geometry, const RenderStroke& stroke) {
+    if (!IsDrawActive() || geometry == nullptr) {
+        return false;
+    }
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(stroke.color);
+    if (brush == nullptr) {
+        return false;
+    }
+    d2dActiveRenderTarget_->DrawGeometry(geometry,
+        brush,
+        (std::max)(1.0f, stroke.width),
+        stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
     return true;
 }
 

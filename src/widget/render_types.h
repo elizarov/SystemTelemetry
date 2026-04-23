@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 struct RenderPoint {
@@ -66,6 +68,14 @@ struct RenderStroke {
     static RenderStroke Dotted(RenderColorId color, float width = 1.0f);
 };
 
+struct RenderArc {
+    RenderPoint center{};
+    int radiusX = 0;
+    int radiusY = 0;
+    double startAngleDegrees = 0.0;
+    double sweepAngleDegrees = 0.0;
+};
+
 enum class RenderPathCommandType {
     MoveTo,
     LineTo,
@@ -88,9 +98,9 @@ struct RenderPathCommand {
 };
 
 struct RenderPath {
-    std::vector<RenderPathCommand> commands;
-
     bool IsEmpty() const;
+
+    std::span<const RenderPathCommand> Commands() const;
 
     void MoveTo(RenderPoint point);
 
@@ -99,6 +109,15 @@ struct RenderPath {
     void ArcTo(RenderPoint center, int radiusX, int radiusY, double startAngleDegrees, double sweepAngleDegrees);
 
     void Close();
+
+private:
+    static constexpr size_t InlineCommandCapacity = 8;
+
+    void PushCommand(const RenderPathCommand& command);
+
+    std::array<RenderPathCommand, InlineCommandCapacity> inlineCommands_{};
+    std::vector<RenderPathCommand> overflowCommands_;
+    size_t commandCount_ = 0;
 };
 
 enum class TextStyleId {

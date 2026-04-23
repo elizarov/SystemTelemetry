@@ -30,15 +30,15 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured `edit-layout` result reached during this workstream:
-  - `drag_loop per_iter_ms=2.41`
-  - `snap avg_ms=0.19`
-  - `apply avg_ms=0.13`
+  - `drag_loop per_iter_ms=2.36`
+  - `snap avg_ms=0.18`
+  - `apply avg_ms=0.08`
   - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.41` to `2.48`
-  - `snap avg_ms=0.19` to `0.20`
-  - `apply avg_ms=0.13`
-  - `paint_draw avg_ms=2.09` to `2.15`
+  - `drag_loop per_iter_ms=2.36` to `2.41`
+  - `snap avg_ms=0.18` to `0.19`
+  - `apply avg_ms=0.08`
+  - `paint_draw avg_ms=2.10` to `2.14`
 - Current repeatable `update-telemetry` result on the current tree:
   - `update_loop per_iter_ms=3.95` to `4.03`
   - `telemetry_update avg_ms=2.11` to `2.18`
@@ -556,6 +556,23 @@ These changes produced real wins and remain in the codebase:
   - The benchmark keeps the same Direct2D and DirectWrite hotspot shape while removing the last benchmark-process `GdiPlus.dll` dependency and keeping icon decode, scale, screenshot export, and bitmap upload on one WIC plus Direct2D asset path.
 - Conclusion:
   - Keep the WIC-based icon path. Future renderer cleanup can assume panel icons, screenshots, and the live frame all stay off GDI+.
+
+### Hypothesis: Keep widget renderer geometry primitive-only with generic paths and arcs
+
+- Change:
+  - Replace widget-facing gauge ring and pill-bar renderer helpers with primitive filled paths, stroked arcs, rounded rectangles, and ellipses; move gauge segment construction and capsule-bar layout into widget code; keep Direct2D conversion generic inside the renderer package.
+- Result:
+  - Initially regressed the maintained layout-edit draw benchmark, then recovered after switching gauge segments from filled annular paths to widget-owned neutral arc primitives and batching those arcs into one renderer-private D2D path.
+- Observed effect:
+  - Before this change, the current direct baseline was `drag_loop per_iter_ms=2.41` to `2.48`, `snap avg_ms=0.19` to `0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.09` to `2.15`.
+  - After this change, `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` first landed at `drag_loop per_iter_ms=2.60`, `snap avg_ms=0.18`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.30`; a confirmation rerun landed at `drag_loop per_iter_ms=2.59`, `snap avg_ms=0.18`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.29`.
+  - `build\SystemTelemetryBenchmarks.exe edit-layout 480 2` landed at `drag_loop per_iter_ms=2.58`, `snap avg_ms=0.19`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.28`.
+  - A small follow-up that keeps common `RenderPath` commands inline and stores arc endpoints in the path command did not recover the regression; reruns landed between `drag_loop per_iter_ms=2.52` and `2.60` and `paint_draw avg_ms=2.25` and `2.31`.
+  - The daemon-backed `profile_benchmark.cmd edit-layout 240 2` capture was noisy and reported lost ETW events, while a shorter `profile_benchmark.cmd edit-layout 60 2` capture still pointed the frame cost at the Direct2D, DirectWrite, and driver stack rather than snap, apply, or app-owned helper logic.
+  - Replacing gauge filled annular segment paths with widget-owned `RenderArc` geometry and neutral `DrawArc`/`DrawArcs` renderer primitives recovered most of the regression: `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` landed at `drag_loop per_iter_ms=2.43`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.17`; confirmation reruns landed at `drag_loop per_iter_ms=2.47` to `2.48`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.22`.
+  - Batching `DrawArcs` through a single renderer-private D2D path geometry instead of one path per arc plus a geometry group recovered the remaining cost: `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` landed at `drag_loop per_iter_ms=2.39` to `2.41`, `snap avg_ms=0.18` to `0.19`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.13` to `2.14`, while `build\SystemTelemetryBenchmarks.exe edit-layout 480 2` landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.10`.
+- Conclusion:
+  - Keep the primitive-only widget renderer boundary, but avoid representing every widget-specific shape as a filled generic path when a neutral primitive maps to a cheaper renderer operation. Widgets still own gauge and capsule-bar geometry, while the renderer owns only generic path, arc, rounded-rect, ellipse, and polyline drawing; renderer-private batching is the right place to recover performance without reintroducing widget-specific renderer helpers.
 
 ### Hypothesis: Reuse one GDI+ `Graphics` object across the whole frame
 

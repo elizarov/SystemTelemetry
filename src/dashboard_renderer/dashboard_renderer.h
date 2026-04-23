@@ -109,6 +109,8 @@ public:
     bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) override;
     bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) override;
     bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) override;
+    bool DrawArc(const RenderArc& arc, const RenderStroke& stroke) override;
+    bool DrawArcs(std::span<const RenderArc> arcs, const RenderStroke& stroke) override;
     bool DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) override;
     bool FillPath(const RenderPath& path, RenderColorId color) override;
     bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) override;
@@ -231,6 +233,7 @@ private:
     Microsoft::WRL::ComPtr<ID2D1GeometryGroup> CreateD2DGeometryGroup(
         std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
     bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId color);
+    bool DrawD2DGeometry(ID2D1Geometry* geometry, const RenderStroke& stroke);
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
