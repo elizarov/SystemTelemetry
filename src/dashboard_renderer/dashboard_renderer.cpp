@@ -2373,12 +2373,22 @@ std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorTarge
     for (const auto& region : layoutResolver_->dynamicEditableAnchorRegions_) {
         regions.push_back(&region);
     }
+    const LayoutEditAnchorRegion* bestRegion = nullptr;
+    long long bestArea = (std::numeric_limits<long long>::max)();
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
-        if ((*it)->targetRect.Contains(clientPoint)) {
-            return (*it)->key;
+        if (!(*it)->targetRect.Contains(clientPoint)) {
+            continue;
+        }
+
+        const long long width = (std::max<LONG>)(0, (*it)->targetRect.right - (*it)->targetRect.left);
+        const long long height = (std::max<LONG>)(0, (*it)->targetRect.bottom - (*it)->targetRect.top);
+        const long long area = width * height;
+        if (bestRegion == nullptr || area < bestArea) {
+            bestRegion = *it;
+            bestArea = area;
         }
     }
-    return std::nullopt;
+    return bestRegion != nullptr ? std::optional<LayoutEditAnchorKey>(bestRegion->key) : std::nullopt;
 }
 
 std::optional<LayoutEditAnchorKey> DashboardRenderer::HitTestEditableAnchorHandle(RenderPoint clientPoint) const {

@@ -449,7 +449,7 @@ void DriveUsageListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Wi
         1.0,
         true,
         true,
-        true,
+        false,
         config.activitySegments);
     renderer.RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
@@ -457,30 +457,24 @@ void DriveUsageListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Wi
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
         renderer.MakeEditableTextBinding(
             widget, WidgetRenderer::LayoutEditParameter::FontSmall, 0, renderer.Config().layout.fonts.smallText.size),
-        WidgetRenderer::LayoutEditParameter::ColorMutedText,
-        false);
+        WidgetRenderer::LayoutEditParameter::ColorMutedText);
     renderer.RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
-        renderer.MakeMetricTextBinding(widget, "drive.activity.read", 100),
-        std::nullopt,
-        false);
+        renderer.MakeMetricTextBinding(widget, "drive.activity.read", 100));
     renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
         renderer.MakeEditableTextBinding(
             widget, WidgetRenderer::LayoutEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size),
-        WidgetRenderer::LayoutEditParameter::ColorMutedText,
-        false);
+        WidgetRenderer::LayoutEditParameter::ColorMutedText);
     renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
-        renderer.MakeMetricTextBinding(widget, "drive.activity.write", 101),
-        std::nullopt,
-        false);
+        renderer.MakeMetricTextBinding(widget, "drive.activity.write", 101));
     renderer.RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
         ResolveDriveMetricLabel(renderer, "drive.usage", "Usage"),
         TextStyleId::Small,

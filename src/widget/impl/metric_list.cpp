@@ -236,7 +236,7 @@ void MetricListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Widget
             RenderPoint{anchorCenterX, anchorCenterY},
             1.0,
             true,
-            true,
+            false,
             true,
             config.barHeight);
         renderer.RegisterStaticEditableAnchorRegion(
