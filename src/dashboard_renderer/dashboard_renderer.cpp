@@ -200,6 +200,10 @@ RenderRect UnionRect(const RenderRect& left, const RenderRect& right) {
         (std::max)(left.bottom, right.bottom)};
 }
 
+bool SameRect(const RenderRect& left, const RenderRect& right) {
+    return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
+}
+
 bool IsFontEditParameter(LayoutEditParameter parameter) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
     return descriptor.has_value() && descriptor->valueFormat == configschema::ValueFormat::FontSpec;
@@ -659,28 +663,14 @@ void DashboardRenderer::DrawHoveredWidgetHighlight(const DashboardOverlayState& 
     if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
-    if (!overlayState.ShouldDrawLayoutEditAffordances() || !overlayState.hoveredEditableWidget.has_value() ||
-        overlayState.hoveredEditableWidget->kind != LayoutEditWidgetIdentity::Kind::Widget) {
+    if (!overlayState.ShouldDrawLayoutEditAffordances()) {
         return;
     }
-
-    const WidgetLayout* hoveredWidget = nullptr;
-    for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
-        for (const auto& widget : card.widgets) {
-            if (MatchesWidgetIdentity(widget, *overlayState.hoveredEditableWidget)) {
-                hoveredWidget = &widget;
-                break;
-            }
-        }
-        if (hoveredWidget != nullptr) {
-            break;
-        }
-    }
-    if (hoveredWidget == nullptr) {
+    const std::optional<RenderRect> hoveredRect = FindHoveredWidgetOutlineRect(overlayState);
+    if (!hoveredRect.has_value() || hoveredRect->IsEmpty()) {
         return;
     }
-    const_cast<DashboardRenderer*>(this)->DrawSolidRect(
-        hoveredWidget->rect, RenderStroke::Solid(RenderColorId::LayoutGuide));
+    const_cast<DashboardRenderer*>(this)->DrawSolidRect(*hoveredRect, RenderStroke::Solid(RenderColorId::LayoutGuide));
 }
 
 void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverlayState& overlayState) const {
@@ -702,15 +692,11 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverla
         }
         existing->second = existing->second || active;
     };
-    const auto sameRect = [](const RenderRect& left, const RenderRect& right) {
-        return left.left == right.left && left.top == right.top && left.right == right.right &&
-               left.bottom == right.bottom;
-    };
     const auto appendRelatedHighlights = [&](const LayoutEditAnchorRegion& source, bool active) {
         const auto collect = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
             for (const auto& region : regions) {
                 if (!::MatchesWidgetIdentity(region.key.widget, source.key.widget) ||
-                    !sameRect(region.targetRect, source.targetRect)) {
+                    !SameRect(region.targetRect, source.targetRect)) {
                     continue;
                 }
                 LayoutEditAnchorRegion highlightedRegion = region;
@@ -786,9 +772,15 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverla
     if (highlights.empty()) {
         return;
     }
+    const std::optional<RenderRect> hoveredWidgetOutlineRect = FindHoveredWidgetOutlineRect(overlayState);
     for (const auto& [highlighted, active] : highlights) {
         const RenderColorId outlineColor = active ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
-        if (highlighted.drawTargetOutline && !highlighted.targetRect.IsEmpty()) {
+        bool drawTargetOutline = highlighted.drawTargetOutline && !highlighted.targetRect.IsEmpty();
+        if (!active && drawTargetOutline && hoveredWidgetOutlineRect.has_value() &&
+            SameRect(highlighted.targetRect, *hoveredWidgetOutlineRect)) {
+            drawTargetOutline = false;
+        }
+        if (drawTargetOutline) {
             const_cast<DashboardRenderer*>(this)->DrawDottedHighlightRect(highlighted.targetRect, outlineColor, active);
         }
 
@@ -852,6 +844,34 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverla
             const_cast<DashboardRenderer*>(this)->FillSolidRect(highlighted.anchorRect, outlineColor);
         }
     }
+}
+
+std::optional<RenderRect> DashboardRenderer::FindHoveredWidgetOutlineRect(
+    const DashboardOverlayState& overlayState) const {
+    if (overlayState.hoveredEditableWidget.has_value() &&
+        overlayState.hoveredEditableWidget->kind == LayoutEditWidgetIdentity::Kind::Widget) {
+        for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
+            for (const auto& widget : card.widgets) {
+                if (MatchesWidgetIdentity(widget, *overlayState.hoveredEditableWidget)) {
+                    return widget.rect;
+                }
+            }
+        }
+    }
+
+    if (overlayState.hoveredEditableCard.has_value() &&
+        overlayState.hoveredEditableCard->kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
+        for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
+            const LayoutEditWidgetIdentity cardIdentity{
+                card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+            if (MatchesCardChromeSelectionIdentity(*overlayState.hoveredEditableCard, cardIdentity) &&
+                !card.chromeLayout.titleRect.IsEmpty()) {
+                return card.chromeLayout.titleRect;
+            }
+        }
+    }
+
+    return std::nullopt;
 }
 
 void DashboardRenderer::DrawSelectedColorEditHighlights(const DashboardOverlayState& overlayState) const {

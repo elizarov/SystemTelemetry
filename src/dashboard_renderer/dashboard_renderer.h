@@ -182,6 +182,7 @@ private:
     void DrawLayoutEditGuides(const DashboardOverlayState& overlayState) const;
     void DrawWidgetEditGuides(const DashboardOverlayState& overlayState) const;
     void DrawGapEditAnchors(const DashboardOverlayState& overlayState) const;
+    std::optional<RenderRect> FindHoveredWidgetOutlineRect(const DashboardOverlayState& overlayState) const;
     void DrawDottedHighlightRect(const RenderRect& rect, RenderColorId color, bool active, bool outside = true) const;
     void DrawLayoutSimilarityIndicators(const DashboardOverlayState& overlayState) const;
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
