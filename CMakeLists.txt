@@ -282,6 +282,7 @@ add_executable(SystemTelemetryTests
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit/layout_edit_parameter.cpp
     src/layout_edit/layout_edit_tooltip.cpp
+    src/util/strings.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
     src/layout_edit/layout_snap_solver.cpp

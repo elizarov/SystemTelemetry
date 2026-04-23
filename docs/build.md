@@ -10,7 +10,7 @@ See also: [docs/project.md](project.md) for repository policy, [docs/diagnostics
 - Visual Studio 2026 Insiders (`18`) C++/CLI support
 - .NET Framework 4.8 SDK
 - vcpkg available either through the active Visual Studio developer environment or through `VCPKG_ROOT`
-- Graphviz `dot` available on `PATH` for rendering the source dependency SVG during lint
+- Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
 - AMD Software: Adrenalin Edition when AMD GPU telemetry is required
 - Gigabyte SIV installed when Gigabyte board temperature or fan telemetry is required
 
@@ -54,7 +54,7 @@ install.cmd
 ## Developer Tooling Entrypoints
 
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources.
-- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT, GraphML, and Graphviz-rendered SVG under `build\architecture\`. The optional tidy sweep writes `build\clang_tidy_report.txt`, uses a one-minute per-file timeout, filters maintained include-cleaner false positives, and excludes `src\diagnostics\snapshot_dump.cpp` because the active Clang diagnostics stall on that translation unit.
+- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep writes `build\clang_tidy_report.txt`, uses a one-minute per-file timeout, filters maintained include-cleaner false positives, and excludes `src\diagnostics\snapshot_dump.cpp` because the active Clang diagnostics stall on that translation unit.
 - `profile_benchmark.cmd` is the maintained entrypoint for elevated benchmark profiling and daemon-backed benchmark requests.
 - `devenv.cmd` is the maintained environment bootstrap for local builds and tool runs.
 

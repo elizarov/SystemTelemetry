@@ -3,39 +3,9 @@
 #include <algorithm>
 #include <cctype>
 
+#include "util/strings.h"
+
 namespace {
-
-std::string Trim(std::string value) {
-    const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
-    const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
-    if (first == value.end()) {
-        return {};
-    }
-    const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
-    return std::string(first, last);
-}
-
-std::vector<std::string> Split(const std::string& input, char delimiter) {
-    std::vector<std::string> parts;
-    std::string current;
-    for (char ch : input) {
-        if (ch == delimiter) {
-            const std::string trimmed = Trim(current);
-            if (!trimmed.empty()) {
-                parts.push_back(trimmed);
-            }
-            current.clear();
-            continue;
-        }
-        current.push_back(ch);
-    }
-
-    const std::string trimmed = Trim(current);
-    if (!trimmed.empty()) {
-        parts.push_back(trimmed);
-    }
-    return parts;
-}
 
 bool IsValidMetricId(std::string_view metricId) {
     if (metricId.empty()) {
@@ -61,8 +31,7 @@ void AddUniqueValue(std::vector<std::string>& values, const std::string& value) 
 
 void CollectLayoutBindingsRecursive(
     const LayoutNodeConfig& node, std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
-    for (const std::string& token : Split(node.parameter, ',')) {
-        const std::string metricRef = Trim(token);
+    for (const std::string& metricRef : SplitTrimmed(node.parameter, ',')) {
         if (!IsValidMetricId(metricRef)) {
             continue;
         }

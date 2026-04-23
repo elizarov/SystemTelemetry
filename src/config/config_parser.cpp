@@ -11,47 +11,10 @@
 #include "config/widget_class.h"
 #include "resource.h"
 #include "util/resource_loader.h"
+#include "util/strings.h"
 #include "util/utf8.h"
 
 namespace {
-
-std::string Trim(const std::string& input) {
-    const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
-    const auto first = std::find_if_not(input.begin(), input.end(), isSpace);
-    if (first == input.end()) {
-        return {};
-    }
-    const auto last = std::find_if_not(input.rbegin(), input.rend(), isSpace).base();
-    return std::string(first, last);
-}
-
-std::vector<std::string> Split(const std::string& input, char delimiter) {
-    std::vector<std::string> parts;
-    std::stringstream stream(input);
-    std::string item;
-    while (std::getline(stream, item, delimiter)) {
-        const std::string trimmed = Trim(item);
-        if (!trimmed.empty()) {
-            parts.push_back(trimmed);
-        }
-    }
-    return parts;
-}
-
-std::vector<std::string> SplitPreservingEmpty(const std::string& input, char delimiter) {
-    std::vector<std::string> parts;
-    std::string current;
-    for (const char ch : input) {
-        if (ch == delimiter) {
-            parts.push_back(Trim(current));
-            current.clear();
-            continue;
-        }
-        current.push_back(ch);
-    }
-    parts.push_back(Trim(current));
-    return parts;
-}
 
 int ParseIntOrDefault(const std::string& value, int fallback) {
     try {
@@ -94,7 +57,7 @@ ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallbac
 }
 
 bool ParseIntPair(const std::string& value, int& first, int& second) {
-    const std::vector<std::string> parts = Split(value, ',');
+    const std::vector<std::string> parts = SplitTrimmed(value, ',');
     if (parts.size() != 2) {
         return false;
     }
@@ -113,7 +76,7 @@ bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
 
 bool ParseMetricDefinition(
     const std::string& value, MetricDefinitionConfig& definition, const ConfigParseContext& context) {
-    const std::vector<std::string> parts = SplitPreservingEmpty(value, ',');
+    const std::vector<std::string> parts = SplitTrimmedPreservingEmpty(value, ',');
     const std::optional<MetricDisplayStyle> metadataStyle = context.metricCatalog.FindMetricDisplayStyle(definition.id);
     if (!metadataStyle.has_value()) {
         return false;
@@ -143,7 +106,7 @@ bool ParseMetricDefinition(
 }
 
 void ParseFontSpec(UiFontConfig& font, const std::string& value) {
-    const std::vector<std::string> parts = Split(value, ',');
+    const std::vector<std::string> parts = SplitTrimmed(value, ',');
     if (parts.size() != 3) {
         return;
     }
@@ -192,7 +155,7 @@ void DecodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(UiFontConfig& 
 template <>
 void DecodeConfigValue<configschema::StringCodec, std::vector<std::string>>(
     std::vector<std::string>& target, const std::string& value) {
-    target = Split(value, ',');
+    target = SplitTrimmed(value, ',');
 }
 
 template <typename Section>

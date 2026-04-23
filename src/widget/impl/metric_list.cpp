@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <optional>
-#include <sstream>
 
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "telemetry/metrics.h"
@@ -29,14 +28,7 @@ std::unique_ptr<DashboardWidget> MetricListWidget::Clone() const {
 
 void MetricListWidget::Initialize(const LayoutNodeConfig& node) {
     metricRefs_.clear();
-    std::stringstream stream(node.parameter);
-    std::string item;
-    while (std::getline(stream, item, ',')) {
-        const std::string metricRef = Trim(item);
-        if (!metricRef.empty()) {
-            metricRefs_.push_back(metricRef);
-        }
-    }
+    metricRefs_ = SplitTrimmed(node.parameter, ',');
 }
 
 int MetricListWidget::PreferredHeight(const DashboardRenderer& renderer) const {

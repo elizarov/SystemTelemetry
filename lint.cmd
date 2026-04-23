@@ -12,7 +12,7 @@ python tools\check_architecture.py
 if errorlevel 1 set "failed=1"
 
 echo Running source dependency checks...
-python tools\source_dependency_graph.py --check
+python tools\source_dependency_graph.py --check --skip-svg
 if errorlevel 1 set "failed=1"
 
 echo Running include style checks...

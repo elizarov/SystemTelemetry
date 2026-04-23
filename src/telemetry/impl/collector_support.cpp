@@ -1,7 +1,6 @@
 #include "telemetry/impl/collector_support.h"
 
 #include <array>
-#include <cctype>
 #include <cstdio>
 #include <intrin.h>
 #include <string_view>
@@ -10,25 +9,6 @@
 #include "util/strings.h"
 
 namespace {
-
-std::string CollapseAsciiWhitespace(std::string value) {
-    std::string collapsed;
-    collapsed.reserve(value.size());
-
-    bool pendingSpace = false;
-    for (unsigned char ch : value) {
-        if (std::isspace(ch)) {
-            pendingSpace = !collapsed.empty();
-            continue;
-        }
-        if (pendingSpace) {
-            collapsed.push_back(' ');
-            pendingSpace = false;
-        }
-        collapsed.push_back(static_cast<char>(ch));
-    }
-    return collapsed;
-}
 
 std::string DetectCpuNameFromCpuid() {
     int maxExtendedLeaf[4]{};

@@ -1,24 +1,13 @@
 #include "util/localization_catalog.h"
 
-#include <algorithm>
-
 #include "resource.h"
 #include "util/resource_loader.h"
+#include "util/strings.h"
 
 namespace {
 
 LocalizationCatalogMap g_localizationCatalog;
 bool g_localizationCatalogInitialized = false;
-
-std::string Trim(std::string value) {
-    const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
-    const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
-    if (first == value.end()) {
-        return {};
-    }
-    const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
-    return std::string(first, last);
-}
 
 }  // namespace
 
@@ -31,7 +20,7 @@ LocalizationCatalogMap ParseLocalizationCatalog(std::string_view text) {
             lineEnd = text.size();
         }
 
-        std::string line = Trim(std::string(text.substr(lineStart, lineEnd - lineStart)));
+        std::string line = Trim(text.substr(lineStart, lineEnd - lineStart));
         if (!line.empty() && line[0] != '#' && line[0] != ';') {
             const size_t equals = line.find('=');
             if (equals != std::string::npos) {

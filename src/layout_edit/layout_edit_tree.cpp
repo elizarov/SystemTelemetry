@@ -1,12 +1,12 @@
 #include "layout_edit/layout_edit_tree.h"
 
 #include <algorithm>
-#include <cctype>
 #include <functional>
 #include <unordered_map>
 
 #include "config/config_parser.h"
 #include "layout_edit/layout_edit_parameter.h"
+#include "util/strings.h"
 
 namespace {
 
@@ -21,27 +21,6 @@ struct TemplateSectionSlot {
     std::string sectionName;
     std::vector<std::string> keys;
 };
-
-std::string Trim(std::string_view value) {
-    size_t first = 0;
-    while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first])) != 0) {
-        ++first;
-    }
-    size_t last = value.size();
-    while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1])) != 0) {
-        --last;
-    }
-    return std::string(value.substr(first, last - first));
-}
-
-std::string LowercaseAscii(std::string_view value) {
-    std::string lower;
-    lower.reserve(value.size());
-    for (const unsigned char ch : value) {
-        lower.push_back(static_cast<char>(std::tolower(ch)));
-    }
-    return lower;
-}
 
 std::vector<TemplateSectionSlot> ParseTemplateSections(std::string_view text) {
     std::vector<TemplateSectionSlot> sections;
@@ -515,11 +494,11 @@ bool NodeMatchesFilter(const LayoutEditTreeNode& node, std::string_view loweredQ
     if (loweredQuery.empty()) {
         return true;
     }
-    const std::string loweredLabel = LowercaseAscii(node.label);
+    const std::string loweredLabel = ToLower(node.label);
     if (loweredLabel.find(loweredQuery) != std::string::npos) {
         return true;
     }
-    const std::string loweredLocation = LowercaseAscii(node.locationText);
+    const std::string loweredLocation = ToLower(node.locationText);
     return loweredLocation.find(loweredQuery) != std::string::npos;
 }
 
@@ -586,7 +565,7 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
 }
 
 LayoutEditTreeModel FilterLayoutEditTreeModel(const LayoutEditTreeModel& model, std::string_view query) {
-    const std::string loweredQuery = LowercaseAscii(Trim(query));
+    const std::string loweredQuery = ToLower(Trim(query));
     if (loweredQuery.empty()) {
         return model;
     }

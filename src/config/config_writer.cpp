@@ -8,19 +8,10 @@
 #include <type_traits>
 
 #include "config/config_parser.h"
+#include "util/strings.h"
 #include "util/utf8.h"
 
 namespace {
-
-std::string Trim(const std::string& input) {
-    const auto isSpace = [](unsigned char ch) { return std::isspace(ch) != 0; };
-    const auto first = std::find_if_not(input.begin(), input.end(), isSpace);
-    if (first == input.end()) {
-        return {};
-    }
-    const auto last = std::find_if_not(input.rbegin(), input.rend(), isSpace).base();
-    return std::string(first, last);
-}
 
 std::string FormatHexColor(ColorConfig color) {
     std::ostringstream stream;

@@ -523,6 +523,11 @@ def parse_args() -> argparse.Namespace:
         help="SVG output path. Defaults to the DOT output path with a .svg suffix.",
     )
     parser.add_argument(
+        "--skip-svg",
+        action="store_true",
+        help="Skip Graphviz SVG rendering and write only DOT and GraphML outputs.",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="Fail when source dependency architecture rules are violated.",
@@ -540,17 +545,21 @@ def main() -> int:
     svg_output = args.svg_output or args.output.with_suffix(".svg")
     write_dot(modules, edges, args.output)
     write_graphml(modules, edges, graphml_output)
-    try:
-        write_svg(args.output, svg_output)
-    except RuntimeError as error:
-        print(error, file=sys.stderr)
-        return 1
+    if not args.skip_svg:
+        try:
+            write_svg(args.output, svg_output)
+        except RuntimeError as error:
+            print(error, file=sys.stderr)
+            return 1
 
     public_edges = sum(1 for kind in edges.values() if kind == "public")
     private_edges = sum(1 for kind in edges.values() if kind == "private")
+    written_outputs = f"{args.output} and {graphml_output}"
+    if not args.skip_svg:
+        written_outputs += f", and {svg_output}"
     print(
-        f"Wrote {args.output}, {graphml_output}, and {svg_output} with {len(modules)} modules, "
-        f"{public_edges} public dependencies, and {private_edges} private dependencies."
+        f"Wrote {written_outputs} with {len(modules)} modules, {public_edges} public dependencies, "
+        f"and {private_edges} private dependencies."
     )
     print_package_loc_summary(modules)
     if args.check:

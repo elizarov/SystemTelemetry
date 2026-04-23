@@ -3,10 +3,14 @@
 #include <windows.h>
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 std::string ToLower(std::string value);
-std::string Trim(std::string value);
+std::string Trim(std::string_view value);
+std::vector<std::string> SplitTrimmed(std::string_view value, char delimiter);
+std::vector<std::string> SplitTrimmedPreservingEmpty(std::string_view value, char delimiter);
+std::string CollapseAsciiWhitespace(std::string_view value);
 bool ContainsInsensitive(const std::string& value, const std::string& needle);
 bool EqualsInsensitive(const std::string& left, const std::string& right);
 bool EqualsInsensitive(const std::wstring& left, const std::wstring& right);
