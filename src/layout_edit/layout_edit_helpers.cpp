@@ -1,7 +1,28 @@
-#include "widget/layout_edit_types.h"
+#include "layout_edit/layout_edit_helpers.h"
 
 #include <algorithm>
 #include <type_traits>
+
+namespace {
+
+bool MatchesLayoutEditAnchorSubject(const LayoutEditAnchorKey& left, const LayoutEditAnchorKey& right) {
+    if (left.subject.index() != right.subject.index()) {
+        return false;
+    }
+    if (const auto* leftParameter = std::get_if<LayoutEditParameter>(&left.subject)) {
+        return *leftParameter == std::get<LayoutEditParameter>(right.subject);
+    }
+    if (const auto* leftMetric = std::get_if<LayoutMetricEditKey>(&left.subject)) {
+        return MatchesLayoutMetricEditKey(*leftMetric, std::get<LayoutMetricEditKey>(right.subject));
+    }
+    if (const auto* leftCardTitle = std::get_if<LayoutCardTitleEditKey>(&left.subject)) {
+        return MatchesLayoutCardTitleEditKey(*leftCardTitle, std::get<LayoutCardTitleEditKey>(right.subject));
+    }
+    return MatchesLayoutMetricListOrderEditKey(
+        std::get<LayoutMetricListOrderEditKey>(left.subject), std::get<LayoutMetricListOrderEditKey>(right.subject));
+}
+
+}  // namespace
 
 bool MatchesWidgetIdentity(const LayoutEditWidgetIdentity& left, const LayoutEditWidgetIdentity& right) {
     return left.kind == right.kind && left.renderCardId == right.renderCardId && left.editCardId == right.editCardId &&
@@ -22,7 +43,7 @@ bool MatchesGapEditAnchorKey(const LayoutEditGapAnchorKey& left, const LayoutEdi
 }
 
 bool MatchesEditableAnchorKey(const LayoutEditAnchorKey& left, const LayoutEditAnchorKey& right) {
-    return left.anchorId == right.anchorId && left.subject == right.subject &&
+    return left.anchorId == right.anchorId && MatchesLayoutEditAnchorSubject(left, right) &&
            MatchesWidgetIdentity(left.widget, right.widget);
 }
 
@@ -40,16 +61,16 @@ bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWei
 }
 
 bool MatchesLayoutMetricEditKey(const LayoutMetricEditKey& left, const LayoutMetricEditKey& right) {
-    return left == right;
+    return left.metricId == right.metricId;
 }
 
 bool MatchesLayoutCardTitleEditKey(const LayoutCardTitleEditKey& left, const LayoutCardTitleEditKey& right) {
-    return left == right;
+    return left.cardId == right.cardId;
 }
 
 bool MatchesLayoutMetricListOrderEditKey(
     const LayoutMetricListOrderEditKey& left, const LayoutMetricListOrderEditKey& right) {
-    return left == right;
+    return left.editCardId == right.editCardId && left.nodePath == right.nodePath;
 }
 
 bool MatchesCardChromeSelectionIdentity(

@@ -23,6 +23,7 @@
 #include "dashboard_renderer/impl/layout_resolver.h"
 #include "dashboard_renderer/impl/palette.h"
 #include "dashboard_renderer/impl/text_width_cache.h"
+#include "layout_edit/layout_edit_helpers.h"
 #include "layout_edit/layout_edit_hit_priority.h"
 #include "layout_edit/layout_edit_parameter_metadata.h"
 #include "layout_edit/layout_edit_service.h"

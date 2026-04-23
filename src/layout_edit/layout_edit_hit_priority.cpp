@@ -1,5 +1,7 @@
 #include "layout_edit/layout_edit_hit_priority.h"
 
+#include "layout_edit/layout_edit_helpers.h"
+
 int GetLayoutEditParameterHitPriority(LayoutEditParameter parameter) {
     return static_cast<int>(parameter);
 }
