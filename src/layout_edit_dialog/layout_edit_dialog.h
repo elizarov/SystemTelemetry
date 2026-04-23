@@ -9,7 +9,7 @@
 
 #include "config/config.h"
 #include "layout_edit/layout_edit_controller.h"
-#include "layout_edit/layout_edit_parameter.h"
+#include "widget/layout_edit_types.h"
 
 struct LayoutEditDialogState;
 

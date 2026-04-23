@@ -10,7 +10,7 @@
 #include "diagnostics/constants.h"
 #include "display/constants.h"
 #include "display/display_config.h"
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 #include "layout_edit/layout_edit_service.h"
 #include "main/autostart.h"
 #include "main/config_io.h"

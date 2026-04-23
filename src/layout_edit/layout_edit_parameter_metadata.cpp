@@ -1,4 +1,4 @@
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 
 #include <cmath>
 #include <type_traits>
@@ -132,17 +132,6 @@ const LayoutEditParameterInfo& GetLayoutEditParameterInfo(LayoutEditParameter pa
 
 const LayoutEditConfigFieldMetadata& GetLayoutEditConfigFieldMetadata(LayoutEditParameter parameter) {
     return *GetLayoutEditParameterInfo(parameter).field;
-}
-
-int GetLayoutEditParameterHitPriority(LayoutEditParameter parameter) {
-    return static_cast<int>(parameter);
-}
-
-int LayoutEditAnchorHitPriority(const LayoutEditAnchorKey& key) {
-    if (const auto parameter = LayoutEditAnchorParameter(key); parameter.has_value()) {
-        return GetLayoutEditParameterHitPriority(*parameter);
-    }
-    return -1;
 }
 
 bool IsFontLayoutEditParameter(LayoutEditParameter parameter) {

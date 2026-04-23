@@ -10,7 +10,7 @@
 #include "dashboard/dashboard_app.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tree.h"
 #include "layout_edit_dialog/layout_edit_dialog.h"

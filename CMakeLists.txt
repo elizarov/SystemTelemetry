@@ -91,8 +91,9 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_trace_session.cpp
     src/widget/layout_edit_types.cpp
+    src/layout_edit/layout_edit_hit_priority.cpp
     src/layout_edit/layout_edit_tree.cpp
-    src/layout_edit/layout_edit_parameter.cpp
+    src/layout_edit/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tooltip.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
     src/layout_edit/layout_edit_service.cpp
@@ -280,8 +281,9 @@ add_executable(SystemTelemetryTests
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
     src/widget/layout_edit_types.cpp
+    src/layout_edit/layout_edit_hit_priority.cpp
     src/layout_edit/layout_edit_tree.cpp
-    src/layout_edit/layout_edit_parameter.cpp
+    src/layout_edit/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tooltip.cpp
     src/util/strings.cpp
     src/util/localization_catalog.cpp
@@ -359,7 +361,8 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/widget/layout_edit_types.cpp
-    src/layout_edit/layout_edit_parameter.cpp
+    src/layout_edit/layout_edit_hit_priority.cpp
+    src/layout_edit/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_trace_session.cpp

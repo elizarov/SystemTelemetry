@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_hit_priority.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 #include "layout_edit/layout_edit_tooltip.h"
 
 TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {

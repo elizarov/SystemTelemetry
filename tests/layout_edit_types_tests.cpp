@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_hit_priority.h"
 #include "widget/layout_edit_types.h"
 
 TEST(LayoutEditTypes, MatchesWidgetIdentityUsingKindAndPath) {

@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 #include "config/config_parser.h"
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 #include "util/strings.h"
 
 namespace {

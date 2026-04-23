@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 #include "widget/layout_edit_types.h"
 
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format);

@@ -6,7 +6,7 @@
 #include <cwchar>
 #include <cwctype>
 
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 #include "layout_edit/layout_edit_service.h"
 #include "resource.h"
 #include "util/utf8.h"

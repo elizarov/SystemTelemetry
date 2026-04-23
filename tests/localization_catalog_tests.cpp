@@ -4,7 +4,7 @@
 #include <sstream>
 #include <vector>
 
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 #include "util/localization_catalog.h"
 #include "util/utf8.h"
 

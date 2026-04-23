@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <sstream>
 
-#include "layout_edit/layout_edit_parameter.h"
+#include "layout_edit/layout_edit_parameter_metadata.h"
 #include "layout_edit_dialog/impl/util.h"
 
 namespace {
