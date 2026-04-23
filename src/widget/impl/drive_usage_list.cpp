@@ -1,9 +1,12 @@
 #include "widget/impl/drive_usage_list.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 #include "telemetry/metrics.h"
+#include "util/numeric_safety.h"
 #include "widget/widget_renderer.h"
 
 namespace {
@@ -132,6 +135,51 @@ void DrawSegmentIndicator(WidgetRenderer& renderer,
 
         top = segmentRect.bottom + clampedGap;
     }
+}
+
+void FillCapsule(WidgetRenderer& renderer, const RenderRect& rect, RenderColorId color) {
+    const int width = rect.Width();
+    const int height = rect.Height();
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+    if (width <= height) {
+        renderer.FillSolidEllipse(rect, color);
+    } else {
+        renderer.FillSolidRoundedRect(rect, height / 2, color);
+    }
+}
+
+std::optional<RenderRect> DrawUsageCapsuleBar(
+    WidgetRenderer& renderer, const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
+    FillCapsule(renderer, rect, RenderColorId::Track);
+
+    const int width = rect.Width();
+    const int height = rect.Height();
+    if (width <= 0 || height <= 0 || !drawFill) {
+        return std::nullopt;
+    }
+
+    const double clampedRatio = ClampFinite(ratio, 0.0, 1.0);
+    const int straightWidth = std::max(0, width - height);
+    const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
+    RenderRect fillRect = rect;
+    fillRect.right = fillRect.left + fillWidth;
+    FillCapsule(renderer, fillRect, RenderColorId::Accent);
+
+    if (!peakRatio.has_value()) {
+        return std::nullopt;
+    }
+
+    const double peak = ClampFinite(*peakRatio, 0.0, 1.0);
+    const int markerWidth = std::min(width, std::max(1, std::max(renderer.ScaleLogical(4), height)));
+    const int centerX = rect.left + static_cast<int>(std::round(peak * width));
+    const int minLeft = rect.left;
+    const int maxLeft = rect.right - markerWidth;
+    const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
+    RenderRect markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
+    FillCapsule(renderer, markerRect, RenderColorId::PeakGhost);
+    return markerRect;
 }
 
 int EffectiveDriveHeaderHeight(const WidgetRenderer& renderer) {
@@ -341,7 +389,8 @@ void DriveUsageListWidget::Draw(
             renderer.CurrentRenderMode() == WidgetRenderer::RenderMode::Blank ? 0.0 : drive.writeActivity,
             RenderColorId::Track,
             RenderColorId::Accent);
-        renderer.DrawPillBar(barRect,
+        DrawUsageCapsuleBar(renderer,
+            barRect,
             drive.usedPercent / 100.0,
             std::nullopt,
             renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank);

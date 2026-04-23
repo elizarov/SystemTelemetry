@@ -34,6 +34,30 @@ RenderStroke RenderStroke::Dotted(RenderColorId color, float width) {
     return RenderStroke{color, width, StrokePattern::Dotted};
 }
 
+bool RenderPath::IsEmpty() const {
+    return commands.empty();
+}
+
+void RenderPath::MoveTo(RenderPoint point) {
+    commands.push_back(RenderPathCommand{RenderPathCommandType::MoveTo, point, {}});
+}
+
+void RenderPath::LineTo(RenderPoint point) {
+    commands.push_back(RenderPathCommand{RenderPathCommandType::LineTo, point, {}});
+}
+
+void RenderPath::ArcTo(
+    RenderPoint center, int radiusX, int radiusY, double startAngleDegrees, double sweepAngleDegrees) {
+    RenderPathCommand command;
+    command.type = RenderPathCommandType::ArcTo;
+    command.arc = RenderPathArc{center, radiusX, radiusY, startAngleDegrees, sweepAngleDegrees};
+    commands.push_back(command);
+}
+
+void RenderPath::Close() {
+    commands.push_back(RenderPathCommand{RenderPathCommandType::Close, {}, {}});
+}
+
 TextLayoutOptions TextLayoutOptions::SingleLine(
     TextHorizontalAlign horizontal, TextVerticalAlign vertical, bool clip, bool ellipsis) {
     return TextLayoutOptions{horizontal, vertical, false, ellipsis, clip};

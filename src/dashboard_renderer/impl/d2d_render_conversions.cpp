@@ -1,6 +1,5 @@
 #include "dashboard_renderer/impl/d2d_render_conversions.h"
 
-#include <algorithm>
 #include <cmath>
 
 D2D1_POINT_2F D2DPointFromRenderPoint(RenderPoint point) {
@@ -16,81 +15,97 @@ D2D1_RECT_F D2DRectFromRenderRect(const RenderRect& rect) {
 
 namespace {
 
-D2D1_ARC_SIZE ArcSize(double sweepAngleDegrees) {
-    return std::abs(sweepAngleDegrees) > 180.0 ? D2D1_ARC_SIZE_LARGE : D2D1_ARC_SIZE_SMALL;
+D2D1_POINT_2F ArcPoint(const RenderPathArc& arc, double angleDegrees) {
+    const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
+    return D2D1::Point2F(
+        static_cast<float>(arc.center.x) + static_cast<float>(std::cos(radians) * static_cast<double>(arc.radiusX)),
+        static_cast<float>(arc.center.y) + static_cast<float>(std::sin(radians) * static_cast<double>(arc.radiusY)));
+}
+
+D2D1_SWEEP_DIRECTION ArcSweepDirection(double sweepAngleDegrees) {
+    return sweepAngleDegrees >= 0.0 ? D2D1_SWEEP_DIRECTION_CLOCKWISE : D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE;
+}
+
+void AddArcSegments(ID2D1GeometrySink* sink, const RenderPathArc& arc) {
+    if (sink == nullptr || arc.radiusX <= 0 || arc.radiusY <= 0 || arc.sweepAngleDegrees == 0.0) {
+        return;
+    }
+
+    double start = arc.startAngleDegrees;
+    double remaining = arc.sweepAngleDegrees;
+    while (std::abs(remaining) > 180.0) {
+        const double chunk = remaining > 0.0 ? 180.0 : -180.0;
+        const double end = start + chunk;
+        sink->AddArc(D2D1::ArcSegment(ArcPoint(arc, end),
+            D2D1::SizeF(static_cast<float>(arc.radiusX), static_cast<float>(arc.radiusY)),
+            0.0f,
+            ArcSweepDirection(chunk),
+            D2D1_ARC_SIZE_SMALL));
+        start = end;
+        remaining -= chunk;
+    }
+
+    if (remaining != 0.0) {
+        const double end = start + remaining;
+        sink->AddArc(D2D1::ArcSegment(ArcPoint(arc, end),
+            D2D1::SizeF(static_cast<float>(arc.radiusX), static_cast<float>(arc.radiusY)),
+            0.0f,
+            ArcSweepDirection(remaining),
+            std::abs(remaining) > 180.0 ? D2D1_ARC_SIZE_LARGE : D2D1_ARC_SIZE_SMALL));
+    }
 }
 
 }  // namespace
 
-Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DRingSegmentPath(
-    ID2D1Factory* factory, const RenderRingSegment& segment) {
-    Microsoft::WRL::ComPtr<ID2D1PathGeometry> path;
-    if (factory == nullptr || segment.outerRadius <= 0 || segment.thickness <= 0 || segment.sweepAngleDegrees <= 0.0) {
-        return path;
+Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DRenderPathGeometry(ID2D1Factory* factory, const RenderPath& path) {
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
+    if (factory == nullptr) {
+        return geometry;
     }
 
-    const float cx = static_cast<float>(segment.centerX);
-    const float cy = static_cast<float>(segment.centerY);
-    const float outerRadius = static_cast<float>(segment.outerRadius);
-    const float innerRadius = (std::max)(0.0f, outerRadius - static_cast<float>(segment.thickness));
-    if (outerRadius <= innerRadius) {
-        return path;
-    }
-
-    const double startRadians = segment.startAngleDegrees * 3.14159265358979323846 / 180.0;
-    const double endRadians = (segment.startAngleDegrees + segment.sweepAngleDegrees) * 3.14159265358979323846 / 180.0;
-    const D2D1_POINT_2F outerStart = D2D1::Point2F(cx + static_cast<float>(std::cos(startRadians) * outerRadius),
-        cy + static_cast<float>(std::sin(startRadians) * outerRadius));
-    const D2D1_POINT_2F outerEnd = D2D1::Point2F(cx + static_cast<float>(std::cos(endRadians) * outerRadius),
-        cy + static_cast<float>(std::sin(endRadians) * outerRadius));
-    const D2D1_POINT_2F innerEnd = D2D1::Point2F(cx + static_cast<float>(std::cos(endRadians) * innerRadius),
-        cy + static_cast<float>(std::sin(endRadians) * innerRadius));
-    const D2D1_POINT_2F innerStart = D2D1::Point2F(cx + static_cast<float>(std::cos(startRadians) * innerRadius),
-        cy + static_cast<float>(std::sin(startRadians) * innerRadius));
-
-    if (FAILED(factory->CreatePathGeometry(path.GetAddressOf())) || path == nullptr) {
+    if (FAILED(factory->CreatePathGeometry(geometry.GetAddressOf())) || geometry == nullptr) {
         return {};
     }
 
     Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
-    if (FAILED(path->Open(sink.GetAddressOf())) || sink == nullptr) {
+    if (FAILED(geometry->Open(sink.GetAddressOf())) || sink == nullptr) {
         return {};
     }
     sink->SetFillMode(D2D1_FILL_MODE_WINDING);
-    sink->BeginFigure(outerStart, D2D1_FIGURE_BEGIN_FILLED);
-    sink->AddArc(D2D1::ArcSegment(outerEnd,
-        D2D1::SizeF(outerRadius, outerRadius),
-        0.0f,
-        D2D1_SWEEP_DIRECTION_CLOCKWISE,
-        ArcSize(segment.sweepAngleDegrees)));
-    sink->AddLine(innerEnd);
-    if (innerRadius > 0.0f) {
-        sink->AddArc(D2D1::ArcSegment(innerStart,
-            D2D1::SizeF(innerRadius, innerRadius),
-            0.0f,
-            D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE,
-            ArcSize(segment.sweepAngleDegrees)));
-    } else {
-        sink->AddLine(D2D1::Point2F(cx, cy));
+
+    bool figureOpen = false;
+    for (const RenderPathCommand& command : path.commands) {
+        switch (command.type) {
+            case RenderPathCommandType::MoveTo:
+                if (figureOpen) {
+                    sink->EndFigure(D2D1_FIGURE_END_OPEN);
+                }
+                sink->BeginFigure(D2DPointFromRenderPoint(command.point), D2D1_FIGURE_BEGIN_FILLED);
+                figureOpen = true;
+                break;
+            case RenderPathCommandType::LineTo:
+                if (figureOpen) {
+                    sink->AddLine(D2DPointFromRenderPoint(command.point));
+                }
+                break;
+            case RenderPathCommandType::ArcTo:
+                if (figureOpen) {
+                    AddArcSegments(sink.Get(), command.arc);
+                }
+                break;
+            case RenderPathCommandType::Close:
+                if (figureOpen) {
+                    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+                    figureOpen = false;
+                }
+                break;
+        }
     }
-    sink->AddLine(outerStart);
-    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    if (figureOpen) {
+        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    }
     if (FAILED(sink->Close())) {
         return {};
     }
-    return path;
-}
-
-std::optional<RenderRect> RenderRectFromD2DGeometryBounds(ID2D1Geometry* geometry) {
-    if (geometry == nullptr) {
-        return std::nullopt;
-    }
-    D2D1_RECT_F bounds{};
-    if (FAILED(geometry->GetBounds(nullptr, &bounds))) {
-        return std::nullopt;
-    }
-    return RenderRect{static_cast<int>(std::floor(bounds.left)),
-        static_cast<int>(std::floor(bounds.top)),
-        static_cast<int>(std::ceil(bounds.right)),
-        static_cast<int>(std::ceil(bounds.bottom))};
+    return geometry;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 struct RenderPoint {
     int x = 0;
@@ -65,13 +66,39 @@ struct RenderStroke {
     static RenderStroke Dotted(RenderColorId color, float width = 1.0f);
 };
 
-struct RenderRingSegment {
-    int centerX = 0;
-    int centerY = 0;
-    int outerRadius = 0;
-    int thickness = 0;
+enum class RenderPathCommandType {
+    MoveTo,
+    LineTo,
+    ArcTo,
+    Close,
+};
+
+struct RenderPathArc {
+    RenderPoint center{};
+    int radiusX = 0;
+    int radiusY = 0;
     double startAngleDegrees = 0.0;
     double sweepAngleDegrees = 0.0;
+};
+
+struct RenderPathCommand {
+    RenderPathCommandType type = RenderPathCommandType::MoveTo;
+    RenderPoint point{};
+    RenderPathArc arc{};
+};
+
+struct RenderPath {
+    std::vector<RenderPathCommand> commands;
+
+    bool IsEmpty() const;
+
+    void MoveTo(RenderPoint point);
+
+    void LineTo(RenderPoint point);
+
+    void ArcTo(RenderPoint center, int radiusX, int radiusY, double startAngleDegrees, double sweepAngleDegrees);
+
+    void Close();
 };
 
 enum class TextStyleId {

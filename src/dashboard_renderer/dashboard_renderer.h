@@ -100,19 +100,18 @@ public:
         TextStyleId style,
         RenderColorId color,
         const TextLayoutOptions& options) override;
-    std::optional<RenderRect> DrawPillBar(
-        const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true) override;
     void PushClipRect(const RenderRect& rect) override;
     void PopClipRect() override;
     bool FillSolidRect(const RenderRect& rect, RenderColorId color) override;
-    bool FillSolidEllipse(RenderPoint center, int diameter, RenderColorId color) override;
+    bool FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) override;
+    bool FillSolidEllipse(const RenderRect& rect, RenderColorId color) override;
     bool FillSolidDiamond(const RenderRect& rect, RenderColorId color) override;
     bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) override;
     bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) override;
     bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) override;
     bool DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) override;
-    bool FillRingSegments(std::span<const RenderRingSegment> segments, RenderColorId color) override;
-    std::optional<RenderRect> RingSegmentBounds(const RenderRingSegment& segment) const override;
+    bool FillPath(const RenderPath& path, RenderColorId color) override;
+    bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) override;
     LayoutEditAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const override;
     LayoutEditAnchorBinding MakeMetricTextBinding(
@@ -232,7 +231,6 @@ private:
     Microsoft::WRL::ComPtr<ID2D1GeometryGroup> CreateD2DGeometryGroup(
         std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
     bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId color);
-    Microsoft::WRL::ComPtr<ID2D1PathGeometry> BuildRingSegmentPath(const RenderRingSegment& segment) const;
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,

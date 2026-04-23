@@ -13,7 +13,10 @@ namespace {
 using ThroughputGraphLayout = ThroughputWidget::LayoutState;
 
 void FillCircle(WidgetRenderer& renderer, int centerX, int centerY, int diameter, RenderColorId color) {
-    renderer.FillSolidEllipse(RenderPoint{centerX, centerY}, diameter, color);
+    const int radius = diameter / 2;
+    renderer.FillSolidEllipse(
+        RenderRect{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter},
+        color);
 }
 
 RenderRect MakeAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {

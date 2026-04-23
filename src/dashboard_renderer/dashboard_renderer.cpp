@@ -28,7 +28,6 @@
 #include "layout_edit/layout_edit_parameter_metadata.h"
 #include "layout_edit/layout_edit_service.h"
 #include "resource.h"
-#include "util/numeric_safety.h"
 #include "util/strings.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -1886,67 +1885,6 @@ void DashboardRenderer::DrawPanel(size_t cardIndex) {
     }
 }
 
-std::optional<RenderRect> DashboardRenderer::DrawPillBar(
-    const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
-    const auto fillCapsule = [&](const RenderRect& capsuleRect, RenderColorId color) {
-        const int capsuleWidth = capsuleRect.Width();
-        const int capsuleHeight = capsuleRect.Height();
-        if (capsuleWidth <= 0 || capsuleHeight <= 0) {
-            return;
-        }
-        ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
-        if (brush == nullptr) {
-            return;
-        }
-        if (capsuleWidth <= capsuleHeight) {
-            const float radiusX = static_cast<float>(capsuleWidth) / 2.0f;
-            const float radiusY = static_cast<float>(capsuleHeight) / 2.0f;
-            d2dActiveRenderTarget_->FillEllipse(
-                D2D1::Ellipse(D2D1::Point2F(static_cast<float>(capsuleRect.left) + radiusX,
-                                  static_cast<float>(capsuleRect.top) + radiusY),
-                    radiusX,
-                    radiusY),
-                brush);
-        } else {
-            const float radius = static_cast<float>(capsuleHeight) / 2.0f;
-            d2dActiveRenderTarget_->FillRoundedRectangle(
-                D2D1::RoundedRect(D2DRectFromRenderRect(capsuleRect), radius, radius), brush);
-        }
-    };
-
-    fillCapsule(rect, RenderColorId::Track);
-
-    const int width = rect.Width();
-    const int height = rect.Height();
-    if (width <= 0 || height <= 0) {
-        return std::nullopt;
-    }
-
-    if (!drawFill) {
-        return std::nullopt;
-    }
-
-    const double clampedRatio = ClampFinite(ratio, 0.0, 1.0);
-    const int straightWidth = std::max(0, width - height);
-    const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
-    RenderRect fillRect = rect;
-    fillRect.right = fillRect.left + fillWidth;
-    fillCapsule(fillRect, RenderColorId::Accent);
-
-    if (peakRatio.has_value()) {
-        const double peak = ClampFinite(*peakRatio, 0.0, 1.0);
-        const int markerWidth = std::min(width, std::max(1, std::max(ScaleLogical(4), height)));
-        const int centerX = rect.left + static_cast<int>(std::round(peak * width));
-        const int minLeft = rect.left;
-        const int maxLeft = rect.right - markerWidth;
-        const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
-        RenderRect markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-        fillCapsule(markerRect, RenderColorId::PeakGhost);
-        return markerRect;
-    }
-    return std::nullopt;
-}
-
 void DashboardRenderer::DrawResolvedWidget(const DashboardWidgetLayout& widget, const MetricSource& metrics) {
     if (widget.widget == nullptr) {
         return;
@@ -2825,7 +2763,7 @@ void DashboardRenderer::PopClipRect() {
 }
 
 bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColorId color) {
-    if (!IsDrawActive()) {
+    if (!IsDrawActive() || rect.IsEmpty()) {
         return false;
     }
     ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
@@ -2836,16 +2774,35 @@ bool DashboardRenderer::FillSolidRect(const RenderRect& rect, RenderColorId colo
     return true;
 }
 
-bool DashboardRenderer::FillSolidEllipse(RenderPoint center, int diameter, RenderColorId color) {
-    if (!IsDrawActive() || diameter <= 0) {
+bool DashboardRenderer::FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) {
+    if (!IsDrawActive() || rect.IsEmpty()) {
         return false;
     }
     ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
     if (brush == nullptr) {
         return false;
     }
-    const float radius = static_cast<float>(diameter) / 2.0f;
-    d2dActiveRenderTarget_->FillEllipse(D2D1::Ellipse(D2DPointFromRenderPoint(center), radius, radius), brush);
+    const float clampedRadius = static_cast<float>(std::max(0, radius));
+    d2dActiveRenderTarget_->FillRoundedRectangle(
+        D2D1::RoundedRect(D2DRectFromRenderRect(rect), clampedRadius, clampedRadius), brush);
+    return true;
+}
+
+bool DashboardRenderer::FillSolidEllipse(const RenderRect& rect, RenderColorId color) {
+    if (!IsDrawActive() || rect.IsEmpty()) {
+        return false;
+    }
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(color);
+    if (brush == nullptr) {
+        return false;
+    }
+    const float radiusX = static_cast<float>(rect.Width()) / 2.0f;
+    const float radiusY = static_cast<float>(rect.Height()) / 2.0f;
+    d2dActiveRenderTarget_->FillEllipse(
+        D2D1::Ellipse(D2D1::Point2F(static_cast<float>(rect.left) + radiusX, static_cast<float>(rect.top) + radiusY),
+            radiusX,
+            radiusY),
+        brush);
     return true;
 }
 
@@ -2966,20 +2923,26 @@ bool DashboardRenderer::FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId c
     return true;
 }
 
-Microsoft::WRL::ComPtr<ID2D1PathGeometry> DashboardRenderer::BuildRingSegmentPath(
-    const RenderRingSegment& segment) const {
-    return CreateD2DRingSegmentPath(d2dFactory_.Get(), segment);
+bool DashboardRenderer::FillPath(const RenderPath& path, RenderColorId color) {
+    if (!IsDrawActive() || path.IsEmpty()) {
+        return false;
+    }
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = CreateD2DRenderPathGeometry(d2dFactory_.Get(), path);
+    return FillD2DGeometry(geometry.Get(), color);
 }
 
-bool DashboardRenderer::FillRingSegments(std::span<const RenderRingSegment> segments, RenderColorId color) {
-    if (!IsDrawActive() || segments.empty()) {
+bool DashboardRenderer::FillPaths(std::span<const RenderPath> paths, RenderColorId color) {
+    if (!IsDrawActive() || paths.empty()) {
         return false;
     }
 
     std::vector<Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries;
-    geometries.reserve(segments.size());
-    for (const RenderRingSegment& segment : segments) {
-        Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = BuildRingSegmentPath(segment);
+    geometries.reserve(paths.size());
+    for (const RenderPath& path : paths) {
+        if (path.IsEmpty()) {
+            continue;
+        }
+        Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = CreateD2DRenderPathGeometry(d2dFactory_.Get(), path);
         if (geometry != nullptr) {
             geometries.push_back(std::move(geometry));
         }
@@ -2992,11 +2955,6 @@ bool DashboardRenderer::FillRingSegments(std::span<const RenderRingSegment> segm
     }
     Microsoft::WRL::ComPtr<ID2D1GeometryGroup> group = CreateD2DGeometryGroup(geometries, geometries.size());
     return FillD2DGeometry(group.Get(), color);
-}
-
-std::optional<RenderRect> DashboardRenderer::RingSegmentBounds(const RenderRingSegment& segment) const {
-    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry = BuildRingSegmentPath(segment);
-    return RenderRectFromD2DGeometryBounds(geometry.Get());
 }
 
 bool DashboardRenderer::DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) {

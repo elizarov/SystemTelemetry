@@ -57,19 +57,18 @@ public:
         TextStyleId style,
         RenderColorId color,
         const TextLayoutOptions& options) = 0;
-    virtual std::optional<RenderRect> DrawPillBar(
-        const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill = true) = 0;
     virtual void PushClipRect(const RenderRect& rect) = 0;
     virtual void PopClipRect() = 0;
     virtual bool FillSolidRect(const RenderRect& rect, RenderColorId color) = 0;
-    virtual bool FillSolidEllipse(RenderPoint center, int diameter, RenderColorId color) = 0;
+    virtual bool FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) = 0;
+    virtual bool FillSolidEllipse(const RenderRect& rect, RenderColorId color) = 0;
     virtual bool FillSolidDiamond(const RenderRect& rect, RenderColorId color) = 0;
     virtual bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) = 0;
     virtual bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) = 0;
     virtual bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) = 0;
     virtual bool DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) = 0;
-    virtual bool FillRingSegments(std::span<const RenderRingSegment> segments, RenderColorId color) = 0;
-    virtual std::optional<RenderRect> RingSegmentBounds(const RenderRingSegment& segment) const = 0;
+    virtual bool FillPath(const RenderPath& path, RenderColorId color) = 0;
+    virtual bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) = 0;
     virtual LayoutEditAnchorBinding MakeEditableTextBinding(
         const DashboardWidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const = 0;
     virtual LayoutEditAnchorBinding MakeMetricTextBinding(

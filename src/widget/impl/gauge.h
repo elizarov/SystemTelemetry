@@ -43,7 +43,8 @@ public:
         RenderRect ringThicknessAnchorRect{};
         RenderRect valueRect{};
         RenderRect labelRect{};
-        std::vector<RenderRingSegment> ringSegments;
+        std::vector<RenderPath> ringSegments;
+        std::vector<RenderRect> ringSegmentBounds;
     };
 
     DashboardWidgetClass Class() const override;

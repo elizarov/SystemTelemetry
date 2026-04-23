@@ -65,10 +65,103 @@ RenderRect ExpandSegmentBounds(RenderPoint start, RenderPoint end, int inset) {
         ((std::max))(start.y, end.y) + inset + 1};
 }
 
+double NormalizeAngle(double angleDegrees) {
+    double normalized = std::fmod(angleDegrees, 360.0);
+    if (normalized < 0.0) {
+        normalized += 360.0;
+    }
+    return normalized;
+}
+
+bool AngleInSweep(double angleDegrees, double startAngleDegrees, double sweepAngleDegrees) {
+    if (std::abs(sweepAngleDegrees) >= 360.0) {
+        return true;
+    }
+    const double angle = NormalizeAngle(angleDegrees);
+    const double start = NormalizeAngle(startAngleDegrees);
+    if (sweepAngleDegrees >= 0.0) {
+        const double delta = NormalizeAngle(angle - start);
+        return delta <= sweepAngleDegrees + 0.0001;
+    }
+    const double delta = NormalizeAngle(start - angle);
+    return delta <= -sweepAngleDegrees + 0.0001;
+}
+
+struct RenderPointF {
+    double x = 0.0;
+    double y = 0.0;
+};
+
+RenderPointF RenderArcPoint(RenderPoint center, int radiusX, int radiusY, double angleDegrees) {
+    const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
+    return RenderPointF{static_cast<double>(center.x) + std::cos(radians) * static_cast<double>(radiusX),
+        static_cast<double>(center.y) + std::sin(radians) * static_cast<double>(radiusY)};
+}
+
 RenderRect MakeCircleAnchorRect(int centerX, int centerY, int representedDiameter, int extraDiameter) {
     const int diameter = (std::max)(4, representedDiameter + extraDiameter);
     const int radius = diameter / 2;
     return RenderRect{centerX - radius, centerY - radius, centerX - radius + diameter, centerY - radius + diameter};
+}
+
+RenderPath MakeRingSegmentPath(
+    int centerX, int centerY, int outerRadius, int thickness, double startAngleDegrees, double sweepAngleDegrees) {
+    RenderPath path;
+    const int innerRadius = (std::max)(0, outerRadius - thickness);
+    if (outerRadius <= 0 || thickness <= 0 || innerRadius >= outerRadius || sweepAngleDegrees <= 0.0) {
+        return path;
+    }
+
+    const RenderPoint center{centerX, centerY};
+    const RenderPoint outerStart = PolarPoint(centerX, centerY, outerRadius, startAngleDegrees);
+    const RenderPoint innerEnd = PolarPoint(centerX, centerY, innerRadius, startAngleDegrees + sweepAngleDegrees);
+    path.MoveTo(outerStart);
+    path.ArcTo(center, outerRadius, outerRadius, startAngleDegrees, sweepAngleDegrees);
+    path.LineTo(innerEnd);
+    if (innerRadius > 0) {
+        path.ArcTo(center, innerRadius, innerRadius, startAngleDegrees + sweepAngleDegrees, -sweepAngleDegrees);
+    } else {
+        path.LineTo(center);
+    }
+    path.LineTo(outerStart);
+    path.Close();
+    return path;
+}
+
+RenderRect ComputeGaugeSegmentBounds(
+    int centerX, int centerY, int outerRadius, int thickness, double startAngleDegrees, double sweepAngleDegrees) {
+    const int innerRadius = (std::max)(0, outerRadius - thickness);
+    if (outerRadius <= 0 || thickness <= 0 || innerRadius >= outerRadius || sweepAngleDegrees <= 0.0) {
+        return {};
+    }
+
+    const RenderPoint center{centerX, centerY};
+    std::vector<RenderPointF> points;
+    points.reserve(10);
+    points.push_back(RenderArcPoint(center, outerRadius, outerRadius, startAngleDegrees));
+    points.push_back(RenderArcPoint(center, outerRadius, outerRadius, startAngleDegrees + sweepAngleDegrees));
+    points.push_back(RenderArcPoint(center, innerRadius, innerRadius, startAngleDegrees));
+    points.push_back(RenderArcPoint(center, innerRadius, innerRadius, startAngleDegrees + sweepAngleDegrees));
+    for (double cardinal = 0.0; cardinal < 360.0; cardinal += 90.0) {
+        if (AngleInSweep(cardinal, startAngleDegrees, sweepAngleDegrees)) {
+            points.push_back(RenderArcPoint(center, outerRadius, outerRadius, cardinal));
+        }
+    }
+
+    double left = points.front().x;
+    double top = points.front().y;
+    double right = points.front().x;
+    double bottom = points.front().y;
+    for (const RenderPointF point : points) {
+        left = (std::min)(left, point.x);
+        top = (std::min)(top, point.y);
+        right = (std::max)(right, point.x);
+        bottom = (std::max)(bottom, point.y);
+    }
+    return RenderRect{static_cast<int>(std::floor(left)),
+        static_cast<int>(std::floor(top)),
+        static_cast<int>(std::ceil(right)),
+        static_cast<int>(std::ceil(bottom))};
 }
 
 int GaugeOuterRadiusForRect(const WidgetRenderer& renderer, const RenderRect& rect) {
@@ -158,16 +251,24 @@ void GaugeWidget::ResolveLayoutState(const WidgetRenderer& renderer, const Rende
         layoutState_.cx + layoutState_.halfWidth,
         layoutState_.cy + layoutState_.labelBottom};
     layoutState_.ringSegments.clear();
+    layoutState_.ringSegmentBounds.clear();
     layoutState_.ringSegments.reserve(static_cast<size_t>(layoutState_.segmentLayout.segmentCount));
+    layoutState_.ringSegmentBounds.reserve(static_cast<size_t>(layoutState_.segmentLayout.segmentCount));
     for (int i = 0; i < layoutState_.segmentLayout.segmentCount; ++i) {
         const double slotStart =
             layoutState_.segmentLayout.gaugeStart + layoutState_.segmentLayout.pitchSweep * static_cast<double>(i);
-        layoutState_.ringSegments.push_back(RenderRingSegment{layoutState_.cx,
+        layoutState_.ringSegments.push_back(MakeRingSegmentPath(layoutState_.cx,
             layoutState_.cy,
             layoutState_.outerRadius,
             layoutState_.ringThickness,
             slotStart,
-            layoutState_.segmentLayout.segmentSweep});
+            layoutState_.segmentLayout.segmentSweep));
+        layoutState_.ringSegmentBounds.push_back(ComputeGaugeSegmentBounds(layoutState_.cx,
+            layoutState_.cy,
+            layoutState_.outerRadius,
+            layoutState_.ringThickness,
+            slotStart,
+            layoutState_.segmentLayout.segmentSweep));
     }
 }
 
@@ -191,21 +292,20 @@ void GaugeWidget::Draw(
                   0,
                   gaugeLayout.segmentCount - 1);
 
-    renderer.FillRingSegments(layoutState_.ringSegments, RenderColorId::Track);
+    renderer.FillPaths(layoutState_.ringSegments, RenderColorId::Track);
     if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank && filledSegments > 0) {
-        renderer.FillRingSegments(
-            std::span<const RenderRingSegment>(layoutState_.ringSegments.data(), static_cast<size_t>(filledSegments)),
+        renderer.FillPaths(
+            std::span<const RenderPath>(layoutState_.ringSegments.data(), static_cast<size_t>(filledSegments)),
             RenderColorId::Accent);
     }
     if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank && peakSegment >= 0 &&
         static_cast<size_t>(peakSegment) < layoutState_.ringSegments.size()) {
-        const RenderRingSegment& peakSegmentGeometry = layoutState_.ringSegments[static_cast<size_t>(peakSegment)];
-        renderer.FillRingSegments(
-            std::span<const RenderRingSegment>(&peakSegmentGeometry, 1), RenderColorId::PeakGhost);
-        if (const auto peakSegmentBounds = renderer.RingSegmentBounds(peakSegmentGeometry);
-            peakSegmentBounds.has_value()) {
+        const size_t peakSegmentIndex = static_cast<size_t>(peakSegment);
+        renderer.FillPath(layoutState_.ringSegments[peakSegmentIndex], RenderColorId::PeakGhost);
+        if (peakSegmentIndex < layoutState_.ringSegmentBounds.size() &&
+            !layoutState_.ringSegmentBounds[peakSegmentIndex].IsEmpty()) {
             renderer.RegisterDynamicColorEditRegion(
-                WidgetRenderer::LayoutEditParameter::ColorPeakGhost, *peakSegmentBounds);
+                WidgetRenderer::LayoutEditParameter::ColorPeakGhost, layoutState_.ringSegmentBounds[peakSegmentIndex]);
         }
     }
 
