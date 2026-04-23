@@ -106,16 +106,19 @@ public:
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt) = 0;
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) = 0;
     virtual void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt) = 0;
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) = 0;
     virtual void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt) = 0;
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) = 0;
     virtual void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) = 0;
     virtual void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) = 0;
     virtual std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable() = 0;

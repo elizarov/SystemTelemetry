@@ -149,16 +149,19 @@ public:
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt) override;
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) override;
     void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt) override;
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) override;
     void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt) override;
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) override;
     void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
     void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
     std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable() override;
@@ -264,10 +267,12 @@ private:
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
-        const LayoutEditAnchorBinding& editable);
+        const LayoutEditAnchorBinding& editable,
+        bool drawTargetOutline);
     void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
         const TextLayoutResult& layoutResult,
-        const LayoutEditAnchorBinding& editable);
+        const LayoutEditAnchorBinding& editable,
+        bool drawTargetOutline);
     bool IsDrawActive() const;
     const MetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();

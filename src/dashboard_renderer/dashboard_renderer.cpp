@@ -1479,7 +1479,8 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& 
     const std::string& text,
     TextStyleId style,
     const TextLayoutOptions& options,
-    const LayoutEditAnchorBinding& editable) {
+    const LayoutEditAnchorBinding& editable,
+    bool drawTargetOutline) {
     if (text.empty()) {
         return;
     }
@@ -1498,13 +1499,14 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& 
         1.0,
         editable.draggable,
         false,
-        true,
+        drawTargetOutline,
         editable.value);
 }
 
 void DashboardRenderer::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
     const TextLayoutResult& layoutResult,
-    const LayoutEditAnchorBinding& editable) {
+    const LayoutEditAnchorBinding& editable,
+    bool drawTargetOutline) {
     const RenderRect& textRect = layoutResult.textRect;
     if (textRect.right <= textRect.left || textRect.bottom <= textRect.top) {
         return;
@@ -1523,7 +1525,7 @@ void DashboardRenderer::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& 
         1.0,
         editable.draggable,
         false,
-        true,
+        drawTargetOutline,
         editable.value);
 }
 
@@ -1532,8 +1534,10 @@ void DashboardRenderer::RegisterStaticTextAnchor(const RenderRect& rect,
     TextStyleId style,
     const TextLayoutOptions& options,
     const LayoutEditAnchorBinding& editable,
-    std::optional<LayoutEditParameter> colorParameter) {
-    RegisterTextAnchor(layoutResolver_->staticEditableAnchorRegions_, rect, text, style, options, editable);
+    std::optional<LayoutEditParameter> colorParameter,
+    bool drawTargetOutline) {
+    RegisterTextAnchor(
+        layoutResolver_->staticEditableAnchorRegions_, rect, text, style, options, editable, drawTargetOutline);
     if (colorParameter.has_value()) {
         RegisterStaticColorEditRegion(*colorParameter, MeasureTextBlock(rect, text, style, options).textRect);
     }
@@ -1541,11 +1545,12 @@ void DashboardRenderer::RegisterStaticTextAnchor(const RenderRect& rect,
 
 void DashboardRenderer::RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
     const LayoutEditAnchorBinding& editable,
-    std::optional<LayoutEditParameter> colorParameter) {
+    std::optional<LayoutEditParameter> colorParameter,
+    bool drawTargetOutline) {
     if (!layoutResolver_->dynamicAnchorRegistrationEnabled_) {
         return;
     }
-    RegisterTextAnchor(layoutResolver_->dynamicEditableAnchorRegions_, layoutResult, editable);
+    RegisterTextAnchor(layoutResolver_->dynamicEditableAnchorRegions_, layoutResult, editable, drawTargetOutline);
     if (colorParameter.has_value()) {
         RegisterDynamicColorEditRegion(*colorParameter, layoutResult.textRect);
     }
@@ -1556,11 +1561,13 @@ void DashboardRenderer::RegisterDynamicTextAnchor(const RenderRect& rect,
     TextStyleId style,
     const TextLayoutOptions& options,
     const LayoutEditAnchorBinding& editable,
-    std::optional<LayoutEditParameter> colorParameter) {
+    std::optional<LayoutEditParameter> colorParameter,
+    bool drawTargetOutline) {
     if (!layoutResolver_->dynamicAnchorRegistrationEnabled_) {
         return;
     }
-    RegisterTextAnchor(layoutResolver_->dynamicEditableAnchorRegions_, rect, text, style, options, editable);
+    RegisterTextAnchor(
+        layoutResolver_->dynamicEditableAnchorRegions_, rect, text, style, options, editable, drawTargetOutline);
     if (colorParameter.has_value()) {
         RegisterDynamicColorEditRegion(*colorParameter, MeasureTextBlock(rect, text, style, options).textRect);
     }
