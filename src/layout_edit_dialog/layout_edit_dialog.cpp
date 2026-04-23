@@ -352,6 +352,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
         RebuildLayoutEditTree(state, hwnd, state->initialFocus);
         state->dialog->PositionWindow(hwnd);
         ShowWindow(hwnd, SW_SHOWNORMAL);
+        EnsureVisibleLayoutEditTreeSelection(hwnd);
         return TRUE;
     }
 

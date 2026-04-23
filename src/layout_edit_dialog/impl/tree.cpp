@@ -191,6 +191,22 @@ void HandleLayoutEditTreeSelection(LayoutEditDialogState* state, HWND hwnd, HTRE
     RefreshLayoutEditValidationState(state, hwnd);
 }
 
+void EnsureVisibleLayoutEditTreeSelection(HWND hwnd) {
+    if (hwnd == nullptr) {
+        return;
+    }
+
+    HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE);
+    if (tree == nullptr) {
+        return;
+    }
+
+    if (HTREEITEM selectedItem = TreeView_GetSelection(tree); selectedItem != nullptr) {
+        ExpandTreeAncestors(tree, selectedItem);
+        TreeView_EnsureVisible(tree, selectedItem);
+    }
+}
+
 void RefreshLayoutEditDialogControls(LayoutEditDialogState* state,
     HWND hwnd,
     const std::optional<LayoutEditFocusKey>& preferredFocus,
@@ -211,6 +227,7 @@ void RefreshLayoutEditDialogControls(LayoutEditDialogState* state,
                 TreeView_SelectItem(tree, item);
                 TreeView_EnsureVisible(tree, item);
                 HandleLayoutEditTreeSelection(state, hwnd, item);
+                EnsureVisibleLayoutEditTreeSelection(hwnd);
                 return;
             }
         }
