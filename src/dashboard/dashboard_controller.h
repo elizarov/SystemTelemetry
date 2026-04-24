@@ -84,6 +84,8 @@ public:
         DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
     bool ApplyMetricListOrder(
         DashboardShellHost& shell, const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs);
+    bool ApplyContainerChildOrder(
+        DashboardShellHost& shell, const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex);
     bool ApplyLayoutEditValue(
         DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, double value);
     bool ApplyLayoutEditFont(

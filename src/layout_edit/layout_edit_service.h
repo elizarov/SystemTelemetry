@@ -20,6 +20,8 @@ std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNode
 bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
 bool ApplyMetricListOrder(
     AppConfig& config, const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs);
+bool ApplyContainerChildOrder(
+    AppConfig& config, const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex);
 bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widget, std::string_view metricRef);
 
 std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer,

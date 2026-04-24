@@ -5,6 +5,7 @@
 #include <map>
 
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "layout_edit/layout_edit_helpers.h"
 
 namespace {
 
@@ -79,6 +80,58 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
             if (widget.widget != nullptr) {
                 widget.widget->BuildStaticAnchors(renderer, widget);
             }
+        }
+    }
+
+    std::vector<LayoutContainerEditKey> registeredContainers;
+    for (const LayoutEditGuide& guide : layoutEditGuides_) {
+        LayoutContainerEditKey containerKey{guide.editCardId, guide.nodePath};
+        if (std::any_of(registeredContainers.begin(), registeredContainers.end(), [&](const auto& registered) {
+                return MatchesLayoutContainerEditKey(registered, containerKey);
+            })) {
+            continue;
+        }
+        registeredContainers.push_back(containerKey);
+        if (guide.childRects.size() < 2) {
+            continue;
+        }
+
+        const bool horizontal = guide.axis == LayoutGuideAxis::Vertical;
+        const int handleWidth = (std::max)(6, renderer.ScaleLogical(horizontal ? 12 : 8));
+        const int handleHeight = (std::max)(6, renderer.ScaleLogical(horizontal ? 8 : 12));
+        const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
+        const int handleInset = (std::max)(2, renderer.ScaleLogical(3));
+        const LayoutEditWidgetIdentity widgetIdentity =
+            guide.editCardId.empty()
+                ? LayoutEditWidgetIdentity{"", "", guide.nodePath, LayoutEditWidgetIdentity::Kind::DashboardChrome}
+                : LayoutEditWidgetIdentity{
+                      guide.renderCardId, guide.editCardId, guide.nodePath, LayoutEditWidgetIdentity::Kind::Widget};
+        for (size_t i = 0; i < guide.childRects.size(); ++i) {
+            const RenderRect& childRect = guide.childRects[i];
+            const int centerX =
+                horizontal ? childRect.left + childRect.Width() / 2 : childRect.right - (handleWidth / 2) - handleInset;
+            const int centerY =
+                horizontal ? childRect.top + (handleHeight / 2) + handleInset : childRect.top + childRect.Height() / 2;
+            const RenderRect anchorRect{centerX - handleWidth / 2,
+                centerY - handleHeight / 2,
+                centerX - handleWidth / 2 + handleWidth,
+                centerY - handleHeight / 2 + handleHeight};
+            renderer.RegisterStaticEditableAnchorRegion(
+                LayoutEditAnchorKey{widgetIdentity,
+                    LayoutContainerChildOrderEditKey{guide.editCardId, guide.nodePath},
+                    static_cast<int>(i)},
+                childRect,
+                anchorRect,
+                horizontal ? AnchorShape::HorizontalReorder : AnchorShape::VerticalReorder,
+                horizontal ? AnchorDragAxis::Horizontal : AnchorDragAxis::Vertical,
+                AnchorDragMode::AxisDelta,
+                anchorRect.Center(),
+                1.0,
+                true,
+                true,
+                false,
+                0);
+            staticEditableAnchorRegions_.back().anchorHitRect = anchorRect.Inflate(hitInset, hitInset);
         }
     }
 }

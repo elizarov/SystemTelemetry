@@ -153,6 +153,8 @@ std::string FormatAnchorShape(AnchorShape shape) {
             return "wedge";
         case AnchorShape::VerticalReorder:
             return "vertical-reorder";
+        case AnchorShape::HorizontalReorder:
+            return "horizontal-reorder";
         case AnchorShape::Plus:
             return "plus";
     }
@@ -171,6 +173,9 @@ std::string FormatAnchorSubject(const AppConfig& config, const LayoutEditAnchorK
     }
     if (const auto order = LayoutEditAnchorMetricListOrderKey(key); order.has_value()) {
         return "metric list order " + FormatLayoutConfigPath(config, order->editCardId, order->nodePath);
+    }
+    if (const auto order = LayoutEditAnchorContainerChildOrderKey(key); order.has_value()) {
+        return "container child order " + FormatLayoutConfigPath(config, order->editCardId, order->nodePath);
     }
     return "unknown anchor subject";
 }
@@ -815,29 +820,47 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverla
                 bottomLeft, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
             const_cast<DashboardRenderer*>(this)->DrawSolidLine(
                 topRight, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
-        } else if (highlighted.shape == AnchorShape::VerticalReorder) {
+        } else if (highlighted.shape == AnchorShape::VerticalReorder ||
+                   highlighted.shape == AnchorShape::HorizontalReorder) {
             const float outlineWidth =
                 static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
             const int centerX = highlighted.anchorRect.left +
                                 (std::max<LONG>(0, highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
             const int centerY = highlighted.anchorRect.top +
                                 (std::max<LONG>(0, highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-            const int halfWidth =
-                (std::max)(1, static_cast<int>(highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
             const int gapHalf = (std::max)(1, ScaleLogical(1));
-            const RenderPoint upApex{centerX, highlighted.anchorRect.top};
-            const RenderPoint upLeft{centerX - halfWidth, centerY - gapHalf};
-            const RenderPoint upRight{centerX + halfWidth, centerY - gapHalf};
-            const RenderPoint downApex{centerX, highlighted.anchorRect.bottom};
-            const RenderPoint downLeft{centerX - halfWidth, centerY + gapHalf};
-            const RenderPoint downRight{centerX + halfWidth, centerY + gapHalf};
             const auto stroke = RenderStroke::Solid(outlineColor, outlineWidth);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(upApex, upLeft, stroke);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(upLeft, upRight, stroke);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(upRight, upApex, stroke);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(downLeft, downApex, stroke);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(downApex, downRight, stroke);
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(downRight, downLeft, stroke);
+            if (highlighted.shape == AnchorShape::HorizontalReorder) {
+                const int halfHeight =
+                    (std::max)(1, static_cast<int>(highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
+                const RenderPoint leftApex{highlighted.anchorRect.left, centerY};
+                const RenderPoint leftTop{centerX - gapHalf, centerY - halfHeight};
+                const RenderPoint leftBottom{centerX - gapHalf, centerY + halfHeight};
+                const RenderPoint rightApex{highlighted.anchorRect.right, centerY};
+                const RenderPoint rightTop{centerX + gapHalf, centerY - halfHeight};
+                const RenderPoint rightBottom{centerX + gapHalf, centerY + halfHeight};
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(leftApex, leftTop, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(leftTop, leftBottom, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(leftBottom, leftApex, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(rightTop, rightApex, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(rightApex, rightBottom, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(rightBottom, rightTop, stroke);
+            } else {
+                const int halfWidth =
+                    (std::max)(1, static_cast<int>(highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
+                const RenderPoint upApex{centerX, highlighted.anchorRect.top};
+                const RenderPoint upLeft{centerX - halfWidth, centerY - gapHalf};
+                const RenderPoint upRight{centerX + halfWidth, centerY - gapHalf};
+                const RenderPoint downApex{centerX, highlighted.anchorRect.bottom};
+                const RenderPoint downLeft{centerX - halfWidth, centerY + gapHalf};
+                const RenderPoint downRight{centerX + halfWidth, centerY + gapHalf};
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(upApex, upLeft, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(upLeft, upRight, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(upRight, upApex, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(downLeft, downApex, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(downApex, downRight, stroke);
+                const_cast<DashboardRenderer*>(this)->DrawSolidLine(downRight, downLeft, stroke);
+            }
         } else if (highlighted.shape == AnchorShape::Plus) {
             const float outlineWidth =
                 static_cast<float>(active ? (std::max)(2, ScaleLogical(2)) : (std::max)(1, ScaleLogical(1)));
@@ -1897,6 +1920,58 @@ void DashboardRenderer::DrawResolvedWidget(const WidgetLayout& widget, const Met
     widget.widget->Draw(*this, widget, metrics);
 }
 
+bool DashboardRenderer::ShouldSkipForContainerChildReorder(const RenderRect& rect) const {
+    if (activeOverlayState_ == nullptr || !activeOverlayState_->activeContainerChildReorderDrag.has_value()) {
+        return false;
+    }
+    const ContainerChildReorderOverlayState& drag = *activeOverlayState_->activeContainerChildReorderDrag;
+    if (drag.currentIndex < 0 || drag.currentIndex >= static_cast<int>(drag.childRects.size())) {
+        return false;
+    }
+    const RenderRect& childRect = drag.childRects[static_cast<size_t>(drag.currentIndex)];
+    return rect.left >= childRect.left && rect.top >= childRect.top && rect.right <= childRect.right &&
+           rect.bottom <= childRect.bottom;
+}
+
+void DashboardRenderer::DrawContainerChildReorderOverlay(const MetricSource& metrics) {
+    if (activeOverlayState_ == nullptr || !activeOverlayState_->activeContainerChildReorderDrag.has_value() ||
+        d2dActiveRenderTarget_ == nullptr) {
+        return;
+    }
+
+    const ContainerChildReorderOverlayState& drag = *activeOverlayState_->activeContainerChildReorderDrag;
+    if (drag.currentIndex < 0 || drag.currentIndex >= static_cast<int>(drag.childRects.size())) {
+        return;
+    }
+
+    const RenderRect& childRect = drag.childRects[static_cast<size_t>(drag.currentIndex)];
+    const int childStart = drag.horizontal ? childRect.left : childRect.top;
+    const int offset = drag.mouseCoordinate - drag.dragOffset - childStart;
+
+    D2D1_MATRIX_3X2_F previousTransform{};
+    d2dActiveRenderTarget_->GetTransform(&previousTransform);
+    const D2D1_MATRIX_3X2_F translation = drag.horizontal
+                                              ? D2D1::Matrix3x2F::Translation(static_cast<float>(offset), 0.0f)
+                                              : D2D1::Matrix3x2F::Translation(0.0f, static_cast<float>(offset));
+    d2dActiveRenderTarget_->SetTransform(translation * previousTransform);
+    const bool previousDynamicRegistration = layoutResolver_->dynamicAnchorRegistrationEnabled_;
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
+        if (ShouldSkipForContainerChildReorder(card.chrome.rect)) {
+            DrawResolvedWidget(card.chrome, metrics);
+        }
+        for (const auto& widget : card.widgets) {
+            if (ShouldSkipForContainerChildReorder(widget.rect)) {
+                DrawResolvedWidget(widget, metrics);
+            }
+        }
+    }
+    DrawSolidRect(
+        childRect, RenderStroke::Dotted(RenderColorId::ActiveEdit, static_cast<float>((std::max)(2, ScaleLogical(2)))));
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = previousDynamicRegistration;
+    d2dActiveRenderTarget_->SetTransform(previousTransform);
+}
+
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
     return DrawWindow(snapshot, DashboardOverlayState{});
 }
@@ -1922,11 +1997,16 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     const MetricSource& metrics = ResolveMetrics(snapshot);
     d2dActiveRenderTarget_->Clear(palette_->Get(RenderColorId::Background).ToD2DColorF());
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
-        DrawResolvedWidget(card.chrome, metrics);
+        if (!ShouldSkipForContainerChildReorder(card.chrome.rect)) {
+            DrawResolvedWidget(card.chrome, metrics);
+        }
         for (const auto& widget : card.widgets) {
-            DrawResolvedWidget(widget, metrics);
+            if (!ShouldSkipForContainerChildReorder(widget.rect)) {
+                DrawResolvedWidget(widget, metrics);
+            }
         }
     }
+    DrawContainerChildReorderOverlay(metrics);
     DrawSelectedColorEditHighlights(overlayState);
     DrawSelectedTreeNodeHighlight(overlayState);
     DrawHoveredWidgetHighlight(overlayState);

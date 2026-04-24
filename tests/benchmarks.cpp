@@ -429,6 +429,17 @@ private:
         return applied;
     }
 
+    bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) override {
+        const auto start = Clock::now();
+        const bool applied = ::ApplyContainerChildOrder(config_, key, fromIndex, toIndex);
+        if (applied) {
+            renderer_.SetConfig(config_);
+            dirty_ = true;
+        }
+        RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
+        return applied;
+    }
+
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,

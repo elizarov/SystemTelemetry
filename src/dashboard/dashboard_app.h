@@ -114,6 +114,7 @@ private:
     bool ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) override;
     bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) override;
+    bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) override;
     bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override;
     void InvalidateLayoutEdit() override;
 

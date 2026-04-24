@@ -19,6 +19,7 @@ enum class AnchorShape {
     Square,
     Wedge,
     VerticalReorder,
+    HorizontalReorder,
     Plus,
 };
 
@@ -65,11 +66,25 @@ struct LayoutMetricListOrderEditKey {
     std::vector<size_t> nodePath;
 };
 
+struct LayoutContainerChildOrderEditKey {
+    std::string editCardId;
+    std::vector<size_t> nodePath;
+};
+
 struct MetricListReorderOverlayState {
     LayoutEditWidgetIdentity widget;
     int currentIndex = 0;
     int mouseY = 0;
     int dragOffsetY = 0;
+};
+
+struct ContainerChildReorderOverlayState {
+    LayoutContainerChildOrderEditKey key;
+    std::vector<RenderRect> childRects;
+    int currentIndex = 0;
+    int mouseCoordinate = 0;
+    int dragOffset = 0;
+    bool horizontal = false;
 };
 
 struct LayoutEditLinearGeometry {
@@ -95,7 +110,11 @@ struct LayoutEditGuide {
 
 struct LayoutEditAnchorKey {
     LayoutEditWidgetIdentity widget;
-    std::variant<LayoutEditParameter, LayoutMetricEditKey, LayoutCardTitleEditKey, LayoutMetricListOrderEditKey>
+    std::variant<LayoutEditParameter,
+        LayoutMetricEditKey,
+        LayoutCardTitleEditKey,
+        LayoutMetricListOrderEditKey,
+        LayoutContainerChildOrderEditKey>
         subject = LayoutEditParameter::MetricListBarHeight;
     int anchorId = 0;
 };

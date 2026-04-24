@@ -374,6 +374,13 @@ bool DashboardApp::ApplyMetricListOrder(
     return applied;
 }
 
+bool DashboardApp::ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) {
+    const auto start = std::chrono::steady_clock::now();
+    const bool applied = controller_.ApplyContainerChildOrder(*this, key, fromIndex, toIndex);
+    RecordLayoutEditTracePhase(TracePhase::Apply, std::chrono::steady_clock::now() - start);
+    return applied;
+}
+
 bool DashboardApp::ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) {
     const auto start = std::chrono::steady_clock::now();
     const bool applied = controller_.ApplyLayoutEditValue(*this, parameter, value);

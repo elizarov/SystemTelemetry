@@ -192,6 +192,8 @@ private:
     void DrawLayoutSimilarityIndicators(const DashboardOverlayState& overlayState) const;
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
+    bool ShouldSkipForContainerChildReorder(const RenderRect& rect) const;
+    void DrawContainerChildReorderOverlay(const MetricSource& metrics);
     bool UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,

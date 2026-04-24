@@ -117,6 +117,13 @@ public:
         return false;
     }
 
+    bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) override {
+        (void)key;
+        (void)fromIndex;
+        (void)toIndex;
+        return false;
+    }
+
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,

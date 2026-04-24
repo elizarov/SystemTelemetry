@@ -18,8 +18,15 @@ bool MatchesLayoutEditAnchorSubject(const LayoutEditAnchorKey& left, const Layou
     if (const auto* leftCardTitle = std::get_if<LayoutCardTitleEditKey>(&left.subject)) {
         return MatchesLayoutCardTitleEditKey(*leftCardTitle, std::get<LayoutCardTitleEditKey>(right.subject));
     }
-    return MatchesLayoutMetricListOrderEditKey(
-        std::get<LayoutMetricListOrderEditKey>(left.subject), std::get<LayoutMetricListOrderEditKey>(right.subject));
+    if (const auto* leftMetricListOrder = std::get_if<LayoutMetricListOrderEditKey>(&left.subject)) {
+        return MatchesLayoutMetricListOrderEditKey(
+            *leftMetricListOrder, std::get<LayoutMetricListOrderEditKey>(right.subject));
+    }
+    return MatchesLayoutContainerEditKey(
+        LayoutContainerEditKey{std::get<LayoutContainerChildOrderEditKey>(left.subject).editCardId,
+            std::get<LayoutContainerChildOrderEditKey>(left.subject).nodePath},
+        LayoutContainerEditKey{std::get<LayoutContainerChildOrderEditKey>(right.subject).editCardId,
+            std::get<LayoutContainerChildOrderEditKey>(right.subject).nodePath});
 }
 
 }  // namespace
@@ -131,13 +138,14 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
                MatchesLayoutCardTitleEditKey(*cardTitleKey, std::get<LayoutCardTitleEditKey>(key.subject));
     }
     if (const auto* metricListOrderKey = std::get_if<LayoutMetricListOrderEditKey>(&focusKey)) {
-        return key.subject.index() == 3 && MatchesLayoutMetricListOrderEditKey(*metricListOrderKey,
-                                               std::get<LayoutMetricListOrderEditKey>(key.subject));
+        const auto* anchorKey = std::get_if<LayoutMetricListOrderEditKey>(&key.subject);
+        return anchorKey != nullptr && MatchesLayoutMetricListOrderEditKey(*metricListOrderKey, *anchorKey);
     }
     const auto* containerKey = std::get_if<LayoutContainerEditKey>(&focusKey);
-    return containerKey != nullptr && key.subject.index() == 3 &&
-           MatchesLayoutMetricListOrderEditKey(std::get<LayoutMetricListOrderEditKey>(key.subject),
-               LayoutMetricListOrderEditKey{containerKey->editCardId, containerKey->nodePath});
+    const auto* containerOrderKey = std::get_if<LayoutContainerChildOrderEditKey>(&key.subject);
+    return containerKey != nullptr && containerOrderKey != nullptr &&
+           MatchesLayoutContainerEditKey(
+               *containerKey, LayoutContainerEditKey{containerOrderKey->editCardId, containerOrderKey->nodePath});
 }
 
 bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditGuide& guide) {
@@ -189,6 +197,12 @@ std::optional<LayoutMetricListOrderEditKey> LayoutEditAnchorMetricListOrderKey(c
     const auto* metricListOrderKey = std::get_if<LayoutMetricListOrderEditKey>(&key.subject);
     return metricListOrderKey != nullptr ? std::optional<LayoutMetricListOrderEditKey>(*metricListOrderKey)
                                          : std::nullopt;
+}
+
+std::optional<LayoutContainerChildOrderEditKey> LayoutEditAnchorContainerChildOrderKey(const LayoutEditAnchorKey& key) {
+    const auto* containerOrderKey = std::get_if<LayoutContainerChildOrderEditKey>(&key.subject);
+    return containerOrderKey != nullptr ? std::optional<LayoutContainerChildOrderEditKey>(*containerOrderKey)
+                                        : std::nullopt;
 }
 
 bool IsLayoutGuidePayload(const TooltipPayload& payload) {
@@ -294,6 +308,11 @@ std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& p
                 if (const auto metricListOrderKey = LayoutEditAnchorMetricListOrderKey(value.key);
                     metricListOrderKey.has_value()) {
                     return LayoutEditFocusKey{*metricListOrderKey};
+                }
+                if (const auto containerOrderKey = LayoutEditAnchorContainerChildOrderKey(value.key);
+                    containerOrderKey.has_value()) {
+                    return LayoutEditFocusKey{
+                        LayoutContainerEditKey{containerOrderKey->editCardId, containerOrderKey->nodePath}};
                 }
                 return std::nullopt;
             } else {

@@ -36,6 +36,7 @@ public:
     virtual bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) = 0;
     virtual bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) = 0;
+    virtual bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) = 0;
     virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
@@ -159,6 +160,18 @@ private:
         int mouseY = 0;
     };
 
+    struct ContainerChildReorderDragState {
+        LayoutEditWidgetIdentity widget;
+        LayoutContainerChildOrderEditKey key;
+        std::vector<RenderRect> childRects;
+        bool horizontal = false;
+        int currentIndex = 0;
+        int childCount = 0;
+        int containerStart = 0;
+        int dragOffset = 0;
+        int mouseCoordinate = 0;
+    };
+
     const LayoutEditGuide* HitTestLayoutGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
     const LayoutEditWidgetGuide* HitTestWidgetEditGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
     const LayoutEditGapAnchor* HitTestGapEditAnchor(RenderPoint clientPoint, size_t* index = nullptr) const;
@@ -169,6 +182,8 @@ private:
     bool UpdateGapEditDrag(RenderPoint clientPoint);
     bool UpdateAnchorEditDrag(RenderPoint clientPoint);
     bool UpdateMetricListReorderDrag(RenderPoint clientPoint);
+    bool UpdateContainerChildReorderDrag(RenderPoint clientPoint);
+    void RefreshContainerChildReorderRects(ContainerChildReorderDragState& drag);
     void SyncRendererInteractionState();
     void ClearInteractionState();
     void SetCursorForPoint(RenderPoint clientPoint);
@@ -189,5 +204,6 @@ private:
     std::optional<GapEditDragState> activeGapEditDrag_;
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
     std::optional<MetricListReorderDragState> activeMetricListReorderDrag_;
+    std::optional<ContainerChildReorderDragState> activeContainerChildReorderDrag_;
     std::optional<RenderPoint> lastClientPoint_;
 };

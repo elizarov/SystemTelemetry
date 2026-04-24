@@ -524,6 +524,17 @@ bool DashboardController::ApplyMetricListOrder(
     return true;
 }
 
+bool DashboardController::ApplyContainerChildOrder(
+    DashboardShellHost& shell, const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) {
+    if (!::ApplyContainerChildOrder(state_.config, key, fromIndex, toIndex)) {
+        return false;
+    }
+    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
+    return true;
+}
+
 bool DashboardController::ApplyLayoutEditValue(
     DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, double value) {
     double nextValue = value;

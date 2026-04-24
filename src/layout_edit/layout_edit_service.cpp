@@ -193,6 +193,39 @@ bool ApplyMetricListOrder(
     return updated;
 }
 
+bool ApplyContainerChildOrder(
+    AppConfig& config, const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) {
+    const auto applyOrder = [&](LayoutNodeConfig* node) -> bool {
+        if (node == nullptr || (node->name != "rows" && node->name != "columns") || fromIndex < 0 || toIndex < 0 ||
+            fromIndex >= static_cast<int>(node->children.size()) ||
+            toIndex >= static_cast<int>(node->children.size())) {
+            return false;
+        }
+        if (fromIndex == toIndex) {
+            return true;
+        }
+        LayoutNodeConfig moved = std::move(node->children[static_cast<size_t>(fromIndex)]);
+        node->children.erase(node->children.begin() + fromIndex);
+        node->children.insert(node->children.begin() + toIndex, std::move(moved));
+        return true;
+    };
+
+    bool updated = false;
+    if (key.editCardId.empty()) {
+        updated = applyOrder(FindLayoutNodeByPath(config.layout.structure.cardsLayout, key.nodePath));
+        if (!updated) {
+            return false;
+        }
+        if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
+            applyOrder(FindLayoutNodeByPath(namedLayout->cardsLayout, key.nodePath));
+        }
+    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, key.editCardId)) {
+        updated = applyOrder(FindLayoutNodeByPath(card->layout, key.nodePath));
+    }
+
+    return updated;
+}
+
 bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widget, std::string_view metricRef) {
     if (metricRef.empty()) {
         return false;
