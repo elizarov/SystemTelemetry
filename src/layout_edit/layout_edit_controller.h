@@ -165,9 +165,12 @@ private:
         LayoutContainerChildOrderEditKey key;
         std::vector<RenderRect> childRects;
         bool horizontal = false;
+        std::vector<int> stableSnapCenters;
+        int originalIndex = 0;
         int currentIndex = 0;
         int childCount = 0;
         int containerStart = 0;
+        int draggedExtent = 1;
         int dragOffset = 0;
         int mouseCoordinate = 0;
     };

@@ -74,6 +74,22 @@ std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
                    : " path=" + FormatNodePath(key.widget.nodePath));
 }
 
+int ContainerChildAxisStart(const RenderRect& rect, bool horizontal) {
+    return horizontal ? rect.left : rect.top;
+}
+
+int ContainerChildAxisEnd(const RenderRect& rect, bool horizontal) {
+    return horizontal ? rect.right : rect.bottom;
+}
+
+int ContainerChildAxisExtent(const RenderRect& rect, bool horizontal) {
+    return (std::max)(1, ContainerChildAxisEnd(rect, horizontal) - ContainerChildAxisStart(rect, horizontal));
+}
+
+int ContainerChildAxisCenter(const RenderRect& rect, bool horizontal) {
+    return ContainerChildAxisStart(rect, horizontal) + (ContainerChildAxisExtent(rect, horizontal) / 2);
+}
+
 double NormalizeDegrees(double degrees) {
     double normalized = std::fmod(degrees, 360.0);
     if (normalized < 0.0) {
@@ -487,13 +503,26 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                 drag.key = *containerOrderKey;
                 drag.horizontal = node->name == "columns";
                 drag.currentIndex = region->key.anchorId;
+                drag.originalIndex = region->key.anchorId;
                 drag.childCount = static_cast<int>(node->children.size());
                 drag.containerStart = drag.horizontal ? region->targetRect.left : region->targetRect.top;
+                drag.draggedExtent = ContainerChildAxisExtent(region->targetRect, drag.horizontal);
                 drag.dragOffset = (drag.horizontal ? clientPoint.x : clientPoint.y) -
                                   (drag.horizontal ? region->targetRect.left : region->targetRect.top);
                 drag.mouseCoordinate = drag.horizontal ? clientPoint.x : clientPoint.y;
                 activeContainerChildReorderDrag_ = std::move(drag);
                 RefreshContainerChildReorderRects(*activeContainerChildReorderDrag_);
+                ContainerChildReorderDragState& activeDrag = *activeContainerChildReorderDrag_;
+                activeDrag.stableSnapCenters.clear();
+                activeDrag.stableSnapCenters.reserve(activeDrag.childRects.size());
+                for (const RenderRect& childRect : activeDrag.childRects) {
+                    activeDrag.stableSnapCenters.push_back(ContainerChildAxisCenter(childRect, activeDrag.horizontal));
+                }
+                if (activeDrag.currentIndex >= 0 &&
+                    activeDrag.currentIndex < static_cast<int>(activeDrag.childRects.size())) {
+                    activeDrag.draggedExtent = ContainerChildAxisExtent(
+                        activeDrag.childRects[static_cast<size_t>(activeDrag.currentIndex)], activeDrag.horizontal);
+                }
                 renderer.SetInteractiveDragTraceActive(true);
                 host_.BeginLayoutEditTraceSession("container_child_reorder", DescribeEditableAnchor(region->key));
                 SyncRendererInteractionState();
@@ -1294,14 +1323,20 @@ void LayoutEditController::RefreshContainerChildReorderRects(ContainerChildReord
 bool LayoutEditController::UpdateContainerChildReorderDrag(RenderPoint clientPoint) {
     ContainerChildReorderDragState& drag = *activeContainerChildReorderDrag_;
     drag.mouseCoordinate = drag.horizontal ? clientPoint.x : clientPoint.y;
-    int targetIndex = drag.currentIndex;
-    for (int index = 0; index < static_cast<int>(drag.childRects.size()); ++index) {
-        const RenderRect& rect = drag.childRects[static_cast<size_t>(index)];
-        const int start = drag.horizontal ? rect.left : rect.top;
-        const int end = drag.horizontal ? rect.right : rect.bottom;
-        if (drag.mouseCoordinate >= start && drag.mouseCoordinate < end) {
-            targetIndex = index;
-            break;
+    if (drag.stableSnapCenters.size() != static_cast<size_t>((std::max)(0, drag.childCount))) {
+        SyncRendererInteractionState();
+        host_.InvalidateLayoutEdit();
+        return true;
+    }
+
+    const int draggedCenter = drag.mouseCoordinate - drag.dragOffset + (drag.draggedExtent / 2);
+    int targetIndex = 0;
+    for (int index = 0; index < static_cast<int>(drag.stableSnapCenters.size()); ++index) {
+        if (index == drag.originalIndex) {
+            continue;
+        }
+        if (draggedCenter > drag.stableSnapCenters[static_cast<size_t>(index)]) {
+            ++targetIndex;
         }
     }
     targetIndex = std::clamp(targetIndex, 0, (std::max)(0, drag.childCount - 1));
