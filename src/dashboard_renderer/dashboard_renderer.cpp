@@ -209,6 +209,14 @@ bool SameRect(const RenderRect& left, const RenderRect& right) {
     return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
 }
 
+RenderRect OffsetRect(RenderRect rect, int dx, int dy) {
+    rect.left += dx;
+    rect.right += dx;
+    rect.top += dy;
+    rect.bottom += dy;
+    return rect;
+}
+
 bool IsFontEditParameter(LayoutEditParameter parameter) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
     return descriptor.has_value() && descriptor->valueFormat == configschema::ValueFormat::FontSpec;
@@ -791,8 +799,41 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverla
     if (highlights.empty()) {
         return;
     }
+    const auto moveActiveReorderHighlight = [&](LayoutEditAnchorRegion& region) {
+        if (const auto orderKey = LayoutEditAnchorMetricListOrderKey(region.key);
+            orderKey.has_value() && overlayState.activeMetricListReorderDrag.has_value()) {
+            const MetricListReorderOverlayState& drag = *overlayState.activeMetricListReorderDrag;
+            if (drag.currentIndex == region.key.anchorId && ::MatchesWidgetIdentity(drag.widget, region.key.widget)) {
+                const int dy = drag.mouseY - drag.dragOffsetY - region.targetRect.top;
+                region.targetRect = OffsetRect(region.targetRect, 0, dy);
+                region.anchorRect = OffsetRect(region.anchorRect, 0, dy);
+                region.anchorHitRect = OffsetRect(region.anchorHitRect, 0, dy);
+            }
+            return;
+        }
+        if (const auto orderKey = LayoutEditAnchorContainerChildOrderKey(region.key);
+            orderKey.has_value() && overlayState.activeContainerChildReorderDrag.has_value()) {
+            const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
+            if (drag.currentIndex == region.key.anchorId &&
+                MatchesLayoutContainerEditKey(LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath},
+                    LayoutContainerEditKey{orderKey->editCardId, orderKey->nodePath})) {
+                const int childStart = drag.horizontal ? region.targetRect.left : region.targetRect.top;
+                const int offset = drag.mouseCoordinate - drag.dragOffset - childStart;
+                const int dx = drag.horizontal ? offset : 0;
+                const int dy = drag.horizontal ? 0 : offset;
+                region.targetRect = OffsetRect(region.targetRect, dx, dy);
+                region.anchorRect = OffsetRect(region.anchorRect, dx, dy);
+                region.anchorHitRect = OffsetRect(region.anchorHitRect, dx, dy);
+            }
+        }
+    };
     const std::optional<RenderRect> hoveredWidgetOutlineRect = FindHoveredWidgetOutlineRect(overlayState);
-    for (const auto& [highlighted, active] : highlights) {
+    for (const auto& highlight : highlights) {
+        LayoutEditAnchorRegion highlighted = highlight.first;
+        const bool active = highlight.second;
+        if (active) {
+            moveActiveReorderHighlight(highlighted);
+        }
         const RenderColorId outlineColor = active ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
         bool drawTargetOutline = highlighted.drawTargetOutline && !highlighted.targetRect.IsEmpty();
         if (!active && drawTargetOutline && hoveredWidgetOutlineRect.has_value() &&
