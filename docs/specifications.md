@@ -23,6 +23,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
 - `Save Config` persists live placement, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
 - `Config To Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `telemetry_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
+- `Config To Display` marks a display entry with a checkbox when the live config already targets that display at `0,0` and the configured wallpaper path is non-empty, while still allowing that checked entry to be invoked again.
 
 ## Dashboard Composition And Rendering
 

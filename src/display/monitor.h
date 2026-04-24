@@ -30,6 +30,7 @@ struct DisplayMenuOption {
     RECT rect{};
     UINT dpi = USER_DEFAULT_SCREEN_DPI;
     bool layoutFits = false;
+    bool matchesCurrentConfig = false;
     double fittedScale = 0.0;
 };
 

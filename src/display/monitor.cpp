@@ -183,10 +183,17 @@ MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
 }
 
 std::vector<DisplayMenuOption> EnumerateDisplayMenuOptions(const AppConfig& config) {
+    const std::optional<TargetMonitorInfo> configuredMonitor = FindTargetMonitor(config.display.monitorName);
+    const bool hasConfiguredWallpaper = !config.display.wallpaper.empty();
+    const bool isConfiguredAtOrigin = config.display.position.x == 0 && config.display.position.y == 0;
+
     struct SearchContext {
         const AppConfig* config = nullptr;
+        const std::optional<TargetMonitorInfo>* configuredMonitor = nullptr;
+        bool hasConfiguredWallpaper = false;
+        bool isConfiguredAtOrigin = false;
         std::vector<DisplayMenuOption> results;
-    } context{&config, {}};
+    } context{&config, &configuredMonitor, hasConfiguredWallpaper, isConfiguredAtOrigin, {}};
 
     EnumDisplayMonitors(
         nullptr,
@@ -214,6 +221,9 @@ std::vector<DisplayMenuOption> EnumerateDisplayMenuOptions(const AppConfig& conf
             option.rect = info.rcMonitor;
             option.dpi = dpi;
             option.layoutFits = fittedScale > 0.0;
+            option.matchesCurrentConfig = context->hasConfiguredWallpaper && context->isConfiguredAtOrigin &&
+                                          context->configuredMonitor->has_value() &&
+                                          RectsEqual(context->configuredMonitor->value().rect, option.rect);
             option.fittedScale = fittedScale;
             context->results.push_back(std::move(option));
             return context->results.size() < (kCommandConfigureDisplayMax - kCommandConfigureDisplayBase + 1);

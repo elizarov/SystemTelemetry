@@ -1336,7 +1336,8 @@ void DashboardShellUi::ShowContextMenu(
     } else {
         for (const auto& option : state.configDisplayOptions) {
             const std::wstring label = WideFromUtf8(option.displayName);
-            const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED);
+            const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED) |
+                               (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(configureDisplayMenu, flags, option.commandId, label.c_str());
         }
     }
