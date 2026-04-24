@@ -627,7 +627,6 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
 
 bool LayoutEditController::HandleMouseMove(RenderPoint clientPoint) {
     lastClientPoint_ = clientPoint;
-    host_.LayoutDashboardOverlayState().hoverOnExposedDashboard = true;
     if (activeLayoutDrag_.has_value()) {
         return UpdateLayoutDrag(clientPoint);
     }
@@ -647,6 +646,7 @@ bool LayoutEditController::HandleMouseMove(RenderPoint clientPoint) {
         return UpdateWidgetEditDrag(clientPoint);
     }
 
+    host_.LayoutDashboardOverlayState().hoverOnExposedDashboard = true;
     RefreshHover(clientPoint);
     return true;
 }
@@ -966,7 +966,13 @@ void LayoutEditController::SyncRendererInteractionState() {
     } else {
         overlayState.activeContainerChildReorderDrag.reset();
     }
-    overlayState.hoverOnExposedDashboard = overlayState.hoverOnExposedDashboard || HasActiveDrag();
+    if (HasActiveDrag()) {
+        overlayState.hoverOnExposedDashboard = false;
+        overlayState.hoveredLayoutEditGuide.reset();
+        overlayState.hoveredLayoutCard.reset();
+        overlayState.hoveredGapEditAnchor.reset();
+        overlayState.hoveredEditableAnchor.reset();
+    }
 }
 
 void LayoutEditController::ClearInteractionState() {
@@ -1134,7 +1140,6 @@ bool LayoutEditController::UpdateLayoutDrag(RenderPoint clientPoint) {
     }
 
     SyncRendererInteractionState();
-    RefreshHover(clientPoint);
     return true;
 }
 
@@ -1268,7 +1273,6 @@ bool LayoutEditController::UpdateMetricListReorderDrag(RenderPoint clientPoint) 
     drag.currentIndex = targetIndex;
     SyncRendererInteractionState();
     host_.InvalidateLayoutEdit();
-    RefreshHover(clientPoint);
     return true;
 }
 
@@ -1315,6 +1319,5 @@ bool LayoutEditController::UpdateContainerChildReorderDrag(RenderPoint clientPoi
     RefreshContainerChildReorderRects(drag);
     SyncRendererInteractionState();
     host_.InvalidateLayoutEdit();
-    RefreshHover(clientPoint);
     return true;
 }

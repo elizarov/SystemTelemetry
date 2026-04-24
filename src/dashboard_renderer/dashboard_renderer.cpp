@@ -1282,7 +1282,6 @@ void DashboardRenderer::DrawWidgetEditGuides(const DashboardOverlayState& overla
     };
 
     const int lineWidth = (std::max)(1, ScaleLogical(1));
-    const int activeLineWidth = (std::max)(lineWidth + 1, ScaleLogical(2));
     for (const auto& guide : layoutResolver_->widgetEditGuides_) {
         if (!shouldDraw(guide)) {
             continue;
@@ -1297,7 +1296,7 @@ void DashboardRenderer::DrawWidgetEditGuides(const DashboardOverlayState& overla
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(
             ApplyContainerChildReorderOffset(guide.drawStart, guide.widgetRect),
             ApplyContainerChildReorderOffset(guide.drawEnd, guide.widgetRect),
-            RenderStroke::Solid(color, static_cast<float>(emphasized ? activeLineWidth : lineWidth)));
+            RenderStroke::Solid(color, static_cast<float>(lineWidth)));
     }
 }
 
@@ -1340,7 +1339,6 @@ void DashboardRenderer::DrawGapEditAnchors(const DashboardOverlayState& overlayS
 
     const int capHalf = (std::max)(2, ScaleLogical(4));
     const int lineWidth = (std::max)(1, ScaleLogical(1));
-    const int activeLineWidth = (std::max)(lineWidth + 1, ScaleLogical(2));
     const int handleOutline = (std::max)(1, ScaleLogical(1));
     for (const auto& anchor : layoutResolver_->gapEditAnchors_) {
         if (!shouldDraw(anchor)) {
@@ -1355,7 +1353,7 @@ void DashboardRenderer::DrawGapEditAnchors(const DashboardOverlayState& overlayS
                              MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
         const bool emphasized = active || selected;
         const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
-        const float strokeWidth = static_cast<float>(emphasized ? activeLineWidth : lineWidth);
+        const float strokeWidth = static_cast<float>(lineWidth);
         const RenderRect offsetSource = anchor.hitRect.IsEmpty() ? anchor.handleRect : anchor.hitRect;
         const RenderPoint drawStart = ApplyContainerChildReorderOffset(anchor.drawStart, offsetSource);
         const RenderPoint drawEnd = ApplyContainerChildReorderOffset(anchor.drawEnd, offsetSource);
