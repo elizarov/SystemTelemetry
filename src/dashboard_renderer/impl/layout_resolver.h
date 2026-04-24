@@ -40,6 +40,14 @@ public:
         bool verticalSpring = false;
     };
 
+    struct ContainerChildReorderTarget {
+        std::string renderCardId;
+        std::string editCardId;
+        std::vector<size_t> nodePath;
+        bool horizontal = false;
+        std::vector<RenderRect> childRects;
+    };
+
     void Clear();
     void ClearDynamicEditArtifacts();
     void ResolveNodeWidgets(DashboardRenderer& renderer,
@@ -79,6 +87,7 @@ private:
 
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
+    std::vector<ContainerChildReorderTarget> containerChildReorderTargets_;
     std::vector<LayoutEditWidgetGuide> widgetEditGuides_;
     std::vector<LayoutEditGapAnchor> gapEditAnchors_;
     std::vector<LayoutEditAnchorRegion> staticEditableAnchorRegions_;

@@ -5,7 +5,6 @@
 #include <map>
 
 #include "dashboard_renderer/dashboard_renderer.h"
-#include "layout_edit/layout_edit_helpers.h"
 
 namespace {
 
@@ -30,6 +29,7 @@ RenderRect MakeSquareAnchorRect(int centerX, int centerY, int size) {
 void DashboardLayoutResolver::Clear() {
     resolvedLayout_ = {};
     layoutEditGuides_.clear();
+    containerChildReorderTargets_.clear();
     widgetEditGuides_.clear();
     gapEditAnchors_.clear();
     staticEditableAnchorRegions_.clear();
@@ -83,31 +83,23 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
         }
     }
 
-    std::vector<LayoutContainerEditKey> registeredContainers;
-    for (const LayoutEditGuide& guide : layoutEditGuides_) {
-        LayoutContainerEditKey containerKey{guide.editCardId, guide.nodePath};
-        if (std::any_of(registeredContainers.begin(), registeredContainers.end(), [&](const auto& registered) {
-                return MatchesLayoutContainerEditKey(registered, containerKey);
-            })) {
-            continue;
-        }
-        registeredContainers.push_back(containerKey);
-        if (guide.childRects.size() < 2) {
+    for (const ContainerChildReorderTarget& target : containerChildReorderTargets_) {
+        if (target.childRects.size() < 2) {
             continue;
         }
 
-        const bool horizontal = guide.axis == LayoutGuideAxis::Vertical;
+        const bool horizontal = target.horizontal;
         const int handleWidth = (std::max)(6, renderer.ScaleLogical(horizontal ? 12 : 8));
         const int handleHeight = (std::max)(6, renderer.ScaleLogical(horizontal ? 8 : 12));
         const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
         const int handleInset = (std::max)(2, renderer.ScaleLogical(3));
         const LayoutEditWidgetIdentity widgetIdentity =
-            guide.editCardId.empty()
-                ? LayoutEditWidgetIdentity{"", "", guide.nodePath, LayoutEditWidgetIdentity::Kind::DashboardChrome}
+            target.editCardId.empty()
+                ? LayoutEditWidgetIdentity{"", "", target.nodePath, LayoutEditWidgetIdentity::Kind::DashboardChrome}
                 : LayoutEditWidgetIdentity{
-                      guide.renderCardId, guide.editCardId, guide.nodePath, LayoutEditWidgetIdentity::Kind::Widget};
-        for (size_t i = 0; i < guide.childRects.size(); ++i) {
-            const RenderRect& childRect = guide.childRects[i];
+                      target.renderCardId, target.editCardId, target.nodePath, LayoutEditWidgetIdentity::Kind::Widget};
+        for (size_t i = 0; i < target.childRects.size(); ++i) {
+            const RenderRect& childRect = target.childRects[i];
             const int centerX =
                 horizontal ? childRect.left + childRect.Width() / 2 : childRect.right - (handleWidth / 2) - handleInset;
             const int centerY =
@@ -118,7 +110,7 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 centerY - handleHeight / 2 + handleHeight};
             renderer.RegisterStaticEditableAnchorRegion(
                 LayoutEditAnchorKey{widgetIdentity,
-                    LayoutContainerChildOrderEditKey{guide.editCardId, guide.nodePath},
+                    LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
                     static_cast<int>(i)},
                 childRect,
                 anchorRect,
@@ -149,6 +141,8 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     }
 
     const bool horizontal = node.name == "columns";
+    containerChildReorderTargets_.push_back(
+        ContainerChildReorderTarget{renderCardId, editCardId, nodePath, horizontal, childRects});
     const LayoutEditWidgetIdentity gapWidgetIdentity =
         renderCardId.empty()
             ? LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome}
@@ -467,6 +461,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
 bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool includeWidgetState) {
     resolvedLayout_ = {};
     layoutEditGuides_.clear();
+    containerChildReorderTargets_.clear();
     widgetEditGuides_.clear();
     gapEditAnchors_.clear();
     staticEditableAnchorRegions_.clear();
