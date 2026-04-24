@@ -800,6 +800,7 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverla
         return;
     }
     const auto moveActiveReorderHighlight = [&](LayoutEditAnchorRegion& region) {
+        bool movedByActiveAnchor = false;
         if (const auto orderKey = LayoutEditAnchorMetricListOrderKey(region.key);
             orderKey.has_value() && overlayState.activeMetricListReorderDrag.has_value()) {
             const MetricListReorderOverlayState& drag = *overlayState.activeMetricListReorderDrag;
@@ -808,6 +809,7 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverla
                 region.targetRect = OffsetRect(region.targetRect, 0, dy);
                 region.anchorRect = OffsetRect(region.anchorRect, 0, dy);
                 region.anchorHitRect = OffsetRect(region.anchorHitRect, 0, dy);
+                movedByActiveAnchor = true;
             }
             return;
         }
@@ -824,14 +826,20 @@ void DashboardRenderer::DrawHoveredEditableAnchorHighlight(const DashboardOverla
                 region.targetRect = OffsetRect(region.targetRect, dx, dy);
                 region.anchorRect = OffsetRect(region.anchorRect, dx, dy);
                 region.anchorHitRect = OffsetRect(region.anchorHitRect, dx, dy);
+                movedByActiveAnchor = true;
             }
+        }
+        if (!movedByActiveAnchor) {
+            region.targetRect = ApplyContainerChildReorderOffset(region.targetRect);
+            region.anchorRect = ApplyContainerChildReorderOffset(region.anchorRect);
+            region.anchorHitRect = ApplyContainerChildReorderOffset(region.anchorHitRect);
         }
     };
     const std::optional<RenderRect> hoveredWidgetOutlineRect = FindHoveredWidgetOutlineRect(overlayState);
     for (const auto& highlight : highlights) {
         LayoutEditAnchorRegion highlighted = highlight.first;
         const bool active = highlight.second;
-        if (active) {
+        if (active || overlayState.activeContainerChildReorderDrag.has_value()) {
             moveActiveReorderHighlight(highlighted);
         }
         const RenderColorId outlineColor = active ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
@@ -931,7 +939,7 @@ std::optional<RenderRect> DashboardRenderer::FindHoveredWidgetOutlineRect(
         for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
                 if (MatchesWidgetIdentity(widget, *overlayState.hoveredEditableWidget)) {
-                    return widget.rect;
+                    return ApplyContainerChildReorderOffset(widget.rect);
                 }
             }
         }
@@ -944,9 +952,10 @@ std::optional<RenderRect> DashboardRenderer::FindHoveredWidgetOutlineRect(
                 card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
             if (MatchesCardChromeSelectionIdentity(*overlayState.hoveredEditableCard, cardIdentity) &&
                 !card.chromeLayout.titleRect.IsEmpty()) {
-                return card.chromeLayout.iconRect.IsEmpty()
-                           ? card.chromeLayout.titleRect
-                           : UnionRect(card.chromeLayout.iconRect, card.chromeLayout.titleRect);
+                const RenderRect titleRect = card.chromeLayout.iconRect.IsEmpty()
+                                                 ? card.chromeLayout.titleRect
+                                                 : UnionRect(card.chromeLayout.iconRect, card.chromeLayout.titleRect);
+                return ApplyContainerChildReorderOffset(titleRect);
             }
         }
     }
@@ -967,13 +976,14 @@ void DashboardRenderer::DrawSelectedColorEditHighlights(const DashboardOverlaySt
         if (rect.IsEmpty()) {
             return;
         }
+        const RenderRect adjustedRect = ApplyContainerChildReorderOffset(rect);
         const auto existing =
             std::find_if(highlightedRects.begin(), highlightedRects.end(), [&](const RenderRect& candidate) {
-                return candidate.left == rect.left && candidate.top == rect.top && candidate.right == rect.right &&
-                       candidate.bottom == rect.bottom;
+                return candidate.left == adjustedRect.left && candidate.top == adjustedRect.top &&
+                       candidate.right == adjustedRect.right && candidate.bottom == adjustedRect.bottom;
             });
         if (existing == highlightedRects.end()) {
-            highlightedRects.push_back(rect);
+            highlightedRects.push_back(adjustedRect);
         }
     };
     const auto collect = [&](const std::vector<LayoutEditColorRegion>& regions) {
@@ -1005,13 +1015,14 @@ void DashboardRenderer::DrawSelectedTreeNodeHighlight(const DashboardOverlayStat
         if (rect.IsEmpty()) {
             return;
         }
+        const RenderRect adjustedRect = ApplyContainerChildReorderOffset(rect);
         const auto existing =
             std::find_if(selectedRects.begin(), selectedRects.end(), [&](const RenderRect& candidate) {
-                return candidate.left == rect.left && candidate.top == rect.top && candidate.right == rect.right &&
-                       candidate.bottom == rect.bottom;
+                return candidate.left == adjustedRect.left && candidate.top == adjustedRect.top &&
+                       candidate.right == adjustedRect.right && candidate.bottom == adjustedRect.bottom;
             });
         if (existing == selectedRects.end()) {
-            selectedRects.push_back(rect);
+            selectedRects.push_back(adjustedRect);
         }
     };
     const auto appendWidgetRectsForIdentity = [&](const LayoutEditWidgetIdentity& identity) {
@@ -1189,13 +1200,14 @@ void DashboardRenderer::DrawLayoutEditGuides(const DashboardOverlayState& overla
         if (rect.IsEmpty()) {
             return;
         }
+        const RenderRect adjustedRect = ApplyContainerChildReorderOffset(rect);
         const auto existing =
             std::find_if(containerHighlights.begin(), containerHighlights.end(), [&](const auto& entry) {
-                return entry.first.left == rect.left && entry.first.top == rect.top &&
-                       entry.first.right == rect.right && entry.first.bottom == rect.bottom;
+                return entry.first.left == adjustedRect.left && entry.first.top == adjustedRect.top &&
+                       entry.first.right == adjustedRect.right && entry.first.bottom == adjustedRect.bottom;
             });
         if (existing == containerHighlights.end()) {
-            containerHighlights.push_back({rect, active});
+            containerHighlights.push_back({adjustedRect, active});
             return;
         }
         existing->second = existing->second || active;
@@ -1225,10 +1237,12 @@ void DashboardRenderer::DrawLayoutEditGuides(const DashboardOverlayState& overla
             continue;
         }
         const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
-        const RenderPoint start{guide.lineRect.left, guide.lineRect.top};
-        const RenderPoint end = guide.axis == LayoutGuideAxis::Vertical
-                                    ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
-                                    : RenderPoint{guide.lineRect.right, guide.lineRect.top};
+        const RenderPoint start =
+            ApplyContainerChildReorderOffset(RenderPoint{guide.lineRect.left, guide.lineRect.top}, guide.lineRect);
+        const RenderPoint end = ApplyContainerChildReorderOffset(
+            guide.axis == LayoutGuideAxis::Vertical ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
+                                                    : RenderPoint{guide.lineRect.right, guide.lineRect.top},
+            guide.lineRect);
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(
             start, end, RenderStroke::Solid(color, static_cast<float>(emphasized ? activeLineWidth : lineWidth)));
     }
@@ -1280,8 +1294,9 @@ void DashboardRenderer::DrawWidgetEditGuides(const DashboardOverlayState& overla
                               MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
         const bool emphasized = active || selected;
         const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
-        const_cast<DashboardRenderer*>(this)->DrawSolidLine(guide.drawStart,
-            guide.drawEnd,
+        const_cast<DashboardRenderer*>(this)->DrawSolidLine(
+            ApplyContainerChildReorderOffset(guide.drawStart, guide.widgetRect),
+            ApplyContainerChildReorderOffset(guide.drawEnd, guide.widgetRect),
             RenderStroke::Solid(color, static_cast<float>(emphasized ? activeLineWidth : lineWidth)));
     }
 }
@@ -1341,34 +1356,34 @@ void DashboardRenderer::DrawGapEditAnchors(const DashboardOverlayState& overlayS
         const bool emphasized = active || selected;
         const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
         const float strokeWidth = static_cast<float>(emphasized ? activeLineWidth : lineWidth);
+        const RenderRect offsetSource = anchor.hitRect.IsEmpty() ? anchor.handleRect : anchor.hitRect;
+        const RenderPoint drawStart = ApplyContainerChildReorderOffset(anchor.drawStart, offsetSource);
+        const RenderPoint drawEnd = ApplyContainerChildReorderOffset(anchor.drawEnd, offsetSource);
+        const RenderRect handleRect = ApplyContainerChildReorderOffset(anchor.handleRect);
 
         const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-            anchor.drawStart, anchor.drawEnd, RenderStroke::Solid(color, strokeWidth));
+            drawStart, drawEnd, RenderStroke::Solid(color, strokeWidth));
         if (anchor.axis == LayoutGuideAxis::Vertical) {
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                RenderPoint{anchor.drawStart.x - capHalf, anchor.drawStart.y},
-                RenderPoint{anchor.drawStart.x + capHalf, anchor.drawStart.y},
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(RenderPoint{drawStart.x - capHalf, drawStart.y},
+                RenderPoint{drawStart.x + capHalf, drawStart.y},
                 RenderStroke::Solid(color, strokeWidth));
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                RenderPoint{anchor.drawEnd.x - capHalf, anchor.drawEnd.y},
-                RenderPoint{anchor.drawEnd.x + capHalf, anchor.drawEnd.y},
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(RenderPoint{drawEnd.x - capHalf, drawEnd.y},
+                RenderPoint{drawEnd.x + capHalf, drawEnd.y},
                 RenderStroke::Solid(color, strokeWidth));
         } else {
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                RenderPoint{anchor.drawStart.x, anchor.drawStart.y - capHalf},
-                RenderPoint{anchor.drawStart.x, anchor.drawStart.y + capHalf},
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(RenderPoint{drawStart.x, drawStart.y - capHalf},
+                RenderPoint{drawStart.x, drawStart.y + capHalf},
                 RenderStroke::Solid(color, strokeWidth));
-            const_cast<DashboardRenderer*>(this)->DrawSolidLine(
-                RenderPoint{anchor.drawEnd.x, anchor.drawEnd.y - capHalf},
-                RenderPoint{anchor.drawEnd.x, anchor.drawEnd.y + capHalf},
+            const_cast<DashboardRenderer*>(this)->DrawSolidLine(RenderPoint{drawEnd.x, drawEnd.y - capHalf},
+                RenderPoint{drawEnd.x, drawEnd.y + capHalf},
                 RenderStroke::Solid(color, strokeWidth));
         }
 
         if (emphasized || hovered || overlayState.hoverOnExposedDashboard) {
-            const_cast<DashboardRenderer*>(this)->FillSolidRect(anchor.handleRect, color);
+            const_cast<DashboardRenderer*>(this)->FillSolidRect(handleRect, color);
         } else {
             const_cast<DashboardRenderer*>(this)->DrawSolidRect(
-                anchor.handleRect, RenderStroke::Solid(color, static_cast<float>(handleOutline)));
+                handleRect, RenderStroke::Solid(color, static_cast<float>(handleOutline)));
         }
     }
 }
@@ -1961,17 +1976,42 @@ void DashboardRenderer::DrawResolvedWidget(const WidgetLayout& widget, const Met
     widget.widget->Draw(*this, widget, metrics);
 }
 
-bool DashboardRenderer::ShouldSkipForContainerChildReorder(const RenderRect& rect) const {
+std::optional<RenderPoint> DashboardRenderer::ContainerChildReorderOffsetForRect(const RenderRect& rect) const {
     if (activeOverlayState_ == nullptr || !activeOverlayState_->activeContainerChildReorderDrag.has_value()) {
-        return false;
+        return std::nullopt;
     }
     const ContainerChildReorderOverlayState& drag = *activeOverlayState_->activeContainerChildReorderDrag;
     if (drag.currentIndex < 0 || drag.currentIndex >= static_cast<int>(drag.childRects.size())) {
-        return false;
+        return std::nullopt;
     }
     const RenderRect& childRect = drag.childRects[static_cast<size_t>(drag.currentIndex)];
-    return rect.left >= childRect.left && rect.top >= childRect.top && rect.right <= childRect.right &&
-           rect.bottom <= childRect.bottom;
+    if (!(rect.left >= childRect.left && rect.top >= childRect.top && rect.right <= childRect.right &&
+            rect.bottom <= childRect.bottom)) {
+        return std::nullopt;
+    }
+
+    const int childStart = drag.horizontal ? childRect.left : childRect.top;
+    const int offset = drag.mouseCoordinate - drag.dragOffset - childStart;
+    return drag.horizontal ? RenderPoint{offset, 0} : RenderPoint{0, offset};
+}
+
+RenderRect DashboardRenderer::ApplyContainerChildReorderOffset(const RenderRect& rect) const {
+    if (const auto offset = ContainerChildReorderOffsetForRect(rect); offset.has_value()) {
+        return OffsetRect(rect, offset->x, offset->y);
+    }
+    return rect;
+}
+
+RenderPoint DashboardRenderer::ApplyContainerChildReorderOffset(RenderPoint point, const RenderRect& sourceRect) const {
+    if (const auto offset = ContainerChildReorderOffsetForRect(sourceRect); offset.has_value()) {
+        point.x += offset->x;
+        point.y += offset->y;
+    }
+    return point;
+}
+
+bool DashboardRenderer::ShouldSkipForContainerChildReorder(const RenderRect& rect) const {
+    return ContainerChildReorderOffsetForRect(rect).has_value();
 }
 
 void DashboardRenderer::DrawContainerChildReorderOverlay(const MetricSource& metrics) {

@@ -192,6 +192,9 @@ private:
     void DrawLayoutSimilarityIndicators(const DashboardOverlayState& overlayState) const;
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
+    std::optional<RenderPoint> ContainerChildReorderOffsetForRect(const RenderRect& rect) const;
+    RenderRect ApplyContainerChildReorderOffset(const RenderRect& rect) const;
+    RenderPoint ApplyContainerChildReorderOffset(RenderPoint point, const RenderRect& sourceRect) const;
     bool ShouldSkipForContainerChildReorder(const RenderRect& rect) const;
     void DrawContainerChildReorderOverlay(const MetricSource& metrics);
     bool UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const;
