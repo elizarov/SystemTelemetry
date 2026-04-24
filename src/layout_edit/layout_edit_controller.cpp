@@ -499,11 +499,14 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                     rowTop,
                     rowHeight,
                     static_cast<int>(metricRefs.size()),
-                    region->key.anchorId};
+                    region->key.anchorId,
+                    clientPoint.y - static_cast<int>(region->targetRect.top),
+                    clientPoint.y};
                 hoveredEditableWidget_ = region->key.widget;
                 renderer.SetInteractiveDragTraceActive(true);
                 host_.BeginLayoutEditTraceSession("metric_list_reorder", DescribeEditableAnchor(region->key));
                 SyncRendererInteractionState();
+                host_.InvalidateLayoutEdit();
                 SetCapture(hwnd);
                 return true;
             }
@@ -890,6 +893,12 @@ void LayoutEditController::SyncRendererInteractionState() {
             LayoutMetricListOrderEditKey{
                 activeMetricListReorderDrag_->widget.editCardId, activeMetricListReorderDrag_->widget.nodePath},
             activeMetricListReorderDrag_->currentIndex};
+        overlayState.activeMetricListReorderDrag = MetricListReorderOverlayState{activeMetricListReorderDrag_->widget,
+            activeMetricListReorderDrag_->currentIndex,
+            activeMetricListReorderDrag_->mouseY,
+            activeMetricListReorderDrag_->dragOffsetY};
+    } else {
+        overlayState.activeMetricListReorderDrag.reset();
     }
     overlayState.hoverOnExposedDashboard = overlayState.hoverOnExposedDashboard || HasActiveDrag();
 }
@@ -1171,9 +1180,12 @@ bool LayoutEditController::UpdateAnchorEditDrag(RenderPoint clientPoint) {
 
 bool LayoutEditController::UpdateMetricListReorderDrag(RenderPoint clientPoint) {
     MetricListReorderDragState& drag = *activeMetricListReorderDrag_;
+    drag.mouseY = clientPoint.y;
     const int relativeY = clientPoint.y - drag.rowTop;
     const int targetIndex = std::clamp(relativeY / (std::max)(1, drag.rowHeight), 0, (std::max)(0, drag.rowCount - 1));
     if (targetIndex == drag.currentIndex) {
+        SyncRendererInteractionState();
+        host_.InvalidateLayoutEdit();
         return true;
     }
 
@@ -1188,6 +1200,7 @@ bool LayoutEditController::UpdateMetricListReorderDrag(RenderPoint clientPoint) 
     drag.metricRefs = std::move(nextMetricRefs);
     drag.currentIndex = targetIndex;
     SyncRendererInteractionState();
+    host_.InvalidateLayoutEdit();
     RefreshHover(clientPoint);
     return true;
 }

@@ -530,6 +530,20 @@ std::vector<LayoutEditGapAnchor>& DashboardRenderer::GapEditAnchorsMutable() {
     return layoutResolver_->gapEditAnchors_;
 }
 
+std::optional<MetricListReorderOverlayState> DashboardRenderer::ActiveMetricListReorderDrag(
+    const LayoutEditWidgetIdentity& widget) const {
+    if (activeOverlayState_ == nullptr || !activeOverlayState_->activeMetricListReorderDrag.has_value()) {
+        return std::nullopt;
+    }
+
+    const MetricListReorderOverlayState& drag = *activeOverlayState_->activeMetricListReorderDrag;
+    if (drag.widget.kind != widget.kind || drag.widget.renderCardId != widget.renderCardId ||
+        drag.widget.editCardId != widget.editCardId || drag.widget.nodePath != widget.nodePath) {
+        return std::nullopt;
+    }
+    return drag;
+}
+
 int DashboardRenderer::WindowWidth() const {
     return std::max(1, ScaleLogical(config_.layout.structure.window.width));
 }
@@ -1902,6 +1916,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
         return;
     }
 
+    activeOverlayState_ = &overlayState;
     layoutResolver_->ClearDynamicEditArtifacts();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
     const MetricSource& metrics = ResolveMetrics(snapshot);
@@ -1922,6 +1937,7 @@ void DashboardRenderer::DrawDirect2DFrame(const SystemSnapshot& snapshot, const 
     DrawLayoutSimilarityIndicators(overlayState);
     DrawMoveOverlay(overlayState.moveOverlay);
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    activeOverlayState_ = nullptr;
 }
 
 bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {

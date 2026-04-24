@@ -124,4 +124,6 @@ public:
     virtual std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable() = 0;
     virtual const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const = 0;
     virtual const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const = 0;
+    virtual std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
+        const LayoutEditWidgetIdentity& widget) const = 0;
 };

@@ -63,6 +63,64 @@ std::optional<RenderRect> DrawMetricCapsuleBar(
     return markerRect;
 }
 
+RenderRect OffsetRect(RenderRect rect, int dy) {
+    rect.top += dy;
+    rect.bottom += dy;
+    return rect;
+}
+
+void DrawMetricListRow(WidgetRenderer& renderer,
+    const WidgetLayout& widget,
+    const MetricListWidget::LayoutState& layout,
+    const std::vector<std::string>& metricRefs,
+    int rowIndex,
+    const MetricValue& row,
+    int yOffset,
+    bool registerEditRegions) {
+    const RenderRect labelRect = OffsetRect(layout.labelRects[rowIndex], yOffset);
+    const RenderRect valueRect = OffsetRect(layout.valueRects[rowIndex], yOffset);
+    renderer.DrawText(labelRect,
+        row.label,
+        TextStyleId::Label,
+        RenderColorId::MutedText,
+        TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
+    if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank) {
+        const WidgetRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(valueRect,
+            row.valueText,
+            TextStyleId::Value,
+            RenderColorId::Foreground,
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
+        if (registerEditRegions) {
+            renderer.RegisterDynamicTextAnchor(valueLayout,
+                renderer.MakeEditableTextBinding(widget,
+                    WidgetRenderer::LayoutEditParameter::FontValue,
+                    rowIndex * 2 + 1,
+                    renderer.Config().layout.fonts.value.size),
+                WidgetRenderer::LayoutEditParameter::ColorForeground);
+            if (rowIndex < static_cast<int>(metricRefs.size()) && !IsRuntimePlaceholderMetricId(metricRefs[rowIndex])) {
+                renderer.RegisterDynamicTextAnchor(
+                    valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs[rowIndex], rowIndex * 2 + 101));
+            }
+        }
+    }
+
+    const RenderRect barRect = OffsetRect(layout.barRects[rowIndex], yOffset);
+    const std::optional<RenderRect> peakMarkerRect = DrawMetricCapsuleBar(
+        renderer, barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank);
+    if (!registerEditRegions) {
+        return;
+    }
+
+    const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
+    renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorAccent,
+        RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
+    renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorTrack,
+        RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
+    if (peakMarkerRect.has_value()) {
+        renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorPeakGhost, *peakMarkerRect);
+    }
+}
+
 }  // namespace
 
 WidgetClass MetricListWidget::Class() const {
@@ -163,52 +221,32 @@ void MetricListWidget::ResolveLayoutState(const WidgetRenderer& renderer, const 
 
 void MetricListWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     renderer.PushClipRect(widget.rect);
+    const auto dragState = renderer.ActiveMetricListReorderDrag(
+        LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath});
+    const int draggedIndex = dragState.has_value() ? dragState->currentIndex : -1;
+    const auto& rows = metrics.ResolveMetricList(metricRefs_);
     int rowIndex = 0;
-    for (const auto& row : metrics.ResolveMetricList(metricRefs_)) {
+    for (const auto& row : rows) {
         if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
             break;
         }
-        const RenderRect& labelRect = layoutState_.labelRects[rowIndex];
-        const RenderRect& valueRect = layoutState_.valueRects[rowIndex];
-        renderer.DrawText(labelRect,
-            row.label,
-            TextStyleId::Label,
-            RenderColorId::MutedText,
-            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
-        if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank) {
-            const WidgetRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(valueRect,
-                row.valueText,
-                TextStyleId::Value,
-                RenderColorId::Foreground,
-                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
-            renderer.RegisterDynamicTextAnchor(valueLayout,
-                renderer.MakeEditableTextBinding(widget,
-                    WidgetRenderer::LayoutEditParameter::FontValue,
-                    rowIndex * 2 + 1,
-                    renderer.Config().layout.fonts.value.size),
-                WidgetRenderer::LayoutEditParameter::ColorForeground);
-            if (!IsRuntimePlaceholderMetricId(metricRefs_[rowIndex])) {
-                renderer.RegisterDynamicTextAnchor(
-                    valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs_[rowIndex], rowIndex * 2 + 101));
-            }
-        }
-        const RenderRect& barRect = layoutState_.barRects[rowIndex];
-        const std::optional<RenderRect> peakMarkerRect = DrawMetricCapsuleBar(renderer,
-            barRect,
-            row.ratio,
-            row.peakRatio,
-            renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank);
-        const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
-        renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorAccent,
-            RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
-        renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorTrack,
-            RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
-        if (peakMarkerRect.has_value()) {
-            renderer.RegisterDynamicColorEditRegion(
-                WidgetRenderer::LayoutEditParameter::ColorPeakGhost, *peakMarkerRect);
+        if (rowIndex != draggedIndex) {
+            DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, rowIndex, row, 0, true);
         }
 
         ++rowIndex;
+    }
+
+    if (dragState.has_value() && draggedIndex >= 0 && draggedIndex < static_cast<int>(rows.size()) &&
+        draggedIndex < static_cast<int>(layoutState_.rowRects.size())) {
+        const int draggedTop = dragState->mouseY - dragState->dragOffsetY;
+        const int yOffset = draggedTop - layoutState_.rowRects[draggedIndex].top;
+        DrawMetricListRow(
+            renderer, widget, layoutState_, metricRefs_, draggedIndex, rows[draggedIndex], yOffset, false);
+        const RenderRect outlineRect = OffsetRect(layoutState_.rowRects[draggedIndex], yOffset);
+        renderer.DrawSolidRect(outlineRect,
+            RenderStroke::Dotted(
+                RenderColorId::ActiveEdit, static_cast<float>((std::max)(2, renderer.ScaleLogical(2)))));
     }
     renderer.PopClipRect();
 }

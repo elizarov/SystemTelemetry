@@ -65,6 +65,13 @@ struct LayoutMetricListOrderEditKey {
     std::vector<size_t> nodePath;
 };
 
+struct MetricListReorderOverlayState {
+    LayoutEditWidgetIdentity widget;
+    int currentIndex = 0;
+    int mouseY = 0;
+    int dragOffsetY = 0;
+};
+
 struct LayoutEditLinearGeometry {
     RenderPoint drawStart{};
     RenderPoint drawEnd{};

@@ -28,6 +28,7 @@ struct DashboardOverlayState {
     std::optional<LayoutEditGapAnchorKey> activeGapEditAnchor;
     std::optional<LayoutEditAnchorKey> hoveredEditableAnchor;
     std::optional<LayoutEditAnchorKey> activeEditableAnchor;
+    std::optional<MetricListReorderOverlayState> activeMetricListReorderDrag;
     std::optional<LayoutEditSelectionHighlight> selectedTreeHighlight;
     DashboardMoveOverlayState moveOverlay{};
 

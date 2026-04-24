@@ -79,7 +79,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Metric leaves whose ids begin with `board.temp.` or `board.fan.` also expose a live `Binding` selector for the matching board-sensor mapping.
 - The board-metric `Binding` selector keeps the last discovered provider sensor-name list available for config editing even if a later live board sample omits that metadata.
 - Multiple logical board metrics can bind to the same provider sensor name, and each bound row shows that same live value.
-- Metric-list widgets support row reorder handles and add-row affordances.
+- Metric-list widgets support row reorder handles and add-row affordances. Dragging a row reorder handle keeps that row under the pointer with the active dashed outline, draws the widget underneath with the dragged row's current slot empty, reorders as soon as the pointer reaches another row slot, and snaps the row into its slot on release.
 - Gauge, throughput, metric-list, drive-usage, text, card-chrome, dashboard-spacing, and container-split targets all stay editable through the shared layout-edit interaction model rather than through one-off editors.
 - While the editor window is above the dashboard, covered dashboard regions stay mouse-transparent to the editor and suppress dashboard hover, tooltip, and cursor updates for those covered points.
 - Closing the editor window closes only the modeless editor window, clears any tree-selection highlight from the dashboard, and keeps layout-edit mode active.

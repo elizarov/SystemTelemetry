@@ -10,7 +10,8 @@ bool DashboardOverlayState::ShouldDrawLayoutEditAffordances() const {
     return activeLayoutEditGuide.has_value() || hoveredLayoutEditGuide.has_value() || hoveredLayoutCard.has_value() ||
            hoveredEditableCard.has_value() || hoveredEditableWidget.has_value() || activeWidgetEditGuide.has_value() ||
            hoveredGapEditAnchor.has_value() || activeGapEditAnchor.has_value() || hoveredEditableAnchor.has_value() ||
-           activeEditableAnchor.has_value() || selectedTreeHighlight.has_value();
+           activeEditableAnchor.has_value() || activeMetricListReorderDrag.has_value() ||
+           selectedTreeHighlight.has_value();
 }
 
 bool DashboardOverlayState::IsContainerGuideDragActive() const {

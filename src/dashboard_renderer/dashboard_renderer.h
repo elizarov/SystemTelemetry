@@ -168,6 +168,8 @@ public:
     std::vector<LayoutEditGapAnchor>& GapEditAnchorsMutable();
     int ScaleLogical(int value) const override;
     int MeasureTextWidth(TextStyleId style, std::string_view text) const override;
+    std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
+        const LayoutEditWidgetIdentity& widget) const override;
 
 private:
     friend class DashboardLayoutResolver;
@@ -309,4 +311,5 @@ private:
     bool wicComInitialized_ = false;
     bool d2dFirstDrawWarmupPending_ = false;
     int d2dClipDepth_ = 0;
+    const DashboardOverlayState* activeOverlayState_ = nullptr;
 };

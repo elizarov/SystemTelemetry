@@ -155,6 +155,8 @@ private:
         int rowHeight = 1;
         int rowCount = 0;
         int currentIndex = 0;
+        int dragOffsetY = 0;
+        int mouseY = 0;
     };
 
     const LayoutEditGuide* HitTestLayoutGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
