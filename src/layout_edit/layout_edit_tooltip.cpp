@@ -1,51 +1,10 @@
-#include "layout_model/layout_edit_tooltip.h"
+#include "layout_edit/layout_edit_tooltip.h"
 
-#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
 
-namespace {
-
-const LayoutNodeConfig* FindNodeByPath(const LayoutNodeConfig& root, const std::vector<size_t>& path) {
-    const LayoutNodeConfig* node = &root;
-    for (size_t index : path) {
-        if (index >= node->children.size()) {
-            return nullptr;
-        }
-        node = &node->children[index];
-    }
-    return node;
-}
-
-const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
-    if (key.editCardId.empty()) {
-        return FindNodeByPath(config.layout.structure.cardsLayout, key.nodePath);
-    }
-
-    const auto it = std::find_if(config.layout.cards.begin(),
-        config.layout.cards.end(),
-        [&](const LayoutCardConfig& card) { return card.id == key.editCardId; });
-    if (it == config.layout.cards.end()) {
-        return nullptr;
-    }
-    return FindNodeByPath(it->layout, key.nodePath);
-}
-
-std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter) {
-    std::vector<std::string> metricRefs;
-    std::stringstream stream;
-    stream << parameter;
-    std::string item;
-    while (std::getline(stream, item, ',')) {
-        if (!item.empty()) {
-            metricRefs.push_back(item);
-        }
-    }
-    return metricRefs;
-}
-
-}  // namespace
+#include "layout_edit/layout_edit_service.h"
 
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format) {
     if (format == configschema::ValueFormat::String || format == configschema::ValueFormat::FontSpec ||

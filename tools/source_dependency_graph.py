@@ -341,6 +341,50 @@ def check_layout_model_layer(edges: dict[tuple[str, str], str]) -> list[Violatio
     return violations
 
 
+def check_layout_edit_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    allowed_targets = {"layout_edit", "config", "dashboard_renderer", "layout_model", "util", "widget"}
+    for source, target in sorted(edges):
+        if top_level_package(source) != "layout_edit":
+            continue
+        if top_level_package(target) in allowed_targets:
+            continue
+        violations.append(
+            Violation(
+                kind="layer-layout-edit",
+                source=source,
+                target=target,
+                message=(
+                    f"{source} is in the layout_edit layer and must depend only on layout_edit, config, "
+                    f"dashboard_renderer, layout_model, util, or widget modules, not project module {target}."
+                ),
+            )
+        )
+    return violations
+
+
+def check_dashboard_renderer_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    allowed_targets = {"dashboard_renderer", "config", "layout_model", "renderer", "telemetry", "util", "widget"}
+    for source, target in sorted(edges):
+        if top_level_package(source) != "dashboard_renderer":
+            continue
+        if top_level_package(target) in allowed_targets:
+            continue
+        violations.append(
+            Violation(
+                kind="layer-dashboard-renderer",
+                source=source,
+                target=target,
+                message=(
+                    f"{source} is in the dashboard_renderer layer and must depend only on dashboard_renderer, "
+                    f"config, layout_model, renderer, telemetry, util, or widget modules, not project module {target}."
+                ),
+            )
+        )
+    return violations
+
+
 def check_renderer_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     violations: list[Violation] = []
     allowed_targets = {"renderer", "config", "util"}
@@ -391,6 +435,8 @@ def check_graph_rules(edges: dict[tuple[str, str], str]) -> list[Violation]:
         *check_telemetry_layer(edges),
         *check_widget_layer(edges),
         *check_layout_model_layer(edges),
+        *check_layout_edit_layer(edges),
+        *check_dashboard_renderer_layer(edges),
         *check_renderer_layer(edges),
         *check_d2d_layer(edges),
     ]

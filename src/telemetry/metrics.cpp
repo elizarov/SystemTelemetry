@@ -648,7 +648,7 @@ std::optional<MetricDisplayStyle> FindMetricDisplayStyle(std::string_view metric
 }
 
 ConfigMetricCatalog TelemetryMetricCatalog() {
-    return ConfigMetricCatalog{&FindMetricDisplayStyle};
+    return ConfigMetricCatalog{&FindMetricDisplayStyle, &IsGenerallyAvailableMetric};
 }
 
 bool IsGenerallyAvailableMetric(std::string_view metricRef) {

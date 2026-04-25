@@ -6,9 +6,10 @@
 #include <cwchar>
 #include <cwctype>
 
+#include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
-#include "layout_model/layout_edit_service.h"
 #include "resource.h"
+#include "telemetry/metrics.h"
 #include "util/utf8.h"
 
 namespace {
@@ -339,7 +340,7 @@ std::optional<std::pair<int, int>> FindWeightEditValues(const AppConfig& config,
 }
 
 std::vector<std::string> AvailableMetricDefinitionIds(const AppConfig& config) {
-    return AvailableMetricListMetricIds(config);
+    return AvailableMetricListMetricIds(config, TelemetryMetricCatalog());
 }
 
 bool IsMetricListSupportedDisplayStyle(MetricDisplayStyle style) {

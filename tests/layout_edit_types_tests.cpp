@@ -2,6 +2,7 @@
 
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_hit_priority.h"
+#include "layout_edit/layout_edit_tooltip_payload.h"
 
 TEST(LayoutEditTypes, MatchesWidgetIdentityUsingKindAndPath) {
     const LayoutEditWidgetIdentity widgetA{"card-a", "card-a", {1, 2, 3}};

@@ -38,11 +38,4 @@ bool IsFontLayoutEditParameter(LayoutEditParameter parameter);
 std::string GetLayoutEditParameterDisplayName(LayoutEditParameter parameter);
 std::optional<LayoutEditParameter> FindLayoutEditParameterByConfigField(
     std::string_view sectionName, std::string_view parameterName);
-std::optional<double> FindLayoutEditParameterNumericValue(const AppConfig& config, LayoutEditParameter parameter);
-std::optional<unsigned int> FindLayoutEditParameterColorValue(const AppConfig& config, LayoutEditParameter parameter);
 std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(LayoutEditParameter parameter);
-std::optional<const UiFontConfig*> FindLayoutEditTooltipFontValue(
-    const AppConfig& config, LayoutEditParameter parameter);
-bool ApplyLayoutEditParameterValue(AppConfig& config, LayoutEditParameter parameter, double value);
-bool ApplyLayoutEditParameterColorValue(AppConfig& config, LayoutEditParameter parameter, unsigned int value);
-bool ApplyLayoutEditParameterFontValue(AppConfig& config, LayoutEditParameter parameter, const UiFontConfig& value);

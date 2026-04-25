@@ -6,3 +6,7 @@ std::optional<MetricDisplayStyle> ConfigMetricCatalog::FindMetricDisplayStyle(st
     }
     return resolveMetricDisplayStyle(metricRef);
 }
+
+bool ConfigMetricCatalog::IsGenerallyAvailableMetric(std::string_view metricRef) const {
+    return isGenerallyAvailableMetric != nullptr && isGenerallyAvailableMetric(metricRef);
+}
