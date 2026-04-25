@@ -1,6 +1,7 @@
 #include "layout_edit_dialog/impl/editors.h"
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <sstream>
 
@@ -19,6 +20,39 @@ const LayoutMetricListOrderEditKey* SelectedMetricListOrderKey(const LayoutEditD
     return state != nullptr && state->selectedLeaf != nullptr
                ? std::get_if<LayoutMetricListOrderEditKey>(&state->selectedLeaf->focusKey)
                : nullptr;
+}
+
+bool IsFontsSectionNode(const LayoutEditDialogState* state) {
+    return state != nullptr && state->selectedLeaf == nullptr && state->selectedNode != nullptr &&
+           state->selectedNode->kind == LayoutEditTreeNodeKind::Section && state->selectedNode->label == "fonts";
+}
+
+std::array<const UiFontConfig*, 9> FontSetValues(const UiFontSetConfig& fonts) {
+    return {
+        &fonts.title,
+        &fonts.big,
+        &fonts.value,
+        &fonts.label,
+        &fonts.text,
+        &fonts.smallText,
+        &fonts.footer,
+        &fonts.clockTime,
+        &fonts.clockDate,
+    };
+}
+
+std::wstring CommonFontFamilyText(const UiFontSetConfig& fonts) {
+    const auto fontValues = FontSetValues(fonts);
+    if (fontValues.empty() || fontValues.front() == nullptr) {
+        return {};
+    }
+    const std::string& firstFace = fontValues.front()->face;
+    for (const UiFontConfig* font : fontValues) {
+        if (font == nullptr || font->face != firstFace) {
+            return {};
+        }
+    }
+    return WideFromUtf8(firstFace);
 }
 
 std::vector<std::string> ReadMetricListOrderDialogRows(const LayoutEditDialogState* state, HWND hwnd) {
@@ -94,7 +128,7 @@ bool MutateMetricListOrderRows(
 
 LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* state) {
     if (state == nullptr || state->selectedLeaf == nullptr) {
-        return LayoutEditEditorKind::Summary;
+        return IsFontsSectionNode(state) ? LayoutEditEditorKind::GlobalFontFamily : LayoutEditEditorKind::Summary;
     }
     if (std::holds_alternative<LayoutWeightEditKey>(state->selectedLeaf->focusKey)) {
         return LayoutEditEditorKind::Weights;
@@ -143,6 +177,22 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
 
     state->updatingControls = true;
     SetLayoutEditDescription(hwnd, state->selectedNode);
+    if (IsFontsSectionNode(state)) {
+        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, L"Family:");
+        PopulateFontFaceComboBox(hwnd, CommonFontFamilyText(state->dialog->Host().CurrentConfig().layout.fonts));
+        DestroyMetricListOrderEditorControls(state);
+        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false, true);
+        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+        SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, L"Previewing changes in the dashboard.");
+        state->activeSelectionValid = true;
+        state->updatingControls = false;
+        LayoutLayoutEditRightPane(state, hwnd);
+        UpdateLayoutEditActionState(state, hwnd);
+        RefreshLayoutEditRightPane(hwnd);
+        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
+            BuildTraceNodeText(state->selectedNode) + " editor=\"font_family\"");
+        return;
+    }
     if (state->selectedLeaf == nullptr) {
         DestroyMetricListOrderEditorControls(state);
         ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false);
@@ -160,6 +210,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
 
     if (const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey)) {
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec) {
+            SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, L"Font name:");
             const auto font = FindLayoutEditTooltipFontValue(state->dialog->Host().CurrentConfig(), *parameter);
             PopulateFontFaceComboBox(hwnd, font.has_value() && *font != nullptr ? WideFromUtf8((**font).face) : L"");
             SetDlgItemTextW(hwnd,
@@ -536,6 +587,25 @@ bool PreviewSelectedFont(LayoutEditDialogState* state, HWND hwnd, UINT notificat
     return applied;
 }
 
+bool PreviewSelectedGlobalFontFamily(LayoutEditDialogState* state, HWND hwnd, UINT notificationCode) {
+    if (state == nullptr || !IsFontsSectionNode(state) || state->updatingControls) {
+        return false;
+    }
+
+    const std::wstring familyText = ReadFontDialogFaceText(hwnd, notificationCode);
+    if (familyText.empty()) {
+        return false;
+    }
+
+    const std::string family = Utf8FromWide(familyText);
+    const bool applied = state->dialog->Host().ApplyFontFamilyPreview(family);
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << " family=" << QuoteTraceText(family)
+          << " applied=" << QuoteTraceText(applied ? "true" : "false");
+    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:preview_font_family", trace.str());
+    return applied;
+}
+
 bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd) {
     if (state == nullptr || state->selectedLeaf == nullptr || state->updatingControls) {
         return false;
@@ -722,6 +792,14 @@ bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd,
 
 bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
     if (state == nullptr || state->selectedLeaf == nullptr) {
+        if (IsFontsSectionNode(state)) {
+            const bool applied = state->dialog->Host().ApplyFontSetPreview(state->originalConfig.layout.fonts);
+            if (applied) {
+                PopulateLayoutEditSelection(state, hwnd);
+                RefreshLayoutEditValidationState(state, hwnd);
+            }
+            return applied;
+        }
         return false;
     }
 

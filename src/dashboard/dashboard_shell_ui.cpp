@@ -604,6 +604,14 @@ public:
         return shellUi_.ApplyFontPreview(parameter, value);
     }
 
+    bool ApplyFontFamilyPreview(const std::string& family) override {
+        return shellUi_.ApplyFontFamilyPreview(family);
+    }
+
+    bool ApplyFontSetPreview(const UiFontSetConfig& fonts) override {
+        return shellUi_.ApplyFontSetPreview(fonts);
+    }
+
     bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) override {
         return shellUi_.ApplyColorPreview(parameter, value);
     }
@@ -925,6 +933,28 @@ bool DashboardShellUi::ApplyParameterPreview(LayoutEditParameter parameter, doub
 
 bool DashboardShellUi::ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value) {
     return app_.controller_.ApplyLayoutEditFont(app_, parameter, value);
+}
+
+bool DashboardShellUi::ApplyFontFamilyPreview(const std::string& family) {
+    AppConfig updatedConfig = CurrentConfig();
+    updatedConfig.layout.fonts.title.face = family;
+    updatedConfig.layout.fonts.big.face = family;
+    updatedConfig.layout.fonts.value.face = family;
+    updatedConfig.layout.fonts.label.face = family;
+    updatedConfig.layout.fonts.text.face = family;
+    updatedConfig.layout.fonts.smallText.face = family;
+    updatedConfig.layout.fonts.footer.face = family;
+    updatedConfig.layout.fonts.clockTime.face = family;
+    updatedConfig.layout.fonts.clockDate.face = family;
+    RestoreConfigSnapshot(updatedConfig);
+    return true;
+}
+
+bool DashboardShellUi::ApplyFontSetPreview(const UiFontSetConfig& fonts) {
+    AppConfig updatedConfig = CurrentConfig();
+    updatedConfig.layout.fonts = fonts;
+    RestoreConfigSnapshot(updatedConfig);
+    return true;
 }
 
 bool DashboardShellUi::ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) {

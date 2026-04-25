@@ -73,6 +73,8 @@ private:
     void RestoreConfigSnapshot(const AppConfig& config);
     bool ApplyParameterPreview(LayoutEditParameter parameter, double value);
     bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value);
+    bool ApplyFontFamilyPreview(const std::string& family);
+    bool ApplyFontSetPreview(const UiFontSetConfig& fonts);
     bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value);
     bool ApplyMetricPreview(const LayoutMetricEditKey& key,
         const std::optional<double>& scale,

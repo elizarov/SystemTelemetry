@@ -51,7 +51,8 @@ void ShowLayoutEditEditors(HWND hwnd,
     bool showWeights,
     bool showMetric,
     bool showBinding,
-    bool showMetricListOrder);
+    bool showMetricListOrder,
+    bool showGlobalFontFamily = false);
 void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state);
 void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd, size_t rowCount);
 void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd);

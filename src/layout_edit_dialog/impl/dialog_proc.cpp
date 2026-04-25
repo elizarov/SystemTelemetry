@@ -214,6 +214,12 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_SIZE_EDIT ||
                      LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT) &&
                     HIWORD(wParam) == EN_CHANGE)) {
+                if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT &&
+                    CurrentLayoutEditEditorKind(state) == LayoutEditEditorKind::GlobalFontFamily) {
+                    PreviewSelectedGlobalFontFamily(state, hwnd, HIWORD(wParam));
+                    RefreshLayoutEditValidationState(state, hwnd);
+                    return TRUE;
+                }
                 PreviewSelectedFont(state, hwnd, HIWORD(wParam));
                 RefreshLayoutEditValidationState(state, hwnd);
                 return TRUE;

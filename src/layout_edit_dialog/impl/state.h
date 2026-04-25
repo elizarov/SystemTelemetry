@@ -29,6 +29,7 @@ enum class LayoutEditEditorKind {
     Summary,
     Numeric,
     Font,
+    GlobalFontFamily,
     Color,
     Weights,
     Metric,

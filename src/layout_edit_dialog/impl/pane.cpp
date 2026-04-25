@@ -218,6 +218,8 @@ std::vector<int> ActiveEditorLabelControls(LayoutEditEditorKind kind, bool showB
         case LayoutEditEditorKind::Font:
             return {
                 IDC_LAYOUT_EDIT_FONT_FACE_LABEL, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL};
+        case LayoutEditEditorKind::GlobalFontFamily:
+            return {IDC_LAYOUT_EDIT_FONT_FACE_LABEL};
         case LayoutEditEditorKind::Color:
             return {IDC_LAYOUT_EDIT_COLOR_RED_LABEL,
                 IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL,
@@ -569,14 +571,16 @@ void ShowLayoutEditEditors(HWND hwnd,
     bool showWeights,
     bool showMetric,
     bool showBinding,
-    bool showMetricListOrder) {
+    bool showMetricListOrder,
+    bool showGlobalFontFamily) {
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
     ShowDialogControl(hwnd,
         IDC_LAYOUT_EDIT_SUMMARY,
-        !(showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder));
+        !(showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder ||
+            showGlobalFontFamily));
 
-    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, showFont);
-    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, showFont);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, showFont || showGlobalFontFamily);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, showFont || showGlobalFontFamily);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL, showFont);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, showFont);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL, showFont);
@@ -618,7 +622,8 @@ void ShowLayoutEditEditors(HWND hwnd,
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT, showMetric && showBinding);
     ShowDialogControl(hwnd,
         IDC_LAYOUT_EDIT_HINT,
-        showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder);
+        showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder ||
+            showGlobalFontFamily);
 }
 
 void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state) {
@@ -721,7 +726,10 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const int footerTop = footerBottom - footerHeight;
     SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_FOOTER_HINT, paneLeft, footerTop, paneWidth, footerHeight);
 
-    const int revertWidth = DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_REVERT);
+    const int revertWidth = std::max(DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_REVERT),
+        MeasureTextWidthForControl(
+            hwnd, IDC_LAYOUT_EDIT_REVERT, ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_REVERT)) +
+            24);
     const int revertHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_REVERT);
     const int statusWidth = std::max(1, paneWidth - revertWidth - metrics.inlineGap);
     const int statusHeight =
@@ -862,6 +870,24 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int sampleHeight = std::max(28, DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_FONT_SAMPLE));
             SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_FONT_SAMPLE, innerLeft, cursorY, innerWidth, sampleHeight);
             cursorY += sampleHeight + metrics.hintGap;
+
+            const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
+            const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
+            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_HINT, innerLeft, cursorY, innerWidth, hintHeight);
+            contentBottom = cursorY + hintHeight;
+            break;
+        }
+        case LayoutEditEditorKind::GlobalFontFamily: {
+            const int fontFaceRowHeight = LayoutLabeledControlRow(hwnd,
+                IDC_LAYOUT_EDIT_FONT_FACE_LABEL,
+                IDC_LAYOUT_EDIT_FONT_FACE_EDIT,
+                innerLeft,
+                cursorY,
+                labelColumnWidth,
+                metrics.labelGap,
+                innerWidth - labelColumnWidth - metrics.labelGap,
+                singleLineFieldHeight);
+            cursorY += fontFaceRowHeight + metrics.hintGap;
 
             const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
             const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
@@ -1138,6 +1164,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
 
     switch (kind) {
         case LayoutEditEditorKind::Font:
+        case LayoutEditEditorKind::GlobalFontFamily:
             BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
             break;
         case LayoutEditEditorKind::Metric:
@@ -1172,7 +1199,11 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
 }
 
 void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd) {
-    const bool canRevert = state != nullptr && state->selectedLeaf != nullptr;
+    const bool isFontsSection = state != nullptr && state->selectedLeaf == nullptr && state->selectedNode != nullptr &&
+                                state->selectedNode->kind == LayoutEditTreeNodeKind::Section &&
+                                state->selectedNode->label == "fonts";
+    const bool canRevert = state != nullptr && (state->selectedLeaf != nullptr || isFontsSection);
+    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_REVERT, isFontsSection ? L"Revert Font Changes" : L"Revert Field");
     EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_REVERT), canRevert ? TRUE : FALSE);
 }
 
