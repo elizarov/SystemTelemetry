@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <d2d1.h>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -100,7 +99,7 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredWidgetHighlight(const Dashbo
     if (!hoveredRect.has_value() || hoveredRect->IsEmpty()) {
         return;
     }
-    renderer_.DrawSolidRect(*hoveredRect, RenderStroke::Solid(RenderColorId::LayoutGuide));
+    renderer_.Renderer().DrawSolidRect(*hoveredRect, RenderStroke::Solid(RenderColorId::LayoutGuide));
 }
 
 void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
@@ -259,17 +258,19 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
         if (highlighted.shape == AnchorShape::Circle) {
             const float outlineWidth = static_cast<float>(
                 active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
-            renderer_.DrawSolidEllipse(highlighted.anchorRect, RenderStroke::Solid(outlineColor, outlineWidth));
+            renderer_.Renderer().DrawSolidEllipse(
+                highlighted.anchorRect, RenderStroke::Solid(outlineColor, outlineWidth));
         } else if (highlighted.shape == AnchorShape::Diamond) {
-            renderer_.FillSolidDiamond(highlighted.anchorRect, outlineColor);
+            renderer_.Renderer().FillSolidDiamond(highlighted.anchorRect, outlineColor);
         } else if (highlighted.shape == AnchorShape::Wedge) {
             const float outlineWidth = static_cast<float>(
                 active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
             const RenderPoint topRight{highlighted.anchorRect.right, highlighted.anchorRect.top};
             const RenderPoint bottomLeft{highlighted.anchorRect.left, highlighted.anchorRect.bottom};
             const RenderPoint bottomRight{highlighted.anchorRect.right, highlighted.anchorRect.bottom};
-            renderer_.DrawSolidLine(bottomLeft, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
-            renderer_.DrawSolidLine(topRight, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
+            renderer_.Renderer().DrawSolidLine(
+                bottomLeft, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
+            renderer_.Renderer().DrawSolidLine(topRight, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
         } else if (highlighted.shape == AnchorShape::VerticalReorder ||
                    highlighted.shape == AnchorShape::HorizontalReorder) {
             const float outlineWidth = static_cast<float>(
@@ -289,12 +290,12 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
                 const RenderPoint rightApex{highlighted.anchorRect.right, centerY};
                 const RenderPoint rightTop{centerX + gapHalf, centerY - halfHeight};
                 const RenderPoint rightBottom{centerX + gapHalf, centerY + halfHeight};
-                renderer_.DrawSolidLine(leftApex, leftTop, stroke);
-                renderer_.DrawSolidLine(leftTop, leftBottom, stroke);
-                renderer_.DrawSolidLine(leftBottom, leftApex, stroke);
-                renderer_.DrawSolidLine(rightTop, rightApex, stroke);
-                renderer_.DrawSolidLine(rightApex, rightBottom, stroke);
-                renderer_.DrawSolidLine(rightBottom, rightTop, stroke);
+                renderer_.Renderer().DrawSolidLine(leftApex, leftTop, stroke);
+                renderer_.Renderer().DrawSolidLine(leftTop, leftBottom, stroke);
+                renderer_.Renderer().DrawSolidLine(leftBottom, leftApex, stroke);
+                renderer_.Renderer().DrawSolidLine(rightTop, rightApex, stroke);
+                renderer_.Renderer().DrawSolidLine(rightApex, rightBottom, stroke);
+                renderer_.Renderer().DrawSolidLine(rightBottom, rightTop, stroke);
             } else {
                 const int halfWidth =
                     (std::max)(1, static_cast<int>(highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
@@ -304,12 +305,12 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
                 const RenderPoint downApex{centerX, highlighted.anchorRect.bottom};
                 const RenderPoint downLeft{centerX - halfWidth, centerY + gapHalf};
                 const RenderPoint downRight{centerX + halfWidth, centerY + gapHalf};
-                renderer_.DrawSolidLine(upApex, upLeft, stroke);
-                renderer_.DrawSolidLine(upLeft, upRight, stroke);
-                renderer_.DrawSolidLine(upRight, upApex, stroke);
-                renderer_.DrawSolidLine(downLeft, downApex, stroke);
-                renderer_.DrawSolidLine(downApex, downRight, stroke);
-                renderer_.DrawSolidLine(downRight, downLeft, stroke);
+                renderer_.Renderer().DrawSolidLine(upApex, upLeft, stroke);
+                renderer_.Renderer().DrawSolidLine(upLeft, upRight, stroke);
+                renderer_.Renderer().DrawSolidLine(upRight, upApex, stroke);
+                renderer_.Renderer().DrawSolidLine(downLeft, downApex, stroke);
+                renderer_.Renderer().DrawSolidLine(downApex, downRight, stroke);
+                renderer_.Renderer().DrawSolidLine(downRight, downLeft, stroke);
             }
         } else if (highlighted.shape == AnchorShape::Plus) {
             const float outlineWidth = static_cast<float>(
@@ -323,12 +324,12 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
             const int halfHeight =
                 (std::max)(2, static_cast<int>(highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
             const auto stroke = RenderStroke::Solid(outlineColor, outlineWidth);
-            renderer_.DrawSolidLine(
+            renderer_.Renderer().DrawSolidLine(
                 RenderPoint{centerX - halfWidth, centerY}, RenderPoint{centerX + halfWidth, centerY}, stroke);
-            renderer_.DrawSolidLine(
+            renderer_.Renderer().DrawSolidLine(
                 RenderPoint{centerX, centerY - halfHeight}, RenderPoint{centerX, centerY + halfHeight}, stroke);
         } else {
-            renderer_.FillSolidRect(highlighted.anchorRect, outlineColor);
+            renderer_.Renderer().FillSolidRect(highlighted.anchorRect, outlineColor);
         }
     }
 }
@@ -645,7 +646,7 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(const DashboardOve
             guide.axis == LayoutGuideAxis::Vertical ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
                                                     : RenderPoint{guide.lineRect.right, guide.lineRect.top},
             guide.lineRect);
-        renderer_.DrawSolidLine(
+        renderer_.Renderer().DrawSolidLine(
             start, end, RenderStroke::Solid(color, static_cast<float>(emphasized ? activeLineWidth : lineWidth)));
     }
 }
@@ -695,7 +696,7 @@ void DashboardLayoutEditOverlayRenderer::DrawWidgetEditGuides(const DashboardOve
                               MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
         const bool emphasized = active || selected;
         const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
-        renderer_.DrawSolidLine(ApplyContainerChildReorderOffset(guide.drawStart, guide.widgetRect),
+        renderer_.Renderer().DrawSolidLine(ApplyContainerChildReorderOffset(guide.drawStart, guide.widgetRect),
             ApplyContainerChildReorderOffset(guide.drawEnd, guide.widgetRect),
             RenderStroke::Solid(color, static_cast<float>(lineWidth)));
     }
@@ -760,27 +761,28 @@ void DashboardLayoutEditOverlayRenderer::DrawGapEditAnchors(const DashboardOverl
         const RenderPoint drawEnd = ApplyContainerChildReorderOffset(anchor.drawEnd, offsetSource);
         const RenderRect handleRect = ApplyContainerChildReorderOffset(anchor.handleRect);
 
-        renderer_.DrawSolidLine(drawStart, drawEnd, RenderStroke::Solid(color, strokeWidth));
+        renderer_.Renderer().DrawSolidLine(drawStart, drawEnd, RenderStroke::Solid(color, strokeWidth));
         if (anchor.axis == LayoutGuideAxis::Vertical) {
-            renderer_.DrawSolidLine(RenderPoint{drawStart.x - capHalf, drawStart.y},
+            renderer_.Renderer().DrawSolidLine(RenderPoint{drawStart.x - capHalf, drawStart.y},
                 RenderPoint{drawStart.x + capHalf, drawStart.y},
                 RenderStroke::Solid(color, strokeWidth));
-            renderer_.DrawSolidLine(RenderPoint{drawEnd.x - capHalf, drawEnd.y},
+            renderer_.Renderer().DrawSolidLine(RenderPoint{drawEnd.x - capHalf, drawEnd.y},
                 RenderPoint{drawEnd.x + capHalf, drawEnd.y},
                 RenderStroke::Solid(color, strokeWidth));
         } else {
-            renderer_.DrawSolidLine(RenderPoint{drawStart.x, drawStart.y - capHalf},
+            renderer_.Renderer().DrawSolidLine(RenderPoint{drawStart.x, drawStart.y - capHalf},
                 RenderPoint{drawStart.x, drawStart.y + capHalf},
                 RenderStroke::Solid(color, strokeWidth));
-            renderer_.DrawSolidLine(RenderPoint{drawEnd.x, drawEnd.y - capHalf},
+            renderer_.Renderer().DrawSolidLine(RenderPoint{drawEnd.x, drawEnd.y - capHalf},
                 RenderPoint{drawEnd.x, drawEnd.y + capHalf},
                 RenderStroke::Solid(color, strokeWidth));
         }
 
         if (emphasized || hovered || overlayState.hoverOnExposedDashboard) {
-            renderer_.FillSolidRect(handleRect, color);
+            renderer_.Renderer().FillSolidRect(handleRect, color);
         } else {
-            renderer_.DrawSolidRect(handleRect, RenderStroke::Solid(color, static_cast<float>(handleOutline)));
+            renderer_.Renderer().DrawSolidRect(
+                handleRect, RenderStroke::Solid(color, static_cast<float>(handleOutline)));
         }
     }
 }
@@ -805,13 +807,13 @@ void DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect(
     const auto drawHorizontal = [&](int y, int left, int right) {
         for (int x = left; x < right; x += dotLength + gapLength) {
             const int segmentRight = (std::min)(x + dotLength, right);
-            renderer.FillSolidRect(RenderRect{x, y, segmentRight, y + strokeWidth}, color);
+            renderer.Renderer().FillSolidRect(RenderRect{x, y, segmentRight, y + strokeWidth}, color);
         }
     };
     const auto drawVertical = [&](int x, int top, int bottom) {
         for (int y = top; y < bottom; y += dotLength + gapLength) {
             const int segmentBottom = (std::min)(y + dotLength, bottom);
-            renderer.FillSolidRect(RenderRect{x, y, x + strokeWidth, segmentBottom}, color);
+            renderer.Renderer().FillSolidRect(RenderRect{x, y, x + strokeWidth, segmentBottom}, color);
         }
     };
 
@@ -984,18 +986,18 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             const int left = rect.left + inset;
             const int right = rect.right - inset;
             const RenderStroke stroke = RenderStroke::Solid(color);
-            renderer_.DrawSolidLine(RenderPoint{left, y}, RenderPoint{right, y}, stroke);
-            renderer_.DrawSolidLine(RenderPoint{left + cap, y - cap}, RenderPoint{left, y}, stroke);
-            renderer_.DrawSolidLine(RenderPoint{left, y}, RenderPoint{left + cap, y + cap + 1}, stroke);
-            renderer_.DrawSolidLine(RenderPoint{right - cap, y - cap}, RenderPoint{right, y}, stroke);
-            renderer_.DrawSolidLine(RenderPoint{right, y}, RenderPoint{right - cap, y + cap + 1}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{left, y}, RenderPoint{right, y}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{left + cap, y - cap}, RenderPoint{left, y}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{left, y}, RenderPoint{left + cap, y + cap + 1}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{right - cap, y - cap}, RenderPoint{right, y}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{right, y}, RenderPoint{right - cap, y + cap + 1}, stroke);
             if (indicator.exactTypeOrdinal > 0) {
                 const int cx = left + std::max(0, (right - left) / 2);
                 const int count = indicator.exactTypeOrdinal;
                 const int totalWidth = (count - 1) * notchSpacing;
                 int notchX = cx - (totalWidth / 2);
                 for (int i = 0; i < count; ++i) {
-                    renderer_.DrawSolidLine(
+                    renderer_.Renderer().DrawSolidLine(
                         RenderPoint{notchX, y - notchDepth}, RenderPoint{notchX, y + notchDepth + 1}, stroke);
                     notchX += notchSpacing;
                 }
@@ -1005,18 +1007,18 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             const int top = rect.top + inset;
             const int bottom = rect.bottom - inset;
             const RenderStroke stroke = RenderStroke::Solid(color);
-            renderer_.DrawSolidLine(RenderPoint{x, top}, RenderPoint{x, bottom}, stroke);
-            renderer_.DrawSolidLine(RenderPoint{x - cap, top + cap}, RenderPoint{x, top}, stroke);
-            renderer_.DrawSolidLine(RenderPoint{x, top}, RenderPoint{x + cap + 1, top + cap}, stroke);
-            renderer_.DrawSolidLine(RenderPoint{x - cap, bottom - cap}, RenderPoint{x, bottom}, stroke);
-            renderer_.DrawSolidLine(RenderPoint{x, bottom}, RenderPoint{x + cap + 1, bottom - cap}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{x, top}, RenderPoint{x, bottom}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{x - cap, top + cap}, RenderPoint{x, top}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{x, top}, RenderPoint{x + cap + 1, top + cap}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{x - cap, bottom - cap}, RenderPoint{x, bottom}, stroke);
+            renderer_.Renderer().DrawSolidLine(RenderPoint{x, bottom}, RenderPoint{x + cap + 1, bottom - cap}, stroke);
             if (indicator.exactTypeOrdinal > 0) {
                 const int cy = top + std::max(0, (bottom - top) / 2);
                 const int count = indicator.exactTypeOrdinal;
                 const int totalHeight = (count - 1) * notchSpacing;
                 int notchY = cy - (totalHeight / 2);
                 for (int i = 0; i < count; ++i) {
-                    renderer_.DrawSolidLine(
+                    renderer_.Renderer().DrawSolidLine(
                         RenderPoint{x - notchDepth, notchY}, RenderPoint{x + notchDepth + 1, notchY}, stroke);
                     notchY += notchSpacing;
                 }
@@ -1075,8 +1077,7 @@ bool DashboardLayoutEditOverlayRenderer::ShouldSkipForContainerChildReorder(cons
 
 void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const MetricSource& metrics) {
     if (renderer_.activeOverlayState_ == nullptr ||
-        !renderer_.activeOverlayState_->activeContainerChildReorderDrag.has_value() ||
-        renderer_.d2dActiveRenderTarget_ == nullptr) {
+        !renderer_.activeOverlayState_->activeContainerChildReorderDrag.has_value()) {
         return;
     }
 
@@ -1089,12 +1090,7 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
     const int childStart = drag.horizontal ? childRect.left : childRect.top;
     const int offset = drag.mouseCoordinate - drag.dragOffset - childStart;
 
-    D2D1_MATRIX_3X2_F previousTransform{};
-    renderer_.d2dActiveRenderTarget_->GetTransform(&previousTransform);
-    const D2D1_MATRIX_3X2_F translation = drag.horizontal
-                                              ? D2D1::Matrix3x2F::Translation(static_cast<float>(offset), 0.0f)
-                                              : D2D1::Matrix3x2F::Translation(0.0f, static_cast<float>(offset));
-    renderer_.d2dActiveRenderTarget_->SetTransform(translation * previousTransform);
+    renderer_.Renderer().PushTranslation(drag.horizontal ? RenderPoint{offset, 0} : RenderPoint{0, offset});
     const bool previousDynamicRegistration = layoutResolver_.dynamicAnchorRegistrationEnabled_;
     layoutResolver_.dynamicAnchorRegistrationEnabled_ = false;
     for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
@@ -1107,8 +1103,8 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
             }
         }
     }
-    renderer_.DrawSolidRect(childRect,
+    renderer_.Renderer().DrawSolidRect(childRect,
         RenderStroke::Dotted(RenderColorId::ActiveEdit, static_cast<float>((std::max)(2, renderer_.ScaleLogical(2)))));
     layoutResolver_.dynamicAnchorRegistrationEnabled_ = previousDynamicRegistration;
-    renderer_.d2dActiveRenderTarget_->SetTransform(previousTransform);
+    renderer_.Renderer().PopTranslation();
 }

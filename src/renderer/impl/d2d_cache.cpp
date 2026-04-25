@@ -1,31 +1,31 @@
-#include "dashboard_renderer/impl/d2d_cache.h"
+#include "renderer/impl/d2d_cache.h"
 
 #include <algorithm>
 
-#include "dashboard_renderer/impl/d2d_render_conversions.h"
+#include "renderer/impl/d2d_render_conversions.h"
 
-size_t DashboardD2DCache::IconCacheKeyHash::operator()(const IconCacheKey& key) const {
+size_t D2DCache::IconCacheKeyHash::operator()(const IconCacheKey& key) const {
     size_t hash = std::hash<std::string>{}(key.name);
     hash = (hash * 1315423911u) ^ std::hash<int>{}(key.width);
     hash = (hash * 1315423911u) ^ std::hash<int>{}(key.height);
     return hash;
 }
 
-size_t DashboardD2DCache::BrushCacheKeyHash::operator()(const BrushCacheKey& key) const {
+size_t D2DCache::BrushCacheKeyHash::operator()(const BrushCacheKey& key) const {
     return std::hash<std::uint32_t>{}(key.packedRgba);
 }
 
-void DashboardD2DCache::Clear() {
+void D2DCache::Clear() {
     solidBrushes_.clear();
     iconBitmaps_.clear();
 }
 
-void DashboardD2DCache::ResetTarget() {
+void D2DCache::ResetTarget() {
     ownerTarget_ = nullptr;
     Clear();
 }
 
-void DashboardD2DCache::AttachTarget(ID2D1RenderTarget* target) {
+void D2DCache::AttachTarget(ID2D1RenderTarget* target) {
     if (ownerTarget_ == target) {
         return;
     }
@@ -33,11 +33,11 @@ void DashboardD2DCache::AttachTarget(ID2D1RenderTarget* target) {
     ownerTarget_ = target;
 }
 
-void DashboardD2DCache::ClearIconBitmaps() {
+void D2DCache::ClearIconBitmaps() {
     iconBitmaps_.clear();
 }
 
-ID2D1SolidColorBrush* DashboardD2DCache::SolidBrush(ID2D1RenderTarget* target, RenderColor color) {
+ID2D1SolidColorBrush* D2DCache::SolidBrush(ID2D1RenderTarget* target, RenderColor color) {
     if (target == nullptr) {
         return nullptr;
     }
@@ -53,7 +53,7 @@ ID2D1SolidColorBrush* DashboardD2DCache::SolidBrush(ID2D1RenderTarget* target, R
     return solidBrushes_.emplace(key, std::move(brush)).first->second.Get();
 }
 
-void DashboardD2DCache::DrawIcon(IWICImagingFactory* wicFactory,
+void D2DCache::DrawIcon(IWICImagingFactory* wicFactory,
     ID2D1RenderTarget* target,
     const IconSources& icons,
     std::string_view iconName,

@@ -1,7 +1,7 @@
 #include "widget/impl/network_footer.h"
 
 #include "telemetry/metrics.h"
-#include "widget/widget_renderer.h"
+#include "widget/widget_host.h"
 
 WidgetClass NetworkFooterWidget::Class() const {
     return WidgetClass::NetworkFooter;
@@ -13,23 +13,23 @@ std::unique_ptr<Widget> NetworkFooterWidget::Clone() const {
 
 void NetworkFooterWidget::Initialize(const LayoutNodeConfig&) {}
 
-int NetworkFooterWidget::PreferredHeight(const WidgetRenderer& renderer) const {
-    return renderer.TextMetrics().footer +
-           (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
+int NetworkFooterWidget::PreferredHeight(const WidgetHost& renderer) const {
+    return renderer.Renderer().TextMetrics().footer +
+           (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
 }
 
 bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void NetworkFooterWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
-    const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
-    const int y = widget.rect.top + renderer.TextMetrics().footer;
+void NetworkFooterWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {
+    const int hitInset = (std::max)(3, renderer.Renderer().ScaleLogical(4));
+    const int y = widget.rect.top + renderer.Renderer().TextMetrics().footer;
 
     LayoutEditWidgetGuide guide;
     guide.axis = LayoutGuideAxis::Horizontal;
     guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = WidgetRenderer::LayoutEditParameter::NetworkFooterBottomGap;
+    guide.parameter = WidgetHost::LayoutEditParameter::NetworkFooterBottomGap;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
     guide.drawStart = RenderPoint{widget.rect.left, y};
@@ -40,20 +40,19 @@ void NetworkFooterWidget::BuildEditGuides(WidgetRenderer& renderer, const Widget
     renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
 }
 
-void NetworkFooterWidget::Draw(
-    WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
-    if (renderer.CurrentRenderMode() == WidgetRenderer::RenderMode::Blank) {
+void NetworkFooterWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
+    if (renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank) {
         return;
     }
 
     const std::string text = metrics.ResolveNetworkFooter();
-    const WidgetRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
+    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(widget.rect,
         text,
         TextStyleId::Footer,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     renderer.RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(
-            widget, WidgetRenderer::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size),
-        WidgetRenderer::LayoutEditParameter::ColorMutedText);
+            widget, WidgetHost::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size),
+        WidgetHost::LayoutEditParameter::ColorMutedText);
 }

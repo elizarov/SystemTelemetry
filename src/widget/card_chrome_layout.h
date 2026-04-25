@@ -3,9 +3,9 @@
 #include <string_view>
 
 #include "config/config.h"
-#include "widget/render_types.h"
+#include "renderer/render_types.h"
 
-class WidgetRenderer;
+class WidgetHost;
 
 struct CardChromeLayoutMetrics {
     int padding = 0;
@@ -22,7 +22,7 @@ struct CardChromeLayout {
     RenderRect contentRect{};
 };
 
-CardChromeLayoutMetrics ResolveCardChromeLayoutMetrics(const WidgetRenderer& renderer);
+CardChromeLayoutMetrics ResolveCardChromeLayoutMetrics(const WidgetHost& renderer);
 CardChromeLayout ResolveCardChromeLayout(
     const LayoutCardConfig& card, const RenderRect& cardRect, const CardChromeLayoutMetrics& metrics);
 CardChromeLayout ResolveCardChromeLayout(std::string_view title,

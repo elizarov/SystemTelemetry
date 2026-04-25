@@ -2,16 +2,16 @@
 
 #include <algorithm>
 
-#include "widget/widget_renderer.h"
+#include "widget/widget_host.h"
 
-CardChromeLayoutMetrics ResolveCardChromeLayoutMetrics(const WidgetRenderer& renderer) {
+CardChromeLayoutMetrics ResolveCardChromeLayoutMetrics(const WidgetHost& renderer) {
     const auto& style = renderer.Config().layout.cardStyle;
     CardChromeLayoutMetrics metrics;
-    metrics.padding = (std::max)(0, renderer.ScaleLogical(style.cardPadding));
-    metrics.iconSize = (std::max)(0, renderer.ScaleLogical(style.headerIconSize));
-    metrics.iconGap = (std::max)(0, renderer.ScaleLogical(style.headerIconGap));
-    metrics.headerContentGap = (std::max)(0, renderer.ScaleLogical(style.headerContentGap));
-    metrics.titleHeight = (std::max)(0, renderer.TextMetrics().title);
+    metrics.padding = (std::max)(0, renderer.Renderer().ScaleLogical(style.cardPadding));
+    metrics.iconSize = (std::max)(0, renderer.Renderer().ScaleLogical(style.headerIconSize));
+    metrics.iconGap = (std::max)(0, renderer.Renderer().ScaleLogical(style.headerIconGap));
+    metrics.headerContentGap = (std::max)(0, renderer.Renderer().ScaleLogical(style.headerContentGap));
+    metrics.titleHeight = (std::max)(0, renderer.Renderer().TextMetrics().title);
     return metrics;
 }
 

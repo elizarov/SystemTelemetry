@@ -10,10 +10,10 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 
-#include "dashboard_renderer/impl/palette.h"
-#include "widget/render_types.h"
+#include "renderer/impl/palette.h"
+#include "renderer/render_types.h"
 
-class DashboardD2DCache {
+class D2DCache {
 public:
     using IconSources = std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>>;
 

@@ -24,15 +24,15 @@ bool Widget::IsVerticalSpring() const {
     return false;
 }
 
-void Widget::ResolveLayoutState(const WidgetRenderer&, const RenderRect&) {}
+void Widget::ResolveLayoutState(const WidgetHost&, const RenderRect&) {}
 
-void Widget::Draw(WidgetRenderer&, const WidgetLayout&, const MetricSource&) const {}
+void Widget::Draw(WidgetHost&, const WidgetLayout&, const MetricSource&) const {}
 
-void Widget::FinalizeLayoutGroup(WidgetRenderer&, const std::vector<WidgetLayout*>&) {}
+void Widget::FinalizeLayoutGroup(WidgetHost&, const std::vector<WidgetLayout*>&) {}
 
-void Widget::BuildEditGuides(WidgetRenderer&, const WidgetLayout&) const {}
+void Widget::BuildEditGuides(WidgetHost&, const WidgetLayout&) const {}
 
-void Widget::BuildStaticAnchors(WidgetRenderer&, const WidgetLayout&) const {}
+void Widget::BuildStaticAnchors(WidgetHost&, const WidgetLayout&) const {}
 
 std::unique_ptr<Widget> CreateWidget(WidgetClass widgetClass) {
     switch (widgetClass) {

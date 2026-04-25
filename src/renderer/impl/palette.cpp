@@ -1,4 +1,4 @@
-#include "dashboard_renderer/impl/palette.h"
+#include "renderer/impl/palette.h"
 
 namespace {
 
@@ -29,13 +29,13 @@ D2D1_COLOR_F RenderColor::ToD2DColorF() const {
         static_cast<float>(a) * kScale);
 }
 
-DashboardPalette::DashboardPalette() = default;
+RendererPalette::RendererPalette() = default;
 
-DashboardPalette::DashboardPalette(const ColorsConfig& config) {
+RendererPalette::RendererPalette(const ColorsConfig& config) {
     Rebuild(config);
 }
 
-void DashboardPalette::Rebuild(const ColorsConfig& config) {
+void RendererPalette::Rebuild(const ColorsConfig& config) {
     colors_[ColorSlot(RenderColorId::Background)] = ToRenderColor(config.backgroundColor);
     colors_[ColorSlot(RenderColorId::Foreground)] = ToRenderColor(config.foregroundColor);
     colors_[ColorSlot(RenderColorId::Icon)] = ToRenderColor(config.iconColor);
@@ -52,6 +52,6 @@ void DashboardPalette::Rebuild(const ColorsConfig& config) {
     colors_[ColorSlot(RenderColorId::GraphAxis)] = ToRenderColor(config.graphAxisColor);
 }
 
-const RenderColor& DashboardPalette::Get(RenderColorId id) const {
+const RenderColor& RendererPalette::Get(RenderColorId id) const {
     return colors_[ColorSlot(id)];
 }

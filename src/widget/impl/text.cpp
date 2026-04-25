@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "telemetry/metrics.h"
-#include "widget/widget_renderer.h"
+#include "widget/widget_host.h"
 
 WidgetClass TextWidget::Class() const {
     return WidgetClass::Text;
@@ -19,22 +19,23 @@ void TextWidget::Initialize(const LayoutNodeConfig& node) {
     cachedStaticText_.clear();
 }
 
-int TextWidget::PreferredHeight(const WidgetRenderer& renderer) const {
-    return renderer.TextMetrics().text + (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.text.bottomGap));
+int TextWidget::PreferredHeight(const WidgetHost& renderer) const {
+    return renderer.Renderer().TextMetrics().text +
+           (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.text.bottomGap));
 }
 
 bool TextWidget::UsesFixedPreferredHeightInRows() const {
     return true;
 }
 
-void TextWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
-    const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
+void TextWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {
+    const int hitInset = (std::max)(3, renderer.Renderer().ScaleLogical(4));
     const int y = widget.rect.bottom;
 
     LayoutEditWidgetGuide guide;
     guide.axis = LayoutGuideAxis::Horizontal;
     guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = WidgetRenderer::LayoutEditParameter::TextBottomGap;
+    guide.parameter = WidgetHost::LayoutEditParameter::TextBottomGap;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
     guide.drawStart = RenderPoint{widget.rect.left, y};
@@ -45,15 +46,15 @@ void TextWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& w
     renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
 }
 
-void TextWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
+void TextWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     const std::string text = metrics.ResolveText(metric_);
-    const WidgetRenderer::TextLayoutResult textLayout = renderer.DrawTextBlock(widget.rect,
+    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(widget.rect,
         text,
         TextStyleId::Text,
         RenderColorId::Foreground,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     const auto binding = renderer.MakeEditableTextBinding(
-        widget, WidgetRenderer::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
+        widget, WidgetHost::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
     if (IsStaticTextMetric(metric_)) {
         if (!staticAnchorRegistered_) {
             cachedStaticText_ = text;
@@ -62,10 +63,10 @@ void TextWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, cons
                 TextStyleId::Text,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true),
                 binding,
-                WidgetRenderer::LayoutEditParameter::ColorForeground);
+                WidgetHost::LayoutEditParameter::ColorForeground);
             staticAnchorRegistered_ = true;
         }
         return;
     }
-    renderer.RegisterDynamicTextAnchor(textLayout, binding, WidgetRenderer::LayoutEditParameter::ColorForeground);
+    renderer.RegisterDynamicTextAnchor(textLayout, binding, WidgetHost::LayoutEditParameter::ColorForeground);
 }

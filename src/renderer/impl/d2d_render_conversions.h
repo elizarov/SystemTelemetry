@@ -4,7 +4,7 @@
 #include <span>
 #include <wrl/client.h>
 
-#include "widget/render_types.h"
+#include "renderer/render_types.h"
 
 D2D1_POINT_2F D2DPointFromRenderPoint(RenderPoint point);
 D2D1_RECT_F D2DRectFromRenderRect(const RenderRect& rect);

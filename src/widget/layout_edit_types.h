@@ -5,8 +5,8 @@
 #include <vector>
 
 #include "config/widget_class.h"
+#include "renderer/render_types.h"
 #include "widget/layout_edit_parameter_id.h"
-#include "widget/render_types.h"
 
 enum class LayoutGuideAxis {
     Horizontal,

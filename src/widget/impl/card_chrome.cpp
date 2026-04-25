@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "widget/widget_renderer.h"
+#include "widget/widget_host.h"
 
 namespace {
 
@@ -33,7 +33,7 @@ std::unique_ptr<Widget> CardChromeWidget::Clone() const {
 
 void CardChromeWidget::Initialize(const LayoutNodeConfig&) {}
 
-int CardChromeWidget::PreferredHeight(const WidgetRenderer&) const {
+int CardChromeWidget::PreferredHeight(const WidgetHost&) const {
     return 0;
 }
 
@@ -41,42 +41,42 @@ bool CardChromeWidget::IsHoverable() const {
     return false;
 }
 
-void CardChromeWidget::ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect) {
+void CardChromeWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect) {
     layoutState_ = ResolveCardChromeLayout(title_, iconName_, rect, ResolveCardChromeLayoutMetrics(renderer));
 }
 
-void CardChromeWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource&) const {
-    const int radius = (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardRadius));
-    const float borderWidth =
-        static_cast<float>((std::max)(1, renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth)));
+void CardChromeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource&) const {
+    const int radius = (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardRadius));
+    const float borderWidth = static_cast<float>(
+        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth)));
 
-    renderer.FillSolidRoundedRect(widget.rect, radius, RenderColorId::PanelFill);
-    renderer.DrawSolidRoundedRect(widget.rect, radius, RenderStroke::Solid(RenderColorId::PanelBorder, borderWidth));
+    renderer.Renderer().FillSolidRoundedRect(widget.rect, radius, RenderColorId::PanelFill);
+    renderer.Renderer().DrawSolidRoundedRect(
+        widget.rect, radius, RenderStroke::Solid(RenderColorId::PanelBorder, borderWidth));
 
     if (!iconName_.empty()) {
-        renderer.DrawIcon(iconName_, layoutState_.iconRect);
-        renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorIcon, layoutState_.iconRect);
+        renderer.Renderer().DrawIcon(iconName_, layoutState_.iconRect);
+        renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorIcon, layoutState_.iconRect);
     }
     if (!title_.empty()) {
-        const WidgetRenderer::TextLayoutResult titleLayout = renderer.DrawTextBlock(layoutState_.titleRect,
+        const WidgetHost::TextLayoutResult titleLayout = renderer.Renderer().DrawTextBlock(layoutState_.titleRect,
             title_,
             TextStyleId::Title,
             RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
-        renderer.RegisterDynamicColorEditRegion(
-            WidgetRenderer::LayoutEditParameter::ColorForeground, titleLayout.textRect);
+        renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorForeground, titleLayout.textRect);
     }
 }
 
-void CardChromeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
+void CardChromeWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {
     const auto addGuide = [&](LayoutGuideAxis axis,
                               int guideId,
-                              WidgetRenderer::LayoutEditParameter parameter,
+                              WidgetHost::LayoutEditParameter parameter,
                               int value,
                               int dragDirection,
                               RenderPoint start,
                               RenderPoint end) {
-        const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
+        const int hitInset = (std::max)(3, renderer.Renderer().ScaleLogical(4));
         LayoutEditWidgetGuide guide;
         guide.axis = axis;
         guide.widget = CardIdentity(widget);
@@ -102,12 +102,12 @@ void CardChromeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLay
     const int contentRight =
         std::clamp(layoutState_.contentRect.right, contentLeft, static_cast<int>(widget.rect.right));
     const int paddingY =
-        std::clamp(widget.rect.top + renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardPadding),
+        std::clamp(widget.rect.top + renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardPadding),
             static_cast<int>(widget.rect.top),
             static_cast<int>(widget.rect.bottom));
     addGuide(LayoutGuideAxis::Horizontal,
         0,
-        WidgetRenderer::LayoutEditParameter::CardPadding,
+        WidgetHost::LayoutEditParameter::CardPadding,
         renderer.Config().layout.cardStyle.cardPadding,
         1,
         RenderPoint{contentLeft, paddingY},
@@ -118,7 +118,7 @@ void CardChromeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLay
             layoutState_.titleRect.left, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
         addGuide(LayoutGuideAxis::Vertical,
             1,
-            WidgetRenderer::LayoutEditParameter::CardHeaderIconGap,
+            WidgetHost::LayoutEditParameter::CardHeaderIconGap,
             renderer.Config().layout.cardStyle.headerIconGap,
             1,
             RenderPoint{guideX, layoutState_.titleRect.top},
@@ -130,7 +130,7 @@ void CardChromeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLay
             layoutState_.contentRect.top, static_cast<int>(widget.rect.top), static_cast<int>(widget.rect.bottom));
         addGuide(LayoutGuideAxis::Horizontal,
             2,
-            WidgetRenderer::LayoutEditParameter::CardHeaderContentGap,
+            WidgetHost::LayoutEditParameter::CardHeaderContentGap,
             renderer.Config().layout.cardStyle.headerContentGap,
             1,
             RenderPoint{contentLeft, guideY},
@@ -138,13 +138,13 @@ void CardChromeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLay
     }
 }
 
-void CardChromeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const {
+void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const {
     const LayoutEditWidgetIdentity cardIdentity = CardIdentity(widget);
-    const int squareAnchorSize = (std::max)(4, renderer.ScaleLogical(6));
+    const int squareAnchorSize = (std::max)(4, renderer.Renderer().ScaleLogical(6));
     const int radiusLogical = renderer.Config().layout.cardStyle.cardRadius;
-    const int radiusScaled = renderer.ScaleLogical(radiusLogical);
+    const int radiusScaled = renderer.Renderer().ScaleLogical(radiusLogical);
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{cardIdentity, WidgetRenderer::LayoutEditParameter::CardRadius, 0},
+        LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardRadius, 0},
         {},
         MakeSquareAnchorRect(widget.rect.left + radiusScaled, widget.rect.top, squareAnchorSize),
         AnchorShape::Square,
@@ -157,12 +157,13 @@ void CardChromeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Widget
         false,
         radiusLogical);
 
-    const int borderScaled = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth));
-    const int borderAnchorPadding = (std::max)(1, renderer.ScaleLogical(1));
+    const int borderScaled =
+        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth));
+    const int borderAnchorPadding = (std::max)(1, renderer.Renderer().ScaleLogical(1));
     const int borderCenterX = widget.rect.left + (std::max)(0, (widget.rect.right - widget.rect.left) / 2);
     const int borderCenterY = widget.rect.top;
     renderer.RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{cardIdentity, WidgetRenderer::LayoutEditParameter::CardBorder, 0},
+        LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardBorder, 0},
         {},
         MakeCircleAnchorRect(borderCenterX, borderCenterY, borderScaled, borderAnchorPadding),
         AnchorShape::Circle,
@@ -179,7 +180,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Widget
         const int anchorCenterX = layoutState_.iconRect.right;
         const int anchorCenterY = layoutState_.iconRect.top;
         renderer.RegisterStaticEditableAnchorRegion(
-            LayoutEditAnchorKey{cardIdentity, WidgetRenderer::LayoutEditParameter::CardHeaderIconSize, 0},
+            LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardHeaderIconSize, 0},
             layoutState_.iconRect,
             MakeSquareAnchorRect(anchorCenterX, anchorCenterY, squareAnchorSize),
             AnchorShape::Square,
@@ -198,8 +199,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Widget
             title_,
             TextStyleId::Title,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
-            LayoutEditAnchorBinding{
-                LayoutEditAnchorKey{cardIdentity, WidgetRenderer::LayoutEditParameter::FontTitle, 0},
+            LayoutEditAnchorBinding{LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::FontTitle, 0},
                 renderer.Config().layout.fonts.title.size,
                 AnchorShape::Circle,
                 AnchorDragAxis::Vertical,

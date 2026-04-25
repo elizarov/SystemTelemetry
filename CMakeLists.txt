@@ -126,12 +126,14 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/metrics.cpp
     src/dashboard/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp
-    src/widget/render_types.cpp
-    src/dashboard_renderer/impl/d2d_cache.cpp
-    src/dashboard_renderer/impl/d2d_render_conversions.cpp
+    src/renderer/renderer.cpp
+    src/renderer/render_types.cpp
+    src/renderer/impl/d2d_renderer.cpp
+    src/renderer/impl/d2d_cache.cpp
+    src/renderer/impl/d2d_render_conversions.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
-    src/dashboard_renderer/impl/palette.cpp
-    src/dashboard_renderer/impl/text_width_cache.cpp
+    src/renderer/impl/palette.cpp
+    src/renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/text.cpp
@@ -311,7 +313,7 @@ add_executable(SystemTelemetryTests
     src/widget/impl/drive_usage_list.cpp
     src/widget/impl/clock_time.cpp
     src/widget/impl/clock_date.cpp
-    src/widget/render_types.cpp
+    src/renderer/render_types.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/impl/retained_history.cpp
     src/util/utf8.cpp
@@ -391,12 +393,14 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/metrics.cpp
     src/dashboard/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp
-    src/widget/render_types.cpp
-    src/dashboard_renderer/impl/d2d_cache.cpp
-    src/dashboard_renderer/impl/d2d_render_conversions.cpp
+    src/renderer/renderer.cpp
+    src/renderer/render_types.cpp
+    src/renderer/impl/d2d_renderer.cpp
+    src/renderer/impl/d2d_cache.cpp
+    src/renderer/impl/d2d_render_conversions.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
-    src/dashboard_renderer/impl/palette.cpp
-    src/dashboard_renderer/impl/text_width_cache.cpp
+    src/renderer/impl/palette.cpp
+    src/renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/text.cpp
@@ -467,4 +471,6 @@ set_target_properties(SystemTelemetryBenchmarks PROPERTIES
     PDB_OUTPUT_DIRECTORY_RELEASE "${output_root}"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
+
+
 

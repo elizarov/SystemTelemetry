@@ -7,9 +7,9 @@
 #include <vector>
 
 #include "config/config.h"
+#include "renderer/render_types.h"
 #include "widget/card_chrome_layout.h"
 #include "widget/layout_edit_types.h"
-#include "widget/render_types.h"
 #include "widget/widget.h"
 
 class DashboardRenderer;

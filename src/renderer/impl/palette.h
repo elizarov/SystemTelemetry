@@ -5,7 +5,7 @@
 #include <d2d1.h>
 
 #include "config/config.h"
-#include "widget/render_types.h"
+#include "renderer/render_types.h"
 
 struct RenderColor {
     std::uint8_t r = 0;
@@ -19,10 +19,10 @@ struct RenderColor {
     D2D1_COLOR_F ToD2DColorF() const;
 };
 
-class DashboardPalette {
+class RendererPalette {
 public:
-    DashboardPalette();
-    explicit DashboardPalette(const ColorsConfig& config);
+    RendererPalette();
+    explicit RendererPalette(const ColorsConfig& config);
 
     void Rebuild(const ColorsConfig& config);
     const RenderColor& Get(RenderColorId id) const;

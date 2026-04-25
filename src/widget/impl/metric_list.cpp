@@ -7,32 +7,32 @@
 #include "telemetry/metrics.h"
 #include "util/numeric_safety.h"
 #include "util/strings.h"
-#include "widget/widget_renderer.h"
+#include "widget/widget_host.h"
 
 namespace {
 
-int EffectiveMetricRowHeight(const WidgetRenderer& renderer) {
-    const int valueHeight = renderer.TextMetrics().value;
-    const int barHeight = std::max(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
-    const int rowGap = std::max(0, renderer.ScaleLogical(renderer.Config().layout.metricList.rowGap));
+int EffectiveMetricRowHeight(const WidgetHost& renderer) {
+    const int valueHeight = renderer.Renderer().TextMetrics().value;
+    const int barHeight = std::max(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.metricList.barHeight));
+    const int rowGap = std::max(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.metricList.rowGap));
     return valueHeight + rowGap + barHeight;
 }
 
-void FillCapsule(WidgetRenderer& renderer, const RenderRect& rect, RenderColorId color) {
+void FillCapsule(WidgetHost& renderer, const RenderRect& rect, RenderColorId color) {
     const int width = rect.Width();
     const int height = rect.Height();
     if (width <= 0 || height <= 0) {
         return;
     }
     if (width <= height) {
-        renderer.FillSolidEllipse(rect, color);
+        renderer.Renderer().FillSolidEllipse(rect, color);
     } else {
-        renderer.FillSolidRoundedRect(rect, height / 2, color);
+        renderer.Renderer().FillSolidRoundedRect(rect, height / 2, color);
     }
 }
 
 std::optional<RenderRect> DrawMetricCapsuleBar(
-    WidgetRenderer& renderer, const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
+    WidgetHost& renderer, const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
     FillCapsule(renderer, rect, RenderColorId::Track);
 
     const int width = rect.Width();
@@ -53,7 +53,7 @@ std::optional<RenderRect> DrawMetricCapsuleBar(
     }
 
     const double peak = ClampFinite(*peakRatio, 0.0, 1.0);
-    const int markerWidth = std::min(width, std::max(1, std::max(renderer.ScaleLogical(4), height)));
+    const int markerWidth = std::min(width, std::max(1, std::max(renderer.Renderer().ScaleLogical(4), height)));
     const int centerX = rect.left + static_cast<int>(std::round(peak * width));
     const int minLeft = rect.left;
     const int maxLeft = rect.right - markerWidth;
@@ -69,7 +69,7 @@ RenderRect OffsetRect(RenderRect rect, int dy) {
     return rect;
 }
 
-void DrawMetricListRow(WidgetRenderer& renderer,
+void DrawMetricListRow(WidgetHost& renderer,
     const WidgetLayout& widget,
     const MetricListWidget::LayoutState& layout,
     const std::vector<std::string>& metricRefs,
@@ -79,13 +79,13 @@ void DrawMetricListRow(WidgetRenderer& renderer,
     bool registerEditRegions) {
     const RenderRect labelRect = OffsetRect(layout.labelRects[rowIndex], yOffset);
     const RenderRect valueRect = OffsetRect(layout.valueRects[rowIndex], yOffset);
-    renderer.DrawText(labelRect,
+    renderer.Renderer().DrawText(labelRect,
         row.label,
         TextStyleId::Label,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
-    if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank) {
-        const WidgetRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(valueRect,
+    if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
+        const WidgetHost::TextLayoutResult valueLayout = renderer.Renderer().DrawTextBlock(valueRect,
             row.valueText,
             TextStyleId::Value,
             RenderColorId::Foreground,
@@ -93,10 +93,10 @@ void DrawMetricListRow(WidgetRenderer& renderer,
         if (registerEditRegions) {
             renderer.RegisterDynamicTextAnchor(valueLayout,
                 renderer.MakeEditableTextBinding(widget,
-                    WidgetRenderer::LayoutEditParameter::FontValue,
+                    WidgetHost::LayoutEditParameter::FontValue,
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size),
-                WidgetRenderer::LayoutEditParameter::ColorForeground);
+                WidgetHost::LayoutEditParameter::ColorForeground);
             if (rowIndex < static_cast<int>(metricRefs.size()) && !IsRuntimePlaceholderMetricId(metricRefs[rowIndex])) {
                 renderer.RegisterDynamicTextAnchor(
                     valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs[rowIndex], rowIndex * 2 + 101));
@@ -106,18 +106,18 @@ void DrawMetricListRow(WidgetRenderer& renderer,
 
     const RenderRect barRect = OffsetRect(layout.barRects[rowIndex], yOffset);
     const std::optional<RenderRect> peakMarkerRect = DrawMetricCapsuleBar(
-        renderer, barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank);
+        renderer, barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank);
     if (!registerEditRegions) {
         return;
     }
 
     const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
-    renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorAccent,
-        RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
-    renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorTrack,
-        RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
+    renderer.RegisterDynamicColorEditRegion(
+        WidgetHost::LayoutEditParameter::ColorAccent, RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
+    renderer.RegisterDynamicColorEditRegion(
+        WidgetHost::LayoutEditParameter::ColorTrack, RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
     if (peakMarkerRect.has_value()) {
-        renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorPeakGhost, *peakMarkerRect);
+        renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorPeakGhost, *peakMarkerRect);
     }
 }
 
@@ -136,19 +136,21 @@ void MetricListWidget::Initialize(const LayoutNodeConfig& node) {
     metricRefs_ = SplitTrimmed(node.parameter, ',');
 }
 
-int MetricListWidget::PreferredHeight(const WidgetRenderer& renderer) const {
+int MetricListWidget::PreferredHeight(const WidgetHost& renderer) const {
     return static_cast<int>(metricRefs_.size()) * EffectiveMetricRowHeight(renderer);
 }
 
-void MetricListWidget::ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect) {
+void MetricListWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect) {
     layoutState_ = {};
     layoutState_.rowHeight = EffectiveMetricRowHeight(renderer);
-    layoutState_.labelWidth = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.labelWidth));
-    layoutState_.metricBarHeight = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.metricList.barHeight));
-    layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
-    layoutState_.reorderAnchorWidth = (std::max)(6, renderer.ScaleLogical(8));
-    layoutState_.reorderAnchorHeight = (std::max)(10, renderer.ScaleLogical(12));
-    const int valueHeight = renderer.TextMetrics().value;
+    layoutState_.labelWidth =
+        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.metricList.labelWidth));
+    layoutState_.metricBarHeight =
+        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.metricList.barHeight));
+    layoutState_.anchorSize = (std::max)(4, renderer.Renderer().ScaleLogical(6));
+    layoutState_.reorderAnchorWidth = (std::max)(6, renderer.Renderer().ScaleLogical(8));
+    layoutState_.reorderAnchorHeight = (std::max)(10, renderer.Renderer().ScaleLogical(12));
+    const int valueHeight = renderer.Renderer().TextMetrics().value;
     const int rowContentHeight = valueHeight + layoutState_.metricBarHeight;
     layoutState_.visibleRows =
         layoutState_.rowHeight > 0
@@ -188,7 +190,7 @@ void MetricListWidget::ResolveLayoutState(const WidgetRenderer& renderer, const 
             anchorCenterX - (layoutState_.anchorSize / 2) + layoutState_.anchorSize,
             anchorCenterY - (layoutState_.anchorSize / 2) + layoutState_.anchorSize});
         const int reorderCenterX =
-            rowRect.right - (std::max)(layoutState_.reorderAnchorWidth, renderer.ScaleLogical(10)) / 2;
+            rowRect.right - (std::max)(layoutState_.reorderAnchorWidth, renderer.Renderer().ScaleLogical(10)) / 2;
         const int reorderCenterY = rowRect.top + ((std::max)(0, static_cast<int>(rowRect.bottom - rowRect.top)) / 2);
         layoutState_.reorderAnchorRects.push_back(RenderRect{reorderCenterX - (layoutState_.reorderAnchorWidth / 2),
             reorderCenterY - (layoutState_.reorderAnchorHeight / 2),
@@ -204,7 +206,7 @@ void MetricListWidget::ResolveLayoutState(const WidgetRenderer& renderer, const 
     if (rowRect.bottom <= rect.bottom) {
         layoutState_.showAddRowAnchor = true;
         layoutState_.addRowRect = rowRect;
-        const int addAnchorSize = (std::max)(layoutState_.reorderAnchorWidth, renderer.ScaleLogical(10));
+        const int addAnchorSize = (std::max)(layoutState_.reorderAnchorWidth, renderer.Renderer().ScaleLogical(10));
         const int addCenterX = rowRect.right - (addAnchorSize / 2);
         const int addCenterY = rowRect.top + ((std::max)(0, static_cast<int>(rowRect.bottom - rowRect.top)) / 2);
         layoutState_.addRowAnchorRect = RenderRect{addCenterX - (addAnchorSize / 2),
@@ -214,8 +216,8 @@ void MetricListWidget::ResolveLayoutState(const WidgetRenderer& renderer, const 
     }
 }
 
-void MetricListWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
-    renderer.PushClipRect(widget.rect);
+void MetricListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
+    renderer.Renderer().PushClipRect(widget.rect);
     const auto dragState = renderer.ActiveMetricListReorderDrag(
         LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath});
     const int draggedIndex = dragState.has_value() ? dragState->currentIndex : -1;
@@ -239,14 +241,14 @@ void MetricListWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget
         DrawMetricListRow(
             renderer, widget, layoutState_, metricRefs_, draggedIndex, rows[draggedIndex], yOffset, false);
         const RenderRect outlineRect = OffsetRect(layoutState_.rowRects[draggedIndex], yOffset);
-        renderer.DrawSolidRect(outlineRect,
+        renderer.Renderer().DrawSolidRect(outlineRect,
             RenderStroke::Dotted(
-                RenderColorId::ActiveEdit, static_cast<float>((std::max)(2, renderer.ScaleLogical(2)))));
+                RenderColorId::ActiveEdit, static_cast<float>((std::max)(2, renderer.Renderer().ScaleLogical(2)))));
     }
-    renderer.PopClipRect();
+    renderer.Renderer().PopClipRect();
 }
 
-void MetricListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const {
+void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.metricList;
     for (int rowIndex = 0;
         rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.barRects.size()) &&
@@ -259,7 +261,7 @@ void MetricListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Widget
         const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
         renderer.RegisterStaticEditableAnchorRegion(
             LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                WidgetRenderer::LayoutEditParameter::MetricListBarHeight,
+                WidgetHost::LayoutEditParameter::MetricListBarHeight,
                 rowIndex},
             barRect,
             anchorRect,
@@ -295,10 +297,10 @@ void MetricListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Widget
                 TextStyleId::Label,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
                 renderer.MakeEditableTextBinding(widget,
-                    WidgetRenderer::LayoutEditParameter::FontLabel,
+                    WidgetHost::LayoutEditParameter::FontLabel,
                     rowIndex * 2,
                     renderer.Config().layout.fonts.label.size),
-                WidgetRenderer::LayoutEditParameter::ColorMutedText);
+                WidgetHost::LayoutEditParameter::ColorMutedText);
             renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
                 definition->label,
                 TextStyleId::Label,
@@ -325,8 +327,8 @@ void MetricListWidget::BuildStaticAnchors(WidgetRenderer& renderer, const Widget
     }
 }
 
-void MetricListWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
-    const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
+void MetricListWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {
+    const int hitInset = (std::max)(3, renderer.Renderer().ScaleLogical(4));
     const int x = std::clamp(static_cast<int>(widget.rect.left) + layoutState_.labelWidth,
         static_cast<int>(widget.rect.left),
         static_cast<int>(widget.rect.right));
@@ -335,7 +337,7 @@ void MetricListWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLay
     LayoutEditWidgetGuide guide;
     guide.axis = LayoutGuideAxis::Vertical;
     guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-    guide.parameter = WidgetRenderer::LayoutEditParameter::MetricListLabelWidth;
+    guide.parameter = WidgetHost::LayoutEditParameter::MetricListLabelWidth;
     guide.guideId = 0;
     guide.widgetRect = widget.rect;
     guide.drawStart = RenderPoint{x, widget.rect.top};
@@ -350,7 +352,7 @@ void MetricListWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLay
         guide = {};
         guide.axis = LayoutGuideAxis::Horizontal;
         guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-        guide.parameter = WidgetRenderer::LayoutEditParameter::MetricListRowGap;
+        guide.parameter = WidgetHost::LayoutEditParameter::MetricListRowGap;
         guide.guideId = 1 + rowIndex;
         guide.widgetRect = widget.rect;
         guide.drawStart = RenderPoint{widget.rect.left, y};

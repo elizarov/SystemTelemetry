@@ -2,40 +2,32 @@
 
 #include <windows.h>
 
-#include <array>
 #include <cstdint>
-#include <d2d1.h>
-#include <dwrite.h>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <ostream>
-#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
-#include <wincodec.h>
-#include <wrl/client.h>
 
 #include "config/config.h"
 #include "dashboard/dashboard_overlay_state.h"
+#include "renderer/renderer.h"
 #include "telemetry/metrics.h"
 #include "util/trace.h"
 #include "widget/widget.h"
-#include "widget/widget_renderer.h"
+#include "widget/widget_host.h"
 
 class DashboardLayoutResolver;
 class DashboardLayoutEditOverlayRenderer;
-class DashboardD2DCache;
-class DashboardPalette;
-class DashboardTextWidthCache;
 
-class DashboardRenderer : public WidgetRenderer {
+class DashboardRenderer : public WidgetHost {
 public:
-    using RenderMode = WidgetRenderer::RenderMode;
-    using TextLayoutResult = WidgetRenderer::TextLayoutResult;
-    using TextStyleMetrics = WidgetRenderer::TextStyleMetrics;
+    using RenderMode = ::RenderMode;
+    using TextLayoutResult = ::TextLayoutResult;
+    using TextStyleMetrics = ::TextStyleMetrics;
     using LayoutEditParameter = ::LayoutEditParameter;
 
     explicit DashboardRenderer(Trace& trace);
@@ -84,39 +76,10 @@ public:
     bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DiscardWindowRenderTarget(std::string_view reason = {});
     const std::string& LastError() const;
+    ::Renderer& Renderer() override;
+    const ::Renderer& Renderer() const override;
     const AppConfig& Config() const override;
-    const TextStyleMetrics& TextMetrics() const override;
     RenderMode CurrentRenderMode() const override;
-    TextLayoutResult MeasureTextBlock(const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        const TextLayoutOptions& options) const override;
-    void DrawText(const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        RenderColorId color,
-        const TextLayoutOptions& options) const override;
-    TextLayoutResult DrawTextBlock(const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        RenderColorId color,
-        const TextLayoutOptions& options) override;
-    void PushClipRect(const RenderRect& rect) override;
-    void PopClipRect() override;
-    bool DrawIcon(std::string_view iconName, const RenderRect& rect) override;
-    bool FillSolidRect(const RenderRect& rect, RenderColorId color) override;
-    bool FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) override;
-    bool FillSolidEllipse(const RenderRect& rect, RenderColorId color) override;
-    bool FillSolidDiamond(const RenderRect& rect, RenderColorId color) override;
-    bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) override;
-    bool DrawSolidRoundedRect(const RenderRect& rect, int radius, const RenderStroke& stroke) override;
-    bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) override;
-    bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) override;
-    bool DrawArc(const RenderArc& arc, const RenderStroke& stroke) override;
-    bool DrawArcs(std::span<const RenderArc> arcs, const RenderStroke& stroke) override;
-    bool DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) override;
-    bool FillPath(const RenderPath& path, RenderColorId color) override;
-    bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) override;
     LayoutEditAnchorBinding MakeEditableTextBinding(
         const WidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const override;
     LayoutEditAnchorBinding MakeMetricTextBinding(
@@ -167,8 +130,7 @@ public:
     void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
     std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable() override;
     std::vector<LayoutEditGapAnchor>& GapEditAnchorsMutable();
-    int ScaleLogical(int value) const override;
-    int MeasureTextWidth(TextStyleId style, std::string_view text) const override;
+    int ScaleLogical(int value) const;
     std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
         const LayoutEditWidgetIdentity& widget) const override;
 
@@ -197,35 +159,8 @@ private:
         bool instantiateWidgets);
     void BuildWidgetEditGuides();
     void BuildStaticEditableAnchors();
-    bool InitializeDirect2D();
-    bool InitializeWic();
-    void ShutdownDirect2D();
-    void RebuildPalette();
-    bool LoadIcons();
-    void ReleaseIcons();
-    bool RebuildTextFormatsAndMetrics();
-    bool EnsureWindowRenderTarget();
-    bool BeginDirect2DDraw(ID2D1RenderTarget* target, bool allowDeferredWarmup = true);
-    void EndDirect2DDraw();
-    bool BeginWindowDraw();
-    void EndWindowDraw();
-    void DrawDirect2DFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
-    bool SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath);
+    void DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void WriteScreenshotActiveRegionsTrace(const DashboardOverlayState& overlayState) const;
-    ID2D1SolidColorBrush* D2DSolidBrush(RenderColorId color);
-    IDWriteTextFormat* DWriteTextFormat(TextStyleId style) const;
-    bool CreateDWriteTextFormats();
-    void ConfigureDWriteTextFormat(IDWriteTextFormat* format, const TextLayoutOptions& options) const;
-    TextLayoutResult MeasureTextBlockD2D(const RenderRect& rect,
-        const std::wstring& wideText,
-        TextStyleId style,
-        const TextLayoutOptions& options,
-        Microsoft::WRL::ComPtr<IDWriteTextLayout>* layout = nullptr) const;
-    Microsoft::WRL::ComPtr<ID2D1PathGeometry> CreateD2DPathGeometry() const;
-    Microsoft::WRL::ComPtr<ID2D1GeometryGroup> CreateD2DGeometryGroup(
-        std::span<const Microsoft::WRL::ComPtr<ID2D1PathGeometry>> geometries, size_t count) const;
-    bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId color);
-    bool DrawD2DGeometry(ID2D1Geometry* geometry, const RenderStroke& stroke);
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -261,22 +196,16 @@ private:
         const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
         bool drawTargetOutline);
-    bool IsDrawActive() const;
+    RendererStyle BuildRendererStyle() const;
     const MetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();
     void WriteTrace(const std::string& text) const;
 
     AppConfig config_;
-    HWND hwnd_ = nullptr;
     Trace& trace_;
-    std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>> icons_;
-    std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
-    TextStyleMetrics textStyleMetrics_{};
-    std::unique_ptr<DashboardPalette> palette_;
+    std::unique_ptr<::Renderer> renderer_;
     std::unique_ptr<DashboardLayoutResolver> layoutResolver_;
     std::unique_ptr<DashboardLayoutEditOverlayRenderer> layoutEditOverlayRenderer_;
-    std::unique_ptr<DashboardD2DCache> d2dCache_;
-    std::unique_ptr<DashboardTextWidthCache> textWidthCache_;
     std::unique_ptr<MetricSource> cachedMetricSource_;
     const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
     uint64_t cachedMetricSnapshotRevision_ = 0;
@@ -287,16 +216,5 @@ private:
     RenderMode renderMode_ = RenderMode::Normal;
     bool layoutGuideDragActive_ = false;
     bool interactiveDragTraceActive_ = false;
-    Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
-    Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> d2dWindowRenderTarget_;
-    Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory_;
-    Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory_;
-    Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dSolidStrokeStyle_;
-    Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dDashedStrokeStyle_;
-    ID2D1RenderTarget* d2dActiveRenderTarget_ = nullptr;
-    bool d2dImmediatePresent_ = false;
-    bool wicComInitialized_ = false;
-    bool d2dFirstDrawWarmupPending_ = false;
-    int d2dClipDepth_ = 0;
     const DashboardOverlayState* activeOverlayState_ = nullptr;
 };

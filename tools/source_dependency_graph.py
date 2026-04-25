@@ -298,7 +298,7 @@ def check_telemetry_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
 
 def check_widget_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     violations: list[Violation] = []
-    allowed_targets = {"widget", "telemetry", "config", "util"}
+    allowed_targets = {"widget", "renderer", "telemetry", "config", "util"}
     for source, target in sorted(edges):
         if top_level_package(source) != "widget":
             continue
@@ -318,20 +318,43 @@ def check_widget_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     return violations
 
 
+def check_renderer_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    allowed_targets = {"renderer", "config", "util"}
+    for source, target in sorted(edges):
+        if top_level_package(source) != "renderer":
+            continue
+        if target == EXTERNAL_D2D_MODULE:
+            continue
+        if top_level_package(target) in allowed_targets:
+            continue
+        violations.append(
+            Violation(
+                kind="layer-renderer",
+                source=source,
+                target=target,
+                message=(
+                    f"{source} is in the renderer layer and must depend only on renderer, config, or util modules, "
+                    f"not project module {target}."
+                ),
+            )
+        )
+    return violations
+
+
 def check_d2d_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     violations: list[Violation] = []
-    lower_layers = {"util", "config", "telemetry", "widget"}
     for source, target in sorted(edges):
         if target != EXTERNAL_D2D_MODULE:
             continue
-        if top_level_package(source) not in lower_layers:
+        if top_level_package(source) == "renderer":
             continue
         violations.append(
             Violation(
                 kind="layer-d2d",
                 source=source,
                 target=target,
-                message=f"{source} is in a lower core layer and must not depend on Direct2D/WRL module {target}.",
+                message=f"{source} must not depend on Direct2D/DirectWrite/WIC/WRL module {target}; only renderer may.",
             )
         )
     return violations
@@ -344,6 +367,7 @@ def check_graph_rules(edges: dict[tuple[str, str], str]) -> list[Violation]:
         *check_config_layer(edges),
         *check_telemetry_layer(edges),
         *check_widget_layer(edges),
+        *check_renderer_layer(edges),
         *check_d2d_layer(edges),
     ]
 

@@ -7,10 +7,10 @@
 
 #include "config/config.h"
 #include "config/widget_class.h"
-#include "widget/render_types.h"
+#include "renderer/render_types.h"
 
 class MetricSource;
-class WidgetRenderer;
+class WidgetHost;
 
 class Widget {
 public:
@@ -19,15 +19,15 @@ public:
     virtual WidgetClass Class() const = 0;
     virtual std::unique_ptr<Widget> Clone() const = 0;
     virtual void Initialize(const LayoutNodeConfig& node) = 0;
-    virtual int PreferredHeight(const WidgetRenderer& renderer) const = 0;
+    virtual int PreferredHeight(const WidgetHost& renderer) const = 0;
     virtual bool UsesFixedPreferredHeightInRows() const;
     virtual bool IsHoverable() const;
     virtual bool IsVerticalSpring() const;
-    virtual void ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect);
-    virtual void Draw(WidgetRenderer& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
-    virtual void FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vector<struct WidgetLayout*>& widgets);
-    virtual void BuildEditGuides(WidgetRenderer& renderer, const struct WidgetLayout& widget) const;
-    virtual void BuildStaticAnchors(WidgetRenderer& renderer, const struct WidgetLayout& widget) const;
+    virtual void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect);
+    virtual void Draw(WidgetHost& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
+    virtual void FinalizeLayoutGroup(WidgetHost& renderer, const std::vector<struct WidgetLayout*>& widgets);
+    virtual void BuildEditGuides(WidgetHost& renderer, const struct WidgetLayout& widget) const;
+    virtual void BuildStaticAnchors(WidgetHost& renderer, const struct WidgetLayout& widget) const;
 };
 
 struct WidgetLayout {

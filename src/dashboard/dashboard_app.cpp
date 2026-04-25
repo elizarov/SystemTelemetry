@@ -453,8 +453,8 @@ void DashboardApp::UpdateMoveTracking() {
         y = cursor.y - moveCursorAnchorClientPoint_->y;
     } else {
         int cursorOffset = ScaleLogicalToPhysical(24, CurrentWindowDpi());
-        cursorOffset =
-            std::max(cursorOffset, renderer_.TextMetrics().smallText + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
+        cursorOffset = std::max(
+            cursorOffset, renderer_.Renderer().TextMetrics().smallText + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
 
         x = cursor.x - (WindowWidth() / 2);
         y = cursor.y - cursorOffset;

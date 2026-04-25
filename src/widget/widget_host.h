@@ -1,78 +1,30 @@
 #pragma once
 
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "config/config.h"
+#include "renderer/renderer.h"
 #include "widget/layout_edit_types.h"
-#include "widget/render_types.h"
 
 struct WidgetLayout;
 struct MetricDefinitionConfig;
 
-class WidgetRenderer {
+class WidgetHost {
 public:
     using LayoutEditParameter = ::LayoutEditParameter;
+    using TextLayoutResult = ::TextLayoutResult;
+    using TextStyleMetrics = ::TextStyleMetrics;
+    using RenderMode = ::RenderMode;
 
-    enum class RenderMode {
-        Normal,
-        Blank,
-    };
+    virtual ~WidgetHost() = default;
 
-    struct TextStyleMetrics {
-        int title = 0;
-        int big = 0;
-        int value = 0;
-        int label = 0;
-        int text = 0;
-        int smallText = 0;
-        int footer = 0;
-        int clockTime = 0;
-        int clockDate = 0;
-    };
-
-    struct TextLayoutResult {
-        RenderRect textRect{};
-    };
-
-    virtual ~WidgetRenderer() = default;
-
+    virtual ::Renderer& Renderer() = 0;
+    virtual const ::Renderer& Renderer() const = 0;
     virtual const AppConfig& Config() const = 0;
-    virtual const TextStyleMetrics& TextMetrics() const = 0;
     virtual RenderMode CurrentRenderMode() const = 0;
-    virtual int ScaleLogical(int value) const = 0;
-    virtual int MeasureTextWidth(TextStyleId style, std::string_view text) const = 0;
-    virtual TextLayoutResult MeasureTextBlock(
-        const RenderRect& rect, const std::string& text, TextStyleId style, const TextLayoutOptions& options) const = 0;
-    virtual void DrawText(const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        RenderColorId color,
-        const TextLayoutOptions& options) const = 0;
-    virtual TextLayoutResult DrawTextBlock(const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        RenderColorId color,
-        const TextLayoutOptions& options) = 0;
-    virtual void PushClipRect(const RenderRect& rect) = 0;
-    virtual void PopClipRect() = 0;
-    virtual bool DrawIcon(std::string_view iconName, const RenderRect& rect) = 0;
-    virtual bool FillSolidRect(const RenderRect& rect, RenderColorId color) = 0;
-    virtual bool FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) = 0;
-    virtual bool FillSolidEllipse(const RenderRect& rect, RenderColorId color) = 0;
-    virtual bool FillSolidDiamond(const RenderRect& rect, RenderColorId color) = 0;
-    virtual bool DrawSolidRect(const RenderRect& rect, const RenderStroke& stroke) = 0;
-    virtual bool DrawSolidRoundedRect(const RenderRect& rect, int radius, const RenderStroke& stroke) = 0;
-    virtual bool DrawSolidEllipse(const RenderRect& rect, const RenderStroke& stroke) = 0;
-    virtual bool DrawSolidLine(RenderPoint start, RenderPoint end, const RenderStroke& stroke) = 0;
-    virtual bool DrawArc(const RenderArc& arc, const RenderStroke& stroke) = 0;
-    virtual bool DrawArcs(std::span<const RenderArc> arcs, const RenderStroke& stroke) = 0;
-    virtual bool DrawPolyline(std::span<const RenderPoint> points, const RenderStroke& stroke) = 0;
-    virtual bool FillPath(const RenderPath& path, RenderColorId color) = 0;
-    virtual bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) = 0;
     virtual LayoutEditAnchorBinding MakeEditableTextBinding(
         const WidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const = 0;
     virtual LayoutEditAnchorBinding MakeMetricTextBinding(

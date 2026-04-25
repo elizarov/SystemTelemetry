@@ -10,7 +10,7 @@ std::unique_ptr<Widget> VerticalSpringWidget::Clone() const {
 
 void VerticalSpringWidget::Initialize(const LayoutNodeConfig&) {}
 
-int VerticalSpringWidget::PreferredHeight(const WidgetRenderer&) const {
+int VerticalSpringWidget::PreferredHeight(const WidgetHost&) const {
     return 0;
 }
 

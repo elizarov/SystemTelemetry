@@ -5,7 +5,7 @@
 
 #include "telemetry/metrics.h"
 #include "util/numeric_safety.h"
-#include "widget/widget_renderer.h"
+#include "widget/widget_host.h"
 
 struct GaugeSharedLayout {
     int radius = 0;
@@ -151,30 +151,33 @@ RenderRect ComputeGaugeSegmentBounds(
         static_cast<int>(std::ceil(bottom))};
 }
 
-int GaugeOuterRadiusForRect(const WidgetRenderer& renderer, const RenderRect& rect) {
+int GaugeOuterRadiusForRect(const WidgetHost& renderer, const RenderRect& rect) {
     const int width = (std::max)(0, rect.right - rect.left);
     const int height = (std::max)(0, rect.bottom - rect.top);
-    const int outerPadding = (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.gauge.outerPadding));
+    const int outerPadding =
+        (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.gauge.outerPadding));
     return (std::max)(1, ((std::min)(width, height) / 2) - outerPadding);
 }
 
-int GaugeTextHalfWidth(const WidgetRenderer& renderer, const std::string& metricRef) {
+int GaugeTextHalfWidth(const WidgetHost& renderer, const std::string& metricRef) {
     const std::string& sampleValueText = renderer.ResolveConfiguredMetricSampleValueText(metricRef);
     const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metricRef);
     const std::string_view valueText =
         sampleValueText.empty() ? std::string_view("100%") : std::string_view(sampleValueText);
-    const int valueWidth = renderer.MeasureTextWidth(TextStyleId::Big, valueText);
+    const int valueWidth = renderer.Renderer().MeasureTextWidth(TextStyleId::Big, valueText);
     const std::string_view labelText = definition != nullptr ? std::string_view(definition->label) : std::string_view{};
-    const int labelWidth = renderer.MeasureTextWidth(TextStyleId::Small, labelText);
+    const int labelWidth = renderer.Renderer().MeasureTextWidth(TextStyleId::Small, labelText);
     return (std::max)(1, (((std::max)(valueWidth, labelWidth) + 1) / 2));
 }
 
-int EffectiveGaugePreferredRadius(const WidgetRenderer& renderer, const std::string& metricRef) {
-    const int outerPadding = (std::max)(0, renderer.ScaleLogical(renderer.Config().layout.gauge.outerPadding));
-    const int ringThickness = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
+int EffectiveGaugePreferredRadius(const WidgetHost& renderer, const std::string& metricRef) {
+    const int outerPadding =
+        (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.gauge.outerPadding));
+    const int ringThickness =
+        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.gauge.ringThickness));
     const int halfWidth = GaugeTextHalfWidth(renderer, metricRef);
-    const int valueHalfHeight = (std::max)(1, (renderer.TextMetrics().big + 1) / 2);
-    const int labelHalfHeight = (std::max)(1, (renderer.TextMetrics().smallText + 1) / 2);
+    const int valueHalfHeight = (std::max)(1, (renderer.Renderer().TextMetrics().big + 1) / 2);
+    const int labelHalfHeight = (std::max)(1, (renderer.Renderer().TextMetrics().smallText + 1) / 2);
     const int innerRadius = (std::max)(halfWidth, (std::max)(valueHalfHeight, labelHalfHeight));
     const int outerRadius = innerRadius + ringThickness + outerPadding;
     return (std::max)(1, outerRadius);
@@ -195,32 +198,33 @@ void GaugeWidget::Initialize(const LayoutNodeConfig& node) {
     sharedLayout_.reset();
 }
 
-int GaugeWidget::PreferredHeight(const WidgetRenderer& renderer) const {
+int GaugeWidget::PreferredHeight(const WidgetHost& renderer) const {
     return EffectiveGaugePreferredRadius(renderer, metric_) * 2;
 }
 
-void GaugeWidget::ResolveLayoutState(const WidgetRenderer& renderer, const RenderRect& rect) {
+void GaugeWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect) {
     layoutState_ = {};
     layoutState_.outerRadius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
                                    ? sharedLayout_->radius
                                    : GaugeOuterRadiusForRect(renderer, rect);
     layoutState_.cx = rect.left + ((std::max)(0, rect.right - rect.left) / 2);
     layoutState_.cy = rect.top + ((std::max)(0, rect.bottom - rect.top) / 2);
-    layoutState_.ringThickness = (std::max)(1, renderer.ScaleLogical(renderer.Config().layout.gauge.ringThickness));
+    layoutState_.ringThickness =
+        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.gauge.ringThickness));
     layoutState_.segmentLayout = ComputeGaugeSegmentLayout(renderer.Config().layout.gauge.sweepDegrees,
         renderer.Config().layout.gauge.segmentCount,
         renderer.Config().layout.gauge.segmentGapDegrees);
     layoutState_.innerRadius = (std::max)(0, layoutState_.outerRadius - layoutState_.ringThickness);
-    layoutState_.anchorPadding = (std::max)(1, renderer.ScaleLogical(1));
-    layoutState_.anchorSize = (std::max)(4, renderer.ScaleLogical(6));
+    layoutState_.anchorPadding = (std::max)(1, renderer.Renderer().ScaleLogical(1));
+    layoutState_.anchorSize = (std::max)(4, renderer.Renderer().ScaleLogical(6));
     layoutState_.anchorHalf = layoutState_.anchorSize / 2;
     layoutState_.halfWidth = GaugeTextHalfWidth(renderer, metric_);
-    layoutState_.valueBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.valueBottom);
-    layoutState_.valueHeight = renderer.TextMetrics().big;
-    layoutState_.labelBottom = renderer.ScaleLogical(renderer.Config().layout.gauge.labelBottom);
-    layoutState_.labelHeight = renderer.TextMetrics().smallText;
+    layoutState_.valueBottom = renderer.Renderer().ScaleLogical(renderer.Config().layout.gauge.valueBottom);
+    layoutState_.valueHeight = renderer.Renderer().TextMetrics().big;
+    layoutState_.labelBottom = renderer.Renderer().ScaleLogical(renderer.Config().layout.gauge.labelBottom);
+    layoutState_.labelHeight = renderer.Renderer().TextMetrics().smallText;
     layoutState_.guideHalfExtension = (std::max)(1, layoutState_.ringThickness / 2);
-    layoutState_.hitInset = (std::max)(4, renderer.ScaleLogical(5));
+    layoutState_.hitInset = (std::max)(4, renderer.Renderer().ScaleLogical(5));
     layoutState_.segmentCountAnchorRect = RenderRect{layoutState_.cx - layoutState_.anchorHalf,
         layoutState_.cy - layoutState_.outerRadius - layoutState_.anchorHalf,
         layoutState_.cx - layoutState_.anchorHalf + layoutState_.anchorSize,
@@ -259,7 +263,7 @@ void GaugeWidget::ResolveLayoutState(const WidgetRenderer& renderer, const Rende
     }
 }
 
-void GaugeWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
+void GaugeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     const MetricValue& metric = metrics.ResolveMetric(metric_);
     const GaugeSegmentLayout& gaugeLayout = layoutState_.segmentLayout;
     const double clampedRatio = ClampFinite(metric.ratio, 0.0, 1.0);
@@ -280,60 +284,60 @@ void GaugeWidget::Draw(WidgetRenderer& renderer, const WidgetLayout& widget, con
 
     const RenderStroke trackStroke =
         RenderStroke::Solid(RenderColorId::Track, static_cast<float>(layoutState_.ringThickness));
-    renderer.DrawArcs(layoutState_.ringSegments, trackStroke);
-    if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank && filledSegments > 0) {
+    renderer.Renderer().DrawArcs(layoutState_.ringSegments, trackStroke);
+    if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank && filledSegments > 0) {
         const RenderStroke accentStroke =
             RenderStroke::Solid(RenderColorId::Accent, static_cast<float>(layoutState_.ringThickness));
-        renderer.DrawArcs(
+        renderer.Renderer().DrawArcs(
             std::span<const RenderArc>(layoutState_.ringSegments.data(), static_cast<size_t>(filledSegments)),
             accentStroke);
     }
-    if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank && peakSegment >= 0 &&
+    if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank && peakSegment >= 0 &&
         static_cast<size_t>(peakSegment) < layoutState_.ringSegments.size()) {
         const size_t peakSegmentIndex = static_cast<size_t>(peakSegment);
-        renderer.DrawArc(layoutState_.ringSegments[peakSegmentIndex],
+        renderer.Renderer().DrawArc(layoutState_.ringSegments[peakSegmentIndex],
             RenderStroke::Solid(RenderColorId::PeakGhost, static_cast<float>(layoutState_.ringThickness)));
         if (peakSegmentIndex < layoutState_.ringSegmentBounds.size() &&
             !layoutState_.ringSegmentBounds[peakSegmentIndex].IsEmpty()) {
             renderer.RegisterDynamicColorEditRegion(
-                WidgetRenderer::LayoutEditParameter::ColorPeakGhost, layoutState_.ringSegmentBounds[peakSegmentIndex]);
+                WidgetHost::LayoutEditParameter::ColorPeakGhost, layoutState_.ringSegmentBounds[peakSegmentIndex]);
         }
     }
 
-    if (renderer.CurrentRenderMode() != WidgetRenderer::RenderMode::Blank) {
-        const WidgetRenderer::TextLayoutResult valueLayout = renderer.DrawTextBlock(layoutState_.valueRect,
+    if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
+        const WidgetHost::TextLayoutResult valueLayout = renderer.Renderer().DrawTextBlock(layoutState_.valueRect,
             metric.valueText,
             TextStyleId::Big,
             RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
         renderer.RegisterDynamicTextAnchor(valueLayout,
             renderer.MakeEditableTextBinding(
-                widget, WidgetRenderer::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size),
-            WidgetRenderer::LayoutEditParameter::ColorForeground);
+                widget, WidgetHost::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size),
+            WidgetHost::LayoutEditParameter::ColorForeground);
         renderer.RegisterDynamicTextAnchor(valueLayout, renderer.MakeMetricTextBinding(widget, metric_, 100));
     }
     const RenderRect ringBounds{layoutState_.cx - layoutState_.outerRadius,
         layoutState_.cy - layoutState_.outerRadius,
         layoutState_.cx + layoutState_.outerRadius,
         layoutState_.cy + layoutState_.outerRadius};
-    renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorAccent,
+    renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorAccent,
         RenderRect{ringBounds.left, ringBounds.top, layoutState_.cx, ringBounds.bottom});
-    renderer.RegisterDynamicColorEditRegion(WidgetRenderer::LayoutEditParameter::ColorTrack,
+    renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorTrack,
         RenderRect{layoutState_.cx, ringBounds.top, ringBounds.right, ringBounds.bottom});
-    renderer.DrawText(layoutState_.labelRect,
+    renderer.Renderer().DrawText(layoutState_.labelRect,
         metric.label,
         TextStyleId::Small,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
 }
 
-void GaugeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayout& widget) const {
+void GaugeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const {
     const int cx = layoutState_.cx;
     const int cy = layoutState_.cy;
     const int outerRadius = layoutState_.outerRadius;
     renderer.RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            WidgetRenderer::LayoutEditParameter::GaugeSegmentCount,
+            WidgetHost::LayoutEditParameter::GaugeSegmentCount,
             0},
         widget.rect,
         layoutState_.segmentCountAnchorRect,
@@ -348,7 +352,7 @@ void GaugeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayou
         renderer.Config().layout.gauge.segmentCount);
     renderer.RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            WidgetRenderer::LayoutEditParameter::GaugeOuterPadding,
+            WidgetHost::LayoutEditParameter::GaugeOuterPadding,
             0},
         layoutState_.outerPaddingAnchorRect,
         layoutState_.outerPaddingAnchorRect,
@@ -363,7 +367,7 @@ void GaugeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayou
         renderer.Config().layout.gauge.outerPadding);
     renderer.RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            WidgetRenderer::LayoutEditParameter::GaugeRingThickness,
+            WidgetHost::LayoutEditParameter::GaugeRingThickness,
             0},
         layoutState_.ringThicknessAnchorRect,
         layoutState_.ringThicknessAnchorRect,
@@ -382,11 +386,9 @@ void GaugeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayou
             definition->label,
             TextStyleId::Small,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
-            renderer.MakeEditableTextBinding(widget,
-                WidgetRenderer::LayoutEditParameter::FontSmall,
-                1,
-                renderer.Config().layout.fonts.smallText.size),
-            WidgetRenderer::LayoutEditParameter::ColorMutedText);
+            renderer.MakeEditableTextBinding(
+                widget, WidgetHost::LayoutEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size),
+            WidgetHost::LayoutEditParameter::ColorMutedText);
         renderer.RegisterStaticTextAnchor(layoutState_.labelRect,
             definition->label,
             TextStyleId::Small,
@@ -395,7 +397,7 @@ void GaugeWidget::BuildStaticAnchors(WidgetRenderer& renderer, const WidgetLayou
     }
 }
 
-void GaugeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& widget) const {
+void GaugeWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {
     const int outerRadius = layoutState_.outerRadius;
     if (outerRadius <= 0) {
         return;
@@ -409,7 +411,7 @@ void GaugeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& 
     const int hitInset = layoutState_.hitInset;
     const int halfWidth = layoutState_.halfWidth;
 
-    const auto addRadialGuide = [&](WidgetRenderer::LayoutEditParameter parameter,
+    const auto addRadialGuide = [&](WidgetHost::LayoutEditParameter parameter,
                                     int guideId,
                                     double angleDegrees,
                                     double value,
@@ -436,21 +438,21 @@ void GaugeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& 
         renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
     };
 
-    addRadialGuide(WidgetRenderer::LayoutEditParameter::GaugeSweepDegrees,
+    addRadialGuide(WidgetHost::LayoutEditParameter::GaugeSweepDegrees,
         0,
         gaugeLayout.gaugeEnd,
         gaugeLayout.totalSweep,
         0.0,
         360.0);
-    addRadialGuide(WidgetRenderer::LayoutEditParameter::GaugeSegmentGapDegrees,
+    addRadialGuide(WidgetHost::LayoutEditParameter::GaugeSegmentGapDegrees,
         gaugeLayout.segmentCount,
         gaugeLayout.gaugeStart + gaugeLayout.segmentSweep,
         gaugeLayout.segmentGap,
         gaugeLayout.gaugeStart,
         gaugeLayout.gaugeStart + gaugeLayout.maxSegmentSweep);
 
-    const auto addHorizontalGuide = [&](WidgetRenderer::LayoutEditParameter parameter, int guideId, int bottomOffset) {
-        const int y = cy + renderer.ScaleLogical(bottomOffset);
+    const auto addHorizontalGuide = [&](WidgetHost::LayoutEditParameter parameter, int guideId, int bottomOffset) {
+        const int y = cy + renderer.Renderer().ScaleLogical(bottomOffset);
         LayoutEditWidgetGuide guide;
         guide.axis = LayoutGuideAxis::Horizontal;
         guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -466,12 +468,12 @@ void GaugeWidget::BuildEditGuides(WidgetRenderer& renderer, const WidgetLayout& 
     };
 
     addHorizontalGuide(
-        WidgetRenderer::LayoutEditParameter::GaugeValueBottom, 100, renderer.Config().layout.gauge.valueBottom);
+        WidgetHost::LayoutEditParameter::GaugeValueBottom, 100, renderer.Config().layout.gauge.valueBottom);
     addHorizontalGuide(
-        WidgetRenderer::LayoutEditParameter::GaugeLabelBottom, 101, renderer.Config().layout.gauge.labelBottom);
+        WidgetHost::LayoutEditParameter::GaugeLabelBottom, 101, renderer.Config().layout.gauge.labelBottom);
 }
 
-void GaugeWidget::FinalizeLayoutGroup(WidgetRenderer& renderer, const std::vector<WidgetLayout*>& widgets) {
+void GaugeWidget::FinalizeLayoutGroup(WidgetHost& renderer, const std::vector<WidgetLayout*>& widgets) {
     auto sharedLayout = std::make_shared<GaugeSharedLayout>();
     int gaugeCount = 0;
     for (WidgetLayout* widget : widgets) {

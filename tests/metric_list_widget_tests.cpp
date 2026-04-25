@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <optional>
 #include <span>
@@ -5,11 +6,11 @@
 #include <vector>
 
 #include "widget/impl/metric_list.h"
-#include "widget/widget_renderer.h"
+#include "widget/widget_host.h"
 
 namespace {
 
-class MetricListTestRenderer final : public WidgetRenderer {
+class MetricListTestRenderer final : public WidgetHost, public Renderer {
 public:
     MetricListTestRenderer() {
         config_.layout.metricList.barHeight = 8;
@@ -21,8 +22,49 @@ public:
             MetricDefinitionConfig{"cpu.clock", MetricDisplayStyle::Scalar, false, 5.0, "GHz", "Clock"});
     }
 
+    ::Renderer& Renderer() override {
+        return *this;
+    }
+
+    const ::Renderer& Renderer() const override {
+        return *this;
+    }
+
     const AppConfig& Config() const override {
         return config_;
+    }
+
+    bool SetStyle(const RendererStyle&) override {
+        return true;
+    }
+
+    void AttachWindow(HWND) override {}
+
+    void Shutdown() override {}
+
+    void SetImmediatePresent(bool) override {}
+
+    void SetTraceSuppressed(bool) override {}
+
+    void DiscardWindowTarget(std::string_view = {}) override {}
+
+    bool DrawWindow(int, int, const DrawCallback& draw) override {
+        draw();
+        return true;
+    }
+
+    bool DrawOffscreen(int, int, const DrawCallback& draw) override {
+        draw();
+        return true;
+    }
+
+    bool SavePng(const std::filesystem::path&, int, int, const DrawCallback& draw) override {
+        draw();
+        return true;
+    }
+
+    const std::string& LastError() const override {
+        return empty_;
     }
 
     const TextStyleMetrics& TextMetrics() const override {
@@ -57,6 +99,10 @@ public:
     void PushClipRect(const RenderRect&) override {}
 
     void PopClipRect() override {}
+
+    void PushTranslation(RenderPoint) override {}
+
+    void PopTranslation() override {}
 
     bool DrawIcon(std::string_view, const RenderRect&) override {
         return true;

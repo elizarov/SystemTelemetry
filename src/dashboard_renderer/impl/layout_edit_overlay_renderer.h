@@ -2,8 +2,8 @@
 
 #include <optional>
 
+#include "renderer/render_types.h"
 #include "widget/layout_edit_types.h"
-#include "widget/render_types.h"
 
 class DashboardLayoutResolver;
 class DashboardRenderer;
