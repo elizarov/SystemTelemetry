@@ -13,6 +13,7 @@ bool g_localizationCatalogInitialized = false;
 
 LocalizationCatalogMap ParseLocalizationCatalog(std::string_view text) {
     LocalizationCatalogMap values;
+    std::string section;
     size_t lineStart = 0;
     while (lineStart < text.size()) {
         size_t lineEnd = text.find_first_of("\r\n", lineStart);
@@ -22,12 +23,13 @@ LocalizationCatalogMap ParseLocalizationCatalog(std::string_view text) {
 
         std::string line = Trim(text.substr(lineStart, lineEnd - lineStart));
         if (!line.empty() && line[0] != '#' && line[0] != ';') {
-            const size_t equals = line.find('=');
-            if (equals != std::string::npos) {
+            if (line.size() >= 2 && line.front() == '[' && line.back() == ']') {
+                section = Trim(std::string_view(line).substr(1, line.size() - 2));
+            } else if (const size_t equals = line.find('='); equals != std::string::npos) {
                 const std::string key = Trim(line.substr(0, equals));
                 const std::string value = Trim(line.substr(equals + 1));
                 if (!key.empty()) {
-                    values[key] = value;
+                    values[section.empty() ? key : section + "." + key] = value;
                 }
             }
         }

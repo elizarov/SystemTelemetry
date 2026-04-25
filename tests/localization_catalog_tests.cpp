@@ -9,6 +9,19 @@
 #include "util/utf8.h"
 
 TEST(LocalizationCatalog, ParsesKeyValueLines) {
+    const LocalizationCatalogMap catalog = ParseLocalizationCatalog("# comment\n"
+                                                                    "[config]\n"
+                                                                    "metric_list.label_width = Label width text\n"
+                                                                    "\n"
+                                                                    "[layout_edit]\n"
+                                                                    "section.metrics = Metrics text\n");
+
+    ASSERT_EQ(catalog.size(), 2u);
+    EXPECT_EQ(catalog.at("config.metric_list.label_width"), "Label width text");
+    EXPECT_EQ(catalog.at("layout_edit.section.metrics"), "Metrics text");
+}
+
+TEST(LocalizationCatalog, KeepsFlatKeyLinesOutsideSections) {
     const LocalizationCatalogMap catalog =
         ParseLocalizationCatalog("# comment\n"
                                  "config.metric_list.label_width = Label width text\n"
