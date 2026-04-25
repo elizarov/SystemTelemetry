@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "config/config.h"
-#include "dashboard/dashboard_overlay_state.h"
+#include "layout_model/dashboard_overlay_state.h"
 #include "renderer/renderer.h"
 #include "telemetry/metrics.h"
 #include "util/trace.h"

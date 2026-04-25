@@ -72,7 +72,7 @@ private:
     void UpdateRendererScale(double scale);
     double ResolveCurrentDisplayScale(UINT dpi) const;
     bool IsLayoutEditMode() const;
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis);
@@ -111,7 +111,7 @@ private:
     const AppConfig& LayoutEditConfig() const override;
     DashboardRenderer& LayoutEditRenderer() override;
     DashboardOverlayState& LayoutDashboardOverlayState() override;
-    bool ApplyLayoutGuideWeights(const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) override;
+    bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) override;
     bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) override;
     bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) override;

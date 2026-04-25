@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "config/config.h"
-#include "layout_edit/layout_edit_tree.h"
+#include "layout_model/layout_edit_tree.h"
 #include "resource.h"
 
 struct ColorDialogControls {

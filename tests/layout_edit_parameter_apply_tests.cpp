@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "layout_edit/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
 
 TEST(LayoutEditParameterApply, ClampsGaugeDegreeFieldsToZeroTo360) {
     AppConfig config;

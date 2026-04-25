@@ -10,8 +10,8 @@
 #include "diagnostics/constants.h"
 #include "display/constants.h"
 #include "display/display_config.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
-#include "layout_edit/layout_edit_service.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_service.h"
 #include "main/autostart.h"
 #include "main/config_io.h"
 
@@ -503,7 +503,7 @@ bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost
 }
 
 bool DashboardController::ApplyLayoutGuideWeights(
-    DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
+    DashboardShellHost& shell, const LayoutEditLayoutTarget& target, const std::vector<int>& weights) {
     if (!ApplyGuideWeights(state_.config, target, weights)) {
         return false;
     }
@@ -592,11 +592,15 @@ void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const A
 }
 
 std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
-    const LayoutEditHost::LayoutTarget& target,
+    const LayoutEditLayoutTarget& target,
     const std::vector<int>& weights,
     const LayoutEditWidgetIdentity& widget,
     LayoutGuideAxis axis) {
-    return EvaluateWidgetExtentForGuideWeights(shell.Renderer(), target, weights, widget, axis);
+    DashboardRenderer& renderer = shell.Renderer();
+    if (!renderer.ApplyLayoutGuideWeightsPreview(target.editCardId, target.nodePath, weights)) {
+        return std::nullopt;
+    }
+    return renderer.FindLayoutWidgetExtent(widget, axis);
 }
 
 AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {

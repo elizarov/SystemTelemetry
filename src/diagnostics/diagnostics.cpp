@@ -104,7 +104,7 @@ public:
         return overlayState_;
     }
 
-    bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) override {
+    bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) override {
         (void)target;
         (void)weights;
         return false;
@@ -124,7 +124,7 @@ public:
         return false;
     }
 
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) override {

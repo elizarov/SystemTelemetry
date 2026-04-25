@@ -1,4 +1,4 @@
-#include "layout_edit/layout_edit_service.h"
+#include "layout_model/layout_edit_service.h"
 
 #include <algorithm>
 
@@ -46,7 +46,7 @@ const LayoutNodeConfig* FindLayoutNodeByPath(const LayoutNodeConfig& root, const
 
 }  // namespace
 
-const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditHost::LayoutTarget& target) {
+const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditLayoutTarget& target) {
     if (target.editCardId.empty()) {
         return FindLayoutNodeByPath(config.layout.structure.cardsLayout, target.nodePath);
     }
@@ -60,14 +60,14 @@ const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditH
 }
 
 const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const LayoutEditWidgetIdentity& widget) {
-    LayoutEditHost::LayoutTarget target;
+    LayoutEditLayoutTarget target;
     target.editCardId = widget.editCardId;
     target.nodePath = widget.nodePath;
     return FindGuideNode(config, target);
 }
 
 const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
-    LayoutEditHost::LayoutTarget target;
+    LayoutEditLayoutTarget target;
     target.editCardId = key.editCardId;
     target.nodePath = key.nodePath;
     const LayoutNodeConfig* node = FindGuideNode(config, target);
@@ -129,7 +129,7 @@ std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNode
     return weights;
 }
 
-bool ApplyGuideWeights(AppConfig& config, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
+bool ApplyGuideWeights(AppConfig& config, const LayoutEditLayoutTarget& target, const std::vector<int>& weights) {
     if (weights.size() < 2) {
         return false;
     }
@@ -231,7 +231,7 @@ bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widg
         return false;
     }
 
-    const LayoutEditHost::LayoutTarget target{widget.editCardId, widget.nodePath};
+    const LayoutEditLayoutTarget target{widget.editCardId, widget.nodePath};
     const LayoutNodeConfig* currentNode = FindGuideNode(config, target);
     if (currentNode == nullptr || currentNode->name != "metric_list") {
         return false;
@@ -240,15 +240,4 @@ bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widg
     std::vector<std::string> metricRefs = ParseMetricListMetricRefs(currentNode->parameter);
     metricRefs.push_back(std::string(metricRef));
     return ApplyMetricListOrder(config, widget, metricRefs);
-}
-
-std::optional<int> EvaluateWidgetExtentForGuideWeights(DashboardRenderer& renderer,
-    const LayoutEditHost::LayoutTarget& target,
-    const std::vector<int>& weights,
-    const LayoutEditWidgetIdentity& widget,
-    LayoutGuideAxis axis) {
-    if (!renderer.ApplyLayoutGuideWeightsPreview(target.editCardId, target.nodePath, weights)) {
-        return std::nullopt;
-    }
-    return renderer.FindLayoutWidgetExtent(widget, axis);
 }

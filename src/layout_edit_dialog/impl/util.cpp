@@ -6,8 +6,8 @@
 #include <cwchar>
 #include <cwctype>
 
-#include "layout_edit/layout_edit_parameter_metadata.h"
-#include "layout_edit/layout_edit_service.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_service.h"
 #include "resource.h"
 #include "util/utf8.h"
 
@@ -36,7 +36,7 @@ bool CaseInsensitiveEqual(const std::wstring& left, const std::wstring& right) {
 }
 
 const LayoutNodeConfig* FindWeightEditNode(const AppConfig& config, const LayoutWeightEditKey& key) {
-    LayoutEditHost::LayoutTarget target;
+    LayoutEditLayoutTarget target;
     target.editCardId = key.editCardId;
     target.nodePath = key.nodePath;
     return FindGuideNode(config, target);

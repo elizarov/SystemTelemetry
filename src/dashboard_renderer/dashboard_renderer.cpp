@@ -15,10 +15,10 @@
 
 #include "dashboard_renderer/impl/layout_edit_overlay_renderer.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
-#include "layout_edit/layout_edit_helpers.h"
-#include "layout_edit/layout_edit_hit_priority.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
-#include "layout_edit/layout_edit_service.h"
+#include "layout_model/layout_edit_helpers.h"
+#include "layout_model/layout_edit_hit_priority.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_service.h"
 #include "util/strings.h"
 #include "util/trace.h"
 
@@ -891,7 +891,7 @@ std::optional<int> DashboardRenderer::FindLayoutWidgetExtent(
 
 bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
     const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights) {
-    LayoutEditHost::LayoutTarget target;
+    LayoutEditLayoutTarget target;
     target.editCardId = editCardId;
     target.nodePath = nodePath;
     if (!ApplyGuideWeights(config_, target, weights)) {

@@ -2,9 +2,9 @@
 
 #include <commctrl.h>
 
-#include "layout_edit/layout_edit_helpers.h"
 #include "layout_edit_dialog/impl/editors.h"
 #include "layout_edit_dialog/impl/trace.h"
+#include "layout_model/layout_edit_helpers.h"
 #include "resource.h"
 #include "util/utf8.h"
 

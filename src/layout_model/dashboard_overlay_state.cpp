@@ -1,4 +1,4 @@
-#include "dashboard/dashboard_overlay_state.h"
+#include "layout_model/dashboard_overlay_state.h"
 
 bool DashboardOverlayState::ShouldDrawLayoutEditAffordances() const {
     if (!showLayoutEditGuides) {

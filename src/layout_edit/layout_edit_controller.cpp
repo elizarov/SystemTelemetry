@@ -6,10 +6,10 @@
 #include <sstream>
 
 #include "layout_edit/impl/layout_snap_solver.h"
-#include "layout_edit/layout_edit_helpers.h"
-#include "layout_edit/layout_edit_hit_priority.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
-#include "layout_edit/layout_edit_service.h"
+#include "layout_model/layout_edit_helpers.h"
+#include "layout_model/layout_edit_hit_priority.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_service.h"
 
 namespace {
 
@@ -187,13 +187,6 @@ std::optional<double> ComputeGaugeSegmentGapDegrees(const LayoutEditWidgetGuide&
 }
 
 }  // namespace
-
-LayoutEditHost::LayoutTarget LayoutEditHost::LayoutTarget::ForGuide(const LayoutEditGuide& guide) {
-    LayoutTarget target;
-    target.editCardId = guide.editCardId;
-    target.nodePath = guide.nodePath;
-    return target;
-}
 
 LayoutEditController::LayoutEditController(LayoutEditHost& host) : host_(host) {}
 
@@ -493,7 +486,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
             if (const auto containerOrderKey = LayoutEditAnchorContainerChildOrderKey(region->key);
                 containerOrderKey.has_value()) {
                 const LayoutNodeConfig* node = FindGuideNode(host_.LayoutEditConfig(),
-                    LayoutEditHost::LayoutTarget{containerOrderKey->editCardId, containerOrderKey->nodePath});
+                    LayoutEditLayoutTarget{containerOrderKey->editCardId, containerOrderKey->nodePath});
                 if (node == nullptr || (node->name != "rows" && node->name != "columns") || region->key.anchorId < 0 ||
                     region->key.anchorId >= static_cast<int>(node->children.size())) {
                     return false;
@@ -634,7 +627,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
         const auto& guides = renderer.LayoutEditGuides();
         const LayoutEditGuide& guide = guides[*resolution.hoveredLayoutGuideIndex];
         const LayoutNodeConfig* guideNode =
-            FindGuideNode(host_.LayoutEditConfig(), LayoutEditHost::LayoutTarget::ForGuide(guide));
+            FindGuideNode(host_.LayoutEditConfig(), LayoutEditLayoutTarget::ForGuide(guide));
         const std::vector<int> initialWeights = SeedGuideWeights(guide, guideNode);
         activeLayoutDrag_ = LayoutDragState{
             guide,
@@ -1113,7 +1106,7 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
                 }
 
                 std::optional<int> extent = host_.EvaluateLayoutWidgetExtentForWeights(
-                    LayoutEditHost::LayoutTarget::ForGuide(drag.guide), attemptWeights, widget, drag.guide.axis);
+                    LayoutEditLayoutTarget::ForGuide(drag.guide), attemptWeights, widget, drag.guide.axis);
                 drag.extentCache.emplace(std::move(cacheKey), extent);
                 return extent;
             });
@@ -1155,7 +1148,7 @@ bool LayoutEditController::UpdateLayoutDrag(RenderPoint clientPoint) {
         host_.RecordLayoutEditTracePhase(
             LayoutEditHost::TracePhase::Snap, std::chrono::steady_clock::now() - snapStart);
     }
-    if (!host_.ApplyLayoutGuideWeights(LayoutEditHost::LayoutTarget::ForGuide(drag.guide), weights)) {
+    if (!host_.ApplyLayoutGuideWeights(LayoutEditLayoutTarget::ForGuide(drag.guide), weights)) {
         return false;
     }
 

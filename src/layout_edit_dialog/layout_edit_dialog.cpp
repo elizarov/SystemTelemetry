@@ -4,15 +4,15 @@
 #include <commctrl.h>
 
 #include "display/monitor.h"
-#include "layout_edit/layout_edit_helpers.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
-#include "layout_edit/layout_edit_tree.h"
 #include "layout_edit_dialog/impl/dialog_proc.h"
 #include "layout_edit_dialog/impl/pane.h"
 #include "layout_edit_dialog/impl/state.h"
 #include "layout_edit_dialog/impl/trace.h"
 #include "layout_edit_dialog/impl/tree.h"
 #include "layout_edit_dialog/impl/util.h"
+#include "layout_model/layout_edit_helpers.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_tree.h"
 #include "resource.h"
 
 LayoutEditDialog::LayoutEditDialog(LayoutEditDialogHost& host) : host_(host) {}

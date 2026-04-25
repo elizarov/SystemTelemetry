@@ -8,8 +8,8 @@
 
 #include "dashboard/dashboard_shell_ui.h"
 #include "display/display_config.h"
-#include "layout_edit/layout_edit_helpers.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
+#include "layout_model/layout_edit_helpers.h"
 #include "util/localization_catalog.h"
 #include "util/trace.h"
 
@@ -358,8 +358,7 @@ bool DashboardApp::ApplyConfiguredWallpaper() {
     return ::ApplyConfiguredWallpaper(controller_.State().config, trace_);
 }
 
-bool DashboardApp::ApplyLayoutGuideWeights(
-    const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights) {
+bool DashboardApp::ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) {
     const auto start = std::chrono::steady_clock::now();
     const bool applied = controller_.ApplyLayoutGuideWeights(*this, target, weights);
     RecordLayoutEditTracePhase(TracePhase::Apply, std::chrono::steady_clock::now() - start);
@@ -388,7 +387,7 @@ bool DashboardApp::ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter p
     return applied;
 }
 
-std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditHost::LayoutTarget& target,
+std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
     const std::vector<int>& weights,
     const LayoutEditWidgetIdentity& widget,
     LayoutGuideAxis axis) {

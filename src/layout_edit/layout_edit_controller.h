@@ -11,6 +11,7 @@
 
 #include "config/config.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "layout_model/layout_edit_layout_target.h"
 
 class LayoutEditHost {
 public:
@@ -23,21 +24,14 @@ public:
         PaintDraw,
     };
 
-    struct LayoutTarget {
-        std::string editCardId;
-        std::vector<size_t> nodePath;
-
-        static LayoutTarget ForGuide(const LayoutEditGuide& guide);
-    };
-
     virtual const AppConfig& LayoutEditConfig() const = 0;
     virtual DashboardRenderer& LayoutEditRenderer() = 0;
     virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
-    virtual bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) = 0;
+    virtual bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) = 0;
     virtual bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) = 0;
     virtual bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) = 0;
-    virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
+    virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) = 0;

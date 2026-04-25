@@ -90,13 +90,14 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_dialog/impl/util.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_trace_session.cpp
-    src/layout_edit/layout_edit_helpers.cpp
-    src/layout_edit/layout_edit_hit_priority.cpp
-    src/layout_edit/layout_edit_tree.cpp
-    src/layout_edit/layout_edit_parameter_metadata.cpp
-    src/layout_edit/layout_edit_tooltip.cpp
+    src/layout_model/layout_edit_helpers.cpp
+    src/layout_model/layout_edit_hit_priority.cpp
+    src/layout_model/layout_edit_layout_target.cpp
+    src/layout_model/layout_edit_tree.cpp
+    src/layout_model/layout_edit_parameter_metadata.cpp
+    src/layout_model/layout_edit_tooltip.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
-    src/layout_edit/layout_edit_service.cpp
+    src/layout_model/layout_edit_service.cpp
     src/config/config.cpp
     src/config/metric_catalog.cpp
     src/config/config_parser.cpp
@@ -124,7 +125,7 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/metrics.cpp
-    src/dashboard/dashboard_overlay_state.cpp
+    src/layout_model/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp
     src/renderer/renderer.cpp
     src/renderer/render_types.cpp
@@ -288,11 +289,12 @@ add_executable(SystemTelemetryTests
     src/config/config_parser.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
-    src/layout_edit/layout_edit_helpers.cpp
-    src/layout_edit/layout_edit_hit_priority.cpp
-    src/layout_edit/layout_edit_tree.cpp
-    src/layout_edit/layout_edit_parameter_metadata.cpp
-    src/layout_edit/layout_edit_tooltip.cpp
+    src/layout_model/layout_edit_helpers.cpp
+    src/layout_model/layout_edit_hit_priority.cpp
+    src/layout_model/layout_edit_layout_target.cpp
+    src/layout_model/layout_edit_tree.cpp
+    src/layout_model/layout_edit_parameter_metadata.cpp
+    src/layout_model/layout_edit_tooltip.cpp
     src/util/strings.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
@@ -381,17 +383,18 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
-    src/layout_edit/layout_edit_helpers.cpp
-    src/layout_edit/layout_edit_hit_priority.cpp
-    src/layout_edit/layout_edit_parameter_metadata.cpp
-    src/layout_edit/layout_edit_tree.cpp
+    src/layout_model/layout_edit_helpers.cpp
+    src/layout_model/layout_edit_hit_priority.cpp
+    src/layout_model/layout_edit_layout_target.cpp
+    src/layout_model/layout_edit_parameter_metadata.cpp
+    src/layout_model/layout_edit_tree.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_trace_session.cpp
-    src/layout_edit/layout_edit_service.cpp
+    src/layout_model/layout_edit_service.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
     src/telemetry/metrics.cpp
-    src/dashboard/dashboard_overlay_state.cpp
+    src/layout_model/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp
     src/renderer/renderer.cpp
     src/renderer/render_types.cpp

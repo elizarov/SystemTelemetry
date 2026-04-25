@@ -1,12 +1,12 @@
-#include "layout_edit/layout_edit_tree.h"
+#include "layout_model/layout_edit_tree.h"
 
 #include <algorithm>
 #include <functional>
 #include <unordered_map>
 
 #include "config/config_parser.h"
-#include "layout_edit/layout_edit_helpers.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_helpers.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
 #include "util/strings.h"
 
 namespace {

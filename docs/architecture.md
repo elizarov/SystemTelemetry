@@ -10,12 +10,13 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/display/` contains monitor enumeration, DPI scaling, placement, configure-display, wallpaper application helpers, and display-owned constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, elevation handoff, and main-process constants.
-- `src/widget/widget.*` owns the widget interface plus the enum-backed and special widget factories, `src/widget/widget_host.h` owns the widget-facing host boundary, `src/widget/card_chrome_layout.*` owns shared card-chrome layout geometry, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the dashboard renderer.
+- `src/widget/widget.*` owns the widget interface plus the enum-backed and special widget factories, `src/widget/widget_host.h` owns the widget-facing host boundary, `src/widget/card_chrome_layout.*` owns shared card-chrome layout geometry, `src/widget/layout_edit_types.h` owns widget-facing edit-artifact DTO contracts, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the dashboard renderer.
+- `src/layout_model/` contains shared layout-edit model contracts and behavior, including edit-target identity, artifact matching, hit priority, parameter metadata, config-field mutation helpers, layout tree construction, tooltip formatting, guide and reorder config helpers, and dashboard overlay state.
 - `src/util/` contains pure shared utilities for paths, command-line text, string trimming, splitting, case folding, whitespace normalization, enum string conversion, UTF-8 conversion, embedded resource loading, localization catalog access, numeric safety, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
 - `src/renderer/` owns render-space contract types, the `Renderer` drawing interface, renderer style resources, render-target lifecycle, and the Direct2D/DirectWrite/WIC implementation under `src/renderer/impl/`. It does not own dashboard drawing modes, overlay policy, or trace emission.
 - `src/dashboard_renderer/dashboard_renderer.*` owns dashboard scene traversal, layout resolution, renderer style input selection, hit testing, drawing-mode state, and widget-host services. It implements `WidgetHost`, owns a `Renderer` instance, and keeps graphics-backend details encapsulated in `src/renderer/`.
-- `src/layout_edit/` contains shared layout-edit interaction, edit-artifact helpers, parameter metadata, hit-priority policy, tooltip, tree, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
+- `src/layout_edit/` contains runtime layout-edit interaction, drag flow, controller-host integration, tooltip text assembly, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
 - `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
@@ -24,7 +25,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ## Layered Core
 
-- The core project layers are ordered `util` -> `config` -> `renderer` -> `telemetry` -> `widget` -> application-facing packages such as dashboard, dashboard_renderer, diagnostics, display, layout-edit, and main.
+- The core project layers are ordered `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as dashboard, dashboard_renderer, diagnostics, display, layout-edit, layout-edit dialog, and main.
 - Dependencies flow downward only. A higher layer may include lower-layer contracts, but a lower layer must not include or call into a higher layer.
 - `src/util/` is the base layer. It contains domain-neutral helpers for text, paths, resources, enum strings, UTF-8 conversion, localization catalog access, numeric safety, and trace emission. Util modules may depend on other util modules, but must not depend on config, telemetry, rendering, UI, diagnostics, or application packages.
 - `src/config/` is the second layer. It owns the persisted config model, parser, writer, resolver, schema metadata, and config-facing contract types such as widget class, metric display style, and telemetry settings DTOs. Config modules may depend only on config and util modules.
@@ -33,8 +34,9 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Telemetry is allowed to consume config contracts such as telemetry settings and metric display style, and it publishes runtime contracts such as `TelemetryCollector`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
 - `src/renderer/` owns render-space DTOs, renderer style DTOs, the D2D-free `Renderer` interface, and the only Direct2D, DirectWrite, WIC, and WRL implementation modules. Renderer modules may depend only on renderer, config, and util modules.
 - `src/widget/` is the widget layer. It owns widget contracts, widget-local layout and drawing behavior, widget-facing layout-edit DTO contracts, and the D2D-free `WidgetHost` interface. Widget modules may depend on widget, renderer, telemetry, config, and util modules, but must not depend on dashboard, diagnostics, display, layout-edit, main, Direct2D, DirectWrite, WIC, or WRL modules.
+- `src/layout_model/` is the shared layout-edit model layer. It may depend on layout_model, widget, renderer, telemetry, config, and util modules, but must not depend on dashboard, dashboard_renderer, diagnostics, display, layout-edit, layout-edit dialog, main, Direct2D, DirectWrite, WIC, or WRL modules.
 - Cross-layer shared types belong in the lowest layer that semantically owns them. Move config-language DTOs to config, runtime telemetry DTOs to telemetry, and domain-neutral helpers to util; do not copy catalogs or enums across layers to avoid a dependency violation.
-- `lint.cmd` enforces the util, config, renderer, telemetry, widget, and renderer-only D2D rules through the source dependency graph before reporting success.
+- `lint.cmd` enforces the util, config, renderer, telemetry, widget, layout-model, and renderer-only D2D rules through the source dependency graph before reporting success.
 
 ## Major Subsystems
 
@@ -76,7 +78,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Layout editing
 
 - `LayoutEditController` owns hover state, active drags, hit-testing, capture, cursor choice, and drag-session flow.
-- Layout-edit helpers own edit-artifact matching, focus and selection resolution, anchor subject extraction, and tooltip-payload interpretation. Layout-edit parameter metadata centralizes editable config-field mapping, display names, current-value lookup, and preview application; separate hit-priority helpers own edit-artifact ordering policy.
+- Layout-model helpers own edit-artifact matching, focus and selection resolution, anchor subject extraction, tooltip-payload interpretation, and edit-artifact ordering policy. Layout-edit parameter metadata centralizes editable config-field mapping, display names, current-value lookup, and preview application.
 - `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/impl/`.
 - The dashboard renderer exposes the resolved guide and anchor geometry used both by live interaction and by diagnostics screenshot validation.
 
@@ -118,7 +120,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Layout-edit flow
 
 - The shell forwards pointer events into the layout-edit controller, which resolves actionable targets from renderer-provided guide and anchor data.
-- Package-private layout-edit helpers live under `src/layout_edit/impl/` when they have no incoming production dependencies from outside `src/layout_edit/`.
+- Package-private layout-edit interaction helpers live under `src/layout_edit/impl/` when they have no incoming production dependencies from outside `src/layout_edit/`.
 - Edits preview through shared config mutation helpers and the same renderer resolution path used by ordinary runtime rendering.
 - The modeless editor window uses the same config mutation and preview path as drag-based editing so both interaction styles operate on the same session state, and post-menu hover recovery relies on explicit cursor refresh instead of rebuilding hover inside `WM_MOUSELEAVE`.
 
@@ -153,3 +155,4 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/telemetry/` is the third layer, so telemetry modules may depend on telemetry, config, and util modules but must not depend on higher-level project modules.
 - `src/renderer/` is the graphics boundary, so renderer modules may depend on renderer, config, util, and the synthetic `d2d` package only.
 - `src/widget/` is the widget layer, so widget modules may depend on widget, renderer, telemetry, config, and util modules but must not depend on higher-level project modules or the synthetic `d2d` package.
+- `src/layout_model/` is the shared layout-edit model layer, so layout-model modules may depend on layout_model, widget, renderer, telemetry, config, and util modules but must not depend on higher-level project modules or the synthetic `d2d` package.

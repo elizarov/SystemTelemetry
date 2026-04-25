@@ -318,6 +318,28 @@ def check_widget_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     return violations
 
 
+def check_layout_model_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    allowed_targets = {"layout_model", "widget", "renderer", "telemetry", "config", "util"}
+    for source, target in sorted(edges):
+        if top_level_package(source) != "layout_model":
+            continue
+        if top_level_package(target) in allowed_targets:
+            continue
+        violations.append(
+            Violation(
+                kind="layer-layout-model",
+                source=source,
+                target=target,
+                message=(
+                    f"{source} is in the layout_model layer and must depend only on layout_model, widget, renderer, "
+                    f"telemetry, config, or util modules, not project module {target}."
+                ),
+            )
+        )
+    return violations
+
+
 def check_renderer_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     violations: list[Violation] = []
     allowed_targets = {"renderer", "config", "util"}
@@ -367,6 +389,7 @@ def check_graph_rules(edges: dict[tuple[str, str], str]) -> list[Violation]:
         *check_config_layer(edges),
         *check_telemetry_layer(edges),
         *check_widget_layer(edges),
+        *check_layout_model_layer(edges),
         *check_renderer_layer(edges),
         *check_d2d_layer(edges),
     ]

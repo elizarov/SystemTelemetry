@@ -2,10 +2,10 @@
 
 #include <algorithm>
 
-#include "layout_edit/layout_edit_helpers.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
-#include "layout_edit/layout_edit_service.h"
-#include "layout_edit/layout_edit_tooltip.h"
+#include "layout_model/layout_edit_helpers.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_service.h"
+#include "layout_model/layout_edit_tooltip.h"
 #include "util/localization_catalog.h"
 #include "util/utf8.h"
 
@@ -81,7 +81,7 @@ LayoutEditTooltipDescriptor CardTitleTooltipDescriptor(const LayoutCardTitleEdit
 }
 
 const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const LayoutEditGuide& guide) {
-    return FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
+    return FindGuideNode(config, LayoutEditLayoutTarget::ForGuide(guide));
 }
 
 std::string LayoutGuideChildName(const LayoutNodeConfig& node) {

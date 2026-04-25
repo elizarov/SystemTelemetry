@@ -16,10 +16,10 @@
 #include "config/config_resolution.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_edit/layout_edit_controller.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
-#include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_trace_session.h"
-#include "layout_edit/layout_edit_tree.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_service.h"
+#include "layout_model/layout_edit_tree.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
 #include "util/enum_string.h"
@@ -406,7 +406,7 @@ private:
         return overlayState_;
     }
 
-    bool ApplyLayoutGuideWeights(const LayoutTarget& target, const std::vector<int>& weights) override {
+    bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) override {
         const auto start = Clock::now();
         const bool applied = ApplyGuideWeights(config_, target, weights);
         if (applied) {
@@ -440,11 +440,14 @@ private:
         return applied;
     }
 
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutTarget& target,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) override {
-        return EvaluateWidgetExtentForGuideWeights(renderer_, target, weights, widget, axis);
+        if (!renderer_.ApplyLayoutGuideWeightsPreview(target.editCardId, target.nodePath, weights)) {
+            return std::nullopt;
+        }
+        return renderer_.FindLayoutWidgetExtent(widget, axis);
     }
 
     bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override {
@@ -677,7 +680,7 @@ int RunEditLayoutBenchmarkCommand(size_t iterations, double renderScale, Trace& 
         return 1;
     }
 
-    const LayoutEditHost::LayoutTarget target = LayoutEditHost::LayoutTarget::ForGuide(*guide);
+    const LayoutEditLayoutTarget target = LayoutEditLayoutTarget::ForGuide(*guide);
     const LayoutNodeConfig* node = FindGuideNode(runtimeConfig, target);
     const std::vector<int> initialWeights = SeedGuideWeights(*guide, node);
     const std::vector<std::vector<int>> weightSequence = BuildWeightSequence(initialWeights, iterations);

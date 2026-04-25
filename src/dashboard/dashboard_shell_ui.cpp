@@ -10,11 +10,11 @@
 #include "dashboard/dashboard_app.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
-#include "layout_edit/layout_edit_helpers.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
-#include "layout_edit/layout_edit_service.h"
-#include "layout_edit/layout_edit_tree.h"
 #include "layout_edit_dialog/layout_edit_dialog.h"
+#include "layout_model/layout_edit_helpers.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_service.h"
+#include "layout_model/layout_edit_tree.h"
 #include "util/strings.h"
 
 namespace {
@@ -264,7 +264,7 @@ std::wstring BuildLayoutGuideEditLabel(const LayoutEditGuide& guide) {
 }
 
 const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const LayoutEditGuide& guide) {
-    return FindGuideNode(config, LayoutEditHost::LayoutTarget::ForGuide(guide));
+    return FindGuideNode(config, LayoutEditLayoutTarget::ForGuide(guide));
 }
 
 std::wstring BuildLayoutGuideItemLabel(
@@ -276,7 +276,7 @@ std::wstring BuildLayoutGuideItemLabel(
 }
 
 const LayoutNodeConfig* FindWeightEditNode(const AppConfig& config, const LayoutWeightEditKey& key) {
-    LayoutEditHost::LayoutTarget target;
+    LayoutEditLayoutTarget target;
     target.editCardId = key.editCardId;
     target.nodePath = key.nodePath;
     return FindGuideNode(config, target);
@@ -1023,7 +1023,7 @@ bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int fi
     weights[key.separatorIndex] = firstWeight;
     weights[key.separatorIndex + 1] = secondWeight;
 
-    LayoutEditHost::LayoutTarget target;
+    LayoutEditLayoutTarget target;
     target.editCardId = key.editCardId;
     target.nodePath = key.nodePath;
     return app_.ApplyLayoutGuideWeights(target, weights);

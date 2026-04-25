@@ -81,7 +81,7 @@ public:
     bool HasUnsavedLayoutEditChanges() const;
     bool RestoreLayoutEditSessionSavedLayout(DashboardShellHost& shell);
     bool ApplyLayoutGuideWeights(
-        DashboardShellHost& shell, const LayoutEditHost::LayoutTarget& target, const std::vector<int>& weights);
+        DashboardShellHost& shell, const LayoutEditLayoutTarget& target, const std::vector<int>& weights);
     bool ApplyMetricListOrder(
         DashboardShellHost& shell, const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs);
     bool ApplyContainerChildOrder(
@@ -94,7 +94,7 @@ public:
         DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, unsigned int value);
     void ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config);
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
-        const LayoutEditHost::LayoutTarget& target,
+        const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis);

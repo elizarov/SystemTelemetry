@@ -9,8 +9,8 @@
 
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
-#include "layout_edit/layout_edit_helpers.h"
-#include "layout_edit/layout_edit_parameter_metadata.h"
+#include "layout_model/layout_edit_helpers.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
 
 namespace {
 
