@@ -49,3 +49,4 @@ Validation workflow:
 - When a benchmark optimization experiment fails or regresses, record that hypothesis and the observed benchmark result in `docs/profile_benchmark.md` before finishing so future work can avoid repeating it blindly.
 - If `devenv.cmd` changes between Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run so CMake, MSVC, and the vcpkg-detected compiler do not mix mismatched compiler and STL versions.
 - Git pathspecs such as `tests/**/*.cpp` do not cover top-level files like `tests/benchmarks.cpp`; formatter and hook discovery should start from broad `*.cpp` and `*.h` pathspecs, then apply the repo eligibility filter.
+- The repo uses CRLF text checkouts; keep `.githooks/pre-commit` as a minimal CRLF-tolerant shell launcher and put multi-line hook logic in PowerShell.
