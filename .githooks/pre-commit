@@ -2,7 +2,7 @@
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
 
-staged_files=$(git -C "$repo_root" diff --cached --name-only --diff-filter=ACMR -- 'src/**/*.cpp' 'src/**/*.h' 'tests/**/*.cpp' 'tests/**/*.h')
+staged_files=$(git -C "$repo_root" diff --cached --name-only --diff-filter=ACMR -- '*.cpp' '*.h')
 if [ -z "$staged_files" ]; then
     exit 0
 fi

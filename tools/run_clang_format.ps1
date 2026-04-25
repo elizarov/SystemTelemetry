@@ -132,7 +132,7 @@ function Get-ChangedCppFiles {
         [string]$RepoRoot
     )
 
-    $pathSpecs = @('src/**/*.cpp', 'src/**/*.h', 'tests/**/*.cpp', 'tests/**/*.h')
+    $pathSpecs = @('*.cpp', '*.h')
     $changedFiles = [System.Collections.Generic.List[string]]::new()
 
     $headExists = $false
@@ -177,7 +177,7 @@ function Get-StagedCppFiles {
         [string]$RepoRoot
     )
 
-    $pathSpecs = @('src/**/*.cpp', 'src/**/*.h', 'tests/**/*.cpp', 'tests/**/*.h')
+    $pathSpecs = @('*.cpp', '*.h')
     $stagedOutput = & git -C $RepoRoot diff --cached --name-only --diff-filter=ACMR -- $pathSpecs 2>$null
     foreach ($relativePath in ($stagedOutput | Sort-Object -Unique)) {
         if ([string]::IsNullOrWhiteSpace($relativePath)) {

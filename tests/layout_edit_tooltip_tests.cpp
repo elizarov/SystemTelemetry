@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include "layout_model/layout_edit_hit_priority.h"
-#include "layout_model/layout_edit_parameter_metadata.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_tooltip.h"
+#include "layout_model/layout_edit_hit_priority.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
 
 TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::MetricListLabelWidth);
