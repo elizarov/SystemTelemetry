@@ -62,6 +62,12 @@ class SourceFileLoc:
 
 
 @dataclass(frozen=True)
+class PackageDependencyComponent:
+    packages: tuple[str, ...]
+    total_loc: int
+
+
+@dataclass(frozen=True)
 class IncludeUse:
     source: str
     target: str
@@ -351,12 +357,119 @@ def summarize_package_loc(modules: dict[str, Module]) -> dict[str, PackageLocSum
     summaries: dict[str, PackageLocSummary] = {}
     for module in modules.values():
         package = top_level_package(module.name)
+        if package == EXTERNAL_D2D_MODULE:
+            continue
         summary = summaries.setdefault(package, PackageLocSummary())
         summary.header_files += module.header_files
         summary.header_loc += module.header_loc
         summary.cpp_files += module.cpp_files
         summary.cpp_loc += module.cpp_loc
     return summaries
+
+
+def collect_package_dependencies(modules: dict[str, Module], edges: dict[tuple[str, str], str]) -> dict[str, set[str]]:
+    dependencies: dict[str, set[str]] = {
+        top_level_package(module.name): set()
+        for module in modules.values()
+        if top_level_package(module.name) != EXTERNAL_D2D_MODULE
+    }
+    for source, target in edges:
+        source_package = top_level_package(source)
+        target_package = top_level_package(target)
+        if source_package == EXTERNAL_D2D_MODULE or target_package == EXTERNAL_D2D_MODULE:
+            continue
+        dependencies.setdefault(source_package, set())
+        dependencies.setdefault(target_package, set())
+        if source_package != target_package:
+            dependencies[source_package].add(target_package)
+    return dependencies
+
+
+def find_strongly_connected_components(graph: dict[str, set[str]]) -> list[tuple[str, ...]]:
+    index = 0
+    stack: list[str] = []
+    on_stack: set[str] = set()
+    indexes: dict[str, int] = {}
+    lowlinks: dict[str, int] = {}
+    components: list[tuple[str, ...]] = []
+
+    def connect(node: str) -> None:
+        nonlocal index
+        indexes[node] = index
+        lowlinks[node] = index
+        index += 1
+        stack.append(node)
+        on_stack.add(node)
+
+        for target in sorted(graph[node]):
+            if target not in indexes:
+                connect(target)
+                lowlinks[node] = min(lowlinks[node], lowlinks[target])
+            elif target in on_stack:
+                lowlinks[node] = min(lowlinks[node], indexes[target])
+
+        if lowlinks[node] != indexes[node]:
+            return
+
+        component: list[str] = []
+        while True:
+            member = stack.pop()
+            on_stack.remove(member)
+            component.append(member)
+            if member == node:
+                break
+        components.append(tuple(sorted(component)))
+
+    for node in sorted(graph):
+        if node not in indexes:
+            connect(node)
+    return components
+
+
+def topologically_sort_components(
+    graph: dict[str, set[str]], components: list[tuple[str, ...]]
+) -> list[tuple[str, ...]]:
+    component_by_package = {
+        package: component_index for component_index, component in enumerate(components) for package in component
+    }
+    component_edges: dict[int, set[int]] = {index: set() for index in range(len(components))}
+    indegrees: dict[int, int] = {index: 0 for index in range(len(components))}
+
+    for source, targets in graph.items():
+        source_component = component_by_package[source]
+        for target in targets:
+            target_component = component_by_package[target]
+            if source_component == target_component or target_component in component_edges[source_component]:
+                continue
+            component_edges[source_component].add(target_component)
+            indegrees[target_component] += 1
+
+    ready = sorted((index for index, indegree in indegrees.items() if indegree == 0), key=lambda item: components[item])
+    ordered: list[tuple[str, ...]] = []
+    while ready:
+        component_index = ready.pop(0)
+        ordered.append(components[component_index])
+        for target_component in sorted(component_edges[component_index], key=lambda item: components[item]):
+            indegrees[target_component] -= 1
+            if indegrees[target_component] == 0:
+                ready.append(target_component)
+        ready.sort(key=lambda item: components[item])
+    return ordered
+
+
+def summarize_package_dependency_components(
+    modules: dict[str, Module], edges: dict[tuple[str, str], str]
+) -> list[PackageDependencyComponent]:
+    summaries = summarize_package_loc(modules)
+    graph = collect_package_dependencies(modules, edges)
+    components = topologically_sort_components(graph, find_strongly_connected_components(graph))
+    return [
+        PackageDependencyComponent(
+            packages=component,
+            total_loc=sum(summaries[package].total_loc for package in component),
+        )
+        for component in components
+    ]
 
 
 def format_loc_count(value: int) -> str:
@@ -393,6 +506,15 @@ def print_package_loc_summary(modules: dict[str, Module]) -> None:
         f"(.h {format_loc_count(total.header_loc)} in {total.header_files} file(s), "
         f".cpp {format_loc_count(total.cpp_loc)} in {total.cpp_files} file(s))"
     )
+
+
+def print_package_dependency_components(modules: dict[str, Module], edges: dict[tuple[str, str], str]) -> None:
+    print("Package dependency components in topological order:")
+    for index, component in enumerate(summarize_package_dependency_components(modules, edges), start=1):
+        print(
+            f"  {index}. {format_loc_count(component.total_loc)} LOC: "
+            f"{', '.join(component.packages)}"
+        )
 
 
 def print_large_source_files(files: list[Path]) -> None:
@@ -639,6 +761,7 @@ def main() -> int:
         f"and {private_edges} private dependencies."
     )
     print_package_loc_summary(modules)
+    print_package_dependency_components(modules, edges)
     print_large_source_files(files)
     if args.check:
         violations = check_graph_rules(edges)

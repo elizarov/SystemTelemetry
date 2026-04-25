@@ -139,7 +139,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `lint.cmd` writes the maintained DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
 - Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
-- Graph generation counts physical source lines in each non-vendored `.h` and `.cpp` file, annotates each node with header, implementation, and total LOC, and prints LOC totals for each top-level `src` package plus an overall total. It also prints every non-vendored source file above 1,000 LOC, ordered largest first.
+- Graph generation counts physical source lines in each non-vendored `.h` and `.cpp` file, annotates each node with header, implementation, and total LOC, and prints LOC totals for each top-level `src` package plus an overall total. It also condenses the real source package dependency graph into strongly connected components, prints those components in topological order with their combined LOC and package list, and prints every non-vendored source file above 1,000 LOC, ordered largest first.
 - The graph includes a synthetic `d2d` package for Direct2D, DirectWrite, WIC, and WRL includes so lower core layers can reject accidental graphics-stack coupling.
 - DOT clusters group nodes by their containing source directory, and the optional SVG graph is rendered from the DOT graph with Graphviz `dot` when `tools\source_dependency_graph.py` runs without `--skip-svg`.
 - GraphML nodes include `label`, `directory`, `header_loc`, `cpp_loc`, `total_loc`, and `loc_annotation` data, and GraphML edges include `label` and `kind` data.
