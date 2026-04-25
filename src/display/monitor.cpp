@@ -1,6 +1,5 @@
 #include "display/monitor.h"
 
-#include <algorithm>
 #include <cmath>
 
 #include "display/constants.h"
@@ -47,42 +46,8 @@ UINT GetMonitorDpi(HMONITOR monitor) {
     return kDefaultDpi;
 }
 
-double ScaleFromDpi(UINT dpi) {
-    return static_cast<double>(std::max(kDefaultDpi, dpi)) / static_cast<double>(kDefaultDpi);
-}
-
-bool HasExplicitDisplayScale(double scale) {
-    return std::isfinite(scale) && scale > 0.0;
-}
-
-double ResolveDisplayScale(double configuredScale, UINT dpi) {
-    return HasExplicitDisplayScale(configuredScale) ? configuredScale : ScaleFromDpi(dpi);
-}
-
 double ResolveDisplayScale(const AppConfig& config, UINT dpi) {
     return ResolveDisplayScale(config.display.scale, dpi);
-}
-
-int ScaleLogicalToPhysical(int logicalValue, double scale) {
-    if (logicalValue == 0) {
-        return 0;
-    }
-    return static_cast<int>(std::lround(static_cast<double>(logicalValue) * scale));
-}
-
-int ScaleLogicalToPhysical(int logicalValue, UINT dpi) {
-    return ScaleLogicalToPhysical(logicalValue, ScaleFromDpi(dpi));
-}
-
-int ScalePhysicalToLogical(int physicalValue, double scale) {
-    if (physicalValue == 0) {
-        return 0;
-    }
-    return static_cast<int>(std::lround(static_cast<double>(physicalValue) / scale));
-}
-
-int ScalePhysicalToLogical(int physicalValue, UINT dpi) {
-    return ScalePhysicalToLogical(physicalValue, ScaleFromDpi(dpi));
 }
 
 SIZE ComputeWindowSizeForScale(const AppConfig& config, double scale) {

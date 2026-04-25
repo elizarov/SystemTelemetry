@@ -363,6 +363,38 @@ def check_layout_edit_layer(edges: dict[tuple[str, str], str]) -> list[Violation
     return violations
 
 
+def check_layout_edit_dialog_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+    violations: list[Violation] = []
+    allowed_targets = {
+        "layout_edit_dialog",
+        "config",
+        "dashboard_renderer",
+        "layout_edit",
+        "layout_model",
+        "telemetry",
+        "util",
+        "widget",
+    }
+    for source, target in sorted(edges):
+        if top_level_package(source) != "layout_edit_dialog":
+            continue
+        if top_level_package(target) in allowed_targets:
+            continue
+        violations.append(
+            Violation(
+                kind="layer-layout-edit-dialog",
+                source=source,
+                target=target,
+                message=(
+                    f"{source} is in the layout_edit_dialog layer and must depend only on layout_edit_dialog, config, "
+                    f"dashboard_renderer, layout_edit, layout_model, telemetry, util, or widget modules, "
+                    f"not project module {target}."
+                ),
+            )
+        )
+    return violations
+
+
 def check_dashboard_renderer_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
     violations: list[Violation] = []
     allowed_targets = {"dashboard_renderer", "config", "layout_model", "renderer", "telemetry", "util", "widget"}
@@ -436,6 +468,7 @@ def check_graph_rules(edges: dict[tuple[str, str], str]) -> list[Violation]:
         *check_widget_layer(edges),
         *check_layout_model_layer(edges),
         *check_layout_edit_layer(edges),
+        *check_layout_edit_dialog_layer(edges),
         *check_dashboard_renderer_layer(edges),
         *check_renderer_layer(edges),
         *check_d2d_layer(edges),

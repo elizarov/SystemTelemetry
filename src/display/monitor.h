@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "config/config.h"
+#include "util/scale.h"
 
 struct MonitorPlacementInfo {
     std::string deviceName;
@@ -36,14 +37,7 @@ struct DisplayMenuOption {
 
 bool RectsEqual(const RECT& lhs, const RECT& rhs);
 UINT GetMonitorDpi(HMONITOR monitor);
-double ScaleFromDpi(UINT dpi);
-bool HasExplicitDisplayScale(double scale);
-double ResolveDisplayScale(double configuredScale, UINT dpi);
 double ResolveDisplayScale(const AppConfig& config, UINT dpi);
-int ScaleLogicalToPhysical(int logicalValue, double scale);
-int ScaleLogicalToPhysical(int logicalValue, UINT dpi);
-int ScalePhysicalToLogical(int physicalValue, double scale);
-int ScalePhysicalToLogical(int physicalValue, UINT dpi);
 SIZE ComputeWindowSizeForScale(const AppConfig& config, double scale);
 SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi);
 double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LONG monitorHeight);
