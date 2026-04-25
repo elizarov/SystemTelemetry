@@ -165,11 +165,6 @@ void MetricListWidget::ResolveLayoutState(const WidgetRenderer& renderer, const 
     layoutState_.showAddRowAnchor = false;
     layoutState_.addRowRect = {};
     layoutState_.addRowAnchorRect = {};
-    const int availableRowSlots =
-        layoutState_.rowHeight > 0
-            ? (std::max)(0,
-                  ((std::max)(0, rect.bottom - rect.top) + layoutState_.rowHeight - 1) / layoutState_.rowHeight)
-            : 0;
     RenderRect rowRect{rect.left, rect.top, rect.right, rect.top + layoutState_.rowHeight};
     for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
         layoutState_.rowRects.push_back(rowRect);
@@ -206,7 +201,7 @@ void MetricListWidget::ResolveLayoutState(const WidgetRenderer& renderer, const 
             rowRect.bottom + layoutState_.rowHeight,
         };
     }
-    if (availableRowSlots > layoutState_.visibleRows) {
+    if (rowRect.bottom <= rect.bottom) {
         layoutState_.showAddRowAnchor = true;
         layoutState_.addRowRect = rowRect;
         const int addAnchorSize = (std::max)(layoutState_.reorderAnchorWidth, renderer.ScaleLogical(10));

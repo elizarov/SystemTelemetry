@@ -267,6 +267,7 @@ add_executable(SystemTelemetryTests
     tests/snapshot_dump_tests.cpp
     tests/widget_factory_tests.cpp
     tests/widget_class_tests.cpp
+    tests/metric_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
