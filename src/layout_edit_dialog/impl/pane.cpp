@@ -650,6 +650,14 @@ void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd
     if (state == nullptr || hwnd == nullptr) {
         return;
     }
+    if (state->metricListRowControls.size() == rowCount) {
+        if (state->metricListAddRowButton == nullptr) {
+            state->metricListAddRowButton = CreateMetricListEditorControl(
+                hwnd, WC_BUTTONW, L"Add row", BS_PUSHBUTTON, IDC_LAYOUT_EDIT_METRIC_LIST_ADD_ROW);
+        }
+        return;
+    }
+
     DestroyMetricListOrderEditorControls(state);
 
     state->metricListRowControls.reserve(rowCount);
@@ -764,7 +772,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const int innerTop = groupTop + metrics.groupPadding + groupTopBorderInset;
 
     const LayoutEditEditorKind kind = CurrentLayoutEditEditorKind(state);
-    ShowMetricListOrderEditorControls(state, kind == LayoutEditEditorKind::MetricListOrder);
+    ShowMetricListOrderEditorControls(state, false);
     const bool showBinding = CurrentLayoutEditShowsMetricBinding(state);
     const int singleLineFieldHeight = MeasureSingleLineFieldVisibleHeight(hwnd);
     const int labelColumnWidth = ActiveEditorLabelControls(kind, showBinding).empty()
@@ -1138,6 +1146,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             }
             break;
         case LayoutEditEditorKind::MetricListOrder:
+            ShowMetricListOrderEditorControls(state, true);
             for (const auto& row : state->metricListRowControls) {
                 if (row.combo != nullptr) {
                     SetWindowPos(row.combo, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);

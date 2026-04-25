@@ -141,6 +141,13 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         return;
     }
 
+    std::optional<DialogRedrawScope> redrawScope;
+    if (IsWindowVisible(hwnd) != FALSE) {
+        if (const auto paneRect = LayoutEditRightPaneRect(hwnd); paneRect.has_value()) {
+            redrawScope.emplace(hwnd, *paneRect, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+        }
+    }
+
     state->updatingControls = true;
     SetLayoutEditDescription(hwnd, state->selectedNode);
     if (state->selectedLeaf == nullptr) {
@@ -672,11 +679,7 @@ bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd,
             controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE, state->metricListRowControls.size()) &&
         notificationCode == CBN_SELCHANGE) {
         const std::vector<std::string> metricRefs = ReadMetricListOrderDialogRows(state, hwnd);
-        const bool applied = ApplyMetricListOrderRows(state, hwnd, metricRefs);
-        if (applied) {
-            PopulateLayoutEditSelection(state, hwnd);
-            RefreshLayoutEditValidationState(state, hwnd);
-        }
+        ApplyMetricListOrderRows(state, hwnd, metricRefs);
         return true;
     }
 
