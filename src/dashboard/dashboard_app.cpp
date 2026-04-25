@@ -702,6 +702,11 @@ void DashboardApp::UpdateLayoutEditTooltip() {
         HideLayoutEditTooltip();
         return;
     }
+    if (layoutEditController_.HasActiveDrag()) {
+        TraceLayoutEditUiEvent("layout_edit_tooltip:update_skip", "reason=" + QuoteTraceText("active_drag"));
+        HideLayoutEditTooltip();
+        return;
+    }
 
     POINT screenPoint{};
     if (GetCursorPos(&screenPoint) && ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {

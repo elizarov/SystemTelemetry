@@ -35,7 +35,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.08`
   - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.37` to `2.38` on confirmation reruns, with one direct `240`-iteration run at `2.49`
+  - `drag_loop per_iter_ms=2.36` to `2.38` on confirmation reruns, with one direct `240`-iteration run at `2.49`
   - `snap avg_ms=0.17` to `0.18`
   - `apply avg_ms=0.08`
   - `paint_draw avg_ms=2.11` to `2.13` on confirmation reruns, with one direct `240`-iteration run at `2.23`
@@ -75,6 +75,7 @@ Interpretation:
 - The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.11` to `2.18 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.85` to `1.88 ms` in repaint on this machine.
 - The direct `layout-switch` benchmark is paint-bound on this machine: repaint sits around `2.63` to `2.68 ms` of the `3.53` to `3.59 ms` loop while the dialog refresh work stays around `0.15 ms`.
 - The direct `edit-layout` benchmark remains paint-bound on this tree after the guide-hover priority fix: confirmation reruns land around `drag_loop per_iter_ms=2.37` to `2.38`, `snap avg_ms=0.17` to `0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.11` to `2.13`, so the remaining time sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
+- Suppressing layout-edit tooltip refresh while a drag is active does not regress the direct `edit-layout` benchmark; the post-change `240`-iteration run landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.17`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.11`.
 - The direct `mouse-hover` benchmark is paint-bound on this machine: hover hit testing stays around `0.01 ms` per step while repaint sits around `2.10` to `2.11 ms`, so layout-edit hit testing is not a bottleneck relative to drawing hovered overlays.
 - Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs remain in the established current-tree range.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
