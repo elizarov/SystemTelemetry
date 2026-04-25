@@ -35,25 +35,25 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.08`
   - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.36` to `2.38` on confirmation reruns, with one direct `240`-iteration run at `2.49`
-  - `snap avg_ms=0.17` to `0.18`
+  - `drag_loop per_iter_ms=2.46` to `2.49`
+  - `snap avg_ms=0.18`
   - `apply avg_ms=0.08`
-  - `paint_draw avg_ms=2.11` to `2.13` on confirmation reruns, with one direct `240`-iteration run at `2.23`
+  - `paint_draw avg_ms=2.20` to `2.23`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=3.95` to `4.03`
-  - `telemetry_update avg_ms=2.11` to `2.18`
-  - `paint_total avg_ms=1.85` to `1.88`
-  - `paint_draw avg_ms=1.85` to `1.88`
+  - `update_loop per_iter_ms=4.22`
+  - `telemetry_update avg_ms=2.18`
+  - `paint_total avg_ms=2.04`
+  - `paint_draw avg_ms=2.04`
 - Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=3.53` to `3.59`
-  - `switch_apply avg_ms=0.74` to `0.75`
+  - `switch_loop per_iter_ms=3.60` to `3.66`
+  - `switch_apply avg_ms=0.73` to `0.74`
   - `dialog_refresh avg_ms=0.15`
-  - `switch_paint avg_ms=2.63` to `2.68`
+  - `switch_paint avg_ms=2.72` to `2.76`
 - Current repeatable `mouse-hover` result on the current tree:
-  - `hover_loop per_iter_ms=2.11` to `2.12`
+  - `hover_loop per_iter_ms=2.14`
   - `hover_hit_test avg_ms=0.01`
-  - `paint_total avg_ms=2.10` to `2.11`
-  - `paint_draw avg_ms=2.10` to `2.11`
+  - `paint_total avg_ms=2.13`
+  - `paint_draw avg_ms=2.13`
 
 ## Current Confirmed Hotspots
 
@@ -72,11 +72,11 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.11` to `2.18 ms` in `TelemetryCollector::UpdateSnapshot()` versus `1.85` to `1.88 ms` in repaint on this machine.
-- The direct `layout-switch` benchmark is paint-bound on this machine: repaint sits around `2.63` to `2.68 ms` of the `3.53` to `3.59 ms` loop while the dialog refresh work stays around `0.15 ms`.
-- The direct `edit-layout` benchmark remains paint-bound on this tree after the guide-hover priority fix: confirmation reruns land around `drag_loop per_iter_ms=2.37` to `2.38`, `snap avg_ms=0.17` to `0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.11` to `2.13`, so the remaining time sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.18 ms` in `TelemetryCollector::UpdateSnapshot()` versus `2.04 ms` in repaint on this machine.
+- The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.72` to `2.76 ms` of the `3.60` to `3.66 ms` loop while the dialog refresh work stays around `0.15 ms`.
+- The direct `edit-layout` benchmark remains paint-bound on this tree after restoring incremental renderer style updates: confirmation reruns land around `drag_loop per_iter_ms=2.46` to `2.49`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.23`, so the remaining time sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
 - Suppressing layout-edit tooltip refresh while a drag is active does not regress the direct `edit-layout` benchmark; the post-change `240`-iteration run landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.17`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.11`.
-- The direct `mouse-hover` benchmark is paint-bound on this machine: hover hit testing stays around `0.01 ms` per step while repaint sits around `2.10` to `2.11 ms`, so layout-edit hit testing is not a bottleneck relative to drawing hovered overlays.
+- The direct `mouse-hover` benchmark is paint-bound on this machine: hover hit testing stays around `0.01 ms` per step while repaint sits around `2.13 ms`, so layout-edit hit testing is not a bottleneck relative to drawing hovered overlays.
 - Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs remain in the established current-tree range.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
@@ -95,8 +95,23 @@ These changes produced real wins and remain in the codebase:
 - Remove the legacy renderer GDI fallback path and keep both live repaint and screenshot export on the same Direct2D and DirectWrite scene.
 - Decode embedded panel icons through WIC and scale them with `IWICBitmapScaler` before upload into render-target-local Direct2D bitmaps, so the renderer no longer depends on GDI+ for icon resources.
 - Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
+- Keep renderer style updates incremental so layout-only config changes do not rebuild DirectWrite text formats, palette state, or tinted icon sources during edit-layout drag apply and layout switching.
 
 ## Tested Hypotheses
+
+### Hypothesis: Preserve incremental renderer style updates after the renderer package refactor
+
+- Change:
+  - Restore change detection inside `D2DRenderer::SetStyle` so it initializes Direct2D once, rebuilds palette state only when colors change, reloads tinted icon sources only when icon names or icon color change, and rebuilds DirectWrite text formats only when fonts or render scale change.
+- Result:
+  - Helped materially and fixed a refactor regression.
+- Observed effect:
+  - Before the fix, `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=3.34` to `3.35`, `snap avg_ms=0.18`, `apply avg_ms=0.54`, and `paint_draw avg_ms=2.62` to `2.63`.
+  - Before the fix, `build\SystemTelemetryBenchmarks.exe layout-switch 240 2` reruns landed at `switch_loop per_iter_ms=4.32` to `4.33`, `switch_apply avg_ms=1.18` to `1.19`, `dialog_refresh avg_ms=0.15` to `0.16`, and `switch_paint avg_ms=2.96` to `2.99`.
+  - After the fix, `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=2.46` to `2.49`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.23`.
+  - After the fix, `build\SystemTelemetryBenchmarks.exe layout-switch 240 2` reruns landed at `switch_loop per_iter_ms=3.60` to `3.66`, `switch_apply avg_ms=0.73` to `0.74`, `dialog_refresh avg_ms=0.15`, and `switch_paint avg_ms=2.72` to `2.76`.
+- Conclusion:
+  - Layout-only config updates must keep renderer-owned resources hot. Rebuilding DirectWrite formats and tinted icon sources inside every `SetConfig` call dominates the apply phase and shows up immediately in both edit-layout drag and layout switching.
 
 ### Hypothesis: Caching the embedded layout-edit template materially improves layout switching while the edit dialog is open
 

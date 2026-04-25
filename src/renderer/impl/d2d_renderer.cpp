@@ -208,10 +208,27 @@ D2DRenderer::~D2DRenderer() {
 
 bool D2DRenderer::SetStyle(const RendererStyle& style) {
     lastError_.clear();
-    style_ = style;
-    style_.scale = std::clamp(style_.scale, 0.1, 16.0);
-    palette_.Rebuild(style_.colors);
-    if (!InitializeDirect2D() || !LoadIcons() || !RebuildTextFormatsAndMetrics()) {
+    RendererStyle nextStyle = style;
+    nextStyle.scale = std::clamp(nextStyle.scale, 0.1, 16.0);
+
+    const bool initialized = d2dFactory_ != nullptr && dwriteFactory_ != nullptr;
+    const bool colorsChanged = style_.colors != nextStyle.colors;
+    const bool iconSourcesChanged = !initialized || style_.iconNames != nextStyle.iconNames ||
+                                    style_.colors.iconColor != nextStyle.colors.iconColor;
+    const bool textFormatsChanged =
+        !initialized || style_.fonts != nextStyle.fonts || std::abs(style_.scale - nextStyle.scale) >= 0.0001;
+
+    style_ = std::move(nextStyle);
+    if (!InitializeDirect2D()) {
+        return false;
+    }
+    if (colorsChanged || !initialized) {
+        palette_.Rebuild(style_.colors);
+    }
+    if (iconSourcesChanged && !LoadIcons()) {
+        return false;
+    }
+    if (textFormatsChanged && !RebuildTextFormatsAndMetrics()) {
         return false;
     }
     return true;
