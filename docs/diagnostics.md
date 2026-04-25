@@ -77,8 +77,8 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - The dump contains only the runtime snapshot model that the dashboard renders and that `/fake` reloads.
 - The dump includes retained histories, configured drive rows, and local date and time down to milliseconds.
 - Retained histories store raw sampled values in native runtime units.
-- The current dump format version is `system_telemetry_snapshot_v8`.
-- Dump scalar-unit fields use only the canonical dump tokens: the empty string plus `C`, `GHz`, `MHz`, and `RPM`.
+- The current dump format version is `system_telemetry_snapshot_v9`.
+- Dump scalar-unit fields use only the canonical dump tokens: the empty string plus `C`, `GHz`, `MHz`, `FPS`, and `RPM`.
 - Provider-specific diagnostics and trace-only debug details do not appear in the dump schema.
 
 ## Single-Instance Interaction

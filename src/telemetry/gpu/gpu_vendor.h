@@ -12,6 +12,7 @@ struct GpuVendorTelemetrySample {
     std::optional<double> temperatureC;
     std::optional<double> coreClockMhz;
     std::optional<double> fanRpm;
+    std::optional<double> fps;
     std::optional<double> usedVramGb;
     std::optional<double> totalVramGb;
     std::string providerName = "None";

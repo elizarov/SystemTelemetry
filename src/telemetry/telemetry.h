@@ -59,6 +59,7 @@ struct GpuTelemetry {
     ScalarMetric temperature{std::nullopt, ScalarMetricUnit::Celsius};
     ScalarMetric clock{std::nullopt, ScalarMetricUnit::Megahertz};
     ScalarMetric fan{std::nullopt, ScalarMetricUnit::Rpm};
+    ScalarMetric fps{std::nullopt, ScalarMetricUnit::Fps};
     MemoryMetric vram;
 };
 

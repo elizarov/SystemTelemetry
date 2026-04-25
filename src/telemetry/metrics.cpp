@@ -456,6 +456,16 @@ MetricValue ResolveGpuFanMetric(const SystemSnapshot& snapshot,
         snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.gpu.fan.value), ratio);
 }
 
+MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    std::string_view) {
+    const double value = FiniteNonNegativeOr(snapshot.gpu.fps.value.value_or(0.0));
+    const double ratio = ResolveMetricRatio(definition, value);
+    return BuildResolvedMetric(
+        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.gpu.fps.value), ratio);
+}
+
 MetricValue ResolveGpuMemoryMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
@@ -523,6 +533,7 @@ const MetricBinding kExactBindings[] = {
     MetricBinding::ExactValue("gpu.temp", MetricDisplayStyle::Scalar, &ResolveGpuTemperatureMetric),
     MetricBinding::ExactValue("gpu.clock", MetricDisplayStyle::Scalar, &ResolveGpuClockMetric),
     MetricBinding::ExactValue("gpu.fan", MetricDisplayStyle::Scalar, &ResolveGpuFanMetric),
+    MetricBinding::ExactValue("gpu.fps", MetricDisplayStyle::Scalar, &ResolveGpuFpsMetric),
     MetricBinding::ExactValue("gpu.vram", MetricDisplayStyle::Memory, &ResolveGpuMemoryMetric),
     MetricBinding::ExactThroughput(
         "network.upload", &ResolveNetworkUploadValue, ThroughputGraphGroup::Network, &ResolveFiveMbpsGuideStep),

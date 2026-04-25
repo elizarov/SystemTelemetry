@@ -23,6 +23,8 @@ MetricsSectionConfig BuildMetricsConfig() {
     metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.fan", MetricDisplayStyle::Scalar, false, 3000.0, "RPM", "Fan"});
     metrics.definitions.push_back(
+        MetricDefinitionConfig{"gpu.fps", MetricDisplayStyle::Scalar, false, 240.0, "FPS", "FPS"});
+    metrics.definitions.push_back(
         MetricDefinitionConfig{"cpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"});
     metrics.definitions.push_back(
         MetricDefinitionConfig{"cpu.clock", MetricDisplayStyle::Scalar, false, 5.0, "GHz", "Clock"});
@@ -128,10 +130,12 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     snapshot.cpu.loadPercent = 63.0;
     snapshot.cpu.clock = ScalarMetric{4.25, ScalarMetricUnit::Gigahertz};
     snapshot.cpu.memory = MemoryMetric{18.5, 32.0};
+    snapshot.gpu.fps = ScalarMetric{144.0, ScalarMetricUnit::Fps};
     snapshot.gpu.vram = MemoryMetric{8.4, 16.0};
 
     AddHistorySeries(snapshot, "cpu.load", {20.0, 91.0, 63.0});
     AddHistorySeries(snapshot, "cpu.ram", {3.2, 9.6, 18.5});
+    AddHistorySeries(snapshot, "gpu.fps", {72.0, 144.0, 120.0});
     AddHistorySeries(snapshot, "gpu.vram", {3.2, 8.32, 6.4});
 
     MetricSource source(snapshot, metrics);
@@ -153,10 +157,17 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     EXPECT_EQ(vram.valueText, "8.4 / 16 GB");
     EXPECT_DOUBLE_EQ(vram.ratio, 8.4 / 16.0);
 
-    const std::vector<MetricValue>& metricList = source.ResolveMetricList({"cpu.load", "gpu.vram"});
-    ASSERT_EQ(metricList.size(), 2u);
+    const MetricValue& fps = source.ResolveMetric("gpu.fps");
+    EXPECT_EQ(fps.label, "FPS");
+    EXPECT_EQ(fps.valueText, "144 FPS");
+    EXPECT_DOUBLE_EQ(fps.ratio, 0.6);
+    EXPECT_DOUBLE_EQ(fps.peakRatio, 0.6);
+
+    const std::vector<MetricValue>& metricList = source.ResolveMetricList({"cpu.load", "gpu.vram", "gpu.fps"});
+    ASSERT_EQ(metricList.size(), 3u);
     EXPECT_EQ(metricList[0].label, "Load");
     EXPECT_EQ(metricList[1].label, "VRAM");
+    EXPECT_EQ(metricList[2].label, "FPS");
 }
 
 TEST(Metrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {

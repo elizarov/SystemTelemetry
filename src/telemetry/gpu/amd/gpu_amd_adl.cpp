@@ -251,6 +251,30 @@ public:
             }
         }
 
+        IADLXFPSPtr fpsMetric;
+        trace().Write("amd_adlx:get_fps_begin");
+        const ADLX_RESULT fpsMetricResult = performanceMonitoring_->GetCurrentFPS(&fpsMetric);
+        trace().WriteLazy([&] {
+            return "amd_adlx:get_fps_metric_done result=" + AdlxResultCodeString(fpsMetricResult) +
+                   " available=" + Trace::BoolText(fpsMetric != nullptr);
+        });
+        if (ADLX_SUCCEEDED(fpsMetricResult) && fpsMetric) {
+            adlx_int fps = 0;
+            const ADLX_RESULT fpsResult = fpsMetric->FPS(&fps);
+            trace().WriteLazy([&] {
+                char buffer[128];
+                sprintf_s(buffer,
+                    "amd_adlx:get_fps_done result=%d value=%d",
+                    static_cast<int>(fpsResult),
+                    static_cast<int>(fps));
+                return std::string(buffer);
+            });
+            if (ADLX_SUCCEEDED(fpsResult) && fps >= 0) {
+                sample.fps = static_cast<double>(fps);
+                hasAnyMetric = true;
+            }
+        }
+
         sample.available = hasAnyMetric;
         trace().WriteLazy([&] {
             return "amd_adlx:sample_done available=" + Trace::BoolText(sample.available) + " diagnostics=\"" +

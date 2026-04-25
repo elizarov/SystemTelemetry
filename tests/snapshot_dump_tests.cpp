@@ -21,6 +21,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     dump.snapshot.gpu.temperature = ScalarMetric{68.0, ScalarMetricUnit::Celsius};
     dump.snapshot.gpu.clock = ScalarMetric{2450.0, ScalarMetricUnit::Megahertz};
     dump.snapshot.gpu.fan = ScalarMetric{1500.0, ScalarMetricUnit::Rpm};
+    dump.snapshot.gpu.fps = ScalarMetric{144.0, ScalarMetricUnit::Fps};
     dump.snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
     dump.snapshot.boardFans.push_back({"system", ScalarMetric{900.0, ScalarMetricUnit::Rpm}});
 
@@ -32,6 +33,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     EXPECT_NE(text.find("gpu.temperature.unit=\"C\""), std::string::npos);
     EXPECT_NE(text.find("gpu.clock.unit=\"MHz\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fan.unit=\"RPM\""), std::string::npos);
+    EXPECT_NE(text.find("gpu.fps.unit=\"FPS\""), std::string::npos);
 
     std::istringstream input(text);
     TelemetryDump loaded;
@@ -41,6 +43,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     EXPECT_EQ(loaded.snapshot.gpu.temperature.unit, ScalarMetricUnit::Celsius);
     EXPECT_EQ(loaded.snapshot.gpu.clock.unit, ScalarMetricUnit::Megahertz);
     EXPECT_EQ(loaded.snapshot.gpu.fan.unit, ScalarMetricUnit::Rpm);
+    EXPECT_EQ(loaded.snapshot.gpu.fps.unit, ScalarMetricUnit::Fps);
     ASSERT_EQ(loaded.snapshot.boardTemperatures.size(), 1u);
     ASSERT_EQ(loaded.snapshot.boardFans.size(), 1u);
     EXPECT_EQ(loaded.snapshot.boardTemperatures[0].metric.unit, ScalarMetricUnit::Celsius);
@@ -48,7 +51,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
 }
 
 TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {
-    std::istringstream input("format=system_telemetry_snapshot_v8\n"
+    std::istringstream input("format=system_telemetry_snapshot_v9\n"
                              "cpu.name=\"CPU\"\n"
                              "cpu.load_percent=0\n"
                              "cpu.clock.value=null\n"
@@ -69,6 +72,8 @@ TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {
                              "gpu.clock.unit=\"MHz\"\n"
                              "gpu.fan.value=null\n"
                              "gpu.fan.unit=\"RPM\"\n"
+                             "gpu.fps.value=null\n"
+                             "gpu.fps.unit=\"FPS\"\n"
                              "gpu.vram.used_gb=0\n"
                              "gpu.vram.total_gb=0\n"
                              "network.adapter_name=\"Auto\"\n"
@@ -111,7 +116,7 @@ TEST(SnapshotDump, RoundTripsRawRetainedHistorySamples) {
 }
 
 TEST(SnapshotDump, RejectsPreviousNormalizedHistoryFormatVersion) {
-    std::istringstream input("format=system_telemetry_snapshot_v7\n");
+    std::istringstream input("format=system_telemetry_snapshot_v8\n");
 
     TelemetryDump loaded;
     std::string error;

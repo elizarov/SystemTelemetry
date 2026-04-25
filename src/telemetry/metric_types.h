@@ -10,6 +10,7 @@
     X(Celsius, "C")                                                                                                    \
     X(Gigahertz, "GHz")                                                                                                \
     X(Megahertz, "MHz")                                                                                                \
+    X(Fps, "FPS")                                                                                                      \
     X(Rpm, "RPM")
 
 ENUM_STRING_DECLARE(ScalarMetricUnit, SYSTEM_TELEMETRY_SCALAR_METRIC_UNIT_ITEMS);

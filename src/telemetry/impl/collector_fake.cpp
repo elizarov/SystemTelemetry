@@ -185,6 +185,7 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     const std::vector<double> gpuTemp = BuildSyntheticHistory(tick, 62.0, 4.5, 9.0, 1.8, 14.0);
     const std::vector<double> gpuClock = BuildSyntheticHistory(tick, 2085.0, 155.0, 6.3, 65.0, 11.0);
     const std::vector<double> gpuFan = BuildSyntheticHistory(tick, 1325.0, 170.0, 7.4, 60.0, 13.0);
+    const std::vector<double> gpuFps = BuildSyntheticHistory(tick, 118.0, 21.0, 6.6, 9.0, 12.5);
     const std::vector<double> gpuVram = BuildSyntheticHistory(tick, 5.9, 1.1, 8.0, 0.5, 15.0);
     const std::vector<double> boardTempCpu = BuildSyntheticHistory(tick, 65.0, 5.0, 7.0, 2.0, 12.0);
     const std::vector<double> boardFanCpu = BuildSyntheticHistory(tick, 1380.0, 180.0, 6.8, 70.0, 11.0);
@@ -208,6 +209,7 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     snapshot.gpu.temperature = ScalarMetric{LastHistorySample(gpuTemp), ScalarMetricUnit::Celsius};
     snapshot.gpu.clock = ScalarMetric{LastHistorySample(gpuClock), ScalarMetricUnit::Megahertz};
     snapshot.gpu.fan = ScalarMetric{LastHistorySample(gpuFan), ScalarMetricUnit::Rpm};
+    snapshot.gpu.fps = ScalarMetric{LastHistorySample(gpuFps), ScalarMetricUnit::Fps};
     snapshot.gpu.vram = MemoryMetric{LastHistorySample(gpuVram), 15.984375};
 
     snapshot.boardTemperatures.push_back(
@@ -235,6 +237,7 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     AddSyntheticHistory(snapshot, "gpu.temp", gpuTemp);
     AddSyntheticHistory(snapshot, "gpu.clock", gpuClock);
     AddSyntheticHistory(snapshot, "gpu.fan", gpuFan);
+    AddSyntheticHistory(snapshot, "gpu.fps", gpuFps);
     AddSyntheticHistory(snapshot, "gpu.vram", gpuVram);
     AddSyntheticHistory(snapshot, "board.temp.cpu", boardTempCpu);
     AddSyntheticHistory(snapshot, "board.fan.cpu", boardFanCpu);

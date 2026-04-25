@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v8";
+constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v9";
 
 std::string TrimDumpWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");
@@ -441,6 +441,8 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteScalarMetricUnit(output, "gpu.clock.unit", dump.snapshot.gpu.clock.unit);
     WriteOptionalDouble(output, "gpu.fan.value", dump.snapshot.gpu.fan.value, 6);
     WriteScalarMetricUnit(output, "gpu.fan.unit", dump.snapshot.gpu.fan.unit);
+    WriteOptionalDouble(output, "gpu.fps.value", dump.snapshot.gpu.fps.value, 6);
+    WriteScalarMetricUnit(output, "gpu.fps.unit", dump.snapshot.gpu.fps.unit);
     WriteDouble(output, "gpu.vram.used_gb", dump.snapshot.gpu.vram.usedGb, 6);
     WriteDouble(output, "gpu.vram.total_gb", dump.snapshot.gpu.vram.totalGb, 6);
 
@@ -522,6 +524,8 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
         !LoadScalarMetricUnit(values, "gpu.clock.unit", parsed.snapshot.gpu.clock.unit, error) ||
         !LoadOptionalDouble(values, "gpu.fan.value", parsed.snapshot.gpu.fan.value, error) ||
         !LoadScalarMetricUnit(values, "gpu.fan.unit", parsed.snapshot.gpu.fan.unit, error) ||
+        !LoadOptionalDouble(values, "gpu.fps.value", parsed.snapshot.gpu.fps.value, error) ||
+        !LoadScalarMetricUnit(values, "gpu.fps.unit", parsed.snapshot.gpu.fps.unit, error) ||
         !LoadDouble(values, "gpu.vram.used_gb", parsed.snapshot.gpu.vram.usedGb, error) ||
         !LoadDouble(values, "gpu.vram.total_gb", parsed.snapshot.gpu.vram.totalGb, error) ||
         !LoadString(values, "network.adapter_name", parsed.snapshot.network.adapterName, error) ||

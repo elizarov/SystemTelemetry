@@ -89,6 +89,8 @@ void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTel
     state.snapshot_.gpu.clock.unit = ScalarMetricUnit::Megahertz;
     state.snapshot_.gpu.fan.value = FiniteOptional(sample.fanRpm);
     state.snapshot_.gpu.fan.unit = ScalarMetricUnit::Rpm;
+    state.snapshot_.gpu.fps.value = FiniteOptional(sample.fps);
+    state.snapshot_.gpu.fps.unit = ScalarMetricUnit::Fps;
     if (sample.usedVramGb.has_value()) {
         state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(*sample.usedVramGb);
     }
@@ -258,5 +260,6 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
         state.snapshot_, "gpu.temp", state.snapshot_.gpu.temperature.value.value_or(0.0));
     state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.clock", state.snapshot_.gpu.clock.value.value_or(0.0));
     state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.fan", state.snapshot_.gpu.fan.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.fps", state.snapshot_.gpu.fps.value.value_or(0.0));
     state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.vram", state.snapshot_.gpu.vram.usedGb);
 }

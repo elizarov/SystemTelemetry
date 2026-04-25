@@ -92,7 +92,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 ## Telemetry And Content Behavior
 
 - CPU content includes model name, load, clock, RAM usage, and any requested board temperature or fan metrics that resolve successfully through the active board provider.
-- GPU content includes model name, load, dedicated VRAM usage, total dedicated VRAM capacity, and AMD vendor metrics such as temperature, clock, and fan speed when available.
+- GPU content includes model name, load, dedicated VRAM usage, total dedicated VRAM capacity, and AMD vendor metrics such as temperature, clock, fan speed, and game FPS when available.
 - If a vendor provider is unavailable or unsupported, the dashboard stays running and shows those provider-owned values as unavailable instead of failing the app.
 - Network content shows current upload and download throughput plus a footer line with the selected adapter name and IPv4 address when available.
 - Storage throughput uses system-wide disk I/O counters, while per-drive rows use the currently selected drive set.
