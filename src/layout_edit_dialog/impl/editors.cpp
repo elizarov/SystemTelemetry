@@ -143,9 +143,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
 
     std::optional<DialogRedrawScope> redrawScope;
     if (IsWindowVisible(hwnd) != FALSE) {
-        if (const auto paneRect = LayoutEditRightPaneRect(hwnd); paneRect.has_value()) {
-            redrawScope.emplace(hwnd, *paneRect, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
-        }
+        redrawScope.emplace(hwnd, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
     }
 
     state->updatingControls = true;
