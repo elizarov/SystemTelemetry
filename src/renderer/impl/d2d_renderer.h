@@ -19,18 +19,15 @@
 #include "renderer/impl/text_width_cache.h"
 #include "renderer/renderer.h"
 
-class Trace;
-
 class D2DRenderer final : public Renderer {
 public:
-    explicit D2DRenderer(Trace& trace);
+    D2DRenderer();
     ~D2DRenderer() override;
 
     bool SetStyle(const RendererStyle& style) override;
     void AttachWindow(HWND hwnd) override;
     void Shutdown() override;
     void SetImmediatePresent(bool enabled) override;
-    void SetTraceSuppressed(bool suppressed) override;
     void DiscardWindowTarget(std::string_view reason = {}) override;
     bool DrawWindow(int width, int height, const DrawCallback& draw) override;
     bool DrawOffscreen(int width, int height, const DrawCallback& draw) override;
@@ -100,9 +97,7 @@ private:
     bool FillD2DGeometry(ID2D1Geometry* geometry, RenderColorId color);
     bool DrawD2DGeometry(ID2D1Geometry* geometry, const RenderStroke& stroke);
     bool IsDrawActive() const;
-    void WriteTrace(const std::string& text) const;
 
-    Trace& trace_;
     RendererStyle style_{};
     std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>> icons_;
     std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
@@ -123,5 +118,4 @@ private:
     bool wicComInitialized_ = false;
     int d2dClipDepth_ = 0;
     std::vector<D2D1_MATRIX_3X2_F> d2dTransformStack_;
-    bool traceSuppressed_ = false;
 };

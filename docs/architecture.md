@@ -13,8 +13,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/widget/widget.*` owns the widget interface plus the enum-backed and special widget factories, `src/widget/widget_host.h` owns the widget-facing host boundary, `src/widget/card_chrome_layout.*` owns shared card-chrome layout geometry, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the dashboard renderer.
 - `src/util/` contains pure shared utilities for paths, command-line text, string trimming, splitting, case folding, whitespace normalization, enum string conversion, UTF-8 conversion, embedded resource loading, localization catalog access, numeric safety, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
-- `src/renderer/` owns render-space contract types, the `Renderer` drawing interface, renderer style resources, render-target lifecycle, and the Direct2D/DirectWrite/WIC implementation under `src/renderer/impl/`.
-- `src/dashboard_renderer/dashboard_renderer.*` owns dashboard scene traversal, layout resolution, renderer style input selection, hit testing, and widget-host services. It implements `WidgetHost`, owns a `Renderer` instance, and keeps graphics-backend details encapsulated in `src/renderer/`.
+- `src/renderer/` owns render-space contract types, the `Renderer` drawing interface, renderer style resources, render-target lifecycle, and the Direct2D/DirectWrite/WIC implementation under `src/renderer/impl/`. It does not own dashboard drawing modes, overlay policy, or trace emission.
+- `src/dashboard_renderer/dashboard_renderer.*` owns dashboard scene traversal, layout resolution, renderer style input selection, hit testing, drawing-mode state, and widget-host services. It implements `WidgetHost`, owns a `Renderer` instance, and keeps graphics-backend details encapsulated in `src/renderer/`.
 - `src/layout_edit/` contains shared layout-edit interaction, edit-artifact helpers, parameter metadata, hit-priority policy, tooltip, tree, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
 - `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
@@ -63,10 +63,10 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Rendering and layout resolution
 
-- `Renderer` owns renderer style resources, icon loading, text measurement, live HWND rendering, screenshot export rendering, and primitive drawing such as text, rectangles, rounded rectangles, ellipses, lines, arcs, polylines, filled paths, clips, and translations.
-- `DashboardRenderer` owns static layout resolution, renderer style input selection, resolved scene traversal, layout-edit hit data, and widget-host services.
+- `Renderer` owns renderer style resources, icon loading, text measurement, live HWND rendering, screenshot export rendering, and primitive drawing such as text, rectangles, rounded rectangles, ellipses, lines, arcs, polylines, filled paths, clips, and translations. It stays independent of application trace sinks and dashboard-specific drawing modes.
+- `DashboardRenderer` owns static layout resolution, renderer style input selection, resolved scene traversal, layout-edit hit data, drawing-mode state, and widget-host services.
 - `DashboardLayoutResolver` owns resolved dashboard, card, widget, guide, anchor, and dynamic edit-artifact geometry inside the dashboard-renderer package.
-- `DashboardLayoutEditOverlayRenderer` owns layout-edit overlay presentation inside the dashboard-renderer package, including selected and hovered highlights, layout and widget guides, gap anchors, size similarity indicators, dotted outlines, and dragged container-child replay.
+- `DashboardLayoutEditOverlayRenderer` owns layout-edit overlay presentation inside the dashboard-renderer package, including selected and hovered highlights, layout and widget guides, gap anchors, size similarity indicator policy, dotted outlines, and dragged container-child replay.
 - Shared renderer-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
 - `WidgetHost` is the widget-facing host interface consumed by widgets; it exposes config, render mode, edit-artifact registration, metric lookup, metric-list reorder state, and a `Renderer` reference. Widgets call drawing and text operations through that renderer reference.
 - Widget draw modules refer to colors by render color id; the renderer keeps the resolved RGBA palette private and maps ids to colors internally.
@@ -78,7 +78,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `LayoutEditController` owns hover state, active drags, hit-testing, capture, cursor choice, and drag-session flow.
 - Layout-edit helpers own edit-artifact matching, focus and selection resolution, anchor subject extraction, and tooltip-payload interpretation. Layout-edit parameter metadata centralizes editable config-field mapping, display names, current-value lookup, and preview application; separate hit-priority helpers own edit-artifact ordering policy.
 - `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/impl/`.
-- The renderer exposes the resolved guide and anchor geometry used both by live interaction and by diagnostics screenshot validation.
+- The dashboard renderer exposes the resolved guide and anchor geometry used both by live interaction and by diagnostics screenshot validation.
 
 ### Diagnostics
 

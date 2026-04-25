@@ -179,7 +179,7 @@ RenderRect TextAnchorRectForShape(const DashboardRenderer& renderer, const Rende
 }  // namespace
 
 DashboardRenderer::DashboardRenderer(Trace& trace)
-    : trace_(trace), renderer_(CreateRenderer(trace)), layoutResolver_(std::make_unique<DashboardLayoutResolver>()),
+    : trace_(trace), renderer_(CreateRenderer()), layoutResolver_(std::make_unique<DashboardLayoutResolver>()),
       layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)) {}
 
 DashboardRenderer::~DashboardRenderer() {
@@ -226,7 +226,6 @@ void DashboardRenderer::SetLayoutGuideDragActive(bool active) {
 
 void DashboardRenderer::SetInteractiveDragTraceActive(bool active) {
     interactiveDragTraceActive_ = active;
-    renderer_->SetTraceSuppressed(active);
 }
 
 void DashboardRenderer::RebuildEditArtifacts() {

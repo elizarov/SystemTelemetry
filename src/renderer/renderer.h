@@ -13,13 +13,6 @@
 #include "config/config.h"
 #include "renderer/render_types.h"
 
-class Trace;
-
-enum class RenderMode {
-    Normal,
-    Blank,
-};
-
 struct TextStyleMetrics {
     int title = 0;
     int big = 0;
@@ -53,7 +46,6 @@ public:
     virtual void AttachWindow(HWND hwnd) = 0;
     virtual void Shutdown() = 0;
     virtual void SetImmediatePresent(bool enabled) = 0;
-    virtual void SetTraceSuppressed(bool suppressed) = 0;
     virtual void DiscardWindowTarget(std::string_view reason = {}) = 0;
     virtual bool DrawWindow(int width, int height, const DrawCallback& draw) = 0;
     virtual bool DrawOffscreen(int width, int height, const DrawCallback& draw) = 0;
@@ -94,4 +86,4 @@ public:
     virtual bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) = 0;
 };
 
-std::unique_ptr<Renderer> CreateRenderer(Trace& trace);
+std::unique_ptr<Renderer> CreateRenderer();

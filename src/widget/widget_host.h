@@ -12,6 +12,11 @@
 struct WidgetLayout;
 struct MetricDefinitionConfig;
 
+enum class RenderMode {
+    Normal,
+    Blank,
+};
+
 class WidgetHost {
 public:
     using LayoutEditParameter = ::LayoutEditParameter;

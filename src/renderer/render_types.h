@@ -17,15 +17,10 @@ struct RenderRect {
     int bottom = 0;
 
     int Width() const;
-
     int Height() const;
-
     bool IsEmpty() const;
-
     bool Contains(RenderPoint point) const;
-
     RenderRect Inflate(int dx, int dy) const;
-
     RenderPoint Center() const;
 };
 
@@ -52,19 +47,12 @@ enum class StrokePattern {
     Dotted,
 };
 
-enum class LayoutSimilarityIndicatorMode {
-    ActiveGuide,
-    AllHorizontal,
-    AllVertical,
-};
-
 struct RenderStroke {
     RenderColorId color = RenderColorId::Foreground;
     float width = 1.0f;
     StrokePattern pattern = StrokePattern::Solid;
 
     static RenderStroke Solid(RenderColorId color, float width = 1.0f);
-
     static RenderStroke Dotted(RenderColorId color, float width = 1.0f);
 };
 
@@ -99,15 +87,10 @@ struct RenderPathCommand {
 
 struct RenderPath {
     bool IsEmpty() const;
-
     std::span<const RenderPathCommand> Commands() const;
-
     void MoveTo(RenderPoint point);
-
     void LineTo(RenderPoint point);
-
     void ArcTo(RenderPoint center, int radiusX, int radiusY, double startAngleDegrees, double sweepAngleDegrees);
-
     void Close();
 
 private:
@@ -155,7 +138,6 @@ struct TextLayoutOptions {
         TextVerticalAlign vertical = TextVerticalAlign::Center,
         bool clip = true,
         bool ellipsis = false);
-
     static TextLayoutOptions Wrapped(TextHorizontalAlign horizontal = TextHorizontalAlign::Leading,
         TextVerticalAlign vertical = TextVerticalAlign::Top,
         bool clip = true,

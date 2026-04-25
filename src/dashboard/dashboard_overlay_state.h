@@ -6,6 +6,12 @@
 #include "renderer/render_types.h"
 #include "widget/layout_edit_types.h"
 
+enum class LayoutSimilarityIndicatorMode {
+    ActiveGuide,
+    AllHorizontal,
+    AllVertical,
+};
+
 struct DashboardMoveOverlayState {
     bool visible = false;
     std::string monitorName;

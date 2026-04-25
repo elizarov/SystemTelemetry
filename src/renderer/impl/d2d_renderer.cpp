@@ -9,7 +9,6 @@
 #include "renderer/impl/d2d_render_conversions.h"
 #include "resource.h"
 #include "util/strings.h"
-#include "util/trace.h"
 #include "util/utf8.h"
 
 namespace {
@@ -201,7 +200,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
 
 }  // namespace
 
-D2DRenderer::D2DRenderer(Trace& trace) : trace_(trace), palette_(style_.colors) {}
+D2DRenderer::D2DRenderer() : palette_(style_.colors) {}
 
 D2DRenderer::~D2DRenderer() {
     Shutdown();
@@ -242,10 +241,6 @@ void D2DRenderer::SetImmediatePresent(bool enabled) {
     }
     d2dImmediatePresent_ = enabled;
     DiscardWindowTarget("present_mode_change");
-}
-
-void D2DRenderer::SetTraceSuppressed(bool suppressed) {
-    traceSuppressed_ = suppressed;
 }
 
 const std::string& D2DRenderer::LastError() const {
@@ -702,9 +697,7 @@ void D2DRenderer::EndWindowDraw() {
 }
 
 void D2DRenderer::DiscardWindowTarget(std::string_view reason) {
-    if (!reason.empty()) {
-        WriteTrace("renderer:d2d_window_target_discard reason=\"" + std::string(reason) + "\"");
-    }
+    (void)reason;
     d2dClipDepth_ = 0;
     if (d2dActiveRenderTarget_ == d2dWindowRenderTarget_.Get()) {
         d2dActiveRenderTarget_ = nullptr;
@@ -1165,13 +1158,6 @@ bool D2DRenderer::LoadIcons() {
 void D2DRenderer::ReleaseIcons() {
     d2dCache_.ClearIconBitmaps();
     icons_.clear();
-}
-
-void D2DRenderer::WriteTrace(const std::string& text) const {
-    if (traceSuppressed_ && text.rfind("renderer:", 0) == 0) {
-        return;
-    }
-    trace_.Write(text);
 }
 
 bool D2DRenderer::RebuildTextFormatsAndMetrics() {

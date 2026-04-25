@@ -44,8 +44,6 @@ public:
 
     void SetImmediatePresent(bool) override {}
 
-    void SetTraceSuppressed(bool) override {}
-
     void DiscardWindowTarget(std::string_view = {}) override {}
 
     bool DrawWindow(int, int, const DrawCallback& draw) override {
