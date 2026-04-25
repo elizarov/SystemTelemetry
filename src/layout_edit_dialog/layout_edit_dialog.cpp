@@ -344,6 +344,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
         auto* state = reinterpret_cast<LayoutEditDialogState*>(lParam);
         SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
         SetWindowTextW(hwnd, L"Edit Configuration");
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_COMPOSITED);
         state->dialog->UpdateSelectionHighlight(std::nullopt);
         ConfigureColorSliders(hwnd);
         ConfigureDialogFonts(state, hwnd);

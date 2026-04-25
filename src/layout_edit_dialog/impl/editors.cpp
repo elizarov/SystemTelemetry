@@ -141,11 +141,6 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         return;
     }
 
-    std::optional<DialogRedrawScope> redrawScope;
-    if (IsWindowVisible(hwnd) != FALSE) {
-        redrawScope.emplace(hwnd, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_UPDATENOW);
-    }
-
     state->updatingControls = true;
     SetLayoutEditDescription(hwnd, state->selectedNode);
     if (state->selectedLeaf == nullptr) {
