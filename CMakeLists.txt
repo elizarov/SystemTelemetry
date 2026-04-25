@@ -129,6 +129,7 @@ add_executable(SystemTelemetry WIN32
     src/widget/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
     src/dashboard_renderer/impl/d2d_render_conversions.cpp
+    src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/palette.cpp
     src/dashboard_renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
@@ -393,6 +394,7 @@ add_executable(SystemTelemetryBenchmarks
     src/widget/render_types.cpp
     src/dashboard_renderer/impl/d2d_cache.cpp
     src/dashboard_renderer/impl/d2d_render_conversions.cpp
+    src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/palette.cpp
     src/dashboard_renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp

@@ -26,6 +26,7 @@
 #include "widget/widget_renderer.h"
 
 class DashboardLayoutResolver;
+class DashboardLayoutEditOverlayRenderer;
 class DashboardD2DCache;
 class DashboardPalette;
 class DashboardTextWidthCache;
@@ -173,30 +174,10 @@ public:
 
 private:
     friend class DashboardLayoutResolver;
+    friend class DashboardLayoutEditOverlayRenderer;
 
-    struct SimilarityIndicator {
-        LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
-        RenderRect rect{};
-        int exactTypeOrdinal = 0;
-    };
-
-    void DrawHoveredWidgetHighlight(const DashboardOverlayState& overlayState) const;
-    void DrawHoveredEditableAnchorHighlight(const DashboardOverlayState& overlayState) const;
-    void DrawSelectedColorEditHighlights(const DashboardOverlayState& overlayState) const;
-    void DrawSelectedTreeNodeHighlight(const DashboardOverlayState& overlayState) const;
-    void DrawLayoutEditGuides(const DashboardOverlayState& overlayState) const;
-    void DrawWidgetEditGuides(const DashboardOverlayState& overlayState) const;
-    void DrawGapEditAnchors(const DashboardOverlayState& overlayState) const;
-    std::optional<RenderRect> FindHoveredWidgetOutlineRect(const DashboardOverlayState& overlayState) const;
-    void DrawDottedHighlightRect(const RenderRect& rect, RenderColorId color, bool active, bool outside = true) const;
-    void DrawLayoutSimilarityIndicators(const DashboardOverlayState& overlayState) const;
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
-    std::optional<RenderPoint> ContainerChildReorderOffsetForRect(const RenderRect& rect) const;
-    RenderRect ApplyContainerChildReorderOffset(const RenderRect& rect) const;
-    RenderPoint ApplyContainerChildReorderOffset(RenderPoint point, const RenderRect& sourceRect) const;
-    bool ShouldSkipForContainerChildReorder(const RenderRect& rect) const;
-    void DrawContainerChildReorderOverlay(const MetricSource& metrics);
     bool UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
@@ -293,6 +274,7 @@ private:
     TextStyleMetrics textStyleMetrics_{};
     std::unique_ptr<DashboardPalette> palette_;
     std::unique_ptr<DashboardLayoutResolver> layoutResolver_;
+    std::unique_ptr<DashboardLayoutEditOverlayRenderer> layoutEditOverlayRenderer_;
     std::unique_ptr<DashboardD2DCache> d2dCache_;
     std::unique_ptr<DashboardTextWidthCache> textWidthCache_;
     std::unique_ptr<MetricSource> cachedMetricSource_;

@@ -13,6 +13,7 @@
 #include "widget/widget.h"
 
 class DashboardRenderer;
+class DashboardLayoutEditOverlayRenderer;
 
 class DashboardLayoutResolver {
 public:
@@ -84,6 +85,7 @@ public:
 
 private:
     friend class DashboardRenderer;
+    friend class DashboardLayoutEditOverlayRenderer;
 
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
