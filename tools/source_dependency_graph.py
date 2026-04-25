@@ -25,6 +25,7 @@ D2D_INCLUDE_NAMES = {
     "wincodec.h",
     "wrl/client.h",
 }
+LARGE_SOURCE_FILE_LOC_THRESHOLD = 1_000
 
 
 @dataclass
@@ -52,6 +53,12 @@ class PackageLocSummary:
     @property
     def total_loc(self) -> int:
         return self.header_loc + self.cpp_loc
+
+
+@dataclass(frozen=True)
+class SourceFileLoc:
+    path: Path
+    loc: int
 
 
 @dataclass(frozen=True)
@@ -388,6 +395,20 @@ def print_package_loc_summary(modules: dict[str, Module]) -> None:
     )
 
 
+def print_large_source_files(files: list[Path]) -> None:
+    large_files: list[SourceFileLoc] = []
+    for path in files:
+        line_count = count_source_lines(path)
+        if line_count > LARGE_SOURCE_FILE_LOC_THRESHOLD:
+            large_files.append(SourceFileLoc(path=path, loc=line_count))
+    if not large_files:
+        return
+
+    print(f"Source files over {format_loc_count(LARGE_SOURCE_FILE_LOC_THRESHOLD)} LOC:")
+    for source_file in sorted(large_files, key=lambda item: (-item.loc, relpath(item.path))):
+        print(f"  {relpath(source_file.path)}: {format_loc_count(source_file.loc)} LOC")
+
+
 def dot_quote(text: str) -> str:
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
 
@@ -618,6 +639,7 @@ def main() -> int:
         f"and {private_edges} private dependencies."
     )
     print_package_loc_summary(modules)
+    print_large_source_files(files)
     if args.check:
         violations = check_graph_rules(edges)
         if violations:
