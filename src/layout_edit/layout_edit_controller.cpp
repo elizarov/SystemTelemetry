@@ -363,6 +363,12 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
         return resolution;
     }
 
+    size_t layoutGuideIndex = 0;
+    if (HitTestLayoutGuide(clientPoint, &layoutGuideIndex) != nullptr) {
+        resolution.hoveredLayoutGuideIndex = layoutGuideIndex;
+        return resolution;
+    }
+
     const std::optional<LayoutEditAnchorKey> anchorTarget = renderer.HitTestEditableAnchorTarget(clientPoint);
     const std::optional<LayoutEditWidgetIdentity> hoveredWidget = renderer.HitTestEditableWidget(clientPoint);
     if (hoveredWidget.has_value()) {
@@ -378,12 +384,6 @@ LayoutEditController::HoverResolution LayoutEditController::ResolveHover(RenderP
 
     if (anchorTarget.has_value()) {
         resolution.hoveredEditableAnchor = anchorTarget;
-        return resolution;
-    }
-
-    size_t layoutGuideIndex = 0;
-    if (HitTestLayoutGuide(clientPoint, &layoutGuideIndex) != nullptr) {
-        resolution.hoveredLayoutGuideIndex = layoutGuideIndex;
         return resolution;
     }
 
