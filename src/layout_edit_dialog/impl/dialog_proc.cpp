@@ -1,5 +1,6 @@
 #include "layout_edit_dialog/impl/dialog_proc.h"
 
+#include <algorithm>
 #include <commctrl.h>
 #include <commdlg.h>
 
@@ -21,6 +22,19 @@ bool IsMetricListOrderButtonId(int controlId) {
                controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE + 100) ||
            (controlId >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE &&
                controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE + 100);
+}
+
+bool IsDialogComboBoxControl(HWND hwnd, int controlId) {
+    HWND control = GetDlgItem(hwnd, controlId);
+    if (control == nullptr) {
+        return false;
+    }
+
+    wchar_t className[64] = {};
+    if (GetClassNameW(control, className, ARRAYSIZE(className)) == 0) {
+        return false;
+    }
+    return CompareStringOrdinal(className, -1, WC_COMBOBOXW, -1, TRUE) == CSTR_EQUAL;
 }
 
 void RaiseComboDropList(HWND hwnd, int controlId) {
@@ -81,6 +95,16 @@ void ResizeComboDropList(HWND hwnd, int controlId, int maxVisibleItems = 10) {
 
     SetWindowPos(info.hwndList, HWND_TOPMOST, left, top, width, desiredHeight, SWP_NOACTIVATE | SWP_SHOWWINDOW);
     SetWindowPos(info.hwndList, HWND_NOTOPMOST, left, top, width, desiredHeight, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+}
+
+bool PrepareComboDropList(HWND hwnd, int controlId) {
+    if (!IsDialogComboBoxControl(hwnd, controlId)) {
+        return false;
+    }
+
+    ResizeComboDropList(hwnd, controlId);
+    RaiseComboDropList(hwnd, controlId);
+    return true;
 }
 
 void DrawCenteredFilledTriangle(HDC dc, const RECT& rect, bool up) {
@@ -170,6 +194,9 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
             if (HandleMetricListOrderEditorCommand(state, hwnd, LOWORD(wParam), HIWORD(wParam))) {
                 return TRUE;
             }
+            if (HIWORD(wParam) == CBN_DROPDOWN && PrepareComboDropList(hwnd, LOWORD(wParam))) {
+                return TRUE;
+            }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FILTER_EDIT && HIWORD(wParam) == EN_CHANGE) {
                 wchar_t filterBuffer[256] = {};
                 GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, filterBuffer, ARRAYSIZE(filterBuffer));
@@ -183,15 +210,10 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 return TRUE;
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT &&
-                    (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE ||
-                        HIWORD(wParam) == CBN_DROPDOWN)) ||
+                    (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) ||
                 ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_SIZE_EDIT ||
                      LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT) &&
                     HIWORD(wParam) == EN_CHANGE)) {
-                if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT && HIWORD(wParam) == CBN_DROPDOWN) {
-                    RaiseComboDropList(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
-                    return TRUE;
-                }
                 PreviewSelectedFont(state, hwnd, HIWORD(wParam));
                 RefreshLayoutEditValidationState(state, hwnd);
                 return TRUE;
@@ -251,13 +273,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 return TRUE;
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT &&
-                (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE ||
-                    HIWORD(wParam) == CBN_DROPDOWN)) {
-                if (HIWORD(wParam) == CBN_DROPDOWN) {
-                    ResizeComboDropList(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
-                    RaiseComboDropList(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
-                    return TRUE;
-                }
+                (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) {
                 PreviewSelectedMetric(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
                 return TRUE;
