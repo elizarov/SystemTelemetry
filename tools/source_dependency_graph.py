@@ -65,6 +65,7 @@ class SourceFileLoc:
 class PackageDependencyComponent:
     packages: tuple[str, ...]
     total_loc: int
+    dependencies: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -514,6 +515,16 @@ def summarize_package_dependency_components(
         PackageDependencyComponent(
             packages=component,
             total_loc=sum(summaries[package].total_loc for package in component),
+            dependencies=tuple(
+                sorted(
+                    {
+                        dependency
+                        for package in component
+                        for dependency in graph[package]
+                        if dependency not in component
+                    }
+                )
+            ),
         )
         for component in components
     ]
@@ -558,9 +569,10 @@ def print_package_loc_summary(modules: dict[str, Module]) -> None:
 def print_package_dependency_components(modules: dict[str, Module], edges: dict[tuple[str, str], str]) -> None:
     print("Package dependency components in topological order:")
     for index, component in enumerate(summarize_package_dependency_components(modules, edges), start=1):
+        dependencies = ", ".join(component.dependencies) if component.dependencies else "(none)"
         print(
             f"  {index}. {format_loc_count(component.total_loc)} LOC: "
-            f"{', '.join(component.packages)}"
+            f"{', '.join(component.packages)} -> {dependencies}"
         )
 
 
