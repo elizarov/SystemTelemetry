@@ -81,6 +81,11 @@ private:
     void EndDirect2DDraw();
     bool BeginWindowDraw(int width, int height);
     void EndWindowDraw();
+    bool DrawToWicBitmap(int width,
+        int height,
+        const DrawCallback& draw,
+        std::string_view errorPrefix,
+        Microsoft::WRL::ComPtr<IWICBitmap>* renderedBitmap = nullptr);
     bool SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath);
     ID2D1SolidColorBrush* D2DSolidBrush(RenderColorId color);
     IDWriteTextFormat* DWriteTextFormat(TextStyleId style) const;

@@ -74,9 +74,7 @@ TEST(FontAnchors, BuiltInLayoutRegistersActiveRegionForEveryFontsSectionRole) {
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
 
-    const std::filesystem::path screenshotPath =
-        std::filesystem::temp_directory_path() / "systemtelemetry_font_anchor_test.png";
-    ASSERT_TRUE(renderer.SaveSnapshotPng(screenshotPath, telemetry->Snapshot(), overlayState)) << renderer.LastError();
+    ASSERT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
 
     const std::vector<DashboardActiveRegion> activeRegions = renderer.CollectActiveRegions(overlayState);
     const std::vector<const UiFontConfig*> fontFields = FontFieldPointers(config);
@@ -96,6 +94,4 @@ TEST(FontAnchors, BuiltInLayoutRegistersActiveRegionForEveryFontsSectionRole) {
         EXPECT_TRUE(hasLayoutEditParameter);
         EXPECT_TRUE(hasActiveRegion);
     }
-
-    std::filesystem::remove(screenshotPath);
 }

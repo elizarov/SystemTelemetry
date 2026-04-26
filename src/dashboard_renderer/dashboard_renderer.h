@@ -106,6 +106,7 @@ public:
     bool SaveSnapshotPng(const std::filesystem::path& imagePath,
         const SystemSnapshot& snapshot,
         const DashboardOverlayState& overlayState);
+    bool RenderSnapshotOffscreen(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DiscardWindowRenderTarget(std::string_view reason = {});
     const std::string& LastError() const;

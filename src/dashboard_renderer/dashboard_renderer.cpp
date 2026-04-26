@@ -869,7 +869,7 @@ bool DashboardRenderer::SaveSnapshotPng(
     return saved;
 }
 
-bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
+bool DashboardRenderer::RenderSnapshotOffscreen(
     const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     lastError_.clear();
     renderer_->DrawOffscreen(WindowWidth(), WindowHeight(), [&] { DrawFrame(snapshot, overlayState); });
@@ -877,6 +877,11 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
         lastError_ = renderer_->LastError();
     }
     return lastError_.empty();
+}
+
+bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
+    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+    return RenderSnapshotOffscreen(snapshot, overlayState);
 }
 
 std::vector<DashboardActiveRegion> DashboardRenderer::CollectActiveRegions(

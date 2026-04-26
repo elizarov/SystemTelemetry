@@ -283,42 +283,14 @@ bool D2DRenderer::DrawWindow(int width, int height, const DrawCallback& draw) {
 }
 
 bool D2DRenderer::DrawOffscreen(int width, int height, const DrawCallback& draw) {
-    if (!InitializeDirect2D()) {
-        return false;
-    }
-
-    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
-    const UINT bitmapWidth = static_cast<UINT>(std::max(1, width));
-    const UINT bitmapHeight = static_cast<UINT>(std::max(1, height));
-    HRESULT hr = wicFactory_->CreateBitmap(
-        bitmapWidth, bitmapHeight, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
-    if (FAILED(hr) || bitmap == nullptr) {
-        lastError_ = "renderer:hover_wic_bitmap_failed hr=" + FormatHresult(hr);
-        return false;
-    }
-
-    Microsoft::WRL::ComPtr<ID2D1RenderTarget> bitmapRenderTarget;
-    hr = d2dFactory_->CreateWicBitmapRenderTarget(bitmap.Get(),
-        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
-            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
-            96.0f,
-            96.0f),
-        bitmapRenderTarget.GetAddressOf());
-    if (FAILED(hr) || bitmapRenderTarget == nullptr) {
-        lastError_ = "renderer:hover_d2d_target_failed hr=" + FormatHresult(hr);
-        return false;
-    }
-
-    if (!BeginDirect2DDraw(bitmapRenderTarget.Get())) {
-        return false;
-    }
-    d2dActiveRenderTarget_->Clear(palette_.Get(RenderColorId::Background).ToD2DColorF());
-    draw();
-    EndDirect2DDraw();
-    return lastError_.empty();
+    return DrawToWicBitmap(width, height, draw, "offscreen");
 }
 
-bool D2DRenderer::SavePng(const std::filesystem::path& imagePath, int width, int height, const DrawCallback& draw) {
+bool D2DRenderer::DrawToWicBitmap(int width,
+    int height,
+    const DrawCallback& draw,
+    std::string_view errorPrefix,
+    Microsoft::WRL::ComPtr<IWICBitmap>* renderedBitmap) {
     if (!InitializeDirect2D()) {
         return false;
     }
@@ -329,7 +301,7 @@ bool D2DRenderer::SavePng(const std::filesystem::path& imagePath, int width, int
     HRESULT hr = wicFactory_->CreateBitmap(
         bitmapWidth, bitmapHeight, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
     if (FAILED(hr) || bitmap == nullptr) {
-        lastError_ = "renderer:screenshot_wic_bitmap_failed hr=" + FormatHresult(hr);
+        lastError_ = "renderer:" + std::string(errorPrefix) + "_wic_bitmap_failed hr=" + FormatHresult(hr);
         return false;
     }
 
@@ -341,7 +313,7 @@ bool D2DRenderer::SavePng(const std::filesystem::path& imagePath, int width, int
             96.0f),
         bitmapRenderTarget.GetAddressOf());
     if (FAILED(hr) || bitmapRenderTarget == nullptr) {
-        lastError_ = "renderer:screenshot_d2d_target_failed hr=" + FormatHresult(hr);
+        lastError_ = "renderer:" + std::string(errorPrefix) + "_d2d_target_failed hr=" + FormatHresult(hr);
         return false;
     }
 
@@ -352,6 +324,17 @@ bool D2DRenderer::SavePng(const std::filesystem::path& imagePath, int width, int
     draw();
     EndDirect2DDraw();
     if (!lastError_.empty()) {
+        return false;
+    }
+    if (renderedBitmap != nullptr) {
+        *renderedBitmap = bitmap;
+    }
+    return lastError_.empty();
+}
+
+bool D2DRenderer::SavePng(const std::filesystem::path& imagePath, int width, int height, const DrawCallback& draw) {
+    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+    if (!DrawToWicBitmap(width, height, draw, "screenshot", &bitmap)) {
         return false;
     }
     return SaveWicBitmapPng(bitmap.Get(), imagePath);
