@@ -69,7 +69,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Rendering and layout resolution
 
 - `Renderer` owns renderer style resources, icon loading, text measurement, live HWND rendering, screenshot export rendering, and primitive drawing such as text, rectangles, rounded rectangles, ellipses, lines, arcs, polylines, filled paths, clips, and translations. It stays independent of application trace sinks and dashboard-specific drawing modes.
-- `DashboardRenderer` owns static layout resolution, renderer style input selection, resolved scene traversal, layout-edit hit data, drawing-mode state, and widget-host services.
+- `DashboardRenderer` owns static layout resolution, renderer style input selection, resolved scene traversal, layout-edit hit data and active-region enumeration, drawing-mode state, and widget-host services.
 - `DashboardLayoutResolver` owns resolved dashboard, card, widget, guide, anchor, and dynamic edit-artifact geometry inside the dashboard-renderer package.
 - `DashboardLayoutEditOverlayRenderer` owns layout-edit overlay presentation inside the dashboard-renderer package, including selected and hovered highlights, layout and widget guides, gap anchors, size similarity indicator policy, dotted outlines, and dragged container-child replay.
 - Shared renderer-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
@@ -83,7 +83,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `LayoutEditController` owns hover state, active drags, hit-testing, capture, cursor choice, and drag-session flow.
 - Layout-model helpers own renderer-safe edit-artifact matching, focus and selection resolution, anchor subject extraction, and edit-artifact ordering policy. Layout-edit modules own tooltip-payload interpretation, tooltip formatting, edit-tree construction, current-value lookup, and preview application.
 - `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/impl/`.
-- The dashboard renderer exposes the resolved guide and anchor geometry used both by live interaction and by diagnostics screenshot validation.
+- The dashboard renderer exposes the resolved guide, anchor, and active-region geometry used by live interaction, diagnostics screenshot validation, and active-region trace output.
 
 ### Diagnostics
 

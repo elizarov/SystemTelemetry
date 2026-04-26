@@ -271,11 +271,13 @@ endif()
 find_package(GTest CONFIG REQUIRED)
 
 add_executable(SystemTelemetryTests
+    tests/test_panel_icons.rc
     tests/enum_string_tests.cpp
     tests/metrics_tests.cpp
     tests/snapshot_dump_tests.cpp
     tests/widget_factory_tests.cpp
     tests/widget_class_tests.cpp
+    tests/font_anchor_tests.cpp
     tests/metric_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
@@ -297,6 +299,8 @@ add_executable(SystemTelemetryTests
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
     src/layout_model/layout_edit_layout_target.cpp
+    src/layout_model/layout_edit_service.cpp
+    src/layout_model/dashboard_overlay_state.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_model/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tooltip.cpp
@@ -311,6 +315,7 @@ add_executable(SystemTelemetryTests
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/metrics.cpp
     src/widget/card_chrome_layout.cpp
+    src/renderer/renderer.cpp
     src/widget/widget.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/text.cpp
@@ -324,9 +329,20 @@ add_executable(SystemTelemetryTests
     src/widget/impl/clock_time.cpp
     src/widget/impl/clock_date.cpp
     src/renderer/render_types.cpp
+    src/renderer/impl/d2d_renderer.cpp
+    src/renderer/impl/d2d_cache.cpp
+    src/renderer/impl/d2d_render_conversions.cpp
+    src/renderer/impl/palette.cpp
+    src/renderer/impl/text_width_cache.cpp
+    src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/layout_resolver.cpp
+    src/dashboard_renderer/dashboard_renderer.cpp
     src/diagnostics/snapshot_dump.cpp
+    src/telemetry/impl/collector_fake.cpp
+    src/telemetry/impl/collector_storage_selection.cpp
     src/telemetry/impl/retained_history.cpp
     src/util/utf8.cpp
+    src/util/trace.cpp
   )
 target_include_directories(SystemTelemetryTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
@@ -350,9 +366,16 @@ target_link_options(SystemTelemetryTests PRIVATE
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
+    /MANIFEST:NO
 )
 target_link_libraries(SystemTelemetryTests PRIVATE
     GTest::gtest_main
+    user32
+    gdi32
+    d2d1
+    dwrite
+    windowscodecs
+    ole32
 )
 set_target_properties(SystemTelemetryTests PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"

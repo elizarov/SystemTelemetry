@@ -10,9 +10,11 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "config/config.h"
+#include "dashboard_renderer/impl/layout_resolver.h"
 #include "layout_model/dashboard_overlay_state.h"
 #include "renderer/renderer.h"
 #include "telemetry/metrics.h"
@@ -20,8 +22,38 @@
 #include "widget/widget.h"
 #include "widget/widget_host.h"
 
-class DashboardLayoutResolver;
 class DashboardLayoutEditOverlayRenderer;
+
+enum class DashboardActiveRegionKind {
+    Card,
+    CardHeader,
+    WidgetHover,
+    LayoutWeightGuide,
+    ContainerChildReorderTarget,
+    GapHandle,
+    WidgetGuide,
+    StaticEditAnchorHandle,
+    StaticEditAnchorTarget,
+    DynamicEditAnchorHandle,
+    DynamicEditAnchorTarget,
+    StaticColorTarget,
+    DynamicColorTarget,
+};
+
+using DashboardActiveRegionPayload = std::variant<const DashboardLayoutResolver::ResolvedCardLayout*,
+    const WidgetLayout*,
+    const LayoutEditGuide*,
+    const DashboardLayoutResolver::ContainerChildReorderTarget*,
+    const LayoutEditGapAnchor*,
+    const LayoutEditWidgetGuide*,
+    const LayoutEditAnchorRegion*,
+    const LayoutEditColorRegion*>;
+
+struct DashboardActiveRegion {
+    RenderRect box{};
+    DashboardActiveRegionKind kind = DashboardActiveRegionKind::Card;
+    DashboardActiveRegionPayload payload = static_cast<const DashboardLayoutResolver::ResolvedCardLayout*>(nullptr);
+};
 
 class DashboardRenderer : public WidgetHost {
 public:
@@ -63,6 +95,7 @@ public:
     std::optional<LayoutEditAnchorKey> HitTestEditableAnchorHandle(RenderPoint clientPoint) const;
     std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const;
     std::optional<LayoutEditColorRegion> HitTestEditableColorRegion(RenderPoint clientPoint) const;
+    std::vector<DashboardActiveRegion> CollectActiveRegions(const DashboardOverlayState& overlayState) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
