@@ -10,8 +10,12 @@
 #include <vector>
 
 #include "config/config.h"
-#include "dashboard_renderer/dashboard_renderer.h"
+#include "layout_edit/layout_edit_hit_test.h"
+#include "layout_model/dashboard_overlay_state.h"
+#include "layout_model/layout_edit_active_region.h"
 #include "layout_model/layout_edit_layout_target.h"
+#include "widget/layout_edit_parameter_id.h"
+#include "widget/layout_edit_types.h"
 
 class LayoutEditHost {
 public:
@@ -25,8 +29,13 @@ public:
     };
 
     virtual const AppConfig& LayoutEditConfig() const = 0;
-    virtual DashboardRenderer& LayoutEditRenderer() = 0;
     virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
+    virtual std::vector<LayoutEditActiveRegion> CollectLayoutEditActiveRegions() const = 0;
+    virtual double LayoutEditRenderScale() const = 0;
+    virtual int LayoutEditSimilarityThreshold() const = 0;
+    virtual void SetLayoutGuideDragActive(bool active) = 0;
+    virtual void SetLayoutEditInteractiveDragTraceActive(bool active) = 0;
+    virtual void RebuildLayoutEditArtifacts() = 0;
     virtual bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) = 0;
     virtual bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) = 0;
@@ -35,7 +44,7 @@ public:
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) = 0;
-    virtual bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) = 0;
+    virtual bool ApplyLayoutEditValue(LayoutEditParameter parameter, double value) = 0;
     virtual void InvalidateLayoutEdit() = 0;
     virtual void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) = 0;
     virtual void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) = 0;
@@ -65,19 +74,6 @@ public:
     std::optional<TooltipTarget> CurrentTooltipTarget();
 
 private:
-    struct HoverResolution {
-        std::optional<LayoutEditWidgetIdentity> hoveredLayoutCard;
-        std::optional<LayoutEditWidgetIdentity> hoveredEditableCard;
-        std::optional<LayoutEditWidgetIdentity> hoveredEditableWidget;
-        std::optional<LayoutEditGapAnchorKey> hoveredGapEditAnchor;
-        std::optional<LayoutEditAnchorKey> hoveredEditableAnchor;
-        std::optional<size_t> hoveredGapEditAnchorIndex;
-        std::optional<size_t> hoveredWidgetEditGuideIndex;
-        std::optional<size_t> hoveredLayoutGuideIndex;
-        std::optional<LayoutEditGapAnchorKey> actionableGapEditAnchor;
-        std::optional<LayoutEditAnchorKey> actionableAnchorHandle;
-    };
-
     struct WeightVectorHash {
         size_t operator()(const std::vector<int>& weights) const {
             size_t hash = 0;
@@ -169,10 +165,8 @@ private:
         int mouseCoordinate = 0;
     };
 
-    const LayoutEditGuide* HitTestLayoutGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
-    const LayoutEditWidgetGuide* HitTestWidgetEditGuide(RenderPoint clientPoint, size_t* index = nullptr) const;
-    const LayoutEditGapAnchor* HitTestGapEditAnchor(RenderPoint clientPoint, size_t* index = nullptr) const;
-    HoverResolution ResolveHover(RenderPoint clientPoint) const;
+    std::vector<LayoutEditActiveRegion> ActiveRegions() const;
+    LayoutEditHoverResolution ResolveHover(RenderPoint clientPoint) const;
     void RefreshHover(RenderPoint clientPoint);
     bool UpdateLayoutDrag(RenderPoint clientPoint);
     bool UpdateWidgetEditDrag(RenderPoint clientPoint);
@@ -188,12 +182,12 @@ private:
         LayoutDragState& drag, const std::vector<int>& freeWeights);
 
     LayoutEditHost& host_;
-    std::optional<size_t> hoveredLayoutGuideIndex_;
+    std::optional<LayoutEditGuide> hoveredLayoutGuide_;
     std::optional<LayoutEditWidgetIdentity> hoveredLayoutCard_;
     std::optional<LayoutEditWidgetIdentity> hoveredEditableCard_;
     std::optional<LayoutEditWidgetIdentity> hoveredEditableWidget_;
-    std::optional<size_t> hoveredGapEditAnchorIndex_;
-    std::optional<size_t> hoveredWidgetEditGuideIndex_;
+    std::optional<LayoutEditGapAnchor> hoveredGapEditAnchorRegion_;
+    std::optional<LayoutEditWidgetGuide> hoveredWidgetEditGuide_;
     std::optional<LayoutEditGapAnchorKey> hoveredGapEditAnchor_;
     std::optional<LayoutEditAnchorKey> hoveredEditableAnchor_;
     std::optional<LayoutDragState> activeLayoutDrag_;

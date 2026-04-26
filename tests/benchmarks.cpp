@@ -216,11 +216,17 @@ std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const 
 }
 
 std::optional<LayoutEditGuide> FindTopLevelGuide(const DashboardRenderer& renderer) {
-    const auto& guides = renderer.LayoutEditGuides();
-    const auto it = std::find_if(guides.begin(), guides.end(), [](const auto& guide) {
+    DashboardOverlayState overlayState;
+    overlayState.showLayoutEditGuides = true;
+    const auto regions = renderer.CollectLayoutEditActiveRegions(overlayState);
+    const auto it = std::find_if(regions.begin(), regions.end(), [](const auto& region) {
+        if (region.kind != LayoutEditActiveRegionKind::LayoutWeightGuide) {
+            return false;
+        }
+        const auto& guide = std::get<LayoutEditGuide>(region.payload);
         return guide.editCardId.empty() && guide.nodePath.size() <= 1 && guide.childExtents.size() >= 2;
     });
-    return it != guides.end() ? std::optional<LayoutEditGuide>(*it) : std::nullopt;
+    return it != regions.end() ? std::optional<LayoutEditGuide>(std::get<LayoutEditGuide>(it->payload)) : std::nullopt;
 }
 
 std::vector<std::vector<int>> BuildWeightSequence(const std::vector<int>& seedWeights, size_t iterations) {
@@ -399,12 +405,32 @@ private:
         return config_;
     }
 
-    DashboardRenderer& LayoutEditRenderer() override {
-        return renderer_;
-    }
-
     DashboardOverlayState& LayoutDashboardOverlayState() override {
         return overlayState_;
+    }
+
+    std::vector<LayoutEditActiveRegion> CollectLayoutEditActiveRegions() const override {
+        return renderer_.CollectLayoutEditActiveRegions(overlayState_);
+    }
+
+    double LayoutEditRenderScale() const override {
+        return renderer_.RenderScale();
+    }
+
+    int LayoutEditSimilarityThreshold() const override {
+        return renderer_.LayoutSimilarityThreshold();
+    }
+
+    void SetLayoutGuideDragActive(bool active) override {
+        renderer_.SetLayoutGuideDragActive(active);
+    }
+
+    void SetLayoutEditInteractiveDragTraceActive(bool active) override {
+        renderer_.SetInteractiveDragTraceActive(active);
+    }
+
+    void RebuildLayoutEditArtifacts() override {
+        renderer_.RebuildEditArtifacts();
     }
 
     bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) override {
@@ -451,7 +477,7 @@ private:
         return renderer_.FindLayoutWidgetExtent(widget, axis);
     }
 
-    bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override {
+    bool ApplyLayoutEditValue(LayoutEditParameter parameter, double value) override {
         const auto start = Clock::now();
         const bool applied = ApplyLayoutEditParameterValue(config_, parameter, value);
         if (applied) {

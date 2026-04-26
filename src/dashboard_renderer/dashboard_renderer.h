@@ -16,6 +16,7 @@
 #include "config/config.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
 #include "layout_model/dashboard_overlay_state.h"
+#include "layout_model/layout_edit_active_region.h"
 #include "renderer/renderer.h"
 #include "telemetry/metrics.h"
 #include "util/trace.h"
@@ -23,37 +24,6 @@
 #include "widget/widget_host.h"
 
 class DashboardLayoutEditOverlayRenderer;
-
-enum class DashboardActiveRegionKind {
-    Card,
-    CardHeader,
-    WidgetHover,
-    LayoutWeightGuide,
-    ContainerChildReorderTarget,
-    GapHandle,
-    WidgetGuide,
-    StaticEditAnchorHandle,
-    StaticEditAnchorTarget,
-    DynamicEditAnchorHandle,
-    DynamicEditAnchorTarget,
-    StaticColorTarget,
-    DynamicColorTarget,
-};
-
-using DashboardActiveRegionPayload = std::variant<const DashboardLayoutResolver::ResolvedCardLayout*,
-    const WidgetLayout*,
-    const LayoutEditGuide*,
-    const DashboardLayoutResolver::ContainerChildReorderTarget*,
-    const LayoutEditGapAnchor*,
-    const LayoutEditWidgetGuide*,
-    const LayoutEditAnchorRegion*,
-    const LayoutEditColorRegion*>;
-
-struct DashboardActiveRegion {
-    RenderRect box{};
-    DashboardActiveRegionKind kind = DashboardActiveRegionKind::Card;
-    DashboardActiveRegionPayload payload = static_cast<const DashboardLayoutResolver::ResolvedCardLayout*>(nullptr);
-};
 
 class DashboardRenderer : public WidgetHost {
 public:
@@ -75,27 +45,14 @@ public:
     double RenderScale() const;
     int WindowWidth() const;
     int WindowHeight() const;
-    const std::vector<LayoutEditGuide>& LayoutEditGuides() const;
-    const std::vector<LayoutEditWidgetGuide>& WidgetEditGuides() const;
-    const std::vector<LayoutEditGapAnchor>& GapEditAnchors() const;
     int LayoutSimilarityThreshold() const;
-    std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(const LayoutEditGuide& guide) const;
     std::optional<int> FindLayoutWidgetExtent(const LayoutEditWidgetIdentity& widget, LayoutGuideAxis axis) const;
     std::optional<LayoutEditWidgetIdentity> FindFirstLayoutEditPreviewWidget(const std::string& widgetTypeName) const;
     bool ApplyLayoutGuideWeightsPreview(
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
     const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const override;
     const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const override;
-    std::optional<LayoutEditWidgetIdentity> HitTestLayoutCard(RenderPoint clientPoint) const;
-    std::optional<LayoutEditWidgetIdentity> HitTestEditableCard(RenderPoint clientPoint) const;
-    std::optional<LayoutEditWidgetIdentity> HitTestEditableWidget(RenderPoint clientPoint) const;
-    std::optional<LayoutEditGapAnchorKey> HitTestGapEditAnchor(RenderPoint clientPoint) const;
-    std::optional<LayoutEditGapAnchor> FindGapEditAnchor(const LayoutEditGapAnchorKey& key) const;
-    std::optional<LayoutEditAnchorKey> HitTestEditableAnchorTarget(RenderPoint clientPoint) const;
-    std::optional<LayoutEditAnchorKey> HitTestEditableAnchorHandle(RenderPoint clientPoint) const;
-    std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const;
-    std::optional<LayoutEditColorRegion> HitTestEditableColorRegion(RenderPoint clientPoint) const;
-    std::vector<DashboardActiveRegion> CollectActiveRegions(const DashboardOverlayState& overlayState) const;
+    std::vector<LayoutEditActiveRegion> CollectLayoutEditActiveRegions(const DashboardOverlayState& overlayState) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();
@@ -149,7 +106,6 @@ private:
     void BuildWidgetEditGuides();
     void BuildStaticEditableAnchors();
     void DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
-    void WriteScreenshotActiveRegionsTrace(const DashboardOverlayState& overlayState) const;
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -160,6 +116,7 @@ private:
     int WidgetExtentForAxis(const WidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const WidgetLayout& widget, const LayoutEditGuide& guide) const;
     bool MatchesWidgetIdentity(const WidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const;
+    std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const;
     static bool IsContainerNode(const LayoutNodeConfig& node);
     RendererStyle BuildRendererStyle() const;
     const MetricSource& ResolveMetrics(const SystemSnapshot& snapshot);

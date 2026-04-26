@@ -15,8 +15,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/util/` contains pure shared utilities for paths, command-line text, string trimming, splitting, case folding, whitespace normalization, enum string conversion, UTF-8 conversion, embedded resource loading, localization catalog access, numeric safety, DPI scale conversion, and trace emission.
 - `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
 - `src/renderer/` owns render-space contract types, the `Renderer` drawing interface, renderer style resources, render-target lifecycle, and the Direct2D/DirectWrite/WIC implementation under `src/renderer/impl/`. It does not own dashboard drawing modes, overlay policy, or trace emission.
-- `src/dashboard_renderer/dashboard_renderer.*` owns dashboard scene traversal, renderer style input selection, hit-test facades, drawing-mode state, and widget-host services. It implements `WidgetHost`, owns a `Renderer` instance, and keeps graphics-backend details encapsulated in `src/renderer/`.
-- `src/layout_edit/` contains runtime layout-edit interaction, drag flow, controller-host integration, tooltip payload interpretation and text formatting, edit-tree construction, config-field mutation helpers, guide and reorder config helpers, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
+- `src/dashboard_renderer/dashboard_renderer.*` owns dashboard scene traversal, renderer style input selection, drawing-mode state, widget-host services, and layout-edit active-region collection. It implements `WidgetHost`, owns a `Renderer` instance, and keeps graphics-backend details encapsulated in `src/renderer/`.
+- `src/layout_edit/` contains runtime layout-edit interaction, active-region hit testing, drag flow, controller-host integration, tooltip payload interpretation and text formatting, edit-tree construction, config-field mutation helpers, guide and reorder config helpers, diagnostics active-region trace formatting, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
 - `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
@@ -69,7 +69,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Rendering and layout resolution
 
 - `Renderer` owns renderer style resources, icon loading, text measurement, live HWND rendering, shared offscreen bitmap rendering for screenshot export and validation priming, and primitive drawing such as text, rectangles, rounded rectangles, ellipses, lines, arcs, polylines, filled paths, clips, and translations. It stays independent of application trace sinks and dashboard-specific drawing modes.
-- `DashboardRenderer` owns renderer style input selection, resolved scene traversal, layout-edit hit-test and active-region facades, drawing-mode state, and widget-host services.
+- `DashboardRenderer` owns renderer style input selection, resolved scene traversal, drawing-mode state, widget-host services, and the single active-region snapshot used by layout-edit interaction.
 - `DashboardLayoutResolver` owns static layout resolution plus resolved dashboard, card, widget, guide, anchor, and dynamic edit-artifact geometry inside the dashboard-renderer package. It implements the widget-facing edit-artifact registrar because it owns the registered artifact storage.
 - `DashboardLayoutEditOverlayRenderer` owns layout-edit overlay presentation inside the dashboard-renderer package, including selected and hovered highlights, layout and widget guides, gap anchors, size similarity indicator policy, dotted outlines, and dragged container-child replay.
 - Shared renderer-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
@@ -80,10 +80,10 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Layout editing
 
-- `LayoutEditController` owns hover state, active drags, hit-testing, capture, cursor choice, and drag-session flow.
+- `LayoutEditController` owns hover state, active drags, capture, cursor choice, and drag-session flow. Layout-edit hit testing and snap-candidate discovery operate on renderer-produced active-region snapshots inside the layout-edit package.
 - Layout-model helpers own renderer-safe edit-artifact matching, focus and selection resolution, anchor subject extraction, and edit-artifact ordering policy. Layout-edit modules own tooltip-payload interpretation, tooltip formatting, edit-tree construction, current-value lookup, and preview application.
 - `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/impl/`.
-- The dashboard renderer exposes the resolved guide, anchor, and active-region geometry used by live interaction, diagnostics screenshot validation, and active-region trace output.
+- The dashboard renderer exposes copied active-region geometry used by live interaction and diagnostics screenshot validation; layout-edit modules interpret those regions for hit testing, snap discovery, tooltip targets, and active-region trace output.
 
 ### Diagnostics
 
@@ -122,7 +122,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Layout-edit flow
 
-- The shell forwards pointer events into the layout-edit controller, which resolves actionable targets from renderer-provided guide and anchor data.
+- The shell forwards pointer events into the layout-edit controller, which resolves actionable targets from renderer-provided active-region snapshots.
 - Package-private layout-edit interaction helpers live under `src/layout_edit/impl/` when they have no incoming production dependencies from outside `src/layout_edit/`.
 - Edits preview through shared config mutation helpers and the same renderer resolution path used by ordinary runtime rendering.
 - The modeless editor window uses the same config mutation and preview path as drag-based editing so both interaction styles operate on the same session state, and post-menu hover recovery relies on explicit cursor refresh instead of rebuilding hover inside `WM_MOUSELEAVE`.

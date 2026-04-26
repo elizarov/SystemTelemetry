@@ -11,6 +11,7 @@
 #include "config/config_resolution.h"
 #include "config/config_writer.h"
 #include "diagnostics/constants.h"
+#include "layout_edit/layout_edit_active_region_trace.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "main/config_io.h"
@@ -96,12 +97,32 @@ public:
         return config_;
     }
 
-    DashboardRenderer& LayoutEditRenderer() override {
-        return renderer_;
-    }
-
     DashboardOverlayState& LayoutDashboardOverlayState() override {
         return overlayState_;
+    }
+
+    std::vector<LayoutEditActiveRegion> CollectLayoutEditActiveRegions() const override {
+        return renderer_.CollectLayoutEditActiveRegions(overlayState_);
+    }
+
+    double LayoutEditRenderScale() const override {
+        return renderer_.RenderScale();
+    }
+
+    int LayoutEditSimilarityThreshold() const override {
+        return renderer_.LayoutSimilarityThreshold();
+    }
+
+    void SetLayoutGuideDragActive(bool active) override {
+        renderer_.SetLayoutGuideDragActive(active);
+    }
+
+    void SetLayoutEditInteractiveDragTraceActive(bool active) override {
+        renderer_.SetInteractiveDragTraceActive(active);
+    }
+
+    void RebuildLayoutEditArtifacts() override {
+        renderer_.RebuildEditArtifacts();
     }
 
     bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) override {
@@ -135,7 +156,7 @@ public:
         return std::nullopt;
     }
 
-    bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override {
+    bool ApplyLayoutEditValue(LayoutEditParameter parameter, double value) override {
         (void)parameter;
         (void)value;
         return false;
@@ -740,6 +761,10 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot, overlayState);
     if (!saved && errorText != nullptr) {
         *errorText = renderer.LastError();
+    }
+    if (saved) {
+        WriteLayoutEditActiveRegionTrace(
+            trace, config, renderer.CollectLayoutEditActiveRegions(overlayState), overlayState);
     }
     return saved;
 }

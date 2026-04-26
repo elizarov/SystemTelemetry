@@ -75,7 +75,7 @@ private:
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
-        LayoutGuideAxis axis);
+        LayoutGuideAxis axis) override;
     void StartMoveMode(std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
     void StopMoveMode();
     void UpdateMoveTracking();
@@ -109,13 +109,18 @@ private:
     void EndLayoutEditTraceSession(const std::string& reason) override;
 
     const AppConfig& LayoutEditConfig() const override;
-    DashboardRenderer& LayoutEditRenderer() override;
     DashboardOverlayState& LayoutDashboardOverlayState() override;
+    std::vector<LayoutEditActiveRegion> CollectLayoutEditActiveRegions() const override;
+    double LayoutEditRenderScale() const override;
+    int LayoutEditSimilarityThreshold() const override;
+    void SetLayoutGuideDragActive(bool active) override;
+    void SetLayoutEditInteractiveDragTraceActive(bool active) override;
+    void RebuildLayoutEditArtifacts() override;
     bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) override;
     bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) override;
     bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) override;
-    bool ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) override;
+    bool ApplyLayoutEditValue(LayoutEditParameter parameter, double value) override;
     void InvalidateLayoutEdit() override;
 
     HINSTANCE instance_ = nullptr;

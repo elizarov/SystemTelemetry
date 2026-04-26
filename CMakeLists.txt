@@ -90,6 +90,8 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_dialog/impl/tree.cpp
     src/layout_edit_dialog/impl/util.cpp
     src/layout_edit/layout_edit_controller.cpp
+    src/layout_edit/layout_edit_hit_test.cpp
+    src/layout_edit/layout_edit_active_region_trace.cpp
     src/layout_edit/layout_edit_trace_session.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
@@ -280,6 +282,7 @@ add_executable(SystemTelemetryTests
     tests/metric_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
+    tests/layout_edit_hit_test_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
     tests/layout_edit_types_tests.cpp
     tests/layout_edit_tree_tests.cpp
@@ -306,6 +309,7 @@ add_executable(SystemTelemetryTests
     src/layout_edit/layout_edit_parameter_edit.cpp
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_tooltip_payload.cpp
+    src/layout_edit/layout_edit_hit_test.cpp
     src/util/strings.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
@@ -421,6 +425,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_edit/layout_edit_parameter_edit.cpp
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_controller.cpp
+    src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit/layout_edit_trace_session.cpp
     src/layout_model/layout_edit_service.cpp
     src/layout_edit/impl/layout_snap_solver.cpp

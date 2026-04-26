@@ -109,12 +109,32 @@ const AppConfig& DashboardApp::LayoutEditConfig() const {
     return controller_.State().config;
 }
 
-DashboardRenderer& DashboardApp::LayoutEditRenderer() {
-    return renderer_;
-}
-
 DashboardOverlayState& DashboardApp::LayoutDashboardOverlayState() {
     return rendererDashboardOverlayState_;
+}
+
+std::vector<LayoutEditActiveRegion> DashboardApp::CollectLayoutEditActiveRegions() const {
+    return renderer_.CollectLayoutEditActiveRegions(rendererDashboardOverlayState_);
+}
+
+double DashboardApp::LayoutEditRenderScale() const {
+    return renderer_.RenderScale();
+}
+
+int DashboardApp::LayoutEditSimilarityThreshold() const {
+    return renderer_.LayoutSimilarityThreshold();
+}
+
+void DashboardApp::SetLayoutGuideDragActive(bool active) {
+    renderer_.SetLayoutGuideDragActive(active);
+}
+
+void DashboardApp::SetLayoutEditInteractiveDragTraceActive(bool active) {
+    renderer_.SetInteractiveDragTraceActive(active);
+}
+
+void DashboardApp::RebuildLayoutEditArtifacts() {
+    renderer_.RebuildEditArtifacts();
 }
 
 void DashboardApp::InvalidateLayoutEdit() {
@@ -380,7 +400,7 @@ bool DashboardApp::ApplyContainerChildOrder(const LayoutContainerChildOrderEditK
     return applied;
 }
 
-bool DashboardApp::ApplyLayoutEditValue(DashboardRenderer::LayoutEditParameter parameter, double value) {
+bool DashboardApp::ApplyLayoutEditValue(LayoutEditParameter parameter, double value) {
     const auto start = std::chrono::steady_clock::now();
     const bool applied = controller_.ApplyLayoutEditValue(*this, parameter, value);
     RecordLayoutEditTracePhase(TracePhase::Apply, std::chrono::steady_clock::now() - start);

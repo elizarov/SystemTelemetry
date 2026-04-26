@@ -34,19 +34,19 @@ std::vector<const UiFontConfig*> FontFieldPointers(const AppConfig& config) {
 }
 
 bool ActiveRegionsContainFontParameter(
-    const std::vector<DashboardActiveRegion>& regions, LayoutEditParameter parameter) {
-    for (const DashboardActiveRegion& region : regions) {
-        if (region.kind != DashboardActiveRegionKind::StaticEditAnchorHandle &&
-            region.kind != DashboardActiveRegionKind::StaticEditAnchorTarget &&
-            region.kind != DashboardActiveRegionKind::DynamicEditAnchorHandle &&
-            region.kind != DashboardActiveRegionKind::DynamicEditAnchorTarget) {
+    const std::vector<LayoutEditActiveRegion>& regions, LayoutEditParameter parameter) {
+    for (const LayoutEditActiveRegion& region : regions) {
+        if (region.kind != LayoutEditActiveRegionKind::StaticEditAnchorHandle &&
+            region.kind != LayoutEditActiveRegionKind::StaticEditAnchorTarget &&
+            region.kind != LayoutEditActiveRegionKind::DynamicEditAnchorHandle &&
+            region.kind != LayoutEditActiveRegionKind::DynamicEditAnchorTarget) {
             continue;
         }
-        const auto* anchorRegion = std::get_if<const LayoutEditAnchorRegion*>(&region.payload);
-        if (anchorRegion == nullptr || *anchorRegion == nullptr) {
+        const auto* anchorRegion = std::get_if<LayoutEditAnchorRegion>(&region.payload);
+        if (anchorRegion == nullptr) {
             continue;
         }
-        const auto* anchorParameter = std::get_if<LayoutEditParameter>(&(*anchorRegion)->key.subject);
+        const auto* anchorParameter = std::get_if<LayoutEditParameter>(&anchorRegion->key.subject);
         if (anchorParameter != nullptr && *anchorParameter == parameter) {
             return true;
         }
@@ -75,7 +75,7 @@ TEST(FontAnchors, BuiltInLayoutRegistersActiveRegionForEveryFontsSectionRole) {
 
     ASSERT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
 
-    const std::vector<DashboardActiveRegion> activeRegions = renderer.CollectActiveRegions(overlayState);
+    const std::vector<LayoutEditActiveRegion> activeRegions = renderer.CollectLayoutEditActiveRegions(overlayState);
     const std::vector<const UiFontConfig*> fontFields = FontFieldPointers(config);
     for (size_t index = 0; index < fontFields.size(); ++index) {
         SCOPED_TRACE(index);
