@@ -15,8 +15,6 @@ std::unique_ptr<Widget> TextWidget::Clone() const {
 
 void TextWidget::Initialize(const LayoutNodeConfig& node) {
     metric_ = node.parameter;
-    staticAnchorRegistered_ = false;
-    cachedStaticText_.clear();
 }
 
 int TextWidget::PreferredHeight(const WidgetHost& renderer) const {
@@ -55,18 +53,5 @@ void TextWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const Me
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     const auto binding = renderer.MakeEditableTextBinding(
         widget, WidgetHost::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
-    if (IsStaticTextMetric(metric_)) {
-        if (!staticAnchorRegistered_) {
-            cachedStaticText_ = text;
-            renderer.RegisterStaticTextAnchor(widget.rect,
-                cachedStaticText_,
-                TextStyleId::Text,
-                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true),
-                binding,
-                WidgetHost::LayoutEditParameter::ColorForeground);
-            staticAnchorRegistered_ = true;
-        }
-        return;
-    }
     renderer.RegisterDynamicTextAnchor(textLayout, binding, WidgetHost::LayoutEditParameter::ColorForeground);
 }
