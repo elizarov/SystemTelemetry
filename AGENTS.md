@@ -34,6 +34,7 @@ Validation workflow:
 - Ignore the stray `$null` file at the repository root when it appears; it is a Codex sandbox artifact, not a project file.
 - This project has a single deployment target; do not preserve backwards compatibility for legacy configs unless the user explicitly asks for it.
 - Keep headers declarative: non-template and non-inline-required production logic belongs in `.cpp` files, not in project headers.
+- Add a short code comment when a condition or branch exists to preserve a specific supported case or invariant that is not obvious from the surrounding code.
 - If you trip over a project-specific pitfall and then resolve it, add a short note here for future work so the mistake is less likely to repeat.
 
 ## Pitfall Notes

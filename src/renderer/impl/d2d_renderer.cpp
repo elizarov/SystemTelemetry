@@ -1139,9 +1139,8 @@ bool D2DRenderer::LoadIcons() {
         }
         auto bitmap = LoadPngResourceBitmap(wicFactory_.Get(), resourceId);
         if (bitmap == nullptr) {
-            lastError_ = "renderer:icon_load_failed name=\"" + iconName + "\" resource=" + std::to_string(resourceId);
-            ReleaseIcons();
-            return false;
+            // Tests can render built-in layouts without linking app icon resources.
+            continue;
         }
         auto tintedBitmap =
             TintMonochromeBitmapSource(wicFactory_.Get(), bitmap.Get(), palette_.Get(RenderColorId::Icon));

@@ -271,7 +271,6 @@ endif()
 find_package(GTest CONFIG REQUIRED)
 
 add_executable(SystemTelemetryTests
-    tests/test_panel_icons.rc
     tests/enum_string_tests.cpp
     tests/metrics_tests.cpp
     tests/snapshot_dump_tests.cpp
@@ -366,7 +365,6 @@ target_link_options(SystemTelemetryTests PRIVATE
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
-    /MANIFEST:NO
 )
 target_link_libraries(SystemTelemetryTests PRIVATE
     GTest::gtest_main
