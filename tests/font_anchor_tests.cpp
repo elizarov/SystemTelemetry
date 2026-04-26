@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "config/config_parser.h"
-#include "config/config_resolution.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_model/dashboard_overlay_state.h"

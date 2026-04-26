@@ -11,7 +11,6 @@
 #include "layout_edit_dialog/impl/trace.h"
 #include "layout_edit_dialog/impl/tree.h"
 #include "layout_edit_dialog/impl/util.h"
-#include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "util/scale.h"

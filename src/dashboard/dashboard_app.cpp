@@ -10,7 +10,6 @@
 #include "display/display_config.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
-#include "layout_model/layout_edit_helpers.h"
 #include "util/localization_catalog.h"
 #include "util/trace.h"
 

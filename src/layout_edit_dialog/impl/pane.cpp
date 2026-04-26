@@ -6,7 +6,6 @@
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit_dialog/impl/editors.h"
 #include "layout_edit_dialog/impl/util.h"
-#include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "util/localization_catalog.h"
 #include "util/utf8.h"

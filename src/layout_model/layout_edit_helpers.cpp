@@ -1,7 +1,5 @@
 #include "layout_model/layout_edit_helpers.h"
 
-#include <algorithm>
-
 namespace {
 
 bool MatchesLayoutEditAnchorSubject(const LayoutEditAnchorKey& left, const LayoutEditAnchorKey& right) {

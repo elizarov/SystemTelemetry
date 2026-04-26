@@ -20,7 +20,6 @@
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_trace_session.h"
 #include "layout_edit/layout_edit_tree.h"
-#include "layout_model/layout_edit_parameter_metadata.h"
 #include "layout_model/layout_edit_service.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"

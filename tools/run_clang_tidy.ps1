@@ -10,7 +10,7 @@ param(
 
     [int]$MaxParallel = 0,
 
-    [int]$TimeoutSeconds = 60
+    [int]$TimeoutSeconds = 180
 )
 
 $ErrorActionPreference = 'Stop'

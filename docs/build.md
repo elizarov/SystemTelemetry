@@ -55,7 +55,7 @@ install.cmd
 
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources.
 - The repo `pre-commit` hook launches `tools\pre_commit_format.ps1`, which formats staged eligible C++ files through `tools\run_clang_format.ps1`; Git file discovery starts from all staged `.cpp` and `.h` paths, then the shared formatter filter limits work to maintained non-vendored `src\` and `tests\` files.
-- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep writes `build\clang_tidy_report.txt`, uses a one-minute per-file timeout, filters maintained include-cleaner false positives, and excludes `src\diagnostics\snapshot_dump.cpp` because the active Clang diagnostics stall on that translation unit.
+- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep writes `build\clang_tidy_report.txt`, uses a three-minute per-file timeout, filters maintained include-cleaner false positives, and excludes `src\diagnostics\snapshot_dump.cpp` because the active Clang diagnostics stall on that translation unit.
 - `profile_benchmark.cmd` is the maintained entrypoint for elevated benchmark profiling and daemon-backed benchmark requests.
 - `devenv.cmd` is the maintained environment bootstrap for local builds and tool runs.
 
