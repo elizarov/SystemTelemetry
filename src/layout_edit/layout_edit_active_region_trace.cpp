@@ -261,7 +261,7 @@ std::string FormatActiveRegionDetail(const AppConfig& config, const LayoutEditAc
 
 void WriteLayoutEditActiveRegionTrace(Trace& trace,
     const AppConfig& config,
-    const std::vector<LayoutEditActiveRegion>& regions,
+    const LayoutEditActiveRegions& regions,
     const DashboardOverlayState& overlayState) {
     for (const LayoutEditActiveRegion& region : regions) {
         trace.Write("diagnostics:active_region box=" + FormatTraceRect(region.box) +
@@ -270,6 +270,6 @@ void WriteLayoutEditActiveRegionTrace(Trace& trace,
                     " detail=" + Trace::QuoteText(FormatActiveRegionDetail(config, region)));
     }
 
-    trace.Write("diagnostics:active_regions count=" + std::to_string(regions.size()) +
+    trace.Write("diagnostics:active_regions count=" + std::to_string(regions.Size()) +
                 " layout_edit=" + Trace::BoolText(overlayState.showLayoutEditGuides));
 }

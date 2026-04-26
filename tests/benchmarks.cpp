@@ -409,7 +409,7 @@ private:
         return overlayState_;
     }
 
-    std::vector<LayoutEditActiveRegion> CollectLayoutEditActiveRegions() const override {
+    LayoutEditActiveRegions CollectLayoutEditActiveRegions() const override {
         return renderer_.CollectLayoutEditActiveRegions(overlayState_);
     }
 

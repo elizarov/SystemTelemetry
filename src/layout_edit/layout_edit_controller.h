@@ -30,7 +30,7 @@ public:
 
     virtual const AppConfig& LayoutEditConfig() const = 0;
     virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
-    virtual std::vector<LayoutEditActiveRegion> CollectLayoutEditActiveRegions() const = 0;
+    virtual LayoutEditActiveRegions CollectLayoutEditActiveRegions() const = 0;
     virtual double LayoutEditRenderScale() const = 0;
     virtual int LayoutEditSimilarityThreshold() const = 0;
     virtual void SetLayoutGuideDragActive(bool active) = 0;
@@ -165,7 +165,7 @@ private:
         int mouseCoordinate = 0;
     };
 
-    std::vector<LayoutEditActiveRegion> ActiveRegions() const;
+    LayoutEditActiveRegions ActiveRegions() const;
     LayoutEditHoverResolution ResolveHover(RenderPoint clientPoint) const;
     void RefreshHover(RenderPoint clientPoint);
     bool UpdateLayoutDrag(RenderPoint clientPoint);

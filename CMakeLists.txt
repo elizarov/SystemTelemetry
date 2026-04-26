@@ -93,6 +93,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit/layout_edit_active_region_trace.cpp
     src/layout_edit/layout_edit_trace_session.cpp
+    src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
     src/layout_model/layout_edit_layout_target.cpp
@@ -298,6 +299,7 @@ add_executable(SystemTelemetryTests
     src/config/config_parser.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
+    src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
     src/layout_model/layout_edit_layout_target.cpp
@@ -417,6 +419,7 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
+    src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
     src/layout_model/layout_edit_layout_target.cpp

@@ -113,7 +113,7 @@ DashboardOverlayState& DashboardApp::LayoutDashboardOverlayState() {
     return rendererDashboardOverlayState_;
 }
 
-std::vector<LayoutEditActiveRegion> DashboardApp::CollectLayoutEditActiveRegions() const {
+LayoutEditActiveRegions DashboardApp::CollectLayoutEditActiveRegions() const {
     return renderer_.CollectLayoutEditActiveRegions(rendererDashboardOverlayState_);
 }
 

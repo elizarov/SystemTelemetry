@@ -52,7 +52,7 @@ public:
         const std::string& editCardId, const std::vector<size_t>& nodePath, const std::vector<int>& weights);
     const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const override;
     const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const override;
-    std::vector<LayoutEditActiveRegion> CollectLayoutEditActiveRegions(const DashboardOverlayState& overlayState) const;
+    LayoutEditActiveRegions CollectLayoutEditActiveRegions(const DashboardOverlayState& overlayState) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();

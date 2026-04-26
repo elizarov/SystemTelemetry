@@ -73,7 +73,7 @@ bool IsWidgetAffectedByGuide(const LayoutEditWidgetRegion& widget, const LayoutE
 }
 
 std::vector<LayoutEditWidgetRegion> CollectSimilarityIndicatorWidgets(
-    const std::vector<LayoutEditActiveRegion>& regions, LayoutGuideAxis axis) {
+    const LayoutEditActiveRegions& regions, LayoutGuideAxis axis) {
     struct SimilarityRepresentativeKey {
         std::string cardId;
         WidgetClass widgetClass = WidgetClass::Unknown;
@@ -122,8 +122,7 @@ std::vector<LayoutEditWidgetRegion> CollectSimilarityIndicatorWidgets(
 
 }  // namespace
 
-std::optional<LayoutEditGuide> HitTestLayoutGuide(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint) {
+std::optional<LayoutEditGuide> HitTestLayoutGuide(const LayoutEditActiveRegions& regions, RenderPoint clientPoint) {
     for (const LayoutEditActiveRegion& region : regions) {
         if (region.kind == LayoutEditActiveRegionKind::LayoutWeightGuide && region.box.Contains(clientPoint)) {
             return std::get<LayoutEditGuide>(region.payload);
@@ -133,7 +132,7 @@ std::optional<LayoutEditGuide> HitTestLayoutGuide(
 }
 
 std::optional<LayoutEditWidgetGuide> HitTestWidgetEditGuide(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint) {
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint) {
     const LayoutEditWidgetGuide* bestGuide = nullptr;
     int bestPriority = (std::numeric_limits<int>::max)();
     for (const LayoutEditActiveRegion& region : regions) {
@@ -151,7 +150,7 @@ std::optional<LayoutEditWidgetGuide> HitTestWidgetEditGuide(
 }
 
 std::optional<LayoutEditGapAnchor> HitTestGapEditAnchor(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint) {
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint) {
     const LayoutEditGapAnchor* bestAnchor = nullptr;
     int bestPriority = (std::numeric_limits<int>::max)();
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
@@ -169,7 +168,7 @@ std::optional<LayoutEditGapAnchor> HitTestGapEditAnchor(
 }
 
 std::optional<LayoutEditAnchorRegion> HitTestEditableAnchorTarget(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint) {
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint) {
     const LayoutEditAnchorRegion* bestRegion = nullptr;
     long long bestArea = (std::numeric_limits<long long>::max)();
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
@@ -190,7 +189,7 @@ std::optional<LayoutEditAnchorRegion> HitTestEditableAnchorTarget(
 }
 
 std::optional<LayoutEditAnchorRegion> HitTestEditableAnchorHandle(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint) {
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint) {
     const LayoutEditAnchorRegion* bestRegion = nullptr;
     int bestPriority = 0;
     for (auto it = regions.rbegin(); it != regions.rend(); ++it) {
@@ -211,7 +210,7 @@ std::optional<LayoutEditAnchorRegion> HitTestEditableAnchorHandle(
 }
 
 std::optional<LayoutEditColorRegion> HitTestEditableColorRegion(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint) {
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint) {
     const LayoutEditColorRegion* bestRegion = nullptr;
     int bestPriority = (std::numeric_limits<int>::max)();
     long long bestArea = (std::numeric_limits<long long>::max)();
@@ -235,7 +234,7 @@ std::optional<LayoutEditColorRegion> HitTestEditableColorRegion(
 }
 
 std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditAnchorKey& key) {
+    const LayoutEditActiveRegions& regions, const LayoutEditAnchorKey& key) {
     for (const LayoutEditActiveRegion& region : regions) {
         if (!IsAnchorHandleKind(region.kind) && !IsAnchorTargetKind(region.kind)) {
             continue;
@@ -249,7 +248,7 @@ std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(
 }
 
 std::optional<LayoutEditGapAnchor> FindGapEditAnchor(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditGapAnchorKey& key) {
+    const LayoutEditActiveRegions& regions, const LayoutEditGapAnchorKey& key) {
     for (const LayoutEditActiveRegion& region : regions) {
         if (region.kind != LayoutEditActiveRegionKind::GapHandle) {
             continue;
@@ -263,7 +262,7 @@ std::optional<LayoutEditGapAnchor> FindGapEditAnchor(
 }
 
 std::optional<LayoutEditGuide> FindLayoutEditGuide(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditGuide& guide) {
+    const LayoutEditActiveRegions& regions, const LayoutEditGuide& guide) {
     for (const LayoutEditActiveRegion& region : regions) {
         if (region.kind != LayoutEditActiveRegionKind::LayoutWeightGuide) {
             continue;
@@ -278,7 +277,7 @@ std::optional<LayoutEditGuide> FindLayoutEditGuide(
 }
 
 std::optional<LayoutEditWidgetGuide> FindWidgetEditGuide(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditWidgetGuide& guide) {
+    const LayoutEditActiveRegions& regions, const LayoutEditWidgetGuide& guide) {
     for (const LayoutEditActiveRegion& region : regions) {
         if (region.kind != LayoutEditActiveRegionKind::WidgetGuide) {
             continue;
@@ -292,8 +291,7 @@ std::optional<LayoutEditWidgetGuide> FindWidgetEditGuide(
     return std::nullopt;
 }
 
-LayoutEditHoverResolution ResolveLayoutEditHover(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint) {
+LayoutEditHoverResolution ResolveLayoutEditHover(const LayoutEditActiveRegions& regions, RenderPoint clientPoint) {
     LayoutEditHoverResolution resolution;
     for (const LayoutEditActiveRegion& region : regions) {
         if (region.kind == LayoutEditActiveRegionKind::Card && region.box.Contains(clientPoint)) {
@@ -410,7 +408,7 @@ LayoutEditHoverResolution ResolveLayoutEditHover(
 }
 
 std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditGuide& guide) {
+    const LayoutEditActiveRegions& regions, const LayoutEditGuide& guide) {
     struct SimilarityTypeKey {
         WidgetClass widgetClass = WidgetClass::Unknown;
         int extent = 0;

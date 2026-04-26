@@ -19,27 +19,25 @@ struct LayoutEditHoverResolution {
     std::optional<LayoutEditAnchorKey> actionableAnchorHandle;
 };
 
-std::optional<LayoutEditGuide> HitTestLayoutGuide(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint);
+std::optional<LayoutEditGuide> HitTestLayoutGuide(const LayoutEditActiveRegions& regions, RenderPoint clientPoint);
 std::optional<LayoutEditWidgetGuide> HitTestWidgetEditGuide(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint);
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint);
 std::optional<LayoutEditGapAnchor> HitTestGapEditAnchor(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint);
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint);
 std::optional<LayoutEditAnchorRegion> HitTestEditableAnchorTarget(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint);
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint);
 std::optional<LayoutEditAnchorRegion> HitTestEditableAnchorHandle(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint);
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint);
 std::optional<LayoutEditColorRegion> HitTestEditableColorRegion(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint);
+    const LayoutEditActiveRegions& regions, RenderPoint clientPoint);
 std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditAnchorKey& key);
+    const LayoutEditActiveRegions& regions, const LayoutEditAnchorKey& key);
 std::optional<LayoutEditGapAnchor> FindGapEditAnchor(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditGapAnchorKey& key);
+    const LayoutEditActiveRegions& regions, const LayoutEditGapAnchorKey& key);
 std::optional<LayoutEditGuide> FindLayoutEditGuide(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditGuide& guide);
+    const LayoutEditActiveRegions& regions, const LayoutEditGuide& guide);
 std::optional<LayoutEditWidgetGuide> FindWidgetEditGuide(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditWidgetGuide& guide);
-LayoutEditHoverResolution ResolveLayoutEditHover(
-    const std::vector<LayoutEditActiveRegion>& regions, RenderPoint clientPoint);
+    const LayoutEditActiveRegions& regions, const LayoutEditWidgetGuide& guide);
+LayoutEditHoverResolution ResolveLayoutEditHover(const LayoutEditActiveRegions& regions, RenderPoint clientPoint);
 std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(
-    const std::vector<LayoutEditActiveRegion>& regions, const LayoutEditGuide& guide);
+    const LayoutEditActiveRegions& regions, const LayoutEditGuide& guide);

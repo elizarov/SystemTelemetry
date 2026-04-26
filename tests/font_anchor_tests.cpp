@@ -33,8 +33,7 @@ std::vector<const UiFontConfig*> FontFieldPointers(const AppConfig& config) {
     return FontFieldPointers(config, std::make_index_sequence<std::tuple_size_v<FontFields>>{});
 }
 
-bool ActiveRegionsContainFontParameter(
-    const std::vector<LayoutEditActiveRegion>& regions, LayoutEditParameter parameter) {
+bool ActiveRegionsContainFontParameter(const LayoutEditActiveRegions& regions, LayoutEditParameter parameter) {
     for (const LayoutEditActiveRegion& region : regions) {
         if (region.kind != LayoutEditActiveRegionKind::StaticEditAnchorHandle &&
             region.kind != LayoutEditActiveRegionKind::StaticEditAnchorTarget &&
@@ -75,7 +74,7 @@ TEST(FontAnchors, BuiltInLayoutRegistersActiveRegionForEveryFontsSectionRole) {
 
     ASSERT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
 
-    const std::vector<LayoutEditActiveRegion> activeRegions = renderer.CollectLayoutEditActiveRegions(overlayState);
+    const LayoutEditActiveRegions activeRegions = renderer.CollectLayoutEditActiveRegions(overlayState);
     const std::vector<const UiFontConfig*> fontFields = FontFieldPointers(config);
     for (size_t index = 0; index < fontFields.size(); ++index) {
         SCOPED_TRACE(index);

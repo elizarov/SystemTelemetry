@@ -69,7 +69,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Rendering and layout resolution
 
 - `Renderer` owns renderer style resources, icon loading, text measurement, live HWND rendering, shared offscreen bitmap rendering for screenshot export and validation priming, and primitive drawing such as text, rectangles, rounded rectangles, ellipses, lines, arcs, polylines, filled paths, clips, and translations. It stays independent of application trace sinks and dashboard-specific drawing modes.
-- `DashboardRenderer` owns renderer style input selection, resolved scene traversal, drawing-mode state, widget-host services, and the single active-region snapshot used by layout-edit interaction.
+- `DashboardRenderer` owns renderer style input selection, resolved scene traversal, drawing-mode state, widget-host services, and production of the `LayoutEditActiveRegions` snapshot used by layout-edit interaction.
 - `DashboardLayoutResolver` owns static layout resolution plus resolved dashboard, card, widget, guide, anchor, and dynamic edit-artifact geometry inside the dashboard-renderer package. It implements the widget-facing edit-artifact registrar because it owns the registered artifact storage.
 - `DashboardLayoutEditOverlayRenderer` owns layout-edit overlay presentation inside the dashboard-renderer package, including selected and hovered highlights, layout and widget guides, gap anchors, size similarity indicator policy, dotted outlines, and dragged container-child replay.
 - Shared renderer-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
@@ -80,10 +80,10 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Layout editing
 
-- `LayoutEditController` owns hover state, active drags, capture, cursor choice, and drag-session flow. Layout-edit hit testing and snap-candidate discovery operate on renderer-produced active-region snapshots inside the layout-edit package.
+- `LayoutEditController` owns hover state, active drags, capture, cursor choice, and drag-session flow. Layout-edit hit testing and snap-candidate discovery operate on renderer-produced `LayoutEditActiveRegions` snapshots inside the layout-edit package.
 - Layout-model helpers own renderer-safe edit-artifact matching, focus and selection resolution, anchor subject extraction, and edit-artifact ordering policy. Layout-edit modules own tooltip-payload interpretation, tooltip formatting, edit-tree construction, current-value lookup, and preview application.
 - `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/impl/`.
-- The dashboard renderer exposes copied active-region geometry used by live interaction and diagnostics screenshot validation; layout-edit modules interpret those regions for hit testing, snap discovery, tooltip targets, and active-region trace output.
+- The dashboard renderer exposes copied active-region geometry as a `LayoutEditActiveRegions` value object used by live interaction and diagnostics screenshot validation; layout-edit modules interpret that snapshot for hit testing, snap discovery, tooltip targets, and active-region trace output.
 
 ### Diagnostics
 
@@ -122,7 +122,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Layout-edit flow
 
-- The shell forwards pointer events into the layout-edit controller, which resolves actionable targets from renderer-provided active-region snapshots.
+- The shell forwards pointer events into the layout-edit controller, which resolves actionable targets from renderer-provided `LayoutEditActiveRegions` snapshots.
 - Package-private layout-edit interaction helpers live under `src/layout_edit/impl/` when they have no incoming production dependencies from outside `src/layout_edit/`.
 - Edits preview through shared config mutation helpers and the same renderer resolution path used by ordinary runtime rendering.
 - The modeless editor window uses the same config mutation and preview path as drag-based editing so both interaction styles operate on the same session state, and post-menu hover recovery relies on explicit cursor refresh instead of rebuilding hover inside `WM_MOUSELEAVE`.

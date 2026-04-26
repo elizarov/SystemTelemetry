@@ -206,7 +206,7 @@ void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
     host_.InvalidateLayoutEdit();
 }
 
-std::vector<LayoutEditActiveRegion> LayoutEditController::ActiveRegions() const {
+LayoutEditActiveRegions LayoutEditController::ActiveRegions() const {
     return host_.CollectLayoutEditActiveRegions();
 }
 
@@ -311,7 +311,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
 
 bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint) {
     lastClientPoint_ = clientPoint;
-    const std::vector<LayoutEditActiveRegion> regions = ActiveRegions();
+    const LayoutEditActiveRegions regions = ActiveRegions();
     const LayoutEditHoverResolution resolution = ResolveLayoutEditHover(regions, clientPoint);
     hoveredLayoutCard_ = resolution.hoveredLayoutCard;
     hoveredEditableCard_ = resolution.hoveredEditableCard;
@@ -697,7 +697,7 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
         return TooltipTarget{clientPoint, activeLayoutDrag_->guide};
     }
 
-    const std::vector<LayoutEditActiveRegion> regions = ActiveRegions();
+    const LayoutEditActiveRegions regions = ActiveRegions();
     if (activeMetricListReorderDrag_.has_value()) {
         const LayoutEditAnchorKey key{activeMetricListReorderDrag_->widget,
             LayoutMetricListOrderEditKey{
@@ -847,7 +847,7 @@ void LayoutEditController::ClearInteractionState() {
 }
 
 void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
-    const std::vector<LayoutEditActiveRegion> regions = ActiveRegions();
+    const LayoutEditActiveRegions regions = ActiveRegions();
     const LayoutEditHoverResolution resolution = ResolveLayoutEditHover(regions, clientPoint);
     if (resolution.actionableGapEditAnchor.has_value()) {
         const auto anchor = FindGapEditAnchor(regions, *resolution.actionableGapEditAnchor);

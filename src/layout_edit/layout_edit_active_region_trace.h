@@ -9,5 +9,5 @@
 
 void WriteLayoutEditActiveRegionTrace(Trace& trace,
     const AppConfig& config,
-    const std::vector<LayoutEditActiveRegion>& regions,
+    const LayoutEditActiveRegions& regions,
     const DashboardOverlayState& overlayState);

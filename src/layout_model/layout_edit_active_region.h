@@ -1,6 +1,8 @@
 #pragma once
 
+#include <initializer_list>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -60,4 +62,27 @@ struct LayoutEditActiveRegion {
     RenderRect box{};
     LayoutEditActiveRegionKind kind = LayoutEditActiveRegionKind::Card;
     LayoutEditActiveRegionPayload payload = LayoutEditCardRegion{};
+};
+
+class LayoutEditActiveRegions {
+public:
+    using const_iterator = std::vector<LayoutEditActiveRegion>::const_iterator;
+    using const_reverse_iterator = std::vector<LayoutEditActiveRegion>::const_reverse_iterator;
+
+    LayoutEditActiveRegions() = default;
+    explicit LayoutEditActiveRegions(std::vector<LayoutEditActiveRegion> regions);
+    LayoutEditActiveRegions(std::initializer_list<LayoutEditActiveRegion> regions);
+
+    void Reserve(size_t count);
+    void Add(LayoutEditActiveRegion region);
+    bool Empty() const;
+    size_t Size() const;
+
+    const_iterator begin() const;
+    const_iterator end() const;
+    const_reverse_iterator rbegin() const;
+    const_reverse_iterator rend() const;
+
+private:
+    std::vector<LayoutEditActiveRegion> regions_;
 };

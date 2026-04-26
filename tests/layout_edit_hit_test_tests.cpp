@@ -58,8 +58,7 @@ TEST(LayoutEditHitTest, AnchorHandleBeatsOverlappingGapAndWidgetGuideByPriority)
     guide.parameter = LayoutEditParameter::MetricListRowGap;
     guide.hitRect = RenderRect{0, 0, 30, 30};
 
-    const std::vector<LayoutEditActiveRegion> regions{
-        GapRegion(gap), WidgetGuideRegion(guide), AnchorHandleRegion(anchor)};
+    const LayoutEditActiveRegions regions{GapRegion(gap), WidgetGuideRegion(guide), AnchorHandleRegion(anchor)};
 
     const LayoutEditHoverResolution hover = ResolveLayoutEditHover(regions, RenderPoint{15, 15});
 
@@ -74,7 +73,7 @@ TEST(LayoutEditHitTest, CircleHandleHitsRingNotCenter) {
     anchor.shape = AnchorShape::Circle;
     anchor.anchorHitPadding = 1;
 
-    const std::vector<LayoutEditActiveRegion> regions{AnchorHandleRegion(anchor)};
+    const LayoutEditActiveRegions regions{AnchorHandleRegion(anchor)};
 
     EXPECT_TRUE(HitTestEditableAnchorHandle(regions, RenderPoint{20, 15}).has_value());
     EXPECT_FALSE(HitTestEditableAnchorHandle(regions, RenderPoint{15, 15}).has_value());
@@ -84,7 +83,7 @@ TEST(LayoutEditHitTest, AnchorTargetUsesSmallestContainingArea) {
     LayoutEditAnchorRegion large = BasicAnchor(LayoutEditParameter::CardPadding, RenderRect{0, 0, 100, 100});
     LayoutEditAnchorRegion small = BasicAnchor(LayoutEditParameter::FontLabel, RenderRect{20, 20, 30, 30});
 
-    const std::vector<LayoutEditActiveRegion> regions{AnchorTargetRegion(large), AnchorTargetRegion(small)};
+    const LayoutEditActiveRegions regions{AnchorTargetRegion(large), AnchorTargetRegion(small)};
 
     const auto hit = HitTestEditableAnchorTarget(regions, RenderPoint{25, 25});
 
@@ -96,7 +95,7 @@ TEST(LayoutEditHitTest, ColorRegionUsesPriorityThenSmallestArea) {
     LayoutEditColorRegion lowPriorityLarge{LayoutEditParameter::ColorAccent, RenderRect{0, 0, 100, 100}};
     LayoutEditColorRegion highPrioritySmall{LayoutEditParameter::ColorForeground, RenderRect{20, 20, 40, 40}};
 
-    const std::vector<LayoutEditActiveRegion> regions{ColorRegion(lowPriorityLarge), ColorRegion(highPrioritySmall)};
+    const LayoutEditActiveRegions regions{ColorRegion(lowPriorityLarge), ColorRegion(highPrioritySmall)};
 
     const auto hit = HitTestEditableColorRegion(regions, RenderPoint{25, 25});
 
@@ -122,7 +121,7 @@ TEST(LayoutEditHitTest, FindsGuideFamiliesByIdentity) {
     gap.key.parameter = LayoutEditParameter::CardColumnGap;
     gap.hitRect = RenderRect{30, 30, 40, 40};
 
-    const std::vector<LayoutEditActiveRegion> regions{
+    const LayoutEditActiveRegions regions{
         LayoutGuideRegion(layoutGuide), WidgetGuideRegion(widgetGuide), GapRegion(gap)};
 
     EXPECT_TRUE(FindLayoutEditGuide(regions, layoutGuide).has_value());

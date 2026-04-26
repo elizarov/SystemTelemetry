@@ -371,15 +371,15 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
     return RenderSnapshotOffscreen(snapshot, overlayState);
 }
 
-std::vector<LayoutEditActiveRegion> DashboardRenderer::CollectLayoutEditActiveRegions(
+LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
     const DashboardOverlayState& overlayState) const {
-    std::vector<LayoutEditActiveRegion> regions;
+    LayoutEditActiveRegions regions;
     const auto appendRegion =
         [&](const RenderRect& box, LayoutEditActiveRegionKind kind, LayoutEditActiveRegionPayload payload) {
             if (box.IsEmpty()) {
                 return;
             }
-            regions.push_back(LayoutEditActiveRegion{box, kind, std::move(payload)});
+            regions.Add(LayoutEditActiveRegion{box, kind, std::move(payload)});
         };
 
     if (overlayState.showLayoutEditGuides) {
