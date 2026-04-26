@@ -5,6 +5,7 @@
 #include <map>
 
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
 
 namespace {
 
@@ -24,7 +25,36 @@ RenderRect MakeSquareAnchorRect(int centerX, int centerY, int size) {
         centerX - radius, centerY - radius, centerX - radius + clampedSize, centerY - radius + clampedSize};
 }
 
+bool IsColorEditParameter(LayoutEditParameter parameter) {
+    const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
+    return descriptor.has_value() && descriptor->valueFormat == configschema::ValueFormat::ColorHex;
+}
+
+RenderRect TextAnchorRectForShape(const DashboardRenderer& renderer, const RenderRect& textRect, AnchorShape shape) {
+    const int anchorSize = std::max(4, renderer.ScaleLogical(6));
+    const int anchorHalf = anchorSize / 2;
+    if (shape == AnchorShape::Wedge) {
+        const int outsideLeft = std::max(1, renderer.ScaleLogical(2));
+        const int outsideTop = std::max(1, renderer.ScaleLogical(1));
+        const int insideWidth = std::max(4, renderer.ScaleLogical(5));
+        const int insideHeight = std::max(5, renderer.ScaleLogical(6));
+        return RenderRect{textRect.left - outsideLeft,
+            textRect.top - outsideTop,
+            textRect.left + insideWidth,
+            textRect.top - outsideTop + insideHeight};
+    }
+
+    const int anchorCenterX = textRect.right;
+    const int anchorCenterY = textRect.top;
+    return RenderRect{anchorCenterX - anchorHalf,
+        anchorCenterY - anchorHalf,
+        anchorCenterX - anchorHalf + anchorSize,
+        anchorCenterY - anchorHalf + anchorSize};
+}
+
 }  // namespace
+
+DashboardLayoutResolver::DashboardLayoutResolver(DashboardRenderer& renderer) : renderer_(renderer) {}
 
 void DashboardLayoutResolver::Clear() {
     resolvedLayout_ = {};
@@ -43,6 +73,221 @@ void DashboardLayoutResolver::Clear() {
 void DashboardLayoutResolver::ClearDynamicEditArtifacts() {
     dynamicEditableAnchorRegions_.clear();
     dynamicColorEditRegions_.clear();
+}
+
+void DashboardLayoutResolver::RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
+    const LayoutEditAnchorKey& key,
+    const RenderRect& targetRect,
+    const RenderRect& anchorRect,
+    AnchorShape shape,
+    AnchorDragAxis dragAxis,
+    AnchorDragMode dragMode,
+    RenderPoint dragOrigin,
+    double dragScale,
+    bool draggable,
+    bool showWhenWidgetHovered,
+    bool drawTargetOutline,
+    int value) {
+    if (anchorRect.right <= anchorRect.left || anchorRect.bottom <= anchorRect.top) {
+        return;
+    }
+    LayoutEditAnchorRegion region;
+    region.key = key;
+    region.targetRect = targetRect;
+    region.anchorRect = anchorRect;
+    region.shape = shape;
+    const int anchorHitInset =
+        shape == AnchorShape::Wedge ? std::max(1, renderer_.ScaleLogical(2)) : std::max(3, renderer_.ScaleLogical(4));
+    region.anchorHitPadding = anchorHitInset;
+    region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
+        region.anchorRect.top - anchorHitInset,
+        region.anchorRect.right + anchorHitInset,
+        region.anchorRect.bottom + anchorHitInset};
+    region.dragAxis = dragAxis;
+    region.dragMode = dragMode;
+    region.dragOrigin = dragOrigin;
+    region.dragScale = dragScale;
+    region.draggable = draggable;
+    region.showWhenWidgetHovered = showWhenWidgetHovered;
+    region.drawTargetOutline = drawTargetOutline;
+    region.value = value;
+    regions.push_back(std::move(region));
+}
+
+void DashboardLayoutResolver::RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
+    const RenderRect& targetRect,
+    const RenderRect& anchorRect,
+    AnchorShape shape,
+    AnchorDragAxis dragAxis,
+    AnchorDragMode dragMode,
+    RenderPoint dragOrigin,
+    double dragScale,
+    bool draggable,
+    bool showWhenWidgetHovered,
+    bool drawTargetOutline,
+    int value) {
+    RegisterEditableAnchorRegion(staticEditableAnchorRegions_,
+        key,
+        targetRect,
+        anchorRect,
+        shape,
+        dragAxis,
+        dragMode,
+        dragOrigin,
+        dragScale,
+        draggable,
+        showWhenWidgetHovered,
+        drawTargetOutline,
+        value);
+}
+
+void DashboardLayoutResolver::RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
+    const RenderRect& targetRect,
+    const RenderRect& anchorRect,
+    AnchorShape shape,
+    AnchorDragAxis dragAxis,
+    AnchorDragMode dragMode,
+    RenderPoint dragOrigin,
+    double dragScale,
+    bool draggable,
+    bool showWhenWidgetHovered,
+    bool drawTargetOutline,
+    int value) {
+    if (!dynamicAnchorRegistrationEnabled_) {
+        return;
+    }
+    RegisterEditableAnchorRegion(dynamicEditableAnchorRegions_,
+        key,
+        targetRect,
+        anchorRect,
+        shape,
+        dragAxis,
+        dragMode,
+        dragOrigin,
+        dragScale,
+        draggable,
+        showWhenWidgetHovered,
+        drawTargetOutline,
+        value);
+}
+
+void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
+    const RenderRect& rect,
+    const std::string& text,
+    TextStyleId style,
+    const TextLayoutOptions& options,
+    const LayoutEditAnchorBinding& editable,
+    bool drawTargetOutline) {
+    if (text.empty()) {
+        return;
+    }
+
+    const TextLayoutResult result = renderer_.Renderer().MeasureTextBlock(rect, text, style, options);
+    const RenderRect anchorRect = TextAnchorRectForShape(renderer_, result.textRect, editable.shape);
+    const RenderPoint anchorOrigin = anchorRect.Center();
+    RegisterEditableAnchorRegion(regions,
+        editable.key,
+        result.textRect,
+        anchorRect,
+        editable.shape,
+        editable.dragAxis,
+        editable.dragMode,
+        anchorOrigin,
+        1.0,
+        editable.draggable,
+        false,
+        drawTargetOutline,
+        editable.value);
+}
+
+void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
+    const TextLayoutResult& layoutResult,
+    const LayoutEditAnchorBinding& editable,
+    bool drawTargetOutline) {
+    const RenderRect& textRect = layoutResult.textRect;
+    if (textRect.right <= textRect.left || textRect.bottom <= textRect.top) {
+        return;
+    }
+
+    const RenderRect anchorRect = TextAnchorRectForShape(renderer_, textRect, editable.shape);
+    const RenderPoint anchorOrigin = anchorRect.Center();
+    RegisterEditableAnchorRegion(regions,
+        editable.key,
+        textRect,
+        anchorRect,
+        editable.shape,
+        editable.dragAxis,
+        editable.dragMode,
+        anchorOrigin,
+        1.0,
+        editable.draggable,
+        false,
+        drawTargetOutline,
+        editable.value);
+}
+
+void DashboardLayoutResolver::RegisterStaticTextAnchor(const RenderRect& rect,
+    const std::string& text,
+    TextStyleId style,
+    const TextLayoutOptions& options,
+    const LayoutEditAnchorBinding& editable,
+    std::optional<LayoutEditParameter> colorParameter,
+    bool drawTargetOutline) {
+    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, style, options, editable, drawTargetOutline);
+    if (colorParameter.has_value()) {
+        RegisterStaticColorEditRegion(
+            *colorParameter, renderer_.Renderer().MeasureTextBlock(rect, text, style, options).textRect);
+    }
+}
+
+void DashboardLayoutResolver::RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
+    const LayoutEditAnchorBinding& editable,
+    std::optional<LayoutEditParameter> colorParameter,
+    bool drawTargetOutline) {
+    if (!dynamicAnchorRegistrationEnabled_) {
+        return;
+    }
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, layoutResult, editable, drawTargetOutline);
+    if (colorParameter.has_value()) {
+        RegisterDynamicColorEditRegion(*colorParameter, layoutResult.textRect);
+    }
+}
+
+void DashboardLayoutResolver::RegisterDynamicTextAnchor(const RenderRect& rect,
+    const std::string& text,
+    TextStyleId style,
+    const TextLayoutOptions& options,
+    const LayoutEditAnchorBinding& editable,
+    std::optional<LayoutEditParameter> colorParameter,
+    bool drawTargetOutline) {
+    if (!dynamicAnchorRegistrationEnabled_) {
+        return;
+    }
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, style, options, editable, drawTargetOutline);
+    if (colorParameter.has_value()) {
+        RegisterDynamicColorEditRegion(
+            *colorParameter, renderer_.Renderer().MeasureTextBlock(rect, text, style, options).textRect);
+    }
+}
+
+void DashboardLayoutResolver::RegisterStaticColorEditRegion(
+    LayoutEditParameter parameter, const RenderRect& targetRect) {
+    if (!IsColorEditParameter(parameter) || targetRect.IsEmpty()) {
+        return;
+    }
+    staticColorEditRegions_.push_back(LayoutEditColorRegion{parameter, targetRect});
+}
+
+void DashboardLayoutResolver::RegisterDynamicColorEditRegion(
+    LayoutEditParameter parameter, const RenderRect& targetRect) {
+    if (!dynamicAnchorRegistrationEnabled_ || !IsColorEditParameter(parameter) || targetRect.IsEmpty()) {
+        return;
+    }
+    dynamicColorEditRegions_.push_back(LayoutEditColorRegion{parameter, targetRect});
+}
+
+void DashboardLayoutResolver::RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) {
+    widgetEditGuides_.push_back(std::move(guide));
 }
 
 void DashboardLayoutResolver::ResolveNodeWidgets(DashboardRenderer& renderer,
@@ -108,10 +353,9 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 centerY - handleHeight / 2,
                 centerX - handleWidth / 2 + handleWidth,
                 centerY - handleHeight / 2 + handleHeight};
-            renderer.RegisterStaticEditableAnchorRegion(
-                LayoutEditAnchorKey{widgetIdentity,
-                    LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
-                    static_cast<int>(i)},
+            RegisterStaticEditableAnchorRegion(LayoutEditAnchorKey{widgetIdentity,
+                                                   LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
+                                                   static_cast<int>(i)},
                 childRect,
                 anchorRect,
                 horizontal ? AnchorShape::HorizontalReorder : AnchorShape::VerticalReorder,

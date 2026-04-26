@@ -56,7 +56,8 @@ void CardChromeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
 
     if (!iconName_.empty()) {
         renderer.Renderer().DrawIcon(iconName_, layoutState_.iconRect);
-        renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorIcon, layoutState_.iconRect);
+        renderer.EditArtifacts().RegisterDynamicColorEditRegion(
+            WidgetHost::LayoutEditParameter::ColorIcon, layoutState_.iconRect);
     }
     if (!title_.empty()) {
         const WidgetHost::TextLayoutResult titleLayout = renderer.Renderer().DrawTextBlock(layoutState_.titleRect,
@@ -64,7 +65,8 @@ void CardChromeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
             TextStyleId::Title,
             RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
-        renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorForeground, titleLayout.textRect);
+        renderer.EditArtifacts().RegisterDynamicColorEditRegion(
+            WidgetHost::LayoutEditParameter::ColorForeground, titleLayout.textRect);
     }
 }
 
@@ -94,7 +96,7 @@ void CardChromeWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout&
         }
         guide.value = value;
         guide.dragDirection = dragDirection;
-        renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
+        renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
     };
 
     const int contentLeft = std::clamp(
@@ -143,7 +145,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
     const int squareAnchorSize = (std::max)(4, renderer.Renderer().ScaleLogical(6));
     const int radiusLogical = renderer.Config().layout.cardStyle.cardRadius;
     const int radiusScaled = renderer.Renderer().ScaleLogical(radiusLogical);
-    renderer.RegisterStaticEditableAnchorRegion(
+    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardRadius, 0},
         {},
         MakeSquareAnchorRect(widget.rect.left + radiusScaled, widget.rect.top, squareAnchorSize),
@@ -162,7 +164,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
     const int borderAnchorPadding = (std::max)(1, renderer.Renderer().ScaleLogical(1));
     const int borderCenterX = widget.rect.left + (std::max)(0, (widget.rect.right - widget.rect.left) / 2);
     const int borderCenterY = widget.rect.top;
-    renderer.RegisterStaticEditableAnchorRegion(
+    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardBorder, 0},
         {},
         MakeCircleAnchorRect(borderCenterX, borderCenterY, borderScaled, borderAnchorPadding),
@@ -179,7 +181,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
     if (!iconName_.empty()) {
         const int anchorCenterX = layoutState_.iconRect.right;
         const int anchorCenterY = layoutState_.iconRect.top;
-        renderer.RegisterStaticEditableAnchorRegion(
+        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
             LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardHeaderIconSize, 0},
             layoutState_.iconRect,
             MakeSquareAnchorRect(anchorCenterX, anchorCenterY, squareAnchorSize),
@@ -195,7 +197,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
     }
 
     if (!title_.empty()) {
-        renderer.RegisterStaticTextAnchor(layoutState_.titleRect,
+        renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.titleRect,
             title_,
             TextStyleId::Title,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
@@ -204,7 +206,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
                 AnchorShape::Circle,
                 AnchorDragAxis::Vertical,
                 AnchorDragMode::AxisDelta});
-        renderer.RegisterStaticTextAnchor(layoutState_.titleRect,
+        renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.titleRect,
             title_,
             TextStyleId::Title,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),

@@ -37,7 +37,7 @@ void NetworkFooterWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayo
     guide.hitRect = RenderRect{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
     guide.value = renderer.Config().layout.networkFooter.bottomGap;
     guide.dragDirection = -1;
-    renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
+    renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
 }
 
 void NetworkFooterWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
@@ -51,7 +51,7 @@ void NetworkFooterWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget,
         TextStyleId::Footer,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
-    renderer.RegisterDynamicTextAnchor(textLayout,
+    renderer.EditArtifacts().RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);

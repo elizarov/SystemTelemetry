@@ -32,7 +32,7 @@ void ClockTimeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, con
         TextStyleId::ClockTime,
         RenderColorId::Foreground,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
-    renderer.RegisterDynamicTextAnchor(textLayout,
+    renderer.EditArtifacts().RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontClockTime, 0, renderer.Config().layout.fonts.clockTime.size),
         WidgetHost::LayoutEditParameter::ColorForeground);

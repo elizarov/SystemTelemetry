@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -11,11 +12,12 @@
 #include "widget/card_chrome_layout.h"
 #include "widget/layout_edit_types.h"
 #include "widget/widget.h"
+#include "widget/widget_host.h"
 
 class DashboardRenderer;
 class DashboardLayoutEditOverlayRenderer;
 
-class DashboardLayoutResolver {
+class DashboardLayoutResolver : public WidgetEditArtifactRegistrar {
 public:
     struct ResolvedCardLayout {
         std::string id;
@@ -48,6 +50,8 @@ public:
         bool horizontal = false;
         std::vector<RenderRect> childRects;
     };
+
+    explicit DashboardLayoutResolver(DashboardRenderer& renderer);
 
     void Clear();
     void ClearDynamicEditArtifacts();
@@ -82,11 +86,82 @@ public:
         const LayoutNodeConfig& node,
         const RenderRect& rect,
         bool instantiateWidget) const;
+    void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
+        const RenderRect& targetRect,
+        const RenderRect& anchorRect,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
+        RenderPoint dragOrigin,
+        double dragScale,
+        bool draggable,
+        bool showWhenWidgetHovered,
+        bool drawTargetOutline,
+        int value) override;
+    void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
+        const RenderRect& targetRect,
+        const RenderRect& anchorRect,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
+        RenderPoint dragOrigin,
+        double dragScale,
+        bool draggable,
+        bool showWhenWidgetHovered,
+        bool drawTargetOutline,
+        int value) override;
+    void RegisterStaticTextAnchor(const RenderRect& rect,
+        const std::string& text,
+        TextStyleId style,
+        const TextLayoutOptions& options,
+        const LayoutEditAnchorBinding& editable,
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) override;
+    void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
+        const LayoutEditAnchorBinding& editable,
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) override;
+    void RegisterDynamicTextAnchor(const RenderRect& rect,
+        const std::string& text,
+        TextStyleId style,
+        const TextLayoutOptions& options,
+        const LayoutEditAnchorBinding& editable,
+        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
+        bool drawTargetOutline = true) override;
+    void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
+    void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
+    void RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) override;
 
 private:
     friend class DashboardRenderer;
     friend class DashboardLayoutEditOverlayRenderer;
 
+    void RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
+        const LayoutEditAnchorKey& key,
+        const RenderRect& targetRect,
+        const RenderRect& anchorRect,
+        AnchorShape shape,
+        AnchorDragAxis dragAxis,
+        AnchorDragMode dragMode,
+        RenderPoint dragOrigin,
+        double dragScale,
+        bool draggable,
+        bool showWhenWidgetHovered,
+        bool drawTargetOutline,
+        int value);
+    void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
+        const RenderRect& rect,
+        const std::string& text,
+        TextStyleId style,
+        const TextLayoutOptions& options,
+        const LayoutEditAnchorBinding& editable,
+        bool drawTargetOutline);
+    void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
+        const TextLayoutResult& layoutResult,
+        const LayoutEditAnchorBinding& editable,
+        bool drawTargetOutline);
+
+    DashboardRenderer& renderer_;
     ResolvedDashboardLayout resolvedLayout_{};
     std::vector<LayoutEditGuide> layoutEditGuides_;
     std::vector<ContainerChildReorderTarget> containerChildReorderTargets_;

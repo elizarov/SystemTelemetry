@@ -91,14 +91,14 @@ void DrawMetricListRow(WidgetHost& renderer,
             RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
         if (registerEditRegions) {
-            renderer.RegisterDynamicTextAnchor(valueLayout,
+            renderer.EditArtifacts().RegisterDynamicTextAnchor(valueLayout,
                 renderer.MakeEditableTextBinding(widget,
                     WidgetHost::LayoutEditParameter::FontValue,
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size),
                 WidgetHost::LayoutEditParameter::ColorForeground);
             if (rowIndex < static_cast<int>(metricRefs.size()) && !IsRuntimePlaceholderMetricId(metricRefs[rowIndex])) {
-                renderer.RegisterDynamicTextAnchor(
+                renderer.EditArtifacts().RegisterDynamicTextAnchor(
                     valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs[rowIndex], rowIndex * 2 + 101));
             }
         }
@@ -112,12 +112,13 @@ void DrawMetricListRow(WidgetHost& renderer,
     }
 
     const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
-    renderer.RegisterDynamicColorEditRegion(
+    renderer.EditArtifacts().RegisterDynamicColorEditRegion(
         WidgetHost::LayoutEditParameter::ColorAccent, RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
-    renderer.RegisterDynamicColorEditRegion(
+    renderer.EditArtifacts().RegisterDynamicColorEditRegion(
         WidgetHost::LayoutEditParameter::ColorTrack, RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
     if (peakMarkerRect.has_value()) {
-        renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorPeakGhost, *peakMarkerRect);
+        renderer.EditArtifacts().RegisterDynamicColorEditRegion(
+            WidgetHost::LayoutEditParameter::ColorPeakGhost, *peakMarkerRect);
     }
 }
 
@@ -259,7 +260,7 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
         const RenderRect& anchorRect = layoutState_.barAnchorRects[rowIndex];
         const int anchorCenterX = anchorRect.left + ((std::max)(0, anchorRect.right - anchorRect.left) / 2);
         const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
-        renderer.RegisterStaticEditableAnchorRegion(
+        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
             LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 WidgetHost::LayoutEditParameter::MetricListBarHeight,
                 rowIndex},
@@ -274,7 +275,7 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
             false,
             true,
             config.barHeight);
-        renderer.RegisterStaticEditableAnchorRegion(
+        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
             LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 LayoutMetricListOrderEditKey{widget.editCardId, widget.nodePath},
                 rowIndex},
@@ -292,7 +293,7 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
         const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metricRefs_[rowIndex]);
         if (definition != nullptr && !definition->label.empty() &&
             !IsRuntimePlaceholderMetricId(metricRefs_[rowIndex])) {
-            renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
+            renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
                 definition->label,
                 TextStyleId::Label,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
@@ -301,7 +302,7 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
                     rowIndex * 2,
                     renderer.Config().layout.fonts.label.size),
                 WidgetHost::LayoutEditParameter::ColorMutedText);
-            renderer.RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
+            renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.labelRects[rowIndex],
                 definition->label,
                 TextStyleId::Label,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
@@ -309,7 +310,7 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
         }
     }
     if (layoutState_.showAddRowAnchor && !layoutState_.addRowAnchorRect.IsEmpty()) {
-        renderer.RegisterStaticEditableAnchorRegion(
+        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
             LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 LayoutMetricListOrderEditKey{widget.editCardId, widget.nodePath},
                 static_cast<int>(metricRefs_.size())},
@@ -333,7 +334,6 @@ void MetricListWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout&
         static_cast<int>(widget.rect.left),
         static_cast<int>(widget.rect.right));
 
-    auto& guides = renderer.WidgetEditGuidesMutable();
     LayoutEditWidgetGuide guide;
     guide.axis = LayoutGuideAxis::Vertical;
     guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -345,7 +345,7 @@ void MetricListWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout&
     guide.hitRect = RenderRect{x - hitInset, widget.rect.top, x + hitInset + 1, widget.rect.bottom};
     guide.value = renderer.Config().layout.metricList.labelWidth;
     guide.dragDirection = 1;
-    guides.push_back(guide);
+    renderer.EditArtifacts().RegisterWidgetEditGuide(guide);
 
     for (int rowIndex = 0; rowIndex < layoutState_.visibleRows; ++rowIndex) {
         const int y = layoutState_.rowRects[rowIndex].bottom;
@@ -360,6 +360,6 @@ void MetricListWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout&
         guide.hitRect = RenderRect{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
         guide.value = renderer.Config().layout.metricList.rowGap;
         guide.dragDirection = 1;
-        guides.push_back(std::move(guide));
+        renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
     }
 }

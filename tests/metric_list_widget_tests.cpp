@@ -3,12 +3,74 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "widget/impl/metric_list.h"
 #include "widget/widget_host.h"
 
 namespace {
+
+class MetricListTestEditArtifacts final : public WidgetEditArtifactRegistrar {
+public:
+    void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
+        const RenderRect& targetRect,
+        const RenderRect& anchorRect,
+        AnchorShape shape,
+        AnchorDragAxis,
+        AnchorDragMode,
+        RenderPoint,
+        double,
+        bool,
+        bool,
+        bool,
+        int) override {
+        staticAnchors.push_back(LayoutEditAnchorRegion{key, targetRect, anchorRect, anchorRect, 0, shape});
+    }
+
+    void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey&,
+        const RenderRect&,
+        const RenderRect&,
+        AnchorShape,
+        AnchorDragAxis,
+        AnchorDragMode,
+        RenderPoint,
+        double,
+        bool,
+        bool,
+        bool,
+        int) override {}
+
+    void RegisterStaticTextAnchor(const RenderRect&,
+        const std::string&,
+        TextStyleId,
+        const TextLayoutOptions&,
+        const LayoutEditAnchorBinding&,
+        std::optional<LayoutEditParameter>,
+        bool) override {}
+
+    void RegisterDynamicTextAnchor(
+        const TextLayoutResult&, const LayoutEditAnchorBinding&, std::optional<LayoutEditParameter>, bool) override {}
+
+    void RegisterDynamicTextAnchor(const RenderRect&,
+        const std::string&,
+        TextStyleId,
+        const TextLayoutOptions&,
+        const LayoutEditAnchorBinding&,
+        std::optional<LayoutEditParameter>,
+        bool) override {}
+
+    void RegisterStaticColorEditRegion(LayoutEditParameter, const RenderRect&) override {}
+
+    void RegisterDynamicColorEditRegion(LayoutEditParameter, const RenderRect&) override {}
+
+    void RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) override {
+        guides.push_back(std::move(guide));
+    }
+
+    std::vector<LayoutEditAnchorRegion> staticAnchors;
+    std::vector<LayoutEditWidgetGuide> guides;
+};
 
 class MetricListTestRenderer final : public WidgetHost, public Renderer {
 public:
@@ -71,6 +133,10 @@ public:
 
     RenderMode CurrentRenderMode() const override {
         return RenderMode::Normal;
+    }
+
+    WidgetEditArtifactRegistrar& EditArtifacts() override {
+        return editArtifacts;
     }
 
     int ScaleLogical(int value) const override {
@@ -174,61 +240,6 @@ public:
                 anchorId}};
     }
 
-    void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis,
-        AnchorDragMode,
-        RenderPoint,
-        double,
-        bool,
-        bool,
-        bool,
-        int) override {
-        staticAnchors.push_back(LayoutEditAnchorRegion{key, targetRect, anchorRect, anchorRect, 0, shape});
-    }
-
-    void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey&,
-        const RenderRect&,
-        const RenderRect&,
-        AnchorShape,
-        AnchorDragAxis,
-        AnchorDragMode,
-        RenderPoint,
-        double,
-        bool,
-        bool,
-        bool,
-        int) override {}
-
-    void RegisterStaticTextAnchor(const RenderRect&,
-        const std::string&,
-        TextStyleId,
-        const TextLayoutOptions&,
-        const LayoutEditAnchorBinding&,
-        std::optional<LayoutEditParameter>,
-        bool) override {}
-
-    void RegisterDynamicTextAnchor(
-        const TextLayoutResult&, const LayoutEditAnchorBinding&, std::optional<LayoutEditParameter>, bool) override {}
-
-    void RegisterDynamicTextAnchor(const RenderRect&,
-        const std::string&,
-        TextStyleId,
-        const TextLayoutOptions&,
-        const LayoutEditAnchorBinding&,
-        std::optional<LayoutEditParameter>,
-        bool) override {}
-
-    void RegisterStaticColorEditRegion(LayoutEditParameter, const RenderRect&) override {}
-
-    void RegisterDynamicColorEditRegion(LayoutEditParameter, const RenderRect&) override {}
-
-    std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable() override {
-        return guides_;
-    }
-
     const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const override {
         for (const auto& definition : definitions_) {
             if (definition.id == metricRef) {
@@ -247,13 +258,12 @@ public:
         return std::nullopt;
     }
 
-    std::vector<LayoutEditAnchorRegion> staticAnchors;
+    MetricListTestEditArtifacts editArtifacts;
 
 private:
     AppConfig config_{};
     TextStyleMetrics textMetrics_{};
     std::vector<MetricDefinitionConfig> definitions_;
-    std::vector<LayoutEditWidgetGuide> guides_;
     std::string empty_;
 };
 
@@ -266,8 +276,8 @@ MetricListWidget BuildMetricListWidget() {
 }
 
 int CountPlusAnchors(const MetricListTestRenderer& renderer) {
-    return static_cast<int>(std::count_if(renderer.staticAnchors.begin(),
-        renderer.staticAnchors.end(),
+    return static_cast<int>(std::count_if(renderer.editArtifacts.staticAnchors.begin(),
+        renderer.editArtifacts.staticAnchors.end(),
         [](const LayoutEditAnchorRegion& region) { return region.shape == AnchorShape::Plus; }));
 }
 

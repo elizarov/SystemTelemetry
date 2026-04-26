@@ -41,7 +41,7 @@ void TextWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widge
     guide.hitRect = RenderRect{widget.rect.left, y - hitInset, widget.rect.right, y + hitInset + 1};
     guide.value = renderer.Config().layout.text.bottomGap;
     guide.dragDirection = 1;
-    renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
+    renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
 }
 
 void TextWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
@@ -53,5 +53,6 @@ void TextWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const Me
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
     const auto binding = renderer.MakeEditableTextBinding(
         widget, WidgetHost::LayoutEditParameter::FontText, 0, renderer.Config().layout.fonts.text.size);
-    renderer.RegisterDynamicTextAnchor(textLayout, binding, WidgetHost::LayoutEditParameter::ColorForeground);
+    renderer.EditArtifacts().RegisterDynamicTextAnchor(
+        textLayout, binding, WidgetHost::LayoutEditParameter::ColorForeground);
 }

@@ -114,56 +114,11 @@ public:
     const ::Renderer& Renderer() const override;
     const AppConfig& Config() const override;
     RenderMode CurrentRenderMode() const override;
+    WidgetEditArtifactRegistrar& EditArtifacts() override;
     LayoutEditAnchorBinding MakeEditableTextBinding(
         const WidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const override;
     LayoutEditAnchorBinding MakeMetricTextBinding(
         const WidgetLayout& widget, std::string_view metricId, int anchorId) const override;
-    void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        AnchorDragMode dragMode,
-        RenderPoint dragOrigin,
-        double dragScale,
-        bool draggable,
-        bool showWhenWidgetHovered,
-        bool drawTargetOutline,
-        int value) override;
-    void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        AnchorDragMode dragMode,
-        RenderPoint dragOrigin,
-        double dragScale,
-        bool draggable,
-        bool showWhenWidgetHovered,
-        bool drawTargetOutline,
-        int value) override;
-    void RegisterStaticTextAnchor(const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        const TextLayoutOptions& options,
-        const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) override;
-    void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
-        const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) override;
-    void RegisterDynamicTextAnchor(const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        const TextLayoutOptions& options,
-        const LayoutEditAnchorBinding& editable,
-        std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) override;
-    void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
-    void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
-    std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable() override;
-    std::vector<LayoutEditGapAnchor>& GapEditAnchorsMutable();
     int ScaleLogical(int value) const;
     std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
         const LayoutEditWidgetIdentity& widget) const override;
@@ -206,30 +161,6 @@ private:
     bool IsWidgetAffectedByGuide(const WidgetLayout& widget, const LayoutEditGuide& guide) const;
     bool MatchesWidgetIdentity(const WidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const;
     static bool IsContainerNode(const LayoutNodeConfig& node);
-    void RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
-        const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        AnchorDragMode dragMode,
-        RenderPoint dragOrigin,
-        double dragScale,
-        bool draggable,
-        bool showWhenWidgetHovered,
-        bool drawTargetOutline,
-        int value);
-    void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
-        const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        const TextLayoutOptions& options,
-        const LayoutEditAnchorBinding& editable,
-        bool drawTargetOutline);
-    void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
-        const TextLayoutResult& layoutResult,
-        const LayoutEditAnchorBinding& editable,
-        bool drawTargetOutline);
     RendererStyle BuildRendererStyle() const;
     const MetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();

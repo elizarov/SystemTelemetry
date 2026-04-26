@@ -32,7 +32,7 @@ void ClockDateWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, con
         TextStyleId::ClockDate,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
-    renderer.RegisterDynamicTextAnchor(textLayout,
+    renderer.EditArtifacts().RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontClockDate, 0, renderer.Config().layout.fonts.clockDate.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);

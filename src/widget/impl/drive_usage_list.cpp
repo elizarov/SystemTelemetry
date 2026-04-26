@@ -372,7 +372,7 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
             TextStyleId::Label,
             RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
-        renderer.RegisterDynamicTextAnchor(labelLayout,
+        renderer.EditArtifacts().RegisterDynamicTextAnchor(labelLayout,
             renderer.MakeEditableTextBinding(widget,
                 WidgetHost::LayoutEditParameter::FontLabel,
                 textBaseId,
@@ -398,9 +398,9 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
             std::nullopt,
             renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank);
         const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
-        renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorAccent,
+        renderer.EditArtifacts().RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorAccent,
             RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});
-        renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorTrack,
+        renderer.EditArtifacts().RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorTrack,
             RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
         if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
             const WidgetHost::TextLayoutResult percentLayout = renderer.Renderer().DrawTextBlock(columns.percent,
@@ -408,26 +408,26 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
                 TextStyleId::Label,
                 RenderColorId::Foreground,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
-            renderer.RegisterDynamicTextAnchor(percentLayout,
+            renderer.EditArtifacts().RegisterDynamicTextAnchor(percentLayout,
                 renderer.MakeEditableTextBinding(widget,
                     WidgetHost::LayoutEditParameter::FontLabel,
                     textBaseId + 1,
                     renderer.Config().layout.fonts.label.size),
                 WidgetHost::LayoutEditParameter::ColorForeground);
-            renderer.RegisterDynamicTextAnchor(
+            renderer.EditArtifacts().RegisterDynamicTextAnchor(
                 percentLayout, renderer.MakeMetricTextBinding(widget, "drive.usage", textBaseId + 101));
             const WidgetHost::TextLayoutResult freeLayout = renderer.Renderer().DrawTextBlock(columns.free,
                 drive.freeText,
                 TextStyleId::Small,
                 RenderColorId::MutedText,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
-            renderer.RegisterDynamicTextAnchor(freeLayout,
+            renderer.EditArtifacts().RegisterDynamicTextAnchor(freeLayout,
                 renderer.MakeEditableTextBinding(widget,
                     WidgetHost::LayoutEditParameter::FontSmall,
                     textBaseId + 2,
                     renderer.Config().layout.fonts.smallText.size),
                 WidgetHost::LayoutEditParameter::ColorMutedText);
-            renderer.RegisterDynamicTextAnchor(
+            renderer.EditArtifacts().RegisterDynamicTextAnchor(
                 freeLayout, renderer.MakeMetricTextBinding(widget, "drive.free", textBaseId + 102));
         }
     }
@@ -437,7 +437,7 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
 
 void DriveUsageListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.driveUsageList;
-    renderer.RegisterStaticEditableAnchorRegion(
+    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::DriveUsageActivitySegments,
             0},
@@ -452,50 +452,50 @@ void DriveUsageListWidget::BuildStaticAnchors(WidgetHost& renderer, const Widget
         true,
         false,
         config.activitySegments);
-    renderer.RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
+    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontSmall, 0, renderer.Config().layout.fonts.smallText.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);
-    renderer.RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
+    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
         renderer.MakeMetricTextBinding(widget, "drive.activity.read", 100));
-    renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
+    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);
-    renderer.RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
+    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
         renderer.MakeMetricTextBinding(widget, "drive.activity.write", 101));
-    renderer.RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
+    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
         ResolveDriveMetricLabel(renderer, "drive.usage", "Usage"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontSmall, 2, renderer.Config().layout.fonts.smallText.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);
-    renderer.RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
+    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
         ResolveDriveMetricLabel(renderer, "drive.usage", "Usage"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
         renderer.MakeMetricTextBinding(widget, "drive.usage", 102));
-    renderer.RegisterStaticTextAnchor(layoutState_.headerColumns.free,
+    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerColumns.free,
         ResolveDriveMetricLabel(renderer, "drive.free", "Free"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center),
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontSmall, 3, renderer.Config().layout.fonts.smallText.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);
-    renderer.RegisterStaticTextAnchor(layoutState_.headerColumns.free,
+    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerColumns.free,
         ResolveDriveMetricLabel(renderer, "drive.free", "Free"),
         TextStyleId::Small,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center),
@@ -508,7 +508,7 @@ void DriveUsageListWidget::BuildStaticAnchors(WidgetHost& renderer, const Widget
         const RenderRect& anchorRect = layoutState_.rowBarAnchorRects[rowIndex];
         const int anchorCenterX = anchorRect.left + ((std::max)(0, anchorRect.right - anchorRect.left) / 2);
         const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
-        renderer.RegisterStaticEditableAnchorRegion(
+        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
             LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 WidgetHost::LayoutEditParameter::DriveUsageBarHeight,
                 rowIndex},
@@ -534,7 +534,6 @@ void DriveUsageListWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLay
         return;
     }
 
-    auto& guides = renderer.WidgetEditGuidesMutable();
     const auto addVerticalGuide =
         [&](int guideId, int x, WidgetHost::LayoutEditParameter parameter, int value, int dragDirection) {
             const int clampedX = std::clamp(x, static_cast<int>(widget.rect.left), static_cast<int>(widget.rect.right));
@@ -550,7 +549,7 @@ void DriveUsageListWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLay
                 RenderRect{clampedX - hitInset, widget.rect.top, clampedX + hitInset + 1, widget.rect.bottom};
             guide.value = value;
             guide.dragDirection = dragDirection;
-            guides.push_back(std::move(guide));
+            renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
         };
     const auto addHorizontalGuide = [&](int guideId,
                                         int y,
@@ -573,7 +572,7 @@ void DriveUsageListWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLay
         guide.hitRect = RenderRect{guideLeft, clampedY - hitInset, guideRight, clampedY + hitInset + 1};
         guide.value = value;
         guide.dragDirection = dragDirection;
-        guides.push_back(std::move(guide));
+        renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
     };
 
     addVerticalGuide(0, columns.read.left, WidgetHost::LayoutEditParameter::DriveUsageLabelGap, config.labelGap, 1);

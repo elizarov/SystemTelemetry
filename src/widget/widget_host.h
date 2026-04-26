@@ -17,23 +17,13 @@ enum class RenderMode {
     Blank,
 };
 
-class WidgetHost {
+class WidgetEditArtifactRegistrar {
 public:
     using LayoutEditParameter = ::LayoutEditParameter;
     using TextLayoutResult = ::TextLayoutResult;
-    using TextStyleMetrics = ::TextStyleMetrics;
-    using RenderMode = ::RenderMode;
 
-    virtual ~WidgetHost() = default;
+    virtual ~WidgetEditArtifactRegistrar() = default;
 
-    virtual ::Renderer& Renderer() = 0;
-    virtual const ::Renderer& Renderer() const = 0;
-    virtual const AppConfig& Config() const = 0;
-    virtual RenderMode CurrentRenderMode() const = 0;
-    virtual LayoutEditAnchorBinding MakeEditableTextBinding(
-        const WidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const = 0;
-    virtual LayoutEditAnchorBinding MakeMetricTextBinding(
-        const WidgetLayout& widget, std::string_view metricId, int anchorId) const = 0;
     virtual void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
         const RenderRect& targetRect,
         const RenderRect& anchorRect,
@@ -78,7 +68,27 @@ public:
         bool drawTargetOutline = true) = 0;
     virtual void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) = 0;
     virtual void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) = 0;
-    virtual std::vector<LayoutEditWidgetGuide>& WidgetEditGuidesMutable() = 0;
+    virtual void RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) = 0;
+};
+
+class WidgetHost {
+public:
+    using LayoutEditParameter = ::LayoutEditParameter;
+    using TextLayoutResult = ::TextLayoutResult;
+    using TextStyleMetrics = ::TextStyleMetrics;
+    using RenderMode = ::RenderMode;
+
+    virtual ~WidgetHost() = default;
+
+    virtual ::Renderer& Renderer() = 0;
+    virtual const ::Renderer& Renderer() const = 0;
+    virtual const AppConfig& Config() const = 0;
+    virtual RenderMode CurrentRenderMode() const = 0;
+    virtual WidgetEditArtifactRegistrar& EditArtifacts() = 0;
+    virtual LayoutEditAnchorBinding MakeEditableTextBinding(
+        const WidgetLayout& widget, LayoutEditParameter parameter, int anchorId, int value) const = 0;
+    virtual LayoutEditAnchorBinding MakeMetricTextBinding(
+        const WidgetLayout& widget, std::string_view metricId, int anchorId) const = 0;
     virtual const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const = 0;
     virtual const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const = 0;
     virtual std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(

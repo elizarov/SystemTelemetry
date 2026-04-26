@@ -299,7 +299,7 @@ void GaugeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const M
             RenderStroke::Solid(RenderColorId::PeakGhost, static_cast<float>(layoutState_.ringThickness)));
         if (peakSegmentIndex < layoutState_.ringSegmentBounds.size() &&
             !layoutState_.ringSegmentBounds[peakSegmentIndex].IsEmpty()) {
-            renderer.RegisterDynamicColorEditRegion(
+            renderer.EditArtifacts().RegisterDynamicColorEditRegion(
                 WidgetHost::LayoutEditParameter::ColorPeakGhost, layoutState_.ringSegmentBounds[peakSegmentIndex]);
         }
     }
@@ -310,19 +310,20 @@ void GaugeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const M
             TextStyleId::Big,
             RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
-        renderer.RegisterDynamicTextAnchor(valueLayout,
+        renderer.EditArtifacts().RegisterDynamicTextAnchor(valueLayout,
             renderer.MakeEditableTextBinding(
                 widget, WidgetHost::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size),
             WidgetHost::LayoutEditParameter::ColorForeground);
-        renderer.RegisterDynamicTextAnchor(valueLayout, renderer.MakeMetricTextBinding(widget, metric_, 100));
+        renderer.EditArtifacts().RegisterDynamicTextAnchor(
+            valueLayout, renderer.MakeMetricTextBinding(widget, metric_, 100));
     }
     const RenderRect ringBounds{layoutState_.cx - layoutState_.outerRadius,
         layoutState_.cy - layoutState_.outerRadius,
         layoutState_.cx + layoutState_.outerRadius,
         layoutState_.cy + layoutState_.outerRadius};
-    renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorAccent,
+    renderer.EditArtifacts().RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorAccent,
         RenderRect{ringBounds.left, ringBounds.top, layoutState_.cx, ringBounds.bottom});
-    renderer.RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorTrack,
+    renderer.EditArtifacts().RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorTrack,
         RenderRect{layoutState_.cx, ringBounds.top, ringBounds.right, ringBounds.bottom});
     renderer.Renderer().DrawText(layoutState_.labelRect,
         metric.label,
@@ -335,7 +336,7 @@ void GaugeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& w
     const int cx = layoutState_.cx;
     const int cy = layoutState_.cy;
     const int outerRadius = layoutState_.outerRadius;
-    renderer.RegisterStaticEditableAnchorRegion(
+    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::GaugeSegmentCount,
             0},
@@ -350,7 +351,7 @@ void GaugeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& w
         true,
         true,
         renderer.Config().layout.gauge.segmentCount);
-    renderer.RegisterStaticEditableAnchorRegion(
+    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::GaugeOuterPadding,
             0},
@@ -365,7 +366,7 @@ void GaugeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& w
         true,
         false,
         renderer.Config().layout.gauge.outerPadding);
-    renderer.RegisterStaticEditableAnchorRegion(
+    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::GaugeRingThickness,
             0},
@@ -382,14 +383,14 @@ void GaugeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& w
         renderer.Config().layout.gauge.ringThickness);
     const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metric_);
     if (definition != nullptr && !definition->label.empty()) {
-        renderer.RegisterStaticTextAnchor(layoutState_.labelRect,
+        renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.labelRect,
             definition->label,
             TextStyleId::Small,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
             renderer.MakeEditableTextBinding(
                 widget, WidgetHost::LayoutEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size),
             WidgetHost::LayoutEditParameter::ColorMutedText);
-        renderer.RegisterStaticTextAnchor(layoutState_.labelRect,
+        renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.labelRect,
             definition->label,
             TextStyleId::Small,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
@@ -435,7 +436,7 @@ void GaugeWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widg
         guide.angularDrag = true;
         guide.angularMin = angularMin;
         guide.angularMax = angularMax;
-        renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
+        renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
     };
 
     addRadialGuide(WidgetHost::LayoutEditParameter::GaugeSweepDegrees,
@@ -464,7 +465,7 @@ void GaugeWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widg
         guide.hitRect = RenderRect{cx - halfWidth, y - hitInset, cx + halfWidth, y + hitInset + 1};
         guide.value = bottomOffset;
         guide.dragDirection = 1;
-        renderer.WidgetEditGuidesMutable().push_back(std::move(guide));
+        renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
     };
 
     addHorizontalGuide(
