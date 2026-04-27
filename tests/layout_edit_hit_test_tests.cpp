@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "config/config_parser.h"
+#include "config/config_resolution.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_edit/layout_edit_hit_test.h"
 #include "layout_model/dashboard_overlay_state.h"
@@ -283,7 +284,7 @@ TEST(LayoutEditHitTest, FindsGuideFamiliesByIdentity) {
     EXPECT_TRUE(FindGapEditAnchor(regions, gap.key).has_value());
 }
 
-TEST(LayoutEditHitTest, BuiltInDefaultLayoutActiveRegionsHaveFourByFourReachableHitZone) {
+TEST(LayoutEditHitTest, BuiltInLayoutsActiveRegionsHaveFourByFourReachableHitZone) {
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
 
     Trace trace;
@@ -300,18 +301,24 @@ TEST(LayoutEditHitTest, BuiltInDefaultLayoutActiveRegionsHaveFourByFourReachable
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
 
-    ASSERT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
+    ASSERT_FALSE(config.layout.layouts.empty());
+    for (const LayoutSectionConfig& layout : config.layout.layouts) {
+        SCOPED_TRACE(layout.name);
+        ASSERT_TRUE(SelectLayout(config, layout.name));
+        renderer.SetConfig(config);
+        ASSERT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
 
-    const LayoutEditActiveRegions regions = renderer.CollectLayoutEditActiveRegions(overlayState);
-    ASSERT_FALSE(regions.Empty());
+        const LayoutEditActiveRegions regions = renderer.CollectLayoutEditActiveRegions(overlayState);
+        ASSERT_FALSE(regions.Empty());
 
-    size_t index = 0;
-    for (const LayoutEditActiveRegion& region : regions) {
-        SCOPED_TRACE(index);
-        SCOPED_TRACE(RegionLabel(region));
-        EXPECT_GE(region.box.Width(), 4);
-        EXPECT_GE(region.box.Height(), 4);
-        EXPECT_TRUE(HasFourByFourHitBlock(regions, region));
-        ++index;
+        size_t index = 0;
+        for (const LayoutEditActiveRegion& region : regions) {
+            SCOPED_TRACE(index);
+            SCOPED_TRACE(RegionLabel(region));
+            EXPECT_GE(region.box.Width(), 4);
+            EXPECT_GE(region.box.Height(), 4);
+            EXPECT_TRUE(HasFourByFourHitBlock(regions, region));
+            ++index;
+        }
     }
 }
