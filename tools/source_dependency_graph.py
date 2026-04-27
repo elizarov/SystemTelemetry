@@ -26,6 +26,17 @@ D2D_INCLUDE_NAMES = {
     "wrl/client.h",
 }
 LARGE_SOURCE_FILE_LOC_THRESHOLD = 1_000
+PACKAGE_DEPENDENCY_LIMITS = {
+    "dashboard_renderer": {"config", "layout_model", "renderer", "telemetry", "util", "widget"},
+    "layout_edit_dialog": {"config", "layout_edit", "layout_model", "telemetry", "util", "widget"},
+    "layout_edit": {"config", "layout_model", "util", "widget"},
+    "layout_model": {"config", "renderer", "widget"},
+    "widget": {"config", "renderer", "telemetry", "util"},
+    "renderer": {"config", "util"},
+    "telemetry": {"config", "util"},
+    "config": {"util"},
+    "util": set(),
+}
 
 
 @dataclass
@@ -208,6 +219,13 @@ def top_level_package(module_name: str) -> str:
     return module_name.split("/", 1)[0]
 
 
+def format_allowed_package_dependencies(package: str, dependencies: set[str]) -> str:
+    allowed = [package, *sorted(dependencies)]
+    if len(allowed) == 1:
+        return f"{allowed[0]} modules"
+    return ", ".join(allowed[:-1]) + f", or {allowed[-1]} modules"
+
+
 def is_package_private_module(module_name: str) -> bool:
     return len(module_name.split("/")) > 2
 
@@ -235,205 +253,26 @@ def check_package_encapsulation(edges: dict[tuple[str, str], str]) -> list[Viola
     return violations
 
 
-def check_util_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
+def check_package_dependency_limits(edges: dict[tuple[str, str], str]) -> list[Violation]:
     violations: list[Violation] = []
     for source, target in sorted(edges):
-        if top_level_package(source) != "util":
-            continue
-        if top_level_package(target) == "util":
-            continue
-        violations.append(
-            Violation(
-                kind="layer-util",
-                source=source,
-                target=target,
-                message=f"{source} is in the util layer and must not depend on project module {target}.",
-            )
-        )
-    return violations
-
-
-def check_config_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
-    violations: list[Violation] = []
-    allowed_targets = {"config", "util"}
-    for source, target in sorted(edges):
-        if top_level_package(source) != "config":
-            continue
-        if top_level_package(target) in allowed_targets:
-            continue
-        violations.append(
-            Violation(
-                kind="layer-config",
-                source=source,
-                target=target,
-                message=(
-                    f"{source} is in the config layer and must depend only on config or util modules, "
-                    f"not project module {target}."
-                ),
-            )
-        )
-    return violations
-
-
-def check_telemetry_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
-    violations: list[Violation] = []
-    allowed_targets = {"telemetry", "config", "util"}
-    for source, target in sorted(edges):
-        if top_level_package(source) != "telemetry":
-            continue
-        if top_level_package(target) in allowed_targets:
-            continue
-        violations.append(
-            Violation(
-                kind="layer-telemetry",
-                source=source,
-                target=target,
-                message=(
-                    f"{source} is in the telemetry layer and must depend only on telemetry, config, or util modules, "
-                    f"not project module {target}."
-                ),
-            )
-        )
-    return violations
-
-
-def check_widget_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
-    violations: list[Violation] = []
-    allowed_targets = {"widget", "renderer", "telemetry", "config", "util"}
-    for source, target in sorted(edges):
-        if top_level_package(source) != "widget":
-            continue
-        if top_level_package(target) in allowed_targets:
-            continue
-        violations.append(
-            Violation(
-                kind="layer-widget",
-                source=source,
-                target=target,
-                message=(
-                    f"{source} is in the widget layer and must depend only on widget, telemetry, config, or util "
-                    f"modules, not project module {target}."
-                ),
-            )
-        )
-    return violations
-
-
-def check_layout_model_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
-    violations: list[Violation] = []
-    allowed_targets = {"layout_model", "widget", "renderer", "telemetry", "config", "util"}
-    for source, target in sorted(edges):
-        if top_level_package(source) != "layout_model":
-            continue
-        if top_level_package(target) in allowed_targets:
-            continue
-        violations.append(
-            Violation(
-                kind="layer-layout-model",
-                source=source,
-                target=target,
-                message=(
-                    f"{source} is in the layout_model layer and must depend only on layout_model, widget, renderer, "
-                    f"telemetry, config, or util modules, not project module {target}."
-                ),
-            )
-        )
-    return violations
-
-
-def check_layout_edit_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
-    violations: list[Violation] = []
-    allowed_targets = {"layout_edit", "config", "dashboard_renderer", "layout_model", "util", "widget"}
-    for source, target in sorted(edges):
-        if top_level_package(source) != "layout_edit":
-            continue
-        if top_level_package(target) in allowed_targets:
-            continue
-        violations.append(
-            Violation(
-                kind="layer-layout-edit",
-                source=source,
-                target=target,
-                message=(
-                    f"{source} is in the layout_edit layer and must depend only on layout_edit, config, "
-                    f"dashboard_renderer, layout_model, util, or widget modules, not project module {target}."
-                ),
-            )
-        )
-    return violations
-
-
-def check_layout_edit_dialog_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
-    violations: list[Violation] = []
-    allowed_targets = {
-        "layout_edit_dialog",
-        "config",
-        "dashboard_renderer",
-        "layout_edit",
-        "layout_model",
-        "telemetry",
-        "util",
-        "widget",
-    }
-    for source, target in sorted(edges):
-        if top_level_package(source) != "layout_edit_dialog":
-            continue
-        if top_level_package(target) in allowed_targets:
-            continue
-        violations.append(
-            Violation(
-                kind="layer-layout-edit-dialog",
-                source=source,
-                target=target,
-                message=(
-                    f"{source} is in the layout_edit_dialog layer and must depend only on layout_edit_dialog, config, "
-                    f"dashboard_renderer, layout_edit, layout_model, telemetry, util, or widget modules, "
-                    f"not project module {target}."
-                ),
-            )
-        )
-    return violations
-
-
-def check_dashboard_renderer_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
-    violations: list[Violation] = []
-    allowed_targets = {"dashboard_renderer", "config", "layout_model", "renderer", "telemetry", "util", "widget"}
-    for source, target in sorted(edges):
-        if top_level_package(source) != "dashboard_renderer":
-            continue
-        if top_level_package(target) in allowed_targets:
-            continue
-        violations.append(
-            Violation(
-                kind="layer-dashboard-renderer",
-                source=source,
-                target=target,
-                message=(
-                    f"{source} is in the dashboard_renderer layer and must depend only on dashboard_renderer, "
-                    f"config, layout_model, renderer, telemetry, util, or widget modules, not project module {target}."
-                ),
-            )
-        )
-    return violations
-
-
-def check_renderer_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
-    violations: list[Violation] = []
-    allowed_targets = {"renderer", "config", "util"}
-    for source, target in sorted(edges):
-        if top_level_package(source) != "renderer":
+        source_package = top_level_package(source)
+        target_package = top_level_package(target)
+        allowed_targets = PACKAGE_DEPENDENCY_LIMITS.get(source_package)
+        if allowed_targets is None:
             continue
         if target == EXTERNAL_D2D_MODULE:
             continue
-        if top_level_package(target) in allowed_targets:
+        if target_package == source_package or target_package in allowed_targets:
             continue
         violations.append(
             Violation(
-                kind="layer-renderer",
+                kind=f"package-dependency-{source_package}",
                 source=source,
                 target=target,
                 message=(
-                    f"{source} is in the renderer layer and must depend only on renderer, config, or util modules, "
+                    f"{source} is in the {source_package} package and must depend only on "
+                    f"{format_allowed_package_dependencies(source_package, allowed_targets)}, "
                     f"not project module {target}."
                 ),
             )
@@ -462,15 +301,7 @@ def check_d2d_layer(edges: dict[tuple[str, str], str]) -> list[Violation]:
 def check_graph_rules(edges: dict[tuple[str, str], str]) -> list[Violation]:
     return [
         *check_package_encapsulation(edges),
-        *check_util_layer(edges),
-        *check_config_layer(edges),
-        *check_telemetry_layer(edges),
-        *check_widget_layer(edges),
-        *check_layout_model_layer(edges),
-        *check_layout_edit_layer(edges),
-        *check_layout_edit_dialog_layer(edges),
-        *check_dashboard_renderer_layer(edges),
-        *check_renderer_layer(edges),
+        *check_package_dependency_limits(edges),
         *check_d2d_layer(edges),
     ]
 
