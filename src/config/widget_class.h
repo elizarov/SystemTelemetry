@@ -1,8 +1,5 @@
 #pragma once
 
-#include <optional>
-#include <string_view>
-
 #include "util/enum_string.h"
 
 #define SYSTEM_TELEMETRY_WIDGET_CLASS_ITEMS(X)                                                                         \

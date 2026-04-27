@@ -8,8 +8,6 @@
 
 #include "dashboard/dashboard_menu_types.h"
 #include "diagnostics/diagnostics.h"
-#include "display/constants.h"
-#include "display/display_config.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 

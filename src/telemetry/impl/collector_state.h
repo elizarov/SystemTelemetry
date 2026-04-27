@@ -11,7 +11,6 @@
 #include <iphlpapi.h>
 #include <memory>
 #include <netioapi.h>
-#include <ostream>
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <string>

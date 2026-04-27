@@ -14,6 +14,7 @@
 #include "util/paths.h"
 #include "util/strings.h"
 #include "util/trace.h"
+#include "util/utf8.h"
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     if (config.display.wallpaper.empty()) {

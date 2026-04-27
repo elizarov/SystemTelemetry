@@ -1,17 +1,23 @@
 #include "dashboard/dashboard_app.h"
 
 #include <cmath>
+#include <commctrl.h>
 #include <sstream>
 #include <string_view>
 #include <vector>
+#include <windowsx.h>
 #include <wtsapi32.h>
 
+#include "dashboard/constants.h"
 #include "dashboard/dashboard_shell_ui.h"
 #include "display/display_config.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
+#include "resource.h"
 #include "util/localization_catalog.h"
+#include "util/paths.h"
 #include "util/trace.h"
+#include "util/utf8.h"
 
 namespace {
 

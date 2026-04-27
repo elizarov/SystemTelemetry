@@ -18,35 +18,6 @@
 #include "util/strings.h"
 #include "util/trace.h"
 
-namespace {
-
-RenderRect UnionRect(const RenderRect& left, const RenderRect& right) {
-    if (left.IsEmpty()) {
-        return right;
-    }
-    if (right.IsEmpty()) {
-        return left;
-    }
-    return RenderRect{(std::min)(left.left, right.left),
-        (std::min)(left.top, right.top),
-        (std::max)(left.right, right.right),
-        (std::max)(left.bottom, right.bottom)};
-}
-
-bool SameRect(const RenderRect& left, const RenderRect& right) {
-    return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
-}
-
-RenderRect OffsetRect(RenderRect rect, int dx, int dy) {
-    rect.left += dx;
-    rect.right += dx;
-    rect.top += dy;
-    rect.bottom += dy;
-    return rect;
-}
-
-}  // namespace
-
 DashboardRenderer::DashboardRenderer(Trace& trace)
     : trace_(trace), renderer_(CreateRenderer()), layoutResolver_(std::make_unique<DashboardLayoutResolver>(*this)),
       layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)) {}

@@ -6,7 +6,6 @@
 #include <d2d1.h>
 #include <dwrite.h>
 #include <filesystem>
-#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>

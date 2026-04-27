@@ -2,8 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <commctrl.h>
 #include <commdlg.h>
-#include <cwchar>
 #include <sstream>
 
 #include "dashboard/constants.h"
@@ -16,8 +16,10 @@
 #include "layout_edit_dialog/layout_edit_dialog.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
+#include "resource.h"
 #include "telemetry/metrics.h"
 #include "util/strings.h"
+#include "util/utf8.h"
 
 namespace {
 
@@ -94,22 +96,6 @@ std::optional<BoardMetricBindingTarget> ParseBoardMetricBindingTarget(std::strin
         };
     }
     return std::nullopt;
-}
-
-std::string FindConfiguredBoardMetricBinding(const AppConfig& config, const LayoutMetricEditKey& key) {
-    const auto target = ParseBoardMetricBindingTarget(key.metricId);
-    if (!target.has_value()) {
-        return {};
-    }
-
-    const auto& bindings = target->kind == BoardMetricBindingKind::Temperature
-                               ? config.layout.board.temperatureSensorNames
-                               : config.layout.board.fanSensorNames;
-    const auto it = bindings.find(target->logicalName);
-    if (it != bindings.end() && !it->second.empty()) {
-        return it->second;
-    }
-    return target->logicalName;
 }
 
 AppConfig BuildLayoutEditOriginalConfig(const DashboardSessionState& sessionState) {
@@ -217,32 +203,6 @@ void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
     SetMenuItemInfoW(menu, commandId, FALSE, &info);
 }
 
-std::optional<double> TryParseDialogDouble(const wchar_t* text) {
-    if (text == nullptr || *text == L'\0') {
-        return std::nullopt;
-    }
-    std::wstring normalized(text);
-    std::replace(normalized.begin(), normalized.end(), L',', L'.');
-    wchar_t* end = nullptr;
-    const double value = std::wcstod(normalized.c_str(), &end);
-    if (end == normalized.c_str() || end == nullptr || *end != L'\0' || !std::isfinite(value)) {
-        return std::nullopt;
-    }
-    return value;
-}
-
-std::optional<int> TryParseDialogInteger(const wchar_t* text) {
-    if (text == nullptr || *text == L'\0') {
-        return std::nullopt;
-    }
-    wchar_t* end = nullptr;
-    const long value = std::wcstol(text, &end, 10);
-    if (end == text || end == nullptr || *end != L'\0') {
-        return std::nullopt;
-    }
-    return static_cast<int>(value);
-}
-
 std::wstring BuildLayoutEditMenuLabel(const std::wstring& subject) {
     return L"Edit " + subject + L" ...";
 }
@@ -253,28 +213,8 @@ bool IsMetricListAddRowTarget(const LayoutEditController::TooltipTarget& target)
            LayoutEditAnchorMetricListOrderKey(anchor->key).has_value();
 }
 
-std::wstring BuildLayoutEditDialogTitle(const std::wstring& subject) {
-    return L"Edit " + subject;
-}
-
-std::string LayoutGuideChildName(const LayoutNodeConfig& node) {
-    return node.name.empty() ? "unknown" : node.name;
-}
-
 std::wstring BuildLayoutGuideEditLabel(const LayoutEditGuide& guide) {
     return guide.editCardId.empty() ? L"cards weights" : L"layout weights";
-}
-
-const LayoutNodeConfig* FindLayoutGuideNode(const AppConfig& config, const LayoutEditGuide& guide) {
-    return FindGuideNode(config, LayoutEditLayoutTarget::ForGuide(guide));
-}
-
-std::wstring BuildLayoutGuideItemLabel(
-    const LayoutNodeConfig& node, size_t childIndex, LayoutGuideAxis axis, bool first) {
-    const std::wstring side =
-        axis == LayoutGuideAxis::Vertical ? (first ? L"Left" : L"Right") : (first ? L"Top" : L"Bottom");
-    const std::wstring childName = WideFromUtf8(LayoutGuideChildName(node.children[childIndex]));
-    return side + L" " + childName + L" weight:";
 }
 
 const LayoutNodeConfig* FindWeightEditNode(const AppConfig& config, const LayoutWeightEditKey& key) {
@@ -282,24 +222,6 @@ const LayoutNodeConfig* FindWeightEditNode(const AppConfig& config, const Layout
     target.editCardId = key.editCardId;
     target.nodePath = key.nodePath;
     return FindGuideNode(config, target);
-}
-
-int CALLBACK CollectFontFamilyProc(const LOGFONTW* logFont, const TEXTMETRICW*, DWORD, LPARAM lParam) {
-    auto* families = reinterpret_cast<std::vector<std::wstring>*>(lParam);
-    if (families == nullptr || logFont == nullptr || logFont->lfFaceName[0] == L'\0' ||
-        logFont->lfFaceName[0] == L'@') {
-        return 1;
-    }
-    families->push_back(logFont->lfFaceName);
-    return 1;
-}
-
-bool CaseInsensitiveLess(const std::wstring& left, const std::wstring& right) {
-    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_LESS_THAN;
-}
-
-bool CaseInsensitiveEqual(const std::wstring& left, const std::wstring& right) {
-    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
 }
 
 std::string EscapeTraceText(std::string_view text) {
@@ -329,199 +251,6 @@ std::string EscapeTraceText(std::string_view text) {
 
 std::string QuoteTraceText(std::string_view text) {
     return "\"" + EscapeTraceText(text) + "\"";
-}
-
-std::string FormatTraceColorHex(unsigned int color) {
-    char buffer[16] = {};
-    sprintf_s(buffer, "#%08X", color);
-    return buffer;
-}
-
-std::string ReadDialogControlTextUtf8(HWND hwnd, int controlId) {
-    wchar_t buffer[256] = {};
-    GetDlgItemTextW(hwnd, controlId, buffer, ARRAYSIZE(buffer));
-    return Utf8FromWide(buffer);
-}
-
-const char* TreeNodeKindTraceName(LayoutEditTreeNodeKind kind) {
-    switch (kind) {
-        case LayoutEditTreeNodeKind::Section:
-            return "section";
-        case LayoutEditTreeNodeKind::Group:
-            return "group";
-        case LayoutEditTreeNodeKind::Container:
-            return "container";
-        case LayoutEditTreeNodeKind::Leaf:
-            return "leaf";
-    }
-    return "unknown";
-}
-
-const char* ValueFormatTraceName(configschema::ValueFormat format) {
-    switch (format) {
-        case configschema::ValueFormat::String:
-            return "string";
-        case configschema::ValueFormat::Integer:
-            return "integer";
-        case configschema::ValueFormat::FloatingPoint:
-            return "float";
-        case configschema::ValueFormat::FontSpec:
-            return "font";
-        case configschema::ValueFormat::ColorHex:
-            return "color";
-    }
-    return "unknown";
-}
-
-std::string JoinNodePath(const std::vector<size_t>& path) {
-    std::ostringstream stream;
-    for (size_t i = 0; i < path.size(); ++i) {
-        if (i != 0) {
-            stream << '.';
-        }
-        stream << path[i];
-    }
-    return stream.str();
-}
-
-std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
-    if (leaf == nullptr) {
-        return "focus=\"none\"";
-    }
-    if (const auto* parameter = std::get_if<LayoutEditParameter>(&leaf->focusKey)) {
-        const auto descriptor = FindLayoutEditTooltipDescriptor(*parameter);
-        if (descriptor.has_value()) {
-            return "focus=" + QuoteTraceText(descriptor->configKey);
-        }
-        return "focus=" + QuoteTraceText(GetLayoutEditParameterDisplayName(*parameter));
-    }
-    if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&leaf->focusKey)) {
-        std::ostringstream stream;
-        stream << "focus=" << QuoteTraceText(leaf->sectionName.empty() ? "weight" : leaf->sectionName + ".layout");
-        stream << " edit_card=" << QuoteTraceText(weightKey->editCardId);
-        stream << " node_path=" << QuoteTraceText(JoinNodePath(weightKey->nodePath));
-        stream << " separator=" << weightKey->separatorIndex;
-        return stream.str();
-    }
-    if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&leaf->focusKey)) {
-        return "focus=" + QuoteTraceText("[metrics] " + metricKey->metricId);
-    }
-    if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&leaf->focusKey)) {
-        return "focus=" + QuoteTraceText("[card." + cardTitleKey->cardId + "] title");
-    }
-    if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&leaf->focusKey)) {
-        return "focus=" +
-               QuoteTraceText(
-                   (metricListKey->editCardId.empty() ? "[layout] " : "[card." + metricListKey->editCardId + "] ") +
-                   std::string("metric_list"));
-    }
-    return "focus=\"unknown\"";
-}
-
-std::string BuildTraceNodeText(const LayoutEditTreeNode* node) {
-    if (node == nullptr) {
-        return "node=\"none\"";
-    }
-
-    std::ostringstream stream;
-    stream << "node_kind=" << QuoteTraceText(TreeNodeKindTraceName(node->kind));
-    stream << " label=" << QuoteTraceText(node->label);
-    stream << " location=" << QuoteTraceText(node->locationText);
-    if (node->leaf.has_value()) {
-        stream << " " << BuildTraceFocusKeyText(&*node->leaf);
-        if (std::holds_alternative<LayoutMetricEditKey>(node->leaf->focusKey)) {
-            stream << " value_format=\"metric\"";
-        } else {
-            stream << " value_format=" << QuoteTraceText(ValueFormatTraceName(node->leaf->valueFormat));
-        }
-    }
-    return stream.str();
-}
-
-std::vector<std::wstring> EnumerateInstalledFontFamilies(HWND hwnd) {
-    std::vector<std::wstring> families;
-    HDC dc = GetDC(hwnd);
-    if (dc == nullptr) {
-        return families;
-    }
-
-    LOGFONTW filter{};
-    filter.lfCharSet = DEFAULT_CHARSET;
-    EnumFontFamiliesExW(dc, &filter, CollectFontFamilyProc, reinterpret_cast<LPARAM>(&families), 0);
-    ReleaseDC(hwnd, dc);
-
-    std::sort(families.begin(), families.end(), CaseInsensitiveLess);
-    families.erase(std::unique(families.begin(), families.end(), CaseInsensitiveEqual), families.end());
-    return families;
-}
-
-void PopulateFontFaceComboBox(HWND hwnd, const std::wstring& selectedFace) {
-    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
-    if (combo == nullptr) {
-        return;
-    }
-
-    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
-    const auto families = EnumerateInstalledFontFamilies(hwnd);
-    int selectedIndex = CB_ERR;
-    for (const auto& family : families) {
-        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(family.c_str()));
-        if (index != CB_ERR && selectedIndex == CB_ERR && CaseInsensitiveEqual(family, selectedFace)) {
-            selectedIndex = static_cast<int>(index);
-        }
-    }
-
-    if (selectedIndex != CB_ERR) {
-        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
-    } else {
-        SetWindowTextW(combo, selectedFace.c_str());
-    }
-}
-
-std::wstring ReadFontDialogFaceText(HWND hwnd, UINT notificationCode) {
-    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
-    if (combo == nullptr) {
-        return {};
-    }
-
-    if (notificationCode == CBN_SELCHANGE) {
-        const LRESULT selection = SendMessageW(combo, CB_GETCURSEL, 0, 0);
-        if (selection != CB_ERR) {
-            wchar_t selectedFace[256] = {};
-            SendMessageW(combo, CB_GETLBTEXT, static_cast<WPARAM>(selection), reinterpret_cast<LPARAM>(selectedFace));
-            return selectedFace;
-        }
-    }
-
-    wchar_t faceBuffer[256] = {};
-    GetWindowTextW(combo, faceBuffer, ARRAYSIZE(faceBuffer));
-    return faceBuffer;
-}
-
-void PopulateMetricBindingComboBox(
-    HWND hwnd, const std::vector<std::string>& options, std::string_view selectedBinding, bool enableSelection) {
-    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
-    if (combo == nullptr) {
-        return;
-    }
-
-    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
-    int selectedIndex = CB_ERR;
-    for (const auto& option : options) {
-        const std::wstring wideOption = WideFromUtf8(option);
-        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideOption.c_str()));
-        if (index != CB_ERR && selectedIndex == CB_ERR && option == selectedBinding) {
-            selectedIndex = static_cast<int>(index);
-        }
-    }
-
-    if (selectedIndex != CB_ERR) {
-        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
-    } else {
-        SetWindowTextW(combo, WideFromUtf8(std::string(selectedBinding)).c_str());
-    }
-
-    EnableWindow(combo, enableSelection ? TRUE : FALSE);
 }
 
 struct CustomScaleDialogState {

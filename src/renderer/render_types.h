@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <cstdint>
+#include <cstddef>
 #include <span>
 #include <vector>
 

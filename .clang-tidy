@@ -2,9 +2,10 @@ Checks: >
   -*,
   clang-analyzer-core.*,
   clang-analyzer-cplusplus.NewDelete,
+  clang-diagnostic-unused-function,
   bugprone-use-after-move,
   misc-include-cleaner
-WarningsAsErrors: ''
+WarningsAsErrors: 'clang-diagnostic-unused-function,misc-include-cleaner'
 HeaderFilterRegex: '(^|.*[\\/])(src|tests)[\\/](?!vendor[\\/]).*'
 FormatStyle: none
 UseColor: false

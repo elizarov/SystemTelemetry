@@ -1,7 +1,7 @@
 #pragma once
 
-#include <optional>
+#include <windows.h>
 
-#include "layout_edit_dialog/impl/state.h"
+#include <optional>
 
 std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);

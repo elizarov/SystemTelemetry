@@ -10,10 +10,6 @@ void WriteTelemetryTrace(const RealTelemetryCollectorState& state, const char* t
     state.trace_.Write(text);
 }
 
-void WriteTelemetryTrace(const RealTelemetryCollectorState& state, const std::string& text) {
-    state.trace_.Write(text);
-}
-
 void UpdateMemory(RealTelemetryCollectorState& state) {
     MEMORYSTATUSEX memory{};
     memory.dwLength = sizeof(memory);

@@ -2,13 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <sstream>
 
 #include "layout_edit/impl/layout_snap_solver.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_helpers.h"
-#include "layout_model/layout_edit_hit_priority.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 
 namespace {

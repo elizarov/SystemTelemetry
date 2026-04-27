@@ -24,7 +24,46 @@ $clangTidySkippedFiles = @(
 
 $clangTidyIgnoredUnusedIncludeWarnings = @(
     # The active include-cleaner build does not model these Win32 interface headers correctly.
+    'src/dashboard/constants.h|windows.h',
+    'src/dashboard/dashboard_app.h|windows.h',
+    'src/dashboard/dashboard_menu_types.h|windows.h',
+    'src/dashboard/dashboard_shell_ui.h|windows.h',
+    'src/dashboard_renderer/dashboard_renderer.h|windows.h',
+    'src/diagnostics/diagnostics.h|windows.h',
+    'src/display/constants.h|windows.h',
+    'src/display/display_config.h|windows.h',
     'src/display/display_config.cpp|shobjidl.h',
+    'src/display/monitor.h|windows.h',
+    'src/layout_edit/layout_edit_controller.h|windows.h',
+    'src/layout_edit_dialog/impl/dialog_proc.h|windows.h',
+    'src/layout_edit_dialog/impl/state.h|windows.h',
+    'src/layout_edit_dialog/impl/trace.h|windows.h',
+    'src/layout_edit_dialog/impl/util.h|windows.h',
+    'src/layout_edit_dialog/layout_edit_dialog.h|windows.h',
+    'src/main/autostart.h|windows.h',
+    'src/main/config_io.h|windows.h',
+    'src/renderer/impl/d2d_renderer.h|windows.h',
+    'src/renderer/renderer.h|windows.h',
+    'src/telemetry/impl/collector_state.h|winsock2.h',
+    'src/telemetry/impl/collector_state.h|ws2tcpip.h',
+    'src/telemetry/impl/collector_state.h|windows.h',
+    'src/telemetry/impl/collector_state.h|dxgi.h',
+    'src/telemetry/impl/collector_state.h|iphlpapi.h',
+    'src/telemetry/impl/collector_state.h|netioapi.h',
+    'src/telemetry/impl/collector_state.h|pdhmsg.h',
+    'src/telemetry/impl/collector_storage_selection.h|windows.h',
+    'src/telemetry/impl/system_info_support.h|windows.h',
+    'src/telemetry/telemetry.h|windows.h',
+    'src/util/scale.h|windows.h',
+    'src/util/strings.h|windows.h',
+    # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
+    'src/dashboard/dashboard_app.h|constants.h',
+    'src/dashboard/dashboard_shell_ui.h|dashboard_menu_types.h',
+    'src/diagnostics/diagnostics.h|snapshot_dump.h',
+    'src/display/display_config.h|snapshot_dump.h',
+    'src/display/monitor.h|scale.h',
+    'src/layout_edit/layout_edit_parameter_edit.h|layout_edit_parameter_metadata.h',
+    'src/widget/layout_edit_parameter_id.h|config.h',
     'src/util/resource_loader.cpp|windows.h',
     'src/util/utf8.cpp|windows.h'
 )
@@ -47,7 +86,7 @@ function Test-ClangTidySkippedFile {
     return $relativePath -in $clangTidySkippedFiles
 }
 
-function Test-IgnoredUnusedIncludeWarning {
+function Test-IgnoredUnusedIncludeDiagnostic {
     param(
         [string]$RepoRoot,
         [string]$Text
@@ -55,7 +94,7 @@ function Test-IgnoredUnusedIncludeWarning {
 
     $match = [regex]::Match(
         $Text,
-        '^(?<file>.*\.(?:cpp|h)):\d+:\d+: warning: included header (?<header>\S+) is not used directly \[misc-include-cleaner\]$')
+        '^(?<file>.*\.(?:cpp|h)):\d+:\d+: (?:warning|error): included header (?<header>\S+) is not used directly \[misc-include-cleaner(?:,-warnings-as-errors)?\]$')
     if (-not $match.Success) {
         return $false
     }
@@ -201,7 +240,33 @@ function Resolve-ClangTidyPath {
     return $null
 }
 
-function Get-TrackedCppFiles {
+function Test-EligibleTidyFile {
+    param(
+        [string]$RepoRoot,
+        [string]$FullPath
+    )
+
+    $normalizedPath = [System.IO.Path]::GetFullPath($FullPath)
+    $extension = [System.IO.Path]::GetExtension($normalizedPath)
+    if ($extension -ne '.cpp' -and $extension -ne '.h') {
+        return $false
+    }
+    if ($normalizedPath -notmatch '[\\/]src[\\/]|[\\/]tests[\\/]') {
+        return $false
+    }
+    if ($normalizedPath -match '[\\/]vendor[\\/]') {
+        return $false
+    }
+    if ([System.IO.Path]::GetFileName($normalizedPath) -eq 'board_gigabyte_siv.cpp') {
+        return $false
+    }
+    if (Test-ClangTidySkippedFile -RepoRoot $RepoRoot -FullPath $normalizedPath) {
+        return $false
+    }
+    return $true
+}
+
+function Get-TrackedTidyFiles {
     param(
         [string]$RepoRoot
     )
@@ -216,24 +281,19 @@ function Get-TrackedCppFiles {
             continue
         }
 
-        Get-ChildItem -LiteralPath $searchRoot -Recurse -File -Filter *.cpp |
-            Where-Object {
-                $_.FullName -notmatch '[\\/]vendor[\\/]' -and
-                $_.Name -ne 'board_gigabyte_siv.cpp' -and
-                -not (Test-ClangTidySkippedFile -RepoRoot $RepoRoot -FullPath $_.FullName)
-            }
+        Get-ChildItem -LiteralPath $searchRoot -Recurse -File |
+            Where-Object { Test-EligibleTidyFile -RepoRoot $RepoRoot -FullPath $_.FullName }
     }
 
     return $files | Sort-Object FullName
 }
 
-function Get-ChangedCppFiles {
+function Get-ChangedTidyFiles {
     param(
         [string]$RepoRoot
     )
 
-    $repoRootSlash = $RepoRoot -replace '\\', '/'
-    $pathSpecs = @('src/**/*.cpp', 'tests/**/*.cpp')
+    $pathSpecs = @('*.cpp', '*.h')
 
     $changedFiles = [System.Collections.Generic.List[string]]::new()
 
@@ -273,16 +333,7 @@ function Get-ChangedCppFiles {
         }
 
         $normalizedPath = [System.IO.Path]::GetFullPath($fullPath)
-        if ($normalizedPath -notmatch '[\\/]src[\\/]|[\\/]tests[\\/]') {
-            continue
-        }
-        if ($normalizedPath -match '[\\/]vendor[\\/]') {
-            continue
-        }
-        if ([System.IO.Path]::GetFileName($normalizedPath) -eq 'board_gigabyte_siv.cpp') {
-            continue
-        }
-        if (Test-ClangTidySkippedFile -RepoRoot $RepoRoot -FullPath $normalizedPath) {
+        if (-not (Test-EligibleTidyFile -RepoRoot $RepoRoot -FullPath $normalizedPath)) {
             continue
         }
 
@@ -359,6 +410,11 @@ function Start-TidyProcess {
         '--quiet',
         '-p', (Join-Path $RepoRoot 'build\cmake')
     )
+    if ([System.IO.Path]::GetExtension($RelativePath) -eq '.h') {
+        $commandArgs += '--extra-arg=-Wunused-function'
+    } else {
+        $commandArgs += '--extra-arg=/clang:-Wunused-function'
+    }
     if ($Mode -eq 'fix') {
         $commandArgs += @('-fix', '--format-style=none')
     }
@@ -457,17 +513,29 @@ function Complete-TidyProcess {
             $skipIncludeCleanerMissingBlock = $false
         }
 
-        if ($text -match 'warning: no header providing ".+" is directly included \[misc-include-cleaner\]') {
+        if ($text -match '(?:warning|error): no header providing ".+" is directly included \[misc-include-cleaner(?:,-warnings-as-errors)?\]') {
             $skipIncludeCleanerMissingBlock = $true
             continue
         }
 
-        if (Test-IgnoredUnusedIncludeWarning -RepoRoot $RepoRoot -Text $text) {
+        if (Test-IgnoredUnusedIncludeDiagnostic -RepoRoot $RepoRoot -Text $text) {
             $skipIgnoredUnusedIncludeBlock = $true
             continue
         }
 
-        if ($text -match '^\d+ warnings generated\.$') {
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            continue
+        }
+
+        if ($text -match '^\d+ warnings? generated\.$') {
+            continue
+        }
+
+        if ($text -match '^\d+ warnings? and \d+ errors? generated\.$') {
+            continue
+        }
+
+        if ($text -match '^Error while processing .+\.$') {
             continue
         }
 
@@ -485,6 +553,7 @@ function Complete-TidyProcess {
         RelativePath = $state.RelativePath
         ExitCode = $exitCode
         OutputLines = @($filteredOutputLines)
+        HasReportableOutput = ($filteredOutputLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1) -ne $null
         Duration = ([System.DateTime]::UtcNow - $state.StartedAt)
         TimedOut = $timedOut
     }
@@ -522,9 +591,11 @@ function Write-TidyResult {
         }
     }
 
-    if ($Result.ExitCode -ne 0) {
+    if ($Result.ExitCode -ne 0 -and ($Result.TimedOut -or $Result.HasReportableOutput)) {
         $TidyFailed.Value = $true
         $Writer.WriteLine("clang-tidy exit code: $($Result.ExitCode)")
+    } elseif ($Result.ExitCode -ne 0) {
+        $Writer.WriteLine("clang-tidy exit code ignored after filtering: $($Result.ExitCode)")
     }
 
     $Writer.WriteLine()
@@ -547,17 +618,17 @@ if (-not (Test-Path -LiteralPath $compileCommands)) {
 }
 
 $files = if ($Scope -eq 'changed') {
-    @(Get-ChangedCppFiles -RepoRoot $resolvedRoot)
+    @(Get-ChangedTidyFiles -RepoRoot $resolvedRoot)
 } else {
-    @(Get-TrackedCppFiles -RepoRoot $resolvedRoot)
+    @(Get-TrackedTidyFiles -RepoRoot $resolvedRoot)
 }
 if ($files.Count -eq 0) {
     if ($Scope -eq 'changed') {
-        Write-Host 'No eligible changed project translation units were found.'
+        Write-Host 'No eligible changed project source or header files were found.'
         exit 0
     }
 
-    Write-Host 'No eligible project translation units were found.'
+    Write-Host 'No eligible project source or header files were found.'
     exit 1
 }
 
@@ -582,7 +653,7 @@ try {
     $writer.WriteLine()
 
     Write-Host "Using clang-tidy: $clangTidy"
-    Write-Host "Running optional clang-tidy sweep for $($files.Count) translation units with parallelism=$parallelism..."
+    Write-Host "Running optional clang-tidy sweep for $($files.Count) source and header files with parallelism=$parallelism..."
     if ($report.UsedFallback) {
         Write-Host "Primary report path is locked; writing to $reportPath instead."
     }

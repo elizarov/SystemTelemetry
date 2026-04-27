@@ -7,7 +7,6 @@
 #include <fstream>
 #include <memory>
 #include <optional>
-#include <shellapi.h>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -17,7 +16,6 @@
 #include "diagnostics/diagnostics_options.h"
 #include "diagnostics/snapshot_dump.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     const SystemSnapshot& snapshot,

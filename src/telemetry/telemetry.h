@@ -13,7 +13,6 @@
 
 #include "config/telemetry_settings.h"
 #include "telemetry/board/board_vendor.h"
-#include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/metric_types.h"
 #include "util/trace.h"
 

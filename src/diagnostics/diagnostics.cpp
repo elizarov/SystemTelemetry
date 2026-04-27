@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cwctype>
 #include <limits>
+#include <shellapi.h>
 #include <string_view>
 
 #include "config/config_parser.h"
@@ -19,6 +20,7 @@
 #include "util/paths.h"
 #include "util/scale.h"
 #include "util/strings.h"
+#include "util/utf8.h"
 
 namespace {
 
