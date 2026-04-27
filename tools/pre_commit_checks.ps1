@@ -13,9 +13,7 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-if (-not $stagedFiles) {
-    exit 0
-}
+$hasStagedCppFiles = [bool]$stagedFiles
 
 $stashCreated = $false
 $stashMessage = 'systemtelemetry-pre-commit-format'
@@ -26,8 +24,15 @@ $untrackedFiles = & git -C $repoRoot ls-files --others --exclude-standard
 $hasUntrackedFiles = [bool]$untrackedFiles
 
 if ($hasUnstagedChanges -or $hasUntrackedFiles) {
-    $stashOutput = & git -C $repoRoot stash push --keep-index --include-untracked -q -m $stashMessage 2>&1
-    $stashStatus = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $stashOutput = & git -C $repoRoot stash push --keep-index --include-untracked -q -m $stashMessage 2>&1
+        $stashStatus = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
     if ($stashStatus -ne 0) {
         Write-Host 'pre-commit: unable to stash unstaged changes'
         Write-Host $stashOutput
@@ -53,11 +58,24 @@ function Restore-PreCommitStash {
 }
 
 try {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'tools\run_clang_format.ps1') -Root $repoRoot -Mode fix -Scope staged -Restage
-    $formatStatus = $LASTEXITCODE
-    if ($formatStatus -ne 0) {
-        Restore-PreCommitStash
-        exit $formatStatus
+    $hookStatus = 0
+
+    if ($hasStagedCppFiles) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'tools\run_clang_format.ps1') -Root $repoRoot -Mode fix -Scope staged -Restage
+        $formatStatus = $LASTEXITCODE
+        if ($formatStatus -ne 0) {
+            $hookStatus = $formatStatus
+        }
+    }
+
+    if ($hookStatus -eq 0) {
+        Write-Host 'pre-commit: running lint checks'
+        & cmd.exe /c "`"$repoRoot\lint.cmd`""
+        $lintStatus = $LASTEXITCODE
+        if ($lintStatus -ne 0) {
+            Write-Host 'pre-commit: lint checks failed'
+            $hookStatus = $lintStatus
+        }
     }
 } catch {
     Restore-PreCommitStash
@@ -65,4 +83,4 @@ try {
 }
 
 Restore-PreCommitStash
-exit 0
+exit $hookStatus

@@ -1,2 +1,2 @@
 #!/bin/sh
-exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(git rev-parse --show-toplevel)/tools/pre_commit_format.ps1" #
+exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(git rev-parse --show-toplevel)/tools/pre_commit_checks.ps1" #
