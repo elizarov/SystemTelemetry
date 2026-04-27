@@ -97,7 +97,7 @@ void DashboardLayoutResolver::RegisterEditableAnchorRegion(std::vector<LayoutEdi
     region.anchorRect = anchorRect;
     region.shape = shape;
     const int anchorHitInset =
-        shape == AnchorShape::Wedge ? std::max(1, renderer_.ScaleLogical(2)) : std::max(3, renderer_.ScaleLogical(4));
+        shape == AnchorShape::Wedge ? std::max(1, renderer_.ScaleLogical(2)) : std::max(4, renderer_.ScaleLogical(5));
     region.anchorHitPadding = anchorHitInset;
     region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
         region.anchorRect.top - anchorHitInset,
