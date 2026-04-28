@@ -192,6 +192,7 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
     std::optional<LayoutMetricEditKey> metricKey;
     std::optional<LayoutCardTitleEditKey> cardTitleKey;
     std::optional<LayoutMetricListOrderEditKey> metricListOrderKey;
+    std::optional<LayoutDateTimeFormatEditKey> dateTimeFormatKey;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
     std::optional<unsigned int> colorValue;
@@ -206,6 +207,8 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         metricKey = std::get<LayoutMetricEditKey>(*focusKey);
     } else if (focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
         cardTitleKey = std::get<LayoutCardTitleEditKey>(*focusKey);
+    } else if (focusKey.has_value() && std::holds_alternative<LayoutDateTimeFormatEditKey>(*focusKey)) {
+        dateTimeFormatKey = std::get<LayoutDateTimeFormatEditKey>(*focusKey);
     }
     if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload)) {
         metricListOrderKey = LayoutEditAnchorMetricListOrderKey(anchor->key);
@@ -251,10 +254,26 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
             return AbortTooltipBuild(errorReason, "empty_metric_list_text");
         }
         return tooltipText;
+    } else if (dateTimeFormatKey.has_value()) {
+        const LayoutNodeConfig* node = FindDateTimeFormatNode(config, *dateTimeFormatKey);
+        if (node == nullptr) {
+            return AbortTooltipBuild(errorReason, "missing_date_time_format");
+        }
+        const std::string configKey = dateTimeFormatKey->widgetClass == WidgetClass::ClockTime
+                                          ? "layout_edit.clock_time_format"
+                                          : "layout_edit.clock_date_format";
+        std::wstring tooltipText =
+            WideFromUtf8(std::string(EnumToString(dateTimeFormatKey->widgetClass)) + " format = " + node->parameter);
+        const std::wstring description = WideFromUtf8(FindLocalizedText(configKey));
+        if (!description.empty()) {
+            tooltipText += L"\r\n";
+            tooltipText += description;
+        }
+        return tooltipText;
     }
 
     if (!descriptor.has_value() && !metricKey.has_value() && !cardTitleKey.has_value() &&
-        !metricListOrderKey.has_value()) {
+        !metricListOrderKey.has_value() && !dateTimeFormatKey.has_value()) {
         return AbortTooltipBuild(errorReason, "unsupported_target");
     }
 

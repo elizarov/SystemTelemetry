@@ -109,6 +109,10 @@ std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& p
                     metricListOrderKey.has_value()) {
                     return LayoutEditFocusKey{*metricListOrderKey};
                 }
+                if (const auto dateTimeFormatKey = LayoutEditAnchorDateTimeFormatKey(value.key);
+                    dateTimeFormatKey.has_value()) {
+                    return LayoutEditFocusKey{*dateTimeFormatKey};
+                }
                 if (const auto containerOrderKey = LayoutEditAnchorContainerChildOrderKey(value.key);
                     containerOrderKey.has_value()) {
                     return LayoutEditFocusKey{

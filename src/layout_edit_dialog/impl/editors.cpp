@@ -27,6 +27,53 @@ bool IsFontsSectionNode(const LayoutEditDialogState* state) {
            state->selectedNode->kind == LayoutEditTreeNodeKind::Section && state->selectedNode->label == "fonts";
 }
 
+const LayoutDateTimeFormatEditKey* SelectedDateTimeFormatKey(const LayoutEditDialogState* state) {
+    return state != nullptr && state->selectedLeaf != nullptr
+               ? std::get_if<LayoutDateTimeFormatEditKey>(&state->selectedLeaf->focusKey)
+               : nullptr;
+}
+
+std::vector<std::string> StandardDateTimeFormats(const LayoutDateTimeFormatEditKey& key) {
+    if (key.widgetClass == WidgetClass::ClockTime) {
+        return {"HH:MM", "HH:MM:SS", "H:MM", "hh:MM AM", "hh:MM:SS AM"};
+    }
+    if (key.widgetClass == WidgetClass::ClockDate) {
+        return {"YYYY-MM-DD",
+            "DD.MM.YYYY",
+            "MM/DD/YYYY",
+            "DD/MM/YYYY",
+            "YYYY/MM/DD",
+            "MMM DD, YYYY",
+            "DD MMM YYYY",
+            "dddd, MMMM DD"};
+    }
+    return {};
+}
+
+void PopulateDateTimeFormatCombo(HWND hwnd, const LayoutDateTimeFormatEditKey& key, std::string_view selected) {
+    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO);
+    if (combo == nullptr) {
+        return;
+    }
+    std::vector<std::string> options = StandardDateTimeFormats(key);
+    if (!selected.empty() && std::find(options.begin(), options.end(), selected) == options.end()) {
+        options.push_back(std::string(selected));
+    }
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    int selectedIndex = CB_ERR;
+    for (const std::string& option : options) {
+        const std::wstring wideOption = WideFromUtf8(option);
+        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideOption.c_str()));
+        if (index != CB_ERR && option == selected) {
+            selectedIndex = static_cast<int>(index);
+        }
+    }
+    if (selectedIndex != CB_ERR) {
+        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
+    }
+    SendMessageW(combo, CB_SETMINVISIBLE, 8, 0);
+}
+
 std::array<const UiFontConfig*, 9> FontSetValues(const UiFontSetConfig& fonts) {
     return {
         &fonts.title,
@@ -138,6 +185,9 @@ LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* st
     }
     if (std::holds_alternative<LayoutMetricListOrderEditKey>(state->selectedLeaf->focusKey)) {
         return LayoutEditEditorKind::MetricListOrder;
+    }
+    if (std::holds_alternative<LayoutDateTimeFormatEditKey>(state->selectedLeaf->focusKey)) {
+        return LayoutEditEditorKind::DateTimeFormat;
     }
     if (std::holds_alternative<LayoutCardTitleEditKey>(state->selectedLeaf->focusKey)) {
         return LayoutEditEditorKind::Numeric;
@@ -323,6 +373,20 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"metric_list_order\""
               << " rows=" << QuoteTraceText(std::to_string(metricRefs.size()));
         state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
+    } else if (const auto* formatKey = std::get_if<LayoutDateTimeFormatEditKey>(&state->selectedLeaf->focusKey)) {
+        std::string format;
+        if (const LayoutNodeConfig* node = FindDateTimeFormatNode(state->dialog->Host().CurrentConfig(), *formatKey);
+            node != nullptr) {
+            format = node->parameter;
+        }
+        PopulateDateTimeFormatCombo(hwnd, *formatKey, format);
+        DestroyMetricListOrderEditorControls(state);
+        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false, false, true);
+        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+        std::ostringstream trace;
+        trace << BuildTraceNodeText(state->selectedNode) << " editor=\"date_time_format\""
+              << " format=" << QuoteTraceText(format);
+        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
     } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey)) {
         const MetricDefinitionConfig* definition =
             FindMetricDefinition(state->dialog->Host().CurrentConfig().layout.metrics, metricKey->metricId);
@@ -459,6 +523,12 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
             }
         }
         return {true, L""};
+    }
+
+    if (std::holds_alternative<LayoutDateTimeFormatEditKey>(state->selectedLeaf->focusKey)) {
+        const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
+        return !format.empty() ? LayoutEditValidationResult{true, L""}
+                               : LayoutEditValidationResult{false, L"Choose a date or time format."};
     }
 
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey);
@@ -733,6 +803,23 @@ bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd) {
     return applied;
 }
 
+bool PreviewSelectedDateTimeFormat(LayoutEditDialogState* state, HWND hwnd) {
+    if (state == nullptr || state->selectedLeaf == nullptr || state->updatingControls) {
+        return false;
+    }
+    const auto* key = std::get_if<LayoutDateTimeFormatEditKey>(&state->selectedLeaf->focusKey);
+    if (key == nullptr) {
+        return false;
+    }
+    const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
+    const bool applied = !format.empty() && state->dialog->Host().ApplyDateTimeFormatPreview(*key, format);
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << " format=" << QuoteTraceText(format)
+          << " applied=" << QuoteTraceText(applied ? "true" : "false");
+    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:preview_date_time_format", trace.str());
+    return applied;
+}
+
 bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd, int controlId, UINT notificationCode) {
     if (state == nullptr || SelectedMetricListOrderKey(state) == nullptr) {
         return false;
@@ -904,6 +991,20 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         }
         const bool applied = state->dialog->Host().ApplyMetricListOrderPreview(
             *metricListKey, ParseMetricListMetricRefs(node->parameter));
+        if (applied) {
+            PopulateLayoutEditSelection(state, hwnd);
+            RefreshLayoutEditValidationState(state, hwnd);
+        }
+        return applied;
+    }
+
+    if (const auto* formatKey = std::get_if<LayoutDateTimeFormatEditKey>(&state->selectedLeaf->focusKey);
+        formatKey != nullptr) {
+        const LayoutNodeConfig* node = FindDateTimeFormatNode(state->originalConfig, *formatKey);
+        if (node == nullptr) {
+            return false;
+        }
+        const bool applied = state->dialog->Host().ApplyDateTimeFormatPreview(*formatKey, node->parameter);
         if (applied) {
             PopulateLayoutEditSelection(state, hwnd);
             RefreshLayoutEditValidationState(state, hwnd);

@@ -330,6 +330,28 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     EXPECT_EQ(metricListLeaf->memberName, "layout");
 }
 
+TEST(LayoutEditTree, IncludesDateTimeFormatLeavesForClockWidgets) {
+    AppConfig config;
+    config.display.layout = "primary";
+    config.layout.structure.cardsLayout = MakeDashboardCardNode("time");
+    config.layout.cards.push_back(
+        MakeCard("time", MakeContainerNode("rows", {MakeWidgetNode("clock_time"), MakeWidgetNode("clock_date")})));
+
+    const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
+
+    const LayoutEditTreeLeaf* timeFormatLeaf = FindLayoutEditTreeLeaf(
+        model, LayoutEditFocusKey{LayoutDateTimeFormatEditKey{"time", {0}, WidgetClass::ClockTime}});
+    ASSERT_NE(timeFormatLeaf, nullptr);
+    EXPECT_EQ(timeFormatLeaf->sectionName, "card.time");
+    EXPECT_EQ(timeFormatLeaf->memberName, "layout");
+
+    const LayoutEditTreeLeaf* dateFormatLeaf = FindLayoutEditTreeLeaf(
+        model, LayoutEditFocusKey{LayoutDateTimeFormatEditKey{"time", {1}, WidgetClass::ClockDate}});
+    ASSERT_NE(dateFormatLeaf, nullptr);
+    EXPECT_EQ(dateFormatLeaf->sectionName, "card.time");
+    EXPECT_EQ(dateFormatLeaf->memberName, "layout");
+}
+
 TEST(LayoutEditTree, ShowsReachableCardSectionsForRuntimeStyleDashboardCardNodes) {
     AppConfig config = MakeBaseConfig();
 

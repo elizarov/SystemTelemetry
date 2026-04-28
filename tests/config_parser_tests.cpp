@@ -152,6 +152,28 @@ TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
     std::filesystem::remove(path);
 }
 
+TEST(ConfigParser, ParsesDateTimeWidgetFormatParameters) {
+    const std::filesystem::path path = WriteTestConfig("[display]\n"
+                                                       "layout = test\n"
+                                                       "\n"
+                                                       "[layout.test]\n"
+                                                       "cards = time\n"
+                                                       "\n"
+                                                       "[card.time]\n"
+                                                       "layout = rows(clock_time(HH:MM),clock_date(YYYY-MM-DD))\n");
+
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+
+    ASSERT_EQ(config.layout.cards.size(), 1u);
+    ASSERT_EQ(config.layout.cards[0].layout.children.size(), 2u);
+    EXPECT_EQ(config.layout.cards[0].layout.children[0].name, "clock_time");
+    EXPECT_EQ(config.layout.cards[0].layout.children[0].parameter, "HH:MM");
+    EXPECT_EQ(config.layout.cards[0].layout.children[1].name, "clock_date");
+    EXPECT_EQ(config.layout.cards[0].layout.children[1].parameter, "YYYY-MM-DD");
+
+    std::filesystem::remove(path);
+}
+
 TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
                                                        "cpu.load = *,%,Processor Load\n");

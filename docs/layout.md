@@ -16,6 +16,7 @@ See also: [resources/config.ini](../resources/config.ini) for the maintained shi
 - Container weights use `name:weight` or `name:weight(...)`.
 - Omitted weights default to `1`.
 - Widget parameters are written inline as `widget(...)`.
+- Date and time widget format strings are inline widget parameters.
 - Whitespace around commas is ignored.
 
 ## Section Ownership
@@ -94,7 +95,11 @@ Widget parameter rules:
 
 - `text(...)`, `gauge(...)`, and `throughput(...)` bind one metric id.
 - `metric_list(...)` binds a comma-separated list of metric ids.
-- `drive_usage_list`, `clock_time`, `clock_date`, and `vertical_spring` take no inline parameter payload.
+- `clock_time(...)` and `clock_date(...)` require a format string parameter.
+- The shipped time format is `HH:MM`; the shipped date format is `YYYY-MM-DD`.
+- Time format tokens are `HH`, `H`, `hh`, `h`, `MM`, `M`, `SS`, `S`, `AM`, and `am`.
+- Date format tokens are `YYYY`, `YY`, `MMMM`, `MMM`, `MM`, `M`, `DD`, `D`, `dddd`, and `ddd`.
+- `drive_usage_list` and `vertical_spring` take no inline parameter payload.
 - `vertical_spacer(widget_name)` reserves the preferred height of the referenced widget type without drawing content.
 
 Supported configurable metric ids include built-in CPU, GPU, network, storage, and drive metrics plus configured `board.temp.*` and `board.fan.*` logical metrics. The runtime-only `nothing` placeholder remains valid in metric-list bindings but does not belong in `[metrics]`.

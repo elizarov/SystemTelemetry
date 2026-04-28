@@ -362,6 +362,10 @@ public:
         return shellUi_.ApplyMetricListOrderPreview(key, metricRefs);
     }
 
+    bool ApplyDateTimeFormatPreview(const LayoutDateTimeFormatEditKey& key, const std::string& format) override {
+        return shellUi_.ApplyDateTimeFormatPreview(key, format);
+    }
+
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) override {
         return shellUi_.ApplyWeightPreview(key, firstWeight, secondWeight);
     }
@@ -746,6 +750,15 @@ bool DashboardShellUi::ApplyMetricListOrderPreview(
     return true;
 }
 
+bool DashboardShellUi::ApplyDateTimeFormatPreview(const LayoutDateTimeFormatEditKey& key, const std::string& format) {
+    AppConfig updatedConfig = CurrentConfig();
+    if (!ApplyDateTimeFormat(updatedConfig, key, format)) {
+        return false;
+    }
+    RestoreConfigSnapshot(updatedConfig);
+    return true;
+}
+
 bool DashboardShellUi::ApplyMetricListAddRowPreview(const LayoutEditController::TooltipTarget& target) {
     const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target.payload);
     if (anchor == nullptr || anchor->shape != AnchorShape::Plus) {
@@ -1124,6 +1137,11 @@ void DashboardShellUi::ShowContextMenu(
             } else if (label.empty() && focusKey.has_value() &&
                        std::holds_alternative<LayoutMetricListOrderEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"metrics list");
+            } else if (label.empty() && focusKey.has_value() &&
+                       std::holds_alternative<LayoutDateTimeFormatEditKey>(*focusKey)) {
+                const auto& formatKey = std::get<LayoutDateTimeFormatEditKey>(*focusKey);
+                label = BuildLayoutEditMenuLabel(
+                    formatKey.widgetClass == WidgetClass::ClockTime ? L"time format" : L"date format");
             } else if (label.empty() && focusKey.has_value() &&
                        std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"layout container");

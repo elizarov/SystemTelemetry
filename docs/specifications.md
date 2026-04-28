@@ -36,7 +36,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - CPU and GPU cards each show a large segmented load gauge plus supporting metric rows.
 - Network and storage cards show retained-history throughput plots with current value headers.
 - The storage card also shows per-drive activity and usage rows.
-- The time card shows a dominant time readout plus the local date.
+- The time card shows a dominant configured-format time readout plus the configured-format local date. The shipped formats are `HH:MM` for time and `YYYY-MM-DD` for date.
 - Metric labels and displayed units come from the metric registry defined in config, while dump units stay on the dump contract described in [docs/diagnostics.md](diagnostics.md).
 - The UI style stays high-contrast and minimal: dark background, bright foreground text, restrained separators, rounded cards, compact headers, and shared visual rhythm across comparable cards.
 - CPU and GPU gauges share one fitted gauge size within the active layout even when their surrounding cards differ in height.

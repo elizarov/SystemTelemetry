@@ -238,6 +238,8 @@ std::vector<int> ActiveEditorLabelControls(LayoutEditEditorKind kind, bool showB
             }
             return labels;
         }
+        case LayoutEditEditorKind::DateTimeFormat:
+            return {IDC_LAYOUT_EDIT_DATETIME_FORMAT_LABEL};
         case LayoutEditEditorKind::MetricListOrder:
         case LayoutEditEditorKind::Numeric:
         case LayoutEditEditorKind::Summary:
@@ -571,12 +573,13 @@ void ShowLayoutEditEditors(HWND hwnd,
     bool showMetric,
     bool showBinding,
     bool showMetricListOrder,
-    bool showGlobalFontFamily) {
+    bool showGlobalFontFamily,
+    bool showDateTimeFormat) {
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
     ShowDialogControl(hwnd,
         IDC_LAYOUT_EDIT_SUMMARY,
         !(showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder ||
-            showGlobalFontFamily));
+            showGlobalFontFamily || showDateTimeFormat));
 
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, showFont || showGlobalFontFamily);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT, showFont || showGlobalFontFamily);
@@ -619,10 +622,12 @@ void ShowLayoutEditEditors(HWND hwnd,
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT, showMetric);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_LABEL, showMetric && showBinding);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT, showMetric && showBinding);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_LABEL, showDateTimeFormat);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO, showDateTimeFormat);
     ShowDialogControl(hwnd,
         IDC_LAYOUT_EDIT_HINT,
         showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder ||
-            showGlobalFontFamily);
+            showGlobalFontFamily || showDateTimeFormat);
 }
 
 void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state) {
@@ -1099,6 +1104,26 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             contentBottom = cursorY + hintHeight;
             break;
         }
+        case LayoutEditEditorKind::DateTimeFormat: {
+            const int controlWidth = innerWidth - labelColumnWidth - metrics.labelGap;
+            const int comboHeight = std::max(
+                DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO), singleLineFieldHeight);
+            const int rowHeight = LayoutLabeledControlRow(hwnd,
+                IDC_LAYOUT_EDIT_DATETIME_FORMAT_LABEL,
+                IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO,
+                innerLeft,
+                cursorY,
+                labelColumnWidth,
+                metrics.labelGap,
+                controlWidth,
+                comboHeight);
+            cursorY += rowHeight + metrics.hintGap;
+            const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
+            const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
+            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_HINT, innerLeft, cursorY, innerWidth, hintHeight);
+            contentBottom = cursorY + hintHeight;
+            break;
+        }
         case LayoutEditEditorKind::MetricListOrder: {
             const int buttonWidth = 38;
             const int comboFieldVisibleHeight =
@@ -1170,6 +1195,9 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             if (showBinding) {
                 BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
             }
+            break;
+        case LayoutEditEditorKind::DateTimeFormat:
+            BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO);
             break;
         case LayoutEditEditorKind::MetricListOrder:
             ShowMetricListOrderEditorControls(state, true);

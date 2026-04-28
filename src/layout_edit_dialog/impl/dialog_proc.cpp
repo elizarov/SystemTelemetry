@@ -284,6 +284,12 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 RefreshLayoutEditValidationState(state, hwnd);
                 return TRUE;
             }
+            if (LOWORD(wParam) == IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO &&
+                (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) {
+                PreviewSelectedDateTimeFormat(state, hwnd);
+                RefreshLayoutEditValidationState(state, hwnd);
+                return TRUE;
+            }
             switch (LOWORD(wParam)) {
                 case IDC_LAYOUT_EDIT_REVERT:
                     RevertSelectedLayoutEditField(state, hwnd);

@@ -44,6 +44,8 @@ std::optional<MetricDisplayStyle> FindMetricDisplayStyle(std::string_view metric
 ConfigMetricCatalog TelemetryMetricCatalog();
 bool IsGenerallyAvailableMetric(std::string_view metricRef);
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef);
+std::string FormatClockTime(const SYSTEMTIME& time, std::string_view format);
+std::string FormatClockDate(const SYSTEMTIME& time, std::string_view format);
 
 class MetricSource {
 public:
@@ -66,8 +68,8 @@ public:
     const ThroughputMetric& ResolveThroughput(const std::string& metricRef) const;
     const std::string& ResolveNetworkFooter() const;
     const std::vector<DriveRow>& ResolveDriveRows() const;
-    const std::string& ResolveClockTime() const;
-    const std::string& ResolveClockDate() const;
+    const std::string& ResolveClockTime(std::string_view format) const;
+    const std::string& ResolveClockDate(std::string_view format) const;
 
 private:
     const SystemSnapshot& snapshot_;
@@ -79,6 +81,6 @@ private:
     mutable std::optional<ThroughputSharedState> throughputSharedState_;
     mutable std::optional<std::string> networkFooterCache_;
     mutable std::optional<std::vector<DriveRow>> driveRowsCache_;
-    mutable std::optional<std::string> clockTimeCache_;
-    mutable std::optional<std::string> clockDateCache_;
+    mutable std::unordered_map<std::string, std::string> clockTimeCache_;
+    mutable std::unordered_map<std::string, std::string> clockDateCache_;
 };

@@ -150,6 +150,25 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveMetricListEditableAnchorFocus)
     EXPECT_EQ(metricListKey->nodePath, (std::vector<size_t>{0}));
 }
 
+TEST(LayoutEditTypes, TooltipPayloadHelpersResolveDateTimeFormatEditableAnchorFocus) {
+    LayoutEditAnchorRegion anchor;
+    anchor.key.widget = {"card-a", "card-a", {1}};
+    anchor.key.subject = LayoutDateTimeFormatEditKey{"card-a", {1}, WidgetClass::ClockDate};
+    anchor.anchorRect = RenderRect{100, 200, 109, 209};
+
+    const TooltipPayload payload = anchor;
+
+    EXPECT_FALSE(TooltipPayloadParameter(payload).has_value());
+    EXPECT_FALSE(TooltipPayloadNumericValue(payload).has_value());
+    const auto focusKey = TooltipPayloadFocusKey(payload);
+    ASSERT_TRUE(focusKey.has_value());
+    const auto* formatKey = std::get_if<LayoutDateTimeFormatEditKey>(&*focusKey);
+    ASSERT_NE(formatKey, nullptr);
+    EXPECT_EQ(formatKey->editCardId, "card-a");
+    EXPECT_EQ(formatKey->nodePath, (std::vector<size_t>{1}));
+    EXPECT_EQ(formatKey->widgetClass, WidgetClass::ClockDate);
+}
+
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveColorRegions) {
     LayoutEditColorRegion region;
     region.parameter = LayoutEditParameter::ColorAccent;
@@ -182,17 +201,22 @@ TEST(LayoutEditTypes, MatchesFocusKeysByParameterOrWeightIdentity) {
     const LayoutEditFocusKey metricListA = LayoutMetricListOrderEditKey{"gpu", {0, 1}};
     const LayoutEditFocusKey metricListB = LayoutMetricListOrderEditKey{"gpu", {0, 1}};
     const LayoutEditFocusKey metricListC = LayoutMetricListOrderEditKey{"gpu", {1, 0}};
+    const LayoutEditFocusKey formatA = LayoutDateTimeFormatEditKey{"gpu", {2}, WidgetClass::ClockTime};
+    const LayoutEditFocusKey formatB = LayoutDateTimeFormatEditKey{"gpu", {2}, WidgetClass::ClockTime};
+    const LayoutEditFocusKey formatC = LayoutDateTimeFormatEditKey{"gpu", {2}, WidgetClass::ClockDate};
 
     EXPECT_TRUE(MatchesLayoutEditFocusKey(parameterA, parameterB));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(weightA, weightB));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(metricA, metricB));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(cardTitleA, cardTitleB));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(metricListA, metricListB));
+    EXPECT_TRUE(MatchesLayoutEditFocusKey(formatA, formatB));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(parameterA, weightA));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(weightA, weightC));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(metricA, metricC));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(cardTitleA, cardTitleC));
     EXPECT_FALSE(MatchesLayoutEditFocusKey(metricListA, metricListC));
+    EXPECT_FALSE(MatchesLayoutEditFocusKey(formatA, formatC));
 }
 
 TEST(LayoutEditTypes, MatchesSelectedParameterFocusAgainstWidgetAndAnchorArtifacts) {

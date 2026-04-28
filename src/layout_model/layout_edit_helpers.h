@@ -16,6 +16,8 @@ bool MatchesLayoutMetricEditKey(const LayoutMetricEditKey& left, const LayoutMet
 bool MatchesLayoutCardTitleEditKey(const LayoutCardTitleEditKey& left, const LayoutCardTitleEditKey& right);
 bool MatchesLayoutMetricListOrderEditKey(
     const LayoutMetricListOrderEditKey& left, const LayoutMetricListOrderEditKey& right);
+bool MatchesLayoutDateTimeFormatEditKey(
+    const LayoutDateTimeFormatEditKey& left, const LayoutDateTimeFormatEditKey& right);
 bool MatchesCardChromeSelectionIdentity(
     const LayoutEditWidgetIdentity& selection, const LayoutEditWidgetIdentity& candidate);
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right);
@@ -35,4 +37,5 @@ std::optional<LayoutEditParameter> LayoutEditAnchorParameter(const LayoutEditAnc
 std::optional<LayoutMetricEditKey> LayoutEditAnchorMetricKey(const LayoutEditAnchorKey& key);
 std::optional<LayoutCardTitleEditKey> LayoutEditAnchorCardTitleKey(const LayoutEditAnchorKey& key);
 std::optional<LayoutMetricListOrderEditKey> LayoutEditAnchorMetricListOrderKey(const LayoutEditAnchorKey& key);
+std::optional<LayoutDateTimeFormatEditKey> LayoutEditAnchorDateTimeFormatKey(const LayoutEditAnchorKey& key);
 std::optional<LayoutContainerChildOrderEditKey> LayoutEditAnchorContainerChildOrderKey(const LayoutEditAnchorKey& key);

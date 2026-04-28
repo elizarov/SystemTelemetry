@@ -170,3 +170,24 @@ TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughReflectedDynamicBindings
                            "window = 600,900\r\n"
                            "cards = columns(cpu,gpu)\r\n"));
 }
+
+TEST(ConfigWriter, PreservesDateTimeWidgetFormatParameters) {
+    AppConfig config;
+    LayoutCardConfig card;
+    card.id = "time";
+    card.layout.name = "rows";
+    LayoutNodeConfig timeNode;
+    timeNode.name = "clock_time";
+    timeNode.parameter = "HH:MM";
+    LayoutNodeConfig dateNode;
+    dateNode.name = "clock_date";
+    dateNode.parameter = "YYYY-MM-DD";
+    card.layout.children.push_back(timeNode);
+    card.layout.children.push_back(dateNode);
+    config.layout.cards.push_back(card);
+
+    const std::string output = BuildSavedConfigText(
+        ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
+
+    EXPECT_THAT(output, testing::HasSubstr("layout = rows(clock_time(HH:MM),clock_date(YYYY-MM-DD))\r\n"));
+}

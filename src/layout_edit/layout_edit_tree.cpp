@@ -284,6 +284,25 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
             };
             leafNode.selectionHighlight = leafNode.leaf->focusKey;
             treeNode.children.push_back(std::move(leafNode));
+        } else if (child.name == "clock_time" || child.name == "clock_date") {
+            const auto widgetClass = EnumFromString<WidgetClass>(child.name);
+            if (widgetClass.has_value()) {
+                LayoutEditTreeNode leafNode;
+                leafNode.kind = LayoutEditTreeNodeKind::Leaf;
+                leafNode.label = child.name + std::string("_format");
+                leafNode.locationText = MemberLocationText(sectionName, memberName);
+                leafNode.descriptionKey = *widgetClass == WidgetClass::ClockTime ? "layout_edit.clock_time_format"
+                                                                                 : "layout_edit.clock_date_format";
+                leafNode.leaf = LayoutEditTreeLeaf{
+                    LayoutDateTimeFormatEditKey{editCardId, childPath, *widgetClass},
+                    sectionName,
+                    memberName,
+                    leafNode.descriptionKey,
+                    configschema::ValueFormat::String,
+                };
+                leafNode.selectionHighlight = leafNode.leaf->focusKey;
+                treeNode.children.push_back(std::move(leafNode));
+            }
         }
 
         if (i + 1 < node.children.size() && SeparatorIsEditable(node, i)) {

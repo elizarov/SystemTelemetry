@@ -102,6 +102,10 @@ std::string FormatAnchorSubject(const AppConfig& config, const LayoutEditAnchorK
     if (const auto order = LayoutEditAnchorMetricListOrderKey(key); order.has_value()) {
         return "metric list order " + FormatLayoutConfigPath(config, order->editCardId, order->nodePath);
     }
+    if (const auto format = LayoutEditAnchorDateTimeFormatKey(key); format.has_value()) {
+        return std::string(EnumToString(format->widgetClass)) + " format " +
+               FormatLayoutConfigPath(config, format->editCardId, format->nodePath);
+    }
     if (const auto order = LayoutEditAnchorContainerChildOrderKey(key); order.has_value()) {
         return "container child order " + FormatLayoutConfigPath(config, order->editCardId, order->nodePath);
     }

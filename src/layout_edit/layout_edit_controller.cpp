@@ -64,6 +64,7 @@ std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
                                 : LayoutEditAnchorMetricKey(key).has_value()
                                     ? "metric=" + LayoutEditAnchorMetricKey(key)->metricId
                                 : LayoutEditAnchorMetricListOrderKey(key).has_value()     ? "metric_list_reorder"
+                                : LayoutEditAnchorDateTimeFormatKey(key).has_value()      ? "date_time_format"
                                 : LayoutEditAnchorContainerChildOrderKey(key).has_value() ? "container_child_reorder"
                                                                                           : "subject=unknown";
     return subject + " anchor_id=" + std::to_string(key.anchorId) +
@@ -421,6 +422,20 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
             SetCapture(hwnd);
             return true;
         }
+    }
+
+    if (const auto anchorHandle = HitTestEditableAnchorHandle(regions, clientPoint);
+        anchorHandle.has_value() && !anchorHandle->draggable) {
+        hoveredEditableAnchor_ = anchorHandle->key;
+        if (anchorHandle->key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
+            hoveredEditableCard_ = anchorHandle->key.widget;
+            hoveredEditableWidget_.reset();
+        } else {
+            hoveredEditableWidget_ = anchorHandle->key.widget;
+        }
+        SyncRendererInteractionState();
+        host_.InvalidateLayoutEdit();
+        return true;
     }
 
     if (resolution.actionableGapEditAnchor.has_value()) {

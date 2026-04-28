@@ -1,8 +1,10 @@
 #include "telemetry/metrics.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
+#include <span>
 #include <sstream>
 #include <string_view>
 #include <utility>
@@ -634,7 +636,117 @@ void InitializeThroughputSharedState(const SystemSnapshot& snapshot, MetricSourc
     state.timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot.now);
 }
 
+std::string TwoDigit(int value) {
+    char buffer[8];
+    sprintf_s(buffer, "%02d", value);
+    return buffer;
+}
+
+std::string NumberText(int value) {
+    return std::to_string(value);
+}
+
+std::string MonthName(int month) {
+    static constexpr std::array<std::string_view, 12> kNames{
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    };
+    return month >= 1 && month <= 12 ? std::string(kNames[static_cast<size_t>(month - 1)]) : std::string{};
+}
+
+std::string MonthShortName(int month) {
+    static constexpr std::array<std::string_view, 12> kNames{
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    return month >= 1 && month <= 12 ? std::string(kNames[static_cast<size_t>(month - 1)]) : std::string{};
+}
+
+std::string WeekdayName(int dayOfWeek) {
+    static constexpr std::array<std::string_view, 7> kNames{
+        "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    return dayOfWeek >= 0 && dayOfWeek <= 6 ? std::string(kNames[static_cast<size_t>(dayOfWeek)]) : std::string{};
+}
+
+std::string WeekdayShortName(int dayOfWeek) {
+    static constexpr std::array<std::string_view, 7> kNames{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    return dayOfWeek >= 0 && dayOfWeek <= 6 ? std::string(kNames[static_cast<size_t>(dayOfWeek)]) : std::string{};
+}
+
+struct FormatToken {
+    std::string_view token;
+    std::string (*resolve)(const SYSTEMTIME&);
+};
+
+std::string FormatWithTokens(const SYSTEMTIME& time, std::string_view format, std::span<const FormatToken> tokens) {
+    std::string output;
+    for (size_t index = 0; index < format.size();) {
+        bool matched = false;
+        for (const auto& token : tokens) {
+            if (format.substr(index, token.token.size()) == token.token) {
+                output += token.resolve(time);
+                index += token.token.size();
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            output.push_back(format[index]);
+            ++index;
+        }
+    }
+    return output;
+}
+
 }  // namespace
+
+std::string FormatClockTime(const SYSTEMTIME& time, std::string_view format) {
+    static constexpr std::array<FormatToken, 10> kTokens{{
+        {"HH", [](const SYSTEMTIME& value) { return TwoDigit(value.wHour); }},
+        {"H", [](const SYSTEMTIME& value) { return NumberText(value.wHour); }},
+        {"hh",
+            [](const SYSTEMTIME& value) {
+                const int hour = value.wHour % 12;
+                return TwoDigit(hour == 0 ? 12 : hour);
+            }},
+        {"h",
+            [](const SYSTEMTIME& value) {
+                const int hour = value.wHour % 12;
+                return NumberText(hour == 0 ? 12 : hour);
+            }},
+        {"MM", [](const SYSTEMTIME& value) { return TwoDigit(value.wMinute); }},
+        {"M", [](const SYSTEMTIME& value) { return NumberText(value.wMinute); }},
+        {"SS", [](const SYSTEMTIME& value) { return TwoDigit(value.wSecond); }},
+        {"S", [](const SYSTEMTIME& value) { return NumberText(value.wSecond); }},
+        {"AM", [](const SYSTEMTIME& value) { return value.wHour < 12 ? std::string("AM") : std::string("PM"); }},
+        {"am", [](const SYSTEMTIME& value) { return value.wHour < 12 ? std::string("am") : std::string("pm"); }},
+    }};
+    return FormatWithTokens(time, format, kTokens);
+}
+
+std::string FormatClockDate(const SYSTEMTIME& time, std::string_view format) {
+    static constexpr std::array<FormatToken, 10> kTokens{{
+        {"YYYY", [](const SYSTEMTIME& value) { return NumberText(value.wYear); }},
+        {"YY", [](const SYSTEMTIME& value) { return TwoDigit(value.wYear % 100); }},
+        {"MMMM", [](const SYSTEMTIME& value) { return MonthName(value.wMonth); }},
+        {"MMM", [](const SYSTEMTIME& value) { return MonthShortName(value.wMonth); }},
+        {"MM", [](const SYSTEMTIME& value) { return TwoDigit(value.wMonth); }},
+        {"M", [](const SYSTEMTIME& value) { return NumberText(value.wMonth); }},
+        {"DD", [](const SYSTEMTIME& value) { return TwoDigit(value.wDay); }},
+        {"D", [](const SYSTEMTIME& value) { return NumberText(value.wDay); }},
+        {"dddd", [](const SYSTEMTIME& value) { return WeekdayName(value.wDayOfWeek); }},
+        {"ddd", [](const SYSTEMTIME& value) { return WeekdayShortName(value.wDayOfWeek); }},
+    }};
+    return FormatWithTokens(time, format, kTokens);
+}
 
 bool IsStaticTextMetric(std::string_view metricRef) {
     const MetricBindingMatch match = FindMetricBinding(metricRef);
@@ -801,20 +913,20 @@ const std::vector<DriveRow>& MetricSource::ResolveDriveRows() const {
     return *driveRowsCache_;
 }
 
-const std::string& MetricSource::ResolveClockTime() const {
-    if (!clockTimeCache_.has_value()) {
-        char buffer[32];
-        sprintf_s(buffer, "%02d:%02d", snapshot_.now.wHour, snapshot_.now.wMinute);
-        clockTimeCache_ = buffer;
+const std::string& MetricSource::ResolveClockTime(std::string_view format) const {
+    const std::string key(format);
+    const auto cached = clockTimeCache_.find(key);
+    if (cached != clockTimeCache_.end()) {
+        return cached->second;
     }
-    return *clockTimeCache_;
+    return clockTimeCache_.emplace(key, FormatClockTime(snapshot_.now, format)).first->second;
 }
 
-const std::string& MetricSource::ResolveClockDate() const {
-    if (!clockDateCache_.has_value()) {
-        char buffer[32];
-        sprintf_s(buffer, "%04d-%02d-%02d", snapshot_.now.wYear, snapshot_.now.wMonth, snapshot_.now.wDay);
-        clockDateCache_ = buffer;
+const std::string& MetricSource::ResolveClockDate(std::string_view format) const {
+    const std::string key(format);
+    const auto cached = clockDateCache_.find(key);
+    if (cached != clockDateCache_.end()) {
+        return cached->second;
     }
-    return *clockDateCache_;
+    return clockDateCache_.emplace(key, FormatClockDate(snapshot_.now, format)).first->second;
 }

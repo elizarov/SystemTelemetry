@@ -11,6 +11,7 @@
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditLayoutTarget& target);
 const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const LayoutEditWidgetIdentity& widget);
 const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const LayoutMetricListOrderEditKey& key);
+const LayoutNodeConfig* FindDateTimeFormatNode(const AppConfig& config, const LayoutDateTimeFormatEditKey& key);
 std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter);
 std::vector<std::string> AvailableMetricListMetricIds(const AppConfig& config, const ConfigMetricCatalog& catalog);
 
@@ -21,3 +22,4 @@ bool ApplyMetricListOrder(
 bool ApplyContainerChildOrder(
     AppConfig& config, const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex);
 bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widget, std::string_view metricRef);
+bool ApplyDateTimeFormat(AppConfig& config, const LayoutDateTimeFormatEditKey& key, std::string_view format);

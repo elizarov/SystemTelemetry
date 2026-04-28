@@ -111,6 +111,15 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
     if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&leaf->focusKey)) {
         return "focus=" + QuoteTraceText("[card." + cardTitleKey->cardId + "] title");
     }
+    if (const auto* formatKey = std::get_if<LayoutDateTimeFormatEditKey>(&leaf->focusKey)) {
+        std::ostringstream stream;
+        stream << "focus="
+               << QuoteTraceText(
+                      leaf->sectionName + "." + std::string(EnumToString(formatKey->widgetClass)) + "_format");
+        stream << " edit_card=" << QuoteTraceText(formatKey->editCardId);
+        stream << " node_path=" << QuoteTraceText(JoinNodePath(formatKey->nodePath));
+        return stream.str();
+    }
     return "focus=\"unknown\"";
 }
 

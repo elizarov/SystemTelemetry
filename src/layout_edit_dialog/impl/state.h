@@ -34,6 +34,7 @@ enum class LayoutEditEditorKind {
     Weights,
     Metric,
     MetricListOrder,
+    DateTimeFormat,
 };
 
 inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE = 11000;

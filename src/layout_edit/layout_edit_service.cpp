@@ -67,6 +67,12 @@ const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const Layout
     return node != nullptr && node->name == "metric_list" ? node : nullptr;
 }
 
+const LayoutNodeConfig* FindDateTimeFormatNode(const AppConfig& config, const LayoutDateTimeFormatEditKey& key) {
+    const LayoutNodeConfig* node = FindGuideNode(config, LayoutEditLayoutTarget{key.editCardId, key.nodePath});
+    const std::string_view expectedName = EnumToString(key.widgetClass);
+    return node != nullptr && node->name == expectedName ? node : nullptr;
+}
+
 std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter) {
     return SplitTrimmed(parameter, ',');
 }
@@ -202,4 +208,33 @@ bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widg
     std::vector<std::string> metricRefs = ParseMetricListMetricRefs(currentNode->parameter);
     metricRefs.push_back(std::string(metricRef));
     return ApplyMetricListOrder(config, widget, metricRefs);
+}
+
+bool ApplyDateTimeFormat(AppConfig& config, const LayoutDateTimeFormatEditKey& key, std::string_view format) {
+    if (format.empty() || (key.widgetClass != WidgetClass::ClockTime && key.widgetClass != WidgetClass::ClockDate)) {
+        return false;
+    }
+
+    const auto applyFormat = [&](LayoutNodeConfig* node) -> bool {
+        if (node == nullptr || node->name != EnumToString(key.widgetClass)) {
+            return false;
+        }
+        node->parameter = std::string(format);
+        return true;
+    };
+
+    bool updated = false;
+    if (key.editCardId.empty()) {
+        updated = applyFormat(FindLayoutNodeByPath(config.layout.structure.cardsLayout, key.nodePath));
+        if (!updated) {
+            return false;
+        }
+        if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
+            applyFormat(FindLayoutNodeByPath(namedLayout->cardsLayout, key.nodePath));
+        }
+    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, key.editCardId)) {
+        updated = applyFormat(FindLayoutNodeByPath(card->layout, key.nodePath));
+    }
+
+    return updated;
 }

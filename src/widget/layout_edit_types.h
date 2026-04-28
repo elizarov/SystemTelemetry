@@ -66,6 +66,12 @@ struct LayoutMetricListOrderEditKey {
     std::vector<size_t> nodePath;
 };
 
+struct LayoutDateTimeFormatEditKey {
+    std::string editCardId;
+    std::vector<size_t> nodePath;
+    WidgetClass widgetClass = WidgetClass::Unknown;
+};
+
 struct LayoutContainerChildOrderEditKey {
     std::string editCardId;
     std::vector<size_t> nodePath;
@@ -114,6 +120,7 @@ struct LayoutEditAnchorKey {
         LayoutMetricEditKey,
         LayoutCardTitleEditKey,
         LayoutMetricListOrderEditKey,
+        LayoutDateTimeFormatEditKey,
         LayoutContainerChildOrderEditKey>
         subject = LayoutEditParameter::MetricListBarHeight;
     int anchorId = 0;
@@ -206,6 +213,7 @@ using LayoutEditFocusKey = std::variant<LayoutEditParameter,
     LayoutMetricEditKey,
     LayoutCardTitleEditKey,
     LayoutMetricListOrderEditKey,
+    LayoutDateTimeFormatEditKey,
     LayoutContainerEditKey>;
 using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
     WidgetClass,

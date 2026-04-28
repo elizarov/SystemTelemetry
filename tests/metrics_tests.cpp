@@ -246,6 +246,26 @@ TEST(Metrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
     EXPECT_EQ(rows[0].freeText, "1.5 TB");
 }
 
+TEST(Metrics, FormatsClockTimeAndDateFromConfiguredTokens) {
+    SYSTEMTIME time{};
+    time.wYear = 2026;
+    time.wMonth = 4;
+    time.wDay = 28;
+    time.wDayOfWeek = 2;
+    time.wHour = 13;
+    time.wMinute = 5;
+    time.wSecond = 9;
+
+    EXPECT_EQ(FormatClockTime(time, "HH:MM"), "13:05");
+    EXPECT_EQ(FormatClockTime(time, "H:MM:SS"), "13:05:09");
+    EXPECT_EQ(FormatClockTime(time, "hh:MM AM"), "01:05 PM");
+    EXPECT_EQ(FormatClockTime(time, "h:M:S am"), "1:5:9 pm");
+
+    EXPECT_EQ(FormatClockDate(time, "YYYY-MM-DD"), "2026-04-28");
+    EXPECT_EQ(FormatClockDate(time, "DD MMM YYYY"), "28 Apr 2026");
+    EXPECT_EQ(FormatClockDate(time, "dddd, MMMM D"), "Tuesday, April 28");
+}
+
 TEST(Metrics, KeepsUnknownMetricFallbacksUnchanged) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;

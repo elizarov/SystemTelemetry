@@ -388,6 +388,11 @@ std::wstring BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
         metricListLeaf != nullptr) {
         return L"Metric List";
     }
+    if (const auto* formatLeaf =
+            node->leaf.has_value() ? std::get_if<LayoutDateTimeFormatEditKey>(&node->leaf->focusKey) : nullptr;
+        formatLeaf != nullptr) {
+        return formatLeaf->widgetClass == WidgetClass::ClockTime ? L"Time Format" : L"Date Format";
+    }
     if (const auto* weightLeaf =
             node->leaf.has_value() ? std::get_if<LayoutWeightEditKey>(&node->leaf->focusKey) : nullptr;
         weightLeaf != nullptr) {
