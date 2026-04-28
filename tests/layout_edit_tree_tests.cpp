@@ -336,8 +336,8 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     EXPECT_EQ(titleLeaf->memberName, "title");
     EXPECT_EQ(titleLeaf->valueFormat, configschema::ValueFormat::String);
 
-    const LayoutEditTreeLeaf* metricListLeaf =
-        FindLayoutEditTreeLeaf(model, LayoutEditFocusKey{LayoutMetricListOrderEditKey{"alpha", {1}}});
+    const LayoutEditTreeLeaf* metricListLeaf = FindLayoutEditTreeLeaf(model,
+        LayoutEditFocusKey{LayoutNodeFieldEditKey{"alpha", {1}, WidgetClass::MetricList, LayoutNodeField::Parameter}});
     ASSERT_NE(metricListLeaf, nullptr);
     EXPECT_EQ(metricListLeaf->sectionName, "card.alpha");
     EXPECT_EQ(metricListLeaf->memberName, "layout");
@@ -352,16 +352,16 @@ TEST(LayoutEditTree, IncludesDateTimeFormatLeavesForClockWidgets) {
 
     const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
 
-    const LayoutEditTreeLeaf* timeFormatLeaf = FindLayoutEditTreeLeaf(
-        model, LayoutEditFocusKey{LayoutDateTimeFormatEditKey{"time", {0}, WidgetClass::ClockTime}});
+    const LayoutEditTreeLeaf* timeFormatLeaf = FindLayoutEditTreeLeaf(model,
+        LayoutEditFocusKey{LayoutNodeFieldEditKey{"time", {0}, WidgetClass::ClockTime, LayoutNodeField::Parameter}});
     ASSERT_NE(timeFormatLeaf, nullptr);
     EXPECT_EQ(timeFormatLeaf->sectionName, "card.time");
     EXPECT_EQ(timeFormatLeaf->memberName, "layout");
     ASSERT_NE(FindNodeForLeaf(model.roots, timeFormatLeaf), nullptr);
     EXPECT_EQ(FindNodeForLeaf(model.roots, timeFormatLeaf)->label, "clock_time");
 
-    const LayoutEditTreeLeaf* dateFormatLeaf = FindLayoutEditTreeLeaf(
-        model, LayoutEditFocusKey{LayoutDateTimeFormatEditKey{"time", {1}, WidgetClass::ClockDate}});
+    const LayoutEditTreeLeaf* dateFormatLeaf = FindLayoutEditTreeLeaf(model,
+        LayoutEditFocusKey{LayoutNodeFieldEditKey{"time", {1}, WidgetClass::ClockDate, LayoutNodeField::Parameter}});
     ASSERT_NE(dateFormatLeaf, nullptr);
     EXPECT_EQ(dateFormatLeaf->sectionName, "card.time");
     EXPECT_EQ(dateFormatLeaf->memberName, "layout");

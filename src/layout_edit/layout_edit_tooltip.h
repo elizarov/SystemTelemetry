@@ -16,6 +16,5 @@ std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descri
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& value);
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, std::string_view value);
 std::optional<std::string> BuildMetricListOrderTooltipLine(
-    const AppConfig& config, const LayoutMetricListOrderEditKey& key, int rowIndex);
-std::optional<std::string> BuildMetricListAddRowTooltipLine(
-    const AppConfig& config, const LayoutMetricListOrderEditKey& key);
+    const AppConfig& config, const LayoutNodeFieldEditKey& key, int rowIndex);
+std::optional<std::string> BuildMetricListAddRowTooltipLine(const AppConfig& config, const LayoutNodeFieldEditKey& key);

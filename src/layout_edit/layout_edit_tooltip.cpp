@@ -62,8 +62,8 @@ std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descri
 }
 
 std::optional<std::string> BuildMetricListOrderTooltipLine(
-    const AppConfig& config, const LayoutMetricListOrderEditKey& key, int rowIndex) {
-    const LayoutNodeConfig* node = FindMetricListNode(config, key);
+    const AppConfig& config, const LayoutNodeFieldEditKey& key, int rowIndex) {
+    const LayoutNodeConfig* node = FindLayoutNodeFieldNode(config, key);
     if (node == nullptr || node->name != "metric_list" || rowIndex < 0) {
         return std::nullopt;
     }
@@ -82,8 +82,8 @@ std::optional<std::string> BuildMetricListOrderTooltipLine(
 }
 
 std::optional<std::string> BuildMetricListAddRowTooltipLine(
-    const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
-    const LayoutNodeConfig* node = FindMetricListNode(config, key);
+    const AppConfig& config, const LayoutNodeFieldEditKey& key) {
+    const LayoutNodeConfig* node = FindLayoutNodeFieldNode(config, key);
     if (node == nullptr || node->name != "metric_list") {
         return std::nullopt;
     }

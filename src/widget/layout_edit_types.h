@@ -61,15 +61,15 @@ struct LayoutCardTitleEditKey {
     std::string cardId;
 };
 
-struct LayoutMetricListOrderEditKey {
-    std::string editCardId;
-    std::vector<size_t> nodePath;
+enum class LayoutNodeField {
+    Parameter,
 };
 
-struct LayoutDateTimeFormatEditKey {
+struct LayoutNodeFieldEditKey {
     std::string editCardId;
     std::vector<size_t> nodePath;
     WidgetClass widgetClass = WidgetClass::Unknown;
+    LayoutNodeField field = LayoutNodeField::Parameter;
 };
 
 struct LayoutContainerChildOrderEditKey {
@@ -119,8 +119,7 @@ struct LayoutEditAnchorKey {
     std::variant<LayoutEditParameter,
         LayoutMetricEditKey,
         LayoutCardTitleEditKey,
-        LayoutMetricListOrderEditKey,
-        LayoutDateTimeFormatEditKey,
+        LayoutNodeFieldEditKey,
         LayoutContainerChildOrderEditKey>
         subject = LayoutEditParameter::MetricListBarHeight;
     int anchorId = 0;
@@ -206,14 +205,27 @@ struct LayoutEditAnchorBinding {
     bool draggable = true;
 };
 
+enum class LayoutEditEditorKind {
+    Summary,
+    Numeric,
+    Font,
+    GlobalFontFamily,
+    Color,
+    Weights,
+    Metric,
+    MetricListOrder,
+    DateTimeFormat,
+};
+
+using LayoutEditValue = std::variant<std::string, std::vector<std::string>>;
+
 using TooltipPayload = std::
     variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion, LayoutEditColorRegion>;
 using LayoutEditFocusKey = std::variant<LayoutEditParameter,
     LayoutWeightEditKey,
     LayoutMetricEditKey,
     LayoutCardTitleEditKey,
-    LayoutMetricListOrderEditKey,
-    LayoutDateTimeFormatEditKey,
+    LayoutNodeFieldEditKey,
     LayoutContainerEditKey>;
 using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
     WidgetClass,

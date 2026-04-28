@@ -25,18 +25,6 @@ struct LayoutEditValidationResult {
     std::wstring message;
 };
 
-enum class LayoutEditEditorKind {
-    Summary,
-    Numeric,
-    Font,
-    GlobalFontFamily,
-    Color,
-    Weights,
-    Metric,
-    MetricListOrder,
-    DateTimeFormat,
-};
-
 inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE = 11000;
 inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE = 11100;
 inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE = 11200;

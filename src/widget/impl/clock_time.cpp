@@ -52,7 +52,8 @@ void ClockTimeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayou
     };
     renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
         LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            LayoutDateTimeFormatEditKey{widget.editCardId, widget.nodePath, WidgetClass::ClockTime},
+            LayoutNodeFieldEditKey{
+                widget.editCardId, widget.nodePath, WidgetClass::ClockTime, LayoutNodeField::Parameter},
             0},
         widget.rect,
         anchorRect,

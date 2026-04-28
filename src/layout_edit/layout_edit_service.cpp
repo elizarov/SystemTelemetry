@@ -1,12 +1,45 @@
 #include "layout_edit/layout_edit_service.h"
 
 #include <algorithm>
+#include <array>
+#include <functional>
+#include <utility>
 
 #include "util/strings.h"
 
 namespace {
 
 constexpr std::string_view kMetricListPlaceholderId = "nothing";
+
+constexpr std::array<LayoutNodeFieldEditDescriptor, 3> kNodeFieldDescriptors{{
+    {WidgetClass::MetricList,
+        LayoutNodeField::Parameter,
+        LayoutEditEditorKind::MetricListOrder,
+        configschema::ValueFormat::String,
+        "metric_list",
+        "layout_edit.metric_list_reorder",
+        L"Metric List",
+        L"Choose the metric for each row, move rows up or down, remove rows, or add a new row.",
+        "metric_list_order"},
+    {WidgetClass::ClockTime,
+        LayoutNodeField::Parameter,
+        LayoutEditEditorKind::DateTimeFormat,
+        configschema::ValueFormat::String,
+        "clock_time",
+        "layout_edit.clock_time_format",
+        L"Time Format",
+        L"Choose a time format. Changes preview live.",
+        "date_time_format"},
+    {WidgetClass::ClockDate,
+        LayoutNodeField::Parameter,
+        LayoutEditEditorKind::DateTimeFormat,
+        configschema::ValueFormat::String,
+        "clock_date",
+        "layout_edit.clock_date_format",
+        L"Date Format",
+        L"Choose a date format. Changes preview live.",
+        "date_time_format"},
+}};
 
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
     const auto it = std::find_if(
@@ -43,6 +76,37 @@ const LayoutNodeConfig* FindLayoutNodeByPath(const LayoutNodeConfig& root, const
     return node;
 }
 
+bool ApplyLayoutNodeMutation(AppConfig& config,
+    const std::string& editCardId,
+    const std::vector<size_t>& nodePath,
+    const std::function<bool(LayoutNodeConfig*)>& mutate) {
+    bool updated = false;
+    if (editCardId.empty()) {
+        updated = mutate(FindLayoutNodeByPath(config.layout.structure.cardsLayout, nodePath));
+        if (!updated) {
+            return false;
+        }
+        if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
+            mutate(FindLayoutNodeByPath(namedLayout->cardsLayout, nodePath));
+        }
+    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, editCardId)) {
+        updated = mutate(FindLayoutNodeByPath(card->layout, nodePath));
+    }
+
+    return updated;
+}
+
+std::string JoinMetricRefs(const std::vector<std::string>& metricRefs) {
+    std::string parameter;
+    for (size_t i = 0; i < metricRefs.size(); ++i) {
+        if (i > 0) {
+            parameter += ",";
+        }
+        parameter += metricRefs[i];
+    }
+    return parameter;
+}
+
 }  // namespace
 
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditLayoutTarget& target) {
@@ -62,15 +126,38 @@ const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const La
     return FindGuideNode(config, LayoutEditLayoutTarget{widget.editCardId, widget.nodePath});
 }
 
-const LayoutNodeConfig* FindMetricListNode(const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
-    const LayoutNodeConfig* node = FindGuideNode(config, LayoutEditLayoutTarget{key.editCardId, key.nodePath});
-    return node != nullptr && node->name == "metric_list" ? node : nullptr;
-}
-
-const LayoutNodeConfig* FindDateTimeFormatNode(const AppConfig& config, const LayoutDateTimeFormatEditKey& key) {
+const LayoutNodeConfig* FindLayoutNodeFieldNode(const AppConfig& config, const LayoutNodeFieldEditKey& key) {
+    const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(key);
+    if (descriptor == nullptr) {
+        return nullptr;
+    }
     const LayoutNodeConfig* node = FindGuideNode(config, LayoutEditLayoutTarget{key.editCardId, key.nodePath});
     const std::string_view expectedName = EnumToString(key.widgetClass);
     return node != nullptr && node->name == expectedName ? node : nullptr;
+}
+
+const LayoutNodeFieldEditDescriptor* FindLayoutNodeFieldEditDescriptor(const LayoutNodeFieldEditKey& key) {
+    const auto it = std::find_if(kNodeFieldDescriptors.begin(),
+        kNodeFieldDescriptors.end(),
+        [&](const LayoutNodeFieldEditDescriptor& descriptor) {
+            return descriptor.widgetClass == key.widgetClass && descriptor.field == key.field;
+        });
+    return it != kNodeFieldDescriptors.end() ? &(*it) : nullptr;
+}
+
+std::optional<LayoutNodeFieldEditKey> LayoutNodeFieldEditKeyForWidgetParameter(
+    std::string editCardId, std::vector<size_t> nodePath, WidgetClass widgetClass) {
+    LayoutNodeFieldEditKey key{std::move(editCardId), std::move(nodePath), widgetClass, LayoutNodeField::Parameter};
+    return FindLayoutNodeFieldEditDescriptor(key) != nullptr ? std::optional<LayoutNodeFieldEditKey>(std::move(key))
+                                                             : std::nullopt;
+}
+
+std::string ReadLayoutNodeFieldValue(const LayoutNodeConfig& node, LayoutNodeField field) {
+    switch (field) {
+        case LayoutNodeField::Parameter:
+            return node.parameter;
+    }
+    return {};
 }
 
 std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter) {
@@ -128,37 +215,48 @@ std::vector<int> SeedGuideWeights(const LayoutEditGuide& guide, const LayoutNode
     return weights;
 }
 
-bool ApplyMetricListOrder(
-    AppConfig& config, const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) {
-    const auto applyOrder = [&](LayoutNodeConfig* node) -> bool {
-        if (node == nullptr || node->name != "metric_list") {
-            return false;
-        }
-        std::string parameter;
-        for (size_t i = 0; i < metricRefs.size(); ++i) {
-            if (i > 0) {
-                parameter += ",";
-            }
-            parameter += metricRefs[i];
-        }
-        node->parameter = parameter;
-        return true;
-    };
-
-    bool updated = false;
-    if (widget.editCardId.empty()) {
-        updated = applyOrder(FindLayoutNodeByPath(config.layout.structure.cardsLayout, widget.nodePath));
-        if (!updated) {
-            return false;
-        }
-        if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
-            applyOrder(FindLayoutNodeByPath(namedLayout->cardsLayout, widget.nodePath));
-        }
-    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, widget.editCardId)) {
-        updated = applyOrder(FindLayoutNodeByPath(card->layout, widget.nodePath));
+bool ApplyLayoutNodeFieldValue(AppConfig& config, const LayoutNodeFieldEditKey& key, std::string_view value) {
+    const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(key);
+    if (descriptor == nullptr || (descriptor->editorKind == LayoutEditEditorKind::DateTimeFormat && value.empty())) {
+        return false;
     }
 
-    return updated;
+    const auto applyValue = [&](LayoutNodeConfig* node) -> bool {
+        if (node == nullptr || node->name != EnumToString(key.widgetClass)) {
+            return false;
+        }
+        switch (key.field) {
+            case LayoutNodeField::Parameter:
+                node->parameter = std::string(value);
+                return true;
+        }
+        return false;
+    };
+    return ApplyLayoutNodeMutation(config, key.editCardId, key.nodePath, applyValue);
+}
+
+bool ApplyLayoutEditValue(AppConfig& config, const LayoutEditFocusKey& key, const LayoutEditValue& value) {
+    const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&key);
+    if (nodeFieldKey == nullptr) {
+        return false;
+    }
+    const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldKey);
+    if (descriptor == nullptr) {
+        return false;
+    }
+    if (descriptor->editorKind == LayoutEditEditorKind::MetricListOrder) {
+        const auto* metricRefs = std::get_if<std::vector<std::string>>(&value);
+        return metricRefs != nullptr && ApplyLayoutNodeFieldValue(config, *nodeFieldKey, JoinMetricRefs(*metricRefs));
+    }
+    const auto* text = std::get_if<std::string>(&value);
+    return text != nullptr && ApplyLayoutNodeFieldValue(config, *nodeFieldKey, *text);
+}
+
+bool ApplyMetricListOrder(
+    AppConfig& config, const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) {
+    const LayoutNodeFieldEditKey key{
+        widget.editCardId, widget.nodePath, WidgetClass::MetricList, LayoutNodeField::Parameter};
+    return ApplyLayoutEditValue(config, LayoutEditFocusKey{key}, LayoutEditValue{metricRefs});
 }
 
 bool ApplyContainerChildOrder(
@@ -208,33 +306,4 @@ bool AppendMetricListRow(AppConfig& config, const LayoutEditWidgetIdentity& widg
     std::vector<std::string> metricRefs = ParseMetricListMetricRefs(currentNode->parameter);
     metricRefs.push_back(std::string(metricRef));
     return ApplyMetricListOrder(config, widget, metricRefs);
-}
-
-bool ApplyDateTimeFormat(AppConfig& config, const LayoutDateTimeFormatEditKey& key, std::string_view format) {
-    if (format.empty() || (key.widgetClass != WidgetClass::ClockTime && key.widgetClass != WidgetClass::ClockDate)) {
-        return false;
-    }
-
-    const auto applyFormat = [&](LayoutNodeConfig* node) -> bool {
-        if (node == nullptr || node->name != EnumToString(key.widgetClass)) {
-            return false;
-        }
-        node->parameter = std::string(format);
-        return true;
-    };
-
-    bool updated = false;
-    if (key.editCardId.empty()) {
-        updated = applyFormat(FindLayoutNodeByPath(config.layout.structure.cardsLayout, key.nodePath));
-        if (!updated) {
-            return false;
-        }
-        if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
-            applyFormat(FindLayoutNodeByPath(namedLayout->cardsLayout, key.nodePath));
-        }
-    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, key.editCardId)) {
-        updated = applyFormat(FindLayoutNodeByPath(card->layout, key.nodePath));
-    }
-
-    return updated;
 }

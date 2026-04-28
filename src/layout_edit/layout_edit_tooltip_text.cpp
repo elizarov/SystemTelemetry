@@ -125,8 +125,7 @@ std::wstring BuildMetricTooltipText(const LayoutMetricEditKey& key, const Metric
     return text;
 }
 
-std::wstring BuildMetricListOrderTooltipText(
-    const AppConfig& config, const LayoutMetricListOrderEditKey& key, int rowIndex) {
+std::wstring BuildMetricListOrderTooltipText(const AppConfig& config, const LayoutNodeFieldEditKey& key, int rowIndex) {
     const auto firstLine = BuildMetricListOrderTooltipLine(config, key, rowIndex);
     if (!firstLine.has_value()) {
         return L"";
@@ -140,7 +139,7 @@ std::wstring BuildMetricListOrderTooltipText(
     return text;
 }
 
-std::wstring BuildMetricListAddRowTooltipText(const AppConfig& config, const LayoutMetricListOrderEditKey& key) {
+std::wstring BuildMetricListAddRowTooltipText(const AppConfig& config, const LayoutNodeFieldEditKey& key) {
     const auto firstLine = BuildMetricListAddRowTooltipLine(config, key);
     if (!firstLine.has_value()) {
         return L"";
@@ -191,8 +190,7 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
     std::optional<LayoutEditTooltipDescriptor> descriptor;
     std::optional<LayoutMetricEditKey> metricKey;
     std::optional<LayoutCardTitleEditKey> cardTitleKey;
-    std::optional<LayoutMetricListOrderEditKey> metricListOrderKey;
-    std::optional<LayoutDateTimeFormatEditKey> dateTimeFormatKey;
+    std::optional<LayoutNodeFieldEditKey> nodeFieldKey;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
     std::optional<unsigned int> colorValue;
@@ -207,11 +205,13 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         metricKey = std::get<LayoutMetricEditKey>(*focusKey);
     } else if (focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
         cardTitleKey = std::get<LayoutCardTitleEditKey>(*focusKey);
-    } else if (focusKey.has_value() && std::holds_alternative<LayoutDateTimeFormatEditKey>(*focusKey)) {
-        dateTimeFormatKey = std::get<LayoutDateTimeFormatEditKey>(*focusKey);
+    } else if (focusKey.has_value() && std::holds_alternative<LayoutNodeFieldEditKey>(*focusKey)) {
+        nodeFieldKey = std::get<LayoutNodeFieldEditKey>(*focusKey);
     }
     if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload)) {
-        metricListOrderKey = LayoutEditAnchorMetricListOrderKey(anchor->key);
+        if (const auto anchorNodeFieldKey = LayoutEditAnchorNodeFieldKey(anchor->key); anchorNodeFieldKey.has_value()) {
+            nodeFieldKey = *anchorNodeFieldKey;
+        }
     }
     if (const auto parameter = TooltipPayloadParameter(payload); parameter.has_value()) {
         descriptor = FindLayoutEditTooltipDescriptor(*parameter);
@@ -240,31 +240,35 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
             return AbortTooltipBuild(errorReason, "missing_card_title");
         }
         stringValue = card->title;
-    } else if (metricListOrderKey.has_value()) {
-        int rowIndex = 0;
-        bool addRowAnchor = false;
-        if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload)) {
-            rowIndex = anchor->key.anchorId;
-            addRowAnchor = anchor->shape == AnchorShape::Plus;
+    } else if (nodeFieldKey.has_value()) {
+        const LayoutNodeFieldEditDescriptor* nodeFieldDescriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldKey);
+        if (nodeFieldDescriptor == nullptr) {
+            return AbortTooltipBuild(errorReason, "missing_node_field_descriptor");
         }
-        std::wstring tooltipText = addRowAnchor
-                                       ? BuildMetricListAddRowTooltipText(config, *metricListOrderKey)
-                                       : BuildMetricListOrderTooltipText(config, *metricListOrderKey, rowIndex);
-        if (tooltipText.empty()) {
-            return AbortTooltipBuild(errorReason, "empty_metric_list_text");
+        if (nodeFieldDescriptor->editorKind == LayoutEditEditorKind::MetricListOrder) {
+            int rowIndex = 0;
+            bool addRowAnchor = false;
+            if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload)) {
+                rowIndex = anchor->key.anchorId;
+                addRowAnchor = anchor->shape == AnchorShape::Plus;
+            }
+            std::wstring tooltipText = addRowAnchor ? BuildMetricListAddRowTooltipText(config, *nodeFieldKey)
+                                                    : BuildMetricListOrderTooltipText(config, *nodeFieldKey, rowIndex);
+            if (tooltipText.empty()) {
+                return AbortTooltipBuild(errorReason, "empty_metric_list_text");
+            }
+            return tooltipText;
         }
-        return tooltipText;
-    } else if (dateTimeFormatKey.has_value()) {
-        const LayoutNodeConfig* node = FindDateTimeFormatNode(config, *dateTimeFormatKey);
+        const LayoutNodeConfig* node = FindLayoutNodeFieldNode(config, *nodeFieldKey);
         if (node == nullptr) {
-            return AbortTooltipBuild(errorReason, "missing_date_time_format");
+            return AbortTooltipBuild(errorReason, "missing_node_field");
         }
-        const std::string configKey = dateTimeFormatKey->widgetClass == WidgetClass::ClockTime
-                                          ? "layout_edit.clock_time_format"
-                                          : "layout_edit.clock_date_format";
+        const std::string valueLabel = nodeFieldDescriptor->editorKind == LayoutEditEditorKind::DateTimeFormat
+                                           ? std::string(EnumToString(nodeFieldKey->widgetClass)) + " format"
+                                           : std::string(EnumToString(nodeFieldKey->widgetClass));
         std::wstring tooltipText =
-            WideFromUtf8(std::string(EnumToString(dateTimeFormatKey->widgetClass)) + " format = " + node->parameter);
-        const std::wstring description = WideFromUtf8(FindLocalizedText(configKey));
+            WideFromUtf8(valueLabel + " = " + ReadLayoutNodeFieldValue(*node, nodeFieldKey->field));
+        const std::wstring description = WideFromUtf8(FindLocalizedText(nodeFieldDescriptor->descriptionKey));
         if (!description.empty()) {
             tooltipText += L"\r\n";
             tooltipText += description;
@@ -272,12 +276,11 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         return tooltipText;
     }
 
-    if (!descriptor.has_value() && !metricKey.has_value() && !cardTitleKey.has_value() &&
-        !metricListOrderKey.has_value() && !dateTimeFormatKey.has_value()) {
+    if (!descriptor.has_value() && !metricKey.has_value() && !cardTitleKey.has_value() && !nodeFieldKey.has_value()) {
         return AbortTooltipBuild(errorReason, "unsupported_target");
     }
 
-    if (!metricKey.has_value() && !metricListOrderKey.has_value()) {
+    if (!metricKey.has_value() && !nodeFieldKey.has_value()) {
         const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
         if (descriptor->valueFormat == configschema::ValueFormat::String && stringValue.has_value()) {
             return BuildTooltipText(*descriptor, *stringValue, description);

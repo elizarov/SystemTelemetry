@@ -383,15 +383,13 @@ std::wstring BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
         titleLeaf != nullptr) {
         return L"Card Title";
     }
-    if (const auto* metricListLeaf =
-            node->leaf.has_value() ? std::get_if<LayoutMetricListOrderEditKey>(&node->leaf->focusKey) : nullptr;
-        metricListLeaf != nullptr) {
-        return L"Metric List";
-    }
-    if (const auto* formatLeaf =
-            node->leaf.has_value() ? std::get_if<LayoutDateTimeFormatEditKey>(&node->leaf->focusKey) : nullptr;
-        formatLeaf != nullptr) {
-        return formatLeaf->widgetClass == WidgetClass::ClockTime ? L"Time Format" : L"Date Format";
+    if (const auto* nodeFieldLeaf =
+            node->leaf.has_value() ? std::get_if<LayoutNodeFieldEditKey>(&node->leaf->focusKey) : nullptr;
+        nodeFieldLeaf != nullptr) {
+        if (const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldLeaf);
+            descriptor != nullptr) {
+            return std::wstring(descriptor->title);
+        }
     }
     if (const auto* weightLeaf =
             node->leaf.has_value() ? std::get_if<LayoutWeightEditKey>(&node->leaf->focusKey) : nullptr;
@@ -460,8 +458,12 @@ std::wstring BuildLayoutEditHintText(const LayoutEditTreeNode* node) {
     if (std::holds_alternative<LayoutCardTitleEditKey>(node->leaf->focusKey)) {
         return L"Edit the card title text. Changes preview live.";
     }
-    if (std::holds_alternative<LayoutMetricListOrderEditKey>(node->leaf->focusKey)) {
-        return L"Choose the metric for each row, move rows up or down, remove rows, or add a new row.";
+    if (const auto* nodeFieldLeaf = std::get_if<LayoutNodeFieldEditKey>(&node->leaf->focusKey);
+        nodeFieldLeaf != nullptr) {
+        if (const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldLeaf);
+            descriptor != nullptr) {
+            return std::wstring(descriptor->hint);
+        }
     }
     return L"Select a field to edit it here.";
 }

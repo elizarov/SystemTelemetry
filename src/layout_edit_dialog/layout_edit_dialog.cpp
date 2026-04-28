@@ -226,15 +226,11 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
             initialFocusTrace = "[metrics] " + metricKey->metricId;
         } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
             initialFocusTrace = "[card." + cardTitleKey->cardId + "] title";
-        } else if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&*focusKey)) {
-            initialFocusTrace = metricListKey->editCardId.empty()
-                                    ? "[layout] metric_list"
-                                    : "[card." + metricListKey->editCardId + "] metric_list";
-        } else if (const auto* formatKey = std::get_if<LayoutDateTimeFormatEditKey>(&*focusKey)) {
-            initialFocusTrace = formatKey->editCardId.empty()
-                                    ? "[layout] " + std::string(EnumToString(formatKey->widgetClass)) + " format"
-                                    : "[card." + formatKey->editCardId + "] " +
-                                          std::string(EnumToString(formatKey->widgetClass)) + " format";
+        } else if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey)) {
+            initialFocusTrace =
+                nodeFieldKey->editCardId.empty()
+                    ? "[layout] " + std::string(EnumToString(nodeFieldKey->widgetClass))
+                    : "[card." + nodeFieldKey->editCardId + "] " + std::string(EnumToString(nodeFieldKey->widgetClass));
         } else {
             initialFocusTrace = "weight";
         }

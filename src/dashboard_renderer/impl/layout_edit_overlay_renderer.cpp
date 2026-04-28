@@ -204,8 +204,9 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
     }
     const auto moveActiveReorderHighlight = [&](LayoutEditAnchorRegion& region) {
         bool movedByActiveAnchor = false;
-        if (const auto orderKey = LayoutEditAnchorMetricListOrderKey(region.key);
-            orderKey.has_value() && overlayState.activeMetricListReorderDrag.has_value()) {
+        if (const auto nodeFieldKey = LayoutEditAnchorNodeFieldKey(region.key);
+            nodeFieldKey.has_value() && nodeFieldKey->widgetClass == WidgetClass::MetricList &&
+            overlayState.activeMetricListReorderDrag.has_value()) {
             const MetricListReorderOverlayState& drag = *overlayState.activeMetricListReorderDrag;
             if (drag.currentIndex == region.key.anchorId && ::MatchesWidgetIdentity(drag.widget, region.key.widget)) {
                 const int dy = drag.mouseY - drag.dragOffsetY - region.targetRect.top;

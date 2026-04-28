@@ -82,9 +82,7 @@ private:
         const std::string& label,
         const std::optional<std::string>& binding);
     bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title);
-    bool ApplyMetricListOrderPreview(
-        const LayoutMetricListOrderEditKey& key, const std::vector<std::string>& metricRefs);
-    bool ApplyDateTimeFormatPreview(const LayoutDateTimeFormatEditKey& key, const std::string& format);
+    bool ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value);
     bool ApplyMetricListAddRowPreview(const LayoutEditController::TooltipTarget& target);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
     void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);

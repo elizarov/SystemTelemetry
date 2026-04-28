@@ -1,8 +1,23 @@
 #include <gtest/gtest.h>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_hit_priority.h"
+
+namespace {
+
+LayoutNodeConfig MakeNode(std::string name, std::string parameter = {}) {
+    LayoutNodeConfig node;
+    node.name = std::move(name);
+    node.parameter = std::move(parameter);
+    return node;
+}
+
+}  // namespace
 
 TEST(LayoutEditTypes, MatchesWidgetIdentityUsingKindAndPath) {
     const LayoutEditWidgetIdentity widgetA{"card-a", "card-a", {1, 2, 3}};
@@ -135,7 +150,7 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveCardTitleEditableAnchorFocus) 
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveMetricListEditableAnchorFocus) {
     LayoutEditAnchorRegion anchor;
     anchor.key.widget = {"card-a", "card-a", {0}};
-    anchor.key.subject = LayoutMetricListOrderEditKey{"card-a", {0}};
+    anchor.key.subject = LayoutNodeFieldEditKey{"card-a", {0}, WidgetClass::MetricList, LayoutNodeField::Parameter};
     anchor.anchorRect = RenderRect{100, 200, 109, 209};
 
     const TooltipPayload payload = anchor;
@@ -144,16 +159,18 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveMetricListEditableAnchorFocus)
     EXPECT_FALSE(TooltipPayloadNumericValue(payload).has_value());
     const auto focusKey = TooltipPayloadFocusKey(payload);
     ASSERT_TRUE(focusKey.has_value());
-    const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&*focusKey);
+    const auto* metricListKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey);
     ASSERT_NE(metricListKey, nullptr);
     EXPECT_EQ(metricListKey->editCardId, "card-a");
     EXPECT_EQ(metricListKey->nodePath, (std::vector<size_t>{0}));
+    EXPECT_EQ(metricListKey->widgetClass, WidgetClass::MetricList);
+    EXPECT_EQ(metricListKey->field, LayoutNodeField::Parameter);
 }
 
-TEST(LayoutEditTypes, TooltipPayloadHelpersResolveDateTimeFormatEditableAnchorFocus) {
+TEST(LayoutEditTypes, TooltipPayloadHelpersResolveDateTimeNodeFieldEditableAnchorFocus) {
     LayoutEditAnchorRegion anchor;
     anchor.key.widget = {"card-a", "card-a", {1}};
-    anchor.key.subject = LayoutDateTimeFormatEditKey{"card-a", {1}, WidgetClass::ClockDate};
+    anchor.key.subject = LayoutNodeFieldEditKey{"card-a", {1}, WidgetClass::ClockDate, LayoutNodeField::Parameter};
     anchor.anchorRect = RenderRect{100, 200, 109, 209};
 
     const TooltipPayload payload = anchor;
@@ -162,11 +179,12 @@ TEST(LayoutEditTypes, TooltipPayloadHelpersResolveDateTimeFormatEditableAnchorFo
     EXPECT_FALSE(TooltipPayloadNumericValue(payload).has_value());
     const auto focusKey = TooltipPayloadFocusKey(payload);
     ASSERT_TRUE(focusKey.has_value());
-    const auto* formatKey = std::get_if<LayoutDateTimeFormatEditKey>(&*focusKey);
+    const auto* formatKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey);
     ASSERT_NE(formatKey, nullptr);
     EXPECT_EQ(formatKey->editCardId, "card-a");
     EXPECT_EQ(formatKey->nodePath, (std::vector<size_t>{1}));
     EXPECT_EQ(formatKey->widgetClass, WidgetClass::ClockDate);
+    EXPECT_EQ(formatKey->field, LayoutNodeField::Parameter);
 }
 
 TEST(LayoutEditTypes, TooltipPayloadHelpersResolveColorRegions) {
@@ -198,12 +216,18 @@ TEST(LayoutEditTypes, MatchesFocusKeysByParameterOrWeightIdentity) {
     const LayoutEditFocusKey cardTitleA = LayoutCardTitleEditKey{"gpu"};
     const LayoutEditFocusKey cardTitleB = LayoutCardTitleEditKey{"gpu"};
     const LayoutEditFocusKey cardTitleC = LayoutCardTitleEditKey{"cpu"};
-    const LayoutEditFocusKey metricListA = LayoutMetricListOrderEditKey{"gpu", {0, 1}};
-    const LayoutEditFocusKey metricListB = LayoutMetricListOrderEditKey{"gpu", {0, 1}};
-    const LayoutEditFocusKey metricListC = LayoutMetricListOrderEditKey{"gpu", {1, 0}};
-    const LayoutEditFocusKey formatA = LayoutDateTimeFormatEditKey{"gpu", {2}, WidgetClass::ClockTime};
-    const LayoutEditFocusKey formatB = LayoutDateTimeFormatEditKey{"gpu", {2}, WidgetClass::ClockTime};
-    const LayoutEditFocusKey formatC = LayoutDateTimeFormatEditKey{"gpu", {2}, WidgetClass::ClockDate};
+    const LayoutEditFocusKey metricListA =
+        LayoutNodeFieldEditKey{"gpu", {0, 1}, WidgetClass::MetricList, LayoutNodeField::Parameter};
+    const LayoutEditFocusKey metricListB =
+        LayoutNodeFieldEditKey{"gpu", {0, 1}, WidgetClass::MetricList, LayoutNodeField::Parameter};
+    const LayoutEditFocusKey metricListC =
+        LayoutNodeFieldEditKey{"gpu", {1, 0}, WidgetClass::MetricList, LayoutNodeField::Parameter};
+    const LayoutEditFocusKey formatA =
+        LayoutNodeFieldEditKey{"gpu", {2}, WidgetClass::ClockTime, LayoutNodeField::Parameter};
+    const LayoutEditFocusKey formatB =
+        LayoutNodeFieldEditKey{"gpu", {2}, WidgetClass::ClockTime, LayoutNodeField::Parameter};
+    const LayoutEditFocusKey formatC =
+        LayoutNodeFieldEditKey{"gpu", {2}, WidgetClass::ClockDate, LayoutNodeField::Parameter};
 
     EXPECT_TRUE(MatchesLayoutEditFocusKey(parameterA, parameterB));
     EXPECT_TRUE(MatchesLayoutEditFocusKey(weightA, weightB));
@@ -323,16 +347,65 @@ TEST(LayoutEditTypes, MatchesCardTitleSelectionHighlightAgainstEditableAnchors) 
 
 TEST(LayoutEditTypes, MatchesMetricListSelectionHighlightAgainstEditableAnchors) {
     const LayoutEditSelectionHighlight metricListHighlight =
-        LayoutEditFocusKey{LayoutMetricListOrderEditKey{"gpu", {0, 1}}};
+        LayoutEditFocusKey{LayoutNodeFieldEditKey{"gpu", {0, 1}, WidgetClass::MetricList, LayoutNodeField::Parameter}};
 
     LayoutEditAnchorKey metricListAnchorKey;
-    metricListAnchorKey.subject = LayoutMetricListOrderEditKey{"gpu", {0, 1}};
+    metricListAnchorKey.subject =
+        LayoutNodeFieldEditKey{"gpu", {0, 1}, WidgetClass::MetricList, LayoutNodeField::Parameter};
 
     LayoutEditAnchorKey otherAnchorKey;
-    otherAnchorKey.subject = LayoutMetricListOrderEditKey{"gpu", {1, 0}};
+    otherAnchorKey.subject = LayoutNodeFieldEditKey{"gpu", {1, 0}, WidgetClass::MetricList, LayoutNodeField::Parameter};
 
     EXPECT_TRUE(MatchesLayoutEditSelectionHighlight(metricListHighlight, metricListAnchorKey));
     EXPECT_FALSE(MatchesLayoutEditSelectionHighlight(metricListHighlight, otherAnchorKey));
+}
+
+TEST(LayoutEditService, DescribesWidgetNodeParameterEditors) {
+    const LayoutNodeFieldEditKey metricListKey{"gpu", {0, 1}, WidgetClass::MetricList, LayoutNodeField::Parameter};
+    const LayoutNodeFieldEditKey timeKey{"time", {0}, WidgetClass::ClockTime, LayoutNodeField::Parameter};
+
+    const LayoutNodeFieldEditDescriptor* metricList = FindLayoutNodeFieldEditDescriptor(metricListKey);
+    ASSERT_NE(metricList, nullptr);
+    EXPECT_EQ(metricList->editorKind, LayoutEditEditorKind::MetricListOrder);
+    EXPECT_EQ(metricList->label, "metric_list");
+
+    const LayoutNodeFieldEditDescriptor* time = FindLayoutNodeFieldEditDescriptor(timeKey);
+    ASSERT_NE(time, nullptr);
+    EXPECT_EQ(time->editorKind, LayoutEditEditorKind::DateTimeFormat);
+    EXPECT_EQ(time->label, "clock_time");
+}
+
+TEST(LayoutEditService, AppliesNodeFieldPreviewToDashboardAndActiveNamedLayout) {
+    AppConfig config;
+    config.display.layout = "main";
+    config.layout.structure.cardsLayout.name = "rows";
+    config.layout.structure.cardsLayout.children.push_back(MakeNode("metric_list", "cpu.load"));
+    LayoutSectionConfig named;
+    named.name = "main";
+    named.cardsLayout.name = "rows";
+    named.cardsLayout.children.push_back(MakeNode("metric_list", "cpu.load"));
+    config.layout.layouts.push_back(named);
+
+    const LayoutEditFocusKey key = LayoutNodeFieldEditKey{"", {0}, WidgetClass::MetricList, LayoutNodeField::Parameter};
+
+    ASSERT_TRUE(ApplyLayoutEditValue(config, key, LayoutEditValue{std::vector<std::string>{"cpu.ram", "gpu.vram"}}));
+    EXPECT_EQ(config.layout.structure.cardsLayout.children[0].parameter, "cpu.ram,gpu.vram");
+    EXPECT_EQ(config.layout.layouts[0].cardsLayout.children[0].parameter, "cpu.ram,gpu.vram");
+}
+
+TEST(LayoutEditService, AppliesNodeFieldPreviewToCardLayout) {
+    AppConfig config;
+    LayoutCardConfig card;
+    card.id = "time";
+    card.layout.name = "rows";
+    card.layout.children.push_back(MakeNode("clock_date", "YYYY-MM-DD"));
+    config.layout.cards.push_back(card);
+
+    const LayoutEditFocusKey key =
+        LayoutNodeFieldEditKey{"time", {0}, WidgetClass::ClockDate, LayoutNodeField::Parameter};
+
+    ASSERT_TRUE(ApplyLayoutEditValue(config, key, LayoutEditValue{std::string("DD.MM.YYYY")}));
+    EXPECT_EQ(config.layout.cards[0].layout.children[0].parameter, "DD.MM.YYYY");
 }
 
 TEST(LayoutEditTypes, MatchesCardChromeSelectionByEditedCardIdentity) {

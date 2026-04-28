@@ -209,8 +209,9 @@ std::wstring BuildLayoutEditMenuLabel(const std::wstring& subject) {
 
 bool IsMetricListAddRowTarget(const LayoutEditController::TooltipTarget& target) {
     const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&target.payload);
-    return anchor != nullptr && anchor->shape == AnchorShape::Plus &&
-           LayoutEditAnchorMetricListOrderKey(anchor->key).has_value();
+    const auto nodeFieldKey = anchor != nullptr ? LayoutEditAnchorNodeFieldKey(anchor->key) : std::nullopt;
+    return anchor != nullptr && anchor->shape == AnchorShape::Plus && nodeFieldKey.has_value() &&
+           nodeFieldKey->widgetClass == WidgetClass::MetricList;
 }
 
 std::wstring BuildLayoutGuideEditLabel(const LayoutEditGuide& guide) {
@@ -357,13 +358,8 @@ public:
         return shellUi_.ApplyCardTitlePreview(key, title);
     }
 
-    bool ApplyMetricListOrderPreview(
-        const LayoutMetricListOrderEditKey& key, const std::vector<std::string>& metricRefs) override {
-        return shellUi_.ApplyMetricListOrderPreview(key, metricRefs);
-    }
-
-    bool ApplyDateTimeFormatPreview(const LayoutDateTimeFormatEditKey& key, const std::string& format) override {
-        return shellUi_.ApplyDateTimeFormatPreview(key, format);
+    bool ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value) override {
+        return shellUi_.ApplyLayoutEditPreview(key, value);
     }
 
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) override {
@@ -739,20 +735,9 @@ bool DashboardShellUi::ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, 
     return true;
 }
 
-bool DashboardShellUi::ApplyMetricListOrderPreview(
-    const LayoutMetricListOrderEditKey& key, const std::vector<std::string>& metricRefs) {
+bool DashboardShellUi::ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value) {
     AppConfig updatedConfig = CurrentConfig();
-    const LayoutEditWidgetIdentity widget{"", key.editCardId, key.nodePath};
-    if (!::ApplyMetricListOrder(updatedConfig, widget, metricRefs)) {
-        return false;
-    }
-    RestoreConfigSnapshot(updatedConfig);
-    return true;
-}
-
-bool DashboardShellUi::ApplyDateTimeFormatPreview(const LayoutDateTimeFormatEditKey& key, const std::string& format) {
-    AppConfig updatedConfig = CurrentConfig();
-    if (!ApplyDateTimeFormat(updatedConfig, key, format)) {
+    if (!::ApplyLayoutEditValue(updatedConfig, key, value)) {
         return false;
     }
     RestoreConfigSnapshot(updatedConfig);
@@ -765,8 +750,8 @@ bool DashboardShellUi::ApplyMetricListAddRowPreview(const LayoutEditController::
         return false;
     }
 
-    const auto metricListKey = LayoutEditAnchorMetricListOrderKey(anchor->key);
-    if (!metricListKey.has_value()) {
+    const auto metricListKey = LayoutEditAnchorNodeFieldKey(anchor->key);
+    if (!metricListKey.has_value() || metricListKey->widgetClass != WidgetClass::MetricList) {
         return false;
     }
 
@@ -1135,13 +1120,12 @@ void DashboardShellUi::ShowContextMenu(
                        std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"card title");
             } else if (label.empty() && focusKey.has_value() &&
-                       std::holds_alternative<LayoutMetricListOrderEditKey>(*focusKey)) {
-                label = BuildLayoutEditMenuLabel(L"metrics list");
-            } else if (label.empty() && focusKey.has_value() &&
-                       std::holds_alternative<LayoutDateTimeFormatEditKey>(*focusKey)) {
-                const auto& formatKey = std::get<LayoutDateTimeFormatEditKey>(*focusKey);
-                label = BuildLayoutEditMenuLabel(
-                    formatKey.widgetClass == WidgetClass::ClockTime ? L"time format" : L"date format");
+                       std::holds_alternative<LayoutNodeFieldEditKey>(*focusKey)) {
+                const auto& nodeFieldKey = std::get<LayoutNodeFieldEditKey>(*focusKey);
+                if (const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(nodeFieldKey);
+                    descriptor != nullptr) {
+                    label = BuildLayoutEditMenuLabel(std::wstring(descriptor->title));
+                }
             } else if (label.empty() && focusKey.has_value() &&
                        std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel(L"layout container");

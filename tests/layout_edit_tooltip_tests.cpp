@@ -115,7 +115,8 @@ TEST(LayoutEditTooltip, BuildsMetricListOrderTooltipLineForCardLayout) {
     config.layout.cards.back().layout.name = "metric_list";
     config.layout.cards.back().layout.parameter = "cpu.ram,cpu.clock,board.temp.cpu";
 
-    const auto line = BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}}, 1);
+    const auto line = BuildMetricListOrderTooltipLine(
+        config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, 1);
 
     ASSERT_TRUE(line.has_value());
     EXPECT_EQ(*line, "[card.cpu] layout = metric_list(cpu.clock)");
@@ -127,7 +128,8 @@ TEST(LayoutEditTooltip, BuildsMetricListOrderTooltipLineForDashboardLayout) {
     config.layout.structure.cardsLayout.name = "metric_list";
     config.layout.structure.cardsLayout.parameter = "network.upload,network.download";
 
-    const auto line = BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"", {}}, 0);
+    const auto line = BuildMetricListOrderTooltipLine(
+        config, LayoutNodeFieldEditKey{"", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, 0);
 
     ASSERT_TRUE(line.has_value());
     EXPECT_EQ(*line, "[layout.main] cards = metric_list(network.upload)");
@@ -141,8 +143,12 @@ TEST(LayoutEditTooltip, RejectsMetricListOrderTooltipLineWhenRowIndexIsInvalid) 
     config.layout.cards.back().layout.name = "metric_list";
     config.layout.cards.back().layout.parameter = "cpu.ram,cpu.clock";
 
-    EXPECT_FALSE(BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}}, -1).has_value());
-    EXPECT_FALSE(BuildMetricListOrderTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}}, 2).has_value());
+    EXPECT_FALSE(BuildMetricListOrderTooltipLine(
+        config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, -1)
+            .has_value());
+    EXPECT_FALSE(BuildMetricListOrderTooltipLine(
+        config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, 2)
+            .has_value());
 }
 
 TEST(LayoutEditTooltip, BuildsMetricListAddRowTooltipLineForCardLayout) {
@@ -153,7 +159,8 @@ TEST(LayoutEditTooltip, BuildsMetricListAddRowTooltipLineForCardLayout) {
     config.layout.cards.back().layout.name = "metric_list";
     config.layout.cards.back().layout.parameter = "cpu.ram,cpu.clock";
 
-    const auto line = BuildMetricListAddRowTooltipLine(config, LayoutMetricListOrderEditKey{"cpu", {}});
+    const auto line = BuildMetricListAddRowTooltipLine(
+        config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter});
 
     ASSERT_TRUE(line.has_value());
     EXPECT_EQ(*line, "[card.cpu] layout = metric_list(...)");

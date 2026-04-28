@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "config/config_parser.h"
+#include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "util/strings.h"
@@ -270,35 +271,43 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
             childContainer.has_value()) {
             treeNode.children.push_back(*childContainer);
         } else if (child.name == "metric_list") {
-            LayoutEditTreeNode leafNode;
-            leafNode.kind = LayoutEditTreeNodeKind::Leaf;
-            leafNode.label = "metric_list";
-            leafNode.locationText = MemberLocationText(sectionName, memberName);
-            leafNode.descriptionKey = "layout_edit.metric_list_reorder";
-            leafNode.leaf = LayoutEditTreeLeaf{
-                LayoutMetricListOrderEditKey{editCardId, childPath},
-                sectionName,
-                memberName,
-                leafNode.descriptionKey,
-                configschema::ValueFormat::String,
-            };
-            leafNode.selectionHighlight = leafNode.leaf->focusKey;
-            treeNode.children.push_back(std::move(leafNode));
-        } else if (child.name == "clock_time" || child.name == "clock_date") {
-            const auto widgetClass = EnumFromString<WidgetClass>(child.name);
-            if (widgetClass.has_value()) {
+            if (const auto key =
+                    LayoutNodeFieldEditKeyForWidgetParameter(editCardId, childPath, WidgetClass::MetricList);
+                key.has_value()) {
+                const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*key);
                 LayoutEditTreeNode leafNode;
                 leafNode.kind = LayoutEditTreeNodeKind::Leaf;
-                leafNode.label = child.name;
+                leafNode.label = std::string(descriptor->label);
                 leafNode.locationText = MemberLocationText(sectionName, memberName);
-                leafNode.descriptionKey = *widgetClass == WidgetClass::ClockTime ? "layout_edit.clock_time_format"
-                                                                                 : "layout_edit.clock_date_format";
+                leafNode.descriptionKey = std::string(descriptor->descriptionKey);
                 leafNode.leaf = LayoutEditTreeLeaf{
-                    LayoutDateTimeFormatEditKey{editCardId, childPath, *widgetClass},
+                    *key,
                     sectionName,
                     memberName,
                     leafNode.descriptionKey,
-                    configschema::ValueFormat::String,
+                    descriptor->valueFormat,
+                };
+                leafNode.selectionHighlight = leafNode.leaf->focusKey;
+                treeNode.children.push_back(std::move(leafNode));
+            }
+        } else if (child.name == "clock_time" || child.name == "clock_date") {
+            const auto widgetClass = EnumFromString<WidgetClass>(child.name);
+            const auto key = widgetClass.has_value()
+                                 ? LayoutNodeFieldEditKeyForWidgetParameter(editCardId, childPath, *widgetClass)
+                                 : std::nullopt;
+            if (key.has_value()) {
+                const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*key);
+                LayoutEditTreeNode leafNode;
+                leafNode.kind = LayoutEditTreeNodeKind::Leaf;
+                leafNode.label = std::string(descriptor->label);
+                leafNode.locationText = MemberLocationText(sectionName, memberName);
+                leafNode.descriptionKey = std::string(descriptor->descriptionKey);
+                leafNode.leaf = LayoutEditTreeLeaf{
+                    *key,
+                    sectionName,
+                    memberName,
+                    leafNode.descriptionKey,
+                    descriptor->valueFormat,
                 };
                 leafNode.selectionHighlight = leafNode.leaf->focusKey;
                 treeNode.children.push_back(std::move(leafNode));

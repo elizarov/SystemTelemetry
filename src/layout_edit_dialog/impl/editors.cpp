@@ -16,9 +16,22 @@
 
 namespace {
 
-const LayoutMetricListOrderEditKey* SelectedMetricListOrderKey(const LayoutEditDialogState* state) {
+const LayoutNodeFieldEditKey* SelectedNodeFieldKey(const LayoutEditDialogState* state) {
     return state != nullptr && state->selectedLeaf != nullptr
-               ? std::get_if<LayoutMetricListOrderEditKey>(&state->selectedLeaf->focusKey)
+               ? std::get_if<LayoutNodeFieldEditKey>(&state->selectedLeaf->focusKey)
+               : nullptr;
+}
+
+const LayoutNodeFieldEditDescriptor* SelectedNodeFieldDescriptor(const LayoutEditDialogState* state) {
+    const LayoutNodeFieldEditKey* key = SelectedNodeFieldKey(state);
+    return key != nullptr ? FindLayoutNodeFieldEditDescriptor(*key) : nullptr;
+}
+
+const LayoutNodeFieldEditKey* SelectedMetricListOrderKey(const LayoutEditDialogState* state) {
+    const LayoutNodeFieldEditKey* key = SelectedNodeFieldKey(state);
+    const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
+    return key != nullptr && descriptor != nullptr && descriptor->editorKind == LayoutEditEditorKind::MetricListOrder
+               ? key
                : nullptr;
 }
 
@@ -27,13 +40,7 @@ bool IsFontsSectionNode(const LayoutEditDialogState* state) {
            state->selectedNode->kind == LayoutEditTreeNodeKind::Section && state->selectedNode->label == "fonts";
 }
 
-const LayoutDateTimeFormatEditKey* SelectedDateTimeFormatKey(const LayoutEditDialogState* state) {
-    return state != nullptr && state->selectedLeaf != nullptr
-               ? std::get_if<LayoutDateTimeFormatEditKey>(&state->selectedLeaf->focusKey)
-               : nullptr;
-}
-
-std::vector<std::string> StandardDateTimeFormats(const LayoutDateTimeFormatEditKey& key) {
+std::vector<std::string> StandardDateTimeFormats(const LayoutNodeFieldEditKey& key) {
     if (key.widgetClass == WidgetClass::ClockTime) {
         return {"HH:MM",
             "HH:MM:SS",
@@ -77,7 +84,7 @@ std::vector<std::string> StandardDateTimeFormats(const LayoutDateTimeFormatEditK
     return {};
 }
 
-void PopulateDateTimeFormatCombo(HWND hwnd, const LayoutDateTimeFormatEditKey& key, std::string_view selected) {
+void PopulateDateTimeFormatCombo(HWND hwnd, const LayoutNodeFieldEditKey& key, std::string_view selected) {
     HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO);
     if (combo == nullptr) {
         return;
@@ -146,7 +153,8 @@ std::vector<std::string> ReadMetricListOrderDialogRows(const LayoutEditDialogSta
 
 bool ApplyMetricListOrderRows(LayoutEditDialogState* state, HWND, const std::vector<std::string>& metricRefs) {
     const auto* key = SelectedMetricListOrderKey(state);
-    return key != nullptr && state->dialog->Host().ApplyMetricListOrderPreview(*key, metricRefs);
+    return key != nullptr &&
+           state->dialog->Host().ApplyLayoutEditPreview(LayoutEditFocusKey{*key}, LayoutEditValue{metricRefs});
 }
 
 void PopulateMetricListRowCombo(HWND,
@@ -210,11 +218,8 @@ LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* st
     if (std::holds_alternative<LayoutMetricEditKey>(state->selectedLeaf->focusKey)) {
         return LayoutEditEditorKind::Metric;
     }
-    if (std::holds_alternative<LayoutMetricListOrderEditKey>(state->selectedLeaf->focusKey)) {
-        return LayoutEditEditorKind::MetricListOrder;
-    }
-    if (std::holds_alternative<LayoutDateTimeFormatEditKey>(state->selectedLeaf->focusKey)) {
-        return LayoutEditEditorKind::DateTimeFormat;
+    if (const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state); descriptor != nullptr) {
+        return descriptor->editorKind;
     }
     if (std::holds_alternative<LayoutCardTitleEditKey>(state->selectedLeaf->focusKey)) {
         return LayoutEditEditorKind::Numeric;
@@ -369,9 +374,10 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"text\""
               << " text=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
         state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
-    } else if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&state->selectedLeaf->focusKey)) {
+    } else if (const auto* metricListKey = SelectedMetricListOrderKey(state)) {
         std::vector<std::string> metricRefs;
-        if (const LayoutNodeConfig* node = FindMetricListNode(state->dialog->Host().CurrentConfig(), *metricListKey);
+        if (const LayoutNodeConfig* node =
+                FindLayoutNodeFieldNode(state->dialog->Host().CurrentConfig(), *metricListKey);
             node != nullptr) {
             metricRefs = ParseMetricListMetricRefs(node->parameter);
         }
@@ -400,11 +406,12 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"metric_list_order\""
               << " rows=" << QuoteTraceText(std::to_string(metricRefs.size()));
         state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
-    } else if (const auto* formatKey = std::get_if<LayoutDateTimeFormatEditKey>(&state->selectedLeaf->focusKey)) {
+    } else if (const auto* formatKey = SelectedNodeFieldKey(state);
+        formatKey != nullptr && CurrentLayoutEditEditorKind(state) == LayoutEditEditorKind::DateTimeFormat) {
         std::string format;
-        if (const LayoutNodeConfig* node = FindDateTimeFormatNode(state->dialog->Host().CurrentConfig(), *formatKey);
+        if (const LayoutNodeConfig* node = FindLayoutNodeFieldNode(state->dialog->Host().CurrentConfig(), *formatKey);
             node != nullptr) {
-            format = node->parameter;
+            format = ReadLayoutNodeFieldValue(*node, formatKey->field);
         }
         PopulateDateTimeFormatCombo(hwnd, *formatKey, format);
         DestroyMetricListOrderEditorControls(state);
@@ -543,7 +550,7 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         return {true, L""};
     }
 
-    if (std::holds_alternative<LayoutMetricListOrderEditKey>(state->selectedLeaf->focusKey)) {
+    if (SelectedMetricListOrderKey(state) != nullptr) {
         for (const auto& metricRef : ReadMetricListOrderDialogRows(state, hwnd)) {
             if (metricRef.empty()) {
                 return {false, L"Choose a metric for each row."};
@@ -552,7 +559,8 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         return {true, L""};
     }
 
-    if (std::holds_alternative<LayoutDateTimeFormatEditKey>(state->selectedLeaf->focusKey)) {
+    if (const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
+        descriptor != nullptr && descriptor->editorKind == LayoutEditEditorKind::DateTimeFormat) {
         const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
         return !format.empty() ? LayoutEditValidationResult{true, L""}
                                : LayoutEditValidationResult{false, L"Choose a date or time format."};
@@ -834,12 +842,14 @@ bool PreviewSelectedDateTimeFormat(LayoutEditDialogState* state, HWND hwnd) {
     if (state == nullptr || state->selectedLeaf == nullptr || state->updatingControls) {
         return false;
     }
-    const auto* key = std::get_if<LayoutDateTimeFormatEditKey>(&state->selectedLeaf->focusKey);
-    if (key == nullptr) {
+    const auto* key = SelectedNodeFieldKey(state);
+    const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
+    if (key == nullptr || descriptor == nullptr || descriptor->editorKind != LayoutEditEditorKind::DateTimeFormat) {
         return false;
     }
     const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
-    const bool applied = !format.empty() && state->dialog->Host().ApplyDateTimeFormatPreview(*key, format);
+    const bool applied = !format.empty() && state->dialog->Host().ApplyLayoutEditPreview(
+                                                LayoutEditFocusKey{*key}, LayoutEditValue{format});
     std::ostringstream trace;
     trace << BuildTraceNodeText(state->selectedNode) << " format=" << QuoteTraceText(format)
           << " applied=" << QuoteTraceText(applied ? "true" : "false");
@@ -1010,28 +1020,17 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         return applied;
     }
 
-    if (const auto* metricListKey = std::get_if<LayoutMetricListOrderEditKey>(&state->selectedLeaf->focusKey);
-        metricListKey != nullptr) {
-        const LayoutNodeConfig* node = FindMetricListNode(state->originalConfig, *metricListKey);
+    if (const auto* nodeFieldKey = SelectedNodeFieldKey(state); nodeFieldKey != nullptr) {
+        const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldKey);
+        const LayoutNodeConfig* node = FindLayoutNodeFieldNode(state->originalConfig, *nodeFieldKey);
         if (node == nullptr) {
             return false;
         }
-        const bool applied = state->dialog->Host().ApplyMetricListOrderPreview(
-            *metricListKey, ParseMetricListMetricRefs(node->parameter));
-        if (applied) {
-            PopulateLayoutEditSelection(state, hwnd);
-            RefreshLayoutEditValidationState(state, hwnd);
+        LayoutEditValue value = ReadLayoutNodeFieldValue(*node, nodeFieldKey->field);
+        if (descriptor != nullptr && descriptor->editorKind == LayoutEditEditorKind::MetricListOrder) {
+            value = ParseMetricListMetricRefs(node->parameter);
         }
-        return applied;
-    }
-
-    if (const auto* formatKey = std::get_if<LayoutDateTimeFormatEditKey>(&state->selectedLeaf->focusKey);
-        formatKey != nullptr) {
-        const LayoutNodeConfig* node = FindDateTimeFormatNode(state->originalConfig, *formatKey);
-        if (node == nullptr) {
-            return false;
-        }
-        const bool applied = state->dialog->Host().ApplyDateTimeFormatPreview(*formatKey, node->parameter);
+        const bool applied = state->dialog->Host().ApplyLayoutEditPreview(LayoutEditFocusKey{*nodeFieldKey}, value);
         if (applied) {
             PopulateLayoutEditSelection(state, hwnd);
             RefreshLayoutEditValidationState(state, hwnd);

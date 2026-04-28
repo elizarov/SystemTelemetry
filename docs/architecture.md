@@ -82,6 +82,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `LayoutEditController` owns hover state, active drags, capture, cursor choice, and drag-session flow. Layout-edit hit testing and snap-candidate discovery operate on renderer-produced `LayoutEditActiveRegions` snapshots inside the layout-edit package.
 - Layout-model helpers own renderer-safe edit-artifact matching, focus and selection resolution, anchor subject extraction, and edit-artifact ordering policy. Layout-edit modules own tooltip-payload interpretation, tooltip formatting, edit-tree construction, current-value lookup, and preview application.
+- Widget layout-node parameter edits use `LayoutNodeFieldEditKey` plus layout-edit descriptors so tree labels, editor kind, title, hint, tooltip description, trace identity, value format, and preview routing are declared in one place.
+- Layout-node config mutations resolve `{editCardId,nodePath}` through shared layout-edit helpers and mirror dashboard-layout edits into the active named layout when the edit targets the live dashboard layout.
 - `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/impl/`.
 - The dashboard renderer exposes copied active-region geometry as a `LayoutEditActiveRegions` value object used by live interaction and diagnostics screenshot validation; layout-edit modules interpret that snapshot for hit testing, snap discovery, tooltip targets, and active-region trace output.
 

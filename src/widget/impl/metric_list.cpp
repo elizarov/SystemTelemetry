@@ -277,7 +277,8 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
             config.barHeight);
         renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
             LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                LayoutMetricListOrderEditKey{widget.editCardId, widget.nodePath},
+                LayoutNodeFieldEditKey{
+                    widget.editCardId, widget.nodePath, WidgetClass::MetricList, LayoutNodeField::Parameter},
                 rowIndex},
             layoutState_.rowRects[rowIndex],
             layoutState_.reorderAnchorRects[rowIndex],
@@ -312,7 +313,8 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
     if (layoutState_.showAddRowAnchor && !layoutState_.addRowAnchorRect.IsEmpty()) {
         renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
             LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                LayoutMetricListOrderEditKey{widget.editCardId, widget.nodePath},
+                LayoutNodeFieldEditKey{
+                    widget.editCardId, widget.nodePath, WidgetClass::MetricList, LayoutNodeField::Parameter},
                 static_cast<int>(metricRefs_.size())},
             layoutState_.addRowRect,
             layoutState_.addRowAnchorRect,

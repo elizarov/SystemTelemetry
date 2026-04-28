@@ -63,8 +63,7 @@ std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
                                     ? "parameter=" + DescribeWidgetParameter(*LayoutEditAnchorParameter(key))
                                 : LayoutEditAnchorMetricKey(key).has_value()
                                     ? "metric=" + LayoutEditAnchorMetricKey(key)->metricId
-                                : LayoutEditAnchorMetricListOrderKey(key).has_value()     ? "metric_list_reorder"
-                                : LayoutEditAnchorDateTimeFormatKey(key).has_value()      ? "date_time_format"
+                                : LayoutEditAnchorNodeFieldKey(key).has_value()           ? "node_field"
                                 : LayoutEditAnchorContainerChildOrderKey(key).has_value() ? "container_child_reorder"
                                                                                           : "subject=unknown";
     return subject + " anchor_id=" + std::to_string(key.anchorId) +
@@ -363,7 +362,8 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                 SetCapture(hwnd);
                 return true;
             }
-            if (LayoutEditAnchorMetricListOrderKey(region->key).has_value()) {
+            if (const auto nodeFieldKey = LayoutEditAnchorNodeFieldKey(region->key);
+                nodeFieldKey.has_value() && nodeFieldKey->widgetClass == WidgetClass::MetricList) {
                 const LayoutNodeConfig* node = FindEditableWidgetNode(host_.LayoutEditConfig(), region->key.widget);
                 if (node == nullptr || node->name != "metric_list") {
                     return false;
@@ -713,8 +713,10 @@ std::optional<LayoutEditController::TooltipTarget> LayoutEditController::Current
     const LayoutEditActiveRegions regions = ActiveRegions();
     if (activeMetricListReorderDrag_.has_value()) {
         const LayoutEditAnchorKey key{activeMetricListReorderDrag_->widget,
-            LayoutMetricListOrderEditKey{
-                activeMetricListReorderDrag_->widget.editCardId, activeMetricListReorderDrag_->widget.nodePath},
+            LayoutNodeFieldEditKey{activeMetricListReorderDrag_->widget.editCardId,
+                activeMetricListReorderDrag_->widget.nodePath,
+                WidgetClass::MetricList,
+                LayoutNodeField::Parameter},
             activeMetricListReorderDrag_->currentIndex};
         const auto region = FindEditableAnchorRegion(regions, key);
         if (region.has_value()) {
@@ -805,8 +807,10 @@ void LayoutEditController::SyncRendererInteractionState() {
                                             : std::nullopt;
     if (activeMetricListReorderDrag_.has_value()) {
         overlayState.activeEditableAnchor = LayoutEditAnchorKey{activeMetricListReorderDrag_->widget,
-            LayoutMetricListOrderEditKey{
-                activeMetricListReorderDrag_->widget.editCardId, activeMetricListReorderDrag_->widget.nodePath},
+            LayoutNodeFieldEditKey{activeMetricListReorderDrag_->widget.editCardId,
+                activeMetricListReorderDrag_->widget.nodePath,
+                WidgetClass::MetricList,
+                LayoutNodeField::Parameter},
             activeMetricListReorderDrag_->currentIndex};
         overlayState.activeMetricListReorderDrag = MetricListReorderOverlayState{activeMetricListReorderDrag_->widget,
             activeMetricListReorderDrag_->currentIndex,
