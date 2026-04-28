@@ -82,6 +82,19 @@ std::vector<std::string> ChildLabels(const LayoutEditTreeNode& node) {
     return labels;
 }
 
+const LayoutEditTreeNode* FindNodeForLeaf(
+    const std::vector<LayoutEditTreeNode>& nodes, const LayoutEditTreeLeaf* targetLeaf) {
+    for (const LayoutEditTreeNode& node : nodes) {
+        if (node.leaf.has_value() && &(*node.leaf) == targetLeaf) {
+            return &node;
+        }
+        if (const LayoutEditTreeNode* child = FindNodeForLeaf(node.children, targetLeaf); child != nullptr) {
+            return child;
+        }
+    }
+    return nullptr;
+}
+
 void ExpectSpecialSelectionHighlight(
     const LayoutEditTreeNode* node, LayoutEditSelectionHighlightSpecial expectedHighlight) {
     ASSERT_NE(node, nullptr);
@@ -344,12 +357,16 @@ TEST(LayoutEditTree, IncludesDateTimeFormatLeavesForClockWidgets) {
     ASSERT_NE(timeFormatLeaf, nullptr);
     EXPECT_EQ(timeFormatLeaf->sectionName, "card.time");
     EXPECT_EQ(timeFormatLeaf->memberName, "layout");
+    ASSERT_NE(FindNodeForLeaf(model.roots, timeFormatLeaf), nullptr);
+    EXPECT_EQ(FindNodeForLeaf(model.roots, timeFormatLeaf)->label, "clock_time");
 
     const LayoutEditTreeLeaf* dateFormatLeaf = FindLayoutEditTreeLeaf(
         model, LayoutEditFocusKey{LayoutDateTimeFormatEditKey{"time", {1}, WidgetClass::ClockDate}});
     ASSERT_NE(dateFormatLeaf, nullptr);
     EXPECT_EQ(dateFormatLeaf->sectionName, "card.time");
     EXPECT_EQ(dateFormatLeaf->memberName, "layout");
+    ASSERT_NE(FindNodeForLeaf(model.roots, dateFormatLeaf), nullptr);
+    EXPECT_EQ(FindNodeForLeaf(model.roots, dateFormatLeaf)->label, "clock_date");
 }
 
 TEST(LayoutEditTree, ShowsReachableCardSectionsForRuntimeStyleDashboardCardNodes) {

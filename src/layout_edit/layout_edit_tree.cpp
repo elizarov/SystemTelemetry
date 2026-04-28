@@ -289,7 +289,7 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
             if (widgetClass.has_value()) {
                 LayoutEditTreeNode leafNode;
                 leafNode.kind = LayoutEditTreeNodeKind::Leaf;
-                leafNode.label = child.name + std::string("_format");
+                leafNode.label = child.name;
                 leafNode.locationText = MemberLocationText(sectionName, memberName);
                 leafNode.descriptionKey = *widgetClass == WidgetClass::ClockTime ? "layout_edit.clock_time_format"
                                                                                  : "layout_edit.clock_date_format";
