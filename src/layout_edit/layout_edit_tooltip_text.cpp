@@ -4,6 +4,7 @@
 
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"
+#include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit/layout_edit_tooltip.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_model/layout_edit_helpers.h"

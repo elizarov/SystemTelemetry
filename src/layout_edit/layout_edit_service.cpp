@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <functional>
 
+#include "layout_edit/layout_edit_target_descriptor.h"
 #include "util/strings.h"
 
 namespace {

@@ -1,14 +1,13 @@
 #pragma once
 
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "config/config.h"
 #include "config/metric_catalog.h"
-#include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_model/layout_edit_layout_target.h"
+#include "widget/layout_edit_types.h"
 
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditLayoutTarget& target);
 const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const LayoutEditWidgetIdentity& widget);

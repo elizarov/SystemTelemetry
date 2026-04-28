@@ -11,6 +11,7 @@
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
 #include "layout_edit/layout_edit_service.h"
+#include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tree.h"
 #include "layout_edit_dialog/layout_edit_dialog.h"
