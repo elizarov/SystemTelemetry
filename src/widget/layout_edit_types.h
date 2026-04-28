@@ -8,6 +8,8 @@
 #include "renderer/render_types.h"
 #include "widget/layout_edit_parameter_id.h"
 
+struct WidgetLayout;
+
 enum class LayoutGuideAxis {
     Horizontal,
     Vertical,
@@ -72,6 +74,10 @@ struct LayoutNodeFieldEditKey {
     LayoutNodeField field = LayoutNodeField::Parameter;
 };
 
+LayoutNodeFieldEditKey MakeLayoutNodeFieldEditKey(const LayoutEditWidgetIdentity& widget,
+    WidgetClass widgetClass,
+    LayoutNodeField field = LayoutNodeField::Parameter);
+
 struct LayoutContainerChildOrderEditKey {
     std::string editCardId;
     std::vector<size_t> nodePath;
@@ -124,6 +130,11 @@ struct LayoutEditAnchorKey {
         subject = LayoutEditParameter::MetricListBarHeight;
     int anchorId = 0;
 };
+
+LayoutEditAnchorKey MakeLayoutNodeFieldEditAnchorKey(const WidgetLayout& widget,
+    WidgetClass widgetClass,
+    int anchorId = 0,
+    LayoutNodeField field = LayoutNodeField::Parameter);
 
 struct LayoutEditAnchorRegion {
     LayoutEditAnchorKey key;
@@ -203,18 +214,6 @@ struct LayoutEditAnchorBinding {
     AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
     AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
     bool draggable = true;
-};
-
-enum class LayoutEditEditorKind {
-    Summary,
-    Numeric,
-    Font,
-    GlobalFontFamily,
-    Color,
-    Weights,
-    Metric,
-    MetricListOrder,
-    DateTimeFormat,
 };
 
 using LayoutEditValue = std::variant<std::string, std::vector<std::string>>;

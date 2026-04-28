@@ -1122,9 +1122,9 @@ void DashboardShellUi::ShowContextMenu(
             } else if (label.empty() && focusKey.has_value() &&
                        std::holds_alternative<LayoutNodeFieldEditKey>(*focusKey)) {
                 const auto& nodeFieldKey = std::get<LayoutNodeFieldEditKey>(*focusKey);
-                if (const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(nodeFieldKey);
-                    descriptor != nullptr) {
-                    label = BuildLayoutEditMenuLabel(std::wstring(descriptor->title));
+                const std::wstring subject = LayoutNodeFieldEditMenuSubject(nodeFieldKey);
+                if (!subject.empty()) {
+                    label = BuildLayoutEditMenuLabel(subject);
                 }
             } else if (label.empty() && focusKey.has_value() &&
                        std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {

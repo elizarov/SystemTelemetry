@@ -5,8 +5,10 @@
 
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
+#include "layout_edit_dialog/impl/editor_handler_registry.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_hit_priority.h"
+#include "widget/widget.h"
 
 namespace {
 
@@ -363,6 +365,7 @@ TEST(LayoutEditTypes, MatchesMetricListSelectionHighlightAgainstEditableAnchors)
 TEST(LayoutEditService, DescribesWidgetNodeParameterEditors) {
     const LayoutNodeFieldEditKey metricListKey{"gpu", {0, 1}, WidgetClass::MetricList, LayoutNodeField::Parameter};
     const LayoutNodeFieldEditKey timeKey{"time", {0}, WidgetClass::ClockTime, LayoutNodeField::Parameter};
+    const LayoutNodeFieldEditKey dateKey{"time", {1}, WidgetClass::ClockDate, LayoutNodeField::Parameter};
 
     const LayoutNodeFieldEditDescriptor* metricList = FindLayoutNodeFieldEditDescriptor(metricListKey);
     ASSERT_NE(metricList, nullptr);
@@ -373,6 +376,42 @@ TEST(LayoutEditService, DescribesWidgetNodeParameterEditors) {
     ASSERT_NE(time, nullptr);
     EXPECT_EQ(time->editorKind, LayoutEditEditorKind::DateTimeFormat);
     EXPECT_EQ(time->label, "clock_time");
+
+    const LayoutNodeFieldEditDescriptor* date = FindLayoutNodeFieldEditDescriptor(dateKey);
+    ASSERT_NE(date, nullptr);
+    EXPECT_EQ(date->editorKind, LayoutEditEditorKind::DateTimeFormat);
+    EXPECT_EQ(date->label, "clock_date");
+}
+
+TEST(LayoutEditService, MakesWidgetParameterEditKeysForDescriptorBackedWidgets) {
+    const LayoutEditWidgetIdentity widget{"time", "time", {1}};
+    const LayoutNodeFieldEditKey key = MakeLayoutNodeFieldEditKey(widget, WidgetClass::ClockDate);
+
+    EXPECT_EQ(key.editCardId, "time");
+    EXPECT_EQ(key.nodePath, (std::vector<size_t>{1}));
+    EXPECT_EQ(key.widgetClass, WidgetClass::ClockDate);
+    EXPECT_EQ(key.field, LayoutNodeField::Parameter);
+    EXPECT_NE(FindLayoutNodeFieldEditDescriptor(key), nullptr);
+
+    WidgetLayout layout;
+    layout.cardId = "time-render";
+    layout.editCardId = "time-edit";
+    layout.nodePath = {2, 3};
+    const LayoutEditAnchorKey anchor = MakeLayoutNodeFieldEditAnchorKey(layout, WidgetClass::ClockTime, 4);
+    EXPECT_EQ(anchor.widget.renderCardId, "time-render");
+    EXPECT_EQ(anchor.widget.editCardId, "time-edit");
+    ASSERT_TRUE(std::holds_alternative<LayoutNodeFieldEditKey>(anchor.subject));
+    const auto& fieldKey = std::get<LayoutNodeFieldEditKey>(anchor.subject);
+    EXPECT_EQ(fieldKey.editCardId, "time-edit");
+    EXPECT_EQ(fieldKey.nodePath, (std::vector<size_t>{2, 3}));
+    EXPECT_EQ(fieldKey.widgetClass, WidgetClass::ClockTime);
+    EXPECT_EQ(anchor.anchorId, 4);
+}
+
+TEST(LayoutEditDialog, HasDescriptorHandlersForNodeFieldEditors) {
+    EXPECT_TRUE(HasDescriptorLayoutEditEditorHandler(LayoutEditEditorKind::MetricListOrder));
+    EXPECT_TRUE(HasDescriptorLayoutEditEditorHandler(LayoutEditEditorKind::DateTimeFormat));
+    EXPECT_FALSE(HasDescriptorLayoutEditEditorHandler(LayoutEditEditorKind::Metric));
 }
 
 TEST(LayoutEditService, AppliesNodeFieldPreviewToDashboardAndActiveNamedLayout) {

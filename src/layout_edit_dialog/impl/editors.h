@@ -1,5 +1,6 @@
 #pragma once
 
+#include "layout_edit_dialog/impl/editor_handler_registry.h"
 #include "layout_edit_dialog/impl/state.h"
 
 LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* state);

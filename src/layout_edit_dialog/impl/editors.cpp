@@ -206,6 +206,169 @@ bool MutateMetricListOrderRows(
     return true;
 }
 
+bool PopulateMetricListOrderSelection(LayoutEditDialogState* state, HWND hwnd) {
+    const auto* key = SelectedMetricListOrderKey(state);
+    if (key == nullptr) {
+        return false;
+    }
+
+    std::vector<std::string> metricRefs;
+    if (const LayoutNodeConfig* node = FindLayoutNodeFieldNode(state->dialog->Host().CurrentConfig(), *key);
+        node != nullptr) {
+        metricRefs = ParseMetricListMetricRefs(node->parameter);
+    }
+    std::vector<std::string> options = AvailableMetricDefinitionIds(state->dialog->Host().CurrentConfig());
+    for (const auto& metricRef : metricRefs) {
+        const MetricDefinitionConfig* definition =
+            FindMetricDefinition(state->dialog->Host().CurrentConfig().layout.metrics, metricRef);
+        if (definition != nullptr && IsMetricListSupportedDisplayStyle(definition->style) &&
+            std::find(options.begin(), options.end(), metricRef) == options.end()) {
+            options.push_back(metricRef);
+        }
+    }
+    EnsureMetricListOrderEditorControls(state, hwnd, metricRefs.size());
+    for (size_t i = 0; i < state->metricListRowControls.size(); ++i) {
+        PopulateMetricListRowCombo(hwnd, state->metricListRowControls[i], options, metricRefs[i]);
+        EnableWindow(state->metricListRowControls[i].upButton, i > 0 ? TRUE : FALSE);
+        EnableWindow(state->metricListRowControls[i].downButton, i + 1 < metricRefs.size() ? TRUE : FALSE);
+        EnableWindow(state->metricListRowControls[i].deleteButton, TRUE);
+    }
+    if (state->metricListAddRowButton != nullptr) {
+        EnableWindow(state->metricListAddRowButton, !options.empty() ? TRUE : FALSE);
+    }
+    ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, true);
+    SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << " editor=\"metric_list_order\""
+          << " rows=" << QuoteTraceText(std::to_string(metricRefs.size()));
+    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
+    return true;
+}
+
+bool PopulateDateTimeFormatSelection(LayoutEditDialogState* state, HWND hwnd) {
+    const auto* key = SelectedNodeFieldKey(state);
+    const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
+    if (key == nullptr || descriptor == nullptr || descriptor->editorKind != LayoutEditEditorKind::DateTimeFormat) {
+        return false;
+    }
+
+    std::string format;
+    if (const LayoutNodeConfig* node = FindLayoutNodeFieldNode(state->dialog->Host().CurrentConfig(), *key);
+        node != nullptr) {
+        format = ReadLayoutNodeFieldValue(*node, key->field);
+    }
+    PopulateDateTimeFormatCombo(hwnd, *key, format);
+    DestroyMetricListOrderEditorControls(state);
+    ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false, false, true);
+    SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << " editor=\"date_time_format\""
+          << " format=" << QuoteTraceText(format);
+    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
+    return true;
+}
+
+LayoutEditValidationResult ValidateMetricListOrderSelection(LayoutEditDialogState* state, HWND hwnd) {
+    if (SelectedMetricListOrderKey(state) == nullptr) {
+        return {false, L"Choose a metric for each row."};
+    }
+    for (const auto& metricRef : ReadMetricListOrderDialogRows(state, hwnd)) {
+        if (metricRef.empty()) {
+            return {false, L"Choose a metric for each row."};
+        }
+    }
+    return {true, L""};
+}
+
+LayoutEditValidationResult ValidateDateTimeFormatSelection(LayoutEditDialogState* state, HWND hwnd) {
+    const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
+    if (descriptor == nullptr || descriptor->editorKind != LayoutEditEditorKind::DateTimeFormat) {
+        return {false, L"Choose a date or time format."};
+    }
+    const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
+    return !format.empty() ? LayoutEditValidationResult{true, L""}
+                           : LayoutEditValidationResult{false, L"Choose a date or time format."};
+}
+
+bool PreviewDateTimeFormatSelection(LayoutEditDialogState* state, HWND hwnd) {
+    if (state == nullptr || state->selectedLeaf == nullptr || state->updatingControls) {
+        return false;
+    }
+    const auto* key = SelectedNodeFieldKey(state);
+    const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
+    if (key == nullptr || descriptor == nullptr || descriptor->editorKind != LayoutEditEditorKind::DateTimeFormat) {
+        return false;
+    }
+    const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
+    const bool applied = !format.empty() && state->dialog->Host().ApplyLayoutEditPreview(
+                                                LayoutEditFocusKey{*key}, LayoutEditValue{format});
+    std::ostringstream trace;
+    trace << BuildTraceNodeText(state->selectedNode) << " format=" << QuoteTraceText(format)
+          << " applied=" << QuoteTraceText(applied ? "true" : "false");
+    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:preview_date_time_format", trace.str());
+    return applied;
+}
+
+bool RevertNodeFieldSelection(LayoutEditDialogState* state, HWND hwnd) {
+    const auto* nodeFieldKey = SelectedNodeFieldKey(state);
+    if (nodeFieldKey == nullptr) {
+        return false;
+    }
+    const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldKey);
+    const LayoutNodeConfig* node = FindLayoutNodeFieldNode(state->originalConfig, *nodeFieldKey);
+    if (node == nullptr) {
+        return false;
+    }
+    LayoutEditValue value = ReadLayoutNodeFieldValue(*node, nodeFieldKey->field);
+    if (descriptor != nullptr && descriptor->editorKind == LayoutEditEditorKind::MetricListOrder) {
+        value = ParseMetricListMetricRefs(node->parameter);
+    }
+    const bool applied = state->dialog->Host().ApplyLayoutEditPreview(LayoutEditFocusKey{*nodeFieldKey}, value);
+    if (applied) {
+        PopulateLayoutEditSelection(state, hwnd);
+        RefreshLayoutEditValidationState(state, hwnd);
+    }
+    return applied;
+}
+
+struct DescriptorLayoutEditEditorHandler {
+    LayoutEditEditorKind kind = LayoutEditEditorKind::Summary;
+    bool (*populate)(LayoutEditDialogState*, HWND) = nullptr;
+    LayoutEditValidationResult (*validate)(LayoutEditDialogState*, HWND) = nullptr;
+    bool (*preview)(LayoutEditDialogState*, HWND) = nullptr;
+    bool (*revert)(LayoutEditDialogState*, HWND) = nullptr;
+};
+
+constexpr std::array<DescriptorLayoutEditEditorHandler, 2> kDescriptorEditorHandlers{{
+    {LayoutEditEditorKind::MetricListOrder,
+        PopulateMetricListOrderSelection,
+        ValidateMetricListOrderSelection,
+        nullptr,
+        RevertNodeFieldSelection},
+    {LayoutEditEditorKind::DateTimeFormat,
+        PopulateDateTimeFormatSelection,
+        ValidateDateTimeFormatSelection,
+        PreviewDateTimeFormatSelection,
+        RevertNodeFieldSelection},
+}};
+
+const DescriptorLayoutEditEditorHandler* FindDescriptorLayoutEditEditorHandler(LayoutEditEditorKind kind) {
+    const auto it = std::find_if(kDescriptorEditorHandlers.begin(),
+        kDescriptorEditorHandlers.end(),
+        [&](const DescriptorLayoutEditEditorHandler& handler) { return handler.kind == kind; });
+    return it != kDescriptorEditorHandlers.end() ? &(*it) : nullptr;
+}
+
+const DescriptorLayoutEditEditorHandler* SelectedDescriptorLayoutEditEditorHandler(const LayoutEditDialogState* state) {
+    const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
+    return descriptor != nullptr ? FindDescriptorLayoutEditEditorHandler(descriptor->editorKind) : nullptr;
+}
+
+bool PopulateDescriptorLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
+    const DescriptorLayoutEditEditorHandler* handler = SelectedDescriptorLayoutEditEditorHandler(state);
+    return handler != nullptr && handler->populate != nullptr && handler->populate(state, hwnd);
+}
+
 }  // namespace
 
 LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* state) {
@@ -374,53 +537,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         trace << BuildTraceNodeText(state->selectedNode) << " editor=\"text\""
               << " text=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
         state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
-    } else if (const auto* metricListKey = SelectedMetricListOrderKey(state)) {
-        std::vector<std::string> metricRefs;
-        if (const LayoutNodeConfig* node =
-                FindLayoutNodeFieldNode(state->dialog->Host().CurrentConfig(), *metricListKey);
-            node != nullptr) {
-            metricRefs = ParseMetricListMetricRefs(node->parameter);
-        }
-        std::vector<std::string> options = AvailableMetricDefinitionIds(state->dialog->Host().CurrentConfig());
-        for (const auto& metricRef : metricRefs) {
-            const MetricDefinitionConfig* definition =
-                FindMetricDefinition(state->dialog->Host().CurrentConfig().layout.metrics, metricRef);
-            if (definition != nullptr && IsMetricListSupportedDisplayStyle(definition->style) &&
-                std::find(options.begin(), options.end(), metricRef) == options.end()) {
-                options.push_back(metricRef);
-            }
-        }
-        EnsureMetricListOrderEditorControls(state, hwnd, metricRefs.size());
-        for (size_t i = 0; i < state->metricListRowControls.size(); ++i) {
-            PopulateMetricListRowCombo(hwnd, state->metricListRowControls[i], options, metricRefs[i]);
-            EnableWindow(state->metricListRowControls[i].upButton, i > 0 ? TRUE : FALSE);
-            EnableWindow(state->metricListRowControls[i].downButton, i + 1 < metricRefs.size() ? TRUE : FALSE);
-            EnableWindow(state->metricListRowControls[i].deleteButton, TRUE);
-        }
-        if (state->metricListAddRowButton != nullptr) {
-            EnableWindow(state->metricListAddRowButton, !options.empty() ? TRUE : FALSE);
-        }
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, true);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        std::ostringstream trace;
-        trace << BuildTraceNodeText(state->selectedNode) << " editor=\"metric_list_order\""
-              << " rows=" << QuoteTraceText(std::to_string(metricRefs.size()));
-        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
-    } else if (const auto* formatKey = SelectedNodeFieldKey(state);
-        formatKey != nullptr && CurrentLayoutEditEditorKind(state) == LayoutEditEditorKind::DateTimeFormat) {
-        std::string format;
-        if (const LayoutNodeConfig* node = FindLayoutNodeFieldNode(state->dialog->Host().CurrentConfig(), *formatKey);
-            node != nullptr) {
-            format = ReadLayoutNodeFieldValue(*node, formatKey->field);
-        }
-        PopulateDateTimeFormatCombo(hwnd, *formatKey, format);
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false, false, true);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        std::ostringstream trace;
-        trace << BuildTraceNodeText(state->selectedNode) << " editor=\"date_time_format\""
-              << " format=" << QuoteTraceText(format);
-        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection", trace.str());
+    } else if (PopulateDescriptorLayoutEditSelection(state, hwnd)) {
     } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey)) {
         const MetricDefinitionConfig* definition =
             FindMetricDefinition(state->dialog->Host().CurrentConfig().layout.metrics, metricKey->metricId);
@@ -550,20 +667,9 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         return {true, L""};
     }
 
-    if (SelectedMetricListOrderKey(state) != nullptr) {
-        for (const auto& metricRef : ReadMetricListOrderDialogRows(state, hwnd)) {
-            if (metricRef.empty()) {
-                return {false, L"Choose a metric for each row."};
-            }
-        }
-        return {true, L""};
-    }
-
-    if (const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
-        descriptor != nullptr && descriptor->editorKind == LayoutEditEditorKind::DateTimeFormat) {
-        const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
-        return !format.empty() ? LayoutEditValidationResult{true, L""}
-                               : LayoutEditValidationResult{false, L"Choose a date or time format."};
+    if (const DescriptorLayoutEditEditorHandler* handler = SelectedDescriptorLayoutEditEditorHandler(state);
+        handler != nullptr && handler->validate != nullptr) {
+        return handler->validate(state, hwnd);
     }
 
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey);
@@ -839,22 +945,8 @@ bool PreviewSelectedMetric(LayoutEditDialogState* state, HWND hwnd) {
 }
 
 bool PreviewSelectedDateTimeFormat(LayoutEditDialogState* state, HWND hwnd) {
-    if (state == nullptr || state->selectedLeaf == nullptr || state->updatingControls) {
-        return false;
-    }
-    const auto* key = SelectedNodeFieldKey(state);
-    const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
-    if (key == nullptr || descriptor == nullptr || descriptor->editorKind != LayoutEditEditorKind::DateTimeFormat) {
-        return false;
-    }
-    const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
-    const bool applied = !format.empty() && state->dialog->Host().ApplyLayoutEditPreview(
-                                                LayoutEditFocusKey{*key}, LayoutEditValue{format});
-    std::ostringstream trace;
-    trace << BuildTraceNodeText(state->selectedNode) << " format=" << QuoteTraceText(format)
-          << " applied=" << QuoteTraceText(applied ? "true" : "false");
-    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:preview_date_time_format", trace.str());
-    return applied;
+    const DescriptorLayoutEditEditorHandler* handler = SelectedDescriptorLayoutEditEditorHandler(state);
+    return handler != nullptr && handler->preview != nullptr && handler->preview(state, hwnd);
 }
 
 bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd, int controlId, UINT notificationCode) {
@@ -1020,22 +1112,9 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         return applied;
     }
 
-    if (const auto* nodeFieldKey = SelectedNodeFieldKey(state); nodeFieldKey != nullptr) {
-        const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldKey);
-        const LayoutNodeConfig* node = FindLayoutNodeFieldNode(state->originalConfig, *nodeFieldKey);
-        if (node == nullptr) {
-            return false;
-        }
-        LayoutEditValue value = ReadLayoutNodeFieldValue(*node, nodeFieldKey->field);
-        if (descriptor != nullptr && descriptor->editorKind == LayoutEditEditorKind::MetricListOrder) {
-            value = ParseMetricListMetricRefs(node->parameter);
-        }
-        const bool applied = state->dialog->Host().ApplyLayoutEditPreview(LayoutEditFocusKey{*nodeFieldKey}, value);
-        if (applied) {
-            PopulateLayoutEditSelection(state, hwnd);
-            RefreshLayoutEditValidationState(state, hwnd);
-        }
-        return applied;
+    if (const DescriptorLayoutEditEditorHandler* handler = SelectedDescriptorLayoutEditEditorHandler(state);
+        handler != nullptr && handler->revert != nullptr) {
+        return handler->revert(state, hwnd);
     }
 
     return false;

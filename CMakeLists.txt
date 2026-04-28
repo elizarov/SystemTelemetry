@@ -84,6 +84,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_edit_dialog/layout_edit_dialog.cpp
     src/layout_edit_dialog/impl/dialog_proc.cpp
     src/layout_edit_dialog/impl/editors.cpp
+    src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/layout_edit_dialog/impl/pane.cpp
     src/layout_edit_dialog/impl/state.cpp
     src/layout_edit_dialog/impl/trace.cpp
@@ -101,6 +102,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_model/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tooltip.cpp
     src/layout_edit/layout_edit_parameter_edit.cpp
+    src/layout_edit/layout_edit_target_descriptor.cpp
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_tooltip_payload.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
@@ -144,6 +146,7 @@ add_executable(SystemTelemetry WIN32
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
+    src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
@@ -309,9 +312,11 @@ add_executable(SystemTelemetryTests
     src/layout_model/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tooltip.cpp
     src/layout_edit/layout_edit_parameter_edit.cpp
+    src/layout_edit/layout_edit_target_descriptor.cpp
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_tooltip_payload.cpp
     src/layout_edit/layout_edit_hit_test.cpp
+    src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
@@ -322,6 +327,7 @@ add_executable(SystemTelemetryTests
     src/widget/card_chrome_layout.cpp
     src/renderer/renderer.cpp
     src/widget/widget.cpp
+    src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
@@ -426,6 +432,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_model/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit/layout_edit_parameter_edit.cpp
+    src/layout_edit/layout_edit_target_descriptor.cpp
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
@@ -445,6 +452,7 @@ add_executable(SystemTelemetryBenchmarks
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
+    src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp

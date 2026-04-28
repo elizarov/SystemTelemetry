@@ -246,6 +246,30 @@ std::vector<std::string> CollectTopLevelCards(const AppConfig& config) {
     return orderedCards;
 }
 
+std::optional<LayoutEditTreeNode> BuildNodeFieldLeaf(const std::string& sectionName,
+    const std::string& memberName,
+    const std::string& editCardId,
+    const std::vector<size_t>& nodePath,
+    WidgetClass widgetClass) {
+    const auto key = LayoutNodeFieldEditKeyForWidgetParameter(editCardId, nodePath, widgetClass);
+    if (!key.has_value()) {
+        return std::nullopt;
+    }
+    const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*key);
+    if (descriptor == nullptr) {
+        return std::nullopt;
+    }
+
+    LayoutEditTreeNode leafNode;
+    leafNode.kind = LayoutEditTreeNodeKind::Leaf;
+    leafNode.label = std::string(descriptor->label);
+    leafNode.locationText = MemberLocationText(sectionName, memberName);
+    leafNode.descriptionKey = std::string(descriptor->descriptionKey);
+    leafNode.leaf = LayoutEditTreeLeaf{*key, sectionName, memberName, leafNode.descriptionKey, descriptor->valueFormat};
+    leafNode.selectionHighlight = leafNode.leaf->focusKey;
+    return leafNode;
+}
+
 std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
@@ -271,46 +295,18 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
             childContainer.has_value()) {
             treeNode.children.push_back(*childContainer);
         } else if (child.name == "metric_list") {
-            if (const auto key =
-                    LayoutNodeFieldEditKeyForWidgetParameter(editCardId, childPath, WidgetClass::MetricList);
-                key.has_value()) {
-                const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*key);
-                LayoutEditTreeNode leafNode;
-                leafNode.kind = LayoutEditTreeNodeKind::Leaf;
-                leafNode.label = std::string(descriptor->label);
-                leafNode.locationText = MemberLocationText(sectionName, memberName);
-                leafNode.descriptionKey = std::string(descriptor->descriptionKey);
-                leafNode.leaf = LayoutEditTreeLeaf{
-                    *key,
-                    sectionName,
-                    memberName,
-                    leafNode.descriptionKey,
-                    descriptor->valueFormat,
-                };
-                leafNode.selectionHighlight = leafNode.leaf->focusKey;
-                treeNode.children.push_back(std::move(leafNode));
+            if (auto leafNode =
+                    BuildNodeFieldLeaf(sectionName, memberName, editCardId, childPath, WidgetClass::MetricList);
+                leafNode.has_value()) {
+                treeNode.children.push_back(std::move(*leafNode));
             }
         } else if (child.name == "clock_time" || child.name == "clock_date") {
             const auto widgetClass = EnumFromString<WidgetClass>(child.name);
-            const auto key = widgetClass.has_value()
-                                 ? LayoutNodeFieldEditKeyForWidgetParameter(editCardId, childPath, *widgetClass)
-                                 : std::nullopt;
-            if (key.has_value()) {
-                const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*key);
-                LayoutEditTreeNode leafNode;
-                leafNode.kind = LayoutEditTreeNodeKind::Leaf;
-                leafNode.label = std::string(descriptor->label);
-                leafNode.locationText = MemberLocationText(sectionName, memberName);
-                leafNode.descriptionKey = std::string(descriptor->descriptionKey);
-                leafNode.leaf = LayoutEditTreeLeaf{
-                    *key,
-                    sectionName,
-                    memberName,
-                    leafNode.descriptionKey,
-                    descriptor->valueFormat,
-                };
-                leafNode.selectionHighlight = leafNode.leaf->focusKey;
-                treeNode.children.push_back(std::move(leafNode));
+            if (widgetClass.has_value()) {
+                if (auto leafNode = BuildNodeFieldLeaf(sectionName, memberName, editCardId, childPath, *widgetClass);
+                    leafNode.has_value()) {
+                    treeNode.children.push_back(std::move(*leafNode));
+                }
             }
         }
 

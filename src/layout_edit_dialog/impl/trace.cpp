@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <sstream>
 
+#include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit_dialog/impl/util.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 
@@ -113,8 +114,7 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
     }
     if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&leaf->focusKey)) {
         std::ostringstream stream;
-        stream << "focus="
-               << QuoteTraceText(leaf->sectionName + "." + std::string(EnumToString(nodeFieldKey->widgetClass)));
+        stream << "focus=" << QuoteTraceText(LayoutNodeFieldEditTraceLabel(*nodeFieldKey, leaf->sectionName));
         stream << " edit_card=" << QuoteTraceText(nodeFieldKey->editCardId);
         stream << " node_path=" << QuoteTraceText(JoinNodePath(nodeFieldKey->nodePath));
         return stream.str();

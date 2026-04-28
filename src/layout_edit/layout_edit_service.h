@@ -7,26 +7,12 @@
 
 #include "config/config.h"
 #include "config/metric_catalog.h"
+#include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_model/layout_edit_layout_target.h"
-
-struct LayoutNodeFieldEditDescriptor {
-    WidgetClass widgetClass = WidgetClass::Unknown;
-    LayoutNodeField field = LayoutNodeField::Parameter;
-    LayoutEditEditorKind editorKind = LayoutEditEditorKind::Summary;
-    configschema::ValueFormat valueFormat = configschema::ValueFormat::String;
-    std::string_view label;
-    std::string_view descriptionKey;
-    std::wstring_view title;
-    std::wstring_view hint;
-    std::string_view traceName;
-};
 
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditLayoutTarget& target);
 const LayoutNodeConfig* FindEditableWidgetNode(const AppConfig& config, const LayoutEditWidgetIdentity& widget);
 const LayoutNodeConfig* FindLayoutNodeFieldNode(const AppConfig& config, const LayoutNodeFieldEditKey& key);
-const LayoutNodeFieldEditDescriptor* FindLayoutNodeFieldEditDescriptor(const LayoutNodeFieldEditKey& key);
-std::optional<LayoutNodeFieldEditKey> LayoutNodeFieldEditKeyForWidgetParameter(
-    std::string editCardId, std::vector<size_t> nodePath, WidgetClass widgetClass);
 std::string ReadLayoutNodeFieldValue(const LayoutNodeConfig& node, LayoutNodeField field);
 std::vector<std::string> ParseMetricListMetricRefs(std::string_view parameter);
 std::vector<std::string> AvailableMetricListMetricIds(const AppConfig& config, const ConfigMetricCatalog& catalog);

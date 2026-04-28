@@ -51,10 +51,7 @@ void ClockDateWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayou
         widget.rect.top + anchorSize,
     };
     renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            LayoutNodeFieldEditKey{
-                widget.editCardId, widget.nodePath, WidgetClass::ClockDate, LayoutNodeField::Parameter},
-            0},
+        MakeLayoutNodeFieldEditAnchorKey(widget, WidgetClass::ClockDate),
         widget.rect,
         anchorRect,
         AnchorShape::Wedge,

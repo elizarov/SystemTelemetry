@@ -386,10 +386,7 @@ std::wstring BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
     if (const auto* nodeFieldLeaf =
             node->leaf.has_value() ? std::get_if<LayoutNodeFieldEditKey>(&node->leaf->focusKey) : nullptr;
         nodeFieldLeaf != nullptr) {
-        if (const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldLeaf);
-            descriptor != nullptr) {
-            return std::wstring(descriptor->title);
-        }
+        return LayoutNodeFieldEditTitle(*nodeFieldLeaf);
     }
     if (const auto* weightLeaf =
             node->leaf.has_value() ? std::get_if<LayoutWeightEditKey>(&node->leaf->focusKey) : nullptr;
@@ -460,10 +457,7 @@ std::wstring BuildLayoutEditHintText(const LayoutEditTreeNode* node) {
     }
     if (const auto* nodeFieldLeaf = std::get_if<LayoutNodeFieldEditKey>(&node->leaf->focusKey);
         nodeFieldLeaf != nullptr) {
-        if (const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*nodeFieldLeaf);
-            descriptor != nullptr) {
-            return std::wstring(descriptor->hint);
-        }
+        return LayoutNodeFieldEditHint(*nodeFieldLeaf);
     }
     return L"Select a field to edit it here.";
 }
