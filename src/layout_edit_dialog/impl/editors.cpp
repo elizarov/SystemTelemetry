@@ -35,17 +35,44 @@ const LayoutDateTimeFormatEditKey* SelectedDateTimeFormatKey(const LayoutEditDia
 
 std::vector<std::string> StandardDateTimeFormats(const LayoutDateTimeFormatEditKey& key) {
     if (key.widgetClass == WidgetClass::ClockTime) {
-        return {"HH:MM", "HH:MM:SS", "H:MM", "hh:MM AM", "hh:MM:SS AM"};
+        return {"HH:MM",
+            "HH:MM:SS",
+            "H:MM",
+            "H:MM:SS",
+            "HH.MM",
+            "HH.MM.SS",
+            "hh:MM AM",
+            "h:MM AM",
+            "hh:MM:SS AM",
+            "h:MM:SS AM",
+            "hh:MM am",
+            "h:MM am",
+            "hh:MM:SS am",
+            "h:MM:SS am"};
     }
     if (key.widgetClass == WidgetClass::ClockDate) {
         return {"YYYY-MM-DD",
-            "DD.MM.YYYY",
-            "MM/DD/YYYY",
-            "DD/MM/YYYY",
             "YYYY/MM/DD",
+            "YYYY.MM.DD",
+            "DD.MM.YYYY",
+            "D.M.YYYY",
+            "MM/DD/YYYY",
+            "M/D/YYYY",
+            "DD/MM/YYYY",
+            "D/M/YYYY",
+            "DD-MM-YYYY",
+            "MM-DD-YYYY",
             "MMM DD, YYYY",
+            "MMM D, YYYY",
+            "MMMM DD, YYYY",
+            "MMMM D, YYYY",
             "DD MMM YYYY",
-            "dddd, MMMM DD"};
+            "D MMM YYYY",
+            "DD MMMM YYYY",
+            "D MMMM YYYY",
+            "dddd, MMMM DD",
+            "dddd, MMMM D",
+            "ddd, MMM DD"};
     }
     return {};
 }
