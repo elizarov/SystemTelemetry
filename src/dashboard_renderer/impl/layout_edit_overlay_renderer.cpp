@@ -282,14 +282,13 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
             renderer_.Renderer().DrawSolidLine(topRight, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
         } else if (highlighted.shape == AnchorShape::VerticalReorder ||
                    highlighted.shape == AnchorShape::HorizontalReorder) {
-            const float outlineWidth = static_cast<float>(
-                active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
+            const int outlineWidth = (std::max)(1, renderer_.ScaleLogical(1));
             const int centerX = highlighted.anchorRect.left +
                                 (std::max<LONG>(0, highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
             const int centerY = highlighted.anchorRect.top +
                                 (std::max<LONG>(0, highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
             const int gapHalf = (std::max)(1, renderer_.ScaleLogical(1));
-            const auto stroke = RenderStroke::Solid(outlineColor, outlineWidth);
+            const auto stroke = RenderStroke::Solid(outlineColor, static_cast<float>(outlineWidth));
             if (highlighted.shape == AnchorShape::HorizontalReorder) {
                 const int halfHeight =
                     (std::max)(1, static_cast<int>(highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
