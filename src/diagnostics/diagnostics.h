@@ -28,6 +28,12 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     Trace& trace,
     std::optional<RenderPoint> hoverPoint = std::nullopt,
     std::string* errorText = nullptr);
+bool SaveLayoutGuideSheet(const std::filesystem::path& imagePath,
+    const SystemSnapshot& snapshot,
+    const AppConfig& config,
+    double scale,
+    Trace& trace,
+    std::string* errorText = nullptr);
 
 DiagnosticsOptions GetDiagnosticsOptions();
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
@@ -53,6 +59,7 @@ private:
     std::filesystem::path tracePath_;
     std::filesystem::path dumpPath_;
     std::filesystem::path screenshotPath_;
+    std::filesystem::path layoutGuideSheetPath_;
     std::filesystem::path saveConfigPath_;
     std::filesystem::path saveFullConfigPath_;
     std::ofstream traceStream_;

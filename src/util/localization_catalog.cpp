@@ -1,5 +1,7 @@
 #include "util/localization_catalog.h"
 
+#include <utility>
+
 #include "resource.h"
 #include "util/resource_loader.h"
 #include "util/strings.h"
@@ -48,6 +50,11 @@ void InitializeLocalizationCatalog() {
     }
 
     g_localizationCatalog = ParseLocalizationCatalog(LoadUtf8ResourceData(IDR_LOCALIZATION_CATALOG));
+    g_localizationCatalogInitialized = true;
+}
+
+void ReplaceLocalizationCatalogForTesting(LocalizationCatalogMap catalog) {
+    g_localizationCatalog = std::move(catalog);
     g_localizationCatalogInitialized = true;
 }
 

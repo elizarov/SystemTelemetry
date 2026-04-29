@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <unordered_map>
@@ -363,6 +364,116 @@ bool DashboardRenderer::SaveSnapshotPng(
         lastError_ = renderer_->LastError();
     }
     return saved;
+}
+
+std::vector<LayoutGuideSheetCardSummary> DashboardRenderer::CollectLayoutGuideSheetCardSummaries() const {
+    std::vector<LayoutGuideSheetCardSummary> summaries;
+    summaries.reserve(layoutResolver_->resolvedLayout_.cards.size());
+    for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
+        LayoutGuideSheetCardSummary summary;
+        summary.id = card.id;
+        summary.title = card.title;
+        summary.iconName = card.iconName;
+        summary.rect = card.rect;
+        summary.chromeLayout = card.chromeLayout;
+        for (const auto& widget : card.widgets) {
+            if (widget.widget != nullptr) {
+                summary.widgetClasses.push_back(widget.widget->Class());
+            }
+        }
+        summaries.push_back(std::move(summary));
+    }
+    return summaries;
+}
+
+bool DashboardRenderer::SaveLayoutGuideSheetSurfacePng(
+    const std::filesystem::path& imagePath, int width, int height, std::function<void()> draw) {
+    return renderer_->SavePng(imagePath, width, height, std::move(draw));
+}
+
+void DashboardRenderer::BeginLayoutGuideSheetDynamicArtifacts(const DashboardOverlayState& overlayState) {
+    activeOverlayState_ = &overlayState;
+    layoutResolver_->ClearDynamicEditArtifacts();
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
+}
+
+void DashboardRenderer::ResolveLayoutGuideSheetDynamicArtifactCollisions() {
+    layoutResolver_->ResolveDynamicEditArtifactCollisions();
+}
+
+void DashboardRenderer::EndLayoutGuideSheetDynamicArtifacts() {
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    activeOverlayState_ = nullptr;
+}
+
+void DashboardRenderer::DrawLayoutGuideSheetCard(
+    const std::string& cardId, const RenderRect& sourceRect, const RenderRect& destRect, const MetricSource& metrics) {
+    Renderer().PushClipRect(destRect.Inflate(ScaleLogical(4), ScaleLogical(4)));
+    Renderer().PushTranslation(RenderPoint{destRect.left - sourceRect.left, destRect.top - sourceRect.top});
+    const auto cardIt = std::find_if(layoutResolver_->resolvedLayout_.cards.begin(),
+        layoutResolver_->resolvedLayout_.cards.end(),
+        [&](const auto& card) { return card.id == cardId; });
+    if (cardIt != layoutResolver_->resolvedLayout_.cards.end()) {
+        DrawResolvedWidget(cardIt->chrome, metrics);
+        for (const auto& widget : cardIt->widgets) {
+            DrawResolvedWidget(widget, metrics);
+        }
+    }
+    Renderer().PopTranslation();
+    Renderer().PopClipRect();
+}
+
+void DashboardRenderer::DrawLayoutGuideSheetOverlay(const DashboardOverlayState& overlayState,
+    const RenderRect& sourceRect,
+    const RenderRect& destRect,
+    const MetricSource& metrics) {
+    Renderer().PushClipRect(destRect.Inflate(ScaleLogical(4), ScaleLogical(4)));
+    Renderer().PushTranslation(RenderPoint{destRect.left - sourceRect.left, destRect.top - sourceRect.top});
+    layoutEditOverlayRenderer_->Draw(overlayState, metrics);
+    Renderer().PopTranslation();
+    Renderer().PopClipRect();
+}
+
+LayoutGuideSheetCardChromeArtifacts DashboardRenderer::BuildLayoutGuideSheetCardChromeArtifacts(
+    const std::string& cardId, const RenderRect& rect, const MetricSource* metrics) {
+    LayoutGuideSheetCardChromeArtifacts artifacts;
+    const LayoutCardConfig* card = FindCardConfigById(cardId);
+    if (card == nullptr) {
+        return artifacts;
+    }
+
+    WidgetLayout widget;
+    widget.rect = rect;
+    widget.cardId = cardId;
+    widget.editCardId = cardId;
+    widget.widget = CreateCardChromeWidget(*card);
+    widget.widget->ResolveLayoutState(*this, rect);
+
+    auto savedWidgetGuides = std::move(layoutResolver_->widgetEditGuides_);
+    auto savedStaticAnchors = std::move(layoutResolver_->staticEditableAnchorRegions_);
+    auto savedDynamicAnchors = std::move(layoutResolver_->dynamicEditableAnchorRegions_);
+    auto savedDynamicColors = std::move(layoutResolver_->dynamicColorEditRegions_);
+    layoutResolver_->widgetEditGuides_.clear();
+    layoutResolver_->staticEditableAnchorRegions_.clear();
+    layoutResolver_->dynamicEditableAnchorRegions_.clear();
+    layoutResolver_->dynamicColorEditRegions_.clear();
+
+    widget.widget->BuildEditGuides(*this, widget);
+    widget.widget->BuildStaticAnchors(*this, widget);
+    if (metrics != nullptr) {
+        widget.widget->Draw(*this, widget, *metrics);
+    }
+
+    artifacts.chromeLayout = ResolveCardChromeLayout(*card, rect, ResolveCardChromeLayoutMetrics(*this));
+    artifacts.widgetGuides = layoutResolver_->widgetEditGuides_;
+    artifacts.anchorRegions = layoutResolver_->staticEditableAnchorRegions_;
+    artifacts.colorRegions = layoutResolver_->dynamicColorEditRegions_;
+
+    layoutResolver_->widgetEditGuides_ = std::move(savedWidgetGuides);
+    layoutResolver_->staticEditableAnchorRegions_ = std::move(savedStaticAnchors);
+    layoutResolver_->dynamicEditableAnchorRegions_ = std::move(savedDynamicAnchors);
+    layoutResolver_->dynamicColorEditRegions_ = std::move(savedDynamicColors);
+    return artifacts;
 }
 
 bool DashboardRenderer::RenderSnapshotOffscreen(

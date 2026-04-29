@@ -19,6 +19,7 @@ struct DiagnosticsOptions {
     bool trace = false;
     bool dump = false;
     bool screenshot = false;
+    bool layoutGuideSheet = false;
     bool exit = false;
     bool fake = false;
     bool blank = false;
@@ -36,6 +37,7 @@ struct DiagnosticsOptions {
     std::filesystem::path tracePath;
     std::filesystem::path dumpPath;
     std::filesystem::path screenshotPath;
+    std::filesystem::path layoutGuideSheetPath;
     std::filesystem::path saveConfigPath;
     std::filesystem::path saveFullConfigPath;
     std::filesystem::path fakePath;

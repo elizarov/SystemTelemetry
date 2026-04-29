@@ -39,6 +39,11 @@ enum class RenderColorId {
     GraphBackground,
     GraphMarker,
     GraphAxis,
+    LayoutGuideCalloutLeader,
+    LayoutGuideCalloutFill,
+    LayoutGuideCalloutBorder,
+    LayoutGuideCalloutParameter,
+    LayoutGuideCalloutDescription,
     Count,
 };
 

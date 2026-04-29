@@ -167,6 +167,11 @@ struct ColorsConfig {
     CONFIG_EDITABLE_VALUE(ColorConfig, graphBackgroundColor, "graph_background_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, graphAxisColor, "graph_axis_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, graphMarkerColor, "graph_marker_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutLeaderColor, "layout_guide_callout_leader_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutFillColor, "layout_guide_callout_fill_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutBorderColor, "layout_guide_callout_border_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutParameterColor, "layout_guide_callout_parameter_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutDescriptionColor, "layout_guide_callout_description_color");
     CONFIG_SECTION("colors");
 
     bool operator==(const ColorsConfig& other) const = default;

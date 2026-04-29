@@ -10,6 +10,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - `/trace[:path]` writes continuous trace output.
 - `/dump[:path]` writes the machine-parseable snapshot dump.
 - `/screenshot[:path]` writes the rendered dashboard PNG.
+- `/layout-guide-sheet[:path]` writes a diagnostics PNG that shows a compact selected-layout overview plus representative cards with layout-edit guides and tooltip-style callouts for documented editable targets.
 - `/save-config[:path]` writes the minimal config overlay export.
 - `/save-full-config[:path]` writes the full embedded-template-shaped config export.
 
@@ -37,12 +38,13 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 ### Invalid combinations
 
 - `/blank` cannot be combined with `/fake`.
+- `/blank` cannot be combined with `/layout-guide-sheet`.
 
 ## Output Paths And File Behavior
 
 - Without an explicit path, output switches write in the current working directory.
 - Relative explicit paths also resolve from the current working directory.
-- Default filenames are `telemetry_trace.txt`, `telemetry_dump.txt`, `telemetry_screenshot.png`, `telemetry_config.ini`, and `telemetry_full_config.ini`.
+- Default filenames are `telemetry_trace.txt`, `telemetry_dump.txt`, `telemetry_screenshot.png`, `telemetry_layout_guide_sheet.png`, `telemetry_config.ini`, and `telemetry_full_config.ini`.
 - Trace output appends UTF-8 text without a BOM and uses the `[trace yyyy-mm-dd hh:mm:ss.mmm]` prefix format.
 - Dump, screenshot, minimal-config, and full-config exports overwrite only their requested target file.
 - `/fake` without a path uses the built-in synthetic baseline and reads no external file.
@@ -58,7 +60,9 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
 - `/fake:<path>` reloads the selected fake file once per second while the process runs so manual edits affect the next refresh.
 - Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior.
+- Layout guide sheet exports select the smallest practical card subset that covers the visible widget types in the selected layout, render those cards as separate specimens with forced layout-edit affordances, and use the same active-region geometry and shared layout-edit tooltip text as live editing; callouts document active areas inside rendered representative cards, render each documented target in its hover-equivalent state, group equivalent metric-definition rows into one representative hovered row, omit callouts for non-rendered cards and outside-card layout guides, use left and right side stacks only, grow the canvas to fit tooltip-style callouts beside the card column, and refresh once per second in UI-attached diagnostics mode.
 - When `/trace` and `/screenshot` are both enabled, each screenshot export writes `diagnostics:active_region` trace lines from the `LayoutEditActiveRegions` snapshot for mouse-reactive dashboard regions that are present in the exported frame, including card and widget hover regions, layout guides, container-child reorder targets, gap handles, widget guides, text anchors, and color targets. Each line includes the client-coordinate box, visual type, config or layout path, and a short detail string; a `diagnostics:active_regions` summary records the exported count.
+- When `/trace` and `/layout-guide-sheet` are both enabled, each guide-sheet export writes a `diagnostics:layout_guide_sheet` start and end marker with the selected layout, canvas dimensions, placed callout count, and any placement warning.
 - When `/hover:<x>,<y>` is active during a traced screenshot export, the trace writes one `diagnostics:hover` line with the hover point, resolved target kind, and tooltip text that the live layout-edit UI would show. If no hover target resolves, the line reports `target="none"`.
 - Live layout-edit tooltips use a separate Win32 tooltip window and therefore do not appear in diagnostics screenshots.
 
@@ -106,6 +110,7 @@ Recommended checks:
 - One headless run with explicit output filenames for trace, dump, and screenshot
 - One headless `/trace /default-config /layout:<name> /screenshot /exit`
 - One headless `/trace /default-config /edit-layout /screenshot /exit`
+- One headless `/trace /default-config /layout-guide-sheet /exit`
 - One headless `/trace /default-config /edit-layout /hover:<x>,<y> /screenshot /exit`
 - One headless `/trace /default-config /edit-layout:<widget-name> /screenshot /exit` for each widget class whose edit chrome changed
 - One headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit`

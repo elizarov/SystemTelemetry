@@ -50,6 +50,13 @@ void RendererPalette::Rebuild(const ColorsConfig& config) {
     colors_[ColorSlot(RenderColorId::GraphBackground)] = ToRenderColor(config.graphBackgroundColor);
     colors_[ColorSlot(RenderColorId::GraphMarker)] = ToRenderColor(config.graphMarkerColor);
     colors_[ColorSlot(RenderColorId::GraphAxis)] = ToRenderColor(config.graphAxisColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutLeader)] = ToRenderColor(config.layoutGuideCalloutLeaderColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutFill)] = ToRenderColor(config.layoutGuideCalloutFillColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutBorder)] = ToRenderColor(config.layoutGuideCalloutBorderColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutParameter)] =
+        ToRenderColor(config.layoutGuideCalloutParameterColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutDescription)] =
+        ToRenderColor(config.layoutGuideCalloutDescriptionColor);
 }
 
 const RenderColor& RendererPalette::Get(RenderColorId id) const {

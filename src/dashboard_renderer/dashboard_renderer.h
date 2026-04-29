@@ -2,8 +2,10 @@
 
 #include <windows.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -18,10 +20,28 @@
 #include "renderer/renderer.h"
 #include "telemetry/metrics.h"
 #include "util/trace.h"
+#include "widget/card_chrome_layout.h"
 #include "widget/widget.h"
 #include "widget/widget_host.h"
 
 class DashboardLayoutEditOverlayRenderer;
+class LayoutGuideSheetRenderer;
+
+struct LayoutGuideSheetCardSummary {
+    std::string id;
+    std::string title;
+    std::string iconName;
+    RenderRect rect{};
+    CardChromeLayout chromeLayout{};
+    std::vector<WidgetClass> widgetClasses;
+};
+
+struct LayoutGuideSheetCardChromeArtifacts {
+    CardChromeLayout chromeLayout{};
+    std::vector<LayoutEditWidgetGuide> widgetGuides;
+    std::vector<LayoutEditAnchorRegion> anchorRegions;
+    std::vector<LayoutEditColorRegion> colorRegions;
+};
 
 class DashboardRenderer : public WidgetHost {
 public:
@@ -63,6 +83,7 @@ public:
     bool SaveSnapshotPng(const std::filesystem::path& imagePath,
         const SystemSnapshot& snapshot,
         const DashboardOverlayState& overlayState);
+    std::vector<LayoutGuideSheetCardSummary> CollectLayoutGuideSheetCardSummaries() const;
     bool RenderSnapshotOffscreen(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DiscardWindowRenderTarget(std::string_view reason = {});
@@ -83,6 +104,7 @@ public:
 private:
     friend class DashboardLayoutResolver;
     friend class DashboardLayoutEditOverlayRenderer;
+    friend class LayoutGuideSheetRenderer;
 
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
@@ -122,6 +144,21 @@ private:
     const MetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();
     void WriteTrace(const std::string& text) const;
+    bool SaveLayoutGuideSheetSurfacePng(
+        const std::filesystem::path& imagePath, int width, int height, std::function<void()> draw);
+    void BeginLayoutGuideSheetDynamicArtifacts(const DashboardOverlayState& overlayState);
+    void ResolveLayoutGuideSheetDynamicArtifactCollisions();
+    void EndLayoutGuideSheetDynamicArtifacts();
+    void DrawLayoutGuideSheetCard(const std::string& cardId,
+        const RenderRect& sourceRect,
+        const RenderRect& destRect,
+        const MetricSource& metrics);
+    void DrawLayoutGuideSheetOverlay(const DashboardOverlayState& overlayState,
+        const RenderRect& sourceRect,
+        const RenderRect& destRect,
+        const MetricSource& metrics);
+    LayoutGuideSheetCardChromeArtifacts BuildLayoutGuideSheetCardChromeArtifacts(
+        const std::string& cardId, const RenderRect& rect, const MetricSource* metrics);
 
     AppConfig config_;
     Trace& trace_;

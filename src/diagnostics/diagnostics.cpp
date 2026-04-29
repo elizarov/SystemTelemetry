@@ -14,9 +14,13 @@
 #include "diagnostics/constants.h"
 #include "layout_edit/layout_edit_active_region_trace.h"
 #include "layout_edit/layout_edit_controller.h"
+#include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
+#include "layout_guide_sheet/layout_guide_sheet_planner.h"
+#include "layout_guide_sheet/layout_guide_sheet_renderer.h"
 #include "main/config_io.h"
 #include "telemetry/telemetry.h"
+#include "util/localization_catalog.h"
 #include "util/paths.h"
 #include "util/scale.h"
 #include "util/strings.h"
@@ -287,6 +291,7 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.trace = HasSwitch("/trace");
     options.dump = HasSwitch("/dump");
     options.screenshot = HasSwitch("/screenshot");
+    options.layoutGuideSheet = HasSwitch("/layout-guide-sheet");
     options.exit = HasSwitch("/exit");
     options.fake = HasSwitch("/fake");
     options.blank = HasSwitch("/blank");
@@ -329,6 +334,11 @@ DiagnosticsOptions GetDiagnosticsOptions() {
         options.screenshot = true;
         options.screenshotPath = *screenshotPath;
     }
+    if (const auto layoutGuideSheetPath = GetColonSwitchValue(L"/layout-guide-sheet");
+        layoutGuideSheetPath.has_value()) {
+        options.layoutGuideSheet = true;
+        options.layoutGuideSheetPath = *layoutGuideSheetPath;
+    }
     if (const auto saveConfigPath = GetColonSwitchValue(L"/save-config"); saveConfigPath.has_value()) {
         options.saveConfig = true;
         options.saveConfigPath = *saveConfigPath;
@@ -352,6 +362,15 @@ bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
     if (options.blank && options.fake) {
         if (!options.trace) {
             MessageBoxW(nullptr, L"/blank cannot be used together with /fake.", L"System Telemetry", MB_ICONERROR);
+        }
+        return false;
+    }
+    if (options.blank && options.layoutGuideSheet) {
+        if (!options.trace) {
+            MessageBoxW(nullptr,
+                L"/blank cannot be used together with /layout-guide-sheet.",
+                L"System Telemetry",
+                MB_ICONERROR);
         }
         return false;
     }
@@ -410,6 +429,10 @@ bool DiagnosticsSession::Initialize() {
     if (options_.screenshot) {
         screenshotPath_ =
             ResolveDiagnosticsOutputPath(workingDirectory, options_.screenshotPath, kDefaultScreenshotFileName);
+    }
+    if (options_.layoutGuideSheet) {
+        layoutGuideSheetPath_ = ResolveDiagnosticsOutputPath(
+            workingDirectory, options_.layoutGuideSheetPath, kDefaultLayoutGuideSheetFileName);
     }
     if (options_.saveConfig) {
         saveConfigPath_ =
@@ -473,6 +496,24 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
             "diagnostics:screenshot_save_failed path=\"" + Utf8FromWide(screenshotPath_.wstring()) + "\"";
         if (!screenshotError.empty()) {
             traceText += " detail=\"" + screenshotError + "\"";
+        }
+        ReportError(traceText, message);
+        return false;
+    }
+
+    std::string layoutGuideSheetError;
+    if (options_.layoutGuideSheet && !SaveLayoutGuideSheet(layoutGuideSheetPath_,
+                                         dump.snapshot,
+                                         config,
+                                         ResolveSavedScreenshotScale(config),
+                                         trace_,
+                                         &layoutGuideSheetError)) {
+        const std::wstring message =
+            WideFromUtf8("Failed to save layout guide sheet:\n" + Utf8FromWide(layoutGuideSheetPath_.wstring()));
+        std::string traceText =
+            "diagnostics:layout_guide_sheet_save_failed path=\"" + Utf8FromWide(layoutGuideSheetPath_.wstring()) + "\"";
+        if (!layoutGuideSheetError.empty()) {
+            traceText += " detail=\"" + layoutGuideSheetError + "\"";
         }
         ReportError(traceText, message);
         return false;
@@ -769,6 +810,62 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
             trace, config, renderer.CollectLayoutEditActiveRegions(overlayState), overlayState);
     }
     return saved;
+}
+
+bool SaveLayoutGuideSheet(const std::filesystem::path& imagePath,
+    const SystemSnapshot& snapshot,
+    const AppConfig& config,
+    double scale,
+    Trace& trace,
+    std::string* errorText) {
+    trace.Write("diagnostics:layout_guide_sheet start path=\"" + Utf8FromWide(imagePath.wstring()) + "\" layout=\"" +
+                config.display.layout + "\"");
+    DashboardRenderer renderer(trace);
+    renderer.SetRenderScale(scale);
+    renderer.SetConfig(config);
+    renderer.SetRenderMode(DashboardRenderer::RenderMode::Normal);
+    if (!renderer.Initialize()) {
+        if (errorText != nullptr) {
+            *errorText = renderer.LastError();
+        }
+        trace.Write("diagnostics:layout_guide_sheet failed stage=\"initialize\"");
+        return false;
+    }
+
+    DashboardOverlayState overlayState;
+    overlayState.showLayoutEditGuides = true;
+    overlayState.forceLayoutEditAffordances = true;
+    overlayState.hoverOnExposedDashboard = true;
+    if (!renderer.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
+        if (errorText != nullptr) {
+            *errorText = renderer.LastError();
+        }
+        trace.Write("diagnostics:layout_guide_sheet failed stage=\"active_regions\"");
+        return false;
+    }
+    InitializeLocalizationCatalog();
+    const std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    const std::vector<std::string> selectedCardIds = SelectLayoutGuideSheetCards(cards);
+    const LayoutEditActiveRegions activeRegions = renderer.CollectLayoutEditActiveRegions(overlayState);
+    std::vector<LayoutGuideSheetCalloutRequest> callouts =
+        BuildLayoutGuideSheetOverviewCallouts(config, activeRegions, cards);
+    std::vector<LayoutGuideSheetCalloutRequest> cardCallouts =
+        BuildLayoutGuideSheetCallouts(config, activeRegions, cards, selectedCardIds);
+    callouts.insert(callouts.end(), cardCallouts.begin(), cardCallouts.end());
+
+    std::vector<std::string> traceDetails;
+    LayoutGuideSheetRenderer sheetRenderer(renderer);
+    const bool saved = sheetRenderer.SavePng(imagePath, snapshot, callouts, selectedCardIds, &traceDetails, errorText);
+    if (!saved) {
+        trace.Write("diagnostics:layout_guide_sheet failed stage=\"save\"");
+        return false;
+    }
+    std::string endTrace = "diagnostics:layout_guide_sheet end path=\"" + Utf8FromWide(imagePath.wstring()) + "\"";
+    for (const std::string& detail : traceDetails) {
+        endTrace += " " + detail;
+    }
+    trace.Write(endTrace);
+    return true;
 }
 
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {

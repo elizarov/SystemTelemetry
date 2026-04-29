@@ -69,7 +69,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ### Rendering and layout resolution
 
 - `Renderer` owns renderer style resources, icon loading, text measurement, live HWND rendering, shared offscreen bitmap rendering for screenshot export and validation priming, and primitive drawing such as text, rectangles, rounded rectangles, ellipses, lines, arcs, polylines, filled paths, clips, and translations. It stays independent of application trace sinks and dashboard-specific drawing modes.
-- `DashboardRenderer` owns renderer style input selection, resolved scene traversal, drawing-mode state, widget-host services, and production of the `LayoutEditActiveRegions` snapshot used by layout-edit interaction.
+- `DashboardRenderer` owns renderer style input selection, resolved scene traversal, drawing-mode state, widget-host services, layout guide sheet drawing from prepared callout requests, and production of the `LayoutEditActiveRegions` snapshot used by layout-edit interaction.
 - `DashboardLayoutResolver` owns static layout resolution plus resolved dashboard, card, widget, guide, anchor, and dynamic edit-artifact geometry inside the dashboard-renderer package. It implements the widget-facing edit-artifact registrar because it owns the registered artifact storage, shared affordance presets, and low-level anchor-region construction.
 - `DashboardLayoutEditOverlayRenderer` owns layout-edit overlay presentation inside the dashboard-renderer package, including selected and hovered highlights, layout and widget guides, gap anchors, size similarity indicator policy, dotted outlines, and dragged container-child replay.
 - Shared renderer-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
@@ -92,7 +92,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - The diagnostics subsystem parses diagnostics CLI switches, manages headless `/exit` runs, owns requested output exports, creates the top-level trace session when trace is enabled, and decides whether telemetry initialization failures are reported through trace or modal UI.
 - `src/util/trace.*` owns trace line emission plus generic trace value formatting and quoting helpers. Runtime flows create a top-level `Trace` object and pass it by non-null reference; disabled output and stream-null handling stay inside `Trace`.
 - Snapshot dumps and fake-runtime imports share the same dump serializer and parser.
-- Diagnostics screenshot export uses the same renderer scene, layout-edit hover resolver, and tooltip text builder as the live window path instead of a separate rendering implementation.
+- Diagnostics screenshot export uses the same renderer scene, layout-edit hover resolver, and tooltip text builder as the live window path instead of a separate rendering implementation. The layout guide sheet package in `src/layout_guide_sheet/` owns overview callout selection, representative card selection, callout candidate filtering, equivalent metric-definition grouping, draw-free callout side geometry, leader routing, and sheet rendering. Diagnostics orchestrates the export command and trace records, while `DashboardRenderer` exposes only the resolved-card summaries, card-chrome artifact hooks, and rendering hooks needed by `LayoutGuideSheetRenderer`.
 
 ## Runtime Flows
 
