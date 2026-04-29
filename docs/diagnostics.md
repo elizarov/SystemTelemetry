@@ -1,7 +1,7 @@
 # System Telemetry Diagnostics
 
 This document owns diagnostics CLI behavior, output contracts, failure policy, and validation recipes.
-See also: [docs/specifications.md](specifications.md) for user-visible runtime behavior, [docs/layout.md](layout.md) for config language, and [docs/build.md](build.md) for build and test entrypoints.
+See also: [docs/specifications.md](specifications.md) for user-visible runtime behavior, [docs/layout.md](layout.md) for config language, [docs/layout_guide_sheet.md](layout_guide_sheet.md) for the layout guide sheet feature spec, and [docs/build.md](build.md) for build and test entrypoints.
 
 ## Switches
 
