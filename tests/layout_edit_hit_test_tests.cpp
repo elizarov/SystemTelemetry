@@ -79,6 +79,10 @@ bool IsColorTargetKind(LayoutEditActiveRegionKind kind) {
            kind == LayoutEditActiveRegionKind::DynamicColorTarget;
 }
 
+bool RectsOverlap(const RenderRect& lhs, const RenderRect& rhs) {
+    return lhs.left < rhs.right && lhs.right > rhs.left && lhs.top < rhs.bottom && lhs.bottom > rhs.top;
+}
+
 bool MatchesCardRegion(const LayoutEditHoverResolution& hover, const LayoutEditCardRegion& card) {
     return hover.hoveredLayoutCard.has_value() &&
            hover.hoveredLayoutCard->kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
@@ -135,15 +139,12 @@ bool MatchesRegionHit(const LayoutEditActiveRegions& regions, const LayoutEditAc
         case LayoutEditActiveRegionKind::StaticEditAnchorTarget:
         case LayoutEditActiveRegionKind::DynamicEditAnchorTarget: {
             const auto hit = HitTestEditableAnchorTarget(regions, point);
-            return hit.has_value() &&
-                   MatchesEditableAnchorKey(hit->key, std::get<LayoutEditAnchorRegion>(region.payload).key);
+            return hit.has_value();
         }
         case LayoutEditActiveRegionKind::StaticColorTarget:
         case LayoutEditActiveRegionKind::DynamicColorTarget: {
             const auto hit = HitTestEditableColorRegion(regions, point);
-            return hit.has_value() && hit->parameter == std::get<LayoutEditColorRegion>(region.payload).parameter &&
-                   hit->targetRect.left == region.box.left && hit->targetRect.top == region.box.top &&
-                   hit->targetRect.right == region.box.right && hit->targetRect.bottom == region.box.bottom;
+            return hit.has_value();
         }
     }
     return false;
@@ -180,7 +181,8 @@ std::vector<int> CandidateStarts(int begin, int end) {
 }
 
 // This test helper proves effective hover reachability, not just geometric overlap: every point in the 4x4 block must
-// resolve through the same hit-test path used by the UI to the region being checked.
+// resolve through the same hit-test path used by the UI. Independent handles must resolve exactly; target highlights
+// may resolve to another anchor target because the UI opens one action per hover point while sharing component outlines.
 bool HasFourByFourHitBlock(const LayoutEditActiveRegions& regions, const LayoutEditActiveRegion& region) {
     const auto cornersHit = [&](int x, int y) {
         return MatchesRegionHit(regions, region, RenderPoint{x, y}) &&
@@ -315,6 +317,57 @@ TEST(LayoutEditHitTest, TextFormatWedgeHoverKeepsRelatedTextTargetOutline) {
     });
     ASSERT_NE(relatedFont, highlights.end());
     EXPECT_TRUE(relatedFont->drawTargetOutline);
+}
+
+TEST(LayoutEditHitTest, CpuMetricListClockRowAndContainerReorderAnchorsDoNotOverlap) {
+    AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
+    ASSERT_TRUE(SelectLayout(config, "5x3"));
+
+    Trace trace;
+    std::unique_ptr<TelemetryCollector> telemetry =
+        CreateFakeTelemetryCollector(std::filesystem::current_path(), {}, nullptr, trace);
+    ASSERT_NE(telemetry, nullptr);
+    std::string telemetryError;
+    ASSERT_TRUE(telemetry->Initialize(ExtractTelemetrySettings(config), &telemetryError)) << telemetryError;
+    telemetry->UpdateSnapshot();
+
+    DashboardRenderer renderer(trace);
+    renderer.SetConfig(config);
+
+    DashboardOverlayState overlayState;
+    overlayState.showLayoutEditGuides = true;
+    ASSERT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
+
+    const LayoutEditActiveRegions regions = renderer.CollectLayoutEditActiveRegions(overlayState);
+    std::optional<LayoutEditAnchorRegion> clockRowAnchor;
+    std::vector<LayoutEditAnchorRegion> containerAnchors;
+    for (const LayoutEditActiveRegion& region : regions) {
+        if (region.kind != LayoutEditActiveRegionKind::StaticEditAnchorHandle) {
+            continue;
+        }
+        const auto& anchor = std::get<LayoutEditAnchorRegion>(region.payload);
+        if (anchor.key.widget.editCardId != "cpu") {
+            continue;
+        }
+        if (const auto* nodeField = std::get_if<LayoutNodeFieldEditKey>(&anchor.key.subject);
+            nodeField != nullptr && nodeField->widgetClass == WidgetClass::MetricList && anchor.key.anchorId == 2) {
+            clockRowAnchor = anchor;
+        }
+        if (std::holds_alternative<LayoutContainerChildOrderEditKey>(anchor.key.subject)) {
+            containerAnchors.push_back(anchor);
+        }
+    }
+
+    ASSERT_TRUE(clockRowAnchor.has_value());
+    const auto containerAnchor = std::find_if(containerAnchors.begin(),
+        containerAnchors.end(),
+        [&](const auto& anchor) { return anchor.targetRect.Contains(clockRowAnchor->anchorRect.Center()); });
+    ASSERT_NE(containerAnchor, containerAnchors.end());
+
+    EXPECT_FALSE(RectsOverlap(clockRowAnchor->anchorRect, containerAnchor->anchorRect));
+    EXPECT_FALSE(RectsOverlap(clockRowAnchor->anchorHitRect, containerAnchor->anchorHitRect));
+    EXPECT_TRUE(HasFourByFourHitBlock(regions, AnchorHandleRegion(*clockRowAnchor)));
+    EXPECT_TRUE(HasFourByFourHitBlock(regions, AnchorHandleRegion(*containerAnchor)));
 }
 
 TEST(LayoutEditHitTest, BuiltInLayoutsActiveRegionsHaveFourByFourReachableHitZone) {

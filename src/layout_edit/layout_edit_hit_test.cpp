@@ -28,11 +28,11 @@ bool IsColorTargetKind(LayoutEditActiveRegionKind kind) {
 }
 
 int AnchorHoverPriority(const LayoutEditAnchorRegion& region) {
+    if (region.shape == AnchorShape::Wedge) {
+        return -3;
+    }
     if (region.shape == AnchorShape::Square) {
         return -2;
-    }
-    if (region.shape == AnchorShape::Wedge) {
-        return 2;
     }
     return LayoutEditAnchorHitPriority(region.key);
 }

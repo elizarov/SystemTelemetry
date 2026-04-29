@@ -25,6 +25,120 @@ RenderRect MakeSquareAnchorRect(int centerX, int centerY, int size) {
         centerX - radius, centerY - radius, centerX - radius + clampedSize, centerY - radius + clampedSize};
 }
 
+RenderRect MakeCenteredRect(int centerX, int centerY, int width, int height) {
+    return RenderRect{
+        centerX - width / 2, centerY - height / 2, centerX - width / 2 + width, centerY - height / 2 + height};
+}
+
+bool RectsOverlap(const RenderRect& lhs, const RenderRect& rhs) {
+    return lhs.left < rhs.right && lhs.right > rhs.left && lhs.top < rhs.bottom && lhs.bottom > rhs.top;
+}
+
+bool OverlapsAnyRect(const RenderRect& rect, const std::vector<RenderRect>& occupiedRects) {
+    return std::any_of(occupiedRects.begin(), occupiedRects.end(), [&](const RenderRect& occupied) {
+        return RectsOverlap(rect, occupied);
+    });
+}
+
+std::vector<int> AlternatingOffsets(int step, int negativeLimit, int positiveLimit) {
+    std::vector<int> offsets{0};
+    for (int distance = step; distance <= (std::max)(negativeLimit, positiveLimit); distance += step) {
+        if (distance <= negativeLimit) {
+            offsets.push_back(-distance);
+        }
+        if (distance <= positiveLimit) {
+            offsets.push_back(distance);
+        }
+    }
+    return offsets;
+}
+
+int AnchorHitInset(const LayoutEditAnchorRegion& anchor) {
+    return (std::max)(0, anchor.anchorRect.left - anchor.anchorHitRect.left);
+}
+
+bool IsContainerChildOrderAnchor(const LayoutEditAnchorRegion& anchor) {
+    return std::holds_alternative<LayoutContainerChildOrderEditKey>(anchor.key.subject);
+}
+
+RenderRect ResolveNonOverlappingEdgeAnchorRect(const RenderRect& childRect,
+    const RenderRect& preferredRect,
+    bool horizontal,
+    int handleInset,
+    int hitInset,
+    int collisionStep,
+    const std::vector<RenderRect>& occupiedAnchorHitRects) {
+    const int handleWidth = preferredRect.Width();
+    const int handleHeight = preferredRect.Height();
+    const RenderPoint preferredCenter = preferredRect.Center();
+    const auto candidateFree = [&](const RenderRect& candidate) {
+        return !OverlapsAnyRect(candidate.Inflate(hitInset, hitInset), occupiedAnchorHitRects);
+    };
+    if (candidateFree(preferredRect)) {
+        return preferredRect;
+    }
+
+    if (horizontal) {
+        const int minCenterX = childRect.left + handleWidth / 2 + handleInset;
+        const int maxCenterX = childRect.right - handleWidth / 2 - handleInset;
+        if (minCenterX <= maxCenterX) {
+            const int negativeLimit = preferredCenter.x - minCenterX;
+            const int positiveLimit = maxCenterX - preferredCenter.x;
+            const auto tryHorizontalLane = [&](int centerY) -> std::optional<RenderRect> {
+                for (int offset : AlternatingOffsets(collisionStep, negativeLimit, positiveLimit)) {
+                    const RenderRect candidate =
+                        MakeCenteredRect(preferredCenter.x + offset, centerY, handleWidth, handleHeight);
+                    if (candidateFree(candidate)) {
+                        return candidate;
+                    }
+                }
+                return std::nullopt;
+            };
+            if (const auto candidate = tryHorizontalLane(preferredCenter.y); candidate.has_value()) {
+                return *candidate;
+            }
+
+            const int maxCenterY = childRect.bottom - handleHeight / 2 - handleInset;
+            for (int laneOffset = collisionStep; preferredCenter.y + laneOffset <= maxCenterY;
+                laneOffset += collisionStep) {
+                if (const auto candidate = tryHorizontalLane(preferredCenter.y + laneOffset); candidate.has_value()) {
+                    return *candidate;
+                }
+            }
+        }
+    } else {
+        const int minCenterY = childRect.top + handleHeight / 2 + handleInset;
+        const int maxCenterY = childRect.bottom - handleHeight / 2 - handleInset;
+        if (minCenterY <= maxCenterY) {
+            const int negativeLimit = preferredCenter.y - minCenterY;
+            const int positiveLimit = maxCenterY - preferredCenter.y;
+            const auto tryVerticalLane = [&](int centerX) -> std::optional<RenderRect> {
+                for (int offset : AlternatingOffsets(collisionStep, negativeLimit, positiveLimit)) {
+                    const RenderRect candidate =
+                        MakeCenteredRect(centerX, preferredCenter.y + offset, handleWidth, handleHeight);
+                    if (candidateFree(candidate)) {
+                        return candidate;
+                    }
+                }
+                return std::nullopt;
+            };
+            if (const auto candidate = tryVerticalLane(preferredCenter.x); candidate.has_value()) {
+                return *candidate;
+            }
+
+            const int minCenterX = childRect.left + handleWidth / 2 + handleInset;
+            for (int laneOffset = collisionStep; preferredCenter.x - laneOffset >= minCenterX;
+                laneOffset += collisionStep) {
+                if (const auto candidate = tryVerticalLane(preferredCenter.x - laneOffset); candidate.has_value()) {
+                    return *candidate;
+                }
+            }
+        }
+    }
+
+    return preferredRect;
+}
+
 bool IsColorEditParameter(LayoutEditParameter parameter) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
     return descriptor.has_value() && descriptor->valueFormat == configschema::ValueFormat::ColorHex;
@@ -117,6 +231,7 @@ void DashboardLayoutResolver::RegisterDynamicEditAnchor(LayoutEditAnchorRegistra
         return;
     }
     RegisterEditableAnchorRegion(dynamicEditableAnchorRegions_, registration);
+    ResolveContainerAnchorCollisions();
 }
 
 void DashboardLayoutResolver::RegisterStaticCornerEditAnchor(
@@ -221,6 +336,7 @@ void DashboardLayoutResolver::RegisterDynamicTextAnchor(const TextLayoutResult& 
         return;
     }
     RegisterTextAnchor(dynamicEditableAnchorRegions_, layoutResult, editable, targetOutline);
+    ResolveContainerAnchorCollisions();
     if (colorParameter.has_value()) {
         RegisterDynamicColorEditRegion(*colorParameter, layoutResult.textRect);
     }
@@ -237,6 +353,7 @@ void DashboardLayoutResolver::RegisterDynamicTextAnchor(const RenderRect& rect,
         return;
     }
     RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, style, options, editable, targetOutline);
+    ResolveContainerAnchorCollisions();
     if (colorParameter.has_value()) {
         RegisterDynamicColorEditRegion(
             *colorParameter, renderer_.Renderer().MeasureTextBlock(rect, text, style, options).textRect);
@@ -257,6 +374,36 @@ void DashboardLayoutResolver::RegisterDynamicColorEditRegion(
         return;
     }
     dynamicColorEditRegions_.push_back(LayoutEditColorRegion{parameter, targetRect});
+}
+
+void DashboardLayoutResolver::ResolveContainerAnchorCollisions() {
+    const int collisionStep = (std::max)(4, renderer_.ScaleLogical(4));
+    std::vector<RenderRect> occupiedAnchorHitRects;
+    occupiedAnchorHitRects.reserve(staticEditableAnchorRegions_.size() + dynamicEditableAnchorRegions_.size());
+    for (const LayoutEditAnchorRegion& anchor : staticEditableAnchorRegions_) {
+        if (!IsContainerChildOrderAnchor(anchor)) {
+            occupiedAnchorHitRects.push_back(anchor.anchorHitRect);
+        }
+    }
+    for (const LayoutEditAnchorRegion& anchor : dynamicEditableAnchorRegions_) {
+        occupiedAnchorHitRects.push_back(anchor.anchorHitRect);
+    }
+
+    for (LayoutEditAnchorRegion& anchor : staticEditableAnchorRegions_) {
+        if (!IsContainerChildOrderAnchor(anchor)) {
+            continue;
+        }
+        const bool horizontal = anchor.shape == AnchorShape::HorizontalReorder;
+        const int hitInset = AnchorHitInset(anchor);
+        const RenderRect resolvedRect = ResolveNonOverlappingEdgeAnchorRect(
+            anchor.targetRect, anchor.anchorRect, horizontal, 0, hitInset, collisionStep, occupiedAnchorHitRects);
+        anchor.anchorRect = resolvedRect;
+        anchor.anchorHitRect = resolvedRect.Inflate(hitInset, hitInset);
+        if (anchor.draggable) {
+            anchor.dragOrigin = resolvedRect.Center();
+        }
+        occupiedAnchorHitRects.push_back(anchor.anchorHitRect);
+    }
 }
 
 void DashboardLayoutResolver::RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) {
@@ -311,21 +458,34 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
         const int handleHeight = (std::max)(6, renderer.ScaleLogical(horizontal ? 8 : 12));
         const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
         const int handleInset = (std::max)(2, renderer.ScaleLogical(3));
+        const int collisionStep = (std::max)(4, renderer.ScaleLogical(4));
         const LayoutEditWidgetIdentity widgetIdentity =
             target.editCardId.empty()
                 ? LayoutEditWidgetIdentity{"", "", target.nodePath, LayoutEditWidgetIdentity::Kind::DashboardChrome}
                 : LayoutEditWidgetIdentity{
                       target.renderCardId, target.editCardId, target.nodePath, LayoutEditWidgetIdentity::Kind::Widget};
+        std::vector<RenderRect> occupiedAnchorHitRects;
+        occupiedAnchorHitRects.reserve(staticEditableAnchorRegions_.size() + target.childRects.size());
+        for (const LayoutEditAnchorRegion& region : staticEditableAnchorRegions_) {
+            occupiedAnchorHitRects.push_back(region.anchorHitRect);
+        }
+
         for (size_t i = 0; i < target.childRects.size(); ++i) {
             const RenderRect& childRect = target.childRects[i];
+            if (childRect.IsEmpty()) {
+                continue;
+            }
             const int centerX =
                 horizontal ? childRect.left + childRect.Width() / 2 : childRect.right - (handleWidth / 2) - handleInset;
             const int centerY =
                 horizontal ? childRect.top + (handleHeight / 2) + handleInset : childRect.top + childRect.Height() / 2;
-            const RenderRect anchorRect{centerX - handleWidth / 2,
-                centerY - handleHeight / 2,
-                centerX - handleWidth / 2 + handleWidth,
-                centerY - handleHeight / 2 + handleHeight};
+            const RenderRect anchorRect = ResolveNonOverlappingEdgeAnchorRect(childRect,
+                MakeCenteredRect(centerX, centerY, handleWidth, handleHeight),
+                horizontal,
+                handleInset,
+                hitInset,
+                collisionStep,
+                occupiedAnchorHitRects);
             RegisterStaticEditAnchor(
                 LayoutEditAnchorRegistration{.key = LayoutEditAnchorKey{widgetIdentity,
                                                  LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
@@ -338,6 +498,7 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                     .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
                     .targetOutline = LayoutEditTargetOutline::Hidden});
             staticEditableAnchorRegions_.back().anchorHitRect = anchorRect.Inflate(hitInset, hitInset);
+            occupiedAnchorHitRects.push_back(staticEditableAnchorRegions_.back().anchorHitRect);
         }
     }
 }

@@ -129,6 +129,7 @@ private:
         const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
         LayoutEditTargetOutline targetOutline);
+    void ResolveContainerAnchorCollisions();
 
     DashboardRenderer& renderer_;
     ResolvedDashboardLayout resolvedLayout_{};
