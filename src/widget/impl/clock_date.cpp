@@ -38,9 +38,8 @@ void ClockDateWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, con
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontClockDate, 0, renderer.Config().layout.fonts.clockDate.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);
+    renderer.EditArtifacts().RegisterDynamicCornerEditAnchor(
+        MakeLayoutNodeFieldEditAnchorKey(widget, WidgetClass::ClockDate), textLayout.textRect);
 }
 
-void ClockDateWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const {
-    renderer.EditArtifacts().RegisterStaticCornerEditAnchor(
-        MakeLayoutNodeFieldEditAnchorKey(widget, WidgetClass::ClockDate), widget.rect);
-}
+void ClockDateWidget::BuildStaticAnchors(WidgetHost&, const WidgetLayout&) const {}

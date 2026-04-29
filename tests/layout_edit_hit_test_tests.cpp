@@ -9,6 +9,7 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "dashboard_renderer/impl/layout_edit_overlay_renderer.h"
 #include "layout_edit/layout_edit_hit_test.h"
 #include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_helpers.h"
@@ -282,6 +283,29 @@ TEST(LayoutEditHitTest, FindsGuideFamiliesByIdentity) {
     EXPECT_TRUE(FindLayoutEditGuide(regions, layoutGuide).has_value());
     EXPECT_TRUE(FindWidgetEditGuide(regions, widgetGuide).has_value());
     EXPECT_TRUE(FindGapEditAnchor(regions, gap.key).has_value());
+}
+
+TEST(LayoutEditHitTest, TextFormatWedgeHoverKeepsRelatedTextTargetOutline) {
+    LayoutEditAnchorRegion fontAnchor = BasicAnchor(LayoutEditParameter::FontClockDate, RenderRect{20, 30, 120, 50});
+    fontAnchor.key.anchorId = 0;
+    fontAnchor.shape = AnchorShape::Circle;
+    fontAnchor.drawTargetOutline = true;
+
+    LayoutEditAnchorRegion formatWedge = fontAnchor;
+    formatWedge.key.subject = LayoutNodeFieldEditKey{"time", {1}, WidgetClass::ClockDate, LayoutNodeField::Parameter};
+    formatWedge.key.anchorId = 1;
+    formatWedge.shape = AnchorShape::Wedge;
+    formatWedge.draggable = false;
+    formatWedge.drawTargetOutline = false;
+
+    const std::vector<LayoutEditAnchorRegion> highlights =
+        CollectRelatedEditableAnchorHighlights({}, {fontAnchor, formatWedge}, formatWedge);
+
+    const auto relatedFont = std::find_if(highlights.begin(), highlights.end(), [&](const auto& region) {
+        return MatchesEditableAnchorKey(region.key, fontAnchor.key);
+    });
+    ASSERT_NE(relatedFont, highlights.end());
+    EXPECT_TRUE(relatedFont->drawTargetOutline);
 }
 
 TEST(LayoutEditHitTest, BuiltInLayoutsActiveRegionsHaveFourByFourReachableHitZone) {

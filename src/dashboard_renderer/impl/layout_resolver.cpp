@@ -131,6 +131,21 @@ void DashboardLayoutResolver::RegisterStaticCornerEditAnchor(
         .targetOutline = LayoutEditTargetOutline::Hidden});
 }
 
+void DashboardLayoutResolver::RegisterDynamicCornerEditAnchor(
+    const LayoutEditAnchorKey& key, const RenderRect& targetRect) {
+    if (!dynamicAnchorRegistrationEnabled_) {
+        return;
+    }
+    const int anchorSize = std::max(6, renderer_.Renderer().ScaleLogical(8));
+    RegisterDynamicEditAnchor(LayoutEditAnchorRegistration{.key = key,
+        .targetRect = targetRect,
+        .anchorRect =
+            RenderRect{targetRect.left, targetRect.top, targetRect.left + anchorSize, targetRect.top + anchorSize},
+        .shape = AnchorShape::Wedge,
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
+}
+
 void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
     const RenderRect& rect,
     const std::string& text,

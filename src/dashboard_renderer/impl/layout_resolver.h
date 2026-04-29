@@ -89,6 +89,7 @@ public:
     void RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) override;
     void RegisterDynamicEditAnchor(LayoutEditAnchorRegistration registration) override;
     void RegisterStaticCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) override;
+    void RegisterDynamicCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) override;
     void RegisterStaticTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,

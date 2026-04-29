@@ -28,6 +28,8 @@ public:
         staticAnchors.push_back(LayoutEditAnchorRegion{key, targetRect, targetRect, targetRect, 0, AnchorShape::Wedge});
     }
 
+    void RegisterDynamicCornerEditAnchor(const LayoutEditAnchorKey&, const RenderRect&) override {}
+
     void RegisterStaticTextAnchor(const RenderRect&,
         const std::string&,
         TextStyleId,

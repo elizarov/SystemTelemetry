@@ -26,6 +26,7 @@ public:
     virtual void RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) = 0;
     virtual void RegisterDynamicEditAnchor(LayoutEditAnchorRegistration registration) = 0;
     virtual void RegisterStaticCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) = 0;
+    virtual void RegisterDynamicCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) = 0;
     virtual void RegisterStaticTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,

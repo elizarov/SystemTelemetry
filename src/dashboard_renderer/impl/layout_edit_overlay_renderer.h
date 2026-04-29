@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 
 #include "renderer/render_types.h"
 #include "widget/layout_edit_types.h"
@@ -9,6 +10,11 @@ class DashboardLayoutResolver;
 class DashboardRenderer;
 class MetricSource;
 struct DashboardOverlayState;
+
+std::vector<LayoutEditAnchorRegion> CollectRelatedEditableAnchorHighlights(
+    const std::vector<LayoutEditAnchorRegion>& staticRegions,
+    const std::vector<LayoutEditAnchorRegion>& dynamicRegions,
+    const LayoutEditAnchorRegion& source);
 
 class DashboardLayoutEditOverlayRenderer {
 public:

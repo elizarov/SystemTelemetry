@@ -72,6 +72,25 @@ bool SuppressAnchorTargetSelectionOutline(LayoutEditParameter parameter) {
 
 }  // namespace
 
+std::vector<LayoutEditAnchorRegion> CollectRelatedEditableAnchorHighlights(
+    const std::vector<LayoutEditAnchorRegion>& staticRegions,
+    const std::vector<LayoutEditAnchorRegion>& dynamicRegions,
+    const LayoutEditAnchorRegion& source) {
+    std::vector<LayoutEditAnchorRegion> highlights;
+    const auto collect = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
+        for (const auto& region : regions) {
+            if (!::MatchesWidgetIdentity(region.key.widget, source.key.widget) ||
+                !SameRect(region.targetRect, source.targetRect)) {
+                continue;
+            }
+            highlights.push_back(region);
+        }
+    };
+    collect(staticRegions);
+    collect(dynamicRegions);
+    return highlights;
+}
+
 DashboardLayoutEditOverlayRenderer::DashboardLayoutEditOverlayRenderer(
     DashboardRenderer& renderer, DashboardLayoutResolver& layoutResolver)
     : renderer_(renderer), layoutResolver_(layoutResolver) {}
@@ -123,21 +142,10 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
         existing->second = existing->second || active;
     };
     const auto appendRelatedHighlights = [&](const LayoutEditAnchorRegion& source, bool active) {
-        const auto collect = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
-            for (const auto& region : regions) {
-                if (!::MatchesWidgetIdentity(region.key.widget, source.key.widget) ||
-                    !SameRect(region.targetRect, source.targetRect)) {
-                    continue;
-                }
-                LayoutEditAnchorRegion highlightedRegion = region;
-                if (!MatchesEditableAnchorKey(region.key, source.key)) {
-                    highlightedRegion.drawTargetOutline = false;
-                }
-                appendHighlight(highlightedRegion, active && MatchesEditableAnchorKey(region.key, source.key));
-            }
-        };
-        collect(layoutResolver_.staticEditableAnchorRegions_);
-        collect(layoutResolver_.dynamicEditableAnchorRegions_);
+        for (const auto& region : CollectRelatedEditableAnchorHighlights(
+                 layoutResolver_.staticEditableAnchorRegions_, layoutResolver_.dynamicEditableAnchorRegions_, source)) {
+            appendHighlight(region, active && MatchesEditableAnchorKey(region.key, source.key));
+        }
     };
     const auto appendByKey = [&](const std::optional<LayoutEditAnchorKey>& key, bool active) {
         if (!key.has_value()) {
