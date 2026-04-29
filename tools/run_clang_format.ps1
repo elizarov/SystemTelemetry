@@ -114,7 +114,7 @@ function Get-AllCppFiles {
         [string]$RepoRoot
     )
 
-    $files = & git -C $RepoRoot -c core.quotepath=off ls-files --cached --others --exclude-standard -- '*.cpp' '*.h' 2>$null
+    $files = & git -C $RepoRoot -c core.quotepath=off -c core.safecrlf=false ls-files --cached --others --exclude-standard -- '*.cpp' '*.h' 2>$null
     foreach ($relativePath in ($files | Sort-Object -Unique)) {
         if ([string]::IsNullOrWhiteSpace($relativePath)) {
             continue
@@ -142,14 +142,14 @@ function Get-ChangedCppFiles {
     }
 
     if ($headExists) {
-        $gitDiffOutput = & git -C $RepoRoot diff --name-only --diff-filter=ACMR HEAD -- $pathSpecs 2>$null
+        $gitDiffOutput = & git -C $RepoRoot -c core.safecrlf=false diff --name-only --diff-filter=ACMR HEAD -- $pathSpecs 2>$null
         foreach ($entry in $gitDiffOutput) {
             if (-not [string]::IsNullOrWhiteSpace($entry)) {
                 $changedFiles.Add($entry.Trim())
             }
         }
     } else {
-        $gitDiffOutput = & git -C $RepoRoot diff --name-only --diff-filter=ACMR --cached -- $pathSpecs 2>$null
+        $gitDiffOutput = & git -C $RepoRoot -c core.safecrlf=false diff --name-only --diff-filter=ACMR --cached -- $pathSpecs 2>$null
         foreach ($entry in $gitDiffOutput) {
             if (-not [string]::IsNullOrWhiteSpace($entry)) {
                 $changedFiles.Add($entry.Trim())
@@ -157,7 +157,7 @@ function Get-ChangedCppFiles {
         }
     }
 
-    $untrackedOutput = & git -C $RepoRoot ls-files --others --exclude-standard -- $pathSpecs 2>$null
+    $untrackedOutput = & git -C $RepoRoot -c core.safecrlf=false ls-files --others --exclude-standard -- $pathSpecs 2>$null
     foreach ($entry in $untrackedOutput) {
         if (-not [string]::IsNullOrWhiteSpace($entry)) {
             $changedFiles.Add($entry.Trim())
@@ -178,7 +178,7 @@ function Get-StagedCppFiles {
     )
 
     $pathSpecs = @('*.cpp', '*.h')
-    $stagedOutput = & git -C $RepoRoot diff --cached --name-only --diff-filter=ACMR -- $pathSpecs 2>$null
+    $stagedOutput = & git -C $RepoRoot -c core.safecrlf=false diff --cached --name-only --diff-filter=ACMR -- $pathSpecs 2>$null
     foreach ($relativePath in ($stagedOutput | Sort-Object -Unique)) {
         if ([string]::IsNullOrWhiteSpace($relativePath)) {
             continue
@@ -234,7 +234,7 @@ foreach ($file in $files) {
 
         if ($Restage) {
             $relativePath = Get-RelativeRepoPath -RepoRoot $resolvedRoot -FullPath $file.FullName
-            & git -C $resolvedRoot add -- $relativePath
+            & git -C $resolvedRoot -c core.safecrlf=false add -- $relativePath
             if ($LASTEXITCODE -ne 0) {
                 $failed = $true
             }
