@@ -128,15 +128,22 @@ bool MatchesRegionHit(const LayoutEditActiveRegions& regions, const LayoutEditAc
             return std::get<LayoutEditWidgetGuide>(region.payload).hitRect.Contains(point);
         case LayoutEditActiveRegionKind::StaticEditAnchorHandle:
         case LayoutEditActiveRegionKind::DynamicEditAnchorHandle: {
-            return std::get<LayoutEditAnchorRegion>(region.payload).anchorHitRect.Contains(point);
+            const auto hit = HitTestEditableAnchorHandle(regions, point);
+            return hit.has_value() &&
+                   MatchesEditableAnchorKey(hit->key, std::get<LayoutEditAnchorRegion>(region.payload).key);
         }
         case LayoutEditActiveRegionKind::StaticEditAnchorTarget:
         case LayoutEditActiveRegionKind::DynamicEditAnchorTarget: {
-            return std::get<LayoutEditAnchorRegion>(region.payload).targetRect.Contains(point);
+            const auto hit = HitTestEditableAnchorTarget(regions, point);
+            return hit.has_value() &&
+                   MatchesEditableAnchorKey(hit->key, std::get<LayoutEditAnchorRegion>(region.payload).key);
         }
         case LayoutEditActiveRegionKind::StaticColorTarget:
         case LayoutEditActiveRegionKind::DynamicColorTarget: {
-            return std::get<LayoutEditColorRegion>(region.payload).targetRect.Contains(point);
+            const auto hit = HitTestEditableColorRegion(regions, point);
+            return hit.has_value() && hit->parameter == std::get<LayoutEditColorRegion>(region.payload).parameter &&
+                   hit->targetRect.left == region.box.left && hit->targetRect.top == region.box.top &&
+                   hit->targetRect.right == region.box.right && hit->targetRect.bottom == region.box.bottom;
         }
     }
     return false;
@@ -172,6 +179,8 @@ std::vector<int> CandidateStarts(int begin, int end) {
     return starts;
 }
 
+// This test helper proves effective hover reachability, not just geometric overlap: every point in the 4x4 block must
+// resolve through the same hit-test path used by the UI to the region being checked.
 bool HasFourByFourHitBlock(const LayoutEditActiveRegions& regions, const LayoutEditActiveRegion& region) {
     const auto cornersHit = [&](int x, int y) {
         return MatchesRegionHit(regions, region, RenderPoint{x, y}) &&
