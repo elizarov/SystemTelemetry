@@ -260,34 +260,25 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
         const RenderRect& anchorRect = layoutState_.barAnchorRects[rowIndex];
         const int anchorCenterX = anchorRect.left + ((std::max)(0, anchorRect.right - anchorRect.left) / 2);
         const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
-        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-            LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+            .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 WidgetHost::LayoutEditParameter::MetricListBarHeight,
                 rowIndex},
-            barRect,
-            anchorRect,
-            AnchorShape::Circle,
-            AnchorDragAxis::Horizontal,
-            AnchorDragMode::AxisDelta,
-            RenderPoint{anchorCenterX, anchorCenterY},
-            1.0,
-            true,
-            false,
-            true,
-            config.barHeight);
-        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-            MakeLayoutNodeFieldEditAnchorKey(widget, WidgetClass::MetricList, rowIndex),
-            layoutState_.rowRects[rowIndex],
-            layoutState_.reorderAnchorRects[rowIndex],
-            AnchorShape::VerticalReorder,
-            AnchorDragAxis::Horizontal,
-            AnchorDragMode::AxisDelta,
-            layoutState_.reorderAnchorRects[rowIndex].Center(),
-            1.0,
-            true,
-            true,
-            false,
-            0);
+            .targetRect = barRect,
+            .anchorRect = anchorRect,
+            .shape = AnchorShape::Circle,
+            .value = config.barHeight,
+            .drag = LayoutEditAnchorDrag::AxisDelta(
+                AnchorDragAxis::Horizontal, RenderPoint{anchorCenterX, anchorCenterY})});
+        renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+            .key = MakeLayoutNodeFieldEditAnchorKey(widget, WidgetClass::MetricList, rowIndex),
+            .targetRect = layoutState_.rowRects[rowIndex],
+            .anchorRect = layoutState_.reorderAnchorRects[rowIndex],
+            .shape = AnchorShape::VerticalReorder,
+            .drag = LayoutEditAnchorDrag::AxisDelta(
+                AnchorDragAxis::Horizontal, layoutState_.reorderAnchorRects[rowIndex].Center()),
+            .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+            .targetOutline = LayoutEditTargetOutline::Hidden});
         const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metricRefs_[rowIndex]);
         if (definition != nullptr && !definition->label.empty() &&
             !IsRuntimePlaceholderMetricId(metricRefs_[rowIndex])) {
@@ -308,19 +299,14 @@ void MetricListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
         }
     }
     if (layoutState_.showAddRowAnchor && !layoutState_.addRowAnchorRect.IsEmpty()) {
-        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-            MakeLayoutNodeFieldEditAnchorKey(widget, WidgetClass::MetricList, static_cast<int>(metricRefs_.size())),
-            layoutState_.addRowRect,
-            layoutState_.addRowAnchorRect,
-            AnchorShape::Plus,
-            AnchorDragAxis::Horizontal,
-            AnchorDragMode::AxisDelta,
-            layoutState_.addRowAnchorRect.Center(),
-            1.0,
-            false,
-            true,
-            false,
-            0);
+        renderer.EditArtifacts().RegisterStaticEditAnchor(
+            LayoutEditAnchorRegistration{.key = MakeLayoutNodeFieldEditAnchorKey(
+                                             widget, WidgetClass::MetricList, static_cast<int>(metricRefs_.size())),
+                .targetRect = layoutState_.addRowRect,
+                .anchorRect = layoutState_.addRowAnchorRect,
+                .shape = AnchorShape::Plus,
+                .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+                .targetOutline = LayoutEditTargetOutline::Hidden});
     }
 }
 

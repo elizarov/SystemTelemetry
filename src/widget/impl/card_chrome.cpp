@@ -145,55 +145,41 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
     const int squareAnchorSize = (std::max)(4, renderer.Renderer().ScaleLogical(6));
     const int radiusLogical = renderer.Config().layout.cardStyle.cardRadius;
     const int radiusScaled = renderer.Renderer().ScaleLogical(radiusLogical);
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardRadius, 0},
-        {},
-        MakeSquareAnchorRect(widget.rect.left + radiusScaled, widget.rect.top, squareAnchorSize),
-        AnchorShape::Square,
-        AnchorDragAxis::Vertical,
-        AnchorDragMode::AxisDelta,
-        RenderPoint{widget.rect.left + radiusScaled, widget.rect.top},
-        1.0,
-        true,
-        true,
-        false,
-        radiusLogical);
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardRadius, 0},
+        .anchorRect = MakeSquareAnchorRect(widget.rect.left + radiusScaled, widget.rect.top, squareAnchorSize),
+        .shape = AnchorShape::Square,
+        .value = radiusLogical,
+        .drag = LayoutEditAnchorDrag::AxisDelta(
+            AnchorDragAxis::Vertical, RenderPoint{widget.rect.left + radiusScaled, widget.rect.top}),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
 
     const int borderScaled =
         (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth));
     const int borderAnchorPadding = (std::max)(1, renderer.Renderer().ScaleLogical(1));
     const int borderCenterX = widget.rect.left + (std::max)(0, (widget.rect.right - widget.rect.left) / 2);
     const int borderCenterY = widget.rect.top;
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardBorder, 0},
-        {},
-        MakeCircleAnchorRect(borderCenterX, borderCenterY, borderScaled, borderAnchorPadding),
-        AnchorShape::Circle,
-        AnchorDragAxis::Both,
-        AnchorDragMode::RadialDistance,
-        RenderPoint{borderCenterX, borderCenterY},
-        2.0,
-        true,
-        true,
-        false,
-        renderer.Config().layout.cardStyle.cardBorderWidth);
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardBorder, 0},
+        .anchorRect = MakeCircleAnchorRect(borderCenterX, borderCenterY, borderScaled, borderAnchorPadding),
+        .shape = AnchorShape::Circle,
+        .value = renderer.Config().layout.cardStyle.cardBorderWidth,
+        .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{borderCenterX, borderCenterY}, 2.0),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
 
     if (!iconName_.empty()) {
         const int anchorCenterX = layoutState_.iconRect.right;
         const int anchorCenterY = layoutState_.iconRect.top;
-        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-            LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardHeaderIconSize, 0},
-            layoutState_.iconRect,
-            MakeSquareAnchorRect(anchorCenterX, anchorCenterY, squareAnchorSize),
-            AnchorShape::Square,
-            AnchorDragAxis::Vertical,
-            AnchorDragMode::AxisDelta,
-            RenderPoint{anchorCenterX, anchorCenterY},
-            1.0,
-            true,
-            false,
-            true,
-            renderer.Config().layout.cardStyle.headerIconSize);
+        renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+            .key = LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardHeaderIconSize, 0},
+            .targetRect = layoutState_.iconRect,
+            .anchorRect = MakeSquareAnchorRect(anchorCenterX, anchorCenterY, squareAnchorSize),
+            .shape = AnchorShape::Square,
+            .value = renderer.Config().layout.cardStyle.headerIconSize,
+            .drag =
+                LayoutEditAnchorDrag::AxisDelta(AnchorDragAxis::Vertical, RenderPoint{anchorCenterX, anchorCenterY})});
     }
 
     if (!title_.empty()) {
@@ -204,8 +190,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
             LayoutEditAnchorBinding{LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::FontTitle, 0},
                 renderer.Config().layout.fonts.title.size,
                 AnchorShape::Circle,
-                AnchorDragAxis::Vertical,
-                AnchorDragMode::AxisDelta});
+                LayoutEditAnchorDragSpec::AxisDelta(AnchorDragAxis::Vertical)});
         renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.titleRect,
             title_,
             TextStyleId::Title,
@@ -213,9 +198,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
             LayoutEditAnchorBinding{LayoutEditAnchorKey{cardIdentity, LayoutCardTitleEditKey{widget.editCardId}, 1},
                 0,
                 AnchorShape::Wedge,
-                AnchorDragAxis::Vertical,
-                AnchorDragMode::AxisDelta,
-                false});
+                std::nullopt});
     }
 }
 

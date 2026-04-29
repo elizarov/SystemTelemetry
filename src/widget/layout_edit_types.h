@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -34,6 +35,35 @@ enum class AnchorDragAxis {
 enum class AnchorDragMode {
     AxisDelta,
     RadialDistance,
+};
+
+enum class LayoutEditAnchorVisibility {
+    Always,
+    WhenWidgetHovered,
+};
+
+enum class LayoutEditTargetOutline {
+    Hidden,
+    Visible,
+};
+
+struct LayoutEditAnchorDragSpec {
+    AnchorDragAxis axis = AnchorDragAxis::Vertical;
+    AnchorDragMode mode = AnchorDragMode::AxisDelta;
+    double scale = 1.0;
+
+    static LayoutEditAnchorDragSpec AxisDelta(AnchorDragAxis axis, double scale = 1.0);
+    static LayoutEditAnchorDragSpec RadialDistance(double scale = 1.0);
+};
+
+struct LayoutEditAnchorDrag {
+    AnchorDragAxis axis = AnchorDragAxis::Vertical;
+    AnchorDragMode mode = AnchorDragMode::AxisDelta;
+    RenderPoint origin{};
+    double scale = 1.0;
+
+    static LayoutEditAnchorDrag AxisDelta(AnchorDragAxis axis, RenderPoint origin, double scale = 1.0);
+    static LayoutEditAnchorDrag RadialDistance(RenderPoint origin, double scale = 1.0);
 };
 
 struct LayoutEditWidgetIdentity {
@@ -153,6 +183,17 @@ struct LayoutEditAnchorRegion {
     int value = 0;
 };
 
+struct LayoutEditAnchorRegistration {
+    LayoutEditAnchorKey key;
+    RenderRect targetRect{};
+    RenderRect anchorRect{};
+    AnchorShape shape = AnchorShape::Circle;
+    int value = 0;
+    std::optional<LayoutEditAnchorDrag> drag = std::nullopt;
+    LayoutEditAnchorVisibility visibility = LayoutEditAnchorVisibility::Always;
+    LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible;
+};
+
 struct LayoutEditWidgetGuide : LayoutEditParameterSubject, LayoutEditLinearGeometry {
     LayoutGuideAxis axis = LayoutGuideAxis::Vertical;
     int guideId = 0;
@@ -211,9 +252,8 @@ struct LayoutEditAnchorBinding {
     LayoutEditAnchorKey key;
     int value = 0;
     AnchorShape shape = AnchorShape::Circle;
-    AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
-    AnchorDragMode dragMode = AnchorDragMode::AxisDelta;
-    bool draggable = true;
+    std::optional<LayoutEditAnchorDragSpec> drag =
+        LayoutEditAnchorDragSpec{AnchorDragAxis::Vertical, AnchorDragMode::AxisDelta, 1.0};
 };
 
 using LayoutEditValue = std::variant<std::string, std::vector<std::string>>;

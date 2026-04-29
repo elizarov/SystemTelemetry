@@ -86,48 +86,27 @@ public:
         const LayoutNodeConfig& node,
         const RenderRect& rect,
         bool instantiateWidget) const;
-    void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        AnchorDragMode dragMode,
-        RenderPoint dragOrigin,
-        double dragScale,
-        bool draggable,
-        bool showWhenWidgetHovered,
-        bool drawTargetOutline,
-        int value) override;
-    void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        AnchorDragMode dragMode,
-        RenderPoint dragOrigin,
-        double dragScale,
-        bool draggable,
-        bool showWhenWidgetHovered,
-        bool drawTargetOutline,
-        int value) override;
+    void RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) override;
+    void RegisterDynamicEditAnchor(LayoutEditAnchorRegistration registration) override;
+    void RegisterStaticCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) override;
     void RegisterStaticTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) override;
+        LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) override;
     void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) override;
+        LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) override;
     void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) override;
+        LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) override;
     void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
     void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
     void RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) override;
@@ -136,30 +115,19 @@ private:
     friend class DashboardRenderer;
     friend class DashboardLayoutEditOverlayRenderer;
 
-    void RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
-        const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        AnchorDragMode dragMode,
-        RenderPoint dragOrigin,
-        double dragScale,
-        bool draggable,
-        bool showWhenWidgetHovered,
-        bool drawTargetOutline,
-        int value);
+    void RegisterEditableAnchorRegion(
+        std::vector<LayoutEditAnchorRegion>& regions, const LayoutEditAnchorRegistration& registration);
     void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
         const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
-        bool drawTargetOutline);
+        LayoutEditTargetOutline targetOutline);
     void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
         const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
-        bool drawTargetOutline);
+        LayoutEditTargetOutline targetOutline);
 
     DashboardRenderer& renderer_;
     ResolvedDashboardLayout resolvedLayout_{};

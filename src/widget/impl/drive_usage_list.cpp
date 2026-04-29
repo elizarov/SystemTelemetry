@@ -437,21 +437,18 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
 
 void DriveUsageListWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const {
     const auto& config = renderer.Config().layout.driveUsageList;
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::DriveUsageActivitySegments,
             0},
-        layoutState_.activityTargetRect,
-        layoutState_.activityAnchorRect,
-        AnchorShape::Diamond,
-        AnchorDragAxis::Both,
-        AnchorDragMode::AxisDelta,
-        RenderPoint{layoutState_.activityAnchorCenterX, layoutState_.firstRowContentTop},
-        1.0,
-        true,
-        true,
-        false,
-        config.activitySegments);
+        .targetRect = layoutState_.activityTargetRect,
+        .anchorRect = layoutState_.activityAnchorRect,
+        .shape = AnchorShape::Diamond,
+        .value = config.activitySegments,
+        .drag = LayoutEditAnchorDrag::AxisDelta(
+            AnchorDragAxis::Both, RenderPoint{layoutState_.activityAnchorCenterX, layoutState_.firstRowContentTop}),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
     renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
         ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
         TextStyleId::Small,
@@ -508,21 +505,16 @@ void DriveUsageListWidget::BuildStaticAnchors(WidgetHost& renderer, const Widget
         const RenderRect& anchorRect = layoutState_.rowBarAnchorRects[rowIndex];
         const int anchorCenterX = anchorRect.left + ((std::max)(0, anchorRect.right - anchorRect.left) / 2);
         const int anchorCenterY = anchorRect.top + ((std::max)(0, anchorRect.bottom - anchorRect.top) / 2);
-        renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-            LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+            .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 WidgetHost::LayoutEditParameter::DriveUsageBarHeight,
                 rowIndex},
-            barRect,
-            anchorRect,
-            AnchorShape::Circle,
-            AnchorDragAxis::Horizontal,
-            AnchorDragMode::AxisDelta,
-            RenderPoint{anchorCenterX, anchorCenterY},
-            1.0,
-            true,
-            false,
-            true,
-            config.barHeight);
+            .targetRect = barRect,
+            .anchorRect = anchorRect,
+            .shape = AnchorShape::Circle,
+            .value = config.barHeight,
+            .drag = LayoutEditAnchorDrag::AxisDelta(
+                AnchorDragAxis::Horizontal, RenderPoint{anchorCenterX, anchorCenterY})});
     }
 }
 

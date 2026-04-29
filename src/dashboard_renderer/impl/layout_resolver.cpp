@@ -75,100 +75,60 @@ void DashboardLayoutResolver::ClearDynamicEditArtifacts() {
     dynamicColorEditRegions_.clear();
 }
 
-void DashboardLayoutResolver::RegisterEditableAnchorRegion(std::vector<LayoutEditAnchorRegion>& regions,
-    const LayoutEditAnchorKey& key,
-    const RenderRect& targetRect,
-    const RenderRect& anchorRect,
-    AnchorShape shape,
-    AnchorDragAxis dragAxis,
-    AnchorDragMode dragMode,
-    RenderPoint dragOrigin,
-    double dragScale,
-    bool draggable,
-    bool showWhenWidgetHovered,
-    bool drawTargetOutline,
-    int value) {
-    if (anchorRect.right <= anchorRect.left || anchorRect.bottom <= anchorRect.top) {
+void DashboardLayoutResolver::RegisterEditableAnchorRegion(
+    std::vector<LayoutEditAnchorRegion>& regions, const LayoutEditAnchorRegistration& registration) {
+    if (registration.anchorRect.right <= registration.anchorRect.left ||
+        registration.anchorRect.bottom <= registration.anchorRect.top) {
         return;
     }
     LayoutEditAnchorRegion region;
-    region.key = key;
-    region.targetRect = targetRect;
-    region.anchorRect = anchorRect;
-    region.shape = shape;
-    const int anchorHitInset =
-        shape == AnchorShape::Wedge ? std::max(1, renderer_.ScaleLogical(2)) : std::max(4, renderer_.ScaleLogical(5));
+    region.key = registration.key;
+    region.targetRect = registration.targetRect;
+    region.anchorRect = registration.anchorRect;
+    region.shape = registration.shape;
+    const int anchorHitInset = registration.shape == AnchorShape::Wedge ? std::max(1, renderer_.ScaleLogical(2))
+                                                                        : std::max(4, renderer_.ScaleLogical(5));
     region.anchorHitPadding = anchorHitInset;
     region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
         region.anchorRect.top - anchorHitInset,
         region.anchorRect.right + anchorHitInset,
         region.anchorRect.bottom + anchorHitInset};
-    region.dragAxis = dragAxis;
-    region.dragMode = dragMode;
-    region.dragOrigin = dragOrigin;
-    region.dragScale = dragScale;
-    region.draggable = draggable;
-    region.showWhenWidgetHovered = showWhenWidgetHovered;
-    region.drawTargetOutline = drawTargetOutline;
-    region.value = value;
+    if (registration.drag.has_value()) {
+        region.dragAxis = registration.drag->axis;
+        region.dragMode = registration.drag->mode;
+        region.dragOrigin = registration.drag->origin;
+        region.dragScale = registration.drag->scale;
+        region.draggable = true;
+    } else {
+        region.draggable = false;
+    }
+    region.showWhenWidgetHovered = registration.visibility == LayoutEditAnchorVisibility::WhenWidgetHovered;
+    region.drawTargetOutline = registration.targetOutline == LayoutEditTargetOutline::Visible;
+    region.value = registration.value;
     regions.push_back(std::move(region));
 }
 
-void DashboardLayoutResolver::RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
-    const RenderRect& targetRect,
-    const RenderRect& anchorRect,
-    AnchorShape shape,
-    AnchorDragAxis dragAxis,
-    AnchorDragMode dragMode,
-    RenderPoint dragOrigin,
-    double dragScale,
-    bool draggable,
-    bool showWhenWidgetHovered,
-    bool drawTargetOutline,
-    int value) {
-    RegisterEditableAnchorRegion(staticEditableAnchorRegions_,
-        key,
-        targetRect,
-        anchorRect,
-        shape,
-        dragAxis,
-        dragMode,
-        dragOrigin,
-        dragScale,
-        draggable,
-        showWhenWidgetHovered,
-        drawTargetOutline,
-        value);
+void DashboardLayoutResolver::RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) {
+    RegisterEditableAnchorRegion(staticEditableAnchorRegions_, registration);
 }
 
-void DashboardLayoutResolver::RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
-    const RenderRect& targetRect,
-    const RenderRect& anchorRect,
-    AnchorShape shape,
-    AnchorDragAxis dragAxis,
-    AnchorDragMode dragMode,
-    RenderPoint dragOrigin,
-    double dragScale,
-    bool draggable,
-    bool showWhenWidgetHovered,
-    bool drawTargetOutline,
-    int value) {
+void DashboardLayoutResolver::RegisterDynamicEditAnchor(LayoutEditAnchorRegistration registration) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
-    RegisterEditableAnchorRegion(dynamicEditableAnchorRegions_,
-        key,
-        targetRect,
-        anchorRect,
-        shape,
-        dragAxis,
-        dragMode,
-        dragOrigin,
-        dragScale,
-        draggable,
-        showWhenWidgetHovered,
-        drawTargetOutline,
-        value);
+    RegisterEditableAnchorRegion(dynamicEditableAnchorRegions_, registration);
+}
+
+void DashboardLayoutResolver::RegisterStaticCornerEditAnchor(
+    const LayoutEditAnchorKey& key, const RenderRect& targetRect) {
+    const int anchorSize = std::max(6, renderer_.Renderer().ScaleLogical(8));
+    RegisterStaticEditAnchor(LayoutEditAnchorRegistration{.key = key,
+        .targetRect = targetRect,
+        .anchorRect =
+            RenderRect{targetRect.left, targetRect.top, targetRect.left + anchorSize, targetRect.top + anchorSize},
+        .shape = AnchorShape::Wedge,
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
 }
 
 void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
@@ -177,7 +137,7 @@ void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorReg
     TextStyleId style,
     const TextLayoutOptions& options,
     const LayoutEditAnchorBinding& editable,
-    bool drawTargetOutline) {
+    LayoutEditTargetOutline targetOutline) {
     if (text.empty()) {
         return;
     }
@@ -185,25 +145,24 @@ void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorReg
     const TextLayoutResult result = renderer_.Renderer().MeasureTextBlock(rect, text, style, options);
     const RenderRect anchorRect = TextAnchorRectForShape(renderer_, result.textRect, editable.shape);
     const RenderPoint anchorOrigin = anchorRect.Center();
-    RegisterEditableAnchorRegion(regions,
-        editable.key,
-        result.textRect,
-        anchorRect,
-        editable.shape,
-        editable.dragAxis,
-        editable.dragMode,
-        anchorOrigin,
-        1.0,
-        editable.draggable,
-        false,
-        drawTargetOutline,
-        editable.value);
+    LayoutEditAnchorRegistration registration;
+    registration.key = editable.key;
+    registration.targetRect = result.textRect;
+    registration.anchorRect = anchorRect;
+    registration.shape = editable.shape;
+    registration.value = editable.value;
+    registration.targetOutline = targetOutline;
+    if (editable.drag.has_value()) {
+        registration.drag =
+            LayoutEditAnchorDrag{editable.drag->axis, editable.drag->mode, anchorOrigin, editable.drag->scale};
+    }
+    RegisterEditableAnchorRegion(regions, registration);
 }
 
 void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
     const TextLayoutResult& layoutResult,
     const LayoutEditAnchorBinding& editable,
-    bool drawTargetOutline) {
+    LayoutEditTargetOutline targetOutline) {
     const RenderRect& textRect = layoutResult.textRect;
     if (textRect.right <= textRect.left || textRect.bottom <= textRect.top) {
         return;
@@ -211,19 +170,18 @@ void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorReg
 
     const RenderRect anchorRect = TextAnchorRectForShape(renderer_, textRect, editable.shape);
     const RenderPoint anchorOrigin = anchorRect.Center();
-    RegisterEditableAnchorRegion(regions,
-        editable.key,
-        textRect,
-        anchorRect,
-        editable.shape,
-        editable.dragAxis,
-        editable.dragMode,
-        anchorOrigin,
-        1.0,
-        editable.draggable,
-        false,
-        drawTargetOutline,
-        editable.value);
+    LayoutEditAnchorRegistration registration;
+    registration.key = editable.key;
+    registration.targetRect = textRect;
+    registration.anchorRect = anchorRect;
+    registration.shape = editable.shape;
+    registration.value = editable.value;
+    registration.targetOutline = targetOutline;
+    if (editable.drag.has_value()) {
+        registration.drag =
+            LayoutEditAnchorDrag{editable.drag->axis, editable.drag->mode, anchorOrigin, editable.drag->scale};
+    }
+    RegisterEditableAnchorRegion(regions, registration);
 }
 
 void DashboardLayoutResolver::RegisterStaticTextAnchor(const RenderRect& rect,
@@ -232,8 +190,8 @@ void DashboardLayoutResolver::RegisterStaticTextAnchor(const RenderRect& rect,
     const TextLayoutOptions& options,
     const LayoutEditAnchorBinding& editable,
     std::optional<LayoutEditParameter> colorParameter,
-    bool drawTargetOutline) {
-    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, style, options, editable, drawTargetOutline);
+    LayoutEditTargetOutline targetOutline) {
+    RegisterTextAnchor(staticEditableAnchorRegions_, rect, text, style, options, editable, targetOutline);
     if (colorParameter.has_value()) {
         RegisterStaticColorEditRegion(
             *colorParameter, renderer_.Renderer().MeasureTextBlock(rect, text, style, options).textRect);
@@ -243,11 +201,11 @@ void DashboardLayoutResolver::RegisterStaticTextAnchor(const RenderRect& rect,
 void DashboardLayoutResolver::RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
     const LayoutEditAnchorBinding& editable,
     std::optional<LayoutEditParameter> colorParameter,
-    bool drawTargetOutline) {
+    LayoutEditTargetOutline targetOutline) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
-    RegisterTextAnchor(dynamicEditableAnchorRegions_, layoutResult, editable, drawTargetOutline);
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, layoutResult, editable, targetOutline);
     if (colorParameter.has_value()) {
         RegisterDynamicColorEditRegion(*colorParameter, layoutResult.textRect);
     }
@@ -259,11 +217,11 @@ void DashboardLayoutResolver::RegisterDynamicTextAnchor(const RenderRect& rect,
     const TextLayoutOptions& options,
     const LayoutEditAnchorBinding& editable,
     std::optional<LayoutEditParameter> colorParameter,
-    bool drawTargetOutline) {
+    LayoutEditTargetOutline targetOutline) {
     if (!dynamicAnchorRegistrationEnabled_) {
         return;
     }
-    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, style, options, editable, drawTargetOutline);
+    RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, style, options, editable, targetOutline);
     if (colorParameter.has_value()) {
         RegisterDynamicColorEditRegion(
             *colorParameter, renderer_.Renderer().MeasureTextBlock(rect, text, style, options).textRect);
@@ -353,20 +311,17 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 centerY - handleHeight / 2,
                 centerX - handleWidth / 2 + handleWidth,
                 centerY - handleHeight / 2 + handleHeight};
-            RegisterStaticEditableAnchorRegion(LayoutEditAnchorKey{widgetIdentity,
-                                                   LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
-                                                   static_cast<int>(i)},
-                childRect,
-                anchorRect,
-                horizontal ? AnchorShape::HorizontalReorder : AnchorShape::VerticalReorder,
-                horizontal ? AnchorDragAxis::Horizontal : AnchorDragAxis::Vertical,
-                AnchorDragMode::AxisDelta,
-                anchorRect.Center(),
-                1.0,
-                true,
-                true,
-                false,
-                0);
+            RegisterStaticEditAnchor(
+                LayoutEditAnchorRegistration{.key = LayoutEditAnchorKey{widgetIdentity,
+                                                 LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
+                                                 static_cast<int>(i)},
+                    .targetRect = childRect,
+                    .anchorRect = anchorRect,
+                    .shape = horizontal ? AnchorShape::HorizontalReorder : AnchorShape::VerticalReorder,
+                    .drag = LayoutEditAnchorDrag::AxisDelta(
+                        horizontal ? AnchorDragAxis::Horizontal : AnchorDragAxis::Vertical, anchorRect.Center()),
+                    .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+                    .targetOutline = LayoutEditTargetOutline::Hidden});
             staticEditableAnchorRegions_.back().anchorHitRect = anchorRect.Inflate(hitInset, hitInset);
         }
     }

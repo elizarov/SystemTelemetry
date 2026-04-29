@@ -13,33 +13,20 @@ namespace {
 
 class MetricListTestEditArtifacts final : public WidgetEditArtifactRegistrar {
 public:
-    void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis,
-        AnchorDragMode,
-        RenderPoint,
-        double,
-        bool,
-        bool,
-        bool,
-        int) override {
-        staticAnchors.push_back(LayoutEditAnchorRegion{key, targetRect, anchorRect, anchorRect, 0, shape});
+    void RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) override {
+        staticAnchors.push_back(LayoutEditAnchorRegion{registration.key,
+            registration.targetRect,
+            registration.anchorRect,
+            registration.anchorRect,
+            0,
+            registration.shape});
     }
 
-    void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey&,
-        const RenderRect&,
-        const RenderRect&,
-        AnchorShape,
-        AnchorDragAxis,
-        AnchorDragMode,
-        RenderPoint,
-        double,
-        bool,
-        bool,
-        bool,
-        int) override {}
+    void RegisterDynamicEditAnchor(LayoutEditAnchorRegistration) override {}
+
+    void RegisterStaticCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) override {
+        staticAnchors.push_back(LayoutEditAnchorRegion{key, targetRect, targetRect, targetRect, 0, AnchorShape::Wedge});
+    }
 
     void RegisterStaticTextAnchor(const RenderRect&,
         const std::string&,
@@ -47,10 +34,12 @@ public:
         const TextLayoutOptions&,
         const LayoutEditAnchorBinding&,
         std::optional<LayoutEditParameter>,
-        bool) override {}
+        LayoutEditTargetOutline) override {}
 
-    void RegisterDynamicTextAnchor(
-        const TextLayoutResult&, const LayoutEditAnchorBinding&, std::optional<LayoutEditParameter>, bool) override {}
+    void RegisterDynamicTextAnchor(const TextLayoutResult&,
+        const LayoutEditAnchorBinding&,
+        std::optional<LayoutEditParameter>,
+        LayoutEditTargetOutline) override {}
 
     void RegisterDynamicTextAnchor(const RenderRect&,
         const std::string&,
@@ -58,7 +47,7 @@ public:
         const TextLayoutOptions&,
         const LayoutEditAnchorBinding&,
         std::optional<LayoutEditParameter>,
-        bool) override {}
+        LayoutEditTargetOutline) override {}
 
     void RegisterStaticColorEditRegion(LayoutEditParameter, const RenderRect&) override {}
 
@@ -229,7 +218,9 @@ public:
         return LayoutEditAnchorBinding{
             LayoutEditAnchorKey{
                 LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath}, parameter, anchorId},
-            value};
+            value,
+            AnchorShape::Circle,
+            LayoutEditAnchorDragSpec::AxisDelta(AnchorDragAxis::Vertical)};
     }
 
     LayoutEditAnchorBinding MakeMetricTextBinding(
@@ -237,7 +228,10 @@ public:
         return LayoutEditAnchorBinding{
             LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 LayoutMetricEditKey{std::string(metricId)},
-                anchorId}};
+                anchorId},
+            0,
+            AnchorShape::Wedge,
+            std::nullopt};
     }
 
     const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const override {

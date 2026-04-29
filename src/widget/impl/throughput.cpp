@@ -249,53 +249,43 @@ void ThroughputWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
 
 void ThroughputWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const {
     const ThroughputGraphLayout& layout = layoutState_;
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::ThroughputLeaderDiameter,
             0},
-        layout.leaderAnchorRect,
-        layout.leaderAnchorRect,
-        AnchorShape::Circle,
-        AnchorDragAxis::Both,
-        AnchorDragMode::RadialDistance,
-        RenderPoint{layout.leaderAnchorCenterX, layout.leaderAnchorCenterY},
-        2.0,
-        true,
-        true,
-        false,
-        renderer.Config().layout.throughput.leaderDiameter);
+        .targetRect = layout.leaderAnchorRect,
+        .anchorRect = layout.leaderAnchorRect,
+        .shape = AnchorShape::Circle,
+        .value = renderer.Config().layout.throughput.leaderDiameter,
+        .drag = LayoutEditAnchorDrag::RadialDistance(
+            RenderPoint{layout.leaderAnchorCenterX, layout.leaderAnchorCenterY}, 2.0),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
 
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::ThroughputPlotStrokeWidth,
             0},
-        layout.plotAnchorRect,
-        layout.plotAnchorRect,
-        AnchorShape::Circle,
-        AnchorDragAxis::Both,
-        AnchorDragMode::RadialDistance,
-        RenderPoint{layout.plotAnchorCenterX, layout.plotAnchorCenterY},
-        2.0,
-        true,
-        true,
-        false,
-        renderer.Config().layout.throughput.plotStrokeWidth);
+        .targetRect = layout.plotAnchorRect,
+        .anchorRect = layout.plotAnchorRect,
+        .shape = AnchorShape::Circle,
+        .value = renderer.Config().layout.throughput.plotStrokeWidth,
+        .drag =
+            LayoutEditAnchorDrag::RadialDistance(RenderPoint{layout.plotAnchorCenterX, layout.plotAnchorCenterY}, 2.0),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
 
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::ThroughputGuideStrokeWidth,
             0},
-        layout.guideAnchorRect,
-        layout.guideAnchorRect,
-        AnchorShape::Circle,
-        AnchorDragAxis::Both,
-        AnchorDragMode::RadialDistance,
-        RenderPoint{layout.guideCenterX, layout.guideCenterY},
-        2.0,
-        true,
-        true,
-        false,
-        renderer.Config().layout.throughput.guideStrokeWidth);
+        .targetRect = layout.guideAnchorRect,
+        .anchorRect = layout.guideAnchorRect,
+        .shape = AnchorShape::Circle,
+        .value = renderer.Config().layout.throughput.guideStrokeWidth,
+        .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{layout.guideCenterX, layout.guideCenterY}, 2.0),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
 
     const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metric_);
     if (definition != nullptr && !definition->label.empty()) {

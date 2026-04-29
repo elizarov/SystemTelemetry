@@ -174,9 +174,7 @@ LayoutEditAnchorBinding DashboardRenderer::MakeEditableTextBinding(
     binding.key.anchorId = anchorId;
     binding.value = value;
     binding.shape = AnchorShape::Circle;
-    binding.dragAxis = AnchorDragAxis::Vertical;
-    binding.dragMode = AnchorDragMode::AxisDelta;
-    binding.draggable = true;
+    binding.drag = LayoutEditAnchorDragSpec::AxisDelta(AnchorDragAxis::Vertical);
     return binding;
 }
 
@@ -188,9 +186,7 @@ LayoutEditAnchorBinding DashboardRenderer::MakeMetricTextBinding(
     binding.key.anchorId = anchorId;
     binding.value = 0;
     binding.shape = AnchorShape::Wedge;
-    binding.dragAxis = AnchorDragAxis::Vertical;
-    binding.dragMode = AnchorDragMode::AxisDelta;
-    binding.draggable = false;
+    binding.drag = std::nullopt;
     return binding;
 }
 

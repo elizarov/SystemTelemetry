@@ -336,51 +336,38 @@ void GaugeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& w
     const int cx = layoutState_.cx;
     const int cy = layoutState_.cy;
     const int outerRadius = layoutState_.outerRadius;
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::GaugeSegmentCount,
             0},
-        widget.rect,
-        layoutState_.segmentCountAnchorRect,
-        AnchorShape::Diamond,
-        AnchorDragAxis::Both,
-        AnchorDragMode::AxisDelta,
-        RenderPoint{cx, cy - outerRadius},
-        1.0,
-        true,
-        true,
-        true,
-        renderer.Config().layout.gauge.segmentCount);
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        .targetRect = widget.rect,
+        .anchorRect = layoutState_.segmentCountAnchorRect,
+        .shape = AnchorShape::Diamond,
+        .value = renderer.Config().layout.gauge.segmentCount,
+        .drag = LayoutEditAnchorDrag::AxisDelta(AnchorDragAxis::Both, RenderPoint{cx, cy - outerRadius}),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered});
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::GaugeOuterPadding,
             0},
-        layoutState_.outerPaddingAnchorRect,
-        layoutState_.outerPaddingAnchorRect,
-        AnchorShape::Circle,
-        AnchorDragAxis::Both,
-        AnchorDragMode::RadialDistance,
-        RenderPoint{cx, cy},
-        -1.0,
-        true,
-        true,
-        false,
-        renderer.Config().layout.gauge.outerPadding);
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+        .targetRect = layoutState_.outerPaddingAnchorRect,
+        .anchorRect = layoutState_.outerPaddingAnchorRect,
+        .shape = AnchorShape::Circle,
+        .value = renderer.Config().layout.gauge.outerPadding,
+        .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{cx, cy}, -1.0),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
             WidgetHost::LayoutEditParameter::GaugeRingThickness,
             0},
-        layoutState_.ringThicknessAnchorRect,
-        layoutState_.ringThicknessAnchorRect,
-        AnchorShape::Circle,
-        AnchorDragAxis::Both,
-        AnchorDragMode::RadialDistance,
-        RenderPoint{cx, cy},
-        -1.0,
-        true,
-        true,
-        false,
-        renderer.Config().layout.gauge.ringThickness);
+        .targetRect = layoutState_.ringThicknessAnchorRect,
+        .anchorRect = layoutState_.ringThicknessAnchorRect,
+        .shape = AnchorShape::Circle,
+        .value = renderer.Config().layout.gauge.ringThickness,
+        .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{cx, cy}, -1.0),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
     const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metric_);
     if (definition != nullptr && !definition->label.empty()) {
         renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.labelRect,

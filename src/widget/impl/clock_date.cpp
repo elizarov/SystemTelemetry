@@ -1,7 +1,5 @@
 #include "widget/impl/clock_date.h"
 
-#include <algorithm>
-
 #include "telemetry/metrics.h"
 #include "widget/widget_host.h"
 
@@ -43,24 +41,6 @@ void ClockDateWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, con
 }
 
 void ClockDateWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const {
-    const int anchorSize = std::max(6, renderer.Renderer().ScaleLogical(8));
-    const RenderRect anchorRect{
-        widget.rect.left,
-        widget.rect.top,
-        widget.rect.left + anchorSize,
-        widget.rect.top + anchorSize,
-    };
-    renderer.EditArtifacts().RegisterStaticEditableAnchorRegion(
-        MakeLayoutNodeFieldEditAnchorKey(widget, WidgetClass::ClockDate),
-        widget.rect,
-        anchorRect,
-        AnchorShape::Wedge,
-        AnchorDragAxis::Vertical,
-        AnchorDragMode::AxisDelta,
-        anchorRect.Center(),
-        1.0,
-        false,
-        true,
-        false,
-        0);
+    renderer.EditArtifacts().RegisterStaticCornerEditAnchor(
+        MakeLayoutNodeFieldEditAnchorKey(widget, WidgetClass::ClockDate), widget.rect);
 }

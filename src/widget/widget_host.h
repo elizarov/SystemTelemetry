@@ -23,48 +23,27 @@ public:
 
     virtual ~WidgetEditArtifactRegistrar() = default;
 
-    virtual void RegisterStaticEditableAnchorRegion(const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        AnchorDragMode dragMode,
-        RenderPoint dragOrigin,
-        double dragScale,
-        bool draggable,
-        bool showWhenWidgetHovered,
-        bool drawTargetOutline,
-        int value) = 0;
-    virtual void RegisterDynamicEditableAnchorRegion(const LayoutEditAnchorKey& key,
-        const RenderRect& targetRect,
-        const RenderRect& anchorRect,
-        AnchorShape shape,
-        AnchorDragAxis dragAxis,
-        AnchorDragMode dragMode,
-        RenderPoint dragOrigin,
-        double dragScale,
-        bool draggable,
-        bool showWhenWidgetHovered,
-        bool drawTargetOutline,
-        int value) = 0;
+    virtual void RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) = 0;
+    virtual void RegisterDynamicEditAnchor(LayoutEditAnchorRegistration registration) = 0;
+    virtual void RegisterStaticCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) = 0;
     virtual void RegisterStaticTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) = 0;
+        LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) = 0;
     virtual void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) = 0;
+        LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) = 0;
     virtual void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
-        bool drawTargetOutline = true) = 0;
+        LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) = 0;
     virtual void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) = 0;
     virtual void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) = 0;
     virtual void RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) = 0;
