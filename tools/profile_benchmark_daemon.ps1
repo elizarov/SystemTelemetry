@@ -97,6 +97,7 @@ try {
             $etlPath = Join-Path $requestDir.FullName "${benchmarkStem}_benchmark_wpr.etl"
             $summaryPath = Join-Path $requestDir.FullName "${benchmarkStem}_benchmark_wpr.txt"
             $calltreePath = Join-Path $requestDir.FullName "${benchmarkStem}_benchmark_wpr_calltree.html"
+            $hotspotsPath = Join-Path $requestDir.FullName "${benchmarkStem}_benchmark_hotspots.txt"
 
             try {
                 Write-Host "[daemon] Running request $($requestDir.Name) benchmark=$benchmark iterations=$iterations scale=$renderScale"
@@ -110,6 +111,7 @@ try {
                         "etl=$etlPath"
                         "summary=$summaryPath"
                         "calltree=$calltreePath"
+                        "hotspots=$hotspotsPath"
                     )
                     Set-Content -LiteralPath $doneFile -Value $lines -Encoding ascii
                 }

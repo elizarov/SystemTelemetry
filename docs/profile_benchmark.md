@@ -17,11 +17,13 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - `SystemTelemetryBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-switch`, `mouse-hover`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
 - The mouse-hover benchmark moves the layout-edit cursor path from the dashboard's top-left corner to bottom-right corner, resolving hover hits and drawing the resulting overlay state on every step.
-- Capture a full profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
+- Capture a benchmark-focused CPU profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
-- Daemon-backed and one-shot elevated runs persist the benchmark stdout in the request directory and replay it in the caller window after the request finishes, so the requesting shell sees the same timing lines that the elevated process produced.
-- Treat direct `build\SystemTelemetryBenchmarks.exe <benchmark> 240 2` runs as the fast comparison loop and the WPR profile as hotspot validation.
+- Daemon-backed and one-shot elevated runs persist the benchmark stdout and hotspot summary in the request directory and replay both in the caller window after the request finishes, so the requesting shell sees the same timing lines and top hotspots that the elevated process produced.
+- Profile captures use a minimal xperf CPU sample trace with process and image-load metadata, profile stack walking, process-filtered stack export for `SystemTelemetryBenchmarks.exe`, a `256 MB` circular ETL cap by default, and a compact hotspot summary generated from the filtered call tree.
+- Override the circular ETL cap with `PROFILE_BENCHMARK_MAX_FILE_MB=<size>` and the call-tree cutoff with `PROFILE_BENCHMARK_STACK_MIN_HITS=<hits>` when a specific investigation needs a different tradeoff.
+- Treat direct `build\SystemTelemetryBenchmarks.exe <benchmark> 240 2` runs as the fast comparison loop and the xperf profile as hotspot validation.
 
 ## Current Known Baseline
 

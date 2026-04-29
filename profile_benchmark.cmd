@@ -21,6 +21,7 @@ set "DAEMON_STATUS=%DAEMON_ROOT%\status.env"
 set "DAEMON_READY=%DAEMON_ROOT%\ready.flag"
 set "DAEMON_STOP=%DAEMON_ROOT%\stop.flag"
 set "DAEMON_SCRIPT=%REPO_ROOT%\tools\profile_benchmark_daemon.ps1"
+set "HOTSPOT_SCRIPT=%REPO_ROOT%\tools\summarize_profile_hotspots.ps1"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -187,16 +188,18 @@ call :set_benchmark_stem
 set "TRACE_ETL=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr.etl"
 set "TRACE_TXT=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr.txt"
 set "TRACE_CALLTREE_HTML=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_wpr_calltree.html"
+set "TRACE_HOTSPOTS=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_hotspots.txt"
 set "BENCHMARK_OUTPUT=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_stdout.txt"
 del /q "%REQUEST_DIR%\done.env" >nul 2>nul
 del /q "%REQUEST_DIR%\error.txt" >nul 2>nul
-call :run_benchmark "%TRACE_ETL%" "%TRACE_TXT%" "%TRACE_CALLTREE_HTML%" "%BENCHMARK_OUTPUT%"
+call :run_benchmark "%TRACE_ETL%" "%TRACE_TXT%" "%TRACE_CALLTREE_HTML%" "%TRACE_HOTSPOTS%" "%BENCHMARK_OUTPUT%"
 set "REQUEST_EXIT_CODE=%errorlevel%"
 > "%REQUEST_DIR%\done.env" (
     echo exit_code=%REQUEST_EXIT_CODE%
     echo etl=%TRACE_ETL%
     echo summary=%TRACE_TXT%
     echo calltree=%TRACE_CALLTREE_HTML%
+    echo hotspots=%TRACE_HOTSPOTS%
     echo benchmark_output=%BENCHMARK_OUTPUT%
 )
 exit /b %REQUEST_EXIT_CODE%
@@ -275,21 +278,28 @@ if exist "%REQUEST_WAIT_DIR%\done.env" (
     set "REQUEST_ETL="
     set "REQUEST_SUMMARY="
     set "REQUEST_CALLTREE="
+    set "REQUEST_HOTSPOTS="
     set "REQUEST_BENCHMARK_OUTPUT="
     for /f "usebackq tokens=1,* delims==" %%A in ("%REQUEST_WAIT_DIR%\done.env") do (
         if /i "%%A"=="exit_code" set "REQUEST_EXIT_CODE=%%B"
         if /i "%%A"=="etl" set "REQUEST_ETL=%%B"
         if /i "%%A"=="summary" set "REQUEST_SUMMARY=%%B"
         if /i "%%A"=="calltree" set "REQUEST_CALLTREE=%%B"
+        if /i "%%A"=="hotspots" set "REQUEST_HOTSPOTS=%%B"
         if /i "%%A"=="benchmark_output" set "REQUEST_BENCHMARK_OUTPUT=%%B"
     )
     echo Done.
     if defined REQUEST_BENCHMARK_OUTPUT if exist "!REQUEST_BENCHMARK_OUTPUT!" (
         type "!REQUEST_BENCHMARK_OUTPUT!"
     )
+    if defined REQUEST_HOTSPOTS if exist "!REQUEST_HOTSPOTS!" (
+        echo.
+        type "!REQUEST_HOTSPOTS!"
+    )
     if defined REQUEST_ETL echo ETL: !REQUEST_ETL!
     if defined REQUEST_SUMMARY echo CPU summary: !REQUEST_SUMMARY!
     if defined REQUEST_CALLTREE echo Call tree: !REQUEST_CALLTREE!
+    if defined REQUEST_HOTSPOTS echo Hotspots: !REQUEST_HOTSPOTS!
     if not defined REQUEST_EXIT_CODE set "REQUEST_EXIT_CODE=1"
     endlocal & exit /b !REQUEST_EXIT_CODE!
 )
@@ -334,12 +344,17 @@ exit /b 1
 set "TRACE_ETL=%~1"
 set "TRACE_TXT=%~2"
 set "TRACE_CALLTREE_HTML=%~3"
-set "BENCHMARK_OUTPUT=%~4"
+set "TRACE_HOTSPOTS=%~4"
+set "BENCHMARK_OUTPUT=%~5"
 set "WPR_EXE=%SystemRoot%\System32\wpr.exe"
 call :resolve_xperf
 set "BENCHMARK_EXE=%REPO_ROOT%\build\SystemTelemetryBenchmarks.exe"
 set "BENCHMARK_PDB_DIR=%REPO_ROOT%\build\cmake\CMakeFiles\SystemTelemetryBenchmarks.dir\Release"
 set "FORCE_BUILD=%PROFILE_BENCHMARK_FORCE_BUILD%"
+set "PROFILE_MAX_FILE_MB=%PROFILE_BENCHMARK_MAX_FILE_MB%"
+set "PROFILE_STACK_MIN_HITS=%PROFILE_BENCHMARK_STACK_MIN_HITS%"
+if not defined PROFILE_MAX_FILE_MB set "PROFILE_MAX_FILE_MB=256"
+if not defined PROFILE_STACK_MIN_HITS set "PROFILE_STACK_MIN_HITS=10"
 
 if not exist "%WPR_EXE%" (
     echo Windows Performance Recorder was not found at "%WPR_EXE%".
@@ -372,13 +387,16 @@ set "_NT_SYMBOL_PATH=%REPO_ROOT%\build;%BENCHMARK_PDB_DIR%"
 del /q "%TRACE_ETL%" >nul 2>nul
 del /q "%TRACE_TXT%" >nul 2>nul
 del /q "%TRACE_CALLTREE_HTML%" >nul 2>nul
+del /q "%TRACE_HOTSPOTS%" >nul 2>nul
 if defined BENCHMARK_OUTPUT del /q "%BENCHMARK_OUTPUT%" >nul 2>nul
 
-echo Starting CPU profile capture...
+echo Starting benchmark-focused CPU profile capture...
 "%WPR_EXE%" -cancel >nul 2>nul
-"%WPR_EXE%" -start CPU.verbose -filemode
+"%XPERF_EXE%" -stop >nul 2>nul
+"%XPERF_EXE%" -SetProfInt 10000 >nul
+"%XPERF_EXE%" -on PROC_THREAD+LOADER+PROFILE -stackwalk Profile -BufferSize 256 -MinBuffers 32 -MaxBuffers 128 -MaxFile %PROFILE_MAX_FILE_MB% -FileMode Circular
 if errorlevel 1 (
-    echo Failed to start WPR CPU profiling.
+    echo Failed to start xperf CPU profiling.
     exit /b %errorlevel%
 )
 
@@ -393,9 +411,9 @@ if defined BENCHMARK_OUTPUT (
 set "BENCHMARK_RC=%errorlevel%"
 
 echo Stopping trace and writing "%TRACE_ETL%"...
-"%WPR_EXE%" -stop "%TRACE_ETL%"
+"%XPERF_EXE%" -d "%TRACE_ETL%"
 if errorlevel 1 (
-    echo Failed to stop WPR and save the ETL trace.
+    echo Failed to stop xperf and save the ETL trace.
     exit /b %errorlevel%
 )
 
@@ -407,9 +425,15 @@ if errorlevel 1 (
 )
 
 echo Exporting benchmark call tree to "%TRACE_CALLTREE_HTML%"...
-"%XPERF_EXE%" -i "%TRACE_ETL%" -symbols -a stack -process "SystemTelemetryBenchmarks.exe" -butterfly 1 > "%TRACE_CALLTREE_HTML%"
+"%XPERF_EXE%" -i "%TRACE_ETL%" -symbols -a stack -process "SystemTelemetryBenchmarks.exe" -butterfly %PROFILE_STACK_MIN_HITS% > "%TRACE_CALLTREE_HTML%"
 if errorlevel 1 (
     echo Failed to export the benchmark call tree.
+    exit /b %errorlevel%
+)
+echo Writing hotspot summary to "%TRACE_HOTSPOTS%"...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HOTSPOT_SCRIPT%" -CallTreePath "%TRACE_CALLTREE_HTML%" -ProcessName "SystemTelemetryBenchmarks.exe" > "%TRACE_HOTSPOTS%"
+if errorlevel 1 (
+    echo Failed to write the hotspot summary.
     exit /b %errorlevel%
 )
 exit /b %BENCHMARK_RC%
@@ -428,6 +452,7 @@ del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_stdout.txt" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr.etl" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr.txt" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr_calltree.html" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_hotspots.txt" >nul 2>nul
 echo Requesting administrator access for WPR CPU profiling...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:ComSpec -ArgumentList '/c ""%~f0"" %BENCHMARK_NAME% %ITERATIONS% %RENDER_SCALE% /elevated /run-request ""%DAEMON_ROOT%\adhoc""' -WorkingDirectory '%REPO_ROOT%' -Verb RunAs -Wait | Out-Null"
 if errorlevel 1 (
