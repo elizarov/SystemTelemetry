@@ -123,6 +123,10 @@ LayoutEditActiveRegions DashboardApp::CollectLayoutEditActiveRegions() const {
     return renderer_.CollectLayoutEditActiveRegions(rendererDashboardOverlayState_);
 }
 
+LayoutEditHoverResolution DashboardApp::ResolveLayoutEditHover(RenderPoint clientPoint) const {
+    return renderer_.ResolveLayoutEditHover(rendererDashboardOverlayState_, clientPoint);
+}
+
 double DashboardApp::LayoutEditRenderScale() const {
     return renderer_.RenderScale();
 }

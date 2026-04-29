@@ -51,6 +51,8 @@ public:
     const MetricDefinitionConfig* FindConfiguredMetricDefinition(std::string_view metricRef) const override;
     const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const override;
     LayoutEditActiveRegions CollectLayoutEditActiveRegions(const DashboardOverlayState& overlayState) const;
+    LayoutEditHoverResolution ResolveLayoutEditHover(
+        const DashboardOverlayState& overlayState, RenderPoint clientPoint) const;
 
     bool Initialize(HWND hwnd = nullptr);
     void Shutdown();

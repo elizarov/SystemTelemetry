@@ -38,8 +38,12 @@ int AnchorHoverPriority(const LayoutEditAnchorRegion& region) {
 }
 
 bool AnchorHandleContains(const LayoutEditAnchorRegion& region, RenderPoint clientPoint) {
+    if (!region.anchorHitRect.Contains(clientPoint) &&
+        !region.anchorRect.Inflate(region.anchorHitPadding, region.anchorHitPadding).Contains(clientPoint)) {
+        return false;
+    }
     if (region.shape != AnchorShape::Circle) {
-        return region.anchorHitRect.Contains(clientPoint);
+        return true;
     }
 
     const int width = std::max(1, region.anchorRect.right - region.anchorRect.left);

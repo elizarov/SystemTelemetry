@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "layout_edit/impl/layout_snap_solver.h"
+#include "layout_edit/layout_edit_hit_test.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
@@ -186,6 +187,10 @@ std::optional<double> ComputeGaugeSegmentGapDegrees(const LayoutEditWidgetGuide&
 
 }  // namespace
 
+LayoutEditHoverResolution LayoutEditHost::ResolveLayoutEditHover(RenderPoint clientPoint) const {
+    return ::ResolveLayoutEditHover(CollectLayoutEditActiveRegions(), clientPoint);
+}
+
 LayoutEditController::LayoutEditController(LayoutEditHost& host) : host_(host) {}
 
 void LayoutEditController::StartSession() {
@@ -209,7 +214,7 @@ LayoutEditActiveRegions LayoutEditController::ActiveRegions() const {
 }
 
 LayoutEditHoverResolution LayoutEditController::ResolveHover(RenderPoint clientPoint) const {
-    return ResolveLayoutEditHover(ActiveRegions(), clientPoint);
+    return host_.ResolveLayoutEditHover(clientPoint);
 }
 
 void LayoutEditController::RefreshHover(RenderPoint clientPoint) {

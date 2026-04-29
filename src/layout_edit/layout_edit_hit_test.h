@@ -6,19 +6,6 @@
 #include "layout_model/layout_edit_active_region.h"
 #include "widget/layout_edit_types.h"
 
-struct LayoutEditHoverResolution {
-    std::optional<LayoutEditWidgetIdentity> hoveredLayoutCard;
-    std::optional<LayoutEditWidgetIdentity> hoveredEditableCard;
-    std::optional<LayoutEditWidgetIdentity> hoveredEditableWidget;
-    std::optional<LayoutEditGapAnchorKey> hoveredGapEditAnchor;
-    std::optional<LayoutEditAnchorKey> hoveredEditableAnchor;
-    std::optional<LayoutEditGapAnchor> hoveredGapEditAnchorRegion;
-    std::optional<LayoutEditWidgetGuide> hoveredWidgetEditGuide;
-    std::optional<LayoutEditGuide> hoveredLayoutGuide;
-    std::optional<LayoutEditGapAnchorKey> actionableGapEditAnchor;
-    std::optional<LayoutEditAnchorKey> actionableAnchorHandle;
-};
-
 std::optional<LayoutEditGuide> HitTestLayoutGuide(const LayoutEditActiveRegions& regions, RenderPoint clientPoint);
 std::optional<LayoutEditWidgetGuide> HitTestWidgetEditGuide(
     const LayoutEditActiveRegions& regions, RenderPoint clientPoint);

@@ -14,6 +14,7 @@
 #include "dashboard_renderer/impl/layout_edit_overlay_renderer.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
 #include "layout_model/layout_edit_helpers.h"
+#include "layout_model/layout_edit_hit_priority.h"
 #include "layout_model/layout_edit_service.h"
 #include "util/strings.h"
 #include "util/trace.h"
@@ -25,6 +26,46 @@ DashboardRenderer::DashboardRenderer(Trace& trace)
 DashboardRenderer::~DashboardRenderer() {
     Shutdown();
 }
+
+namespace {
+
+int AnchorHoverPriority(const LayoutEditAnchorRegion& region) {
+    if (region.shape == AnchorShape::Wedge) {
+        return -3;
+    }
+    if (region.shape == AnchorShape::Square) {
+        return -2;
+    }
+    return LayoutEditAnchorHitPriority(region.key);
+}
+
+bool AnchorHandleContains(const LayoutEditAnchorRegion& region, RenderPoint clientPoint) {
+    if (!region.anchorHitRect.Contains(clientPoint) &&
+        !region.anchorRect.Inflate(region.anchorHitPadding, region.anchorHitPadding).Contains(clientPoint)) {
+        return false;
+    }
+    if (region.shape != AnchorShape::Circle) {
+        return true;
+    }
+
+    const int width = std::max(1, region.anchorRect.right - region.anchorRect.left);
+    const int height = std::max(1, region.anchorRect.bottom - region.anchorRect.top);
+    const double radius = static_cast<double>(std::max(width, height)) / 2.0;
+    const double centerX = static_cast<double>(region.anchorRect.left) + static_cast<double>(width) / 2.0;
+    const double centerY = static_cast<double>(region.anchorRect.top) + static_cast<double>(height) / 2.0;
+    const double dx = static_cast<double>(clientPoint.x) - centerX;
+    const double dy = static_cast<double>(clientPoint.y) - centerY;
+    const double distance = std::sqrt((dx * dx) + (dy * dy));
+    return std::abs(distance - radius) <= static_cast<double>(region.anchorHitPadding);
+}
+
+long long RectArea(const RenderRect& rect) {
+    const long long width = std::max<long long>(0, rect.right - rect.left);
+    const long long height = std::max<long long>(0, rect.bottom - rect.top);
+    return width * height;
+}
+
+}  // namespace
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
     lastError_.clear();
@@ -302,6 +343,7 @@ void DashboardRenderer::DrawFrame(const SystemSnapshot& snapshot, const Dashboar
             }
         }
     }
+    layoutResolver_->ResolveDynamicEditArtifactCollisions();
     layoutEditOverlayRenderer_->Draw(overlayState, metrics);
     DrawMoveOverlay(overlayState.moveOverlay);
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
@@ -341,6 +383,17 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
 LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
     const DashboardOverlayState& overlayState) const {
     LayoutEditActiveRegions regions;
+    size_t containerChildTargetCount = 0;
+    for (const auto& target : layoutResolver_->containerChildReorderTargets_) {
+        containerChildTargetCount += target.childRects.size();
+    }
+    regions.Reserve(
+        layoutResolver_->resolvedLayout_.cards.size() * 4 + layoutResolver_->layoutEditGuides_.size() +
+        containerChildTargetCount + layoutResolver_->gapEditAnchors_.size() +
+        layoutResolver_->widgetEditGuides_.size() +
+        (layoutResolver_->staticEditableAnchorRegions_.size() + layoutResolver_->dynamicEditableAnchorRegions_.size()) *
+            2 +
+        layoutResolver_->staticColorEditRegions_.size() + layoutResolver_->dynamicColorEditRegions_.size());
     const auto appendRegion =
         [&](const RenderRect& box, LayoutEditActiveRegionKind kind, LayoutEditActiveRegionPayload payload) {
             if (box.IsEmpty()) {
@@ -375,10 +428,16 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
         }
 
         for (const auto& target : layoutResolver_->containerChildReorderTargets_) {
-            LayoutEditContainerChildReorderRegion targetRegion{
-                target.renderCardId, target.editCardId, target.nodePath, target.horizontal, target.childRects};
-            for (const RenderRect& childRect : target.childRects) {
-                appendRegion(childRect, LayoutEditActiveRegionKind::ContainerChildReorderTarget, targetRegion);
+            for (size_t childIndex = 0; childIndex < target.childRects.size(); ++childIndex) {
+                const RenderRect& childRect = target.childRects[childIndex];
+                appendRegion(childRect,
+                    LayoutEditActiveRegionKind::ContainerChildReorderTarget,
+                    LayoutEditContainerChildReorderRegion{target.renderCardId,
+                        target.editCardId,
+                        target.nodePath,
+                        target.horizontal,
+                        childIndex,
+                        childRect});
             }
         }
 
@@ -416,6 +475,203 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
     }
 
     return regions;
+}
+
+LayoutEditHoverResolution DashboardRenderer::ResolveLayoutEditHover(
+    const DashboardOverlayState&, RenderPoint clientPoint) const {
+    LayoutEditHoverResolution resolution;
+    for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
+        if (card.rect.Contains(clientPoint)) {
+            resolution.hoveredLayoutCard =
+                LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+        }
+        if (card.chromeLayout.hasHeader && card.chromeLayout.titleRect.Contains(clientPoint)) {
+            resolution.hoveredEditableCard =
+                LayoutEditWidgetIdentity{card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+        }
+    }
+
+    const auto hitAnchorHandle = [&](RenderPoint point) -> const LayoutEditAnchorRegion* {
+        const LayoutEditAnchorRegion* bestRegion = nullptr;
+        int bestPriority = 0;
+        const auto scanAnchors = [&](const std::vector<LayoutEditAnchorRegion>& anchors) {
+            for (auto it = anchors.rbegin(); it != anchors.rend(); ++it) {
+                const LayoutEditAnchorRegion& anchor = *it;
+                if (!AnchorHandleContains(anchor, point)) {
+                    continue;
+                }
+                const int priority = AnchorHoverPriority(anchor);
+                if (bestRegion == nullptr || priority < bestPriority) {
+                    bestRegion = &anchor;
+                    bestPriority = priority;
+                }
+            }
+        };
+        scanAnchors(layoutResolver_->dynamicEditableAnchorRegions_);
+        scanAnchors(layoutResolver_->staticEditableAnchorRegions_);
+        return bestRegion;
+    };
+
+    const auto hitGapAnchor = [&](RenderPoint point) -> const LayoutEditGapAnchor* {
+        const LayoutEditGapAnchor* bestAnchor = nullptr;
+        int bestPriority = (std::numeric_limits<int>::max)();
+        for (auto it = layoutResolver_->gapEditAnchors_.rbegin(); it != layoutResolver_->gapEditAnchors_.rend(); ++it) {
+            const LayoutEditGapAnchor& anchor = *it;
+            if (!anchor.hitRect.Contains(point)) {
+                continue;
+            }
+            const int priority = GetLayoutEditParameterHitPriority(anchor.key.parameter);
+            if (bestAnchor == nullptr || priority < bestPriority) {
+                bestAnchor = &anchor;
+                bestPriority = priority;
+            }
+        }
+        return bestAnchor;
+    };
+
+    const auto hitWidgetGuide = [&](RenderPoint point) -> const LayoutEditWidgetGuide* {
+        const LayoutEditWidgetGuide* bestGuide = nullptr;
+        int bestPriority = (std::numeric_limits<int>::max)();
+        for (const LayoutEditWidgetGuide& guide : layoutResolver_->widgetEditGuides_) {
+            if (!guide.hitRect.Contains(point)) {
+                continue;
+            }
+            const int priority = GetLayoutEditParameterHitPriority(guide.parameter);
+            if (bestGuide == nullptr || priority < bestPriority) {
+                bestGuide = &guide;
+                bestPriority = priority;
+            }
+        }
+        return bestGuide;
+    };
+
+    const auto anchorHandle = hitAnchorHandle(clientPoint);
+    const auto setHoveredAnchor = [&]() {
+        resolution.hoveredEditableAnchor = anchorHandle->key;
+        if (anchorHandle->key.widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
+            resolution.hoveredEditableWidget = anchorHandle->key.widget;
+        }
+    };
+    const auto setActionableAnchor = [&]() {
+        setHoveredAnchor();
+        if (anchorHandle->draggable) {
+            resolution.actionableAnchorHandle = anchorHandle->key;
+        }
+    };
+    const auto gapAnchor = hitGapAnchor(clientPoint);
+    const auto widgetGuide = hitWidgetGuide(clientPoint);
+    if (anchorHandle != nullptr && gapAnchor != nullptr) {
+        const int anchorPriority = LayoutEditAnchorHitPriority(anchorHandle->key);
+        const int gapPriority = GetLayoutEditParameterHitPriority(gapAnchor->key.parameter);
+        if (anchorPriority <= gapPriority) {
+            setActionableAnchor();
+            return resolution;
+        }
+        resolution.hoveredGapEditAnchor = gapAnchor->key;
+        resolution.hoveredGapEditAnchorRegion = *gapAnchor;
+        resolution.actionableGapEditAnchor = gapAnchor->key;
+        return resolution;
+    }
+    if (anchorHandle != nullptr && widgetGuide != nullptr) {
+        const int anchorPriority = LayoutEditAnchorHitPriority(anchorHandle->key);
+        const int guidePriority = GetLayoutEditParameterHitPriority(widgetGuide->parameter);
+        if (anchorPriority <= guidePriority) {
+            setActionableAnchor();
+            return resolution;
+        }
+        if (widgetGuide->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
+            resolution.hoveredEditableWidget = widgetGuide->widget;
+        }
+        resolution.hoveredWidgetEditGuide = *widgetGuide;
+        return resolution;
+    }
+    if (gapAnchor != nullptr && widgetGuide != nullptr) {
+        const int gapPriority = GetLayoutEditParameterHitPriority(gapAnchor->key.parameter);
+        const int guidePriority = GetLayoutEditParameterHitPriority(widgetGuide->parameter);
+        if (gapPriority <= guidePriority) {
+            resolution.hoveredGapEditAnchor = gapAnchor->key;
+            resolution.hoveredGapEditAnchorRegion = *gapAnchor;
+            resolution.actionableGapEditAnchor = gapAnchor->key;
+            return resolution;
+        }
+        if (widgetGuide->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
+            resolution.hoveredEditableWidget = widgetGuide->widget;
+        }
+        resolution.hoveredWidgetEditGuide = *widgetGuide;
+        return resolution;
+    }
+    if (anchorHandle != nullptr) {
+        setActionableAnchor();
+        return resolution;
+    }
+    if (gapAnchor != nullptr) {
+        resolution.hoveredGapEditAnchor = gapAnchor->key;
+        resolution.hoveredGapEditAnchorRegion = *gapAnchor;
+        resolution.actionableGapEditAnchor = gapAnchor->key;
+        return resolution;
+    }
+    if (widgetGuide != nullptr) {
+        if (widgetGuide->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
+            resolution.hoveredEditableWidget = widgetGuide->widget;
+        }
+        resolution.hoveredWidgetEditGuide = *widgetGuide;
+        return resolution;
+    }
+    for (const LayoutEditGuide& guide : layoutResolver_->layoutEditGuides_) {
+        if (guide.hitRect.Contains(clientPoint)) {
+            resolution.hoveredLayoutGuide = guide;
+            return resolution;
+        }
+    }
+
+    const auto hitAnchorTarget = [&](RenderPoint point) -> const LayoutEditAnchorRegion* {
+        const LayoutEditAnchorRegion* bestRegion = nullptr;
+        long long bestArea = (std::numeric_limits<long long>::max)();
+        const auto scanAnchors = [&](const std::vector<LayoutEditAnchorRegion>& anchors) {
+            for (auto it = anchors.rbegin(); it != anchors.rend(); ++it) {
+                const LayoutEditAnchorRegion& anchor = *it;
+                if (!anchor.targetRect.Contains(point)) {
+                    continue;
+                }
+                const long long area = RectArea(anchor.targetRect);
+                if (bestRegion == nullptr || area < bestArea) {
+                    bestRegion = &anchor;
+                    bestArea = area;
+                }
+            }
+        };
+        scanAnchors(layoutResolver_->dynamicEditableAnchorRegions_);
+        scanAnchors(layoutResolver_->staticEditableAnchorRegions_);
+        return bestRegion;
+    };
+
+    const auto anchorTarget = hitAnchorTarget(clientPoint);
+    std::optional<LayoutEditWidgetIdentity> hoveredWidget;
+    for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
+        for (const auto& widget : card.widgets) {
+            if (widget.widget == nullptr || !widget.widget->IsHoverable() || !widget.rect.Contains(clientPoint)) {
+                continue;
+            }
+            hoveredWidget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+            break;
+        }
+        if (hoveredWidget.has_value()) {
+            break;
+        }
+    }
+    if (hoveredWidget.has_value()) {
+        resolution.hoveredEditableWidget = hoveredWidget;
+        if (anchorTarget != nullptr && ::MatchesWidgetIdentity(anchorTarget->key.widget, *hoveredWidget)) {
+            resolution.hoveredEditableAnchor = anchorTarget->key;
+            return resolution;
+        }
+        return resolution;
+    }
+    if (anchorTarget != nullptr) {
+        resolution.hoveredEditableAnchor = anchorTarget->key;
+        return resolution;
+    }
+    return resolution;
 }
 
 int DashboardRenderer::ScaleLogical(int value) const {

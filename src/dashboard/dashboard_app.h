@@ -98,6 +98,7 @@ private:
     const AppConfig& LayoutEditConfig() const override;
     DashboardOverlayState& LayoutDashboardOverlayState() override;
     LayoutEditActiveRegions CollectLayoutEditActiveRegions() const override;
+    LayoutEditHoverResolution ResolveLayoutEditHover(RenderPoint clientPoint) const override;
     double LayoutEditRenderScale() const override;
     int LayoutEditSimilarityThreshold() const override;
     void SetLayoutGuideDragActive(bool active) override;

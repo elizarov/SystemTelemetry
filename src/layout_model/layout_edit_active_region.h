@@ -1,6 +1,7 @@
 #pragma once
 
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -45,7 +46,8 @@ struct LayoutEditContainerChildReorderRegion {
     std::string editCardId;
     std::vector<size_t> nodePath;
     bool horizontal = false;
-    std::vector<RenderRect> childRects;
+    size_t childIndex = 0;
+    RenderRect childRect{};
 };
 
 using LayoutEditActiveRegionPayload = std::variant<LayoutEditCardRegion,
@@ -61,6 +63,19 @@ struct LayoutEditActiveRegion {
     RenderRect box{};
     LayoutEditActiveRegionKind kind = LayoutEditActiveRegionKind::Card;
     LayoutEditActiveRegionPayload payload = LayoutEditCardRegion{};
+};
+
+struct LayoutEditHoverResolution {
+    std::optional<LayoutEditWidgetIdentity> hoveredLayoutCard;
+    std::optional<LayoutEditWidgetIdentity> hoveredEditableCard;
+    std::optional<LayoutEditWidgetIdentity> hoveredEditableWidget;
+    std::optional<LayoutEditGapAnchorKey> hoveredGapEditAnchor;
+    std::optional<LayoutEditAnchorKey> hoveredEditableAnchor;
+    std::optional<LayoutEditGapAnchor> hoveredGapEditAnchorRegion;
+    std::optional<LayoutEditWidgetGuide> hoveredWidgetEditGuide;
+    std::optional<LayoutEditGuide> hoveredLayoutGuide;
+    std::optional<LayoutEditGapAnchorKey> actionableGapEditAnchor;
+    std::optional<LayoutEditAnchorKey> actionableAnchorHandle;
 };
 
 class LayoutEditActiveRegions {

@@ -35,10 +35,10 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.08`
   - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.46` to `2.49`
+  - `drag_loop per_iter_ms=2.37` to `2.39`
   - `snap avg_ms=0.18`
   - `apply avg_ms=0.08`
-  - `paint_draw avg_ms=2.20` to `2.23`
+  - `paint_draw avg_ms=2.09` to `2.11`
 - Current repeatable `update-telemetry` result on the current tree:
   - `update_loop per_iter_ms=4.22`
   - `telemetry_update avg_ms=2.18`
@@ -50,10 +50,10 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `dialog_refresh avg_ms=0.15`
   - `switch_paint avg_ms=2.72` to `2.76`
 - Current repeatable `mouse-hover` result on the current tree:
-  - `hover_loop per_iter_ms=2.14`
-  - `hover_hit_test avg_ms=0.01`
-  - `paint_total avg_ms=2.13`
-  - `paint_draw avg_ms=2.13`
+  - `hover_loop per_iter_ms=2.20` to `2.21`
+  - `hover_hit_test avg_ms=0.08`
+  - `paint_total avg_ms=2.12` to `2.13`
+  - `paint_draw avg_ms=2.12` to `2.13`
 
 ## Current Confirmed Hotspots
 
@@ -76,7 +76,7 @@ Interpretation:
 - The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.72` to `2.76 ms` of the `3.60` to `3.66 ms` loop while the dialog refresh work stays around `0.15 ms`.
 - The direct `edit-layout` benchmark remains paint-bound on this tree after restoring incremental renderer style updates: confirmation reruns land around `drag_loop per_iter_ms=2.46` to `2.49`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.23`, so the remaining time sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
 - Suppressing layout-edit tooltip refresh while a drag is active does not regress the direct `edit-layout` benchmark; the post-change `240`-iteration run landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.17`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.11`.
-- The direct `mouse-hover` benchmark is paint-bound on this machine: hover hit testing stays around `0.01 ms` per step while repaint sits around `2.13 ms`, so layout-edit hit testing is not a bottleneck relative to drawing hovered overlays.
+- The current direct `mouse-hover` benchmark remains paint-bound overall after the direct renderer hover resolver: hover hit testing stays around `0.08 ms` per step while repaint sits around `2.12` to `2.13 ms`.
 - Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs remain in the established current-tree range.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
@@ -98,6 +98,36 @@ These changes produced real wins and remain in the codebase:
 - Keep renderer style updates incremental so layout-only config changes do not rebuild DirectWrite text formats, palette state, or tinted icon sources during edit-layout drag apply and layout switching.
 
 ## Tested Hypotheses
+
+### Hypothesis: Collision-aware container anchors regress layout-edit benchmark paths
+
+- Change:
+  - Place container child reorder anchors around occupied widget anchor hit regions, skip empty child slots, and batch dynamic collision resolution once per frame after draw-time dynamic anchors register.
+- Result:
+  - Did not regress the direct layout-edit drag benchmark, and batching avoided an extra paint cost in mouse-hover.
+- Observed effect:
+  - `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=2.37` to `2.39`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.09` to `2.11`.
+  - `build\SystemTelemetryBenchmarks.exe mouse-hover 240 2` landed at `hover_loop per_iter_ms=2.34`, `hover_hit_test avg_ms=0.21`, and `paint_draw avg_ms=2.13`; the confirmation `480`-point run landed at `hover_loop per_iter_ms=2.32`, `hover_hit_test avg_ms=0.21`, and `paint_draw avg_ms=2.12`.
+- Conclusion:
+  - The collision-aware anchor placement is safe for the drag benchmark and normal repaint cost; the follow-up hover-resolver optimization below addresses the active-region hit-test cost separately.
+
+### Hypothesis: Hover hit testing regressed because ordinary hover builds diagnostic active-region payloads
+
+- Change:
+  - Store container child reorder active-region payloads per child instead of copying the full child-rect vector into every child region.
+  - Route `LayoutEditController::ResolveHover()` through a renderer-owned direct hover resolver that scans the already-resolved layout, anchor, guide, and gap collections without constructing diagnostic `LayoutEditActiveRegions`.
+  - Keep the generic active-region resolver and trace payloads available for tests, diagnostics, and tools, but avoid that allocation-heavy path for ordinary mouse hover.
+- Result:
+  - Helped materially and restored hover hit testing close to the maintained pre-regression cost while preserving the new collision-aware anchor behavior.
+- Observed effect:
+  - The initial daemon-backed hotspot capture `profile_benchmark.cmd mouse-hover 240 2` under `build\profile_benchmark_daemon\requests\6091_2699_22676\` reported `hover_hit_test avg_ms=0.22` and showed app-side time in active-region construction, variant/vector payload churn, `ResolveLayoutEditHover`, and anchor hit testing.
+  - Per-child reorder payloads and active-region reservation reduced `profile_benchmark.cmd mouse-hover 240 2` to `hover_hit_test avg_ms=0.14`.
+  - The direct renderer hover resolver reduced direct `build\SystemTelemetryBenchmarks.exe mouse-hover 240 2` reruns to `hover_loop per_iter_ms=2.20` to `2.21`, `hover_hit_test avg_ms=0.08`, and `paint_draw avg_ms=2.12` to `2.13`.
+  - Daemon-backed confirmation runs under `build\profile_benchmark_daemon\requests\8240_30030_13589\` and `build\profile_benchmark_daemon\requests\8367_23234_22164\` landed at `hover_hit_test avg_ms=0.09` and `0.08`; the remaining profile is dominated by the Direct2D, DirectWrite, and driver paint frame rather than active-region payload construction.
+  - A circle-anchor bounding-box guard was neutral within noise, but remains because it avoids needless ring-distance math outside the padded handle bounds.
+  - `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` stayed in range at `drag_loop per_iter_ms=2.36` to `2.38`, `snap avg_ms=0.17` to `0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.09` to `2.11`; daemon-backed `profile_benchmark.cmd edit-layout 240 2` landed at `drag_loop per_iter_ms=2.52`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.24`.
+- Conclusion:
+  - Ordinary hover should resolve against renderer-owned layout/edit collections directly. `LayoutEditActiveRegions` remain the diagnostic and validation surface, but rebuilding that payload set on every mouse move duplicates already-resolved renderer state and makes hover hit testing pay for trace-friendly structures it does not need.
 
 ### Hypothesis: Preserve incremental renderer style updates after the renderer package refactor
 

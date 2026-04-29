@@ -413,6 +413,10 @@ private:
         return renderer_.CollectLayoutEditActiveRegions(overlayState_);
     }
 
+    LayoutEditHoverResolution ResolveLayoutEditHover(RenderPoint clientPoint) const override {
+        return renderer_.ResolveLayoutEditHover(overlayState_, clientPoint);
+    }
+
     double LayoutEditRenderScale() const override {
         return renderer_.RenderScale();
     }

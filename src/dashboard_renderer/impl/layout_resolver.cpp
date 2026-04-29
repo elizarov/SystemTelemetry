@@ -231,7 +231,6 @@ void DashboardLayoutResolver::RegisterDynamicEditAnchor(LayoutEditAnchorRegistra
         return;
     }
     RegisterEditableAnchorRegion(dynamicEditableAnchorRegions_, registration);
-    ResolveContainerAnchorCollisions();
 }
 
 void DashboardLayoutResolver::RegisterStaticCornerEditAnchor(
@@ -336,7 +335,6 @@ void DashboardLayoutResolver::RegisterDynamicTextAnchor(const TextLayoutResult& 
         return;
     }
     RegisterTextAnchor(dynamicEditableAnchorRegions_, layoutResult, editable, targetOutline);
-    ResolveContainerAnchorCollisions();
     if (colorParameter.has_value()) {
         RegisterDynamicColorEditRegion(*colorParameter, layoutResult.textRect);
     }
@@ -353,7 +351,6 @@ void DashboardLayoutResolver::RegisterDynamicTextAnchor(const RenderRect& rect,
         return;
     }
     RegisterTextAnchor(dynamicEditableAnchorRegions_, rect, text, style, options, editable, targetOutline);
-    ResolveContainerAnchorCollisions();
     if (colorParameter.has_value()) {
         RegisterDynamicColorEditRegion(
             *colorParameter, renderer_.Renderer().MeasureTextBlock(rect, text, style, options).textRect);
@@ -404,6 +401,10 @@ void DashboardLayoutResolver::ResolveContainerAnchorCollisions() {
         }
         occupiedAnchorHitRects.push_back(anchor.anchorHitRect);
     }
+}
+
+void DashboardLayoutResolver::ResolveDynamicEditArtifactCollisions() {
+    ResolveContainerAnchorCollisions();
 }
 
 void DashboardLayoutResolver::RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) {

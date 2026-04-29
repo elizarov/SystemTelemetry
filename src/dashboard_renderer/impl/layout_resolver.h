@@ -111,6 +111,7 @@ public:
     void RegisterStaticColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
     void RegisterDynamicColorEditRegion(LayoutEditParameter parameter, const RenderRect& targetRect) override;
     void RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) override;
+    void ResolveDynamicEditArtifactCollisions();
 
 private:
     friend class DashboardRenderer;

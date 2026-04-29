@@ -114,14 +114,9 @@ bool MatchesRegionHit(const LayoutEditActiveRegions& regions, const LayoutEditAc
             return false;
         case LayoutEditActiveRegionKind::ContainerChildReorderTarget: {
             const auto& target = std::get<LayoutEditContainerChildReorderRegion>(region.payload);
-            for (const RenderRect& childRect : target.childRects) {
-                if (childRect.left == region.box.left && childRect.top == region.box.top &&
-                    childRect.right == region.box.right && childRect.bottom == region.box.bottom &&
-                    childRect.Contains(point)) {
-                    return true;
-                }
-            }
-            return false;
+            return target.childRect.left == region.box.left && target.childRect.top == region.box.top &&
+                   target.childRect.right == region.box.right && target.childRect.bottom == region.box.bottom &&
+                   target.childRect.Contains(point);
         }
         case LayoutEditActiveRegionKind::GapHandle:
             if (const auto gap = HitTestGapEditAnchor(regions, point); gap.has_value()) {

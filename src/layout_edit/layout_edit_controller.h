@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "config/config.h"
-#include "layout_edit/layout_edit_hit_test.h"
 #include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_active_region.h"
 #include "layout_model/layout_edit_layout_target.h"
@@ -30,6 +29,7 @@ public:
     virtual const AppConfig& LayoutEditConfig() const = 0;
     virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
     virtual LayoutEditActiveRegions CollectLayoutEditActiveRegions() const = 0;
+    virtual LayoutEditHoverResolution ResolveLayoutEditHover(RenderPoint clientPoint) const;
     virtual double LayoutEditRenderScale() const = 0;
     virtual int LayoutEditSimilarityThreshold() const = 0;
     virtual void SetLayoutGuideDragActive(bool active) = 0;
