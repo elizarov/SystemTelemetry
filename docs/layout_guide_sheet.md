@@ -72,6 +72,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - Representative-card anchor callouts attach their leaders to the resolved drag-anchor rectangle rather than the broader widget or target region. Circular radial-distance anchors attach to the closest point on the resolved circle.
 - Representative guides and anchors are not promoted to active or selected styling just because a callout points at them; the panel content renders as it would in the corresponding layout-edit hover state.
 - Representative cards render hover-equivalent state only for active areas that have callouts on that representative card. Card-level or dashboard-level gap and sizing controls that are documented in the overview do not render in hover state on the representative cards.
+- Metric-list layout reorder callouts appear once per metric-list widget, attached to the first visible row, rather than repeating the same layout guidance for each row.
 - Representative-card layout sizing guide callouts render the guide line itself without the full containing-layout dashed outline to keep the specimen readable.
 - Representative-card anchor callouts keep the same widget-hover context as live hover for related artifact selection, so active-only target outlines do not replace the normal thin widget hover outline around controls such as gauge segment-count anchors.
 - When two guides overlap, the sheet follows the live hit-priority and visual-priority rules unless the callout placement needs a small leader-line offset to remain readable.

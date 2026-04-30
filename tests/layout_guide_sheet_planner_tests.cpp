@@ -105,6 +105,7 @@ TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetr
 
     std::set<std::string> actualTexts;
     size_t metricDefinitionCallouts = 0;
+    size_t cpuMetricListLayoutCallouts = 0;
     for (const LayoutGuideSheetCalloutRequest& callout : callouts) {
         actualTexts.insert(callout.parameterLine + "\n" + callout.descriptionLine);
         EXPECT_FALSE(callout.descriptionLine.empty()) << callout.parameterLine;
@@ -122,6 +123,10 @@ TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetr
             EXPECT_TRUE(callout.hoverAnchorKey.has_value());
             EXPECT_NE(callout.parameterLine.find("[metrics] cpu."), std::string::npos) << callout.parameterLine;
         }
+        if (callout.parameterLine.find("[card.cpu] layout = metric_list(") != std::string::npos) {
+            ++cpuMetricListLayoutCallouts;
+            EXPECT_NE(callout.parameterLine.find("metric_list(cpu.ram)"), std::string::npos) << callout.parameterLine;
+        }
         if (callout.parameterLine.rfind("[colors]", 0) != 0) {
             const bool hasHoverState = callout.hoverAnchorKey.has_value() || callout.hoverWidgetGuide.has_value() ||
                                        callout.hoverLayoutGuide.has_value() || callout.hoverGapAnchorKey.has_value();
@@ -131,6 +136,7 @@ TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetr
 
     EXPECT_GT(actualTexts.size(), 20u);
     EXPECT_EQ(metricDefinitionCallouts, 1u);
+    EXPECT_EQ(cpuMetricListLayoutCallouts, 1u);
 }
 
 TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) {

@@ -193,6 +193,14 @@ std::string LayoutGuideSheetCalloutKey(
         if (std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
             return "card_title";
         }
+        if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey);
+            nodeFieldKey != nullptr && nodeFieldKey->widgetClass == WidgetClass::MetricList) {
+            std::string key = "metric_list_layout:" + nodeFieldKey->editCardId;
+            for (const size_t pathPart : nodeFieldKey->nodePath) {
+                key += "/" + std::to_string(pathPart);
+            }
+            return key;
+        }
     }
     if (const auto* guide = std::get_if<LayoutEditGuide>(&payload); guide != nullptr && guide->renderCardId.empty()) {
         return guide->axis == LayoutGuideAxis::Horizontal ? "overview_horizontal_sizing_guide"
