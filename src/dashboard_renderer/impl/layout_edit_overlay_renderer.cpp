@@ -70,6 +70,14 @@ bool SuppressAnchorTargetSelectionOutline(LayoutEditParameter parameter) {
     return parameter == LayoutEditParameter::GaugeOuterPadding || parameter == LayoutEditParameter::GaugeRingThickness;
 }
 
+RenderColorId ActiveEditColor(const DashboardOverlayState& overlayState) {
+    return overlayState.forceHoverEquivalentColors ? RenderColorId::LayoutGuide : RenderColorId::ActiveEdit;
+}
+
+bool UseActiveEditEmphasis(const DashboardOverlayState& overlayState, bool active) {
+    return active && !overlayState.forceHoverEquivalentColors;
+}
+
 }  // namespace
 
 std::vector<LayoutEditAnchorRegion> CollectRelatedEditableAnchorHighlights(
@@ -254,26 +262,27 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
         if (active || overlayState.activeContainerChildReorderDrag.has_value()) {
             moveActiveReorderHighlight(highlighted);
         }
-        const RenderColorId outlineColor = active ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
+        const RenderColorId outlineColor = active ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
+        const bool activeEmphasis = UseActiveEditEmphasis(overlayState, active);
         bool drawTargetOutline = highlighted.drawTargetOutline && !highlighted.targetRect.IsEmpty();
         if (!active && drawTargetOutline && hoveredWidgetOutlineRect.has_value() &&
             SameRect(highlighted.targetRect, *hoveredWidgetOutlineRect)) {
             drawTargetOutline = false;
         }
         if (drawTargetOutline) {
-            DrawDottedHighlightRect(highlighted.targetRect, outlineColor, active);
+            DrawDottedHighlightRect(highlighted.targetRect, outlineColor, activeEmphasis);
         }
 
         if (highlighted.shape == AnchorShape::Circle) {
             const float outlineWidth = static_cast<float>(
-                active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
+                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
             renderer_.Renderer().DrawSolidEllipse(
                 highlighted.anchorRect, RenderStroke::Solid(outlineColor, outlineWidth));
         } else if (highlighted.shape == AnchorShape::Diamond) {
             renderer_.Renderer().FillSolidDiamond(highlighted.anchorRect, outlineColor);
         } else if (highlighted.shape == AnchorShape::Wedge) {
             const float outlineWidth = static_cast<float>(
-                active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
+                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
             const RenderPoint topRight{highlighted.anchorRect.right, highlighted.anchorRect.top};
             const RenderPoint bottomLeft{highlighted.anchorRect.left, highlighted.anchorRect.bottom};
             const RenderPoint bottomRight{highlighted.anchorRect.right, highlighted.anchorRect.bottom};
@@ -322,7 +331,7 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
             }
         } else if (highlighted.shape == AnchorShape::Plus) {
             const float outlineWidth = static_cast<float>(
-                active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
+                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
             const int centerX = highlighted.anchorRect.left +
                                 (std::max<LONG>(0, highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
             const int centerY = highlighted.anchorRect.top +
@@ -407,7 +416,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedColorEditHighlights(
     collect(layoutResolver_.staticColorEditRegions_);
     collect(layoutResolver_.dynamicColorEditRegions_);
     for (const auto& rect : highlightedRects) {
-        DrawDottedHighlightRect(rect, RenderColorId::ActiveEdit, true);
+        DrawDottedHighlightRect(rect, ActiveEditColor(overlayState), !overlayState.forceHoverEquivalentColors);
     }
 }
 
@@ -420,7 +429,8 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         return;
     }
 
-    const RenderColorId color = RenderColorId::ActiveEdit;
+    const RenderColorId color = ActiveEditColor(overlayState);
+    const bool activeEmphasis = !overlayState.forceHoverEquivalentColors;
     std::vector<RenderRect> selectedRects;
     bool drawDashboardBoundsOutline = false;
     const auto appendRect = [&](const RenderRect& rect) {
@@ -498,7 +508,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     collectAnchorTargets(layoutResolver_.staticEditableAnchorRegions_);
     collectAnchorTargets(layoutResolver_.dynamicEditableAnchorRegions_);
     for (const auto& rect : selectedRects) {
-        DrawDottedHighlightRect(rect, color, true);
+        DrawDottedHighlightRect(rect, color, activeEmphasis);
     }
     if (drawDashboardBoundsOutline) {
         DrawDottedHighlightRect(
@@ -630,8 +640,8 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(const DashboardOve
         appendContainerHighlight(overlayState.activeLayoutEditGuide->containerRect, true);
     }
     for (const auto& [rect, active] : containerHighlights) {
-        const RenderColorId color = active ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
-        DrawDottedHighlightRect(rect, color, active);
+        const RenderColorId color = active ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
+        DrawDottedHighlightRect(rect, color, UseActiveEditEmphasis(overlayState, active));
     }
 
     const int lineWidth = (std::max)(1, renderer_.ScaleLogical(1));
@@ -647,15 +657,17 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(const DashboardOve
         if (!emphasized && !hoveredGuide && !overlayState.hoverOnExposedDashboard) {
             continue;
         }
-        const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
+        const RenderColorId color = emphasized ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
         const RenderPoint start =
             ApplyContainerChildReorderOffset(RenderPoint{guide.lineRect.left, guide.lineRect.top}, guide.lineRect);
         const RenderPoint end = ApplyContainerChildReorderOffset(
             guide.axis == LayoutGuideAxis::Vertical ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
                                                     : RenderPoint{guide.lineRect.right, guide.lineRect.top},
             guide.lineRect);
-        renderer_.Renderer().DrawSolidLine(
-            start, end, RenderStroke::Solid(color, static_cast<float>(emphasized ? activeLineWidth : lineWidth)));
+        renderer_.Renderer().DrawSolidLine(start,
+            end,
+            RenderStroke::Solid(color,
+                static_cast<float>(UseActiveEditEmphasis(overlayState, emphasized) ? activeLineWidth : lineWidth)));
     }
 }
 
@@ -703,7 +715,7 @@ void DashboardLayoutEditOverlayRenderer::DrawWidgetEditGuides(const DashboardOve
                               overlayState.selectedTreeHighlight.has_value() &&
                               MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
         const bool emphasized = active || selected;
-        const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
+        const RenderColorId color = emphasized ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
         renderer_.Renderer().DrawSolidLine(ApplyContainerChildReorderOffset(guide.drawStart, guide.widgetRect),
             ApplyContainerChildReorderOffset(guide.drawEnd, guide.widgetRect),
             RenderStroke::Solid(color, static_cast<float>(lineWidth)));
@@ -766,7 +778,7 @@ void DashboardLayoutEditOverlayRenderer::DrawGapEditAnchors(const DashboardOverl
         const bool hovered = overlayState.hoveredGapEditAnchor.has_value() &&
                              MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor);
         const bool emphasized = active || selected;
-        const RenderColorId color = emphasized ? RenderColorId::ActiveEdit : RenderColorId::LayoutGuide;
+        const RenderColorId color = emphasized ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
         const float strokeWidth = static_cast<float>(lineWidth);
         const RenderRect offsetSource = anchor.hitRect.IsEmpty() ? anchor.handleRect : anchor.hitRect;
         const RenderPoint drawStart = ApplyContainerChildReorderOffset(anchor.drawStart, offsetSource);
@@ -1116,7 +1128,10 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
         }
     }
     renderer_.Renderer().DrawSolidRect(childRect,
-        RenderStroke::Dotted(RenderColorId::ActiveEdit, static_cast<float>((std::max)(2, renderer_.ScaleLogical(2)))));
+        RenderStroke::Dotted(ActiveEditColor(*renderer_.activeOverlayState_),
+            static_cast<float>(UseActiveEditEmphasis(*renderer_.activeOverlayState_, true)
+                                   ? (std::max)(2, renderer_.ScaleLogical(2))
+                                   : (std::max)(1, renderer_.ScaleLogical(1)))));
     layoutResolver_.dynamicAnchorRegistrationEnabled_ = previousDynamicRegistration;
     renderer_.Renderer().PopTranslation();
 }

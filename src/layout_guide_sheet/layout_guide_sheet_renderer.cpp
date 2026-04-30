@@ -409,23 +409,23 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         const int capHalf = ScaleAtLeast(renderer, sheetStyle.overviewGapHandleSize, 1);
         const float strokeWidth = static_cast<float>(ScaleAtLeast(renderer, sheetStyle.overviewGuideStrokeWidth, 1));
         renderer.Renderer().DrawSolidLine(
-            drawStart, drawEnd, RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+            drawStart, drawEnd, RenderStroke::Solid(RenderColorId::LayoutGuide, strokeWidth));
         if (gapAnchor.axis == LayoutGuideAxis::Vertical) {
             renderer.Renderer().DrawSolidLine(RenderPoint{drawStart.x - capHalf, drawStart.y},
                 RenderPoint{drawStart.x + capHalf, drawStart.y},
-                RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+                RenderStroke::Solid(RenderColorId::LayoutGuide, strokeWidth));
             renderer.Renderer().DrawSolidLine(RenderPoint{drawEnd.x - capHalf, drawEnd.y},
                 RenderPoint{drawEnd.x + capHalf, drawEnd.y},
-                RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+                RenderStroke::Solid(RenderColorId::LayoutGuide, strokeWidth));
         } else {
             renderer.Renderer().DrawSolidLine(RenderPoint{drawStart.x, drawStart.y - capHalf},
                 RenderPoint{drawStart.x, drawStart.y + capHalf},
-                RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+                RenderStroke::Solid(RenderColorId::LayoutGuide, strokeWidth));
             renderer.Renderer().DrawSolidLine(RenderPoint{drawEnd.x, drawEnd.y - capHalf},
                 RenderPoint{drawEnd.x, drawEnd.y + capHalf},
-                RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+                RenderStroke::Solid(RenderColorId::LayoutGuide, strokeWidth));
         }
-        renderer.Renderer().FillSolidRect(handle, RenderColorId::ActiveEdit);
+        renderer.Renderer().FillSolidRect(handle, RenderColorId::LayoutGuide);
         return;
     }
     if (artifact.anchorKey.has_value()) {
@@ -449,12 +449,12 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
             renderer.Renderer().DrawSolidLine(
                 topRight, bottomRight, RenderStroke::Solid(RenderColorId::LayoutGuide, outlineWidth));
         } else if (shape == AnchorShape::Diamond) {
-            renderer.Renderer().FillSolidDiamond(handle, RenderColorId::ActiveEdit);
+            renderer.Renderer().FillSolidDiamond(handle, RenderColorId::LayoutGuide);
         } else if (shape == AnchorShape::Square || shape == AnchorShape::VerticalReorder ||
                    shape == AnchorShape::HorizontalReorder || shape == AnchorShape::Plus) {
-            renderer.Renderer().FillSolidRect(handle, RenderColorId::ActiveEdit);
+            renderer.Renderer().FillSolidRect(handle, RenderColorId::LayoutGuide);
         } else {
-            renderer.Renderer().FillSolidEllipse(handle, RenderColorId::ActiveEdit);
+            renderer.Renderer().FillSolidEllipse(handle, RenderColorId::LayoutGuide);
         }
         return;
     }
@@ -485,6 +485,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
     overlayState.forceLayoutEditAffordances = true;
+    overlayState.forceHoverEquivalentColors = true;
     overlayState.hoverOnExposedDashboard = true;
     if (!dashboardRenderer_.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
         if (errorText != nullptr) {
