@@ -154,6 +154,27 @@ std::wstring BuildMetricListAddRowTooltipText(const AppConfig& config, const Lay
     return text;
 }
 
+std::wstring BuildContainerChildOrderTooltipText(const AppConfig& config, const LayoutEditAnchorRegion& anchor) {
+    const auto containerOrderKey = LayoutEditAnchorContainerChildOrderKey(anchor.key);
+    if (!containerOrderKey.has_value()) {
+        return L"";
+    }
+    const auto firstLine = BuildContainerChildOrderTooltipLine(config, *containerOrderKey);
+    if (!firstLine.has_value()) {
+        return L"";
+    }
+    std::wstring text = WideFromUtf8(*firstLine);
+    const char* descriptionKey = anchor.shape == AnchorShape::HorizontalReorder
+                                     ? "layout_edit.container_reorder_horizontal"
+                                     : "layout_edit.container_reorder_vertical";
+    const std::wstring description = WideFromUtf8(FindLocalizedText(descriptionKey));
+    if (!description.empty()) {
+        text += L"\r\n";
+        text += description;
+    }
+    return text;
+}
+
 std::optional<std::wstring> AbortTooltipBuild(std::string* errorReason, std::string_view reason) {
     if (errorReason != nullptr) {
         *errorReason = std::string(reason);
@@ -192,6 +213,7 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
     std::optional<LayoutMetricEditKey> metricKey;
     std::optional<LayoutCardTitleEditKey> cardTitleKey;
     std::optional<LayoutNodeFieldEditKey> nodeFieldKey;
+    std::optional<LayoutContainerEditKey> containerKey;
     double value = 0.0;
     std::optional<UiFontConfig> fontValue;
     std::optional<unsigned int> colorValue;
@@ -208,10 +230,20 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         cardTitleKey = std::get<LayoutCardTitleEditKey>(*focusKey);
     } else if (focusKey.has_value() && std::holds_alternative<LayoutNodeFieldEditKey>(*focusKey)) {
         nodeFieldKey = std::get<LayoutNodeFieldEditKey>(*focusKey);
+    } else if (focusKey.has_value() && std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
+        containerKey = std::get<LayoutContainerEditKey>(*focusKey);
     }
     if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload)) {
         if (const auto anchorNodeFieldKey = LayoutEditAnchorNodeFieldKey(anchor->key); anchorNodeFieldKey.has_value()) {
             nodeFieldKey = *anchorNodeFieldKey;
+        }
+        if (const auto containerOrderKey = LayoutEditAnchorContainerChildOrderKey(anchor->key);
+            containerOrderKey.has_value()) {
+            std::wstring tooltipText = BuildContainerChildOrderTooltipText(config, *anchor);
+            if (tooltipText.empty()) {
+                return AbortTooltipBuild(errorReason, "empty_container_child_order_text");
+            }
+            return tooltipText;
         }
     }
     if (const auto parameter = TooltipPayloadParameter(payload); parameter.has_value()) {
@@ -277,7 +309,8 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         return tooltipText;
     }
 
-    if (!descriptor.has_value() && !metricKey.has_value() && !cardTitleKey.has_value() && !nodeFieldKey.has_value()) {
+    if (!descriptor.has_value() && !metricKey.has_value() && !cardTitleKey.has_value() && !nodeFieldKey.has_value() &&
+        !containerKey.has_value()) {
         return AbortTooltipBuild(errorReason, "unsupported_target");
     }
 

@@ -60,6 +60,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 
 - Each selected card renders with layout-edit mode enabled.
 - The overview shows dashboard-level card spacing guides, dashboard padding controls, and card-chrome controls such as title, icon, border, radius, padding, and header spacing.
+- The overview shows one left/right and one up/down layout-child reorder handle with callouts.
 - Representative cards show visual guides, anchors, size rulers, hover-equivalent outlines, text anchors, color targets, gap handles, split guides, reorder handles, and widget-local guides that are available for the selected card content.
 - Guide geometry comes from the same renderer-owned layout-edit artifact registration path used by live layout-edit mode and diagnostics active-region tracing.
 - Guide rendering remains visually consistent with live layout-edit hover rendering, including stroke weights, colors, dash patterns, anchor shapes, and ruler numbering.
@@ -83,6 +84,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - Each documented tooltip text for an active area inside the overview or a rendered representative card appears in at least one help bubble.
 - Dashboard-level layout guides, between-card gaps, dashboard outer padding, and card-chrome controls produce callouts in the overview.
 - Overview dashboard sizing guides produce at most one horizontal-guide callout and at most one vertical-guide callout, using the first representative of each orientation in screen order.
+- Overview layout-child reorder handles produce at most one left/right callout and at most one up/down callout, using the first representative of each orientation in screen order.
 - Representative cards do not repeat overview-owned card title, icon, card style, dashboard spacing, or dashboard padding callouts.
 - Color-parameter callouts are unique across the whole sheet. If an overview callout already documents a color parameter such as `icon_color`, representative cards keep their visible color target affordances but do not add another bubble or leader for that same color parameter.
 - Metric-definition rows under `[metrics]`, such as `cpu.temp`, `cpu.clock`, and other metric ids, are equivalent for guide-sheet coverage. The first rendered metric-definition row receives the single representative bubble and leader, and that row renders the same hover-equivalent dotted outline, wedge anchor, and text-size anchor that live layout editing shows for the hovered metric row.

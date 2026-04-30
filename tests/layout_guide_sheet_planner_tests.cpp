@@ -153,6 +153,8 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
     bool hasCardIconSize = false;
     bool hasForegroundColor = false;
     bool hasIconColor = false;
+    size_t horizontalReorderCallouts = 0;
+    size_t verticalReorderCallouts = 0;
     size_t horizontalSizingGuides = 0;
     size_t verticalSizingGuides = 0;
     for (const LayoutGuideSheetCalloutRequest& callout : callouts) {
@@ -167,6 +169,16 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
                               callout.hoverColorParameter == LayoutEditParameter::ColorForeground;
         hasIconColor |= callout.parameterLine.find("[colors] icon_color") != std::string::npos &&
                         callout.hoverColorParameter == LayoutEditParameter::ColorIcon;
+        if (callout.key == "overview_horizontal_layout_reorder") {
+            ++horizontalReorderCallouts;
+            EXPECT_NE(callout.descriptionLine.find("left or right"), std::string::npos) << callout.descriptionLine;
+            EXPECT_TRUE(callout.hoverAnchorKey.has_value());
+        }
+        if (callout.key == "overview_vertical_layout_reorder") {
+            ++verticalReorderCallouts;
+            EXPECT_NE(callout.descriptionLine.find("up or down"), std::string::npos) << callout.descriptionLine;
+            EXPECT_TRUE(callout.hoverAnchorKey.has_value());
+        }
         if (callout.hoverLayoutGuide.has_value() && callout.hoverLayoutGuide->renderCardId.empty()) {
             if (callout.hoverLayoutGuide->axis == LayoutGuideAxis::Horizontal) {
                 ++horizontalSizingGuides;
@@ -184,6 +196,8 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
     EXPECT_TRUE(hasCardIconSize);
     EXPECT_TRUE(hasForegroundColor);
     EXPECT_TRUE(hasIconColor);
+    EXPECT_EQ(horizontalReorderCallouts, 1u);
+    EXPECT_EQ(verticalReorderCallouts, 1u);
     EXPECT_EQ(horizontalSizingGuides, 1u);
     EXPECT_EQ(verticalSizingGuides, 1u);
 }

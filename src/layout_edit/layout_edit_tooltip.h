@@ -18,3 +18,5 @@ std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descri
 std::optional<std::string> BuildMetricListOrderTooltipLine(
     const AppConfig& config, const LayoutNodeFieldEditKey& key, int rowIndex);
 std::optional<std::string> BuildMetricListAddRowTooltipLine(const AppConfig& config, const LayoutNodeFieldEditKey& key);
+std::optional<std::string> BuildContainerChildOrderTooltipLine(
+    const AppConfig& config, const LayoutContainerChildOrderEditKey& key);

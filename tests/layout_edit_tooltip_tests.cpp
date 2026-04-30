@@ -166,6 +166,19 @@ TEST(LayoutEditTooltip, BuildsMetricListAddRowTooltipLineForCardLayout) {
     EXPECT_EQ(*line, "[card.cpu] layout = metric_list(...)");
 }
 
+TEST(LayoutEditTooltip, BuildsContainerChildOrderTooltipLineForDashboardLayout) {
+    AppConfig config;
+    config.display.layout = "main";
+    config.layout.structure.cardsLayout.name = "columns";
+    config.layout.structure.cardsLayout.children.push_back(LayoutNodeConfig{.name = "cpu"});
+    config.layout.structure.cardsLayout.children.push_back(LayoutNodeConfig{.name = "gpu"});
+
+    const auto line = BuildContainerChildOrderTooltipLine(config, LayoutContainerChildOrderEditKey{"", {}});
+
+    ASSERT_TRUE(line.has_value());
+    EXPECT_EQ(*line, "[layout.main] cards = ... columns(cpu, gpu)");
+}
+
 TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {
     const auto& gaugeField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::GaugeSegmentCount);
     EXPECT_EQ(gaugeField.sectionName, "gauge");

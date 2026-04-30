@@ -95,3 +95,26 @@ std::optional<std::string> BuildMetricListAddRowTooltipLine(
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
     return "[" + sectionName + "] " + memberName + " = metric_list(...)";
 }
+
+std::optional<std::string> BuildContainerChildOrderTooltipLine(
+    const AppConfig& config, const LayoutContainerChildOrderEditKey& key) {
+    const LayoutNodeConfig* node = FindGuideNode(config, LayoutEditLayoutTarget{key.editCardId, key.nodePath});
+    if (node == nullptr || (node->name != "rows" && node->name != "columns") || node->children.size() < 2) {
+        return std::nullopt;
+    }
+
+    const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty()
+                                        ? "layout." + config.display.layout
+                                    : key.editCardId.empty() ? "layout"
+                                                             : "card." + key.editCardId;
+    const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
+    std::string text = "[" + sectionName + "] " + memberName + " = ... " + node->name + "(";
+    for (size_t i = 0; i < node->children.size(); ++i) {
+        if (i > 0) {
+            text += ", ";
+        }
+        text += node->children[i].name.empty() ? "unknown" : node->children[i].name;
+    }
+    text += ")";
+    return text;
+}

@@ -127,6 +127,7 @@ struct PackedOverview {
     std::vector<PackedOverviewCard> cards;
     std::vector<LayoutEditGuide> guides;
     std::vector<LayoutEditGapAnchor> gapAnchors;
+    std::vector<LayoutEditAnchorRegion> reorderAnchors;
 };
 
 struct PackedNode {
@@ -214,6 +215,10 @@ bool SameGapAnchorIdentity(const LayoutEditGapAnchor& lhs, const LayoutEditGapAn
            lhs.key.nodePath == rhs.nodePath;
 }
 
+bool SameEditableAnchorIdentity(const LayoutEditAnchorRegion& lhs, const LayoutEditAnchorKey& rhs) {
+    return MatchesEditableAnchorKey(lhs.key, rhs);
+}
+
 void AddPackedDashboardGuides(PackedOverview& overview,
     DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
@@ -227,6 +232,38 @@ void AddPackedDashboardGuides(PackedOverview& overview,
     const bool horizontal = node.name == "columns";
     const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
     const int hitInset = ScaleAtLeast(renderer, sheetStyle.overviewGuideHitInset, 1);
+    const int reorderWidth = ScaleAtLeast(renderer, horizontal ? 12 : 8, 1);
+    const int reorderHeight = ScaleAtLeast(renderer, horizontal ? 8 : 12, 1);
+    const int reorderInset = ScaleAtLeast(renderer, 3, 1);
+    for (size_t i = 0; i < childRects.size(); ++i) {
+        const RenderRect& childRect = childRects[i];
+        if (childRect.IsEmpty()) {
+            continue;
+        }
+        const int centerX =
+            horizontal ? childRect.left + childRect.Width() / 2 : childRect.right - (reorderWidth / 2) - reorderInset;
+        const int centerY =
+            horizontal ? childRect.top + (reorderHeight / 2) + reorderInset : childRect.top + childRect.Height() / 2;
+        const RenderRect anchorRect{centerX - reorderWidth / 2,
+            centerY - reorderHeight / 2,
+            centerX - reorderWidth / 2 + reorderWidth,
+            centerY - reorderHeight / 2 + reorderHeight};
+        LayoutEditAnchorRegion anchor;
+        anchor.key = LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{"", "", nodePath, LayoutEditWidgetIdentity::Kind::DashboardChrome},
+            LayoutContainerChildOrderEditKey{"", nodePath},
+            static_cast<int>(i)};
+        anchor.targetRect = childRect;
+        anchor.anchorRect = anchorRect;
+        anchor.anchorHitRect = anchorRect.Inflate(hitInset, hitInset);
+        anchor.anchorHitPadding = hitInset;
+        anchor.shape = horizontal ? AnchorShape::HorizontalReorder : AnchorShape::VerticalReorder;
+        anchor.dragAxis = horizontal ? AnchorDragAxis::Horizontal : AnchorDragAxis::Vertical;
+        anchor.showWhenWidgetHovered = true;
+        anchor.drawTargetOutline = false;
+        overview.reorderAnchors.push_back(std::move(anchor));
+    }
+
     const LayoutEditParameter gapParameter =
         horizontal ? LayoutEditParameter::DashboardColumnGap : LayoutEditParameter::DashboardRowGap;
     const bool gapAnchorAlreadyRegistered = std::any_of(overview.gapAnchors.begin(),
@@ -678,6 +715,23 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
             if (anchorIt != overview.gapAnchors.end()) {
                 callout.targetRect = anchorIt->handleRect;
                 callout.hoverGapAnchor = *anchorIt;
+            }
+            continue;
+        }
+        if (callout.hoverAnchorKey.has_value() &&
+            callout.hoverAnchorKey->widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome) {
+            const auto anchorIt = std::find_if(overview.reorderAnchors.begin(),
+                overview.reorderAnchors.end(),
+                [&](const LayoutEditAnchorRegion& anchor) {
+                    return SameEditableAnchorIdentity(anchor, *callout.hoverAnchorKey);
+                });
+            if (anchorIt != overview.reorderAnchors.end()) {
+                callout.hoverArtifactTargetRect =
+                    anchorIt->targetRect.IsEmpty() ? anchorIt->anchorRect : anchorIt->targetRect;
+                callout.targetRect = anchorIt->anchorRect;
+                callout.hoverAnchorRect = anchorIt->anchorRect;
+                callout.hoverAnchorDrawTargetOutline = anchorIt->drawTargetOutline && !anchorIt->targetRect.IsEmpty();
+                callout.hoverAnchorShape = anchorIt->shape;
             }
             continue;
         }

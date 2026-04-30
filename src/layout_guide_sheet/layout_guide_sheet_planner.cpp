@@ -168,6 +168,11 @@ std::vector<WidgetClass> UniqueWidgetClasses(const LayoutGuideSheetCardSummary& 
     return classes;
 }
 
+bool IsContainerChildOrderAnchor(const LayoutEditActiveRegionPayload& payload) {
+    const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload);
+    return anchor != nullptr && std::holds_alternative<LayoutContainerChildOrderEditKey>(anchor->key.subject);
+}
+
 size_t CoverageCount(const std::vector<WidgetClass>& covered, const std::vector<WidgetClass>& universe) {
     return static_cast<size_t>(std::count_if(universe.begin(), universe.end(), [&](WidgetClass widgetClass) {
         return std::find(covered.begin(), covered.end(), widgetClass) != covered.end();
@@ -186,6 +191,11 @@ void AddCardCoverage(std::vector<WidgetClass>& covered, const LayoutGuideSheetCa
 
 std::string LayoutGuideSheetCalloutKey(
     const std::string& parameterLine, const std::string& descriptionLine, const TooltipPayload& payload) {
+    if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload);
+        anchor != nullptr && std::holds_alternative<LayoutContainerChildOrderEditKey>(anchor->key.subject)) {
+        return anchor->shape == AnchorShape::HorizontalReorder ? "overview_horizontal_layout_reorder"
+                                                               : "overview_vertical_layout_reorder";
+    }
     if (const std::optional<LayoutEditFocusKey> focusKey = TooltipPayloadFocusKey(payload); focusKey.has_value()) {
         if (std::holds_alternative<LayoutMetricEditKey>(*focusKey)) {
             return "metric_definition";
@@ -356,6 +366,9 @@ std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetCallouts(const 
             continue;
         }
         if (!ContainsCardId(selectedCardIds, sourceCard.cardId)) {
+            continue;
+        }
+        if (IsContainerChildOrderAnchor(region.payload)) {
             continue;
         }
         if (!PayloadBelongsToSelectedCard(region.payload, selectedCardIds)) {
