@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 #include <optional>
+#include <set>
 #include <string_view>
 
 #include "layout_edit/layout_edit_tooltip_payload.h"
@@ -397,4 +398,26 @@ std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetOverviewCallout
             order);
     }
     return callouts;
+}
+
+std::vector<LayoutGuideSheetCalloutRequest> MergeLayoutGuideSheetCallouts(
+    const std::vector<LayoutGuideSheetCalloutRequest>& overviewCallouts,
+    const std::vector<LayoutGuideSheetCalloutRequest>& cardCallouts) {
+    std::vector<LayoutGuideSheetCalloutRequest> merged = overviewCallouts;
+    std::set<LayoutEditParameter> coveredColorParameters;
+    for (const LayoutGuideSheetCalloutRequest& callout : merged) {
+        if (callout.hoverColorParameter.has_value()) {
+            coveredColorParameters.insert(*callout.hoverColorParameter);
+        }
+    }
+    for (const LayoutGuideSheetCalloutRequest& callout : cardCallouts) {
+        if (callout.hoverColorParameter.has_value() && coveredColorParameters.contains(*callout.hoverColorParameter)) {
+            continue;
+        }
+        if (callout.hoverColorParameter.has_value()) {
+            coveredColorParameters.insert(*callout.hoverColorParameter);
+        }
+        merged.push_back(callout);
+    }
+    return merged;
 }

@@ -864,10 +864,9 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                           cardPlacements[planned.cardIndex].sourceRect,
                           cardPlacements[planned.cardIndex].destRect)
                     : RenderPoint{planned.target.Center().x + dx, planned.target.Center().y + dy};
-            const int attachmentY =
-                std::clamp(callout.targetAttachment.y, callout.bubbleRect.top, callout.bubbleRect.bottom);
-            callout.bubbleAttachment = RenderPoint{
-                side == RectExitSide::Left ? callout.bubbleRect.right : callout.bubbleRect.left, attachmentY};
+            callout.bubbleAttachment =
+                RenderPoint{side == RectExitSide::Left ? callout.bubbleRect.right : callout.bubbleRect.left,
+                    callout.bubbleRect.Center().y};
             y = callout.bubbleRect.bottom + rowGap;
         }
     };

@@ -847,11 +847,12 @@ bool SaveLayoutGuideSheet(const std::filesystem::path& imagePath,
     const std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
     const std::vector<std::string> selectedCardIds = SelectLayoutGuideSheetCards(cards);
     const LayoutEditActiveRegions activeRegions = renderer.CollectLayoutEditActiveRegions(overlayState);
-    std::vector<LayoutGuideSheetCalloutRequest> callouts =
+    const std::vector<LayoutGuideSheetCalloutRequest> overviewCallouts =
         BuildLayoutGuideSheetOverviewCallouts(config, activeRegions, cards);
-    std::vector<LayoutGuideSheetCalloutRequest> cardCallouts =
+    const std::vector<LayoutGuideSheetCalloutRequest> cardCallouts =
         BuildLayoutGuideSheetCallouts(config, activeRegions, cards, selectedCardIds);
-    callouts.insert(callouts.end(), cardCallouts.begin(), cardCallouts.end());
+    const std::vector<LayoutGuideSheetCalloutRequest> callouts =
+        MergeLayoutGuideSheetCallouts(overviewCallouts, cardCallouts);
 
     std::vector<std::string> traceDetails;
     LayoutGuideSheetRenderer sheetRenderer(renderer);

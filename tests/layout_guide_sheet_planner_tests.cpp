@@ -182,6 +182,34 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
     EXPECT_EQ(verticalSizingGuides, 1u);
 }
 
+TEST(LayoutGuideSheetPlanner, MergedCalloutsDoNotRepeatOverviewColorParametersOnCards) {
+    const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext();
+
+    const std::vector<std::string> selected = SelectLayoutGuideSheetCards(context.cards);
+    const std::vector<LayoutGuideSheetCalloutRequest> overviewCallouts =
+        BuildLayoutGuideSheetOverviewCallouts(context.config, context.regions, context.cards);
+    const std::vector<LayoutGuideSheetCalloutRequest> cardCallouts =
+        BuildLayoutGuideSheetCallouts(context.config, context.regions, context.cards, selected);
+
+    const std::vector<LayoutGuideSheetCalloutRequest> merged =
+        MergeLayoutGuideSheetCallouts(overviewCallouts, cardCallouts);
+
+    std::set<LayoutEditParameter> seenColorParameters;
+    size_t iconColorCallouts = 0;
+    for (const LayoutGuideSheetCalloutRequest& callout : merged) {
+        if (!callout.hoverColorParameter.has_value()) {
+            continue;
+        }
+        EXPECT_TRUE(seenColorParameters.insert(*callout.hoverColorParameter).second) << callout.parameterLine;
+        if (*callout.hoverColorParameter == LayoutEditParameter::ColorIcon) {
+            ++iconColorCallouts;
+            EXPECT_EQ(callout.sourceCardId, kLayoutGuideSheetOverviewSourceId);
+        }
+    }
+
+    EXPECT_EQ(iconColorCallouts, 1u);
+}
+
 TEST(LayoutGuideSheetPlanner, CalloutGeometryPromotesOuterSideItemsToTopAndBottom) {
     const RenderRect card{100, 100, 300, 300};
     const std::vector<LayoutGuideSheetCalloutGeometryInput> inputs{
