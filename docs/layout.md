@@ -30,8 +30,9 @@ The language is divided by responsibility:
 - `[layout.<name>]` owns named dashboard geometry and top-level card placement.
 - `[dashboard]` owns outer dashboard spacing.
 - `[card_style]` owns shared card chrome and in-card spacing.
-- `[colors]` owns the shared palette, including layout guide sheet callout chrome colors.
+- `[colors]` owns the shared dashboard palette.
 - Color values use `#RRGGBBAA`.
+- `[layout_guide_sheet]` owns diagnostics-only guide-sheet callout colors and layout constants; these fields are loaded from config but are not editable through the layout-edit dialog.
 - `[fonts]` owns the shared font roles.
 - `[card.<id>]` owns card-local title, icon, and inner layout composition.
 
@@ -111,7 +112,7 @@ The language defines static layout behavior rather than live interaction behavio
 - Named layouts resolve one dashboard window size plus a top-level `cards` composition.
 - Dashboard spacing belongs only in `[dashboard]`.
 - Shared card chrome and in-card spacing belong only in `[card_style]`.
-- Shared visual styling belongs only in `[colors]` and `[fonts]`; layout guide sheet callout colors are ordinary `[colors]` palette entries.
+- Shared visual styling belongs only in `[colors]` and `[fonts]`; diagnostics-only layout guide sheet chrome and spacing belongs in `[layout_guide_sheet]`.
 - Card sections define relative composition only: title, icon, layout tree, widget bindings, and child weights.
 - Metric-list row height derives from measured fonts plus `[metric_list]` bar and gap settings.
 - Drive-usage header and row heights derive from measured fonts plus `[drive_usage_list]` geometry settings.

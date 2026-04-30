@@ -22,9 +22,9 @@ struct RenderColor {
 class RendererPalette {
 public:
     RendererPalette();
-    explicit RendererPalette(const ColorsConfig& config);
+    explicit RendererPalette(const ColorsConfig& colors, const LayoutGuideSheetConfig& layoutGuideSheet);
 
-    void Rebuild(const ColorsConfig& config);
+    void Rebuild(const ColorsConfig& colors, const LayoutGuideSheetConfig& layoutGuideSheet);
     const RenderColor& Get(RenderColorId id) const;
 
 private:

@@ -31,6 +31,7 @@ struct TextLayoutResult {
 
 struct RendererStyle {
     ColorsConfig colors;
+    LayoutGuideSheetConfig layoutGuideSheet;
     UiFontSetConfig fonts;
     std::vector<std::string> iconNames;
     double scale = 1.0;

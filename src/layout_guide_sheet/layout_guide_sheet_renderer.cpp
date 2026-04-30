@@ -56,6 +56,14 @@ RenderRect OffsetRenderRect(RenderRect rect, int dx, int dy) {
     return rect;
 }
 
+int ScaleNonNegative(DashboardRenderer& renderer, int value) {
+    return std::max(0, renderer.ScaleLogical(value));
+}
+
+int ScaleAtLeast(DashboardRenderer& renderer, int value, int minimum) {
+    return std::max(minimum, renderer.ScaleLogical(value));
+}
+
 enum class RectExitSide {
     Left,
     Right,
@@ -173,7 +181,8 @@ void AddPackedDashboardGuides(PackedOverview& overview,
         return;
     }
     const bool horizontal = node.name == "columns";
-    const int hitInset = std::max(3, renderer.ScaleLogical(4));
+    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const int hitInset = ScaleAtLeast(renderer, sheetStyle.overviewGuideHitInset, 1);
     const LayoutEditParameter gapParameter =
         horizontal ? LayoutEditParameter::DashboardColumnGap : LayoutEditParameter::DashboardRowGap;
     const bool gapAnchorAlreadyRegistered = std::any_of(overview.gapAnchors.begin(),
@@ -187,7 +196,7 @@ void AddPackedDashboardGuides(PackedOverview& overview,
         anchor.key.nodePath = nodePath;
         const RenderRect& lead = childRects.front();
         const RenderRect& trail = childRects[1];
-        const int handleSize = std::max(4, renderer.ScaleLogical(6));
+        const int handleSize = ScaleAtLeast(renderer, sheetStyle.overviewGapHandleSize, 1);
         if (horizontal) {
             anchor.drawStart = RenderPoint{lead.right, rect.top};
             anchor.drawEnd = RenderPoint{trail.left, rect.top};
@@ -317,11 +326,12 @@ void DrawDottedOverviewRect(DashboardRenderer& renderer, const RenderRect& rect)
     if (rect.IsEmpty()) {
         return;
     }
-    const int padding = std::max(1, renderer.ScaleLogical(1));
+    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const int padding = ScaleAtLeast(renderer, sheetStyle.overviewDottedPadding, 0);
     const RenderRect drawRect = rect.Inflate(padding, padding);
-    const int strokeWidth = std::max(1, renderer.ScaleLogical(1));
-    const int dotLength = std::max(strokeWidth + 1, renderer.ScaleLogical(5));
-    const int gapLength = std::max(strokeWidth + 1, renderer.ScaleLogical(4));
+    const int strokeWidth = ScaleAtLeast(renderer, sheetStyle.overviewDottedStrokeWidth, 1);
+    const int dotLength = std::max(strokeWidth + 1, renderer.ScaleLogical(sheetStyle.overviewDottedDashLength));
+    const int gapLength = std::max(strokeWidth + 1, renderer.ScaleLogical(sheetStyle.overviewDottedGapLength));
     const auto drawHorizontal = [&](int y, int left, int right) {
         for (int x = left; x < right; x += dotLength + gapLength) {
             renderer.Renderer().FillSolidRect(
@@ -345,6 +355,7 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
     const RenderRect& sourceRect,
     const RenderRect& destRect) {
     const RenderRect target = TransformRect(artifact.target, sourceRect, destRect);
+    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
     const std::optional<RenderRect> anchor =
         artifact.anchorRect.has_value()
             ? std::optional<RenderRect>(TransformRect(*artifact.anchorRect, sourceRect, destRect))
@@ -354,11 +365,13 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         if (axis == LayoutGuideAxis::Vertical) {
             renderer.Renderer().DrawSolidLine(RenderPoint{center.x, target.top},
                 RenderPoint{center.x, target.bottom},
-                RenderStroke::Solid(RenderColorId::LayoutGuide, 1.0f));
+                RenderStroke::Solid(RenderColorId::LayoutGuide,
+                    static_cast<float>(ScaleAtLeast(renderer, sheetStyle.overviewGuideStrokeWidth, 1))));
         } else {
             renderer.Renderer().DrawSolidLine(RenderPoint{target.left, center.y},
                 RenderPoint{target.right, center.y},
-                RenderStroke::Solid(RenderColorId::LayoutGuide, 1.0f));
+                RenderStroke::Solid(RenderColorId::LayoutGuide,
+                    static_cast<float>(ScaleAtLeast(renderer, sheetStyle.overviewGuideStrokeWidth, 1))));
         }
     };
     if (artifact.layoutGuide.has_value()) {
@@ -370,7 +383,7 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         return;
     }
     if (artifact.gapAnchorKey.has_value()) {
-        const int handleSize = std::max(4, renderer.ScaleLogical(6));
+        const int handleSize = ScaleAtLeast(renderer, sheetStyle.overviewGapHandleSize, 1);
         const RenderRect handle{center.x - handleSize / 2,
             center.y - handleSize / 2,
             center.x - handleSize / 2 + handleSize,
@@ -382,12 +395,15 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         if (artifact.drawAnchorTargetOutline) {
             DrawDottedOverviewRect(renderer, target);
         }
-        const int size = std::max(4, std::min(std::max(target.Width(), target.Height()), renderer.ScaleLogical(10)));
+        const int size = std::max(1,
+            std::min(std::max(target.Width(), target.Height()),
+                ScaleAtLeast(renderer, sheetStyle.overviewAnchorMaxSize, 1)));
         const RenderRect handle = anchor.value_or(RenderRect{
             center.x - size / 2, center.y - size / 2, center.x - size / 2 + size, center.y - size / 2 + size});
         const AnchorShape shape = artifact.anchorShape.value_or(AnchorShape::Circle);
         if (shape == AnchorShape::Wedge) {
-            const float outlineWidth = static_cast<float>(std::max(1, renderer.ScaleLogical(1)));
+            const float outlineWidth =
+                static_cast<float>(ScaleAtLeast(renderer, sheetStyle.overviewGuideStrokeWidth, 1));
             const RenderPoint topRight{handle.right, handle.top};
             const RenderPoint bottomLeft{handle.left, handle.bottom};
             const RenderPoint bottomRight{handle.right, handle.bottom};
@@ -405,7 +421,9 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         }
         return;
     }
-    renderer.Renderer().DrawSolidRect(target, RenderStroke::Solid(RenderColorId::LayoutGuide, 1.0f));
+    renderer.Renderer().DrawSolidRect(target,
+        RenderStroke::Solid(RenderColorId::LayoutGuide,
+            static_cast<float>(ScaleAtLeast(renderer, sheetStyle.overviewGuideStrokeWidth, 1))));
 }
 
 }  // namespace
@@ -525,14 +543,16 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         return lhs.order < rhs.order;
     });
 
-    const int sheetMargin = dashboardRenderer_.ScaleLogical(48);
-    const int calloutGap = dashboardRenderer_.ScaleLogical(48);
-    const int bubblePaddingX = dashboardRenderer_.ScaleLogical(8);
-    const int bubblePaddingY = dashboardRenderer_.ScaleLogical(6);
-    const int lineGap = dashboardRenderer_.ScaleLogical(3);
-    const int bubbleRadius = dashboardRenderer_.ScaleLogical(4);
-    const int maxBubbleWidth = dashboardRenderer_.ScaleLogical(860);
-    const int minBubbleWidth = dashboardRenderer_.ScaleLogical(180);
+    const LayoutGuideSheetConfig& sheetStyle = dashboardRenderer_.Config().layout.layoutGuideSheet;
+    const int sheetMargin = ScaleNonNegative(dashboardRenderer_, sheetStyle.sheetMargin);
+    const int calloutGap = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutGap);
+    const int bubblePaddingX = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutPaddingX);
+    const int bubblePaddingY = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutPaddingY);
+    const int lineGap = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutLineGap);
+    const int bubbleRadius = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutRadius);
+    const int maxBubbleWidth = ScaleAtLeast(dashboardRenderer_, sheetStyle.calloutMaxWidth, 1);
+    const int minBubbleWidth =
+        std::min(maxBubbleWidth, ScaleAtLeast(dashboardRenderer_, sheetStyle.calloutMinWidth, 1));
     const int textLineHeight = std::max(1, dashboardRenderer_.Renderer().TextMetrics().smallText);
     for (Callout& callout : callouts) {
         const int parameterWidth =
@@ -670,7 +690,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         }
     }
 
-    const int cardGap = dashboardRenderer_.ScaleLogical(72);
+    const int cardGap = ScaleNonNegative(dashboardRenderer_, sheetStyle.blockGap);
 
     struct PlannedCallout {
         size_t calloutIndex = 0;
@@ -698,7 +718,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         plannedCallouts.push_back(PlannedCallout{i, calloutCardOrder, callout.targetRect});
     }
 
-    const int rowGap = std::max(dashboardRenderer_.ScaleLogical(12), 1);
+    const int rowGap = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutRowGap);
 
     struct CardCalloutColumns {
         std::vector<size_t> left;
@@ -934,8 +954,9 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         for (const CardPlacement& placement : cardPlacements) {
             if (placement.overview) {
                 dashboardRenderer_.Renderer().FillSolidRect(placement.destRect, RenderColorId::Background);
-                dashboardRenderer_.Renderer().DrawSolidRect(
-                    placement.destRect, RenderStroke::Solid(RenderColorId::PanelBorder, 1.0f));
+                dashboardRenderer_.Renderer().DrawSolidRect(placement.destRect,
+                    RenderStroke::Solid(RenderColorId::PanelBorder,
+                        static_cast<float>(ScaleAtLeast(dashboardRenderer_, sheetStyle.overviewBorderWidth, 1))));
                 for (const PackedOverviewCard& card : overview.cards) {
                     const RenderRect cardRect = TransformRect(card.rect, placement.sourceRect, placement.destRect);
                     dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(card.id, cardRect, &metrics);
@@ -991,13 +1012,16 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         for (const Callout& callout : callouts) {
             dashboardRenderer_.Renderer().DrawSolidLine(callout.targetAttachment,
                 callout.bubbleAttachment,
-                RenderStroke::Solid(RenderColorId::LayoutGuideCalloutLeader, 1.0f));
+                RenderStroke::Solid(RenderColorId::LayoutGuideCalloutLeader,
+                    static_cast<float>(ScaleAtLeast(dashboardRenderer_, sheetStyle.leaderStrokeWidth, 1))));
         }
         for (const Callout& callout : callouts) {
             dashboardRenderer_.Renderer().FillSolidRoundedRect(
                 callout.bubbleRect, bubbleRadius, RenderColorId::LayoutGuideCalloutFill);
-            dashboardRenderer_.Renderer().DrawSolidRoundedRect(
-                callout.bubbleRect, bubbleRadius, RenderStroke::Solid(RenderColorId::LayoutGuideCalloutBorder, 1.0f));
+            dashboardRenderer_.Renderer().DrawSolidRoundedRect(callout.bubbleRect,
+                bubbleRadius,
+                RenderStroke::Solid(RenderColorId::LayoutGuideCalloutBorder,
+                    static_cast<float>(ScaleAtLeast(dashboardRenderer_, sheetStyle.calloutBorderWidth, 1))));
             const RenderRect textRect{callout.bubbleRect.left + bubblePaddingX,
                 callout.bubbleRect.top + bubblePaddingY,
                 callout.bubbleRect.right - bubblePaddingX,

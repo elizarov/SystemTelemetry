@@ -97,21 +97,22 @@ User-visible labels and documentation refer to the generated image as a `layout 
 ## Callout Visual Style
 
 - Callout styling uses the active renderer palette so guide-sheet colors follow the loaded config.
-- The guide sheet introduces dedicated palette entries for callout-only chrome: `layout_guide_callout_leader_color`, `layout_guide_callout_fill_color`, `layout_guide_callout_border_color`, `layout_guide_callout_parameter_color`, and `layout_guide_callout_description_color`.
-- With the shipped palette, panel guide chrome uses its normal layout-edit hover colors, leader lines use `layout_guide_callout_leader_color` (`#FFFF00D9`), bubble fill uses `layout_guide_callout_fill_color` (`#06080BF5`), bubble border uses `layout_guide_callout_border_color` (`#1E2837FF`), parameter text uses `layout_guide_callout_parameter_color` (`#FFFFFFFF`), and description text uses `layout_guide_callout_description_color` (`#A5B4BEFF`).
+- The guide sheet uses dedicated `[layout_guide_sheet]` entries for callout-only chrome: `callout_leader_color`, `callout_fill_color`, `callout_border_color`, `callout_parameter_color`, and `callout_description_color`.
+- With the shipped palette, panel guide chrome uses its normal layout-edit hover colors, leader lines use `callout_leader_color` (`#FFE45CE6`), bubble fill uses `callout_fill_color` (`#06080BF5`), bubble border uses `callout_border_color` (`#B88A22FF`), parameter text uses `callout_parameter_color` (`#FFFFFFFF`), and description text uses `callout_description_color` (`#A5B4BEFF`).
 - Only callout-specific chrome, meaning leader lines and help bubbles, receives distinct guide-sheet styling.
-- Guide-sheet callout colors come directly from those palette entries rather than from adjusted variants of other colors.
-- Leader lines are one physical pixel wide after scale conversion, solid, square-capped, and drawn above card content but below bubble borders and text.
-- Leader lines use `layout_guide_callout_leader_color` exactly as configured.
+- Guide-sheet callout colors come directly from those `[layout_guide_sheet]` entries rather than from adjusted variants of other colors, and they are not exposed in the layout-edit dialog.
+- Leader lines use the configured `leader_stroke_width`, are solid and square-capped, and are drawn above card content but below bubble borders and text.
+- Leader lines use `callout_leader_color` exactly as configured.
 - The leader starts at the representative target rectangle or anchor shape and ends at the closest compatible point on the bubble border.
 - The leader does not use arrowheads, dots, elbows, curves, glow, or shadow.
-- Bubbles use a rounded rectangle with 4 logical pixels of corner radius, 8 logical pixels of horizontal padding, 6 logical pixels of vertical padding, and a 1 logical pixel solid border.
-- Bubble fill uses `layout_guide_callout_fill_color` exactly as configured.
-- Bubble borders use `layout_guide_callout_border_color`.
+- Bubbles use a rounded rectangle with configured corner radius, horizontal padding, vertical padding, and border width.
+- Bubble fill uses `callout_fill_color` exactly as configured.
+- Bubble borders use `callout_border_color`.
 - Bubble text uses the configured `small` font role. The first line uses the role's configured weight or semibold if the role is regular; the second line uses the role's configured weight.
-- The first line uses `layout_guide_callout_parameter_color`; the second line uses `layout_guide_callout_description_color` and is always reserved when the tooltip has description text.
-- A 3 logical pixel gap separates the parameter line from the description line.
+- The first line uses `callout_parameter_color`; the second line uses `callout_description_color` and is always reserved when the tooltip has description text.
+- The configured `callout_line_gap` separates the parameter line from the description line.
 - Bubbles do not use drop shadows or blurred backplates because the artifact must stay crisp under screenshot comparison.
+- Guide-sheet-only margins, block spacing, callout spacing, bubble sizing, bubble padding, border widths, leader stroke width, and packed-overview helper stroke and handle sizes come from `[layout_guide_sheet]`.
 
 ## Bubble Layout Algorithm
 

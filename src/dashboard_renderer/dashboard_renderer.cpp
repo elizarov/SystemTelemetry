@@ -914,6 +914,7 @@ void DashboardRenderer::DiscardWindowRenderTarget(std::string_view reason) {
 RendererStyle DashboardRenderer::BuildRendererStyle() const {
     RendererStyle style;
     style.colors = config_.layout.colors;
+    style.layoutGuideSheet = config_.layout.layoutGuideSheet;
     style.fonts = config_.layout.fonts;
     style.scale = renderScale_;
     for (const auto& card : config_.layout.cards) {

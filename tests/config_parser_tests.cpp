@@ -88,6 +88,27 @@ TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
     std::filesystem::remove(path);
 }
 
+TEST(ConfigParser, ParsesLayoutGuideSheetSection) {
+    const std::filesystem::path path = WriteTestConfig("[layout_guide_sheet]\n"
+                                                       "callout_leader_color = #FFE45CE6\n"
+                                                       "callout_border_color = #B88A22FF\n"
+                                                       "sheet_margin = 41\n"
+                                                       "callout_gap = 42\n"
+                                                       "callout_max_width = 777\n"
+                                                       "leader_stroke_width = 3\n");
+
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutLeaderColor.ToRgba(), 0xFFE45CE6u);
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutBorderColor.ToRgba(), 0xB88A22FFu);
+    EXPECT_EQ(config.layout.layoutGuideSheet.sheetMargin, 41);
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutGap, 42);
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutMaxWidth, 777);
+    EXPECT_EQ(config.layout.layoutGuideSheet.leaderStrokeWidth, 3);
+
+    std::filesystem::remove(path);
+}
+
 TEST(ConfigParser, ParsesMetricsSectionEntries) {
     const std::filesystem::path path = WriteTestConfig("[metrics]\n"
                                                        "cpu.load = *,%,Processor Load\n"

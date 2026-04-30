@@ -200,7 +200,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
 
 }  // namespace
 
-D2DRenderer::D2DRenderer() : palette_(style_.colors) {}
+D2DRenderer::D2DRenderer() : palette_(style_.colors, style_.layoutGuideSheet) {}
 
 D2DRenderer::~D2DRenderer() {
     Shutdown();
@@ -212,7 +212,8 @@ bool D2DRenderer::SetStyle(const RendererStyle& style) {
     nextStyle.scale = std::clamp(nextStyle.scale, 0.1, 16.0);
 
     const bool initialized = d2dFactory_ != nullptr && dwriteFactory_ != nullptr;
-    const bool colorsChanged = style_.colors != nextStyle.colors;
+    const bool colorsChanged =
+        style_.colors != nextStyle.colors || style_.layoutGuideSheet != nextStyle.layoutGuideSheet;
     const bool iconSourcesChanged = !initialized || style_.iconNames != nextStyle.iconNames ||
                                     style_.colors.iconColor != nextStyle.colors.iconColor;
     const bool textFormatsChanged =
@@ -223,7 +224,7 @@ bool D2DRenderer::SetStyle(const RendererStyle& style) {
         return false;
     }
     if (colorsChanged || !initialized) {
-        palette_.Rebuild(style_.colors);
+        palette_.Rebuild(style_.colors, style_.layoutGuideSheet);
     }
     if (iconSourcesChanged && !LoadIcons()) {
         return false;

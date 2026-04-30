@@ -31,32 +31,32 @@ D2D1_COLOR_F RenderColor::ToD2DColorF() const {
 
 RendererPalette::RendererPalette() = default;
 
-RendererPalette::RendererPalette(const ColorsConfig& config) {
-    Rebuild(config);
+RendererPalette::RendererPalette(const ColorsConfig& colors, const LayoutGuideSheetConfig& layoutGuideSheet) {
+    Rebuild(colors, layoutGuideSheet);
 }
 
-void RendererPalette::Rebuild(const ColorsConfig& config) {
-    colors_[ColorSlot(RenderColorId::Background)] = ToRenderColor(config.backgroundColor);
-    colors_[ColorSlot(RenderColorId::Foreground)] = ToRenderColor(config.foregroundColor);
-    colors_[ColorSlot(RenderColorId::Icon)] = ToRenderColor(config.iconColor);
-    colors_[ColorSlot(RenderColorId::Accent)] = ToRenderColor(config.accentColor);
-    colors_[ColorSlot(RenderColorId::PeakGhost)] = ToRenderColor(config.peakGhostColor);
-    colors_[ColorSlot(RenderColorId::MutedText)] = ToRenderColor(config.mutedTextColor);
-    colors_[ColorSlot(RenderColorId::Track)] = ToRenderColor(config.trackColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuide)] = ToRenderColor(config.layoutGuideColor);
-    colors_[ColorSlot(RenderColorId::ActiveEdit)] = ToRenderColor(config.activeEditColor);
-    colors_[ColorSlot(RenderColorId::PanelBorder)] = ToRenderColor(config.panelBorderColor);
-    colors_[ColorSlot(RenderColorId::PanelFill)] = ToRenderColor(config.panelFillColor);
-    colors_[ColorSlot(RenderColorId::GraphBackground)] = ToRenderColor(config.graphBackgroundColor);
-    colors_[ColorSlot(RenderColorId::GraphMarker)] = ToRenderColor(config.graphMarkerColor);
-    colors_[ColorSlot(RenderColorId::GraphAxis)] = ToRenderColor(config.graphAxisColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutLeader)] = ToRenderColor(config.layoutGuideCalloutLeaderColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutFill)] = ToRenderColor(config.layoutGuideCalloutFillColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutBorder)] = ToRenderColor(config.layoutGuideCalloutBorderColor);
+void RendererPalette::Rebuild(const ColorsConfig& colors, const LayoutGuideSheetConfig& layoutGuideSheet) {
+    colors_[ColorSlot(RenderColorId::Background)] = ToRenderColor(colors.backgroundColor);
+    colors_[ColorSlot(RenderColorId::Foreground)] = ToRenderColor(colors.foregroundColor);
+    colors_[ColorSlot(RenderColorId::Icon)] = ToRenderColor(colors.iconColor);
+    colors_[ColorSlot(RenderColorId::Accent)] = ToRenderColor(colors.accentColor);
+    colors_[ColorSlot(RenderColorId::PeakGhost)] = ToRenderColor(colors.peakGhostColor);
+    colors_[ColorSlot(RenderColorId::MutedText)] = ToRenderColor(colors.mutedTextColor);
+    colors_[ColorSlot(RenderColorId::Track)] = ToRenderColor(colors.trackColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuide)] = ToRenderColor(colors.layoutGuideColor);
+    colors_[ColorSlot(RenderColorId::ActiveEdit)] = ToRenderColor(colors.activeEditColor);
+    colors_[ColorSlot(RenderColorId::PanelBorder)] = ToRenderColor(colors.panelBorderColor);
+    colors_[ColorSlot(RenderColorId::PanelFill)] = ToRenderColor(colors.panelFillColor);
+    colors_[ColorSlot(RenderColorId::GraphBackground)] = ToRenderColor(colors.graphBackgroundColor);
+    colors_[ColorSlot(RenderColorId::GraphMarker)] = ToRenderColor(colors.graphMarkerColor);
+    colors_[ColorSlot(RenderColorId::GraphAxis)] = ToRenderColor(colors.graphAxisColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutLeader)] = ToRenderColor(layoutGuideSheet.calloutLeaderColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutFill)] = ToRenderColor(layoutGuideSheet.calloutFillColor);
+    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutBorder)] = ToRenderColor(layoutGuideSheet.calloutBorderColor);
     colors_[ColorSlot(RenderColorId::LayoutGuideCalloutParameter)] =
-        ToRenderColor(config.layoutGuideCalloutParameterColor);
+        ToRenderColor(layoutGuideSheet.calloutParameterColor);
     colors_[ColorSlot(RenderColorId::LayoutGuideCalloutDescription)] =
-        ToRenderColor(config.layoutGuideCalloutDescriptionColor);
+        ToRenderColor(layoutGuideSheet.calloutDescriptionColor);
 }
 
 const RenderColor& RendererPalette::Get(RenderColorId id) const {

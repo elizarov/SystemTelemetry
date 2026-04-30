@@ -167,14 +167,42 @@ struct ColorsConfig {
     CONFIG_EDITABLE_VALUE(ColorConfig, graphBackgroundColor, "graph_background_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, graphAxisColor, "graph_axis_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, graphMarkerColor, "graph_marker_color");
-    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutLeaderColor, "layout_guide_callout_leader_color");
-    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutFillColor, "layout_guide_callout_fill_color");
-    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutBorderColor, "layout_guide_callout_border_color");
-    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutParameterColor, "layout_guide_callout_parameter_color");
-    CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideCalloutDescriptionColor, "layout_guide_callout_description_color");
     CONFIG_SECTION("colors");
 
     bool operator==(const ColorsConfig& other) const = default;
+};
+
+struct LayoutGuideSheetConfig {
+    CONFIG_REFLECTED_STRUCT(LayoutGuideSheetConfig)
+    CONFIG_VALUE(ColorConfig, calloutLeaderColor, "callout_leader_color");
+    CONFIG_VALUE(ColorConfig, calloutFillColor, "callout_fill_color");
+    CONFIG_VALUE(ColorConfig, calloutBorderColor, "callout_border_color");
+    CONFIG_VALUE(ColorConfig, calloutParameterColor, "callout_parameter_color");
+    CONFIG_VALUE(ColorConfig, calloutDescriptionColor, "callout_description_color");
+    CONFIG_VALUE(int, sheetMargin, "sheet_margin");
+    CONFIG_VALUE(int, blockGap, "block_gap");
+    CONFIG_VALUE(int, calloutGap, "callout_gap");
+    CONFIG_VALUE(int, calloutRowGap, "callout_row_gap");
+    CONFIG_VALUE(int, calloutMinWidth, "callout_min_width");
+    CONFIG_VALUE(int, calloutMaxWidth, "callout_max_width");
+    CONFIG_VALUE(int, calloutPaddingX, "callout_padding_x");
+    CONFIG_VALUE(int, calloutPaddingY, "callout_padding_y");
+    CONFIG_VALUE(int, calloutLineGap, "callout_line_gap");
+    CONFIG_VALUE(int, calloutRadius, "callout_radius");
+    CONFIG_VALUE(int, calloutBorderWidth, "callout_border_width");
+    CONFIG_VALUE(int, leaderStrokeWidth, "leader_stroke_width");
+    CONFIG_VALUE(int, overviewBorderWidth, "overview_border_width");
+    CONFIG_VALUE(int, overviewGuideStrokeWidth, "overview_guide_stroke_width");
+    CONFIG_VALUE(int, overviewGuideHitInset, "overview_guide_hit_inset");
+    CONFIG_VALUE(int, overviewGapHandleSize, "overview_gap_handle_size");
+    CONFIG_VALUE(int, overviewAnchorMaxSize, "overview_anchor_max_size");
+    CONFIG_VALUE(int, overviewDottedPadding, "overview_dotted_padding");
+    CONFIG_VALUE(int, overviewDottedStrokeWidth, "overview_dotted_stroke_width");
+    CONFIG_VALUE(int, overviewDottedDashLength, "overview_dotted_dash_length");
+    CONFIG_VALUE(int, overviewDottedGapLength, "overview_dotted_gap_length");
+    CONFIG_SECTION("layout_guide_sheet");
+
+    bool operator==(const LayoutGuideSheetConfig& other) const = default;
 };
 
 struct LayoutNodeConfig {
@@ -316,6 +344,7 @@ struct LayoutEditorConfig {
 struct LayoutConfig {
     CONFIG_REFLECTED_BINDINGS(LayoutConfig)
     CONFIG_SECTION_VALUE(ColorsConfig, colors);
+    CONFIG_SECTION_VALUE(LayoutGuideSheetConfig, layoutGuideSheet);
     CONFIG_SECTION_VALUE(DashboardSectionConfig, dashboard);
     CONFIG_SECTION_VALUE(CardStyleConfig, cardStyle);
     CONFIG_SECTION_VALUE(MetricListWidgetConfig, metricList);
