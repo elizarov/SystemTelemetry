@@ -450,6 +450,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         std::optional<AnchorShape> hoverAnchorShape;
         std::optional<LayoutEditParameter> hoverColorParameter;
         RenderRect targetRect{};
+        std::optional<RenderRect> hoverArtifactTargetRect;
         std::optional<RenderRect> hoverAnchorRect;
         bool hoverAnchorDrawTargetOutline = true;
         RenderRect bubbleRect{};
@@ -474,6 +475,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
             request.hoverAnchorShape,
             request.hoverColorParameter,
             request.targetRect,
+            std::nullopt,
             std::nullopt,
             true,
             {},
@@ -625,8 +627,9 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                             return MatchesEditableAnchorKey(region.key, *callout.hoverAnchorKey);
                         });
                     if (anchorIt != packedCard->chromeArtifacts.anchorRegions.end()) {
-                        callout.targetRect =
+                        callout.hoverArtifactTargetRect =
                             anchorIt->targetRect.IsEmpty() ? anchorIt->anchorRect : anchorIt->targetRect;
+                        callout.targetRect = anchorIt->anchorRect;
                         callout.hoverAnchorRect = anchorIt->anchorRect;
                         callout.hoverAnchorDrawTargetOutline =
                             anchorIt->drawTargetOutline && !anchorIt->targetRect.IsEmpty();
@@ -953,7 +956,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                         continue;
                     }
                     DrawOverviewArtifact(dashboardRenderer_,
-                        OverviewArtifact{callout.targetRect,
+                        OverviewArtifact{callout.hoverArtifactTargetRect.value_or(callout.targetRect),
                             callout.hoverAnchorRect,
                             callout.hoverAnchorDrawTargetOutline,
                             callout.hoverWidgetGuide,
