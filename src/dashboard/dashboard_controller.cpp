@@ -301,6 +301,30 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
     }
 }
 
+void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
+    if (state_.telemetry == nullptr) {
+        return;
+    }
+    const auto path = shell.PromptDiagnosticsSavePath(
+        kDefaultLayoutGuideSheetFileName, L"PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0", L"png");
+    if (!path.has_value()) {
+        return;
+    }
+    std::string errorText;
+    if (!SaveLayoutGuideSheet(*path,
+            state_.telemetry->Dump().snapshot,
+            BuildCurrentConfigForSaving(shell),
+            shell.CurrentRenderScale(),
+            shell.TraceLog(),
+            &errorText)) {
+        std::string message = "Failed to save layout guide sheet:\n" + Utf8FromWide(path->wstring());
+        if (!errorText.empty()) {
+            message += "\n\n" + errorText;
+        }
+        shell.ShowError(WideFromUtf8(message));
+    }
+}
+
 void DashboardController::SaveFullConfigAs(DashboardShellHost& shell) {
     const auto path = shell.PromptDiagnosticsSavePath(
         kDefaultSavedFullConfigFileName, L"INI config (*.ini)\0*.ini\0All files (*.*)\0*.*\0", L"ini");

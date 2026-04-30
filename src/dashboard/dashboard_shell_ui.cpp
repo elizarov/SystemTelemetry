@@ -886,6 +886,9 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
         case kCommandSaveScreenshotAs:
             app_.controller_.SaveScreenshotAs(app_, app_.diagnosticsOptions_);
             break;
+        case kCommandSaveLayoutGuideSheetAs:
+            app_.controller_.SaveLayoutGuideSheetAs(app_);
+            break;
         case kCommandSaveFullConfigAs:
             app_.controller_.SaveFullConfigAs(app_);
             break;
@@ -1105,6 +1108,7 @@ void DashboardShellUi::ShowContextMenu(
     AppendMenuW(diagnosticsMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveDumpAs, L"Save Dump To...");
     AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
+    AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveLayoutGuideSheetAs, L"Save Layout Guide Sheet To...");
     if (layoutEditTarget.has_value()) {
         std::wstring label;
         if (const auto* guide = std::get_if<LayoutEditGuide>(&layoutEditTarget->payload)) {

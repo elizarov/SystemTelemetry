@@ -49,7 +49,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - Dump, screenshot, minimal-config, and full-config exports overwrite only their requested target file.
 - `/fake` without a path uses the built-in synthetic baseline and reads no external file.
 - `/fake:<path>` reads only the selected dump file.
-- The UI diagnostics save dialogs use the same dump, screenshot, and full-config formats as the CLI outputs.
+- The UI diagnostics save dialogs use the same dump, screenshot, layout-guide-sheet, and full-config formats as the CLI outputs.
 
 ## Runtime Mode Behavior
 
