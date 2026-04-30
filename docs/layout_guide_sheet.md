@@ -65,6 +65,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - The sheet may force normally hover-only guide families visible at the same time when that is necessary to explain all editable targets.
 - Every callout target renders the same hover-equivalent affordance that live layout editing shows for that target family, including widget-local gauge and metric-list guides, card-internal layout guides, gap handles, text anchors, and color targets.
 - Overview card title and icon callouts render the corresponding packed card chrome as hovered, including the exact dotted text or icon target outline and the matching anchor shape produced by card-chrome edit-artifact registration.
+- Overview anchors that have no live hover target outline attach their leader to the visible anchor shape and do not draw an extra target outline.
 - Representative guides and anchors are not promoted to active or selected styling just because a callout points at them; the panel content renders as it would in the corresponding layout-edit hover state.
 - When two guides overlap, the sheet follows the live hit-priority and visual-priority rules unless the callout placement needs a small leader-line offset to remain readable.
 

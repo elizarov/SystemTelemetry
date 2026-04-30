@@ -86,6 +86,7 @@ struct PackedNode {
 struct OverviewArtifact {
     RenderRect target{};
     std::optional<RenderRect> anchorRect;
+    bool drawAnchorTargetOutline = true;
     std::optional<LayoutEditWidgetGuide> widgetGuide;
     std::optional<LayoutEditGuide> layoutGuide;
     std::optional<LayoutEditGapAnchorKey> gapAnchorKey;
@@ -378,7 +379,9 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         return;
     }
     if (artifact.anchorKey.has_value()) {
-        DrawDottedOverviewRect(renderer, target);
+        if (artifact.drawAnchorTargetOutline) {
+            DrawDottedOverviewRect(renderer, target);
+        }
         const int size = std::max(4, std::min(std::max(target.Width(), target.Height()), renderer.ScaleLogical(10)));
         const RenderRect handle = anchor.value_or(RenderRect{
             center.x - size / 2, center.y - size / 2, center.x - size / 2 + size, center.y - size / 2 + size});
@@ -447,6 +450,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         std::optional<AnchorShape> hoverAnchorShape;
         RenderRect targetRect{};
         std::optional<RenderRect> hoverAnchorRect;
+        bool hoverAnchorDrawTargetOutline = true;
         RenderRect bubbleRect{};
         RenderPoint targetAttachment{};
         RenderPoint bubbleAttachment{};
@@ -469,6 +473,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
             request.hoverAnchorShape,
             request.targetRect,
             std::nullopt,
+            true,
             {},
             {},
             {},
@@ -601,8 +606,11 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                             return MatchesEditableAnchorKey(region.key, *callout.hoverAnchorKey);
                         });
                     if (anchorIt != packedCard->chromeArtifacts.anchorRegions.end()) {
-                        callout.targetRect = anchorIt->targetRect;
+                        callout.targetRect =
+                            anchorIt->targetRect.IsEmpty() ? anchorIt->anchorRect : anchorIt->targetRect;
                         callout.hoverAnchorRect = anchorIt->anchorRect;
+                        callout.hoverAnchorDrawTargetOutline =
+                            anchorIt->drawTargetOutline && !anchorIt->targetRect.IsEmpty();
                         callout.hoverAnchorShape = anchorIt->shape;
                     } else {
                         callout.targetRect = TransformRect(callout.targetRect, sourceCard->rect, packedCard->rect);
@@ -914,6 +922,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                     DrawOverviewArtifact(dashboardRenderer_,
                         OverviewArtifact{callout.targetRect,
                             callout.hoverAnchorRect,
+                            callout.hoverAnchorDrawTargetOutline,
                             callout.hoverWidgetGuide,
                             callout.hoverLayoutGuide,
                             callout.hoverGapAnchorKey,
