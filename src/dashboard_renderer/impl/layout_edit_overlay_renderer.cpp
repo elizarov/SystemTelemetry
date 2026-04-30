@@ -71,11 +71,11 @@ bool SuppressAnchorTargetSelectionOutline(LayoutEditParameter parameter) {
 }
 
 RenderColorId ActiveEditColor(const DashboardOverlayState& overlayState) {
-    return overlayState.forceHoverEquivalentColors ? RenderColorId::LayoutGuide : RenderColorId::ActiveEdit;
+    return overlayState.forceHoverEquivalentAffordances ? RenderColorId::LayoutGuide : RenderColorId::ActiveEdit;
 }
 
 bool UseActiveEditEmphasis(const DashboardOverlayState& overlayState, bool active) {
-    return active && !overlayState.forceHoverEquivalentColors;
+    return active && !overlayState.forceHoverEquivalentAffordances;
 }
 
 }  // namespace
@@ -416,7 +416,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedColorEditHighlights(
     collect(layoutResolver_.staticColorEditRegions_);
     collect(layoutResolver_.dynamicColorEditRegions_);
     for (const auto& rect : highlightedRects) {
-        DrawDottedHighlightRect(rect, ActiveEditColor(overlayState), !overlayState.forceHoverEquivalentColors);
+        DrawDottedHighlightRect(rect, ActiveEditColor(overlayState), !overlayState.forceHoverEquivalentAffordances);
     }
 }
 
@@ -430,7 +430,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     }
 
     const RenderColorId color = ActiveEditColor(overlayState);
-    const bool activeEmphasis = !overlayState.forceHoverEquivalentColors;
+    const bool activeEmphasis = !overlayState.forceHoverEquivalentAffordances;
     std::vector<RenderRect> selectedRects;
     bool drawDashboardBoundsOutline = false;
     const auto appendRect = [&](const RenderRect& rect) {
@@ -514,7 +514,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         DrawDottedHighlightRect(
             RenderRect{0, 0, layoutResolver_.resolvedLayout_.windowWidth, layoutResolver_.resolvedLayout_.windowHeight},
             color,
-            true,
+            activeEmphasis,
             false);
     }
 
@@ -522,7 +522,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
                 if (widget.widget != nullptr && widget.widget->Class() == *widgetClass) {
-                    DrawDottedHighlightRect(widget.rect, color, true);
+                    DrawDottedHighlightRect(widget.rect, color, activeEmphasis);
                 }
             }
         }
@@ -549,7 +549,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
                 const LayoutEditWidgetIdentity cardIdentity{
                     card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
                 if (MatchesCardChromeSelectionIdentity(*widgetIdentity, cardIdentity)) {
-                    DrawDottedHighlightRect(card.rect, color, true);
+                    DrawDottedHighlightRect(card.rect, color, activeEmphasis);
                 }
             }
             for (const auto& guide : layoutResolver_.layoutEditGuides_) {
@@ -577,7 +577,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
                 }
             }
             for (const auto& rect : embeddedInstanceRects) {
-                DrawDottedHighlightRect(rect, color, true);
+                DrawDottedHighlightRect(rect, color, activeEmphasis);
             }
             return;
         }
@@ -586,7 +586,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     if (const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight)) {
         if (*special == LayoutEditSelectionHighlightSpecial::AllCards) {
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
-                DrawDottedHighlightRect(card.rect, color, true);
+                DrawDottedHighlightRect(card.rect, color, activeEmphasis);
             }
             return;
         }
@@ -594,7 +594,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
                 for (const auto& widget : card.widgets) {
                     if (widget.widget != nullptr && widget.widget->Class() == WidgetClass::Text) {
-                        DrawDottedHighlightRect(widget.rect, color, true);
+                        DrawDottedHighlightRect(widget.rect, color, activeEmphasis);
                     }
                 }
             }
@@ -604,7 +604,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
                 RenderRect{
                     0, 0, layoutResolver_.resolvedLayout_.windowWidth, layoutResolver_.resolvedLayout_.windowHeight},
                 color,
-                true,
+                activeEmphasis,
                 false);
             return;
         }

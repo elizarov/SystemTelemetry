@@ -65,7 +65,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - Guide geometry comes from the same renderer-owned layout-edit artifact registration path used by live layout-edit mode and diagnostics active-region tracing.
 - Guide rendering remains visually consistent with live layout-edit hover rendering, including stroke weights, colors, dash patterns, anchor shapes, and ruler numbering.
 - The sheet may force normally hover-only guide families visible at the same time when that is necessary to explain all editable targets.
-- Forced guide-sheet affordances always use hover-equivalent colors and emphasis; dialog-active or selected `active_edit_color` styling is not used on the sheet.
+- Forced guide-sheet affordances always use hover-equivalent visual styling, including color, line width, dash pattern, and emphasis; dialog-active or selected `active_edit_color` styling is not used on the sheet.
 - Every callout target renders the same hover-equivalent affordance that live layout editing shows for that target family, including widget-local gauge and metric-list guides, card-internal layout guides, gap handles, text anchors, and color targets.
 - Overview card title and icon callouts render the corresponding packed card chrome as hovered, including the exact dotted text or icon target outline and the matching anchor shape produced by card-chrome edit-artifact registration.
 - Overview color callouts attach to the same packed card-chrome active text or icon region that live layout editing uses, and color-only callouts do not draw a guide-sheet-only target outline.

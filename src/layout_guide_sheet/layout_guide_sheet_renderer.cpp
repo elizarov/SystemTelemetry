@@ -571,7 +571,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
     overlayState.forceLayoutEditAffordances = true;
-    overlayState.forceHoverEquivalentColors = true;
+    overlayState.forceHoverEquivalentAffordances = true;
     overlayState.hoverOnExposedDashboard = true;
     if (!dashboardRenderer_.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
         if (errorText != nullptr) {
@@ -860,6 +860,18 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     }
 
     const auto drawStart = std::chrono::steady_clock::now();
+
+    struct RenderModeScope {
+        DashboardRenderer& renderer;
+        RenderMode previous;
+
+        ~RenderModeScope() {
+            renderer.renderMode_ = previous;
+        }
+    };
+
+    const RenderModeScope renderModeScope{dashboardRenderer_, dashboardRenderer_.renderMode_};
+    dashboardRenderer_.renderMode_ = RenderMode::LayoutGuideSheet;
     const bool saved = renderSurface(sheetWidth, sheetHeight, [&] {
         dashboardRenderer_.Renderer().FillSolidRect(
             RenderRect{0, 0, sheetWidth, sheetHeight}, RenderColorId::Background);

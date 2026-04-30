@@ -22,7 +22,7 @@ struct DashboardMoveOverlayState {
 struct DashboardOverlayState {
     bool showLayoutEditGuides = false;
     bool forceLayoutEditAffordances = false;
-    bool forceHoverEquivalentColors = false;
+    bool forceHoverEquivalentAffordances = false;
     bool suppressLayoutGuideContainerHighlights = false;
     bool hoverOnExposedDashboard = false;
     bool drawExposedDashboardChrome = true;

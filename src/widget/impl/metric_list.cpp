@@ -242,9 +242,12 @@ void MetricListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
         DrawMetricListRow(
             renderer, widget, layoutState_, metricRefs_, draggedIndex, rows[draggedIndex], yOffset, false);
         const RenderRect outlineRect = OffsetRect(layoutState_.rowRects[draggedIndex], yOffset);
-        renderer.Renderer().DrawSolidRect(outlineRect,
-            RenderStroke::Dotted(
-                RenderColorId::ActiveEdit, static_cast<float>((std::max)(2, renderer.Renderer().ScaleLogical(2)))));
+        const bool hoverEquivalent = renderer.CurrentRenderMode() == WidgetHost::RenderMode::LayoutGuideSheet;
+        const RenderColorId outlineColor = hoverEquivalent ? RenderColorId::LayoutGuide : RenderColorId::ActiveEdit;
+        const int outlineWidth = hoverEquivalent ? (std::max)(1, renderer.Renderer().ScaleLogical(1))
+                                                 : (std::max)(2, renderer.Renderer().ScaleLogical(2));
+        renderer.Renderer().DrawSolidRect(
+            outlineRect, RenderStroke::Dotted(outlineColor, static_cast<float>(outlineWidth)));
     }
     renderer.Renderer().PopClipRect();
 }
