@@ -145,6 +145,8 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
     bool hasCardTitle = false;
     bool hasCardRadius = false;
     bool hasCardIconSize = false;
+    size_t horizontalSizingGuides = 0;
+    size_t verticalSizingGuides = 0;
     for (const LayoutGuideSheetCalloutRequest& callout : callouts) {
         EXPECT_EQ(callout.sourceCardId, kLayoutGuideSheetOverviewSourceId);
         actualTexts.insert(callout.parameterLine + "\n" + callout.descriptionLine);
@@ -153,6 +155,13 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
         hasCardTitle |= callout.key == "card_title";
         hasCardRadius |= callout.parameterLine.find("[card_style] card_radius") != std::string::npos;
         hasCardIconSize |= callout.parameterLine.find("[card_style] header_icon_size") != std::string::npos;
+        if (callout.hoverLayoutGuide.has_value() && callout.hoverLayoutGuide->renderCardId.empty()) {
+            if (callout.hoverLayoutGuide->axis == LayoutGuideAxis::Horizontal) {
+                ++horizontalSizingGuides;
+            } else {
+                ++verticalSizingGuides;
+            }
+        }
     }
 
     EXPECT_GT(actualTexts.size(), 8u);
@@ -161,6 +170,8 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
     EXPECT_TRUE(hasCardTitle);
     EXPECT_TRUE(hasCardRadius);
     EXPECT_TRUE(hasCardIconSize);
+    EXPECT_EQ(horizontalSizingGuides, 1u);
+    EXPECT_EQ(verticalSizingGuides, 1u);
 }
 
 TEST(LayoutGuideSheetPlanner, CalloutGeometryUsesOnlyLeftAndRightSides) {

@@ -69,6 +69,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 
 - Each documented tooltip text for an active area inside the overview or a rendered representative card appears in at least one help bubble.
 - Dashboard-level layout guides, between-card gaps, dashboard outer padding, and card-chrome controls produce callouts in the overview.
+- Overview dashboard sizing guides produce at most one horizontal-guide callout and at most one vertical-guide callout, using the first representative of each orientation in screen order.
 - Representative cards do not repeat overview-owned card title, icon, card style, dashboard spacing, or dashboard padding callouts.
 - Metric-definition rows under `[metrics]`, such as `cpu.temp`, `cpu.clock`, and other metric ids, are equivalent for guide-sheet coverage. The first rendered metric-definition row receives the single representative bubble and leader, and that row renders the same hover-equivalent dotted outline, wedge anchor, and text-size anchor that live layout editing shows for the hovered metric row.
 - Each help bubble has exactly one thin straight leader line connected to one representative target area for that tooltip text.

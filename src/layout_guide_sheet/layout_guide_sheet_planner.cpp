@@ -191,6 +191,10 @@ std::string LayoutGuideSheetCalloutKey(
             return "card_title";
         }
     }
+    if (const auto* guide = std::get_if<LayoutEditGuide>(&payload); guide != nullptr && guide->renderCardId.empty()) {
+        return guide->axis == LayoutGuideAxis::Horizontal ? "overview_horizontal_sizing_guide"
+                                                          : "overview_vertical_sizing_guide";
+    }
     return parameterLine + "\n" + descriptionLine;
 }
 
