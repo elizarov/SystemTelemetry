@@ -732,6 +732,10 @@ void DashboardLayoutEditOverlayRenderer::DrawGapEditAnchors(const DashboardOverl
         if (selected) {
             return true;
         }
+        if (overlayState.hoveredGapEditAnchor.has_value() &&
+            MatchesGapEditAnchorKey(anchor.key, *overlayState.hoveredGapEditAnchor)) {
+            return true;
+        }
         if (overlayState.selectedTreeHighlight.has_value() && !overlayState.hoverOnExposedDashboard &&
             !overlayState.hoveredLayoutCard.has_value() && !overlayState.hoveredGapEditAnchor.has_value()) {
             return false;
@@ -740,7 +744,7 @@ void DashboardLayoutEditOverlayRenderer::DrawGapEditAnchors(const DashboardOverl
             return true;
         }
         if (anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome) {
-            return true;
+            return overlayState.drawExposedDashboardChrome;
         }
         return overlayState.hoveredLayoutCard.has_value() &&
                anchor.key.widget.renderCardId == overlayState.hoveredLayoutCard->renderCardId &&

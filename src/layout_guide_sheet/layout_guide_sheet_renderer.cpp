@@ -1043,14 +1043,18 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                 }
                 continue;
             }
+            DashboardOverlayState cardBaseOverlayState = overlayState;
+            cardBaseOverlayState.hoverOnExposedDashboard = false;
+            cardBaseOverlayState.drawExposedDashboardChrome = false;
             dashboardRenderer_.DrawLayoutGuideSheetOverlay(
-                overlayState, placement.sourceRect, placement.destRect, metrics);
+                cardBaseOverlayState, placement.sourceRect, placement.destRect, metrics);
             for (const Callout& callout : callouts) {
                 if (callout.sourceCardId != placement.id) {
                     continue;
                 }
                 DashboardOverlayState calloutOverlayState = overlayState;
                 calloutOverlayState.hoverOnExposedDashboard = false;
+                calloutOverlayState.drawExposedDashboardChrome = false;
                 calloutOverlayState.hoveredEditableAnchor = callout.hoverAnchorKey;
                 if (callout.hoverWidgetGuide.has_value()) {
                     calloutOverlayState.hoveredEditableWidget = callout.hoverWidgetGuide->widget;
