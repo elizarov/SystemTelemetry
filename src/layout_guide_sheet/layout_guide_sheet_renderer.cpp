@@ -778,7 +778,6 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
             plannedByCard[cardIndex].right.erase(plannedByCard[cardIndex].right.begin());
         }
     }
-
     const auto stackedHeight = [&](const std::vector<size_t>& plannedIndexes) {
         int height = 0;
         for (size_t i = 0; i < plannedIndexes.size(); ++i) {
@@ -801,6 +800,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
     struct BlockLayout {
         int width = 0;
         int height = 0;
+        int advanceHeight = 0;
         int itemWidth = 0;
         int itemHeight = 0;
         int itemX = 0;
@@ -823,14 +823,16 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         const int bottomWidth = widestBubbleWidthFor(plannedByCard[cardIndex].bottom);
         const int topHeight = stackedHeight(plannedByCard[cardIndex].top);
         const int bottomHeight = stackedHeight(plannedByCard[cardIndex].bottom);
-        const int topOffset = topHeight > 0 ? topHeight + calloutGap : 0;
-        const int bottomOffset = bottomHeight > 0 ? bottomHeight + calloutGap : 0;
+        const int topProtrusion = topHeight > 0 ? topHeight + calloutGap : 0;
+        const int bottomProtrusion = bottomHeight > 0 ? bottomHeight + calloutGap : 0;
         block.itemX = block.leftWidth > 0 ? block.leftWidth + calloutGap : 0;
-        const int itemBandHeight = std::max({block.itemHeight,
-            stackedHeight(plannedByCard[cardIndex].left),
-            stackedHeight(plannedByCard[cardIndex].right)});
-        block.itemY = topOffset + std::max(0, (itemBandHeight - block.itemHeight) / 2);
-        block.height = topOffset + itemBandHeight + bottomOffset;
+        const int sideStackHeight =
+            std::max(stackedHeight(plannedByCard[cardIndex].left), stackedHeight(plannedByCard[cardIndex].right));
+        const int sideAbove = std::max(0, (sideStackHeight - block.itemHeight) / 2);
+        const int sideBelow = std::max(0, sideStackHeight - block.itemHeight - sideAbove);
+        block.itemY = std::max(topProtrusion, sideAbove);
+        block.height = block.itemY + block.itemHeight + std::max(bottomProtrusion, sideBelow);
+        block.advanceHeight = block.height;
         const int mainWidth =
             block.itemX + block.itemWidth + (block.rightWidth > 0 ? calloutGap + block.rightWidth : 0);
         int topX = block.itemX + (block.itemWidth - topWidth) / 2;
@@ -953,15 +955,18 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
 
     const int sheetWidth = sheetMargin * 2 + contentWidth;
     int blockCursorY = sheetMargin;
+    int contentBottom = sheetMargin;
     for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
         const int dx = sheetMargin + (contentWidth - blocks[cardIndex].width) / 2;
         const int dy = blockCursorY;
         CardPlacement& placement = cardPlacements[cardIndex];
         placement.destRect = OffsetRenderRect(placement.destRect, dx, dy);
+        contentBottom = std::max(contentBottom, placement.destRect.bottom);
         const auto offsetCallouts = [&](const std::vector<size_t>& plannedIndexes) {
             for (size_t plannedIndex : plannedIndexes) {
                 Callout& callout = callouts[plannedCallouts[plannedIndex].calloutIndex];
                 callout.bubbleRect = OffsetRenderRect(callout.bubbleRect, dx, dy);
+                contentBottom = std::max(contentBottom, callout.bubbleRect.bottom);
                 callout.targetAttachment.x += dx;
                 callout.targetAttachment.y += dy;
                 callout.bubbleAttachment.x += dx;
@@ -972,9 +977,9 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         offsetCallouts(plannedByCard[cardIndex].left);
         offsetCallouts(plannedByCard[cardIndex].right);
         offsetCallouts(plannedByCard[cardIndex].bottom);
-        blockCursorY += blocks[cardIndex].height + cardGap;
+        blockCursorY += blocks[cardIndex].advanceHeight + cardGap;
     }
-    const int sheetHeight = cardPlacements.empty() ? sheetMargin * 2 : blockCursorY - cardGap + sheetMargin;
+    const int sheetHeight = cardPlacements.empty() ? sheetMargin * 2 : contentBottom + sheetMargin;
 
     const auto sameSideLeaderIntersects = [&](const Callout& callout, const Callout& other) {
         if (callout.exitSide != other.exitSide || callout.sourceCardId != other.sourceCardId) {
