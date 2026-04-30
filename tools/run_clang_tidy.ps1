@@ -19,7 +19,11 @@ $clangTidySkippedFiles = @(
     # clang-tidy is intentionally skipped for snapshot_dump.cpp because isolated timings show
     # that Clang diagnostics, clang-analyzer, and misc-include-cleaner all go pathological on
     # this translation unit, turning the optional tidy sweep into a multi-minute stall.
-    'src/diagnostics/snapshot_dump.cpp'
+    'src/diagnostics/snapshot_dump.cpp',
+    # The active Clang diagnostics also stall on these template-heavy test translation units.
+    'tests/layout_edit_tooltip_tests.cpp',
+    'tests/layout_edit_types_tests.cpp',
+    'tests/metrics_tests.cpp'
 )
 
 $clangTidyIgnoredUnusedIncludeWarnings = @(

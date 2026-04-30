@@ -4,7 +4,6 @@
 #include <limits>
 #include <optional>
 #include <set>
-#include <string_view>
 
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tooltip_text.h"

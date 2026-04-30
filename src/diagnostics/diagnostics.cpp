@@ -14,7 +14,6 @@
 #include "diagnostics/constants.h"
 #include "layout_edit/layout_edit_active_region_trace.h"
 #include "layout_edit/layout_edit_controller.h"
-#include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "layout_guide_sheet/layout_guide_sheet_planner.h"
 #include "layout_guide_sheet/layout_guide_sheet_renderer.h"

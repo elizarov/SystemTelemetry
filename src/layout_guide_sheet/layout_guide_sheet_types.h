@@ -4,8 +4,9 @@
 #include <optional>
 #include <string>
 
-#include "layout_model/layout_edit_active_region.h"
 #include "renderer/render_types.h"
+#include "widget/layout_edit_parameter_id.h"
+#include "widget/layout_edit_types.h"
 
 inline constexpr const char kLayoutGuideSheetOverviewSourceId[] = "__layout_overview";
 

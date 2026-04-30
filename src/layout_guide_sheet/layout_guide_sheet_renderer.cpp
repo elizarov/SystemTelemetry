@@ -29,14 +29,6 @@ RenderRect TransformRect(const RenderRect& rect, const RenderRect& source, const
     return RenderRect{topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
 }
 
-RenderRect OffsetRenderRect(RenderRect rect, int dx, int dy) {
-    rect.left += dx;
-    rect.right += dx;
-    rect.top += dy;
-    rect.bottom += dy;
-    return rect;
-}
-
 int ScaleNonNegative(DashboardRenderer& renderer, int value) {
     return std::max(0, renderer.ScaleLogical(value));
 }
