@@ -70,6 +70,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - Overview color callouts attach to the same packed card-chrome active text or icon region that live layout editing uses, and color-only callouts do not draw a guide-sheet-only target outline.
 - Overview anchor callouts attach their leader to the visible anchor shape. Anchors that have no live hover target outline do not draw an extra target outline.
 - Representative-card anchor callouts attach their leaders to the resolved drag-anchor rectangle rather than the broader widget or target region. Circular radial-distance anchors attach to the closest point on the resolved circle.
+- Representative-card gauge accent and track color callouts attach to the corresponding left or right midpoint of the visible ring stroke rather than the center of the broad color hit rectangle.
 - Representative guides and anchors are not promoted to active or selected styling just because a callout points at them; the panel content renders as it would in the corresponding layout-edit hover state.
 - Representative cards render hover-equivalent state only for active areas that have callouts on that representative card. Card-level or dashboard-level gap and sizing controls that are documented in the overview do not render in hover state on the representative cards.
 - Metric-list layout reorder callouts appear once per metric-list widget, attached to the first visible row, rather than repeating the same layout guidance for each row.

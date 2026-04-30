@@ -71,6 +71,32 @@ RenderPoint ClosestEllipseBoundaryPoint(const RenderRect& rect, RenderPoint refe
         center.y + static_cast<int>(std::lround(dy / normalizedLength))};
 }
 
+bool LooksLikeGaugeHalfRingRect(const RenderRect& rect) {
+    if (rect.Width() <= 0 || rect.Height() <= 0) {
+        return false;
+    }
+    const int expectedHeight = rect.Width() * 2;
+    return std::abs(rect.Height() - expectedHeight) <= std::max(2, rect.Height() / 8);
+}
+
+std::optional<RenderPoint> GaugeRingColorAttachmentPoint(
+    const RenderRect& rect, std::optional<LayoutEditParameter> parameter, int ringThickness) {
+    if (!parameter.has_value() || !LooksLikeGaugeHalfRingRect(rect)) {
+        return std::nullopt;
+    }
+    if (*parameter != LayoutEditParameter::ColorAccent && *parameter != LayoutEditParameter::ColorTrack) {
+        return std::nullopt;
+    }
+
+    const int outerRadius = std::min(rect.Width(), std::max(1, rect.Height() / 2));
+    const int ringCenterRadius = std::max(0, outerRadius - std::max(1, ringThickness) / 2);
+    const int centerY = rect.Center().y;
+    if (*parameter == LayoutEditParameter::ColorAccent) {
+        return RenderPoint{rect.right - ringCenterRadius, centerY};
+    }
+    return RenderPoint{rect.left + ringCenterRadius, centerY};
+}
+
 int ScaleNonNegative(DashboardRenderer& renderer, int value) {
     return std::max(0, renderer.ScaleLogical(value));
 }
@@ -608,6 +634,8 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
     const int lineGap = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutLineGap);
     const int bubbleRadius = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutRadius);
     const int textLineHeight = std::max(1, dashboardRenderer_.Renderer().TextMetrics().smallText);
+    const int gaugeRingThickness =
+        std::max(1, dashboardRenderer_.ScaleLogical(dashboardRenderer_.Config().layout.gauge.ringThickness));
     for (Callout& callout : callouts) {
         const int parameterWidth =
             std::max(1, dashboardRenderer_.Renderer().MeasureTextWidth(TextStyleId::Small, callout.parameterLine));
@@ -936,7 +964,10 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                                                     cardPlacements[planned.cardIndex].sourceRect,
                                                     cardPlacements[planned.cardIndex].destRect)
                                               : OffsetRenderRect(planned.target, dx, dy);
-            callout.targetAttachment = callout.targetAttachmentOnAnchorCircle
+            const std::optional<RenderPoint> gaugeColorAttachment =
+                GaugeRingColorAttachmentPoint(targetRect, callout.hoverColorParameter, gaugeRingThickness);
+            callout.targetAttachment = gaugeColorAttachment.has_value() ? *gaugeColorAttachment
+                                       : callout.targetAttachmentOnAnchorCircle
                                            ? ClosestEllipseBoundaryPoint(targetRect, callout.bubbleAttachment)
                                            : targetRect.Center();
             y = callout.bubbleRect.bottom + rowGap;
@@ -964,7 +995,10 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                                                     cardPlacements[planned.cardIndex].sourceRect,
                                                     cardPlacements[planned.cardIndex].destRect)
                                               : OffsetRenderRect(planned.target, dx, dy);
-            callout.targetAttachment = callout.targetAttachmentOnAnchorCircle
+            const std::optional<RenderPoint> gaugeColorAttachment =
+                GaugeRingColorAttachmentPoint(targetRect, callout.hoverColorParameter, gaugeRingThickness);
+            callout.targetAttachment = gaugeColorAttachment.has_value() ? *gaugeColorAttachment
+                                       : callout.targetAttachmentOnAnchorCircle
                                            ? ClosestEllipseBoundaryPoint(targetRect, callout.bubbleAttachment)
                                            : targetRect.Center();
         }
