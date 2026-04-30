@@ -43,6 +43,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - The overview measures each card at the same scale as the representative cards, using only the horizontal space needed for the card icon and title plus card padding; it does not reserve vertical content space, does not apply layout weights during this intrinsic-size pass, and does not scale down the resolved screen layout.
 - The overview is drawn inside a packed screen box that represents the dashboard bounds without using the dashboard's full window size. After the packed size is known, the overview performs one weighted relayout inside that packed box so extra row or column space from the compact topology follows the configured layout weights.
 - Overview dashboard guides, gap handles, and card-chrome hover targets are resolved from the packed overview geometry itself, so their visible positions match the compact cards rather than the full-size dashboard coordinates.
+- Overview dashboard spacing callouts render their full hover-equivalent sizing guide line, caps, and handle against the packed overview geometry.
 - Packed overview cards render their chrome through the same card-chrome widget layout, draw, guide, and anchor registration path as normal dashboard cards.
 - The overview and each representative card are arranged as separate vertical sheet blocks in layout order.
 - Each sheet block owns its own local callout placement. Most callouts sit in snug left and right stacks beside that block's annotated overview or card instead of sharing page-wide callout columns.

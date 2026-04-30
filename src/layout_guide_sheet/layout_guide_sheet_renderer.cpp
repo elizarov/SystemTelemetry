@@ -96,6 +96,7 @@ struct PackedNode {
 struct OverviewArtifact {
     RenderRect target{};
     std::optional<RenderRect> anchorRect;
+    std::optional<LayoutEditGapAnchor> gapAnchor;
     bool drawAnchorTargetOutline = true;
     std::optional<LayoutEditWidgetGuide> widgetGuide;
     std::optional<LayoutEditGuide> layoutGuide;
@@ -316,6 +317,22 @@ PackedOverview BuildPackedOverview(DashboardRenderer& renderer) {
     const int outerMargin = renderer.ScaleLogical(renderer.Config().layout.dashboard.outerMargin);
     PackedOverview overview;
     overview.rect = RenderRect{0, 0, root.width + outerMargin * 2, root.height + outerMargin * 2};
+    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    LayoutEditGapAnchor outerMarginAnchor;
+    outerMarginAnchor.axis = LayoutGuideAxis::Horizontal;
+    outerMarginAnchor.key.widget =
+        LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome};
+    outerMarginAnchor.key.parameter = LayoutEditParameter::DashboardOuterMargin;
+    outerMarginAnchor.drawStart = RenderPoint{0, outerMargin};
+    outerMarginAnchor.drawEnd = RenderPoint{outerMargin, outerMargin};
+    outerMarginAnchor.dragAxis = AnchorDragAxis::Horizontal;
+    outerMarginAnchor.handleRect = MakeOverviewSquareAnchorRect(
+        outerMargin, outerMargin, ScaleAtLeast(renderer, sheetStyle.overviewGapHandleSize, 1));
+    outerMarginAnchor.hitRect =
+        outerMarginAnchor.handleRect.Inflate(ScaleAtLeast(renderer, sheetStyle.overviewGuideHitInset, 1),
+            ScaleAtLeast(renderer, sheetStyle.overviewGuideHitInset, 1));
+    outerMarginAnchor.value = renderer.Config().layout.dashboard.outerMargin;
+    overview.gapAnchors.push_back(std::move(outerMarginAnchor));
     AppendPackedCards(renderer.Config().layout.structure.cardsLayout,
         renderer,
         RenderRect{outerMargin, outerMargin, outerMargin + root.width, outerMargin + root.height},
@@ -384,12 +401,30 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         drawGuideLine(artifact.widgetGuide->axis);
         return;
     }
-    if (artifact.gapAnchorKey.has_value()) {
-        const int handleSize = ScaleAtLeast(renderer, sheetStyle.overviewGapHandleSize, 1);
-        const RenderRect handle{center.x - handleSize / 2,
-            center.y - handleSize / 2,
-            center.x - handleSize / 2 + handleSize,
-            center.y - handleSize / 2 + handleSize};
+    if (artifact.gapAnchor.has_value()) {
+        const LayoutEditGapAnchor& gapAnchor = *artifact.gapAnchor;
+        const RenderPoint drawStart = TransformPoint(gapAnchor.drawStart, sourceRect, destRect);
+        const RenderPoint drawEnd = TransformPoint(gapAnchor.drawEnd, sourceRect, destRect);
+        const RenderRect handle = TransformRect(gapAnchor.handleRect, sourceRect, destRect);
+        const int capHalf = ScaleAtLeast(renderer, sheetStyle.overviewGapHandleSize, 1);
+        const float strokeWidth = static_cast<float>(ScaleAtLeast(renderer, sheetStyle.overviewGuideStrokeWidth, 1));
+        renderer.Renderer().DrawSolidLine(
+            drawStart, drawEnd, RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+        if (gapAnchor.axis == LayoutGuideAxis::Vertical) {
+            renderer.Renderer().DrawSolidLine(RenderPoint{drawStart.x - capHalf, drawStart.y},
+                RenderPoint{drawStart.x + capHalf, drawStart.y},
+                RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+            renderer.Renderer().DrawSolidLine(RenderPoint{drawEnd.x - capHalf, drawEnd.y},
+                RenderPoint{drawEnd.x + capHalf, drawEnd.y},
+                RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+        } else {
+            renderer.Renderer().DrawSolidLine(RenderPoint{drawStart.x, drawStart.y - capHalf},
+                RenderPoint{drawStart.x, drawStart.y + capHalf},
+                RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+            renderer.Renderer().DrawSolidLine(RenderPoint{drawEnd.x, drawEnd.y - capHalf},
+                RenderPoint{drawEnd.x, drawEnd.y + capHalf},
+                RenderStroke::Solid(RenderColorId::ActiveEdit, strokeWidth));
+        }
         renderer.Renderer().FillSolidRect(handle, RenderColorId::ActiveEdit);
         return;
     }
@@ -472,6 +507,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         RenderRect targetRect{};
         std::optional<RenderRect> hoverArtifactTargetRect;
         std::optional<RenderRect> hoverAnchorRect;
+        std::optional<LayoutEditGapAnchor> hoverGapAnchor;
         bool hoverAnchorDrawTargetOutline = true;
         RenderRect bubbleRect{};
         RenderPoint targetAttachment{};
@@ -495,6 +531,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
             request.hoverAnchorShape,
             request.hoverColorParameter,
             request.targetRect,
+            std::nullopt,
             std::nullopt,
             std::nullopt,
             true,
@@ -594,6 +631,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                 });
             if (anchorIt != overview.gapAnchors.end()) {
                 callout.targetRect = anchorIt->handleRect;
+                callout.hoverGapAnchor = *anchorIt;
             }
             continue;
         }
@@ -1032,6 +1070,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                     DrawOverviewArtifact(dashboardRenderer_,
                         OverviewArtifact{callout.hoverArtifactTargetRect.value_or(callout.targetRect),
                             callout.hoverAnchorRect,
+                            callout.hoverGapAnchor,
                             callout.hoverAnchorDrawTargetOutline,
                             callout.hoverWidgetGuide,
                             callout.hoverLayoutGuide,
