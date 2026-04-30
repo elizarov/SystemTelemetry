@@ -94,7 +94,6 @@ TEST(ConfigParser, ParsesLayoutGuideSheetSection) {
                                                        "callout_border_color = #B88A22FF\n"
                                                        "sheet_margin = 41\n"
                                                        "callout_gap = 42\n"
-                                                       "callout_max_width = 777\n"
                                                        "leader_stroke_width = 3\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
@@ -103,7 +102,6 @@ TEST(ConfigParser, ParsesLayoutGuideSheetSection) {
     EXPECT_EQ(config.layout.layoutGuideSheet.calloutBorderColor.ToRgba(), 0xB88A22FFu);
     EXPECT_EQ(config.layout.layoutGuideSheet.sheetMargin, 41);
     EXPECT_EQ(config.layout.layoutGuideSheet.calloutGap, 42);
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutMaxWidth, 777);
     EXPECT_EQ(config.layout.layoutGuideSheet.leaderStrokeWidth, 3);
 
     std::filesystem::remove(path);

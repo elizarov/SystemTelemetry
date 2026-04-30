@@ -550,9 +550,6 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
     const int bubblePaddingY = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutPaddingY);
     const int lineGap = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutLineGap);
     const int bubbleRadius = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutRadius);
-    const int maxBubbleWidth = ScaleAtLeast(dashboardRenderer_, sheetStyle.calloutMaxWidth, 1);
-    const int minBubbleWidth =
-        std::min(maxBubbleWidth, ScaleAtLeast(dashboardRenderer_, sheetStyle.calloutMinWidth, 1));
     const int textLineHeight = std::max(1, dashboardRenderer_.Renderer().TextMetrics().smallText);
     for (Callout& callout : callouts) {
         const int parameterWidth =
@@ -563,7 +560,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                 : std::max(
                       1, dashboardRenderer_.Renderer().MeasureTextWidth(TextStyleId::Small, callout.descriptionLine));
         const int contentWidth = std::max(parameterWidth, descriptionWidth);
-        const int bubbleWidth = std::clamp(contentWidth + bubblePaddingX * 2, minBubbleWidth, maxBubbleWidth);
+        const int bubbleWidth = contentWidth + bubblePaddingX * 2;
         const int bubbleHeight =
             bubblePaddingY * 2 + textLineHeight + (callout.descriptionLine.empty() ? 0 : lineGap + textLineHeight);
         callout.bubbleRect = RenderRect{0, 0, bubbleWidth, bubbleHeight};
@@ -781,7 +778,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         return height;
     };
 
-    const auto maxBubbleWidthFor = [&](const std::vector<size_t>& plannedIndexes) {
+    const auto widestBubbleWidthFor = [&](const std::vector<size_t>& plannedIndexes) {
         int width = 0;
         for (const size_t plannedIndex : plannedIndexes) {
             width = std::max(width, callouts[plannedCallouts[plannedIndex].calloutIndex].bubbleRect.Width());
@@ -808,8 +805,8 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
             cardPlacements[cardIndex].overview ? overviewHeight : cardPlacements[cardIndex].sourceRect.Height();
         block.itemWidth =
             cardPlacements[cardIndex].overview ? overviewWidth : cardPlacements[cardIndex].sourceRect.Width();
-        block.leftWidth = maxBubbleWidthFor(plannedByCard[cardIndex].left);
-        block.rightWidth = maxBubbleWidthFor(plannedByCard[cardIndex].right);
+        block.leftWidth = widestBubbleWidthFor(plannedByCard[cardIndex].left);
+        block.rightWidth = widestBubbleWidthFor(plannedByCard[cardIndex].right);
         block.itemX = block.leftWidth > 0 ? block.leftWidth + calloutGap : 0;
         block.itemY = std::max(0,
             (std::max({block.itemHeight,

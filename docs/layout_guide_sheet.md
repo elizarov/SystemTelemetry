@@ -112,7 +112,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - The first line uses `callout_parameter_color`; the second line uses `callout_description_color` and is always reserved when the tooltip has description text.
 - The configured `callout_line_gap` separates the parameter line from the description line.
 - Bubbles do not use drop shadows or blurred backplates because the artifact must stay crisp under screenshot comparison.
-- Guide-sheet-only margins, block spacing, callout spacing, bubble sizing, bubble padding, border widths, leader stroke width, and packed-overview helper stroke and handle sizes come from `[layout_guide_sheet]`.
+- Guide-sheet-only margins, block spacing, callout spacing, bubble padding, border widths, leader stroke width, and packed-overview helper stroke and handle sizes come from `[layout_guide_sheet]`.
 
 ## Bubble Layout Algorithm
 
@@ -120,7 +120,7 @@ The guide-sheet bubble layout is deterministic and runs after the selected cards
 
 1. Collect targets. Build candidate records for overview-owned dashboard/card-chrome active areas and for editable active areas that overlap a rendered representative card. Each record stores its rendered source id, active-area rectangle, guide kind, tooltip parameter line, tooltip description line, hover-equivalent overlay state, priority, and stable order from the active-region or edit-artifact source.
 2. Select representatives. Group records by distinct tooltip text, except metric-definition records group together as one equivalent class and card-title records group together as one overview class. Each group produces one bubble. The bubble's representative target area is the topmost record in sheet coordinates, with leftmost position and then stable source order breaking ties. Non-representative records keep their guides but do not receive bubbles or leaders.
-3. Measure bubbles. Format each bubble using the active tooltip text source, fixed padding, a minimum width, and a maximum width. Measure both tooltip lines as single-line text before placement so every candidate rectangle has stable dimensions.
+3. Measure bubbles. Format each bubble using the active tooltip text source and fixed padding. Measure both tooltip lines as single-line text and size the bubble to the widest measured line plus padding, without minimum or maximum width clamping.
 4. Split sides. For each card, sort representative targets by target-center x and split them near the median so the left half uses the left stack and the right half uses the right stack. A single target uses the side nearest its target-center x.
 5. Order stacks. Sort each side stack by representative target-center y. This makes the bubble order match the target order before the leaders are drawn.
 6. Place bubbles. Center each left and right stack on the annotated item center y inside that item's local sheet block. A tall stack may start above the item top and extend below the item bottom by roughly matching amounts.

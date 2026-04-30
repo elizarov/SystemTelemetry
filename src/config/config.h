@@ -183,8 +183,6 @@ struct LayoutGuideSheetConfig {
     CONFIG_VALUE(int, blockGap, "block_gap");
     CONFIG_VALUE(int, calloutGap, "callout_gap");
     CONFIG_VALUE(int, calloutRowGap, "callout_row_gap");
-    CONFIG_VALUE(int, calloutMinWidth, "callout_min_width");
-    CONFIG_VALUE(int, calloutMaxWidth, "callout_max_width");
     CONFIG_VALUE(int, calloutPaddingX, "callout_padding_x");
     CONFIG_VALUE(int, calloutPaddingY, "callout_padding_y");
     CONFIG_VALUE(int, calloutLineGap, "callout_line_gap");
