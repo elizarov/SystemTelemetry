@@ -809,15 +809,6 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         int rightWidth = 0;
     };
 
-    const auto calloutTargetXInItem = [&](const PlannedCallout& planned, const BlockLayout& block) {
-        const RenderRect& source = cardPlacements[planned.cardIndex].sourceRect;
-        if (source.Width() == 0) {
-            return block.itemX;
-        }
-        const double scaleX = static_cast<double>(block.itemWidth) / static_cast<double>(source.Width());
-        return block.itemX + static_cast<int>((planned.target.Center().x - source.left) * scaleX + 0.5);
-    };
-
     std::vector<BlockLayout> blocks(cardPlacements.size());
     int contentWidth = 0;
     for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
@@ -843,15 +834,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         const int mainWidth =
             block.itemX + block.itemWidth + (block.rightWidth > 0 ? calloutGap + block.rightWidth : 0);
         int topX = block.itemX + (block.itemWidth - topWidth) / 2;
-        for (const size_t plannedIndex : plannedByCard[cardIndex].top) {
-            const PlannedCallout& planned = plannedCallouts[plannedIndex];
-            topX = calloutTargetXInItem(planned, block) - callouts[planned.calloutIndex].bubbleRect.Width() / 2;
-        }
         int bottomX = block.itemX + (block.itemWidth - bottomWidth) / 2;
-        for (const size_t plannedIndex : plannedByCard[cardIndex].bottom) {
-            const PlannedCallout& planned = plannedCallouts[plannedIndex];
-            bottomX = calloutTargetXInItem(planned, block) - callouts[planned.calloutIndex].bubbleRect.Width() / 2;
-        }
         const int minX = std::min({0, topX, bottomX});
         const int maxX = std::max({mainWidth, topX + topWidth, bottomX + bottomWidth});
         block.itemX -= minX;
@@ -907,10 +890,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
                           cardPlacements[planned.cardIndex].sourceRect,
                           cardPlacements[planned.cardIndex].destRect)
                     : RenderPoint{planned.target.Center().x + dx, planned.target.Center().y + dy};
-            const int centeredX = callout.targetAttachment.x - callout.bubbleRect.Width() / 2;
-            callout.bubbleRect =
-                RenderRect{centeredX, y, centeredX + callout.bubbleRect.Width(), y + callout.bubbleRect.Height()};
-            callout.bubbleAttachment = RenderPoint{callout.targetAttachment.x,
+            callout.bubbleAttachment = RenderPoint{callout.bubbleRect.Center().x,
                 side == RectExitSide::Top ? callout.bubbleRect.bottom : callout.bubbleRect.top};
         }
     };
