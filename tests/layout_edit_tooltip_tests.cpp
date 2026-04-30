@@ -163,7 +163,7 @@ TEST(LayoutEditTooltip, BuildsMetricListAddRowTooltipLineForCardLayout) {
         config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter});
 
     ASSERT_TRUE(line.has_value());
-    EXPECT_EQ(*line, "[card.cpu] layout = metric_list(...)");
+    EXPECT_EQ(*line, "[card.cpu] layout = metric_list()");
 }
 
 TEST(LayoutEditTooltip, BuildsContainerChildOrderTooltipLineForDashboardLayout) {
@@ -176,7 +176,7 @@ TEST(LayoutEditTooltip, BuildsContainerChildOrderTooltipLineForDashboardLayout) 
     const auto line = BuildContainerChildOrderTooltipLine(config, LayoutContainerChildOrderEditKey{"", {}});
 
     ASSERT_TRUE(line.has_value());
-    EXPECT_EQ(*line, "[layout.main] cards = ... columns(cpu, gpu)");
+    EXPECT_EQ(*line, "[layout.main] cards = columns(cpu, gpu)");
 }
 
 TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {

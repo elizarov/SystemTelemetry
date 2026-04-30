@@ -93,7 +93,7 @@ std::optional<std::string> BuildMetricListAddRowTooltipLine(
                                     : key.editCardId.empty() ? "layout"
                                                              : "card." + key.editCardId;
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
-    return "[" + sectionName + "] " + memberName + " = metric_list(...)";
+    return "[" + sectionName + "] " + memberName + " = metric_list()";
 }
 
 std::optional<std::string> BuildContainerChildOrderTooltipLine(
@@ -108,7 +108,7 @@ std::optional<std::string> BuildContainerChildOrderTooltipLine(
                                     : key.editCardId.empty() ? "layout"
                                                              : "card." + key.editCardId;
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
-    std::string text = "[" + sectionName + "] " + memberName + " = ... " + node->name + "(";
+    std::string text = "[" + sectionName + "] " + memberName + " = " + node->name + "(";
     for (size_t i = 0; i < node->children.size(); ++i) {
         if (i > 0) {
             text += ", ";

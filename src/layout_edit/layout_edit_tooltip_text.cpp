@@ -101,8 +101,8 @@ std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const LayoutEdi
 
     const LayoutNodeConfig& leftChild = node->children[guide.separatorIndex];
     const LayoutNodeConfig& rightChild = node->children[guide.separatorIndex + 1];
-    return "[" + sectionName + "] " + configMember + " = ... " + node->name + "(" + LayoutGuideChildName(leftChild) +
-           ":" + std::to_string((std::max)(1, leftChild.weight)) + ", " + LayoutGuideChildName(rightChild) + ":" +
+    return "[" + sectionName + "] " + configMember + " = " + node->name + "(" + LayoutGuideChildName(leftChild) + ":" +
+           std::to_string((std::max)(1, leftChild.weight)) + ", " + LayoutGuideChildName(rightChild) + ":" +
            std::to_string((std::max)(1, rightChild.weight)) + ")";
 }
 
