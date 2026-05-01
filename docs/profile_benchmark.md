@@ -760,6 +760,20 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep config parser and writer dispatch table-driven at runtime while preserving `config.h` as the metadata source of truth. Avoid reintroducing per-field generated parser/writer lambda chains.
 
+### Hypothesis: Disable native C++ exception handling for app and benchmark targets
+
+- Change:
+  - Remove `/EHsc` from the native app and benchmark targets while leaving the C++/CLI bridge and test target exception model separate.
+  - Suppress expected MSVC C4530 diagnostics on the no-EH native targets because standard-library headers still contain exception-aware code paths.
+- Result:
+  - Helped executable size materially.
+- Observed effect:
+  - Removing native `/EHsc` reduced `build\SystemTelemetry.exe` from `1,253,376` bytes to `1,152,512` bytes and `build\SystemTelemetryBenchmarks.exe` from `939,008` bytes to `868,864` bytes.
+  - The app section sizes after disabling native exception handling are `.text=958,120`, `.rdata=121,074`, `.pdata=23,124`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,332` bytes.
+  - The benchmark section sizes after disabling native exception handling are `.text=709,772`, `.rdata=91,656`, `.pdata=17,532`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,588` bytes.
+- Conclusion:
+  - Keep native production and benchmark code on the no-EH profile. Keep managed exception handling isolated to the C++/CLI provider bridge and keep tests on `/EHsc` where assertion helpers and test support can still use ordinary C++ exceptions.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.

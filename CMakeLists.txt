@@ -303,8 +303,8 @@ target_compile_definitions(SystemTelemetry PRIVATE
 )
 
 target_compile_options(SystemTelemetry PRIVATE
-    /EHsc
     /W4
+    /wd4530
     /permissive-
     /GR-
     /w14505
@@ -605,8 +605,8 @@ target_compile_definitions(SystemTelemetryBenchmarks PRIVATE
     SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 target_compile_options(SystemTelemetryBenchmarks PRIVATE
-    /EHsc
     /W4
+    /wd4530
     /permissive-
     /GR-
     /w14505
