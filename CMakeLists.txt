@@ -136,6 +136,7 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/metrics.cpp
     src/layout_model/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp
@@ -215,6 +216,7 @@ set(systemtelemetry_release_speed_sources
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/impl/collector_board.cpp
@@ -253,7 +255,7 @@ set_source_files_properties(${systemtelemetry_release_speed_sources} PROPERTIES
 )
 
 add_library(SystemTelemetryGigabyte OBJECT
-    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv_bridge.cpp
 )
 
 set_target_properties(SystemTelemetryGigabyte PROPERTIES
@@ -528,6 +530,7 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
