@@ -1,19 +1,44 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
 
 #include "config/config.h"
 
+enum class RuntimeConfigFieldValueKind : std::uint8_t {
+    Int,
+    Double,
+    String,
+    StringList,
+    LogicalPoint,
+    LogicalSize,
+    HexColor,
+    FontSpec,
+    LayoutExpression,
+};
+
+enum class RuntimeConfigFieldPolicy : std::uint8_t {
+    None,
+    PositiveInt,
+    NonNegativeInt,
+    FontSize,
+    Degrees,
+};
+
 struct RuntimeConfigFieldDescriptor {
     std::string_view key;
-    void (*decode)(void* owner, const std::string& value);
-    std::string (*encode)(const void* owner);
-    bool (*equals)(const void* owner, const void* compareOwner);
+    std::uint32_t offset = 0;
+    RuntimeConfigFieldValueKind kind = RuntimeConfigFieldValueKind::String;
+    RuntimeConfigFieldPolicy policy = RuntimeConfigFieldPolicy::None;
 };
 
 std::string FormatLayoutExpression(const LayoutNodeConfig& node);
+void DecodeRuntimeConfigField(const RuntimeConfigFieldDescriptor& field, void* owner, const std::string& value);
+std::string EncodeRuntimeConfigField(const RuntimeConfigFieldDescriptor& field, const void* owner);
+bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const void* owner, const void* compareOwner);
 
 template <typename Section> std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFieldDescriptors();
 

@@ -108,8 +108,8 @@ void SaveStructuredSectionDifferences(
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
         const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
         for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
-            if (compareOwner == nullptr || !field.equals(&owner, compareOwner)) {
-                updateKey(sectionName, std::string(field.key), field.encode(&owner));
+            if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
+                updateKey(sectionName, std::string(field.key), EncodeRuntimeConfigField(field, &owner));
             }
         }
     } else {
@@ -125,8 +125,8 @@ void SaveDynamicStructuredSectionDifferences(const typename Section::owner_type&
     UpdateKeyFn&& updateKey) {
     const std::string sectionName = Section::FormatName(suffix);
     for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
-        if (compareOwner == nullptr || !field.equals(&owner, compareOwner)) {
-            updateKey(sectionName, std::string(field.key), field.encode(&owner));
+        if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
+            updateKey(sectionName, std::string(field.key), EncodeRuntimeConfigField(field, &owner));
         }
     }
 }

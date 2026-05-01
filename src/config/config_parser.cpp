@@ -57,7 +57,7 @@ bool ApplyStructuredSectionFields(
     typename Section::owner_type& owner, const std::string& key, const std::string& value) {
     for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
         if (key == field.key) {
-            field.decode(&owner, value);
+            DecodeRuntimeConfigField(field, &owner, value);
             return true;
         }
     }

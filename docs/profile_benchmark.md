@@ -801,6 +801,18 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep parser and writer field dispatch on the shared runtime descriptor table. Future size work should target type-erased codec operations or direct fixed-arity parsing rather than recreating separate parser/writer descriptor tables.
 
+### Hypothesis: Replace per-field config callbacks with offset descriptors
+
+- Change:
+  - Store structured-section runtime field descriptors as `key`, field offset, value kind, and clamp policy.
+  - Replace the generated per-field decode, encode, and equality callbacks with shared switch-based runtime helpers.
+- Result:
+  - Helped the distributed executable by removing per-field callback instantiations.
+- Observed effect:
+  - Offset-based runtime descriptors reduced `build\SystemTelemetry.exe` from `1,142,784` bytes to `1,135,104` bytes.
+- Conclusion:
+  - Keep config parser and writer field dispatch on the offset descriptor table. This preserves the `config.h` metadata source of truth while making runtime config I/O less template-heavy.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.

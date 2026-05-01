@@ -57,7 +57,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `AppConfig` layers runtime display, network, storage, and active-layout selection around the shared layout-owned state.
 - Runtime-only placeholder metric metadata stays synthesized outside persisted config so `[metrics]` remains limited to configurable metric definitions.
 - Config metric validation uses an injected catalog view; the metric id and display-style source of truth lives in telemetry metrics.
-- Parser and writer code share config-owned runtime field descriptors and UTF-8 file helpers while keeping overlay behavior and text-preserving saves separate from higher-level config resolution.
+- Parser and writer code share config-owned offset-based runtime field descriptors and UTF-8 file helpers while keeping overlay behavior and text-preserving saves separate from higher-level config resolution.
 
 ### Telemetry
 

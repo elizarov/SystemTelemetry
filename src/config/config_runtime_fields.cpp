@@ -1,9 +1,11 @@
 #include "config/config_runtime_fields.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cerrno>
 #include <climits>
+#include <cstddef>
 #include <cstdlib>
 #include <type_traits>
 
@@ -87,132 +89,204 @@ std::string FormatFontSpec(const UiFontConfig& font) {
     return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
 }
 
-template <typename Codec, typename Value> void DecodeConfigValue(Value& target, const std::string& value);
-
-template <> void DecodeConfigValue<configschema::IntCodec, int>(int& target, const std::string& value) {
-    target = ParseIntOrDefault(value, target);
-}
-
-template <> void DecodeConfigValue<configschema::DoubleCodec, double>(double& target, const std::string& value) {
-    target = ParseDoubleOrDefault(value, target);
-}
-
-template <>
-void DecodeConfigValue<configschema::StringCodec, std::string>(std::string& target, const std::string& value) {
-    target = value;
-}
-
-template <>
-void DecodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(
-    LogicalPointConfig& target, const std::string& value) {
-    ParseIntPair(value, target.x, target.y);
-}
-
-template <>
-void DecodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(
-    LogicalSizeConfig& target, const std::string& value) {
-    ParseIntPair(value, target.width, target.height);
-}
-
-template <>
-void DecodeConfigValue<configschema::HexColorCodec, ColorConfig>(ColorConfig& target, const std::string& value) {
-    target = ParseHexColorOrDefault(value, target);
-}
-
-template <>
-void DecodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(UiFontConfig& target, const std::string& value) {
-    ParseFontSpec(target, value);
-}
-
-template <>
-void DecodeConfigValue<configschema::StringCodec, std::vector<std::string>>(
-    std::vector<std::string>& target, const std::string& value) {
-    target = SplitTrimmed(value, ',');
-}
-
-template <>
-void DecodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(
-    LayoutNodeConfig& target, const std::string& value) {
-    LayoutNodeConfig parsed;
-    if (ParseLayoutExpression(value, parsed)) {
-        target = std::move(parsed);
+template <typename Value> RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
+    if constexpr (std::is_same_v<Value, int>) {
+        return RuntimeConfigFieldValueKind::Int;
+    } else if constexpr (std::is_same_v<Value, double>) {
+        return RuntimeConfigFieldValueKind::Double;
+    } else if constexpr (std::is_same_v<Value, std::string>) {
+        return RuntimeConfigFieldValueKind::String;
+    } else if constexpr (std::is_same_v<Value, std::vector<std::string>>) {
+        return RuntimeConfigFieldValueKind::StringList;
+    } else if constexpr (std::is_same_v<Value, LogicalPointConfig>) {
+        return RuntimeConfigFieldValueKind::LogicalPoint;
+    } else if constexpr (std::is_same_v<Value, LogicalSizeConfig>) {
+        return RuntimeConfigFieldValueKind::LogicalSize;
+    } else if constexpr (std::is_same_v<Value, ColorConfig>) {
+        return RuntimeConfigFieldValueKind::HexColor;
+    } else if constexpr (std::is_same_v<Value, UiFontConfig>) {
+        return RuntimeConfigFieldValueKind::FontSpec;
+    } else if constexpr (std::is_same_v<Value, LayoutNodeConfig>) {
+        return RuntimeConfigFieldValueKind::LayoutExpression;
     }
 }
 
-template <typename Codec, typename Value> std::string EncodeConfigValue(const Value& value);
-
-template <> std::string EncodeConfigValue<configschema::IntCodec, int>(const int& value) {
-    return std::to_string(value);
+template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
+    if constexpr (std::is_same_v<Policy, configschema::PositiveIntPolicy>) {
+        return RuntimeConfigFieldPolicy::PositiveInt;
+    } else if constexpr (std::is_same_v<Policy, configschema::NonNegativeIntPolicy>) {
+        return RuntimeConfigFieldPolicy::NonNegativeInt;
+    } else if constexpr (std::is_same_v<Policy, configschema::FontSizePolicy>) {
+        return RuntimeConfigFieldPolicy::FontSize;
+    } else if constexpr (std::is_same_v<Policy, configschema::DegreesPolicy>) {
+        return RuntimeConfigFieldPolicy::Degrees;
+    } else {
+        return RuntimeConfigFieldPolicy::None;
+    }
 }
 
-template <> std::string EncodeConfigValue<configschema::DoubleCodec, double>(const double& value) {
-    return FormatDoubleGeneral(value);
+template <typename Field> std::uint32_t RuntimeFieldOffset() {
+    typename Field::owner_type owner{};
+    const auto* ownerBytes = reinterpret_cast<const char*>(&owner);
+    const auto* fieldBytes = reinterpret_cast<const char*>(&Field::RawGet(owner));
+    return static_cast<std::uint32_t>(fieldBytes - ownerBytes);
 }
 
-template <> std::string EncodeConfigValue<configschema::StringCodec, std::string>(const std::string& value) {
-    return value;
+template <typename Field> RuntimeConfigFieldDescriptor MakeRuntimeFieldDescriptor() {
+    using Policy = typename Field::layout_edit_traits_type::policy_tag;
+    return RuntimeConfigFieldDescriptor{Field::key.view(),
+        RuntimeFieldOffset<Field>(),
+        RuntimeFieldValueKindFor<typename Field::field_type>(),
+        RuntimeFieldPolicyFor<Policy>()};
 }
 
-template <>
-std::string EncodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(const LogicalPointConfig& value) {
-    return std::to_string(value.x) + "," + std::to_string(value.y);
+template <typename... Field> auto MakeRuntimeFieldDescriptors(std::tuple<Field...>) {
+    return std::array<RuntimeConfigFieldDescriptor, sizeof...(Field)>{MakeRuntimeFieldDescriptor<Field>()...};
 }
 
-template <>
-std::string EncodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(const LogicalSizeConfig& value) {
-    return FormatLogicalSize(value);
+char* FieldAddress(void* owner, const RuntimeConfigFieldDescriptor& field) {
+    return static_cast<char*>(owner) + field.offset;
 }
 
-template <> std::string EncodeConfigValue<configschema::HexColorCodec, ColorConfig>(const ColorConfig& value) {
-    return FormatHexColor(value);
+const char* FieldAddress(const void* owner, const RuntimeConfigFieldDescriptor& field) {
+    return static_cast<const char*>(owner) + field.offset;
 }
 
-template <> std::string EncodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(const UiFontConfig& value) {
-    return FormatFontSpec(value);
-}
-
-template <>
-std::string EncodeConfigValue<configschema::StringCodec, std::vector<std::string>>(
-    const std::vector<std::string>& value) {
-    std::string encoded;
-    for (size_t i = 0; i < value.size(); ++i) {
-        if (i > 0) {
-            encoded += ",";
+void ClampDecodedValue(const RuntimeConfigFieldDescriptor& field, void* address) {
+    switch (field.policy) {
+        case RuntimeConfigFieldPolicy::PositiveInt:
+            *reinterpret_cast<int*>(address) = (std::max)(1, *reinterpret_cast<int*>(address));
+            break;
+        case RuntimeConfigFieldPolicy::NonNegativeInt:
+            *reinterpret_cast<int*>(address) = (std::max)(0, *reinterpret_cast<int*>(address));
+            break;
+        case RuntimeConfigFieldPolicy::FontSize: {
+            UiFontConfig& font = *reinterpret_cast<UiFontConfig*>(address);
+            font.size = (std::max)(1, font.size);
+            font.weight = (std::max)(1, font.weight);
+            break;
         }
-        encoded += value[i];
+        case RuntimeConfigFieldPolicy::Degrees:
+            *reinterpret_cast<double*>(address) = std::clamp(*reinterpret_cast<double*>(address), 0.0, 360.0);
+            break;
+        case RuntimeConfigFieldPolicy::None:
+            break;
     }
-    return encoded;
-}
-
-template <>
-std::string EncodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(const LayoutNodeConfig& value) {
-    return FormatLayoutExpression(value);
-}
-
-template <typename Field> void DecodeRuntimeField(void* owner, const std::string& value) {
-    auto& typedOwner = *static_cast<typename Field::owner_type*>(owner);
-    typename Field::field_type decoded = Field::RawGet(typedOwner);
-    DecodeConfigValue<typename Field::codec_type>(decoded, value);
-    Field::Set(typedOwner, std::move(decoded));
-}
-
-template <typename Field> std::string EncodeRuntimeField(const void* owner) {
-    const auto& typedOwner = *static_cast<const typename Field::owner_type*>(owner);
-    return EncodeConfigValue<typename Field::codec_type>(Field::RawGet(typedOwner));
-}
-
-template <typename Field> bool RuntimeFieldEquals(const void* owner, const void* compareOwner) {
-    const auto& typedOwner = *static_cast<const typename Field::owner_type*>(owner);
-    const auto& typedCompareOwner = *static_cast<const typename Field::owner_type*>(compareOwner);
-    return Field::RawGet(typedOwner) == Field::RawGet(typedCompareOwner);
-}
-
-template <typename... Field> constexpr auto MakeRuntimeFieldDescriptors(std::tuple<Field...>) {
-    return std::array<RuntimeConfigFieldDescriptor, sizeof...(Field)>{RuntimeConfigFieldDescriptor{
-        Field::key.view(), &DecodeRuntimeField<Field>, &EncodeRuntimeField<Field>, &RuntimeFieldEquals<Field>}...};
 }
 
 }  // namespace
+
+void DecodeRuntimeConfigField(const RuntimeConfigFieldDescriptor& field, void* owner, const std::string& value) {
+    void* address = FieldAddress(owner, field);
+    switch (field.kind) {
+        case RuntimeConfigFieldValueKind::Int:
+            *reinterpret_cast<int*>(address) = ParseIntOrDefault(value, *reinterpret_cast<int*>(address));
+            break;
+        case RuntimeConfigFieldValueKind::Double:
+            *reinterpret_cast<double*>(address) = ParseDoubleOrDefault(value, *reinterpret_cast<double*>(address));
+            break;
+        case RuntimeConfigFieldValueKind::String:
+            *reinterpret_cast<std::string*>(address) = value;
+            break;
+        case RuntimeConfigFieldValueKind::StringList:
+            *reinterpret_cast<std::vector<std::string>*>(address) = SplitTrimmed(value, ',');
+            break;
+        case RuntimeConfigFieldValueKind::LogicalPoint: {
+            LogicalPointConfig& point = *reinterpret_cast<LogicalPointConfig*>(address);
+            ParseIntPair(value, point.x, point.y);
+            break;
+        }
+        case RuntimeConfigFieldValueKind::LogicalSize: {
+            LogicalSizeConfig& size = *reinterpret_cast<LogicalSizeConfig*>(address);
+            ParseIntPair(value, size.width, size.height);
+            break;
+        }
+        case RuntimeConfigFieldValueKind::HexColor:
+            *reinterpret_cast<ColorConfig*>(address) =
+                ParseHexColorOrDefault(value, *reinterpret_cast<ColorConfig*>(address));
+            break;
+        case RuntimeConfigFieldValueKind::FontSpec:
+            ParseFontSpec(*reinterpret_cast<UiFontConfig*>(address), value);
+            break;
+        case RuntimeConfigFieldValueKind::LayoutExpression: {
+            LayoutNodeConfig parsed;
+            if (ParseLayoutExpression(value, parsed)) {
+                *reinterpret_cast<LayoutNodeConfig*>(address) = std::move(parsed);
+            }
+            break;
+        }
+    }
+    ClampDecodedValue(field, address);
+}
+
+std::string EncodeRuntimeConfigField(const RuntimeConfigFieldDescriptor& field, const void* owner) {
+    const void* address = FieldAddress(owner, field);
+    switch (field.kind) {
+        case RuntimeConfigFieldValueKind::Int:
+            return std::to_string(*reinterpret_cast<const int*>(address));
+        case RuntimeConfigFieldValueKind::Double:
+            return FormatDoubleGeneral(*reinterpret_cast<const double*>(address));
+        case RuntimeConfigFieldValueKind::String:
+            return *reinterpret_cast<const std::string*>(address);
+        case RuntimeConfigFieldValueKind::StringList: {
+            const auto& values = *reinterpret_cast<const std::vector<std::string>*>(address);
+            std::string encoded;
+            for (size_t i = 0; i < values.size(); ++i) {
+                if (i > 0) {
+                    encoded += ",";
+                }
+                encoded += values[i];
+            }
+            return encoded;
+        }
+        case RuntimeConfigFieldValueKind::LogicalPoint: {
+            const LogicalPointConfig& point = *reinterpret_cast<const LogicalPointConfig*>(address);
+            return std::to_string(point.x) + "," + std::to_string(point.y);
+        }
+        case RuntimeConfigFieldValueKind::LogicalSize:
+            return FormatLogicalSize(*reinterpret_cast<const LogicalSizeConfig*>(address));
+        case RuntimeConfigFieldValueKind::HexColor:
+            return FormatHexColor(*reinterpret_cast<const ColorConfig*>(address));
+        case RuntimeConfigFieldValueKind::FontSpec:
+            return FormatFontSpec(*reinterpret_cast<const UiFontConfig*>(address));
+        case RuntimeConfigFieldValueKind::LayoutExpression:
+            return FormatLayoutExpression(*reinterpret_cast<const LayoutNodeConfig*>(address));
+    }
+    return {};
+}
+
+bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const void* owner, const void* compareOwner) {
+    const void* address = FieldAddress(owner, field);
+    const void* compareAddress = FieldAddress(compareOwner, field);
+    switch (field.kind) {
+        case RuntimeConfigFieldValueKind::Int:
+            return *reinterpret_cast<const int*>(address) == *reinterpret_cast<const int*>(compareAddress);
+        case RuntimeConfigFieldValueKind::Double:
+            return *reinterpret_cast<const double*>(address) == *reinterpret_cast<const double*>(compareAddress);
+        case RuntimeConfigFieldValueKind::String:
+            return *reinterpret_cast<const std::string*>(address) ==
+                   *reinterpret_cast<const std::string*>(compareAddress);
+        case RuntimeConfigFieldValueKind::StringList:
+            return *reinterpret_cast<const std::vector<std::string>*>(address) ==
+                   *reinterpret_cast<const std::vector<std::string>*>(compareAddress);
+        case RuntimeConfigFieldValueKind::LogicalPoint:
+            return *reinterpret_cast<const LogicalPointConfig*>(address) ==
+                   *reinterpret_cast<const LogicalPointConfig*>(compareAddress);
+        case RuntimeConfigFieldValueKind::LogicalSize:
+            return *reinterpret_cast<const LogicalSizeConfig*>(address) ==
+                   *reinterpret_cast<const LogicalSizeConfig*>(compareAddress);
+        case RuntimeConfigFieldValueKind::HexColor:
+            return *reinterpret_cast<const ColorConfig*>(address) ==
+                   *reinterpret_cast<const ColorConfig*>(compareAddress);
+        case RuntimeConfigFieldValueKind::FontSpec:
+            return *reinterpret_cast<const UiFontConfig*>(address) ==
+                   *reinterpret_cast<const UiFontConfig*>(compareAddress);
+        case RuntimeConfigFieldValueKind::LayoutExpression:
+            return *reinterpret_cast<const LayoutNodeConfig*>(address) ==
+                   *reinterpret_cast<const LayoutNodeConfig*>(compareAddress);
+    }
+    return false;
+}
 
 std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
     std::string text = node.name;
@@ -236,7 +310,7 @@ std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
 
 #define SYSTEMTELEMETRY_DEFINE_RUNTIME_FIELDS(section_type)                                                            \
     template <> std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFieldDescriptors<section_type>() {          \
-        static constexpr auto fields = MakeRuntimeFieldDescriptors(typename section_type::fields_type{});              \
+        static const auto fields = MakeRuntimeFieldDescriptors(typename section_type::fields_type{});                  \
         return fields;                                                                                                 \
     }
 
