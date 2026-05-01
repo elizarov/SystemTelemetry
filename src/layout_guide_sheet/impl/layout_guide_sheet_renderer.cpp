@@ -9,6 +9,7 @@
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_model/layout_edit_helpers.h"
+#include "util/trace.h"
 
 namespace {
 
@@ -855,7 +856,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     const int sheetHeight = placementResult.sheetHeight;
     if (traceDetails != nullptr) {
         for (const std::string& calloutKey : placementResult.warningCalloutKeys) {
-            traceDetails->push_back("warning=\"leader_intersection_detected\" callout=\"" + calloutKey + "\"");
+            traceDetails->push_back("warning=\"leader_intersection_detected\" callout=" + Trace::QuoteText(calloutKey));
         }
     }
 
