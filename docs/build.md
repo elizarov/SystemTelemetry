@@ -13,7 +13,7 @@ See also: [docs/project.md](project.md) for repository policy, [docs/diagnostics
 - Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
 - AMD Software: Adrenalin Edition when AMD GPU telemetry is required
 - Gigabyte SIV installed when Gigabyte board temperature or fan telemetry is required
-- GitHub Actions uses the `windows-2025-vs2026` runner for push and pull request format, lint, and tidy validation.
+- GitHub Actions uses the `windows-2025-vs2026` runner for push and pull request build, test, format, lint, and tidy validation.
 
 ## Current Toolchain
 
@@ -37,7 +37,7 @@ build.cmd
 Run unit tests after a successful build:
 
 ```bat
-ctest --test-dir build\cmake -C Release --output-on-failure
+test.cmd
 ```
 
 Diagnostics validation commands live in [docs/diagnostics.md](diagnostics.md).
@@ -55,6 +55,7 @@ install.cmd
 ## Developer Tooling Entrypoints
 
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources. Its changed-file mode keeps Git CRLF normalization warnings out of formatter file discovery.
+- `test.cmd` is the maintained entrypoint for running the CTest suite against the built Release tree.
 - The repo `pre-commit` hook launches `tools\pre_commit_checks.ps1`, which formats staged eligible C++ files through `tools\run_clang_format.ps1` and runs `lint.cmd` before each commit. Git file discovery starts from all staged `.cpp` and `.h` paths, then the shared formatter filter limits work to maintained non-vendored `src\` and `tests\` files. The hook temporarily stashes unstaged and untracked files while it formats and lints the staged snapshot, restores them before exit, and aborts the commit when formatting or lint checks fail.
 - `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep checks maintained non-vendored `.cpp` and `.h` files, writes `build\clang_tidy_report.txt`, uses a three-minute per-file timeout, reports unused internal functions as errors, reports unused includes as errors, filters maintained include-cleaner false positives, and excludes `src\diagnostics\snapshot_dump.cpp`, `tests\layout_edit_tooltip_tests.cpp`, `tests\layout_edit_types_tests.cpp`, and `tests\metrics_tests.cpp` because the active Clang diagnostics stall on those translation units.
 - `lint.cmd tidy` runs a full optional `clang-tidy` sweep and commonly needs at least eight minutes on the current toolchain before it can report success or failure. Local development avoids this slow sweep unless explicitly requested. GitHub Actions owns the routine tidy sweep with `SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS` set to a larger per-file timeout and `SYSTEMTELEMETRY_TIDY_MAX_PARALLEL` set for runner stability.
@@ -63,9 +64,9 @@ install.cmd
 
 ## GitHub Validation
 
-- The `Format And Tidy` workflow runs on every push, pull request, and manual dispatch.
-- The workflow builds first with `build.cmd`, then runs `format.cmd`, then runs `lint.cmd tidy` on `windows-2025-vs2026`.
-- The repository branch protection requires the `Format And Tidy` job before pull requests can merge.
+- The `Validation` workflow runs on every push, pull request, and manual dispatch.
+- The workflow checks formatting first with `format.cmd`, then builds with `build.cmd`, runs tests with `test.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
+- The repository branch protection requires the `Validation` job before pull requests can merge.
 - The workflow uploads `build\clang_tidy_report.txt` as an artifact when it is produced.
 
 ## Provider Notes

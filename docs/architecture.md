@@ -22,7 +22,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
-- `.github/workflows/` contains push and pull request automation for runner-hosted format, lint, and tidy validation.
+- `.github/workflows/` contains push and pull request automation for runner-hosted build, test, format, lint, and tidy validation.
 
 ## Layered Core
 
@@ -143,7 +143,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `resources/SystemTelemetry.rc` is the single resource script for the manifest, dialogs, icons, embedded config, and embedded localization catalog.
 - `resources/resource.h` owns the resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and the mixed-mode Gigabyte board-provider object library.
-- `.github/workflows/format-lint-tidy.yml` builds through `build.cmd`, checks formatting through `format.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the `windows-2025-vs2026` GitHub runner.
+- `.github/workflows/format-lint-tidy.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the `windows-2025-vs2026` GitHub runner.
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` builds as a CLR-enabled unit so it can bridge to the vendor .NET assemblies.
 - The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, layout-edit mouse-hover, and telemetry-refresh paths through the same runtime subsystems used by the app. Its supported benchmark names are held in an `enum_string`-backed selector, and each named benchmark owns its top-level command flow in a separate function.

@@ -18,7 +18,7 @@
 - Keep all build artifacts and temporary compiler files in `build\` so the repository root stays clean.
 - Keep the repo-level `.clang-format` in sync with the dominant non-vendored C++ style, especially the non-aligned wrapped-parameter and wrapped-argument layout used across the project.
 - Use the top-level `format.cmd` entry point for C++ formatting checks and fixes; `format` checks non-vendored project sources and `format fix` applies the repo style to those files.
-- Do not run `lint.cmd tidy` locally unless the user explicitly asks for a local tidy run; the GitHub `Format And Tidy` workflow owns the slow `clang-tidy` sweep on push and pull request checks.
+- Do not run `lint.cmd tidy` locally unless the user explicitly asks for a local tidy run; the GitHub `Validation` workflow owns the slow `clang-tidy` sweep on push and pull request checks.
 - Do not run build steps and validation runs in parallel; always finish the build first, then run validation commands sequentially against the freshly built artifacts.
 
 Validation workflow:

@@ -1,4 +1,4 @@
-name: Format And Tidy
+name: Validation
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   format-lint-tidy:
-    name: Format And Tidy
+    name: Validation
     runs-on: windows-2025-vs2026
     timeout-minutes: 240
 
@@ -19,13 +19,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check format
+        shell: cmd
+        run: format.cmd
+
       - name: Build
         shell: cmd
         run: build.cmd
 
-      - name: Check format
+      - name: Run tests
         shell: cmd
-        run: format.cmd
+        run: test.cmd
 
       - name: Run lint tidy
         shell: cmd
