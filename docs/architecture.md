@@ -143,6 +143,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `resources/SystemTelemetry.rc` is the single resource script for the manifest, dialogs, icons, embedded config, and embedded localization catalog.
 - `resources/resource.h` owns the resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and the mixed-mode Gigabyte board-provider object library.
+- `CMakeLists.txt` enables C4505 as an error for MSVC C++ targets and keeps Release executable links non-incremental with `/OPT:REF`.
 - `.github/workflows/format-lint-tidy.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the `windows-2025-vs2026` GitHub runner.
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` builds as a CLR-enabled unit so it can bridge to the vendor .NET assemblies.

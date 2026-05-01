@@ -199,6 +199,8 @@ target_compile_options(SystemTelemetryGigabyte PRIVATE
     /clr
     /W4
     /permissive-
+    /w14505
+    /we4505
     /Zi
 )
 
@@ -223,12 +225,16 @@ target_compile_options(SystemTelemetry PRIVATE
     /EHsc
     /W4
     /permissive-
+    /w14505
+    /we4505
     /Zi
 )
 
 target_link_options(SystemTelemetry PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:Release>:/OPT:REF>
+    $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
     /MANIFEST:NO
@@ -380,11 +386,15 @@ target_compile_options(SystemTelemetryTests PRIVATE
     /EHsc
     /W4
     /permissive-
+    /w14505
+    /we4505
     /Zi
 )
 target_link_options(SystemTelemetryTests PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:Release>:/OPT:REF>
+    $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
 )
@@ -509,12 +519,15 @@ target_compile_options(SystemTelemetryBenchmarks PRIVATE
     /EHsc
     /W4
     /permissive-
+    /w14505
+    /we4505
     /Zi
 )
 target_link_options(SystemTelemetryBenchmarks PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/DEBUG:FULL>
+    $<$<CONFIG:Release>:/OPT:REF>
     $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
