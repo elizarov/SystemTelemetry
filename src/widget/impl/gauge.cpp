@@ -468,8 +468,7 @@ void GaugeWidget::FinalizeLayoutGroup(WidgetHost& renderer, const std::vector<Wi
         if (widget == nullptr) {
             continue;
         }
-        GaugeWidget* gauge = dynamic_cast<GaugeWidget*>(widget->widget.get());
-        if (gauge == nullptr) {
+        if (!widget->widget || widget->widget->Class() != WidgetClass::Gauge) {
             continue;
         }
         const int gaugeRadius = GaugeOuterRadiusForRect(renderer, widget->rect);
@@ -481,9 +480,10 @@ void GaugeWidget::FinalizeLayoutGroup(WidgetHost& renderer, const std::vector<Wi
         if (widget == nullptr) {
             continue;
         }
-        GaugeWidget* gauge = dynamic_cast<GaugeWidget*>(widget->widget.get());
-        if (gauge != nullptr) {
-            gauge->sharedLayout_ = sharedLayout;
+        if (!widget->widget || widget->widget->Class() != WidgetClass::Gauge) {
+            continue;
         }
+        auto* gauge = static_cast<GaugeWidget*>(widget->widget.get());
+        gauge->sharedLayout_ = sharedLayout;
     }
 }

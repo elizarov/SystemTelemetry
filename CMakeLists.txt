@@ -303,6 +303,7 @@ target_compile_options(SystemTelemetry PRIVATE
     /EHsc
     /W4
     /permissive-
+    /GR-
     /w14505
     /we4505
     /Zi
@@ -467,6 +468,7 @@ target_compile_options(SystemTelemetryTests PRIVATE
     /EHsc
     /W4
     /permissive-
+    /GR-
     /w14505
     /we4505
     /Zi
@@ -600,6 +602,7 @@ target_compile_options(SystemTelemetryBenchmarks PRIVATE
     /EHsc
     /W4
     /permissive-
+    /GR-
     /w14505
     /we4505
     /Zi
