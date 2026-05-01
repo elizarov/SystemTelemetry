@@ -264,7 +264,6 @@ void LayoutEditDialog::Refresh(const std::optional<LayoutEditFocusKey>& preferre
     state_->originalConfig = host_.BuildLayoutEditOriginalConfig();
     state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig());
     RefreshLayoutEditDialogControls(state_.get(), hwnd_, preferredFocus, true);
-    EnsureVisibleLayoutEditTreeSelection(hwnd_);
 }
 
 void LayoutEditDialog::RefreshSelection() {

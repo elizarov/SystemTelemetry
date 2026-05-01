@@ -84,6 +84,31 @@ HTREEITEM FindFirstTreeItem(const LayoutEditDialogState& state) {
     return state.treeItems.empty() ? nullptr : state.treeItems.front().item;
 }
 
+std::string TreeNodeViewportLocation(LayoutEditDialogState* state, const LayoutEditTreeNode* node) {
+    if (state == nullptr || node == nullptr) {
+        return {};
+    }
+    if (node->kind == LayoutEditTreeNodeKind::Section && node->label.rfind("theme.", 0) == 0) {
+        return "[theme." + state->dialog->Host().CurrentConfig().display.theme + "]";
+    }
+    if (node->locationText.rfind("[theme.", 0) == 0) {
+        if (const std::string::size_type sectionEnd = node->locationText.find(']'); sectionEnd != std::string::npos) {
+            return "[theme." + state->dialog->Host().CurrentConfig().display.theme + "]" +
+                   node->locationText.substr(sectionEnd + 1);
+        }
+    }
+    return node->locationText;
+}
+
+std::string CaptureFirstVisibleTreeLocation(LayoutEditDialogState* state, HWND tree) {
+    if (state == nullptr || tree == nullptr) {
+        return {};
+    }
+
+    const HTREEITEM firstVisible = TreeView_GetFirstVisible(tree);
+    return TreeNodeViewportLocation(state, TreeNodeFromItem(tree, firstVisible));
+}
+
 void ExpandTreeAncestors(HWND tree, HTREEITEM item) {
     while (item != nullptr) {
         TreeView_Expand(tree, item, TVE_EXPAND);
@@ -118,13 +143,9 @@ void RebuildLayoutEditTree(
             preferredLocation = "[" + leaf->sectionName + "] " + leaf->memberName;
         }
     } else if (state->selectedNode != nullptr) {
-        if (state->selectedNode->kind == LayoutEditTreeNodeKind::Section &&
-            state->selectedNode->label.rfind("theme.", 0) == 0) {
-            preferredLocation = "[theme." + state->dialog->Host().CurrentConfig().display.theme + "]";
-        } else {
-            preferredLocation = state->selectedNode->locationText;
-        }
+        preferredLocation = TreeNodeViewportLocation(state, state->selectedNode);
     }
+    const std::string firstVisibleLocation = CaptureFirstVisibleTreeLocation(state, tree);
 
     state->visibleTreeModel = FilterLayoutEditTreeModel(state->treeModel, Utf8FromWide(state->currentFilter));
     state->treeItems.clear();
@@ -148,7 +169,14 @@ void RebuildLayoutEditTree(
     if (selectedItem != nullptr) {
         ExpandTreeAncestors(tree, selectedItem);
         TreeView_SelectItem(tree, selectedItem);
-        TreeView_EnsureVisible(tree, selectedItem);
+        if (firstVisibleLocation.empty()) {
+            TreeView_EnsureVisible(tree, selectedItem);
+        } else if (HTREEITEM firstVisibleItem = FindTreeItemByLocationText(state, firstVisibleLocation);
+            firstVisibleItem != nullptr) {
+            TreeView_SelectSetFirstVisible(tree, firstVisibleItem);
+        } else {
+            TreeView_EnsureVisible(tree, selectedItem);
+        }
         HandleLayoutEditTreeSelection(state, hwnd, selectedItem);
         state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:tree_rebuild_done",
             "roots=" + std::to_string(state->visibleTreeModel.roots.size()) +

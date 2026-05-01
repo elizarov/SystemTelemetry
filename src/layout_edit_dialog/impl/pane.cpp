@@ -441,36 +441,12 @@ DialogRedrawScope& DialogRedrawScope::operator=(DialogRedrawScope&& other) noexc
 
 DialogDescendantRedrawScope::DialogDescendantRedrawScope(HWND hwnd, UINT redrawFlags)
     : root_(hwnd), redrawFlags_(redrawFlags) {
-    if (root_ == nullptr) {
-        return;
-    }
-
-    windows_.push_back(root_);
-    EnumChildWindows(
-        root_,
-        [](HWND child, LPARAM param) -> BOOL {
-            auto* windows = reinterpret_cast<std::vector<HWND>*>(param);
-            windows->push_back(child);
-            return TRUE;
-        },
-        reinterpret_cast<LPARAM>(&windows_));
-
-    for (HWND window : windows_) {
-        BeginWindowRedrawSuspension(window);
-    }
+    BeginWindowRedrawSuspension(root_);
 }
 
 DialogDescendantRedrawScope::~DialogDescendantRedrawScope() {
-    for (auto it = windows_.rbegin(); it != windows_.rend(); ++it) {
-        EndWindowRedrawSuspension(*it, nullptr, 0);
-    }
+    EndWindowRedrawSuspension(root_, nullptr, 0);
     if (root_ != nullptr && redrawFlags_ != 0) {
-        RedrawWindow(root_, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME);
-        for (HWND window : windows_) {
-            if (window != root_ && IsWindow(window) != FALSE && IsWindowVisible(window) != FALSE) {
-                RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME);
-            }
-        }
         RedrawWindow(root_, nullptr, nullptr, redrawFlags_);
     }
 }

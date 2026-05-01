@@ -1,7 +1,6 @@
 #pragma once
 
 #include <optional>
-#include <vector>
 
 #include "layout_edit_dialog/impl/state.h"
 
@@ -34,7 +33,6 @@ public:
 
 private:
     HWND root_ = nullptr;
-    std::vector<HWND> windows_;
     UINT redrawFlags_ = 0;
 };
 
