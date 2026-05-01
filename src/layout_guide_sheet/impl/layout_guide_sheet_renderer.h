@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "layout_guide_sheet/layout_guide_sheet_types.h"
+#include "layout_guide_sheet/impl/layout_guide_sheet_types.h"
 
 class DashboardRenderer;
 struct SystemSnapshot;

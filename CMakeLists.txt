@@ -69,7 +69,8 @@ add_executable(SystemTelemetry WIN32
     resources/SystemTelemetry.rc
     src/main/main.cpp
     src/diagnostics/diagnostics.cpp
-    src/layout_guide_sheet/layout_guide_sheet_planner.cpp
+    src/layout_guide_sheet/layout_guide_sheet.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
     src/main/autostart.cpp
     src/util/command_line.cpp
     src/main/config_io.cpp
@@ -161,7 +162,7 @@ add_executable(SystemTelemetry WIN32
     src/widget/impl/clock_date.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
-    src/layout_guide_sheet/layout_guide_sheet_renderer.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/utf8.cpp
     src/util/trace.cpp
@@ -353,10 +354,11 @@ add_executable(SystemTelemetryTests
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
-    src/layout_guide_sheet/layout_guide_sheet_renderer.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/diagnostics/snapshot_dump.cpp
-    src/layout_guide_sheet/layout_guide_sheet_planner.cpp
+    src/layout_guide_sheet/layout_guide_sheet.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
     src/telemetry/impl/collector_fake.cpp
     src/telemetry/impl/collector_storage_selection.cpp
     src/telemetry/impl/retained_history.cpp
@@ -477,8 +479,9 @@ add_executable(SystemTelemetryBenchmarks
     src/widget/impl/clock_date.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
-    src/layout_guide_sheet/layout_guide_sheet_planner.cpp
-    src/layout_guide_sheet/layout_guide_sheet_renderer.cpp
+    src/layout_guide_sheet/layout_guide_sheet.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp

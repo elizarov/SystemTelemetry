@@ -15,11 +15,9 @@
 #include "layout_edit/layout_edit_active_region_trace.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
-#include "layout_guide_sheet/layout_guide_sheet_planner.h"
-#include "layout_guide_sheet/layout_guide_sheet_renderer.h"
+#include "layout_guide_sheet/layout_guide_sheet.h"
 #include "main/config_io.h"
 #include "telemetry/telemetry.h"
-#include "util/localization_catalog.h"
 #include "util/paths.h"
 #include "util/scale.h"
 #include "util/strings.h"
@@ -817,55 +815,7 @@ bool SaveLayoutGuideSheet(const std::filesystem::path& imagePath,
     double scale,
     Trace& trace,
     std::string* errorText) {
-    trace.Write("diagnostics:layout_guide_sheet start path=\"" + Utf8FromWide(imagePath.wstring()) + "\" layout=\"" +
-                config.display.layout + "\"");
-    DashboardRenderer renderer(trace);
-    renderer.SetRenderScale(scale);
-    renderer.SetConfig(config);
-    renderer.SetRenderMode(DashboardRenderer::RenderMode::Normal);
-    if (!renderer.Initialize()) {
-        if (errorText != nullptr) {
-            *errorText = renderer.LastError();
-        }
-        trace.Write("diagnostics:layout_guide_sheet failed stage=\"initialize\"");
-        return false;
-    }
-
-    DashboardOverlayState overlayState;
-    overlayState.showLayoutEditGuides = true;
-    overlayState.forceLayoutEditAffordances = true;
-    overlayState.hoverOnExposedDashboard = true;
-    if (!renderer.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
-        if (errorText != nullptr) {
-            *errorText = renderer.LastError();
-        }
-        trace.Write("diagnostics:layout_guide_sheet failed stage=\"active_regions\"");
-        return false;
-    }
-    InitializeLocalizationCatalog();
-    const std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
-    const std::vector<std::string> selectedCardIds = SelectLayoutGuideSheetCards(cards);
-    const LayoutEditActiveRegions activeRegions = renderer.CollectLayoutEditActiveRegions(overlayState);
-    const std::vector<LayoutGuideSheetCalloutRequest> overviewCallouts =
-        BuildLayoutGuideSheetOverviewCallouts(config, activeRegions, cards);
-    const std::vector<LayoutGuideSheetCalloutRequest> cardCallouts =
-        BuildLayoutGuideSheetCallouts(config, activeRegions, cards, selectedCardIds);
-    const std::vector<LayoutGuideSheetCalloutRequest> callouts =
-        MergeLayoutGuideSheetCallouts(overviewCallouts, cardCallouts);
-
-    std::vector<std::string> traceDetails;
-    LayoutGuideSheetRenderer sheetRenderer(renderer);
-    const bool saved = sheetRenderer.SavePng(imagePath, snapshot, callouts, selectedCardIds, &traceDetails, errorText);
-    if (!saved) {
-        trace.Write("diagnostics:layout_guide_sheet failed stage=\"save\"");
-        return false;
-    }
-    std::string endTrace = "diagnostics:layout_guide_sheet end path=\"" + Utf8FromWide(imagePath.wstring()) + "\"";
-    for (const std::string& detail : traceDetails) {
-        endTrace += " " + detail;
-    }
-    trace.Write(endTrace);
-    return true;
+    return SaveLayoutGuideSheetPng(imagePath, snapshot, config, scale, trace, errorText);
 }
 
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {

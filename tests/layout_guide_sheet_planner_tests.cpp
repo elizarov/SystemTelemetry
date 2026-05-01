@@ -10,7 +10,7 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
-#include "layout_guide_sheet/layout_guide_sheet_planner.h"
+#include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 #include "telemetry/impl/collector_fake.h"
 #include "util/localization_catalog.h"
 #include "util/trace.h"
