@@ -1,10 +1,11 @@
 #pragma once
 
-#include <istream>
-#include <ostream>
+#include <cstdio>
 #include <string>
+#include <string_view>
 
 #include "telemetry/telemetry.h"
 
-bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump);
-bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* error = nullptr);
+bool WriteTelemetryDump(std::FILE* output, const TelemetryDump& dump);
+bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump);
+bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string* error = nullptr);

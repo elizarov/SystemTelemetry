@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <commctrl.h>
-#include <sstream>
 #include <string_view>
 #include <vector>
 #include <windowsx.h>
@@ -625,47 +624,46 @@ void DashboardApp::TraceLayoutEditUiEvent(const std::string& event, const std::s
 
 std::string DashboardApp::BuildLayoutEditUiTraceState() const {
     const auto& state = controller_.State();
-    std::ostringstream trace;
-    trace << "layout=" << QuoteTraceText(state.config.display.layout);
-    trace << " editing=" << Trace::BoolText(state.isEditingLayout);
-    trace << " moving=" << Trace::BoolText(state.isMoving);
-    trace << " modal_depth=" << layoutEditModalUiDepth_;
-    trace << " tooltip_visible=" << Trace::BoolText(layoutEditTooltipVisible_);
-    trace << " tooltip_suppressed=" << Trace::BoolText(layoutEditTooltipRefreshSuppressed_);
-    trace << " tooltip_rect_valid=" << Trace::BoolText(layoutEditTooltipRectValid_);
-    trace << " mouse_tracking=" << Trace::BoolText(layoutEditMouseTracking_);
-    trace << " drag_active=" << Trace::BoolText(layoutEditController_.HasActiveDrag());
+    std::string trace = "layout=" + QuoteTraceText(state.config.display.layout);
+    trace += " editing=" + Trace::BoolText(state.isEditingLayout);
+    trace += " moving=" + Trace::BoolText(state.isMoving);
+    trace += " modal_depth=" + std::to_string(layoutEditModalUiDepth_);
+    trace += " tooltip_visible=" + Trace::BoolText(layoutEditTooltipVisible_);
+    trace += " tooltip_suppressed=" + Trace::BoolText(layoutEditTooltipRefreshSuppressed_);
+    trace += " tooltip_rect_valid=" + Trace::BoolText(layoutEditTooltipRectValid_);
+    trace += " mouse_tracking=" + Trace::BoolText(layoutEditMouseTracking_);
+    trace += " drag_active=" + Trace::BoolText(layoutEditController_.HasActiveDrag());
 
     const HWND capture = GetCapture();
-    trace << " capture=";
+    trace += " capture=";
     if (capture == nullptr) {
-        trace << QuoteTraceText("none");
+        trace += QuoteTraceText("none");
     } else if (capture == hwnd_) {
-        trace << QuoteTraceText("dashboard");
+        trace += QuoteTraceText("dashboard");
     } else {
-        trace << QuoteTraceText("other");
+        trace += QuoteTraceText("other");
     }
 
     if (const auto target = const_cast<LayoutEditController&>(layoutEditController_).CurrentTooltipTarget();
         target.has_value()) {
-        trace << " target=" << QuoteTraceText(LayoutEditTooltipPayloadTraceKind(target->payload));
+        trace += " target=" + QuoteTraceText(LayoutEditTooltipPayloadTraceKind(target->payload));
         if (target->clientPoint.has_value()) {
-            trace << " target_point=" << QuoteTraceText(FormatTracePoint(*target->clientPoint));
+            trace += " target_point=" + QuoteTraceText(FormatTracePoint(*target->clientPoint));
         }
     } else {
-        trace << " target=" << QuoteTraceText("none");
+        trace += " target=" + QuoteTraceText("none");
     }
 
     POINT cursor{};
     if (GetCursorPos(&cursor) != FALSE) {
-        trace << " cursor_screen=" << QuoteTraceText(FormatTracePoint(cursor));
+        trace += " cursor_screen=" + QuoteTraceText(FormatTracePoint(cursor));
         if (hwnd_ != nullptr) {
             POINT clientPoint = cursor;
             ScreenToClient(hwnd_, &clientPoint);
-            trace << " cursor_client=" << QuoteTraceText(FormatTracePoint(clientPoint));
+            trace += " cursor_client=" + QuoteTraceText(FormatTracePoint(clientPoint));
         }
     }
-    return trace.str();
+    return trace;
 }
 
 void DashboardApp::HideLayoutEditTooltip() {

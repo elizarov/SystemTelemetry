@@ -1,7 +1,6 @@
 #include "layout_edit/layout_edit_service.h"
 
 #include <algorithm>
-#include <functional>
 
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "util/strings.h"
@@ -45,10 +44,9 @@ const LayoutNodeConfig* FindLayoutNodeByPath(const LayoutNodeConfig& root, const
     return node;
 }
 
-bool ApplyLayoutNodeMutation(AppConfig& config,
-    const std::string& editCardId,
-    const std::vector<size_t>& nodePath,
-    const std::function<bool(LayoutNodeConfig*)>& mutate) {
+template <typename Mutate>
+bool ApplyLayoutNodeMutation(
+    AppConfig& config, const std::string& editCardId, const std::vector<size_t>& nodePath, Mutate&& mutate) {
     bool updated = false;
     if (editCardId.empty()) {
         updated = mutate(FindLayoutNodeByPath(config.layout.structure.cardsLayout, nodePath));

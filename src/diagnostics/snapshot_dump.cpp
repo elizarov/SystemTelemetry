@@ -90,26 +90,34 @@ bool UnescapeQuotedString(const std::string& text, std::string& value) {
     return !escaped;
 }
 
-void WriteLine(std::ostream& output, const std::string& key, const std::string& value) {
-    output << key << '=' << value << '\n';
+bool WriteDumpText(std::FILE* output, std::string_view text) {
+    return output != nullptr && fwrite(text.data(), 1, text.size(), output) == text.size();
 }
 
-void WriteString(std::ostream& output, const std::string& key, const std::string& value) {
+bool WriteLine(std::string& output, const std::string& key, const std::string& value) {
+    output += key;
+    output += '=';
+    output += value;
+    output += '\n';
+    return true;
+}
+
+void WriteString(std::string& output, const std::string& key, const std::string& value) {
     WriteLine(output, key, '"' + EscapeString(value) + '"');
 }
 
-void WriteDouble(std::ostream& output, const std::string& key, double value, int precision = 6) {
+void WriteDouble(std::string& output, const std::string& key, double value, int precision = 6) {
     char buffer[64];
     sprintf_s(buffer, "%.*f", precision, value);
     WriteLine(output, key, buffer);
 }
 
-template <typename T> void WriteInteger(std::ostream& output, const std::string& key, T value) {
+template <typename T> void WriteInteger(std::string& output, const std::string& key, T value) {
     WriteLine(output, key, std::to_string(static_cast<long long>(value)));
 }
 
 void WriteOptionalDouble(
-    std::ostream& output, const std::string& key, const std::optional<double>& value, int precision = 6) {
+    std::string& output, const std::string& key, const std::optional<double>& value, int precision = 6) {
     if (!value.has_value()) {
         WriteLine(output, key, "null");
         return;
@@ -118,7 +126,7 @@ void WriteOptionalDouble(
 }
 
 template <typename T>
-void WriteOptionalInteger(std::ostream& output, const std::string& key, const std::optional<T>& value) {
+void WriteOptionalInteger(std::string& output, const std::string& key, const std::optional<T>& value) {
     if (!value.has_value()) {
         WriteLine(output, key, "null");
         return;
@@ -126,17 +134,18 @@ void WriteOptionalInteger(std::ostream& output, const std::string& key, const st
     WriteInteger(output, key, *value);
 }
 
-void WriteDoubleArray(std::ostream& output, const std::string& key, const std::vector<double>& values) {
-    output << key << "=[";
+void WriteDoubleArray(std::string& output, const std::string& key, const std::vector<double>& values) {
+    output += key;
+    output += "=[";
     for (size_t i = 0; i < values.size(); ++i) {
         if (i != 0) {
-            output << ',';
+            output += ',';
         }
         char buffer[64];
         sprintf_s(buffer, "%.6f", values[i]);
-        output << buffer;
+        output += buffer;
     }
-    output << "]\n";
+    output += "]\n";
 }
 
 std::string_view ScalarMetricUnitDumpText(ScalarMetricUnit unit) {
@@ -147,12 +156,12 @@ bool ParseDumpScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit) {
     return TryEnumFromString(text, unit);
 }
 
-void WriteScalarMetricUnit(std::ostream& output, const std::string& key, ScalarMetricUnit unit) {
+void WriteScalarMetricUnit(std::string& output, const std::string& key, ScalarMetricUnit unit) {
     WriteString(output, key, std::string(ScalarMetricUnitDumpText(unit)));
 }
 
 void WriteNamedScalarMetrics(
-    std::ostream& output, const std::string& prefix, const std::vector<NamedScalarMetric>& metrics) {
+    std::string& output, const std::string& prefix, const std::vector<NamedScalarMetric>& metrics) {
     WriteInteger(output, prefix + ".count", metrics.size());
     for (size_t i = 0; i < metrics.size(); ++i) {
         const std::string metricPrefix = prefix + "." + std::to_string(i);
@@ -163,7 +172,7 @@ void WriteNamedScalarMetrics(
 }
 
 void WriteRetainedHistories(
-    std::ostream& output, const std::string& prefix, const std::vector<RetainedHistorySeries>& histories) {
+    std::string& output, const std::string& prefix, const std::vector<RetainedHistorySeries>& histories) {
     WriteInteger(output, prefix + ".count", histories.size());
     for (size_t i = 0; i < histories.size(); ++i) {
         const std::string historyPrefix = prefix + "." + std::to_string(i);
@@ -420,7 +429,8 @@ void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
 
 }  // namespace
 
-bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
+bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
+    output.clear();
     WriteLine(output, "format", kDumpFormatVersion);
 
     WriteString(output, "cpu.name", dump.snapshot.cpu.name);
@@ -470,23 +480,39 @@ bool WriteTelemetryDump(std::ostream& output, const TelemetryDump& dump) {
     WriteInteger(output, "time.minute", dump.snapshot.now.wMinute);
     WriteInteger(output, "time.second", dump.snapshot.now.wSecond);
     WriteInteger(output, "time.milliseconds", dump.snapshot.now.wMilliseconds);
-    output.flush();
-    return output.good();
+    return true;
 }
 
-bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* error) {
+bool WriteTelemetryDump(std::FILE* output, const TelemetryDump& dump) {
+    std::string text;
+    if (!WriteTelemetryDumpText(text, dump)) {
+        return false;
+    }
+    return WriteDumpText(output, text) && fflush(output) == 0;
+}
+
+bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string* error) {
     TelemetryDump parsed;
 
     std::map<std::string, std::string> values;
-    std::string line;
     size_t lineNumber = 0;
-    while (std::getline(input, line)) {
+    size_t lineStart = 0;
+    while (lineStart <= input.size()) {
+        size_t lineEnd = input.find('\n', lineStart);
+        if (lineEnd == std::string_view::npos) {
+            lineEnd = input.size();
+        }
+        std::string line(input.substr(lineStart, lineEnd - lineStart));
         ++lineNumber;
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
         const std::string trimmed = TrimDumpWhitespace(line);
         if (trimmed.empty() || trimmed[0] == '#') {
+            if (lineEnd == input.size()) {
+                break;
+            }
+            lineStart = lineEnd + 1;
             continue;
         }
         const size_t equals = trimmed.find('=');
@@ -497,6 +523,10 @@ bool LoadTelemetryDump(std::istream& input, TelemetryDump& dump, std::string* er
             return false;
         }
         values[TrimDumpWhitespace(trimmed.substr(0, equals))] = TrimDumpWhitespace(trimmed.substr(equals + 1));
+        if (lineEnd == input.size()) {
+            break;
+        }
+        lineStart = lineEnd + 1;
     }
 
     std::string format;

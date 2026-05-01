@@ -4,8 +4,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
-#include <fstream>
 
 #include "telemetry/impl/collector_storage_selection.h"
 #include "util/strings.h"
@@ -22,6 +22,24 @@ struct ResolvedNetworkCandidate {
 constexpr size_t kSyntheticHistorySamples = 60;
 constexpr double kSyntheticCpuMemoryTotalGb = 63.943493;
 constexpr double kSyntheticCpuMemoryPeakRatio = 0.75;
+
+std::string ReadBinaryFile(const std::filesystem::path& path) {
+    std::FILE* file = nullptr;
+    if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr) {
+        return {};
+    }
+    fseek(file, 0, SEEK_END);
+    const long size = ftell(file);
+    if (size < 0) {
+        fclose(file);
+        return {};
+    }
+    fseek(file, 0, SEEK_SET);
+    std::string text(static_cast<size_t>(size), '\0');
+    const size_t read = text.empty() ? 0 : fread(text.data(), 1, text.size(), file);
+    fclose(file);
+    return read == text.size() ? text : std::string{};
+}
 
 double SyntheticWave(size_t sampleIndex,
     uint64_t tick,
@@ -485,8 +503,8 @@ private:
             return true;
         }
 
-        std::ifstream input(fakePath_, std::ios::binary);
-        if (!input.is_open()) {
+        const std::string input = ReadBinaryFile(fakePath_);
+        if (input.empty()) {
             trace_.Write("fake:load_failed reason=open path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
             if (required && errorText != nullptr) {
                 *errorText = "Failed to open fake telemetry file:\n" + Utf8FromWide(fakePath_.wstring());

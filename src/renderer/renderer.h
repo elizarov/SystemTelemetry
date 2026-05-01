@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -12,6 +11,7 @@
 
 #include "config/config.h"
 #include "renderer/render_types.h"
+#include "util/function_ref.h"
 
 struct TextStyleMetrics {
     int title = 0;
@@ -39,7 +39,7 @@ struct RendererStyle {
 
 class Renderer {
 public:
-    using DrawCallback = std::function<void()>;
+    using DrawCallback = FunctionRef<void()>;
 
     virtual ~Renderer() = default;
 

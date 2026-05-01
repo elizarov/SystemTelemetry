@@ -114,6 +114,41 @@ std::string FormatHresult(HRESULT value) {
     return buffer;
 }
 
+std::string FormatHexColorText(unsigned int value) {
+    char buffer[16];
+    sprintf_s(buffer, "#%08X", value);
+    return buffer;
+}
+
+std::string FormatDoubleGeneral(double value, int precision) {
+    char format[16];
+    sprintf_s(format, "%%.%dg", precision);
+    char buffer[64];
+    sprintf_s(buffer, format, value);
+    return buffer;
+}
+
+std::string FormatDoubleFixed(double value, int precision) {
+    char format[16];
+    sprintf_s(format, "%%.%df", precision);
+    char buffer[64];
+    sprintf_s(buffer, format, value);
+    return buffer;
+}
+
+std::string FormatDoubleFixedTrimmed(double value, int precision) {
+    std::string text = FormatDoubleFixed(value, precision);
+    if (const size_t dot = text.find('.'); dot != std::string::npos) {
+        while (!text.empty() && text.back() == '0') {
+            text.pop_back();
+        }
+        if (!text.empty() && text.back() == '.') {
+            text.pop_back();
+        }
+    }
+    return text;
+}
+
 std::string FormatNetworkFooterText(const std::string& adapterName, const std::string& ipAddress) {
     if (adapterName.empty()) {
         return ipAddress;

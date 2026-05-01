@@ -5,7 +5,6 @@
 #include <cmath>
 #include <cstdio>
 #include <span>
-#include <sstream>
 #include <string_view>
 #include <utility>
 
@@ -814,12 +813,12 @@ const MetricValue& MetricSource::ResolveMetric(const std::string& metricRef) con
 }
 
 const std::vector<MetricValue>& MetricSource::ResolveMetricList(const std::vector<std::string>& metricRefs) const {
-    std::ostringstream cacheKey;
+    std::string key;
     for (const auto& metricRef : metricRefs) {
-        cacheKey << metricRef << '\n';
+        key += metricRef;
+        key += '\n';
     }
 
-    const std::string key = cacheKey.str();
     const auto cached = metricListCache_.find(key);
     if (cached != metricListCache_.end()) {
         return cached->second;

@@ -1,14 +1,14 @@
 #pragma once
 
-#include <ostream>
+#include <cstdio>
 #include <string>
 #include <string_view>
 
 class Trace {
 public:
-    explicit Trace(std::ostream* output = nullptr);
+    explicit Trace(std::FILE* output = nullptr);
 
-    void SetOutput(std::ostream* output);
+    void SetOutput(std::FILE* output);
 
     void Write(const char* text) const;
     void Write(const std::string& text) const;
@@ -26,5 +26,5 @@ public:
     static std::string QuoteText(std::string_view text);
 
 private:
-    std::ostream* output_ = nullptr;
+    std::FILE* output_ = nullptr;
 };

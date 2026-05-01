@@ -2,10 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
-#include <iomanip>
+#include <cstdio>
 #include <set>
-#include <sstream>
 #include <type_traits>
 
 #include "config/color_resolver.h"
@@ -59,9 +57,7 @@ ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallbac
 }
 
 std::string FormatHexColor(ColorConfig color) {
-    std::ostringstream stream;
-    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << color.ToRgba();
-    return stream.str();
+    return FormatHexColorText(color.ToRgba());
 }
 
 bool ParseIntPair(const std::string& value, int& first, int& second) {
@@ -251,14 +247,27 @@ bool DispatchKnownBindingSection(Owner& owner,
 }
 
 std::string ReadFileUtf8(const std::filesystem::path& path) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input.is_open()) {
+    std::FILE* input = nullptr;
+    if (_wfopen_s(&input, path.c_str(), L"rb") != 0 || input == nullptr) {
         return {};
     }
 
-    std::ostringstream buffer;
-    buffer << input.rdbuf();
-    std::string text = buffer.str();
+    fseek(input, 0, SEEK_END);
+    const long size = ftell(input);
+    if (size < 0) {
+        fclose(input);
+        return {};
+    }
+    fseek(input, 0, SEEK_SET);
+    std::string text(static_cast<size_t>(size), '\0');
+    if (!text.empty()) {
+        const size_t read = fread(text.data(), 1, text.size(), input);
+        if (read != text.size()) {
+            fclose(input);
+            return {};
+        }
+    }
+    fclose(input);
     if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
         static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
@@ -502,21 +511,38 @@ template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, Metri
 
 void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigParseContext& context) {
     std::string section;
-    std::stringstream stream(text);
-    std::string line;
 
-    while (std::getline(stream, line)) {
+    size_t lineStart = 0;
+    while (lineStart <= text.size()) {
+        size_t lineEnd = text.find('\n', lineStart);
+        if (lineEnd == std::string::npos) {
+            lineEnd = text.size();
+        }
+
+        std::string line = text.substr(lineStart, lineEnd - lineStart);
         line = Trim(line);
         if (line.empty() || line[0] == '#' || line[0] == ';') {
+            if (lineEnd == text.size()) {
+                break;
+            }
+            lineStart = lineEnd + 1;
             continue;
         }
         if (line.front() == '[' && line.back() == ']') {
             section = Trim(line.substr(1, line.size() - 2));
+            if (lineEnd == text.size()) {
+                break;
+            }
+            lineStart = lineEnd + 1;
             continue;
         }
 
         const size_t eq = line.find('=');
         if (eq == std::string::npos) {
+            if (lineEnd == text.size()) {
+                break;
+            }
+            lineStart = lineEnd + 1;
             continue;
         }
 
@@ -524,6 +550,10 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
         const std::string value = Trim(line.substr(eq + 1));
 
         DispatchKnownBindingSection<AppConfig::BindingList>(config, section, key, value, context);
+        if (lineEnd == text.size()) {
+            break;
+        }
+        lineStart = lineEnd + 1;
     }
 }
 

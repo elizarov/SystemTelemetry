@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <functional>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -387,12 +386,12 @@ std::vector<LayoutGuideSheetCardSummary> DashboardRenderer::CollectLayoutGuideSh
 }
 
 bool DashboardRenderer::SaveLayoutGuideSheetSurfacePng(
-    const std::filesystem::path& imagePath, int width, int height, std::function<void()> draw) {
-    return renderer_->SavePng(imagePath, width, height, std::move(draw));
+    const std::filesystem::path& imagePath, int width, int height, Renderer::DrawCallback draw) {
+    return renderer_->SavePng(imagePath, width, height, draw);
 }
 
-bool DashboardRenderer::RenderLayoutGuideSheetSurfaceOffscreen(int width, int height, std::function<void()> draw) {
-    return renderer_->DrawOffscreen(width, height, std::move(draw));
+bool DashboardRenderer::RenderLayoutGuideSheetSurfaceOffscreen(int width, int height, Renderer::DrawCallback draw) {
+    return renderer_->DrawOffscreen(width, height, draw);
 }
 
 void DashboardRenderer::BeginLayoutGuideSheetDynamicArtifacts(const DashboardOverlayState& overlayState) {

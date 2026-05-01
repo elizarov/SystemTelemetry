@@ -1,6 +1,5 @@
 #include <filesystem>
 #include <fstream>
-#include <functional>
 #include <gtest/gtest.h>
 #include <sstream>
 #include <vector>
@@ -404,19 +403,19 @@ TEST(LayoutEditTree, EveryBuiltNodeHasLocalizedDescriptionAndLocationText) {
     const LayoutEditTreeModel model = BuildLayoutEditTreeModel(MakeBaseConfig(), ReadTemplateText());
     const LocalizationCatalogMap catalog = ReadLocalizationCatalog();
 
-    std::function<void(const LayoutEditTreeNode&)> verifyNode = [&](const LayoutEditTreeNode& node) {
+    const auto verifyNode = [&](const auto& verify, const LayoutEditTreeNode& node) -> void {
         EXPECT_FALSE(node.locationText.empty()) << node.label;
         EXPECT_FALSE(node.descriptionKey.empty()) << node.label;
         const auto it = catalog.find(node.descriptionKey);
         ASSERT_TRUE(it != catalog.end()) << "missing localization key: " << node.descriptionKey;
         EXPECT_FALSE(it->second.empty()) << "empty localization text for key: " << node.descriptionKey;
         for (const auto& child : node.children) {
-            verifyNode(child);
+            verify(verify, child);
         }
     };
 
     for (const auto& root : model.roots) {
-        verifyNode(root);
+        verifyNode(verifyNode, root);
     }
 }
 

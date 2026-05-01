@@ -3,8 +3,8 @@
 #include <windows.h>
 
 #include <commdlg.h>
+#include <cstdio>
 #include <filesystem>
-#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -44,6 +44,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions);
 class DiagnosticsSession {
 public:
     DiagnosticsSession(const DiagnosticsOptions& options, Trace& trace);
+    ~DiagnosticsSession();
 
     bool Initialize();
     bool ShouldShowDialogs() const;
@@ -62,7 +63,7 @@ private:
     std::filesystem::path layoutGuideSheetPath_;
     std::filesystem::path saveConfigPath_;
     std::filesystem::path saveFullConfigPath_;
-    std::ofstream traceStream_;
+    std::FILE* traceFile_ = nullptr;
 };
 
 std::vector<std::wstring> GetCommandLineArguments();

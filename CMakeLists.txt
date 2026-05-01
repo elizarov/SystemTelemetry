@@ -176,6 +176,84 @@ set_source_files_properties(resources/SystemTelemetry.rc PROPERTIES
     OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/config.ini;${CMAKE_SOURCE_DIR}/resources/localization.ini"
 )
 
+set(systemtelemetry_release_speed_sources
+    src/config/config.cpp
+    src/config/config_resolution.cpp
+    src/config/metric_catalog.cpp
+    src/dashboard/dashboard_app.cpp
+    src/dashboard/dashboard_controller.cpp
+    src/dashboard/dashboard_shell_ui.cpp
+    src/dashboard_renderer/dashboard_renderer.cpp
+    src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/layout_resolver.cpp
+    src/layout_edit/impl/layout_snap_solver.cpp
+    src/layout_edit/layout_edit_active_region_trace.cpp
+    src/layout_edit/layout_edit_controller.cpp
+    src/layout_edit/layout_edit_hit_test.cpp
+    src/layout_edit/layout_edit_parameter_edit.cpp
+    src/layout_edit/layout_edit_service.cpp
+    src/layout_edit/layout_edit_target_descriptor.cpp
+    src/layout_edit/layout_edit_tooltip.cpp
+    src/layout_edit/layout_edit_tooltip_payload.cpp
+    src/layout_edit/layout_edit_tooltip_text.cpp
+    src/layout_edit/layout_edit_trace_session.cpp
+    src/layout_edit/layout_edit_tree.cpp
+    src/layout_guide_sheet/layout_guide_sheet.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
+    src/layout_model/dashboard_overlay_state.cpp
+    src/layout_model/layout_edit_active_region.cpp
+    src/layout_model/layout_edit_helpers.cpp
+    src/layout_model/layout_edit_hit_priority.cpp
+    src/layout_model/layout_edit_layout_target.cpp
+    src/layout_model/layout_edit_parameter_metadata.cpp
+    src/layout_model/layout_edit_service.cpp
+    src/renderer/renderer.cpp
+    src/renderer/render_types.cpp
+    src/renderer/impl/d2d_cache.cpp
+    src/renderer/impl/d2d_render_conversions.cpp
+    src/renderer/impl/d2d_renderer.cpp
+    src/renderer/impl/palette.cpp
+    src/renderer/impl/text_width_cache.cpp
+    src/telemetry/board/board_vendor.cpp
+    src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/amd/gpu_amd_adl.cpp
+    src/telemetry/impl/collector_board.cpp
+    src/telemetry/impl/collector_cpu.cpp
+    src/telemetry/impl/collector_fake.cpp
+    src/telemetry/impl/collector_gpu.cpp
+    src/telemetry/impl/collector_network.cpp
+    src/telemetry/impl/collector_real.cpp
+    src/telemetry/impl/collector_state.cpp
+    src/telemetry/impl/collector_storage.cpp
+    src/telemetry/impl/collector_storage_selection.cpp
+    src/telemetry/impl/collector_support.cpp
+    src/telemetry/impl/retained_history.cpp
+    src/telemetry/impl/system_info_support.cpp
+    src/telemetry/metrics.cpp
+    src/telemetry/telemetry.cpp
+    src/widget/card_chrome_layout.cpp
+    src/widget/layout_edit_types.cpp
+    src/widget/widget.cpp
+    src/widget/impl/card_chrome.cpp
+    src/widget/impl/clock_date.cpp
+    src/widget/impl/clock_time.cpp
+    src/widget/impl/drive_usage_list.cpp
+    src/widget/impl/gauge.cpp
+    src/widget/impl/metric_list.cpp
+    src/widget/impl/network_footer.cpp
+    src/widget/impl/text.cpp
+    src/widget/impl/throughput.cpp
+    src/widget/impl/vertical_spacer.cpp
+    src/widget/impl/vertical_spring.cpp
+    tests/benchmarks.cpp
+)
+
+set_source_files_properties(${systemtelemetry_release_speed_sources} PROPERTIES
+    COMPILE_OPTIONS "$<$<CONFIG:Release>:/O2>"
+)
+
 add_library(SystemTelemetryGigabyte OBJECT
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
 )
@@ -227,15 +305,19 @@ target_compile_options(SystemTelemetry PRIVATE
     /EHsc
     /W4
     /permissive-
+    /GR-
     /w14505
     /we4505
     /Zi
+    $<$<CONFIG:Release>:/Os>
+    $<$<CONFIG:Release>:/GL>
 )
 
 target_link_options(SystemTelemetry PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/OPT:REF>
+    $<$<CONFIG:Release>:/LTCG>
     $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
@@ -390,6 +472,7 @@ target_compile_options(SystemTelemetryTests PRIVATE
     /EHsc
     /W4
     /permissive-
+    /GR-
     /w14505
     /we4505
     /Zi
@@ -525,15 +608,19 @@ target_compile_options(SystemTelemetryBenchmarks PRIVATE
     /EHsc
     /W4
     /permissive-
+    /GR-
     /w14505
     /we4505
     /Zi
+    $<$<CONFIG:Release>:/Os>
+    $<$<CONFIG:Release>:/GL>
 )
 target_link_options(SystemTelemetryBenchmarks PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/DEBUG:FULL>
     $<$<CONFIG:Release>:/OPT:REF>
+    $<$<CONFIG:Release>:/LTCG>
     $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>

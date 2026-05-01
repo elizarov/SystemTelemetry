@@ -4,10 +4,10 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <istream>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -131,7 +131,7 @@ protected:
     TelemetryCollector() = default;
 };
 
-using TelemetryDumpLoader = bool (*)(std::istream& input, TelemetryDump& dump, std::string* error);
+using TelemetryDumpLoader = bool (*)(std::string_view input, TelemetryDump& dump, std::string* error);
 
 struct TelemetryCollectorOptions {
     bool fake = false;

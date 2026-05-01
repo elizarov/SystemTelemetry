@@ -1,7 +1,6 @@
 #include "dashboard_renderer/impl/layout_resolver.h"
 
 #include <algorithm>
-#include <functional>
 #include <map>
 
 #include "dashboard_renderer/dashboard_renderer.h"
@@ -916,66 +915,66 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             resolvedLayout_.cards.push_back(std::move(card));
         };
 
-    std::function<void(const LayoutNodeConfig&, const RenderRect&, const std::vector<size_t>&)> resolveDashboardNode =
-        [&](const LayoutNodeConfig& node, const RenderRect& rect, const std::vector<size_t>& nodePath) {
-            if (!DashboardRenderer::IsContainerNode(node)) {
-                resolveCard(node, rect, nodePath);
-                return;
+    const auto resolveDashboardNode = [&](const auto& resolveNode,
+                                          const LayoutNodeConfig& node,
+                                          const RenderRect& rect,
+                                          const std::vector<size_t>& nodePath) -> void {
+        if (!DashboardRenderer::IsContainerNode(node)) {
+            resolveCard(node, rect, nodePath);
+            return;
+        }
+
+        const bool horizontal = node.name == "columns";
+        const int gap = horizontal ? renderer.ScaleLogical(renderer.config_.layout.dashboard.columnGap)
+                                   : renderer.ScaleLogical(renderer.config_.layout.dashboard.rowGap);
+        int totalWeight = 0;
+        for (const auto& child : node.children) {
+            totalWeight += (std::max)(1, child.weight);
+        }
+        if (totalWeight <= 0) {
+            return;
+        }
+
+        const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
+                                   gap * static_cast<int>((std::max)(static_cast<size_t>(0), node.children.size() - 1));
+        int remainingAvailable = totalAvailable;
+        int cursor = horizontal ? rect.left : rect.top;
+        int remainingWeight = totalWeight;
+        std::vector<RenderRect> childRects;
+        childRects.reserve(node.children.size());
+        for (size_t i = 0; i < node.children.size(); ++i) {
+            const auto& child = node.children[i];
+            const int childWeight = (std::max)(1, child.weight);
+            const int size = (i + 1 == node.children.size())
+                                 ? ((horizontal ? rect.right : rect.bottom) - cursor)
+                                 : (std::max)(0, remainingAvailable * childWeight / (std::max)(1, remainingWeight));
+
+            RenderRect childRect = rect;
+            if (horizontal) {
+                childRect.left = cursor;
+                childRect.right = cursor + size;
+            } else {
+                childRect.top = cursor;
+                childRect.bottom = cursor + size;
             }
 
-            const bool horizontal = node.name == "columns";
-            const int gap = horizontal ? renderer.ScaleLogical(renderer.config_.layout.dashboard.columnGap)
-                                       : renderer.ScaleLogical(renderer.config_.layout.dashboard.rowGap);
-            int totalWeight = 0;
-            for (const auto& child : node.children) {
-                totalWeight += (std::max)(1, child.weight);
-            }
-            if (totalWeight <= 0) {
-                return;
-            }
+            renderer.WriteTrace("renderer:layout_dashboard_child parent=\"" + node.name + "\" child=\"" + child.name +
+                                "\" weight=" + std::to_string(childWeight) + " gap=" + std::to_string(gap) +
+                                " size=" + std::to_string(size) + " " + FormatRect(childRect));
+            childRects.push_back(childRect);
+            std::vector<size_t> childPath = nodePath;
+            childPath.push_back(i);
+            resolveNode(resolveNode, child, childRect, childPath);
+            cursor += size + gap;
+            remainingAvailable -= size;
+            remainingWeight -= childWeight;
+        }
+        if (includeWidgetState) {
+            AddLayoutEditGuide(renderer, node, rect, childRects, gap, "", "", nodePath);
+        }
+    };
 
-            const int totalAvailable =
-                (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
-                gap * static_cast<int>((std::max)(static_cast<size_t>(0), node.children.size() - 1));
-            int remainingAvailable = totalAvailable;
-            int cursor = horizontal ? rect.left : rect.top;
-            int remainingWeight = totalWeight;
-            std::vector<RenderRect> childRects;
-            childRects.reserve(node.children.size());
-            for (size_t i = 0; i < node.children.size(); ++i) {
-                const auto& child = node.children[i];
-                const int childWeight = (std::max)(1, child.weight);
-                const int size = (i + 1 == node.children.size())
-                                     ? ((horizontal ? rect.right : rect.bottom) - cursor)
-                                     : (std::max)(0, remainingAvailable * childWeight / (std::max)(1, remainingWeight));
-
-                RenderRect childRect = rect;
-                if (horizontal) {
-                    childRect.left = cursor;
-                    childRect.right = cursor + size;
-                } else {
-                    childRect.top = cursor;
-                    childRect.bottom = cursor + size;
-                }
-
-                renderer.WriteTrace("renderer:layout_dashboard_child parent=\"" + node.name + "\" child=\"" +
-                                    child.name + "\" weight=" + std::to_string(childWeight) +
-                                    " gap=" + std::to_string(gap) + " size=" + std::to_string(size) + " " +
-                                    FormatRect(childRect));
-                childRects.push_back(childRect);
-                std::vector<size_t> childPath = nodePath;
-                childPath.push_back(i);
-                resolveDashboardNode(child, childRect, childPath);
-                cursor += size + gap;
-                remainingAvailable -= size;
-                remainingWeight -= childWeight;
-            }
-            if (includeWidgetState) {
-                AddLayoutEditGuide(renderer, node, rect, childRects, gap, "", "", nodePath);
-            }
-        };
-
-    resolveDashboardNode(renderer.config_.layout.structure.cardsLayout, dashboardRect, {});
+    resolveDashboardNode(resolveDashboardNode, renderer.config_.layout.structure.cardsLayout, dashboardRect, {});
 
     if (resolvedLayout_.cards.empty()) {
         renderer.lastError_ = "renderer:layout_resolve_failed cards=0 root=\"" +

@@ -451,16 +451,22 @@ double ResolveSavedScreenshotScale(const AppConfig& config) {
 DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options, Trace& trace)
     : options_(options), trace_(trace) {}
 
+DiagnosticsSession::~DiagnosticsSession() {
+    if (traceFile_ != nullptr) {
+        trace_.SetOutput(nullptr);
+        fclose(traceFile_);
+    }
+}
+
 bool DiagnosticsSession::Initialize() {
     const std::filesystem::path workingDirectory = GetWorkingDirectory();
     if (options_.trace) {
         tracePath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.tracePath, kDefaultTraceFileName);
-        traceStream_.open(tracePath_, std::ios::binary | std::ios::app);
-        if (!traceStream_.is_open()) {
+        if (_wfopen_s(&traceFile_, tracePath_.c_str(), L"ab") != 0 || traceFile_ == nullptr) {
             ShowFileOpenError("trace file", tracePath_);
             return false;
         }
-        trace_.SetOutput(&traceStream_);
+        trace_.SetOutput(traceFile_);
     }
     if (options_.dump) {
         dumpPath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.dumpPath, kDefaultDumpFileName);
@@ -501,12 +507,14 @@ void DiagnosticsSession::ReportError(const std::string& traceText, const std::ws
 
 bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig& config) {
     if (options_.dump) {
-        std::ofstream dumpStream(dumpPath_, std::ios::binary | std::ios::trunc);
-        if (!dumpStream.is_open()) {
+        std::FILE* dumpFile = nullptr;
+        if (_wfopen_s(&dumpFile, dumpPath_.c_str(), L"wb") != 0 || dumpFile == nullptr) {
             ShowFileOpenError("dump file", dumpPath_);
             return false;
         }
-        if (!WriteTelemetryDump(dumpStream, dump)) {
+        const bool dumpWritten = WriteTelemetryDump(dumpFile, dump);
+        fclose(dumpFile);
+        if (!dumpWritten) {
             const std::wstring message =
                 WideFromUtf8("Failed to write dump file:\n" + Utf8FromWide(dumpPath_.wstring()));
             ReportError("diagnostics:dump_write_failed path=\"" + Utf8FromWide(dumpPath_.wstring()) + "\"", message);

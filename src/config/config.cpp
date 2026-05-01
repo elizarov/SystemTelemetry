@@ -1,7 +1,6 @@
 #include "config/config.h"
 
-#include <iomanip>
-#include <sstream>
+#include "util/strings.h"
 
 namespace {
 
@@ -19,12 +18,7 @@ const MetricDefinitionConfig kRuntimePlaceholderMetricDefinition{
 }  // namespace
 
 ColorConfig ColorConfig::FromRgba(unsigned int value) {
-    std::ostringstream stream;
-    stream << '#' << std::uppercase << std::hex;
-    stream.width(8);
-    stream.fill('0');
-    stream << value;
-    return ColorConfig{static_cast<std::uint32_t>(value), stream.str()};
+    return ColorConfig{static_cast<std::uint32_t>(value), FormatHexColorText(value)};
 }
 
 unsigned int ColorConfig::ToRgb() const {
@@ -110,12 +104,15 @@ bool AppConfig::operator==(const AppConfig& other) const {
 }
 
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
-    std::ostringstream stream;
+    std::string text;
     if (definition.telemetryScale) {
-        stream << "*";
+        text = "*";
     } else {
-        stream << definition.scale;
+        text = FormatDoubleGeneral(definition.scale);
     }
-    stream << "," << definition.unit << "," << definition.label;
-    return stream.str();
+    text += ",";
+    text += definition.unit;
+    text += ",";
+    text += definition.label;
+    return text;
 }

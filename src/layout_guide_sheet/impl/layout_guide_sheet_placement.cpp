@@ -720,9 +720,7 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             if (!RectsOverlap(bubble, leftStack) && !RectsOverlap(bubble, rightStack)) {
                 continue;
             }
-            if (constrainCalloutWidth) {
-                constrainCalloutWidth(callout, std::max(1, block.itemWidth));
-            }
+            constrainCalloutWidth(callout, std::max(1, block.itemWidth));
             changed = true;
         }
         return changed;

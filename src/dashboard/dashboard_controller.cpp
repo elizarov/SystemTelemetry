@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
+#include <cstdio>
 #include <string_view>
 
 #include "config/color_resolver.h"
@@ -263,12 +263,14 @@ void DashboardController::SaveDumpAs(DashboardShellHost& shell) {
     if (!path.has_value()) {
         return;
     }
-    std::ofstream output(*path, std::ios::binary | std::ios::trunc);
-    if (!output.is_open()) {
+    std::FILE* output = nullptr;
+    if (_wfopen_s(&output, path->c_str(), L"wb") != 0 || output == nullptr) {
         shell.ShowError(WideFromUtf8("Failed to open dump file:\n" + Utf8FromWide(path->wstring())));
         return;
     }
-    if (!WriteTelemetryDump(output, state_.telemetry->Dump())) {
+    const bool written = WriteTelemetryDump(output, state_.telemetry->Dump());
+    fclose(output);
+    if (!written) {
         shell.ShowError(WideFromUtf8("Failed to write dump file:\n" + Utf8FromWide(path->wstring())));
     }
 }

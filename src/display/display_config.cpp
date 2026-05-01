@@ -1,6 +1,6 @@
 #include "display/display_config.h"
 
-#include <fstream>
+#include <cstdio>
 #include <shellapi.h>
 #include <shobjidl.h>
 
@@ -15,6 +15,28 @@
 #include "util/strings.h"
 #include "util/trace.h"
 #include "util/utf8.h"
+
+namespace {
+
+std::string ReadBinaryFile(const std::filesystem::path& path) {
+    std::FILE* file = nullptr;
+    if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr) {
+        return {};
+    }
+    fseek(file, 0, SEEK_END);
+    const long size = ftell(file);
+    if (size < 0) {
+        fclose(file);
+        return {};
+    }
+    fseek(file, 0, SEEK_SET);
+    std::string text(static_cast<size_t>(size), '\0');
+    const size_t read = text.empty() ? 0 : fread(text.data(), 1, text.size(), file);
+    fclose(file);
+    return read == text.size() ? text : std::string{};
+}
+
+}  // namespace
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     if (config.display.wallpaper.empty()) {
@@ -129,8 +151,12 @@ bool ConfigureDisplay(
 
     bool prepared = SaveConfig(tempConfigPath, config, RuntimeConfigParseContext());
     if (prepared) {
-        std::ofstream output(tempDumpPath, std::ios::binary | std::ios::trunc);
-        prepared = output.is_open() && WriteTelemetryDump(output, dump);
+        std::FILE* output = nullptr;
+        prepared = _wfopen_s(&output, tempDumpPath.c_str(), L"wb") == 0 && output != nullptr;
+        if (prepared) {
+            prepared = WriteTelemetryDump(output, dump);
+            fclose(output);
+        }
     }
     if (!prepared) {
         std::error_code ignored;
@@ -193,9 +219,9 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
     const AppConfig config = LoadConfig(sourceConfigPath, true, RuntimeConfigParseContext());
     TelemetryDump dump;
     {
-        std::ifstream input(sourceDumpPath, std::ios::binary);
+        const std::string input = ReadBinaryFile(sourceDumpPath);
         std::string error;
-        if (!input.is_open() || !LoadTelemetryDump(input, dump, &error)) {
+        if (input.empty() || !LoadTelemetryDump(input, dump, &error)) {
             return 1;
         }
     }

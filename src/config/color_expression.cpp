@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <limits>
-#include <sstream>
 #include <vector>
 
 #include "util/strings.h"
@@ -20,19 +19,7 @@ double ParseDoubleOrDefault(const std::string& value, double fallback) {
 }
 
 std::string FormatDouble(double value) {
-    std::ostringstream stream;
-    stream.precision(12);
-    stream << value;
-    std::string text = stream.str();
-    if (const size_t dot = text.find('.'); dot != std::string::npos) {
-        while (!text.empty() && text.back() == '0') {
-            text.pop_back();
-        }
-        if (!text.empty() && text.back() == '.') {
-            text.pop_back();
-        }
-    }
-    return text;
+    return FormatDoubleGeneral(value, 12);
 }
 
 std::string FormatAlphaByte(unsigned int alpha) {

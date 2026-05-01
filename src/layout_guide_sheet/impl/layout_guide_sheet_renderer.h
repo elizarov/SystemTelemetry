@@ -2,12 +2,12 @@
 
 #include <chrono>
 #include <filesystem>
-#include <functional>
 #include <string>
 #include <vector>
 
 #include "layout_guide_sheet/impl/layout_guide_sheet_types.h"
 #include "layout_model/layout_edit_active_region.h"
+#include "util/function_ref.h"
 
 class DashboardRenderer;
 struct SystemSnapshot;
@@ -38,8 +38,8 @@ public:
     LayoutEditActiveRegions CollectOverviewActiveRegions(const SystemSnapshot& snapshot);
 
 private:
-    using SurfaceDrawCallback = std::function<void()>;
-    using SurfaceRenderer = std::function<bool(int width, int height, SurfaceDrawCallback draw)>;
+    using SurfaceDrawCallback = FunctionRef<void()>;
+    using SurfaceRenderer = FunctionRef<bool(int width, int height, SurfaceDrawCallback draw)>;
 
     bool Render(const SystemSnapshot& snapshot,
         const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,

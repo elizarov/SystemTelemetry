@@ -39,32 +39,32 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.08`
   - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.37` to `2.39`
-  - `snap avg_ms=0.18`
-  - `apply avg_ms=0.08`
-  - `paint_draw avg_ms=2.09` to `2.11`
+  - `drag_loop per_iter_ms=2.60`
+  - `snap avg_ms=0.21`
+  - `apply avg_ms=0.10`
+  - `paint_draw avg_ms=2.27`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.22`
-  - `telemetry_update avg_ms=2.18`
-  - `paint_total avg_ms=2.04`
-  - `paint_draw avg_ms=2.04`
+  - `update_loop per_iter_ms=5.66`
+  - `telemetry_update avg_ms=3.34`
+  - `paint_total avg_ms=2.32`
+  - `paint_draw avg_ms=2.32`
 - Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=3.60` to `3.66`
-  - `switch_apply avg_ms=0.73` to `0.74`
-  - `dialog_refresh avg_ms=0.15`
-  - `switch_paint avg_ms=2.72` to `2.76`
+  - `switch_loop per_iter_ms=4.04`
+  - `switch_apply avg_ms=0.88`
+  - `dialog_refresh avg_ms=0.18`
+  - `switch_paint avg_ms=2.95`
 - Current repeatable `mouse-hover` result on the current tree:
-  - `hover_loop per_iter_ms=2.20` to `2.21`
-  - `hover_hit_test avg_ms=0.08`
-  - `paint_total avg_ms=2.12` to `2.13`
-  - `paint_draw avg_ms=2.12` to `2.13`
+  - `hover_loop per_iter_ms=2.34`
+  - `hover_hit_test avg_ms=0.09`
+  - `paint_total avg_ms=2.25`
+  - `paint_draw avg_ms=2.25`
 - Current repeatable `layout-guide-sheet` result on the current tree:
-  - `sheet_loop per_iter_ms=328.70`
-  - `active_regions avg_ms=6.66`
-  - `sheet_plan avg_ms=1.25`
-  - `sheet_measure avg_ms=4.51`
-  - `sheet_place avg_ms=299.16`
-  - `sheet_draw avg_ms=16.97`
+  - `sheet_loop per_iter_ms=98.06`
+  - `active_regions avg_ms=6.24`
+  - `sheet_plan avg_ms=1.37`
+  - `sheet_measure avg_ms=5.12`
+  - `sheet_place avg_ms=45.93`
+  - `sheet_draw avg_ms=39.21`
 
 ## Current Confirmed Hotspots
 
@@ -691,6 +691,34 @@ These changes produced real wins and remain in the codebase:
   - After narrowing `SetConfig` to layout-relevant work only, repeatable reruns landed at `drag_loop per_iter_ms=2.60` to `2.68`, `snap avg_ms=0.19` to `0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.28` to `2.35`.
 - Conclusion:
   - The regression was not just in draw; the drag path was also paying avoidable per-frame renderer reconfiguration churn. Preserve caches and resource rebuilds across layout-only config updates.
+
+### Hypothesis: Use size-oriented Release code generation for the single executable
+
+- Change:
+  - Compile the Release app and benchmark targets with `/Os` plus `/GL`, link both with `/LTCG`, `/OPT:REF`, and non-incremental linking, and keep benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units on `/O2` inside that profile.
+- Result:
+  - Helped executable size and did not introduce a meaningful additional benchmark regression relative to the same `/GL` plus `/LTCG` benchmark profile.
+- Observed effect:
+  - `build\SystemTelemetry.exe` decreased from `1,783,808` bytes with `/O2`, `/GL`, and `/LTCG` to `1,465,344` bytes with the size-oriented profile.
+  - A full `/Os` probe without hot-source `/O2` overrides also produced `1,465,344` bytes, but was noisier on paint-heavy loops; retaining `/O2` on benchmark-sensitive files kept the same executable size in this build.
+  - The pre-change direct benchmark binary, which did not yet use the app's `/GL` plus `/LTCG` profile, measured `edit-layout` at `drag_loop per_iter_ms=2.57`, `layout-switch` at `switch_loop per_iter_ms=3.94`, `mouse-hover` at `hover_loop per_iter_ms=2.36`, `update-telemetry` at `update_loop per_iter_ms=5.39`, and `layout-guide-sheet` at `sheet_loop per_iter_ms=108.38`.
+  - A temporary `/O2`, `/GL`, and `/LTCG` benchmark build measured `edit-layout` at `drag_loop per_iter_ms=2.62`, `layout-switch` at `switch_loop per_iter_ms=3.98`, `mouse-hover` at `hover_loop per_iter_ms=2.39`, `update-telemetry` at `update_loop per_iter_ms=5.68`, and `layout-guide-sheet` at `sheet_loop per_iter_ms=101.14`.
+  - The final size-oriented benchmark build measured `edit-layout` at `drag_loop per_iter_ms=2.60`, `layout-switch` at `switch_loop per_iter_ms=4.04`, `mouse-hover` at `hover_loop per_iter_ms=2.34`, `update-telemetry` at `update_loop per_iter_ms=5.66`, and `layout-guide-sheet` at `sheet_loop per_iter_ms=98.06`.
+  - The daemon-backed `profile_benchmark.cmd update-telemetry 240 2` validation under `build\profile_benchmark_daemon\requests\24530_28119_478\` landed at `update_loop per_iter_ms=6.16`, `telemetry_update avg_ms=3.64`, and `paint_draw avg_ms=2.52`; the hotspot shape remained split between the real collector path and Direct2D/DirectWrite drawing, with no new app-owned exclusive hotspot dominating the profile.
+- Conclusion:
+  - Keep the size-oriented Release profile. Compare future performance work against benchmarks built with the same Release profile as the app, because comparing against the old non-LTCG benchmark binary overstates the effect of `/Os`.
+
+### Hypothesis: Remove `std::function` from production callback paths
+
+- Change:
+  - Replace production `std::function` use with direct helpers for local recursion and mutation helpers, then switch synchronous renderer, layout-guide-sheet, snap-solver, and placement callbacks to a non-owning `FunctionRef` view.
+- Result:
+  - Helped executable size modestly.
+- Observed effect:
+  - Removing only local helper type erasure reduced `build\SystemTelemetry.exe` from `1,451,008` bytes to `1,445,888` bytes.
+  - Removing production `std::function` entirely reduced `build\SystemTelemetry.exe` further to `1,440,768` bytes and `build\SystemTelemetryBenchmarks.exe` to `1,078,272` bytes.
+- Conclusion:
+  - Keep `FunctionRef` for synchronous callbacks that do not escape the call. Continue to use owning callback storage only when a callback must outlive the call stack.
 
 ## Practical Guidance For Future Experiments
 

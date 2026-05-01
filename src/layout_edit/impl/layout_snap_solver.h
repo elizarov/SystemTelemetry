@@ -1,9 +1,10 @@
 #pragma once
 
 #include <cstddef>
-#include <functional>
 #include <optional>
 #include <vector>
+
+#include "util/function_ref.h"
 
 namespace layout_snap_solver {
 
@@ -13,7 +14,7 @@ struct SnapCandidate {
     size_t groupOrder = 0;
 };
 
-using ExtentEvaluator = std::function<std::optional<int>(int firstWeight)>;
+using ExtentEvaluator = FunctionRef<std::optional<int>(int firstWeight)>;
 
 std::optional<int> FindNearestSnapWeight(int currentWeight,
     int combinedWeight,

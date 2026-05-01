@@ -1,8 +1,6 @@
 #include "config/config_writer.h"
 
-#include <fstream>
-#include <iomanip>
-#include <sstream>
+#include <cstdio>
 #include <type_traits>
 
 #include "config/config_parser.h"
@@ -12,9 +10,7 @@
 namespace {
 
 std::string FormatHexColor(ColorConfig color) {
-    std::ostringstream stream;
-    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << color.ToRgba();
-    return stream.str();
+    return FormatHexColorText(color.ToRgba());
 }
 
 std::string FormatLogicalSize(const LogicalSizeConfig& size) {
@@ -56,9 +52,7 @@ template <> std::string EncodeConfigValue<configschema::IntCodec, int>(const int
 }
 
 template <> std::string EncodeConfigValue<configschema::DoubleCodec, double>(const double& value) {
-    std::ostringstream stream;
-    stream << value;
-    return stream.str();
+    return FormatDoubleGeneral(value);
 }
 
 template <> std::string EncodeConfigValue<configschema::StringCodec, std::string>(const std::string& value) {
@@ -330,14 +324,27 @@ void SaveKnownSectionDifferences(const Owner& owner, const CompareOwner* compare
 }
 
 std::string ReadFileUtf8(const std::filesystem::path& path) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input.is_open()) {
+    std::FILE* input = nullptr;
+    if (_wfopen_s(&input, path.c_str(), L"rb") != 0 || input == nullptr) {
         return {};
     }
 
-    std::ostringstream buffer;
-    buffer << input.rdbuf();
-    std::string text = buffer.str();
+    fseek(input, 0, SEEK_END);
+    const long size = ftell(input);
+    if (size < 0) {
+        fclose(input);
+        return {};
+    }
+    fseek(input, 0, SEEK_SET);
+    std::string text(static_cast<size_t>(size), '\0');
+    if (!text.empty()) {
+        const size_t read = fread(text.data(), 1, text.size(), input);
+        if (read != text.size()) {
+            fclose(input);
+            return {};
+        }
+    }
+    fclose(input);
     if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
         static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
@@ -353,13 +360,14 @@ bool WriteFileUtf8(const std::filesystem::path& path, const std::string& text) {
         return false;
     }
 
-    std::ofstream output(path, std::ios::binary | std::ios::trunc);
-    if (!output.is_open()) {
+    std::FILE* output = nullptr;
+    if (_wfopen_s(&output, path.c_str(), L"wb") != 0 || output == nullptr) {
         return false;
     }
 
-    output.write(text.data(), static_cast<std::streamsize>(text.size()));
-    return output.good();
+    const bool written = fwrite(text.data(), 1, text.size(), output) == text.size();
+    const bool closed = fclose(output) == 0;
+    return written && closed;
 }
 
 void ReplaceOrAppendKey(std::vector<std::string>& lines,
@@ -390,13 +398,21 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines,
 
 std::vector<std::string> SplitConfigLines(const std::string& text) {
     std::vector<std::string> lines;
-    std::stringstream stream(text);
-    std::string line;
-    while (std::getline(stream, line)) {
+    size_t lineStart = 0;
+    while (lineStart <= text.size()) {
+        size_t lineEnd = text.find('\n', lineStart);
+        if (lineEnd == std::string::npos) {
+            lineEnd = text.size();
+        }
+        std::string line = text.substr(lineStart, lineEnd - lineStart);
         if (!line.empty() && line.back() == '\r') {
             line.pop_back();
         }
         lines.push_back(line);
+        if (lineEnd == text.size()) {
+            break;
+        }
+        lineStart = lineEnd + 1;
     }
     return lines;
 }

@@ -2,13 +2,13 @@
 
 #include <algorithm>
 #include <cmath>
-#include <sstream>
 
 #include "layout_edit/impl/layout_snap_solver.h"
 #include "layout_edit/layout_edit_hit_test.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
+#include "util/strings.h"
 
 namespace {
 
@@ -374,14 +374,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                     return false;
                 }
 
-                std::vector<std::string> metricRefs;
-                std::stringstream stream(node->parameter);
-                std::string item;
-                while (std::getline(stream, item, ',')) {
-                    if (!item.empty()) {
-                        metricRefs.push_back(item);
-                    }
-                }
+                std::vector<std::string> metricRefs = SplitTrimmed(node->parameter, ',');
                 if (region->key.anchorId < 0 || region->key.anchorId >= static_cast<int>(metricRefs.size())) {
                     return false;
                 }

@@ -1,10 +1,9 @@
 #include "layout_edit/layout_edit_tooltip.h"
 
 #include <cmath>
-#include <iomanip>
-#include <sstream>
 
 #include "layout_edit/layout_edit_service.h"
+#include "util/strings.h"
 
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format) {
     if (format == configschema::ValueFormat::String || format == configschema::ValueFormat::FontSpec ||
@@ -15,25 +14,11 @@ std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat
         return std::to_string(static_cast<int>(std::lround(value)));
     }
 
-    std::ostringstream stream;
-    stream << std::fixed << std::setprecision(2) << value;
-    std::string text = stream.str();
-    const size_t dot = text.find('.');
-    if (dot != std::string::npos) {
-        while (!text.empty() && text.back() == '0') {
-            text.pop_back();
-        }
-        if (!text.empty() && text.back() == '.') {
-            text.pop_back();
-        }
-    }
-    return text;
+    return FormatDoubleFixedTrimmed(value, 2);
 }
 
 std::string FormatLayoutEditTooltipValue(unsigned int value) {
-    std::ostringstream stream;
-    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << value;
-    return stream.str();
+    return FormatHexColorText(value);
 }
 
 std::string FormatLayoutEditTooltipValue(const UiFontConfig& value) {

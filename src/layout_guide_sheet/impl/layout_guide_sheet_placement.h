@@ -1,11 +1,11 @@
 #pragma once
 
-#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "renderer/render_types.h"
+#include "util/function_ref.h"
 #include "widget/layout_edit_parameter_id.h"
 #include "widget/layout_edit_types.h"
 
@@ -85,7 +85,7 @@ struct LayoutGuideSheetPlacementResult {
 };
 
 using LayoutGuideSheetConstrainCalloutWidth =
-    std::function<void(LayoutGuideSheetPlacementCallout& callout, int constrainedWidth)>;
+    FunctionRef<void(LayoutGuideSheetPlacementCallout& callout, int constrainedWidth)>;
 
 LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
     std::vector<LayoutGuideSheetCardPlacement>& cardPlacements,

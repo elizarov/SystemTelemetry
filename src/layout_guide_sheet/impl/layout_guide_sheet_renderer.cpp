@@ -602,7 +602,7 @@ bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
         calloutRequests,
         selectedCardIds,
         [&](int width, int height, SurfaceDrawCallback draw) {
-            return dashboardRenderer_.SaveLayoutGuideSheetSurfacePng(imagePath, width, height, std::move(draw));
+            return dashboardRenderer_.SaveLayoutGuideSheetSurfacePng(imagePath, width, height, draw);
         },
         traceDetails,
         errorText,
@@ -620,7 +620,7 @@ bool LayoutGuideSheetRenderer::RenderOffscreen(const SystemSnapshot& snapshot,
         calloutRequests,
         selectedCardIds,
         [&](int width, int height, SurfaceDrawCallback draw) {
-            return dashboardRenderer_.RenderLayoutGuideSheetSurfaceOffscreen(width, height, std::move(draw));
+            return dashboardRenderer_.RenderLayoutGuideSheetSurfaceOffscreen(width, height, draw);
         },
         traceDetails,
         errorText,

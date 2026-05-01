@@ -9,7 +9,6 @@
 #include <memory>
 #include <msclr\marshal_cppstd.h>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -319,10 +318,9 @@ bool CaptureGigabyteSnapshot(
         CollectManagedSensors(context, context->sensorTemperature, nullptr, &snapshot.temperatures);
         snapshot.success = true;
 
-        std::ostringstream details;
-        details << "Gigabyte SIV hardware-monitor query completed."
-                << " fan_count=" << snapshot.fans.size() << " temp_count=" << snapshot.temperatures.size();
-        snapshot.diagnostics = details.str();
+        snapshot.diagnostics =
+            "Gigabyte SIV hardware-monitor query completed. fan_count=" + std::to_string(snapshot.fans.size()) +
+            " temp_count=" + std::to_string(snapshot.temperatures.size());
         diagnostics = snapshot.diagnostics;
         trace.WriteLazy([&] {
             return "gigabyte_siv:snapshot_done fan_count=" + std::to_string(snapshot.fans.size()) +

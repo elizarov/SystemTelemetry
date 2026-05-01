@@ -4,9 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <functional>
-#include <iomanip>
 #include <optional>
-#include <sstream>
 #include <string_view>
 
 #include "config/color_expression.h"
@@ -15,9 +13,7 @@
 namespace {
 
 std::string FormatHexColor(ColorConfig color) {
-    std::ostringstream stream;
-    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << color.ToRgba();
-    return stream.str();
+    return FormatHexColorText(color.ToRgba());
 }
 
 ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallback) {

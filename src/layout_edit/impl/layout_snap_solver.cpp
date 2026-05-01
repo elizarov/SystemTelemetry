@@ -10,7 +10,7 @@ std::optional<int> FindNearestSnapWeight(int currentWeight,
     int threshold,
     const std::vector<SnapCandidate>& candidates,
     const ExtentEvaluator& evaluateExtent) {
-    if (combinedWeight <= 1 || threshold <= 0 || !evaluateExtent) {
+    if (combinedWeight <= 1 || threshold <= 0) {
         return std::nullopt;
     }
 

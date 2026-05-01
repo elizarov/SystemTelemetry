@@ -1,14 +1,11 @@
 #include "layout_edit/layout_edit_trace_session.h"
 
-#include <iomanip>
-#include <sstream>
+#include "util/strings.h"
 
 namespace {
 
 std::string FormatMilliseconds(double value) {
-    std::ostringstream stream;
-    stream << std::fixed << std::setprecision(3) << value;
-    return stream.str();
+    return FormatDoubleFixed(value, 3);
 }
 
 double DurationMilliseconds(std::chrono::nanoseconds value) {

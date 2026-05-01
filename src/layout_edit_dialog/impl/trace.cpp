@@ -1,7 +1,6 @@
 #include "layout_edit_dialog/impl/trace.h"
 
 #include <cstdio>
-#include <sstream>
 
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit_dialog/impl/util.h"
@@ -77,14 +76,14 @@ std::string FormatTraceColorHex(unsigned int color) {
 }
 
 std::string JoinNodePath(const std::vector<size_t>& path) {
-    std::ostringstream stream;
+    std::string text;
     for (size_t i = 0; i < path.size(); ++i) {
         if (i != 0) {
-            stream << '.';
+            text += '.';
         }
-        stream << path[i];
+        text += std::to_string(path[i]);
     }
-    return stream.str();
+    return text;
 }
 
 std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
@@ -99,12 +98,10 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
         return "focus=" + QuoteTraceText(GetLayoutEditParameterDisplayName(*parameter));
     }
     if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&leaf->focusKey)) {
-        std::ostringstream stream;
-        stream << "focus=" << QuoteTraceText(leaf->sectionName.empty() ? "weight" : leaf->sectionName + ".layout");
-        stream << " edit_card=" << QuoteTraceText(weightKey->editCardId);
-        stream << " node_path=" << QuoteTraceText(JoinNodePath(weightKey->nodePath));
-        stream << " separator=" << weightKey->separatorIndex;
-        return stream.str();
+        return "focus=" + QuoteTraceText(leaf->sectionName.empty() ? "weight" : leaf->sectionName + ".layout") +
+               " edit_card=" + QuoteTraceText(weightKey->editCardId) +
+               " node_path=" + QuoteTraceText(JoinNodePath(weightKey->nodePath)) +
+               " separator=" + std::to_string(weightKey->separatorIndex);
     }
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&leaf->focusKey)) {
         return "focus=" + QuoteTraceText("[metrics] " + metricKey->metricId);
@@ -113,11 +110,9 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
         return "focus=" + QuoteTraceText("[card." + cardTitleKey->cardId + "] title");
     }
     if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&leaf->focusKey)) {
-        std::ostringstream stream;
-        stream << "focus=" << QuoteTraceText(LayoutNodeFieldEditTraceLabel(*nodeFieldKey, leaf->sectionName));
-        stream << " edit_card=" << QuoteTraceText(nodeFieldKey->editCardId);
-        stream << " node_path=" << QuoteTraceText(JoinNodePath(nodeFieldKey->nodePath));
-        return stream.str();
+        return "focus=" + QuoteTraceText(LayoutNodeFieldEditTraceLabel(*nodeFieldKey, leaf->sectionName)) +
+               " edit_card=" + QuoteTraceText(nodeFieldKey->editCardId) +
+               " node_path=" + QuoteTraceText(JoinNodePath(nodeFieldKey->nodePath));
     }
     return "focus=\"unknown\"";
 }
@@ -127,37 +122,32 @@ std::string BuildTraceNodeText(const LayoutEditTreeNode* node) {
         return "node=\"none\"";
     }
 
-    std::ostringstream stream;
-    stream << "node_kind=" << QuoteTraceText(TreeNodeKindTraceName(node->kind));
-    stream << " label=" << QuoteTraceText(node->label);
-    stream << " location=" << QuoteTraceText(node->locationText);
+    std::string text = "node_kind=" + QuoteTraceText(TreeNodeKindTraceName(node->kind));
+    text += " label=" + QuoteTraceText(node->label);
+    text += " location=" + QuoteTraceText(node->locationText);
     if (node->leaf.has_value()) {
-        stream << " " << BuildTraceFocusKeyText(&*node->leaf);
+        text += " " + BuildTraceFocusKeyText(&*node->leaf);
         if (std::holds_alternative<LayoutMetricEditKey>(node->leaf->focusKey)) {
-            stream << " value_format=\"metric\"";
+            text += " value_format=\"metric\"";
         } else {
-            stream << " value_format=" << QuoteTraceText(ValueFormatTraceName(node->leaf->valueFormat));
+            text += " value_format=" + QuoteTraceText(ValueFormatTraceName(node->leaf->valueFormat));
         }
     }
-    return stream.str();
+    return text;
 }
 
 std::string BuildColorDialogTraceValues(HWND hwnd) {
-    std::ostringstream trace;
-    trace << " hex=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT))
-          << " red=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT))
-          << " green=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT))
-          << " blue=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT))
-          << " alpha=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT));
-    return trace.str();
+    return " hex=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT)) +
+           " red=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT)) +
+           " green=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT)) +
+           " blue=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT)) +
+           " alpha=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT));
 }
 
 std::string BuildMetricDialogTraceValues(HWND hwnd) {
-    std::ostringstream trace;
-    trace << " style=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE))
-          << " scale=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT))
-          << " unit=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT))
-          << " label=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT))
-          << " binding=" << QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT));
-    return trace.str();
+    return " style=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE)) +
+           " scale=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT)) +
+           " unit=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT)) +
+           " label=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT)) +
+           " binding=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT));
 }

@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
 
 #include "vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.h"
@@ -122,14 +121,15 @@ public:
         fanSupported_ = ADLX_SUCCEEDED(fanResult) && fanSupported;
         vramSupported_ = ADLX_SUCCEEDED(vramResult) && vramSupported;
 
-        std::ostringstream diag;
-        diag << "ADLX GPU=" << gpuName_ << " usage_supported=" << (usageSupported ? "yes" : "no") << "("
-             << static_cast<int>(usageResult) << ")"
-             << " temp_supported=" << (tempSupported ? "yes" : "no") << "(" << static_cast<int>(tempResult) << ")"
-             << " clock_supported=" << (clockSupported ? "yes" : "no") << "(" << static_cast<int>(clockResult) << ")"
-             << " fan_supported=" << (fanSupported ? "yes" : "no") << "(" << static_cast<int>(fanResult) << ")"
-             << " vram_supported=" << (vramSupported ? "yes" : "no") << "(" << static_cast<int>(vramResult) << ")";
-        diagnostics_ = diag.str();
+        diagnostics_ =
+            "ADLX GPU=" + gpuName_ + " usage_supported=" + (usageSupported ? "yes" : "no") + "(" +
+            std::to_string(static_cast<int>(usageResult)) + ")" + " temp_supported=" + (tempSupported ? "yes" : "no") +
+            "(" + std::to_string(static_cast<int>(tempResult)) + ")" +
+            " clock_supported=" + (clockSupported ? "yes" : "no") + "(" +
+            std::to_string(static_cast<int>(clockResult)) + ")" + " fan_supported=" + (fanSupported ? "yes" : "no") +
+            "(" + std::to_string(static_cast<int>(fanResult)) + ")" +
+            " vram_supported=" + (vramSupported ? "yes" : "no") + "(" + std::to_string(static_cast<int>(vramResult)) +
+            ")";
         initialized_ = true;
         trace().Write("amd_adlx:initialize_done diagnostics=\"" + diagnostics_ + "\"");
         return true;

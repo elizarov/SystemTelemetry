@@ -1,7 +1,6 @@
 #include "layout_edit/layout_edit_tree.h"
 
 #include <algorithm>
-#include <functional>
 #include <unordered_map>
 
 #include "config/config_parser.h"
@@ -237,22 +236,25 @@ std::vector<std::string> CollectReachableCards(const AppConfig& config) {
     return orderedCards;
 }
 
+void CollectTopLevelCardsFromNode(const LayoutNodeConfig& node,
+    std::vector<std::string>& orderedCards,
+    std::unordered_map<std::string, bool>& seenCards) {
+    if (node.name == "rows" || node.name == "columns") {
+        for (const auto& child : node.children) {
+            CollectTopLevelCardsFromNode(child, orderedCards, seenCards);
+        }
+        return;
+    }
+    if (!node.name.empty() && !seenCards.contains(node.name)) {
+        orderedCards.push_back(node.name);
+        seenCards.emplace(node.name, true);
+    }
+}
+
 std::vector<std::string> CollectTopLevelCards(const AppConfig& config) {
     std::vector<std::string> orderedCards;
     std::unordered_map<std::string, bool> seenCards;
-    const std::function<void(const LayoutNodeConfig&)> collectNode = [&](const LayoutNodeConfig& node) {
-        if (node.name == "rows" || node.name == "columns") {
-            for (const auto& child : node.children) {
-                collectNode(child);
-            }
-            return;
-        }
-        if (!node.name.empty() && !seenCards.contains(node.name)) {
-            orderedCards.push_back(node.name);
-            seenCards.emplace(node.name, true);
-        }
-    };
-    collectNode(config.layout.structure.cardsLayout);
+    CollectTopLevelCardsFromNode(config.layout.structure.cardsLayout, orderedCards, seenCards);
     return orderedCards;
 }
 
