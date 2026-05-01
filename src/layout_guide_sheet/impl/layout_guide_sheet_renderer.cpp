@@ -1025,7 +1025,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
         traceDetails->push_back("canvas=\"" + std::to_string(sheetWidth) + "x" + std::to_string(sheetHeight) + "\"");
         for (const LayoutGuideSheetPlacementBlockTrace& block : placementResult.blocks) {
             traceDetails->push_back(
-                "leader_score_" + block.cardId + "=" + std::to_string(block.leaderScore) + " leader_side_repairs_" +
+                "leader_score_" + block.cardId + "=" + std::to_string(block.leaderScore) + " leader_repair_passes_" +
                 block.cardId + "=" + std::to_string(block.sideRepairPasses) + " leader_columns_" + block.cardId +
                 "=\"" + std::to_string(block.leftCallouts) + "," + std::to_string(block.topCallouts) + "," +
                 std::to_string(block.rightCallouts) + "," + std::to_string(block.bottomCallouts) + "\"");
