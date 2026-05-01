@@ -306,6 +306,7 @@ target_compile_definitions(SystemTelemetry PRIVATE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
+    _USE_STD_VECTOR_ALGORITHMS=0
 )
 
 target_compile_options(SystemTelemetry PRIVATE
@@ -476,6 +477,7 @@ target_compile_definitions(SystemTelemetryTests PRIVATE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
+    _USE_STD_VECTOR_ALGORITHMS=0
     SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 target_compile_options(SystemTelemetryTests PRIVATE
@@ -617,6 +619,7 @@ target_compile_definitions(SystemTelemetryBenchmarks PRIVATE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
+    _USE_STD_VECTOR_ALGORITHMS=0
     SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 target_compile_options(SystemTelemetryBenchmarks PRIVATE

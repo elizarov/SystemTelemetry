@@ -37,6 +37,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Keep config-file I/O on standard C++ streams and preserve strict UTF-8 handling without ANSI code-page fallback.
 - Keep project filesystem operations on `src/util/file_path.*` helpers instead of `std::filesystem` so path handling stays UTF-16 Win32-backed without pulling the standard filesystem library into the executable.
 - Keep native app and benchmark targets built without native C++ exception handling; the C++/CLI bridge owns the managed exception boundary separately.
+- Keep native app, test, and benchmark targets compiled with `_USE_STD_VECTOR_ALGORITHMS=0` so MSVC's vectorized STL algorithm dispatch tables stay out of the single-file binaries.
 - Keep `resources/localization.ini` as the embedded key-value catalog for localizable runtime strings.
 - Keep one full-fidelity widget draw path for normal repaints and layout-edit drag repaints.
 - When a private module needs shared mutable collector data across multiple `.cpp` files, expose that state through a dedicated state type plus module-owned free functions.

@@ -41,20 +41,20 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.08`
   - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.60`
-  - `snap avg_ms=0.21`
+  - `drag_loop per_iter_ms=2.70`
+  - `snap avg_ms=0.22`
   - `apply avg_ms=0.10`
-  - `paint_draw avg_ms=2.27`
+  - `paint_draw avg_ms=2.37`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=5.66`
-  - `telemetry_update avg_ms=3.34`
-  - `paint_total avg_ms=2.32`
-  - `paint_draw avg_ms=2.32`
+  - `update_loop per_iter_ms=4.89`
+  - `telemetry_update avg_ms=2.63`
+  - `paint_total avg_ms=2.26`
+  - `paint_draw avg_ms=2.26`
 - Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=4.04`
-  - `switch_apply avg_ms=0.88`
+  - `switch_loop per_iter_ms=4.08`
+  - `switch_apply avg_ms=0.86`
   - `dialog_refresh avg_ms=0.18`
-  - `switch_paint avg_ms=2.95`
+  - `switch_paint avg_ms=3.01`
 - Current repeatable `theme-change` result on the current tree:
   - `theme_loop per_iter_ms=4.92`
   - `config_copy avg_ms=0.01`
@@ -64,17 +64,17 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `theme_preview avg_ms=1.00`
   - `theme_paint avg_ms=2.61`
 - Current repeatable `mouse-hover` result on the current tree:
-  - `hover_loop per_iter_ms=2.34`
-  - `hover_hit_test avg_ms=0.09`
-  - `paint_total avg_ms=2.25`
-  - `paint_draw avg_ms=2.25`
+  - `hover_loop per_iter_ms=2.59`
+  - `hover_hit_test avg_ms=0.10`
+  - `paint_total avg_ms=2.49`
+  - `paint_draw avg_ms=2.49`
 - Current repeatable `layout-guide-sheet` result on the current tree:
-  - `sheet_loop per_iter_ms=98.06`
-  - `active_regions avg_ms=6.24`
-  - `sheet_plan avg_ms=1.37`
-  - `sheet_measure avg_ms=5.12`
-  - `sheet_place avg_ms=45.93`
-  - `sheet_draw avg_ms=39.21`
+  - `sheet_loop per_iter_ms=91.23`
+  - `active_regions avg_ms=5.38`
+  - `sheet_plan avg_ms=1.13`
+  - `sheet_measure avg_ms=4.60`
+  - `sheet_place avg_ms=46.20`
+  - `sheet_draw avg_ms=33.76`
 
 ## Current Confirmed Hotspots
 
@@ -859,6 +859,21 @@ These changes produced real wins and remain in the codebase:
   - In the fresh linker map, `PopulateLayoutEditSelection` fell from `11,088` bytes to `9,172` bytes before accounting for the small shared helper functions.
 - Conclusion:
   - Keep the common selection finish and trace plumbing shared. Further layout edit dialog size work should target larger standalone routines rather than adding branch-specific cleverness here.
+
+### Hypothesis: Disable MSVC STL vectorized algorithm dispatch
+
+- Change:
+  - Define `_USE_STD_VECTOR_ALGORITHMS=0` for the native app, tests, and benchmark targets.
+  - Keep app and benchmark builds on the same compile and link profile while removing the MSVC STL vectorized algorithm object and lookup tables from the linked binaries.
+- Result:
+  - Helped executable size materially without a confirmed benchmark regression.
+- Observed effect:
+  - Disabling vectorized STL algorithm dispatch reduced `build\SystemTelemetry.exe` from `1,132,544` bytes to `1,107,456` bytes and `build\SystemTelemetryBenchmarks.exe` from `868,864` bytes to `846,848` bytes.
+  - A fresh linker map no longer contains `msvcprt:vector_algorithms.obj`, which previously contributed about `25.7 KiB` across code and read-only data.
+  - Same-session baseline before the flag landed at `edit-layout drag_loop=6.18 ms`, `update-telemetry update_loop=6.16 ms`, `layout-switch switch_loop=4.46 ms`, `mouse-hover hover_loop=2.61 ms`, and `layout-guide-sheet sheet_loop=110.14 ms`; this pass was noisy but gives the local before-change measurement.
+  - Confirmation reruns with `_USE_STD_VECTOR_ALGORITHMS=0` landed at `edit-layout drag_loop=2.70 ms`, `update-telemetry update_loop=4.89 ms`, `layout-switch switch_loop=4.08 ms`, `mouse-hover hover_loop=2.59 ms`, and `layout-guide-sheet sheet_loop=91.23 ms`.
+- Conclusion:
+  - Keep `_USE_STD_VECTOR_ALGORITHMS=0` for the current native targets. The app's hot paths are not helped by the STL vectorized dispatch tables enough to justify the extra single-executable size.
 
 ## Practical Guidance For Future Experiments
 
