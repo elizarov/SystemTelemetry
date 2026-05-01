@@ -320,6 +320,10 @@ public:
         return shellUi_.ApplyFontSetPreview(fonts);
     }
 
+    bool ApplyLayoutPreview(const std::string& layoutName) override {
+        return shellUi_.ApplyLayoutPreview(layoutName);
+    }
+
     bool ApplyThemePreview(const std::string& themeName) override {
         return shellUi_.ApplyThemePreview(themeName);
     }
@@ -674,6 +678,10 @@ bool DashboardShellUi::ApplyFontSetPreview(const UiFontSetConfig& fonts) {
     updatedConfig.layout.fonts = fonts;
     RestoreConfigSnapshot(updatedConfig);
     return true;
+}
+
+bool DashboardShellUi::ApplyLayoutPreview(const std::string& layoutName) {
+    return app_.controller_.SwitchLayout(app_, layoutName, app_.diagnosticsOptions_.editLayout);
 }
 
 bool DashboardShellUi::ApplyThemePreview(const std::string& themeName) {

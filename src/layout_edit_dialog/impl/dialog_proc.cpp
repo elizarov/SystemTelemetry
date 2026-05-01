@@ -332,7 +332,11 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 return TRUE;
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_THEME_COMBO && HIWORD(wParam) == CBN_SELCHANGE) {
-                PreviewSelectedTheme(state, hwnd);
+                if (CurrentLayoutEditEditorKind(state) == LayoutEditEditorKind::LayoutSelector) {
+                    PreviewSelectedLayout(state, hwnd);
+                } else {
+                    PreviewSelectedTheme(state, hwnd);
+                }
                 return TRUE;
             }
             switch (LOWORD(wParam)) {

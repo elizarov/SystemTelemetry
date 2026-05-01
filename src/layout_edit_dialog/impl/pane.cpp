@@ -277,6 +277,7 @@ std::vector<int> ActiveEditorLabelControls(LayoutEditEditorKind kind, bool showB
         }
         case LayoutEditEditorKind::DateTimeFormat:
             return {IDC_LAYOUT_EDIT_DATETIME_FORMAT_LABEL};
+        case LayoutEditEditorKind::LayoutSelector:
         case LayoutEditEditorKind::ThemeSelector:
             return {IDC_LAYOUT_EDIT_THEME_LABEL};
         case LayoutEditEditorKind::MetricListOrder:
@@ -736,14 +737,16 @@ void ShowLayoutEditEditors(HWND hwnd,
     bool showMetricListOrder,
     bool showGlobalFontFamily,
     bool showDateTimeFormat,
-    bool showThemeSelector) {
+    bool showThemeSelector,
+    bool showLayoutSelector) {
+    const bool showSectionSelector = showThemeSelector || showLayoutSelector;
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
     ShowDialogControl(hwnd,
         IDC_LAYOUT_EDIT_SUMMARY,
         !(showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder ||
-            showGlobalFontFamily || showDateTimeFormat || showThemeSelector));
-    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_THEME_LABEL, showThemeSelector);
-    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO, showThemeSelector);
+            showGlobalFontFamily || showDateTimeFormat || showSectionSelector));
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_THEME_LABEL, showSectionSelector);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO, showSectionSelector);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_THEME_PREVIEW, showThemeSelector);
 
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, showFont || showGlobalFontFamily);
@@ -776,7 +779,7 @@ void ShowLayoutEditEditors(HWND hwnd,
     ShowDialogControl(hwnd,
         IDC_LAYOUT_EDIT_HINT,
         showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder ||
-            showGlobalFontFamily || showDateTimeFormat || showThemeSelector);
+            showGlobalFontFamily || showDateTimeFormat || showSectionSelector);
 }
 
 void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state) {
@@ -1041,6 +1044,27 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 innerWidth - labelColumnWidth - metrics.labelGap,
                 singleLineFieldHeight);
             cursorY += fontFaceRowHeight + metrics.hintGap;
+
+            const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
+            const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
+            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_HINT, innerLeft, cursorY, innerWidth, hintHeight);
+            contentBottom = cursorY + hintHeight;
+            break;
+        }
+        case LayoutEditEditorKind::LayoutSelector: {
+            const int comboWidth = innerWidth - labelColumnWidth - metrics.labelGap;
+            const int comboHeight =
+                std::max(DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO), singleLineFieldHeight);
+            const int rowHeight = LayoutLabeledControlRow(hwnd,
+                IDC_LAYOUT_EDIT_THEME_LABEL,
+                IDC_LAYOUT_EDIT_THEME_COMBO,
+                innerLeft,
+                cursorY,
+                labelColumnWidth,
+                metrics.labelGap,
+                comboWidth,
+                comboHeight);
+            cursorY += rowHeight + metrics.hintGap;
 
             const std::wstring hintText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_HINT);
             const int hintHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_HINT, hintText, innerWidth);
@@ -1551,6 +1575,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
         case LayoutEditEditorKind::DateTimeFormat:
             BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO);
             break;
+        case LayoutEditEditorKind::LayoutSelector:
         case LayoutEditEditorKind::ThemeSelector:
             BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO);
             break;
@@ -1587,12 +1612,17 @@ void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd) {
     const bool isThemeSection = state != nullptr && state->selectedLeaf == nullptr && state->selectedNode != nullptr &&
                                 state->selectedNode->kind == LayoutEditTreeNodeKind::Section &&
                                 state->selectedNode->label.rfind("theme.", 0) == 0;
-    const bool canRevert = state != nullptr && (state->selectedLeaf != nullptr || isFontsSection || isThemeSection);
+    const bool isLayoutSection = state != nullptr && state->selectedLeaf == nullptr && state->selectedNode != nullptr &&
+                                 state->selectedNode->kind == LayoutEditTreeNodeKind::Section &&
+                                 state->selectedNode->label.rfind("layout.", 0) == 0;
+    const bool canRevert =
+        state != nullptr && (state->selectedLeaf != nullptr || isFontsSection || isThemeSection || isLayoutSection);
     SetDlgItemTextW(hwnd,
         IDC_LAYOUT_EDIT_REVERT,
-        isFontsSection   ? L"Revert Font Changes"
-        : isThemeSection ? L"Revert Theme"
-                         : L"Revert Field");
+        isFontsSection    ? L"Revert Font Changes"
+        : isThemeSection  ? L"Revert Theme"
+        : isLayoutSection ? L"Revert Layout"
+                          : L"Revert Field");
     EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_REVERT), canRevert ? TRUE : FALSE);
 }
 

@@ -46,6 +46,12 @@ bool IsThemeSectionNode(const LayoutEditDialogState* state) {
            state->selectedNode->label.rfind("theme.", 0) == 0;
 }
 
+bool IsLayoutSectionNode(const LayoutEditDialogState* state) {
+    return state != nullptr && state->selectedLeaf == nullptr && state->selectedNode != nullptr &&
+           state->selectedNode->kind == LayoutEditTreeNodeKind::Section &&
+           state->selectedNode->label.rfind("layout.", 0) == 0;
+}
+
 std::optional<ColorConfig> FindThemeColorValue(const AppConfig& config, const ThemeColorEditKey& key) {
     const auto it = std::find_if(config.layout.themes.begin(),
         config.layout.themes.end(),
@@ -600,6 +606,15 @@ std::vector<std::string> ThemeNames(const AppConfig& config) {
     return names;
 }
 
+std::vector<std::string> LayoutNames(const AppConfig& config) {
+    std::vector<std::string> names;
+    names.reserve(config.layout.layouts.size());
+    for (const LayoutSectionConfig& layout : config.layout.layouts) {
+        names.push_back(layout.name);
+    }
+    return names;
+}
+
 void ShowLayoutEditSelectionEditors(LayoutEditDialogState* state,
     HWND hwnd,
     bool value,
@@ -610,7 +625,8 @@ void ShowLayoutEditSelectionEditors(LayoutEditDialogState* state,
     bool metricBinding,
     bool globalFontFamily = false,
     bool dateTimeFormat = false,
-    bool themeSelector = false) {
+    bool themeSelector = false,
+    bool layoutSelector = false) {
     DestroyMetricListOrderEditorControls(state);
     ShowLayoutEditEditors(hwnd,
         value,
@@ -622,7 +638,8 @@ void ShowLayoutEditSelectionEditors(LayoutEditDialogState* state,
         false,
         globalFontFamily,
         dateTimeFormat,
-        themeSelector);
+        themeSelector,
+        layoutSelector);
     SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
 }
 
@@ -646,6 +663,9 @@ LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* st
     if (state == nullptr || state->selectedLeaf == nullptr) {
         if (IsFontsSectionNode(state)) {
             return LayoutEditEditorKind::GlobalFontFamily;
+        }
+        if (IsLayoutSectionNode(state)) {
+            return LayoutEditEditorKind::LayoutSelector;
         }
         if (IsThemeSectionNode(state)) {
             return LayoutEditEditorKind::ThemeSelector;
@@ -712,12 +732,24 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     }
     if (IsThemeSectionNode(state)) {
         const AppConfig& config = state->dialog->Host().CurrentConfig();
+        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_THEME_LABEL, L"Theme:");
         PopulateTextCombo(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO, ThemeNames(config), config.display.theme);
         ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false, false, false, true);
         FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Previewing changes in the dashboard.");
         InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_PREVIEW), nullptr, TRUE);
         TracePopulateLayoutEditSelection(
             state, " editor=\"theme_selector\" theme=" + QuoteTraceText(config.display.theme));
+        return;
+    }
+    if (IsLayoutSectionNode(state)) {
+        const AppConfig& config = state->dialog->Host().CurrentConfig();
+        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_THEME_LABEL, L"Layout:");
+        PopulateTextCombo(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO, LayoutNames(config), config.display.layout);
+        ShowLayoutEditSelectionEditors(
+            state, hwnd, false, false, false, false, false, false, false, false, false, true);
+        FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Previewing changes in the dashboard.");
+        TracePopulateLayoutEditSelection(
+            state, " editor=\"layout_selector\" layout=" + QuoteTraceText(config.display.layout));
         return;
     }
     if (state->selectedLeaf == nullptr) {
@@ -991,7 +1023,8 @@ void RefreshLayoutEditValidationState(LayoutEditDialogState* state, HWND hwnd) {
     }
     const LayoutEditValidationResult validation = ValidateCurrentSelectionInput(state, hwnd);
     state->activeSelectionValid = validation.valid;
-    if (state->selectedLeaf == nullptr && !IsFontsSectionNode(state) && !IsThemeSectionNode(state)) {
+    if (state->selectedLeaf == nullptr && !IsFontsSectionNode(state) && !IsThemeSectionNode(state) &&
+        !IsLayoutSectionNode(state)) {
         SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, L"Select a field to edit it here.");
     } else if (validation.valid) {
         SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, L"Previewing changes in the dashboard.");
@@ -1104,6 +1137,23 @@ bool PreviewSelectedTheme(LayoutEditDialogState* state, HWND hwnd) {
     const bool applied = !themeName.empty() && state->dialog->Host().ApplyThemePreview(themeName);
     state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:preview_theme",
         BuildTraceNodeText(state->selectedNode) + " theme=" + QuoteTraceText(themeName) +
+            " applied=" + QuoteTraceText(applied ? "true" : "false"));
+    if (applied) {
+        state->dialog->Refresh();
+        SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO));
+    }
+    return applied;
+}
+
+bool PreviewSelectedLayout(LayoutEditDialogState* state, HWND hwnd) {
+    if (state == nullptr || !IsLayoutSectionNode(state) || state->updatingControls) {
+        return false;
+    }
+
+    const std::string layoutName = ReadComboTextUtf8(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO);
+    const bool applied = !layoutName.empty() && state->dialog->Host().ApplyLayoutPreview(layoutName);
+    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:preview_layout",
+        BuildTraceNodeText(state->selectedNode) + " layout=" + QuoteTraceText(layoutName) +
             " applied=" + QuoteTraceText(applied ? "true" : "false"));
     if (applied) {
         state->dialog->Refresh();
@@ -1412,6 +1462,14 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
         }
         if (IsThemeSectionNode(state)) {
             const bool applied = state->dialog->Host().ApplyThemePreview(state->originalConfig.display.theme);
+            if (applied) {
+                state->dialog->Refresh();
+                RefreshLayoutEditValidationState(state, hwnd);
+            }
+            return applied;
+        }
+        if (IsLayoutSectionNode(state)) {
+            const bool applied = state->dialog->Host().ApplyLayoutPreview(state->originalConfig.display.layout);
             if (applied) {
                 state->dialog->Refresh();
                 RefreshLayoutEditValidationState(state, hwnd);

@@ -75,6 +75,7 @@ private:
     bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value);
     bool ApplyFontFamilyPreview(const std::string& family);
     bool ApplyFontSetPreview(const UiFontSetConfig& fonts);
+    bool ApplyLayoutPreview(const std::string& layoutName);
     bool ApplyThemePreview(const std::string& themeName);
     bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value);
     bool ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression);

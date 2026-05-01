@@ -206,6 +206,18 @@ TEST(LayoutEditTree, IncludesOnlyTheActiveLayoutSection) {
     EXPECT_EQ(FindRootNode(model, "layout.primary"), nullptr);
 }
 
+TEST(LayoutEditTree, ShowsActiveLayoutSectionEvenWithoutEditableChildren) {
+    AppConfig config = MakeBaseConfig();
+    config.display.layout = "empty";
+    config.layout.structure.cardsLayout = {};
+
+    const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
+
+    const LayoutEditTreeNode* layoutRoot = FindRootNode(model, "layout.empty");
+    ASSERT_NE(layoutRoot, nullptr);
+    EXPECT_TRUE(layoutRoot->children.empty());
+}
+
 TEST(LayoutEditTree, IncludesOnlyReachableCardsInEncounterOrderAndSkipsCycles) {
     AppConfig config;
     config.display.layout = "primary";

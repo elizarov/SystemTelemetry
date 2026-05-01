@@ -97,9 +97,18 @@ std::string TreeNodeViewportLocation(LayoutEditDialogState* state, const LayoutE
     if (node->kind == LayoutEditTreeNodeKind::Section && node->label.rfind("theme.", 0) == 0) {
         return "[theme." + state->dialog->Host().CurrentConfig().display.theme + "]";
     }
+    if (node->kind == LayoutEditTreeNodeKind::Section && node->label.rfind("layout.", 0) == 0) {
+        return "[layout." + state->dialog->Host().CurrentConfig().display.layout + "]";
+    }
     if (node->locationText.rfind("[theme.", 0) == 0) {
         if (const std::string::size_type sectionEnd = node->locationText.find(']'); sectionEnd != std::string::npos) {
             return "[theme." + state->dialog->Host().CurrentConfig().display.theme + "]" +
+                   node->locationText.substr(sectionEnd + 1);
+        }
+    }
+    if (node->locationText.rfind("[layout.", 0) == 0) {
+        if (const std::string::size_type sectionEnd = node->locationText.find(']'); sectionEnd != std::string::npos) {
+            return "[layout." + state->dialog->Host().CurrentConfig().display.layout + "]" +
                    node->locationText.substr(sectionEnd + 1);
         }
     }

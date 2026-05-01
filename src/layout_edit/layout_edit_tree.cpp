@@ -475,9 +475,6 @@ std::optional<LayoutEditTreeNode> BuildActiveLayoutSectionNode(const AppConfig& 
         groupNode.has_value()) {
         sectionNode.children.push_back(*groupNode);
     }
-    if (sectionNode.children.empty()) {
-        return std::nullopt;
-    }
     return sectionNode;
 }
 

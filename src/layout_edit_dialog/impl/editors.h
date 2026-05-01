@@ -12,6 +12,7 @@ void RefreshLayoutEditValidationState(LayoutEditDialogState* state, HWND hwnd);
 bool PreviewSelectedValue(LayoutEditDialogState* state, HWND hwnd);
 bool PreviewSelectedFont(LayoutEditDialogState* state, HWND hwnd, UINT notificationCode = 0);
 bool PreviewSelectedGlobalFontFamily(LayoutEditDialogState* state, HWND hwnd, UINT notificationCode = 0);
+bool PreviewSelectedLayout(LayoutEditDialogState* state, HWND hwnd);
 bool PreviewSelectedTheme(LayoutEditDialogState* state, HWND hwnd);
 bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd);
 void RefreshSelectedColorDerivedControls(LayoutEditDialogState* state, HWND hwnd);

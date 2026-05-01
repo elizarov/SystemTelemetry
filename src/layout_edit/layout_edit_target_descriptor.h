@@ -18,6 +18,7 @@ enum class LayoutEditEditorKind {
     Metric,
     MetricListOrder,
     DateTimeFormat,
+    LayoutSelector,
     ThemeSelector,
 };
 

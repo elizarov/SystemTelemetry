@@ -69,7 +69,8 @@ void ShowLayoutEditEditors(HWND hwnd,
     bool showMetricListOrder,
     bool showGlobalFontFamily = false,
     bool showDateTimeFormat = false,
-    bool showThemeSelector = false);
+    bool showThemeSelector = false,
+    bool showLayoutSelector = false);
 void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state);
 void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd, size_t rowCount);
 void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd);
