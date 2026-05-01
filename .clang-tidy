@@ -3,9 +3,10 @@ Checks: >
   clang-analyzer-core.*,
   clang-analyzer-cplusplus.NewDelete,
   clang-diagnostic-unused-function,
+  bugprone-branch-clone,
   bugprone-use-after-move,
   misc-include-cleaner
-WarningsAsErrors: 'clang-diagnostic-unused-function,misc-include-cleaner'
+WarningsAsErrors: 'clang-diagnostic-unused-function,bugprone-branch-clone,misc-include-cleaner'
 HeaderFilterRegex: '(^|.*[\\/])(src|tests)[\\/](?!vendor[\\/]).*'
 FormatStyle: none
 UseColor: false
