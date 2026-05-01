@@ -590,7 +590,7 @@ LayoutEditActiveRegions LayoutGuideSheetRenderer::CollectOverviewActiveRegions(c
     return CollectActiveRegionsFromPackedOverview(overview);
 }
 
-bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
+bool LayoutGuideSheetRenderer::SavePng(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,
     const std::vector<std::string>& selectedCardIds,

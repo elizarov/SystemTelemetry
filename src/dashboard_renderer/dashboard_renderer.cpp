@@ -350,12 +350,12 @@ void DashboardRenderer::DrawFrame(const SystemSnapshot& snapshot, const Dashboar
     activeOverlayState_ = nullptr;
 }
 
-bool DashboardRenderer::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
+bool DashboardRenderer::SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot) {
     return SaveSnapshotPng(imagePath, snapshot, DashboardOverlayState{});
 }
 
 bool DashboardRenderer::SaveSnapshotPng(
-    const std::filesystem::path& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+    const FilePath& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     lastError_.clear();
     const bool saved =
         renderer_->SavePng(imagePath, WindowWidth(), WindowHeight(), [&] { DrawFrame(snapshot, overlayState); });
@@ -386,7 +386,7 @@ std::vector<LayoutGuideSheetCardSummary> DashboardRenderer::CollectLayoutGuideSh
 }
 
 bool DashboardRenderer::SaveLayoutGuideSheetSurfacePng(
-    const std::filesystem::path& imagePath, int width, int height, Renderer::DrawCallback draw) {
+    const FilePath& imagePath, int width, int height, Renderer::DrawCallback draw) {
     return renderer_->SavePng(imagePath, width, height, draw);
 }
 

@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <optional>
@@ -26,6 +25,7 @@
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
 #include "util/enum_string.h"
+#include "util/file_path.h"
 #include "util/trace.h"
 
 #define SYSTEM_TELEMETRY_BENCHMARK_ITEMS(X)                                                                            \
@@ -77,8 +77,8 @@ struct BenchmarkCommandLine {
     double renderScale = 2.0;
 };
 
-std::filesystem::path SourceConfigPath() {
-    return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+FilePath SourceConfigPath() {
+    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext BenchmarkConfigParseContext() {
@@ -208,8 +208,7 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
 
 std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config, Trace& trace) {
     TelemetryCollectorOptions options;
-    std::unique_ptr<TelemetryCollector> telemetry =
-        CreateTelemetryCollector(options, std::filesystem::current_path(), trace);
+    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
     if (telemetry == nullptr) {
         return nullptr;
     }
@@ -222,8 +221,7 @@ std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppC
 std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const AppConfig& config, Trace& trace) {
     TelemetryCollectorOptions options;
     options.fake = true;
-    std::unique_ptr<TelemetryCollector> telemetry =
-        CreateTelemetryCollector(options, std::filesystem::current_path(), trace);
+    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
     if (telemetry == nullptr) {
         return nullptr;
     }

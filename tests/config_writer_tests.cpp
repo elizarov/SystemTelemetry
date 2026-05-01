@@ -10,16 +10,15 @@
 namespace {
 
 std::string ReadConfigTemplateFromSourceTree() {
-    const std::filesystem::path configPath =
-        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    const FilePath configPath = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
     std::ifstream input(configPath, std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
     return buffer.str();
 }
 
-std::filesystem::path SourceConfigPath() {
-    return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+FilePath SourceConfigPath() {
+    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext TestConfigParseContext() {

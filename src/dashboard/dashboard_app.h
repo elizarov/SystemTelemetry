@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <chrono>
-#include <filesystem>
 #include <memory>
 #include <optional>
 #include <shellapi.h>
@@ -15,6 +14,7 @@
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_trace_session.h"
+#include "util/file_path.h"
 
 class DashboardShellUi;
 
@@ -28,7 +28,7 @@ public:
     bool InitializeFonts() override;
     void SetRenderConfig(const AppConfig& config);
     void ReleaseFonts() override;
-    bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
+    bool SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot);
     bool WriteDiagnosticsOutputs();
     HWND WindowHandle() const override;
     Trace& TraceLog() override;
@@ -42,7 +42,7 @@ public:
     void InvalidateShell() override;
     void RedrawShellNow() override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
-    std::optional<std::filesystem::path> PromptDiagnosticsSavePath(
+    std::optional<FilePath> PromptDiagnosticsSavePath(
         const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const override;
     void ShowError(const std::wstring& message) const override;
 

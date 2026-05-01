@@ -5,7 +5,6 @@
 #include <array>
 #include <d2d1.h>
 #include <dwrite.h>
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -17,6 +16,7 @@
 #include "renderer/impl/palette.h"
 #include "renderer/impl/text_width_cache.h"
 #include "renderer/renderer.h"
+#include "util/file_path.h"
 
 class D2DRenderer final : public Renderer {
 public:
@@ -30,7 +30,7 @@ public:
     void DiscardWindowTarget(std::string_view reason = {}) override;
     bool DrawWindow(int width, int height, const DrawCallback& draw) override;
     bool DrawOffscreen(int width, int height, const DrawCallback& draw) override;
-    bool SavePng(const std::filesystem::path& imagePath, int width, int height, const DrawCallback& draw) override;
+    bool SavePng(const FilePath& imagePath, int width, int height, const DrawCallback& draw) override;
     const std::string& LastError() const override;
     const TextStyleMetrics& TextMetrics() const override;
     int ScaleLogical(int value) const override;
@@ -85,7 +85,7 @@ private:
         const DrawCallback& draw,
         std::string_view errorPrefix,
         Microsoft::WRL::ComPtr<IWICBitmap>* renderedBitmap = nullptr);
-    bool SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath);
+    bool SaveWicBitmapPng(IWICBitmap* bitmap, const FilePath& imagePath);
     ID2D1SolidColorBrush* D2DSolidBrush(RenderColorId color);
     IDWriteTextFormat* DWriteTextFormat(TextStyleId style) const;
     bool CreateDWriteTextFormats();

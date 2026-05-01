@@ -320,7 +320,7 @@ void SaveKnownSectionDifferences(const Owner& owner, const CompareOwner* compare
     });
 }
 
-std::string ReadFileUtf8(const std::filesystem::path& path) {
+std::string ReadFileUtf8(const FilePath& path) {
     std::FILE* input = nullptr;
     if (_wfopen_s(&input, path.c_str(), L"rb") != 0 || input == nullptr) {
         return {};
@@ -352,7 +352,7 @@ std::string ReadFileUtf8(const std::filesystem::path& path) {
     return text;
 }
 
-bool WriteFileUtf8(const std::filesystem::path& path, const std::string& text) {
+bool WriteFileUtf8(const FilePath& path, const std::string& text) {
     if (!IsValidUtf8(text)) {
         return false;
     }
@@ -541,13 +541,13 @@ std::string BuildSavedConfigText(
     return JoinConfigLines(lines);
 }
 
-bool SaveConfig(const std::filesystem::path& path, const AppConfig& config, const ConfigParseContext& context) {
+bool SaveConfig(const FilePath& path, const AppConfig& config, const ConfigParseContext& context) {
     const AppConfig compareConfig = LoadConfig(path, true, context);
     const std::string output = BuildSavedConfigText(ReadFileUtf8(path), config, &compareConfig);
     return WriteFileUtf8(path, output);
 }
 
-bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) {
+bool SaveFullConfig(const FilePath& path, const AppConfig& config) {
     const std::string output =
         BuildSavedConfigText(LoadEmbeddedConfigTemplate(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
     return WriteFileUtf8(path, output);

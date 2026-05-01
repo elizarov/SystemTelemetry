@@ -417,7 +417,7 @@ DiagnosticsSession::~DiagnosticsSession() {
 }
 
 bool DiagnosticsSession::Initialize() {
-    const std::filesystem::path workingDirectory = GetWorkingDirectory();
+    const FilePath workingDirectory = GetWorkingDirectory();
     if (options_.trace) {
         tracePath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.tracePath, kDefaultTraceFileName);
         if (_wfopen_s(&traceFile_, tracePath_.c_str(), L"ab") != 0 || traceFile_ == nullptr) {
@@ -542,7 +542,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     return true;
 }
 
-void DiagnosticsSession::ShowFileOpenError(const char* label, const std::filesystem::path& path) {
+void DiagnosticsSession::ShowFileOpenError(const char* label, const FilePath& path) {
     const std::wstring message =
         WideFromUtf8(std::string("Failed to open ") + label + ":\n" + Utf8FromWide(path.wstring()));
     ReportError("diagnostics:file_open_failed label=\"" + std::string(label) + "\" path=\"" +
@@ -550,9 +550,8 @@ void DiagnosticsSession::ShowFileOpenError(const char* label, const std::filesys
         message);
 }
 
-std::filesystem::path ResolveDiagnosticsOutputPath(const std::filesystem::path& workingDirectory,
-    const std::filesystem::path& configuredPath,
-    const wchar_t* defaultFileName) {
+FilePath ResolveDiagnosticsOutputPath(
+    const FilePath& workingDirectory, const FilePath& configuredPath, const wchar_t* defaultFileName) {
     if (configuredPath.empty()) {
         return workingDirectory / defaultFileName;
     }
@@ -562,8 +561,8 @@ std::filesystem::path ResolveDiagnosticsOutputPath(const std::filesystem::path& 
     return workingDirectory / configuredPath;
 }
 
-std::optional<std::filesystem::path> PromptSavePath(HWND owner,
-    const std::filesystem::path& initialDirectory,
+std::optional<FilePath> PromptSavePath(HWND owner,
+    const FilePath& initialDirectory,
     const wchar_t* defaultFileName,
     const wchar_t* filter,
     const wchar_t* defaultExtension) {
@@ -584,12 +583,12 @@ std::optional<std::filesystem::path> PromptSavePath(HWND owner,
     if (!GetSaveFileNameW(&dialog)) {
         return std::nullopt;
     }
-    return std::filesystem::path(dialog.lpstrFile);
+    return FilePath(dialog.lpstrFile);
 }
 
-bool CanWriteRuntimeConfig(const std::filesystem::path& path) {
+bool CanWriteRuntimeConfig(const FilePath& path) {
     const std::wstring widePath = path.wstring();
-    if (std::filesystem::exists(path)) {
+    if (FileExists(path)) {
         HANDLE file = CreateFileW(widePath.c_str(),
             GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -604,10 +603,10 @@ bool CanWriteRuntimeConfig(const std::filesystem::path& path) {
         return true;
     }
 
-    const std::filesystem::path parent = path.has_parent_path() ? path.parent_path() : std::filesystem::current_path();
+    const FilePath parent = path.has_parent_path() ? path.parent_path() : CurrentDirectoryPath();
     const std::wstring probeName = L".config-write-test-" + std::to_wstring(GetCurrentProcessId()) + L"-" +
                                    std::to_wstring(GetTickCount64()) + L".tmp";
-    const std::filesystem::path probePath = parent / probeName;
+    const FilePath probePath = parent / probeName;
     HANDLE probe = CreateFileW(probePath.wstring().c_str(),
         GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -622,7 +621,7 @@ bool CanWriteRuntimeConfig(const std::filesystem::path& path) {
     return true;
 }
 
-std::filesystem::path CreateTempFilePath(const wchar_t* prefix) {
+FilePath CreateTempFilePath(const wchar_t* prefix) {
     wchar_t tempPathBuffer[MAX_PATH];
     const DWORD length = GetTempPathW(ARRAYSIZE(tempPathBuffer), tempPathBuffer);
     if (length == 0 || length >= ARRAYSIZE(tempPathBuffer)) {
@@ -633,10 +632,10 @@ std::filesystem::path CreateTempFilePath(const wchar_t* prefix) {
     if (GetTempFileNameW(tempPathBuffer, prefix, 0, tempFileBuffer) == 0) {
         return {};
     }
-    return std::filesystem::path(tempFileBuffer);
+    return FilePath(tempFileBuffer);
 }
 
-std::filesystem::path CreateElevatedSaveConfigTempPath() {
+FilePath CreateElevatedSaveConfigTempPath() {
     return CreateTempFilePath(L"stc");
 }
 
@@ -648,7 +647,7 @@ TelemetryCollectorOptions BuildTelemetryCollectorOptions(const DiagnosticsOption
     return options;
 }
 
-int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath) {
+int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& targetPath) {
     if (sourcePath.empty() || targetPath.empty()) {
         return 2;
     }
@@ -657,9 +656,7 @@ int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std
     if (!SaveConfig(targetPath, config, RuntimeConfigParseContext())) {
         return 1;
     }
-
-    std::error_code ignored;
-    std::filesystem::remove(sourcePath, ignored);
+    RemoveFileIfExists(sourcePath);
     return 0;
 }
 
@@ -690,7 +687,7 @@ std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(const A
     return telemetry;
 }
 
-bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
+bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
@@ -742,7 +739,7 @@ bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     return true;
 }
 
-bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
+bool SaveDumpScreenshot(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,
@@ -817,7 +814,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     return saved;
 }
 
-bool SaveLayoutGuideSheet(const std::filesystem::path& imagePath,
+bool SaveLayoutGuideSheet(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,

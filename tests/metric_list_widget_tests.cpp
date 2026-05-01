@@ -1,4 +1,3 @@
-#include <filesystem>
 #include <gtest/gtest.h>
 #include <optional>
 #include <span>
@@ -6,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "util/file_path.h"
 #include "widget/impl/metric_list.h"
 #include "widget/widget_host.h"
 
@@ -109,7 +109,7 @@ public:
         return true;
     }
 
-    bool SavePng(const std::filesystem::path&, int, int, const DrawCallback& draw) override {
+    bool SavePng(const FilePath&, int, int, const DrawCallback& draw) override {
         draw();
         return true;
     }

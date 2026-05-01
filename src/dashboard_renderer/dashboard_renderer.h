@@ -4,7 +4,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -18,6 +17,7 @@
 #include "layout_model/layout_edit_active_region.h"
 #include "renderer/renderer.h"
 #include "telemetry/metrics.h"
+#include "util/file_path.h"
 #include "util/trace.h"
 #include "widget/card_chrome_layout.h"
 #include "widget/widget.h"
@@ -78,10 +78,9 @@ public:
 
     bool DrawWindow(const SystemSnapshot& snapshot);
     bool DrawWindow(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
-    bool SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot);
-    bool SaveSnapshotPng(const std::filesystem::path& imagePath,
-        const SystemSnapshot& snapshot,
-        const DashboardOverlayState& overlayState);
+    bool SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot);
+    bool SaveSnapshotPng(
+        const FilePath& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     std::vector<LayoutGuideSheetCardSummary> CollectLayoutGuideSheetCardSummaries() const;
     bool RenderSnapshotOffscreen(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
@@ -143,8 +142,7 @@ private:
     const MetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();
     void WriteTrace(const std::string& text) const;
-    bool SaveLayoutGuideSheetSurfacePng(
-        const std::filesystem::path& imagePath, int width, int height, Renderer::DrawCallback draw);
+    bool SaveLayoutGuideSheetSurfacePng(const FilePath& imagePath, int width, int height, Renderer::DrawCallback draw);
     bool RenderLayoutGuideSheetSurfaceOffscreen(int width, int height, Renderer::DrawCallback draw);
     void BeginLayoutGuideSheetDynamicArtifacts(const DashboardOverlayState& overlayState);
     void ResolveLayoutGuideSheetDynamicArtifactCollisions();

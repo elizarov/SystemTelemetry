@@ -7,9 +7,8 @@
 
 namespace {
 
-std::filesystem::path WriteTestConfig(const std::string& text) {
-    const std::filesystem::path path =
-        std::filesystem::temp_directory_path() / "systemtelemetry_config_parser_test.ini";
+FilePath WriteTestConfig(const std::string& text) {
+    const FilePath path = TempDirectoryPath() / "systemtelemetry_config_parser_test.ini";
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     output << text;
     return path;
@@ -22,15 +21,15 @@ ConfigParseContext TestConfigParseContext() {
 }  // namespace
 
 TEST(ConfigParser, ClampsParsedEditableValuesThroughSchemaPolicies) {
-    const std::filesystem::path path = WriteTestConfig("[fonts]\n"
-                                                       "label = Segoe UI,-5,600\n"
-                                                       "\n"
-                                                       "[drive_usage_list]\n"
-                                                       "activity_segment_gap = -9\n"
-                                                       "\n"
-                                                       "[gauge]\n"
-                                                       "sweep_degrees = 500\n"
-                                                       "segment_gap_degrees = -12\n");
+    const FilePath path = WriteTestConfig("[fonts]\n"
+                                          "label = Segoe UI,-5,600\n"
+                                          "\n"
+                                          "[drive_usage_list]\n"
+                                          "activity_segment_gap = -9\n"
+                                          "\n"
+                                          "[gauge]\n"
+                                          "sweep_degrees = 500\n"
+                                          "segment_gap_degrees = -12\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -39,15 +38,15 @@ TEST(ConfigParser, ClampsParsedEditableValuesThroughSchemaPolicies) {
     EXPECT_EQ(config.layout.gauge.sweepDegrees, 360.0);
     EXPECT_EQ(config.layout.gauge.segmentGapDegrees, 0.0);
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, ParsesRenamedCardStyleKeys) {
-    const std::filesystem::path path = WriteTestConfig("[card_style]\n"
-                                                       "header_icon_size = 21\n"
-                                                       "header_icon_gap = 7\n"
-                                                       "header_content_gap = 5\n"
-                                                       "row_gap = 4\n");
+    const FilePath path = WriteTestConfig("[card_style]\n"
+                                          "header_icon_size = 21\n"
+                                          "header_icon_gap = 7\n"
+                                          "header_content_gap = 5\n"
+                                          "row_gap = 4\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -56,14 +55,14 @@ TEST(ConfigParser, ParsesRenamedCardStyleKeys) {
     EXPECT_EQ(config.layout.cardStyle.headerContentGap, 5);
     EXPECT_EQ(config.layout.cardStyle.rowGap, 4);
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
-    const std::filesystem::path path = WriteTestConfig("[dashboard]\n"
-                                                       "outer_margin = 8\n"
-                                                       "row_gap = 9\n"
-                                                       "column_gap = 11\n");
+    const FilePath path = WriteTestConfig("[dashboard]\n"
+                                          "outer_margin = 8\n"
+                                          "row_gap = 9\n"
+                                          "column_gap = 11\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -71,13 +70,13 @@ TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
     EXPECT_EQ(config.layout.dashboard.rowGap, 9);
     EXPECT_EQ(config.layout.dashboard.columnGap, 11);
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
-    const std::filesystem::path path = WriteTestConfig("[colors]\n"
-                                                       "accent_color = #12345678\n"
-                                                       "track_color = #ABCDEF\n");
+    const FilePath path = WriteTestConfig("[colors]\n"
+                                          "accent_color = #12345678\n"
+                                          "track_color = #ABCDEF\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
     const AppConfig defaults;
@@ -85,17 +84,17 @@ TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
     EXPECT_EQ(config.layout.colors.accentColor.ToRgba(), 0x12345678u);
     EXPECT_EQ(config.layout.colors.trackColor, defaults.layout.colors.trackColor);
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, ParsesLayoutGuideSheetSection) {
-    const std::filesystem::path path = WriteTestConfig("[layout_guide_sheet]\n"
-                                                       "callout_leader_color = #FFE45CE6\n"
-                                                       "callout_border_color = #B88A22FF\n"
-                                                       "sheet_margin = 41\n"
-                                                       "callout_gap = 42\n"
-                                                       "leader_stroke_width = 3\n"
-                                                       "leader_endpoint_diameter = 7\n");
+    const FilePath path = WriteTestConfig("[layout_guide_sheet]\n"
+                                          "callout_leader_color = #FFE45CE6\n"
+                                          "callout_border_color = #B88A22FF\n"
+                                          "sheet_margin = 41\n"
+                                          "callout_gap = 42\n"
+                                          "leader_stroke_width = 3\n"
+                                          "leader_endpoint_diameter = 7\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -106,13 +105,13 @@ TEST(ConfigParser, ParsesLayoutGuideSheetSection) {
     EXPECT_EQ(config.layout.layoutGuideSheet.leaderStrokeWidth, 3);
     EXPECT_EQ(config.layout.layoutGuideSheet.leaderEndpointDiameter, 7);
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, ParsesMetricsSectionEntries) {
-    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
-                                                       "cpu.load = *,%,Processor Load\n"
-                                                       "gpu.temp = 110,C,GPU Temp\n");
+    const FilePath path = WriteTestConfig("[metrics]\n"
+                                          "cpu.load = *,%,Processor Load\n"
+                                          "gpu.temp = 110,C,GPU Temp\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -131,13 +130,13 @@ TEST(ConfigParser, ParsesMetricsSectionEntries) {
     EXPECT_EQ(gpuTemp->unit, "C");
     EXPECT_EQ(gpuTemp->label, "GPU Temp");
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, IgnoresRuntimePlaceholderMetricMetadataInMetricsSection) {
-    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
-                                                       "nothing = 7,ignored,Overridden Placeholder\n"
-                                                       "cpu.load = *,%,Processor Load\n");
+    const FilePath path = WriteTestConfig("[metrics]\n"
+                                          "nothing = 7,ignored,Overridden Placeholder\n"
+                                          "cpu.load = *,%,Processor Load\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -146,17 +145,17 @@ TEST(ConfigParser, IgnoresRuntimePlaceholderMetricMetadataInMetricsSection) {
     ASSERT_NE(loadMetric, nullptr);
     EXPECT_EQ(loadMetric->label, "Processor Load");
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
-    const std::filesystem::path path = WriteTestConfig("[display]\n"
-                                                       "layout = portrait\n"
-                                                       "\n"
-                                                       "[layout.portrait]\n"
-                                                       "description = Portrait Mode\n"
-                                                       "window = 480,800\n"
-                                                       "cards = columns(cpu,gpu)\n");
+    const FilePath path = WriteTestConfig("[display]\n"
+                                          "layout = portrait\n"
+                                          "\n"
+                                          "[layout.portrait]\n"
+                                          "description = Portrait Mode\n"
+                                          "window = 480,800\n"
+                                          "cards = columns(cpu,gpu)\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -170,18 +169,18 @@ TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
     EXPECT_EQ(config.layout.layouts[0].cardsLayout.children[0].name, "cpu");
     EXPECT_EQ(config.layout.layouts[0].cardsLayout.children[1].name, "gpu");
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, ParsesDateTimeWidgetFormatParameters) {
-    const std::filesystem::path path = WriteTestConfig("[display]\n"
-                                                       "layout = test\n"
-                                                       "\n"
-                                                       "[layout.test]\n"
-                                                       "cards = time\n"
-                                                       "\n"
-                                                       "[card.time]\n"
-                                                       "layout = rows(clock_time(HH:MM),clock_date(YYYY-MM-DD))\n");
+    const FilePath path = WriteTestConfig("[display]\n"
+                                          "layout = test\n"
+                                          "\n"
+                                          "[layout.test]\n"
+                                          "cards = time\n"
+                                          "\n"
+                                          "[card.time]\n"
+                                          "layout = rows(clock_time(HH:MM),clock_date(YYYY-MM-DD))\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -192,12 +191,12 @@ TEST(ConfigParser, ParsesDateTimeWidgetFormatParameters) {
     EXPECT_EQ(config.layout.cards[0].layout.children[1].name, "clock_date");
     EXPECT_EQ(config.layout.cards[0].layout.children[1].parameter, "YYYY-MM-DD");
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
-    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
-                                                       "cpu.load = *,%,Processor Load\n");
+    const FilePath path = WriteTestConfig("[metrics]\n"
+                                          "cpu.load = *,%,Processor Load\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -208,33 +207,33 @@ TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
     EXPECT_EQ(loadMetric->unit, "%");
     EXPECT_EQ(loadMetric->label, "Processor Load");
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, RejectsSerializedMetricStyleTokensInMetricsSection) {
-    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
-                                                       "cpu.load = percent,*,%,Processor Load\n");
+    const FilePath path = WriteTestConfig("[metrics]\n"
+                                          "cpu.load = percent,*,%,Processor Load\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(FindMetricDefinition(config.layout.metrics, "cpu.load"), nullptr);
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, RejectsUnknownMetricIdsWithoutMetadataStyle) {
-    const std::filesystem::path path = WriteTestConfig("[metrics]\n"
-                                                       "custom.metric = 100,U,Custom\n");
+    const FilePath path = WriteTestConfig("[metrics]\n"
+                                          "custom.metric = 100,U,Custom\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(FindMetricDefinition(config.layout.metrics, "custom.metric"), nullptr);
 
-    std::filesystem::remove(path);
+    RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, CheckedInConfigTemplateUsesValidUtf8) {
-    const std::filesystem::path path = std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    const FilePath path = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
     std::ifstream input(path, std::ios::binary);
     ASSERT_TRUE(input.is_open()) << "failed to open " << path.string();
 

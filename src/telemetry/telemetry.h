@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <cstdint>
-#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -14,6 +13,7 @@
 #include "config/telemetry_settings.h"
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/metric_types.h"
+#include "util/file_path.h"
 #include "util/trace.h"
 
 struct MemoryMetric {
@@ -135,9 +135,9 @@ using TelemetryDumpLoader = bool (*)(std::string_view input, TelemetryDump& dump
 
 struct TelemetryCollectorOptions {
     bool fake = false;
-    std::filesystem::path fakePath;
+    FilePath fakePath;
     TelemetryDumpLoader loadFakeDump = nullptr;
 };
 
 std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
-    const TelemetryCollectorOptions& options, const std::filesystem::path& workingDirectory, Trace& trace);
+    const TelemetryCollectorOptions& options, const FilePath& workingDirectory, Trace& trace);

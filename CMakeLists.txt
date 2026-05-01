@@ -77,6 +77,7 @@ add_executable(SystemTelemetry WIN32
     src/display/display_config.cpp
     src/diagnostics/diagnostics_options.cpp
     src/display/monitor.cpp
+    src/util/file_path.cpp
     src/util/paths.cpp
     src/util/scale.cpp
     src/util/strings.cpp
@@ -417,6 +418,7 @@ add_executable(SystemTelemetryTests
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
+    src/util/file_path.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/metrics.cpp
@@ -549,6 +551,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_model/layout_edit_service.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
+    src/util/file_path.cpp
     src/telemetry/metrics.cpp
     src/layout_model/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <chrono>
-#include <filesystem>
 #include <string>
 #include <vector>
+
+#include "util/file_path.h"
 
 class DashboardRenderer;
 class Trace;
@@ -21,7 +22,7 @@ struct LayoutGuideSheetPipelineStats {
     size_t callouts = 0;
 };
 
-bool SaveLayoutGuideSheetPng(const std::filesystem::path& imagePath,
+bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,

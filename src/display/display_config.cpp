@@ -18,7 +18,7 @@
 
 namespace {
 
-std::string ReadBinaryFile(const std::filesystem::path& path) {
+std::string ReadBinaryFile(const FilePath& path) {
     std::FILE* file = nullptr;
     if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr) {
         return {};
@@ -54,8 +54,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
         return false;
     }
 
-    const std::filesystem::path wallpaperPath =
-        ResolveExecutableRelativePath(std::filesystem::path(WideFromUtf8(config.display.wallpaper)));
+    const FilePath wallpaperPath = ResolveExecutableRelativePath(FilePath(WideFromUtf8(config.display.wallpaper)));
     if (wallpaperPath.empty()) {
         trace.Write("wallpaper:path_empty monitor=\"" + config.display.monitorName + "\"");
         return false;
@@ -123,8 +122,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
 
 bool ConfigureDisplay(
     const AppConfig& config, const TelemetryDump& dump, double targetScale, Trace& trace, HWND owner) {
-    const std::filesystem::path configPath = GetRuntimeConfigPath();
-    const std::filesystem::path imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
+    const FilePath configPath = GetRuntimeConfigPath();
+    const FilePath imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
 
     if (CanWriteRuntimeConfig(configPath) && CanWriteRuntimeConfig(imagePath)) {
         std::string screenshotError;
@@ -143,8 +142,8 @@ bool ConfigureDisplay(
                ApplyConfiguredWallpaper(config, trace);
     }
 
-    const std::filesystem::path tempConfigPath = CreateTempFilePath(L"SystemTelemetryConfigureDisplayConfig");
-    const std::filesystem::path tempDumpPath = CreateTempFilePath(L"SystemTelemetryConfigureDisplayDump");
+    const FilePath tempConfigPath = CreateTempFilePath(L"SystemTelemetryConfigureDisplayConfig");
+    const FilePath tempDumpPath = CreateTempFilePath(L"SystemTelemetryConfigureDisplayDump");
     if (tempConfigPath.empty() || tempDumpPath.empty()) {
         return false;
     }
@@ -159,17 +158,15 @@ bool ConfigureDisplay(
         }
     }
     if (!prepared) {
-        std::error_code ignored;
-        std::filesystem::remove(tempConfigPath, ignored);
-        std::filesystem::remove(tempDumpPath, ignored);
+        RemoveFileIfExists(tempConfigPath);
+        RemoveFileIfExists(tempDumpPath);
         return false;
     }
 
     const auto executablePath = GetExecutablePath();
     if (!executablePath.has_value()) {
-        std::error_code ignored;
-        std::filesystem::remove(tempConfigPath, ignored);
-        std::filesystem::remove(tempDumpPath, ignored);
+        RemoveFileIfExists(tempConfigPath);
+        RemoveFileIfExists(tempDumpPath);
         return false;
     }
 
@@ -191,9 +188,8 @@ bool ConfigureDisplay(
     executeInfo.lpParameters = parameters.c_str();
     executeInfo.nShow = SW_HIDE;
     if (!ShellExecuteExW(&executeInfo)) {
-        std::error_code ignored;
-        std::filesystem::remove(tempConfigPath, ignored);
-        std::filesystem::remove(tempDumpPath, ignored);
+        RemoveFileIfExists(tempConfigPath);
+        RemoveFileIfExists(tempDumpPath);
         return false;
     }
 
@@ -201,17 +197,15 @@ bool ConfigureDisplay(
     DWORD exitCode = 1;
     GetExitCodeProcess(executeInfo.hProcess, &exitCode);
     CloseHandle(executeInfo.hProcess);
-
-    std::error_code ignored;
-    std::filesystem::remove(tempConfigPath, ignored);
-    std::filesystem::remove(tempDumpPath, ignored);
+    RemoveFileIfExists(tempConfigPath);
+    RemoveFileIfExists(tempDumpPath);
     return exitCode == 0;
 }
 
-int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPath,
-    const std::filesystem::path& sourceDumpPath,
-    const std::filesystem::path& targetConfigPath,
-    const std::filesystem::path& targetImagePath) {
+int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
+    const FilePath& sourceDumpPath,
+    const FilePath& targetConfigPath,
+    const FilePath& targetImagePath) {
     if (sourceConfigPath.empty() || sourceDumpPath.empty() || targetConfigPath.empty() || targetImagePath.empty()) {
         return 2;
     }
@@ -255,9 +249,7 @@ int RunElevatedConfigureDisplayMode(const std::filesystem::path& sourceConfigPat
         &screenshotError);
     const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config, RuntimeConfigParseContext());
     const bool wallpaperApplied = configSaved && ApplyConfiguredWallpaper(config, trace);
-
-    std::error_code ignored;
-    std::filesystem::remove(sourceConfigPath, ignored);
-    std::filesystem::remove(sourceDumpPath, ignored);
+    RemoveFileIfExists(sourceConfigPath);
+    RemoveFileIfExists(sourceDumpPath);
     return wallpaperApplied ? 0 : 1;
 }

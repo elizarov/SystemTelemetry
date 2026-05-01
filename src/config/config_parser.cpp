@@ -232,7 +232,7 @@ bool DispatchKnownBindingSection(Owner& owner,
     return handled;
 }
 
-std::string ReadFileUtf8(const std::filesystem::path& path) {
+std::string ReadFileUtf8(const FilePath& path) {
     std::FILE* input = nullptr;
     if (_wfopen_s(&input, path.c_str(), L"rb") != 0 || input == nullptr) {
         return {};
@@ -549,7 +549,7 @@ std::string LoadEmbeddedConfigTemplate() {
     return LoadUtf8ResourceData(IDR_CONFIG_TEMPLATE);
 }
 
-AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay, const ConfigParseContext& context) {
+AppConfig LoadConfig(const FilePath& path, bool includeOverlay, const ConfigParseContext& context) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config, context);
     if (includeOverlay) {

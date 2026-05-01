@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <set>
@@ -13,13 +12,14 @@
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_renderer.h"
 #include "telemetry/impl/collector_fake.h"
+#include "util/file_path.h"
 #include "util/localization_catalog.h"
 #include "util/trace.h"
 
 namespace {
 
-std::filesystem::path SourceConfigPath() {
-    return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+FilePath SourceConfigPath() {
+    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext TestConfigParseContext() {
@@ -27,8 +27,7 @@ ConfigParseContext TestConfigParseContext() {
 }
 
 void LoadTestLocalizationCatalog() {
-    const std::filesystem::path path =
-        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    const FilePath path = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(path, std::ios::binary);
     ASSERT_TRUE(input.good());
     std::ostringstream buffer;
@@ -50,7 +49,7 @@ BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* l
 
     Trace trace;
     std::unique_ptr<TelemetryCollector> telemetry =
-        CreateFakeTelemetryCollector(std::filesystem::current_path(), {}, nullptr, trace);
+        CreateFakeTelemetryCollector(CurrentDirectoryPath(), {}, nullptr, trace);
     EXPECT_NE(telemetry, nullptr);
     std::string telemetryError;
     EXPECT_TRUE(telemetry->Initialize(ExtractTelemetrySettings(config), &telemetryError)) << telemetryError;

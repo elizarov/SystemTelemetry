@@ -4,7 +4,6 @@
 
 #include <commdlg.h>
 #include <cstdio>
-#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -15,9 +14,10 @@
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "diagnostics/diagnostics_options.h"
 #include "diagnostics/snapshot_dump.h"
+#include "util/file_path.h"
 #include "util/trace.h"
 
-bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
+bool SaveDumpScreenshot(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,
@@ -28,7 +28,7 @@ bool SaveDumpScreenshot(const std::filesystem::path& imagePath,
     Trace& trace,
     std::optional<RenderPoint> hoverPoint = std::nullopt,
     std::string* errorText = nullptr);
-bool SaveLayoutGuideSheet(const std::filesystem::path& imagePath,
+bool SaveLayoutGuideSheet(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,
@@ -53,16 +53,16 @@ public:
 
 private:
     void ReportError(const std::string& traceText, const std::wstring& message);
-    void ShowFileOpenError(const char* label, const std::filesystem::path& path);
+    void ShowFileOpenError(const char* label, const FilePath& path);
 
     DiagnosticsOptions options_;
     Trace& trace_;
-    std::filesystem::path tracePath_;
-    std::filesystem::path dumpPath_;
-    std::filesystem::path screenshotPath_;
-    std::filesystem::path layoutGuideSheetPath_;
-    std::filesystem::path saveConfigPath_;
-    std::filesystem::path saveFullConfigPath_;
+    FilePath tracePath_;
+    FilePath dumpPath_;
+    FilePath screenshotPath_;
+    FilePath layoutGuideSheetPath_;
+    FilePath saveConfigPath_;
+    FilePath saveFullConfigPath_;
     std::FILE* traceFile_ = nullptr;
 };
 
@@ -76,25 +76,24 @@ std::optional<std::string> GetLayoutSwitchValue();
 bool ApplyDiagnosticsLayoutOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
 void ApplyDiagnosticsScaleOverride(AppConfig& config, const DiagnosticsOptions& options);
-std::filesystem::path ResolveDiagnosticsOutputPath(const std::filesystem::path& workingDirectory,
-    const std::filesystem::path& configuredPath,
-    const wchar_t* defaultFileName);
-std::optional<std::filesystem::path> PromptSavePath(HWND owner,
-    const std::filesystem::path& initialDirectory,
+FilePath ResolveDiagnosticsOutputPath(
+    const FilePath& workingDirectory, const FilePath& configuredPath, const wchar_t* defaultFileName);
+std::optional<FilePath> PromptSavePath(HWND owner,
+    const FilePath& initialDirectory,
     const wchar_t* defaultFileName,
     const wchar_t* filter,
     const wchar_t* defaultExtension);
-bool CanWriteRuntimeConfig(const std::filesystem::path& path);
-std::filesystem::path CreateTempFilePath(const wchar_t* prefix);
-std::filesystem::path CreateElevatedSaveConfigTempPath();
-int RunElevatedSaveConfigMode(const std::filesystem::path& sourcePath, const std::filesystem::path& targetPath);
+bool CanWriteRuntimeConfig(const FilePath& path);
+FilePath CreateTempFilePath(const wchar_t* prefix);
+FilePath CreateElevatedSaveConfigTempPath();
+int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& targetPath);
 std::wstring FormatTelemetryInitializeError(std::string_view errorText);
 
 std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
     std::string* errorText = nullptr);
-bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
+bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryCollector>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,

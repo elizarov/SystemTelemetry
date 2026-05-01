@@ -734,6 +734,18 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep mixed-mode translation units narrow and avoid STL types in `/clr` method signatures. Native performance containers are fine, but they should stay in native `.cpp` files so their template spellings and provider implementation details do not inflate CLR metadata.
 
+### Hypothesis: Replace `std::filesystem` with a project filesystem utility
+
+- Change:
+  - Add a Win32-backed `FilePath` and filesystem helper module under `src/util/`, then route project and test path operations through that module instead of `std::filesystem`.
+- Result:
+  - Helped executable size modestly.
+- Observed effect:
+  - Removing project `std::filesystem` use reduced `build\SystemTelemetry.exe` from `1,309,184` bytes to `1,303,040` bytes and `build\SystemTelemetryBenchmarks.exe` from `947,200` bytes to `943,104` bytes.
+  - The app section sizes after the filesystem migration are `.text=1,053,628`, `.rdata=172,802`, `.pdata=27,948`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,304` bytes.
+- Conclusion:
+  - Keep common path and file operations in `src/util/file_path.*` instead of reintroducing `std::filesystem`; the size win is small but keeps filesystem-related standard-library machinery out of the single executable.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.

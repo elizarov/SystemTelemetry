@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <algorithm>
-#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -15,6 +14,7 @@
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/board/gigabyte/board_gigabyte_siv_bridge.h"
 #include "telemetry/impl/system_info_support.h"
+#include "util/file_path.h"
 #include "util/strings.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -200,7 +200,7 @@ public:
             return false;
         }
 
-        loadedLibrary_ = Utf8FromWide((std::filesystem::path(*sivDirectory_) / kEngineEnvironmentControlDll).wstring());
+        loadedLibrary_ = Utf8FromWide((FilePath(*sivDirectory_) / kEngineEnvironmentControlDll).wstring());
         diagnostics_ = "Gigabyte SIV provider ready.";
         temperatureMetricTemplate_ =
             CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);

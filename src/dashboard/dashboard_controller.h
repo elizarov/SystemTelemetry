@@ -1,7 +1,6 @@
 #pragma once
 
 #include <chrono>
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -10,6 +9,7 @@
 #include "diagnostics/diagnostics.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
+#include "util/file_path.h"
 
 struct DashboardSessionState {
     AppConfig config;
@@ -48,7 +48,7 @@ public:
     virtual void InvalidateShell() = 0;
     virtual void RedrawShellNow() = 0;
     virtual MonitorPlacementInfo GetWindowPlacementInfo() const = 0;
-    virtual std::optional<std::filesystem::path> PromptDiagnosticsSavePath(
+    virtual std::optional<FilePath> PromptDiagnosticsSavePath(
         const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const = 0;
     virtual void ShowError(const std::wstring& message) const = 0;
 };

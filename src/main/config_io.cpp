@@ -8,7 +8,7 @@
 #include "telemetry/metrics.h"
 #include "util/paths.h"
 
-std::filesystem::path GetRuntimeConfigPath() {
+FilePath GetRuntimeConfigPath() {
     return GetExecutableDirectory() / L"config.ini";
 }
 
@@ -22,15 +22,14 @@ AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options) {
     return config;
 }
 
-bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig& config, HWND owner) {
-    const std::filesystem::path tempPath = CreateElevatedSaveConfigTempPath();
+bool SaveConfigElevated(const FilePath& targetPath, const AppConfig& config, HWND owner) {
+    const FilePath tempPath = CreateElevatedSaveConfigTempPath();
     if (tempPath.empty() || targetPath.empty()) {
         return false;
     }
 
     if (!SaveConfig(tempPath, config, RuntimeConfigParseContext())) {
-        std::error_code ignored;
-        std::filesystem::remove(tempPath, ignored);
+        RemoveFileIfExists(tempPath);
         return false;
     }
 
@@ -47,16 +46,14 @@ bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig
     executeInfo.lpVerb = L"runas";
     const auto executablePath = GetExecutablePath();
     if (!executablePath.has_value()) {
-        std::error_code ignored;
-        std::filesystem::remove(tempPath, ignored);
+        RemoveFileIfExists(tempPath);
         return false;
     }
     executeInfo.lpFile = executablePath->c_str();
     executeInfo.lpParameters = parameters.c_str();
     executeInfo.nShow = SW_HIDE;
     if (!ShellExecuteExW(&executeInfo)) {
-        std::error_code ignored;
-        std::filesystem::remove(tempPath, ignored);
+        RemoveFileIfExists(tempPath);
         return false;
     }
 
@@ -64,8 +61,6 @@ bool SaveConfigElevated(const std::filesystem::path& targetPath, const AppConfig
     DWORD exitCode = 1;
     GetExitCodeProcess(executeInfo.hProcess, &exitCode);
     CloseHandle(executeInfo.hProcess);
-
-    std::error_code ignored;
-    std::filesystem::remove(tempPath, ignored);
+    RemoveFileIfExists(tempPath);
     return exitCode == 0;
 }
