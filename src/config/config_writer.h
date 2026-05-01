@@ -11,7 +11,6 @@ enum class ConfigSaveShape {
     ExistingTemplateOnly,
 };
 
-std::string FormatLayoutExpression(const LayoutNodeConfig& node);
 std::string BuildSavedConfigText(const std::string& initialText,
     const AppConfig& config,
     const AppConfig* compareConfig,

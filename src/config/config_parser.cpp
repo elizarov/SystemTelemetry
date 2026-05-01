@@ -1,82 +1,20 @@
 #include "config/config_parser.h"
 
-#include <algorithm>
-#include <array>
 #include <cctype>
 #include <cerrno>
-#include <climits>
 #include <cstdlib>
 #include <set>
 #include <type_traits>
 
 #include "config/config_file_io.h"
 #include "config/config_resolution.h"
+#include "config/config_runtime_fields.h"
 #include "config/widget_class.h"
 #include "resource.h"
 #include "util/resource_loader.h"
 #include "util/strings.h"
 
 namespace {
-
-int ParseIntOrDefault(const std::string& value, int fallback) {
-    errno = 0;
-    char* end = nullptr;
-    const long parsed = std::strtol(value.c_str(), &end, 10);
-    if (errno != 0 || end == value.c_str() || *end != '\0' || parsed < INT_MIN || parsed > INT_MAX) {
-        return fallback;
-    }
-    return static_cast<int>(parsed);
-}
-
-double ParseDoubleOrDefault(const std::string& value, double fallback) {
-    errno = 0;
-    char* end = nullptr;
-    const double parsed = std::strtod(value.c_str(), &end);
-    if (errno != 0 || end == value.c_str() || *end != '\0') {
-        return fallback;
-    }
-    return parsed;
-}
-
-ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallback) {
-    std::string text = Trim(value);
-    if (!text.empty() && text.front() == '#') {
-        text.erase(text.begin());
-    }
-    if (text.size() != 8) {
-        return fallback;
-    }
-    for (unsigned char ch : text) {
-        if (!std::isxdigit(ch)) {
-            return fallback;
-        }
-    }
-    errno = 0;
-    char* end = nullptr;
-    const unsigned long parsed = std::strtoul(text.c_str(), &end, 16);
-    if (errno != 0 || end == text.c_str() || *end != '\0' || parsed > 0xFFFFFFFFul) {
-        return fallback;
-    }
-    return ColorConfig::FromRgba(static_cast<unsigned int>(parsed));
-}
-
-bool ParseIntPair(const std::string& value, int& first, int& second) {
-    const std::vector<std::string> parts = SplitTrimmed(value, ',');
-    if (parts.size() != 2) {
-        return false;
-    }
-    first = ParseIntOrDefault(parts[0], first);
-    second = ParseIntOrDefault(parts[1], second);
-    return true;
-}
-
-bool ParseLogicalPoint(const std::string& value, LogicalPointConfig& point) {
-    return ParseIntPair(value, point.x, point.y);
-}
-
-bool ParseLogicalSize(const std::string& value, LogicalSizeConfig& size) {
-    return ParseIntPair(value, size.width, size.height);
-}
 
 bool ParseMetricDefinition(
     const std::string& value, MetricDefinitionConfig& definition, const ConfigParseContext& context) {
@@ -95,7 +33,12 @@ bool ParseMetricDefinition(
         parsed.telemetryScale = true;
         parsed.scale = 0.0;
     } else {
-        const double parsedScale = ParseDoubleOrDefault(parts[0], 0.0);
+        errno = 0;
+        char* end = nullptr;
+        const double parsedScale = std::strtod(parts[0].c_str(), &end);
+        if (errno != 0 || end == parts[0].c_str() || *end != '\0') {
+            return false;
+        }
         if (!(parsedScale > 0.0)) {
             return false;
         }
@@ -109,85 +52,10 @@ bool ParseMetricDefinition(
     return true;
 }
 
-void ParseFontSpec(UiFontConfig& font, const std::string& value) {
-    const std::vector<std::string> parts = SplitTrimmed(value, ',');
-    if (parts.size() != 3) {
-        return;
-    }
-    font.face = parts[0];
-    font.size = ParseIntOrDefault(parts[1], font.size);
-    font.weight = ParseIntOrDefault(parts[2], font.weight);
-}
-
-template <typename Codec, typename Value> void DecodeConfigValue(Value& target, const std::string& value);
-
-template <> void DecodeConfigValue<configschema::IntCodec, int>(int& target, const std::string& value) {
-    target = ParseIntOrDefault(value, target);
-}
-
-template <> void DecodeConfigValue<configschema::DoubleCodec, double>(double& target, const std::string& value) {
-    target = ParseDoubleOrDefault(value, target);
-}
-
-template <>
-void DecodeConfigValue<configschema::StringCodec, std::string>(std::string& target, const std::string& value) {
-    target = value;
-}
-
-template <>
-void DecodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(
-    LogicalPointConfig& target, const std::string& value) {
-    ParseLogicalPoint(value, target);
-}
-
-template <>
-void DecodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(
-    LogicalSizeConfig& target, const std::string& value) {
-    ParseLogicalSize(value, target);
-}
-
-template <>
-void DecodeConfigValue<configschema::HexColorCodec, ColorConfig>(ColorConfig& target, const std::string& value) {
-    target = ParseHexColorOrDefault(value, target);
-}
-
-template <>
-void DecodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(UiFontConfig& target, const std::string& value) {
-    ParseFontSpec(target, value);
-}
-
-template <>
-void DecodeConfigValue<configschema::StringCodec, std::vector<std::string>>(
-    std::vector<std::string>& target, const std::string& value) {
-    target = SplitTrimmed(value, ',');
-}
-
-struct RuntimeFieldParser {
-    std::string_view key;
-    void (*decode)(void* owner, const std::string& value);
-};
-
-template <typename Field> void DecodeRuntimeField(void* owner, const std::string& value) {
-    auto& typedOwner = *static_cast<typename Field::owner_type*>(owner);
-    typename Field::field_type decoded = Field::RawGet(typedOwner);
-    DecodeConfigValue<typename Field::codec_type>(decoded, value);
-    Field::Set(typedOwner, std::move(decoded));
-}
-
-template <typename... Field> constexpr auto MakeRuntimeFieldParsers(std::tuple<Field...>) {
-    return std::array<RuntimeFieldParser, sizeof...(Field)>{
-        RuntimeFieldParser{Field::key.view(), &DecodeRuntimeField<Field>}...};
-}
-
-template <typename Section> const auto& RuntimeFieldParsers() {
-    static constexpr auto fields = MakeRuntimeFieldParsers(typename Section::fields_type{});
-    return fields;
-}
-
 template <typename Section>
 bool ApplyStructuredSectionFields(
     typename Section::owner_type& owner, const std::string& key, const std::string& value) {
-    for (const RuntimeFieldParser& field : RuntimeFieldParsers<Section>()) {
+    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
         if (key == field.key) {
             field.decode(&owner, value);
             return true;
@@ -336,7 +204,14 @@ private:
         if (begin == index_) {
             return fallback;
         }
-        return ParseIntOrDefault(text_.substr(begin, index_ - begin), fallback);
+        errno = 0;
+        const std::string token = text_.substr(begin, index_ - begin);
+        char* end = nullptr;
+        const long parsed = std::strtol(token.c_str(), &end, 10);
+        if (errno != 0 || end == token.c_str() || *end != '\0') {
+            return fallback;
+        }
+        return static_cast<int>(parsed);
     }
 
     bool ParseChildren(std::vector<LayoutNodeConfig>& children);
@@ -426,15 +301,6 @@ void MarkCardLayoutReferences(LayoutConfig& layout) {
     }
     for (auto& card : layout.cards) {
         MarkCardReferencesRecursive(card.layout, cardIds);
-    }
-}
-
-template <>
-void DecodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(
-    LayoutNodeConfig& target, const std::string& value) {
-    LayoutNodeConfig parsed;
-    if (ParseLayoutExpression(value, parsed)) {
-        target = std::move(parsed);
     }
 }
 

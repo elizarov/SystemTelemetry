@@ -788,6 +788,19 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep full and minimal config saves on one writer traversal so future schema growth does not duplicate save-template code. Do not retry the flat card-reference vector in the parser for size.
 
+### Hypothesis: Unify config parser and writer runtime field descriptors
+
+- Change:
+  - Move structured-section field decoding, encoding, equality checks, and layout-expression formatting into `src/config/config_runtime_fields.*`.
+  - Replace parser-only and writer-only descriptor tables with one `RuntimeConfigFieldDescriptor` table per structured section.
+- Result:
+  - Helped the distributed executable modestly.
+- Observed effect:
+  - Unifying runtime field descriptors reduced `build\SystemTelemetry.exe` from `1,144,832` bytes to `1,142,784` bytes.
+  - The app section sizes after unifying descriptors are `.text=951,048`, `.rdata=119,266`, `.pdata=23,004`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,132` bytes.
+- Conclusion:
+  - Keep parser and writer field dispatch on the shared runtime descriptor table. Future size work should target type-erased codec operations or direct fixed-arity parsing rather than recreating separate parser/writer descriptor tables.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.

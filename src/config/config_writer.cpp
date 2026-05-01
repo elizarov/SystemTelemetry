@@ -1,126 +1,13 @@
 #include "config/config_writer.h"
 
-#include <array>
 #include <type_traits>
 
 #include "config/config_file_io.h"
 #include "config/config_parser.h"
+#include "config/config_runtime_fields.h"
 #include "util/strings.h"
 
 namespace {
-
-std::string FormatHexColor(ColorConfig color) {
-    return FormatHexColorText(color.ToRgba());
-}
-
-std::string FormatLogicalSize(const LogicalSizeConfig& size) {
-    return std::to_string(size.width) + "," + std::to_string(size.height);
-}
-
-std::string FormatFontSpec(const UiFontConfig& font) {
-    return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
-}
-
-}  // namespace
-
-std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
-    std::string text = node.name;
-    if (node.weight != 1) {
-        text += ":" + std::to_string(node.weight);
-    }
-    if (!node.children.empty()) {
-        text += "(";
-        for (size_t i = 0; i < node.children.size(); ++i) {
-            if (i > 0) {
-                text += ",";
-            }
-            text += FormatLayoutExpression(node.children[i]);
-        }
-        text += ")";
-    } else if (!node.parameter.empty()) {
-        text += "(" + node.parameter + ")";
-    }
-    return text;
-}
-
-namespace {
-
-template <typename Codec, typename Value> std::string EncodeConfigValue(const Value& value);
-
-template <> std::string EncodeConfigValue<configschema::IntCodec, int>(const int& value) {
-    return std::to_string(value);
-}
-
-template <> std::string EncodeConfigValue<configschema::DoubleCodec, double>(const double& value) {
-    return FormatDoubleGeneral(value);
-}
-
-template <> std::string EncodeConfigValue<configschema::StringCodec, std::string>(const std::string& value) {
-    return value;
-}
-
-template <>
-std::string EncodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(const LogicalPointConfig& value) {
-    return std::to_string(value.x) + "," + std::to_string(value.y);
-}
-
-template <>
-std::string EncodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(const LogicalSizeConfig& value) {
-    return FormatLogicalSize(value);
-}
-
-template <> std::string EncodeConfigValue<configschema::HexColorCodec, ColorConfig>(const ColorConfig& value) {
-    return FormatHexColor(value);
-}
-
-template <> std::string EncodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(const UiFontConfig& value) {
-    return FormatFontSpec(value);
-}
-
-template <>
-std::string EncodeConfigValue<configschema::StringCodec, std::vector<std::string>>(
-    const std::vector<std::string>& value) {
-    std::string encoded;
-    for (size_t i = 0; i < value.size(); ++i) {
-        if (i > 0) {
-            encoded += ",";
-        }
-        encoded += value[i];
-    }
-    return encoded;
-}
-
-template <>
-std::string EncodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(const LayoutNodeConfig& value) {
-    return FormatLayoutExpression(value);
-}
-
-struct RuntimeFieldWriter {
-    std::string_view key;
-    std::string (*encode)(const void* owner);
-    bool (*equals)(const void* owner, const void* compareOwner);
-};
-
-template <typename Field> std::string EncodeRuntimeField(const void* owner) {
-    const auto& typedOwner = *static_cast<const typename Field::owner_type*>(owner);
-    return EncodeConfigValue<typename Field::codec_type>(Field::RawGet(typedOwner));
-}
-
-template <typename Field> bool RuntimeFieldEquals(const void* owner, const void* compareOwner) {
-    const auto& typedOwner = *static_cast<const typename Field::owner_type*>(owner);
-    const auto& typedCompareOwner = *static_cast<const typename Field::owner_type*>(compareOwner);
-    return Field::RawGet(typedOwner) == Field::RawGet(typedCompareOwner);
-}
-
-template <typename... Field> constexpr auto MakeRuntimeFieldWriters(std::tuple<Field...>) {
-    return std::array<RuntimeFieldWriter, sizeof...(Field)>{
-        RuntimeFieldWriter{Field::key.view(), &EncodeRuntimeField<Field>, &RuntimeFieldEquals<Field>}...};
-}
-
-template <typename Section> const auto& RuntimeFieldWriters() {
-    static constexpr auto fields = MakeRuntimeFieldWriters(typename Section::fields_type{});
-    return fields;
-}
 
 template <typename Codec, typename Owner> struct CustomSectionHandler {
     template <typename UpdateKeyFn> static void Save(const Owner&, UpdateKeyFn&&) {}
@@ -220,7 +107,7 @@ void SaveStructuredSectionDifferences(
     const typename Section::owner_type& owner, const CompareOwner* compareOwner, UpdateKeyFn&& updateKey) {
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
         const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
-        for (const RuntimeFieldWriter& field : RuntimeFieldWriters<Section>()) {
+        for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
             if (compareOwner == nullptr || !field.equals(&owner, compareOwner)) {
                 updateKey(sectionName, std::string(field.key), field.encode(&owner));
             }
@@ -237,7 +124,7 @@ void SaveDynamicStructuredSectionDifferences(const typename Section::owner_type&
     const CompareOwner* compareOwner,
     UpdateKeyFn&& updateKey) {
     const std::string sectionName = Section::FormatName(suffix);
-    for (const RuntimeFieldWriter& field : RuntimeFieldWriters<Section>()) {
+    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
         if (compareOwner == nullptr || !field.equals(&owner, compareOwner)) {
             updateKey(sectionName, std::string(field.key), field.encode(&owner));
         }
