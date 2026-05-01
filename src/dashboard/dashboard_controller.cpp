@@ -57,7 +57,7 @@ std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOp
     return session;
 }
 
-bool SaveRuntimeConfig(const std::filesystem::path& path, const AppConfig& config, HWND owner) {
+bool SaveRuntimeConfig(const FilePath& path, const AppConfig& config, HWND owner) {
     if (CanWriteRuntimeConfig(path)) {
         return SaveConfig(path, config, RuntimeConfigParseContext());
     }
@@ -670,7 +670,7 @@ AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& s
 }
 
 bool DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& shell) {
-    const std::filesystem::path configPath = GetRuntimeConfigPath();
+    const FilePath configPath = GetRuntimeConfigPath();
     AppConfig config = BuildCurrentConfigForSaving(shell);
     if (!SaveRuntimeConfig(configPath, config, shell.WindowHandle())) {
         shell.ShowError(WideFromUtf8("Failed to save " + Utf8FromWide(configPath.wstring()) + "."));

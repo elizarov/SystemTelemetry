@@ -1,15 +1,85 @@
 #include "diagnostics/snapshot_dump.h"
 
 #include <cerrno>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
-#include <map>
 #include <string_view>
+#include <utility>
 
 namespace {
 
 constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v9";
+
+enum class DumpFieldKind : std::uint8_t {
+    String,
+    Double,
+    OptionalDouble,
+    ScalarUnit,
+    SystemTimeWord,
+};
+
+struct DumpFieldDescriptor {
+    std::string_view key;
+    std::uint32_t offset = 0;
+    DumpFieldKind kind = DumpFieldKind::String;
+};
+
+using DumpValues = std::vector<std::pair<std::string, std::string>>;
+
+#define DUMP_FIELD(key, kind, field)                                                                                   \
+    DumpFieldDescriptor {                                                                                              \
+        key, static_cast<std::uint32_t>(offsetof(TelemetryDump, field)), kind                                          \
+    }
+
+const std::vector<DumpFieldDescriptor>& FlatDumpFields() {
+    static const std::vector<DumpFieldDescriptor> fields{
+        DUMP_FIELD("cpu.name", DumpFieldKind::String, snapshot.cpu.name),
+        DUMP_FIELD("cpu.load_percent", DumpFieldKind::Double, snapshot.cpu.loadPercent),
+        DUMP_FIELD("cpu.clock.value", DumpFieldKind::OptionalDouble, snapshot.cpu.clock.value),
+        DUMP_FIELD("cpu.clock.unit", DumpFieldKind::ScalarUnit, snapshot.cpu.clock.unit),
+        DUMP_FIELD("cpu.memory.used_gb", DumpFieldKind::Double, snapshot.cpu.memory.usedGb),
+        DUMP_FIELD("cpu.memory.total_gb", DumpFieldKind::Double, snapshot.cpu.memory.totalGb),
+        DUMP_FIELD("gpu.name", DumpFieldKind::String, snapshot.gpu.name),
+        DUMP_FIELD("gpu.load_percent", DumpFieldKind::Double, snapshot.gpu.loadPercent),
+        DUMP_FIELD("gpu.temperature.value", DumpFieldKind::OptionalDouble, snapshot.gpu.temperature.value),
+        DUMP_FIELD("gpu.temperature.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.temperature.unit),
+        DUMP_FIELD("gpu.clock.value", DumpFieldKind::OptionalDouble, snapshot.gpu.clock.value),
+        DUMP_FIELD("gpu.clock.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.clock.unit),
+        DUMP_FIELD("gpu.fan.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fan.value),
+        DUMP_FIELD("gpu.fan.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fan.unit),
+        DUMP_FIELD("gpu.fps.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fps.value),
+        DUMP_FIELD("gpu.fps.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fps.unit),
+        DUMP_FIELD("gpu.vram.used_gb", DumpFieldKind::Double, snapshot.gpu.vram.usedGb),
+        DUMP_FIELD("gpu.vram.total_gb", DumpFieldKind::Double, snapshot.gpu.vram.totalGb),
+        DUMP_FIELD("network.adapter_name", DumpFieldKind::String, snapshot.network.adapterName),
+        DUMP_FIELD("network.upload_mbps", DumpFieldKind::Double, snapshot.network.uploadMbps),
+        DUMP_FIELD("network.download_mbps", DumpFieldKind::Double, snapshot.network.downloadMbps),
+        DUMP_FIELD("network.ip_address", DumpFieldKind::String, snapshot.network.ipAddress),
+        DUMP_FIELD("storage.read_mbps", DumpFieldKind::Double, snapshot.storage.readMbps),
+        DUMP_FIELD("storage.write_mbps", DumpFieldKind::Double, snapshot.storage.writeMbps),
+        DUMP_FIELD("time.year", DumpFieldKind::SystemTimeWord, snapshot.now.wYear),
+        DUMP_FIELD("time.month", DumpFieldKind::SystemTimeWord, snapshot.now.wMonth),
+        DUMP_FIELD("time.day", DumpFieldKind::SystemTimeWord, snapshot.now.wDay),
+        DUMP_FIELD("time.hour", DumpFieldKind::SystemTimeWord, snapshot.now.wHour),
+        DUMP_FIELD("time.minute", DumpFieldKind::SystemTimeWord, snapshot.now.wMinute),
+        DUMP_FIELD("time.second", DumpFieldKind::SystemTimeWord, snapshot.now.wSecond),
+        DUMP_FIELD("time.milliseconds", DumpFieldKind::SystemTimeWord, snapshot.now.wMilliseconds),
+    };
+    return fields;
+}
+
+#undef DUMP_FIELD
+
+template <typename Field> Field& DumpField(TelemetryDump& dump, const DumpFieldDescriptor& field) {
+    return *reinterpret_cast<Field*>(reinterpret_cast<char*>(&dump) + field.offset);
+}
+
+template <typename Field> const Field& DumpField(const TelemetryDump& dump, const DumpFieldDescriptor& field) {
+    return *reinterpret_cast<const Field*>(reinterpret_cast<const char*>(&dump) + field.offset);
+}
 
 std::string TrimDumpWhitespace(const std::string& value) {
     const size_t begin = value.find_first_not_of(" \t\r\n");
@@ -125,15 +195,6 @@ void WriteOptionalDouble(
     WriteDouble(output, key, *value, precision);
 }
 
-template <typename T>
-void WriteOptionalInteger(std::string& output, const std::string& key, const std::optional<T>& value) {
-    if (!value.has_value()) {
-        WriteLine(output, key, "null");
-        return;
-    }
-    WriteInteger(output, key, *value);
-}
-
 void WriteDoubleArray(std::string& output, const std::string& key, const std::vector<double>& values) {
     output += key;
     output += "=[";
@@ -158,6 +219,32 @@ bool ParseDumpScalarMetricUnit(std::string_view text, ScalarMetricUnit& unit) {
 
 void WriteScalarMetricUnit(std::string& output, const std::string& key, ScalarMetricUnit unit) {
     WriteString(output, key, std::string(ScalarMetricUnitDumpText(unit)));
+}
+
+void WriteFlatDumpFields(std::string& output, const TelemetryDump& dump, size_t begin, size_t end) {
+    const std::vector<DumpFieldDescriptor>& fields = FlatDumpFields();
+    end = (std::min)(end, fields.size());
+    for (size_t i = begin; i < end; ++i) {
+        const DumpFieldDescriptor& field = fields[i];
+        const std::string key(field.key);
+        switch (field.kind) {
+            case DumpFieldKind::String:
+                WriteString(output, key, DumpField<std::string>(dump, field));
+                break;
+            case DumpFieldKind::Double:
+                WriteDouble(output, key, DumpField<double>(dump, field), 6);
+                break;
+            case DumpFieldKind::OptionalDouble:
+                WriteOptionalDouble(output, key, DumpField<std::optional<double>>(dump, field), 6);
+                break;
+            case DumpFieldKind::ScalarUnit:
+                WriteScalarMetricUnit(output, key, DumpField<ScalarMetricUnit>(dump, field));
+                break;
+            case DumpFieldKind::SystemTimeWord:
+                WriteInteger(output, key, DumpField<WORD>(dump, field));
+                break;
+        }
+    }
 }
 
 void WriteNamedScalarMetrics(
@@ -231,17 +318,27 @@ bool ParseDoubleArray(const std::string& text, std::vector<double>& values) {
     return true;
 }
 
-bool TryGetValue(const std::map<std::string, std::string>& values, const std::string& key, std::string& value) {
-    const auto it = values.find(key);
-    if (it == values.end()) {
-        return false;
+bool TryGetValue(const DumpValues& values, const std::string& key, std::string& value) {
+    for (const auto& item : values) {
+        if (item.first == key) {
+            value = item.second;
+            return true;
+        }
     }
-    value = it->second;
-    return true;
+    return false;
 }
 
-bool LoadString(
-    const std::map<std::string, std::string>& values, const std::string& key, std::string& field, std::string* error) {
+void SetDumpValue(DumpValues& values, std::string key, std::string value) {
+    for (auto& item : values) {
+        if (item.first == key) {
+            item.second = std::move(value);
+            return;
+        }
+    }
+    values.emplace_back(std::move(key), std::move(value));
+}
+
+bool LoadString(const DumpValues& values, const std::string& key, std::string& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -255,8 +352,7 @@ bool LoadString(
     return true;
 }
 
-bool LoadDouble(
-    const std::map<std::string, std::string>& values, const std::string& key, double& field, std::string* error) {
+bool LoadDouble(const DumpValues& values, const std::string& key, double& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -271,8 +367,7 @@ bool LoadDouble(
 }
 
 template <typename T>
-bool LoadUnsigned(
-    const std::map<std::string, std::string>& values, const std::string& key, T& field, std::string* error) {
+bool LoadUnsigned(const DumpValues& values, const std::string& key, T& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -289,10 +384,8 @@ bool LoadUnsigned(
     return true;
 }
 
-bool LoadOptionalDouble(const std::map<std::string, std::string>& values,
-    const std::string& key,
-    std::optional<double>& field,
-    std::string* error) {
+bool LoadOptionalDouble(
+    const DumpValues& values, const std::string& key, std::optional<double>& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -312,10 +405,8 @@ bool LoadOptionalDouble(const std::map<std::string, std::string>& values,
     return true;
 }
 
-bool LoadScalarMetricUnit(const std::map<std::string, std::string>& values,
-    const std::string& key,
-    ScalarMetricUnit& field,
-    std::string* error) {
+bool LoadScalarMetricUnit(
+    const DumpValues& values, const std::string& key, ScalarMetricUnit& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -330,35 +421,8 @@ bool LoadScalarMetricUnit(const std::map<std::string, std::string>& values,
     return true;
 }
 
-template <typename T>
-bool LoadOptionalUnsigned(const std::map<std::string, std::string>& values,
-    const std::string& key,
-    std::optional<T>& field,
-    std::string* error) {
-    std::string text;
-    if (!TryGetValue(values, key, text)) {
-        return true;
-    }
-    if (text == "null") {
-        field = std::nullopt;
-        return true;
-    }
-    unsigned long long parsed = 0;
-    if (!ParseStrictUnsigned(text, parsed) ||
-        parsed > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
-        if (error != nullptr) {
-            *error = "Invalid optional integer for key: " + key;
-        }
-        return false;
-    }
-    field = static_cast<T>(parsed);
-    return true;
-}
-
-bool LoadDoubleArrayField(const std::map<std::string, std::string>& values,
-    const std::string& key,
-    std::vector<double>& field,
-    std::string* error) {
+bool LoadDoubleArrayField(
+    const DumpValues& values, const std::string& key, std::vector<double>& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
@@ -372,10 +436,45 @@ bool LoadDoubleArrayField(const std::map<std::string, std::string>& values,
     return true;
 }
 
-bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values,
-    const std::string& prefix,
-    std::vector<NamedScalarMetric>& field,
-    std::string* error) {
+bool LoadFlatDumpFields(const DumpValues& values, TelemetryDump& dump, size_t begin, size_t end, std::string* error) {
+    const std::vector<DumpFieldDescriptor>& fields = FlatDumpFields();
+    end = (std::min)(end, fields.size());
+    for (size_t i = begin; i < end; ++i) {
+        const DumpFieldDescriptor& field = fields[i];
+        const std::string key(field.key);
+        switch (field.kind) {
+            case DumpFieldKind::String:
+                if (!LoadString(values, key, DumpField<std::string>(dump, field), error)) {
+                    return false;
+                }
+                break;
+            case DumpFieldKind::Double:
+                if (!LoadDouble(values, key, DumpField<double>(dump, field), error)) {
+                    return false;
+                }
+                break;
+            case DumpFieldKind::OptionalDouble:
+                if (!LoadOptionalDouble(values, key, DumpField<std::optional<double>>(dump, field), error)) {
+                    return false;
+                }
+                break;
+            case DumpFieldKind::ScalarUnit:
+                if (!LoadScalarMetricUnit(values, key, DumpField<ScalarMetricUnit>(dump, field), error)) {
+                    return false;
+                }
+                break;
+            case DumpFieldKind::SystemTimeWord:
+                if (!LoadUnsigned(values, key, DumpField<WORD>(dump, field), error)) {
+                    return false;
+                }
+                break;
+        }
+    }
+    return true;
+}
+
+bool LoadNamedScalarMetrics(
+    const DumpValues& values, const std::string& prefix, std::vector<NamedScalarMetric>& field, std::string* error) {
     size_t count = 0;
     if (!LoadUnsigned(values, prefix + ".count", count, error)) {
         return false;
@@ -396,7 +495,7 @@ bool LoadNamedScalarMetrics(const std::map<std::string, std::string>& values,
     return true;
 }
 
-bool LoadRetainedHistories(const std::map<std::string, std::string>& values,
+bool LoadRetainedHistories(const DumpValues& values,
     const std::string& prefix,
     std::vector<RetainedHistorySeries>& field,
     std::string* error) {
@@ -433,35 +532,11 @@ bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
     output.clear();
     WriteLine(output, "format", kDumpFormatVersion);
 
-    WriteString(output, "cpu.name", dump.snapshot.cpu.name);
-    WriteDouble(output, "cpu.load_percent", dump.snapshot.cpu.loadPercent, 6);
-    WriteOptionalDouble(output, "cpu.clock.value", dump.snapshot.cpu.clock.value, 6);
-    WriteScalarMetricUnit(output, "cpu.clock.unit", dump.snapshot.cpu.clock.unit);
-    WriteDouble(output, "cpu.memory.used_gb", dump.snapshot.cpu.memory.usedGb, 6);
-    WriteDouble(output, "cpu.memory.total_gb", dump.snapshot.cpu.memory.totalGb, 6);
+    WriteFlatDumpFields(output, dump, 0, 6);
     WriteNamedScalarMetrics(output, "board.temperatures", dump.snapshot.boardTemperatures);
     WriteNamedScalarMetrics(output, "board.fans", dump.snapshot.boardFans);
     WriteRetainedHistories(output, "retained_histories", dump.snapshot.retainedHistories);
-
-    WriteString(output, "gpu.name", dump.snapshot.gpu.name);
-    WriteDouble(output, "gpu.load_percent", dump.snapshot.gpu.loadPercent, 6);
-    WriteOptionalDouble(output, "gpu.temperature.value", dump.snapshot.gpu.temperature.value, 6);
-    WriteScalarMetricUnit(output, "gpu.temperature.unit", dump.snapshot.gpu.temperature.unit);
-    WriteOptionalDouble(output, "gpu.clock.value", dump.snapshot.gpu.clock.value, 6);
-    WriteScalarMetricUnit(output, "gpu.clock.unit", dump.snapshot.gpu.clock.unit);
-    WriteOptionalDouble(output, "gpu.fan.value", dump.snapshot.gpu.fan.value, 6);
-    WriteScalarMetricUnit(output, "gpu.fan.unit", dump.snapshot.gpu.fan.unit);
-    WriteOptionalDouble(output, "gpu.fps.value", dump.snapshot.gpu.fps.value, 6);
-    WriteScalarMetricUnit(output, "gpu.fps.unit", dump.snapshot.gpu.fps.unit);
-    WriteDouble(output, "gpu.vram.used_gb", dump.snapshot.gpu.vram.usedGb, 6);
-    WriteDouble(output, "gpu.vram.total_gb", dump.snapshot.gpu.vram.totalGb, 6);
-
-    WriteString(output, "network.adapter_name", dump.snapshot.network.adapterName);
-    WriteDouble(output, "network.upload_mbps", dump.snapshot.network.uploadMbps, 6);
-    WriteDouble(output, "network.download_mbps", dump.snapshot.network.downloadMbps, 6);
-    WriteString(output, "network.ip_address", dump.snapshot.network.ipAddress);
-    WriteDouble(output, "storage.read_mbps", dump.snapshot.storage.readMbps, 6);
-    WriteDouble(output, "storage.write_mbps", dump.snapshot.storage.writeMbps, 6);
+    WriteFlatDumpFields(output, dump, 6, 24);
 
     WriteInteger(output, "drives.count", dump.snapshot.drives.size());
     for (size_t i = 0; i < dump.snapshot.drives.size(); ++i) {
@@ -473,13 +548,7 @@ bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
         WriteDouble(output, prefix + ".write_mbps", dump.snapshot.drives[i].writeMbps, 6);
     }
 
-    WriteInteger(output, "time.year", dump.snapshot.now.wYear);
-    WriteInteger(output, "time.month", dump.snapshot.now.wMonth);
-    WriteInteger(output, "time.day", dump.snapshot.now.wDay);
-    WriteInteger(output, "time.hour", dump.snapshot.now.wHour);
-    WriteInteger(output, "time.minute", dump.snapshot.now.wMinute);
-    WriteInteger(output, "time.second", dump.snapshot.now.wSecond);
-    WriteInteger(output, "time.milliseconds", dump.snapshot.now.wMilliseconds);
+    WriteFlatDumpFields(output, dump, 24, FlatDumpFields().size());
     return true;
 }
 
@@ -494,7 +563,7 @@ bool WriteTelemetryDump(std::FILE* output, const TelemetryDump& dump) {
 bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string* error) {
     TelemetryDump parsed;
 
-    std::map<std::string, std::string> values;
+    DumpValues values;
     size_t lineNumber = 0;
     size_t lineStart = 0;
     while (lineStart <= input.size()) {
@@ -522,7 +591,8 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
             }
             return false;
         }
-        values[TrimDumpWhitespace(trimmed.substr(0, equals))] = TrimDumpWhitespace(trimmed.substr(equals + 1));
+        SetDumpValue(
+            values, TrimDumpWhitespace(trimmed.substr(0, equals)), TrimDumpWhitespace(trimmed.substr(equals + 1)));
         if (lineEnd == input.size()) {
             break;
         }
@@ -537,33 +607,11 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         return false;
     }
 
-    if (!LoadString(values, "cpu.name", parsed.snapshot.cpu.name, error) ||
-        !LoadDouble(values, "cpu.load_percent", parsed.snapshot.cpu.loadPercent, error) ||
-        !LoadOptionalDouble(values, "cpu.clock.value", parsed.snapshot.cpu.clock.value, error) ||
-        !LoadScalarMetricUnit(values, "cpu.clock.unit", parsed.snapshot.cpu.clock.unit, error) ||
-        !LoadDouble(values, "cpu.memory.used_gb", parsed.snapshot.cpu.memory.usedGb, error) ||
-        !LoadDouble(values, "cpu.memory.total_gb", parsed.snapshot.cpu.memory.totalGb, error) ||
+    if (!LoadFlatDumpFields(values, parsed, 0, 6, error) ||
         !LoadNamedScalarMetrics(values, "board.temperatures", parsed.snapshot.boardTemperatures, error) ||
         !LoadNamedScalarMetrics(values, "board.fans", parsed.snapshot.boardFans, error) ||
         !LoadRetainedHistories(values, "retained_histories", parsed.snapshot.retainedHistories, error) ||
-        !LoadString(values, "gpu.name", parsed.snapshot.gpu.name, error) ||
-        !LoadDouble(values, "gpu.load_percent", parsed.snapshot.gpu.loadPercent, error) ||
-        !LoadOptionalDouble(values, "gpu.temperature.value", parsed.snapshot.gpu.temperature.value, error) ||
-        !LoadScalarMetricUnit(values, "gpu.temperature.unit", parsed.snapshot.gpu.temperature.unit, error) ||
-        !LoadOptionalDouble(values, "gpu.clock.value", parsed.snapshot.gpu.clock.value, error) ||
-        !LoadScalarMetricUnit(values, "gpu.clock.unit", parsed.snapshot.gpu.clock.unit, error) ||
-        !LoadOptionalDouble(values, "gpu.fan.value", parsed.snapshot.gpu.fan.value, error) ||
-        !LoadScalarMetricUnit(values, "gpu.fan.unit", parsed.snapshot.gpu.fan.unit, error) ||
-        !LoadOptionalDouble(values, "gpu.fps.value", parsed.snapshot.gpu.fps.value, error) ||
-        !LoadScalarMetricUnit(values, "gpu.fps.unit", parsed.snapshot.gpu.fps.unit, error) ||
-        !LoadDouble(values, "gpu.vram.used_gb", parsed.snapshot.gpu.vram.usedGb, error) ||
-        !LoadDouble(values, "gpu.vram.total_gb", parsed.snapshot.gpu.vram.totalGb, error) ||
-        !LoadString(values, "network.adapter_name", parsed.snapshot.network.adapterName, error) ||
-        !LoadDouble(values, "network.upload_mbps", parsed.snapshot.network.uploadMbps, error) ||
-        !LoadDouble(values, "network.download_mbps", parsed.snapshot.network.downloadMbps, error) ||
-        !LoadString(values, "network.ip_address", parsed.snapshot.network.ipAddress, error) ||
-        !LoadDouble(values, "storage.read_mbps", parsed.snapshot.storage.readMbps, error) ||
-        !LoadDouble(values, "storage.write_mbps", parsed.snapshot.storage.writeMbps, error)) {
+        !LoadFlatDumpFields(values, parsed, 6, 24, error)) {
         return false;
     }
 
@@ -586,13 +634,7 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         parsed.snapshot.drives.push_back(std::move(drive));
     }
 
-    if (!LoadUnsigned(values, "time.year", parsed.snapshot.now.wYear, error) ||
-        !LoadUnsigned(values, "time.month", parsed.snapshot.now.wMonth, error) ||
-        !LoadUnsigned(values, "time.day", parsed.snapshot.now.wDay, error) ||
-        !LoadUnsigned(values, "time.hour", parsed.snapshot.now.wHour, error) ||
-        !LoadUnsigned(values, "time.minute", parsed.snapshot.now.wMinute, error) ||
-        !LoadUnsigned(values, "time.second", parsed.snapshot.now.wSecond, error) ||
-        !LoadUnsigned(values, "time.milliseconds", parsed.snapshot.now.wMilliseconds, error)) {
+    if (!LoadFlatDumpFields(values, parsed, 24, FlatDumpFields().size(), error)) {
         return false;
     }
 

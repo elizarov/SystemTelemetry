@@ -4,7 +4,7 @@
 #include "telemetry/impl/collector_real.h"
 
 std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
-    const TelemetryCollectorOptions& options, const std::filesystem::path& workingDirectory, Trace& trace) {
+    const TelemetryCollectorOptions& options, const FilePath& workingDirectory, Trace& trace) {
     if (options.fake) {
         return CreateFakeTelemetryCollector(workingDirectory, options.fakePath, options.loadFakeDump, trace);
     }

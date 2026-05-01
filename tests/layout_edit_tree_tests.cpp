@@ -1,16 +1,16 @@
-#include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <sstream>
 #include <vector>
 
 #include "layout_edit/layout_edit_tree.h"
+#include "util/file_path.h"
 #include "util/localization_catalog.h"
 
 namespace {
 
 std::string ReadTemplateText() {
-    const std::filesystem::path path = std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    const FilePath path = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
     std::ifstream input(path, std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
@@ -18,8 +18,7 @@ std::string ReadTemplateText() {
 }
 
 LocalizationCatalogMap ReadLocalizationCatalog() {
-    const std::filesystem::path path =
-        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    const FilePath path = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(path, std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();

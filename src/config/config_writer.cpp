@@ -1,102 +1,13 @@
 #include "config/config_writer.h"
 
-#include <cstdio>
 #include <type_traits>
 
+#include "config/config_file_io.h"
 #include "config/config_parser.h"
+#include "config/config_runtime_fields.h"
 #include "util/strings.h"
-#include "util/utf8.h"
 
 namespace {
-
-std::string FormatHexColor(ColorConfig color) {
-    return FormatHexColorText(color.ToRgba());
-}
-
-std::string FormatLogicalSize(const LogicalSizeConfig& size) {
-    return std::to_string(size.width) + "," + std::to_string(size.height);
-}
-
-std::string FormatFontSpec(const UiFontConfig& font) {
-    return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
-}
-
-}  // namespace
-
-std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
-    std::string text = node.name;
-    if (node.weight != 1) {
-        text += ":" + std::to_string(node.weight);
-    }
-    if (!node.children.empty()) {
-        text += "(";
-        for (size_t i = 0; i < node.children.size(); ++i) {
-            if (i > 0) {
-                text += ",";
-            }
-            text += FormatLayoutExpression(node.children[i]);
-        }
-        text += ")";
-    } else if (!node.parameter.empty()) {
-        text += "(" + node.parameter + ")";
-    }
-    return text;
-}
-
-namespace {
-
-template <typename Codec, typename Value> std::string EncodeConfigValue(const Value& value);
-
-template <> std::string EncodeConfigValue<configschema::IntCodec, int>(const int& value) {
-    return std::to_string(value);
-}
-
-template <> std::string EncodeConfigValue<configschema::DoubleCodec, double>(const double& value) {
-    return FormatDoubleGeneral(value);
-}
-
-template <> std::string EncodeConfigValue<configschema::StringCodec, std::string>(const std::string& value) {
-    return value;
-}
-
-template <>
-std::string EncodeConfigValue<configschema::LogicalPointCodec, LogicalPointConfig>(const LogicalPointConfig& value) {
-    return std::to_string(value.x) + "," + std::to_string(value.y);
-}
-
-template <>
-std::string EncodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(const LogicalSizeConfig& value) {
-    return FormatLogicalSize(value);
-}
-
-template <> std::string EncodeConfigValue<configschema::HexColorCodec, ColorConfig>(const ColorConfig& value) {
-    if (!value.expression.empty()) {
-        return value.expression;
-    }
-    return FormatHexColor(value);
-}
-
-template <> std::string EncodeConfigValue<configschema::FontSpecCodec, UiFontConfig>(const UiFontConfig& value) {
-    return FormatFontSpec(value);
-}
-
-template <>
-std::string EncodeConfigValue<configschema::StringCodec, std::vector<std::string>>(
-    const std::vector<std::string>& value) {
-    std::string encoded;
-    for (size_t i = 0; i < value.size(); ++i) {
-        if (i > 0) {
-            encoded += ",";
-        }
-        encoded += value[i];
-    }
-    return encoded;
-}
-
-template <>
-std::string EncodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(const LayoutNodeConfig& value) {
-    return FormatLayoutExpression(value);
-}
 
 template <typename Codec, typename Owner> struct CustomSectionHandler {
     template <typename UpdateKeyFn> static void Save(const Owner&, UpdateKeyFn&&) {}
@@ -191,61 +102,16 @@ template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, Metri
     }
 };
 
-template <typename Section, typename UpdateKeyFn>
-void SaveStructuredSection(const typename Section::owner_type& owner, UpdateKeyFn&& updateKey) {
-    if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
-        const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
-        std::apply(
-            [&](auto... field) {
-                (updateKey(sectionName,
-                     std::string(std::remove_cvref_t<decltype(field)>::key.view()),
-                     EncodeConfigValue<typename std::remove_cvref_t<decltype(field)>::codec_type>(
-                         owner.*(std::remove_cvref_t<decltype(field)>::member))),
-                    ...);
-            },
-            Section::fields);
-    } else {
-        CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::Save(
-            owner, std::forward<UpdateKeyFn>(updateKey));
-    }
-}
-
-template <typename Section, typename UpdateKeyFn>
-void SaveDynamicStructuredSection(
-    const typename Section::owner_type& owner, std::string_view suffix, UpdateKeyFn&& updateKey) {
-    const std::string sectionName = Section::FormatName(suffix);
-    std::apply(
-        [&](auto... field) {
-            (updateKey(sectionName,
-                 std::string(std::remove_cvref_t<decltype(field)>::key.view()),
-                 EncodeConfigValue<typename std::remove_cvref_t<decltype(field)>::codec_type>(
-                     owner.*(std::remove_cvref_t<decltype(field)>::member))),
-                ...);
-        },
-        Section::fields);
-}
-
 template <typename Section, typename CompareOwner, typename UpdateKeyFn>
 void SaveStructuredSectionDifferences(
     const typename Section::owner_type& owner, const CompareOwner* compareOwner, UpdateKeyFn&& updateKey) {
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
         const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
-        std::apply(
-            [&](auto... field) {
-                (..., [&] {
-                    using Field = std::remove_cvref_t<decltype(field)>;
-                    const std::string currentValue =
-                        EncodeConfigValue<typename Field::codec_type>(owner.*(Field::member));
-                    const std::string compareValue =
-                        compareOwner != nullptr
-                            ? EncodeConfigValue<typename Field::codec_type>((*compareOwner).*(Field::member))
-                            : std::string{};
-                    if (compareOwner == nullptr || currentValue != compareValue) {
-                        updateKey(sectionName, std::string(Field::key.view()), currentValue);
-                    }
-                }());
-            },
-            Section::fields);
+        for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
+            if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
+                updateKey(sectionName, std::string(field.key), EncodeRuntimeConfigField(field, &owner));
+            }
+        }
     } else {
         CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::SaveDifferences(
             owner, compareOwner, std::forward<UpdateKeyFn>(updateKey));
@@ -258,43 +124,15 @@ void SaveDynamicStructuredSectionDifferences(const typename Section::owner_type&
     const CompareOwner* compareOwner,
     UpdateKeyFn&& updateKey) {
     const std::string sectionName = Section::FormatName(suffix);
-    std::apply(
-        [&](auto... field) {
-            (..., [&] {
-                using Field = std::remove_cvref_t<decltype(field)>;
-                const std::string currentValue = EncodeConfigValue<typename Field::codec_type>(owner.*(Field::member));
-                const std::string compareValue =
-                    compareOwner != nullptr
-                        ? EncodeConfigValue<typename Field::codec_type>((*compareOwner).*(Field::member))
-                        : std::string{};
-                if (compareOwner == nullptr || currentValue != compareValue) {
-                    updateKey(sectionName, std::string(Field::key.view()), currentValue);
-                }
-            }());
-        },
-        Section::fields);
+    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
+        if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
+            updateKey(sectionName, std::string(field.key), EncodeRuntimeConfigField(field, &owner));
+        }
+    }
 }
 
 template <typename BindingList, typename Owner, typename Fn> void ForEachKnownBinding(Owner&& owner, Fn&& fn) {
     BindingList::ForEach([&](auto binding) { fn(std::remove_cvref_t<decltype(binding)>{}, owner); });
-}
-
-template <typename BindingList, typename Owner, typename UpdateKeyFn>
-void SaveKnownSections(const Owner& owner, UpdateKeyFn&& updateKey) {
-    ForEachKnownBinding<BindingList>(owner, [&](auto binding, const auto& currentOwner) {
-        using Binding = decltype(binding);
-        if constexpr (Binding::is_recursive) {
-            SaveKnownSections<typename Binding::nested_owner_type::BindingList>(Binding::Get(currentOwner), updateKey);
-        } else if constexpr (Binding::is_dynamic) {
-            using Section = typename Binding::section_type;
-            for (const auto& item : Binding::Get(currentOwner)) {
-                SaveDynamicStructuredSection<Section>(item, Binding::Key(item), updateKey);
-            }
-        } else {
-            using Section = typename Binding::section_type;
-            SaveStructuredSection<Section>(Binding::Get(currentOwner), updateKey);
-        }
-    });
 }
 
 template <typename BindingList, typename Owner, typename CompareOwner, typename UpdateKeyFn>
@@ -321,53 +159,6 @@ void SaveKnownSectionDifferences(const Owner& owner, const CompareOwner* compare
                 Binding::Get(currentOwner), compareSectionOwner, updateKey);
         }
     });
-}
-
-std::string ReadFileUtf8(const std::filesystem::path& path) {
-    std::FILE* input = nullptr;
-    if (_wfopen_s(&input, path.c_str(), L"rb") != 0 || input == nullptr) {
-        return {};
-    }
-
-    fseek(input, 0, SEEK_END);
-    const long size = ftell(input);
-    if (size < 0) {
-        fclose(input);
-        return {};
-    }
-    fseek(input, 0, SEEK_SET);
-    std::string text(static_cast<size_t>(size), '\0');
-    if (!text.empty()) {
-        const size_t read = fread(text.data(), 1, text.size(), input);
-        if (read != text.size()) {
-            fclose(input);
-            return {};
-        }
-    }
-    fclose(input);
-    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
-        static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
-        text.erase(0, 3);
-    }
-    if (!IsValidUtf8(text)) {
-        return {};
-    }
-    return text;
-}
-
-bool WriteFileUtf8(const std::filesystem::path& path, const std::string& text) {
-    if (!IsValidUtf8(text)) {
-        return false;
-    }
-
-    std::FILE* output = nullptr;
-    if (_wfopen_s(&output, path.c_str(), L"wb") != 0 || output == nullptr) {
-        return false;
-    }
-
-    const bool written = fwrite(text.data(), 1, text.size(), output) == text.size();
-    const bool closed = fclose(output) == 0;
-    return written && closed;
 }
 
 void ReplaceOrAppendKey(std::vector<std::string>& lines,
@@ -424,10 +215,6 @@ std::string JoinConfigLines(const std::vector<std::string>& lines) {
         output += "\r\n";
     }
     return output;
-}
-
-template <typename UpdateKeyFn> void SaveKnownStructuredSections(const AppConfig& config, UpdateKeyFn&& updateKey) {
-    SaveKnownSections<AppConfig::BindingList>(config, updateKey);
 }
 
 template <typename UpdateKeyFn>
@@ -536,22 +323,18 @@ std::string BuildSavedConfigText(
         ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value, shape == ConfigSaveShape::UpdateOrAppend);
     };
 
-    if (compareConfig == nullptr) {
-        SaveKnownStructuredSections(config, updateKey);
-    } else {
-        SaveKnownStructuredSectionDifferences(config, compareConfig, updateKey);
-    }
+    SaveKnownStructuredSectionDifferences(config, compareConfig, updateKey);
     return JoinConfigLines(lines);
 }
 
-bool SaveConfig(const std::filesystem::path& path, const AppConfig& config, const ConfigParseContext& context) {
+bool SaveConfig(const FilePath& path, const AppConfig& config, const ConfigParseContext& context) {
     const AppConfig compareConfig = LoadConfig(path, true, context);
-    const std::string output = BuildSavedConfigText(ReadFileUtf8(path), config, &compareConfig);
-    return WriteFileUtf8(path, output);
+    const std::string output = BuildSavedConfigText(ReadConfigFileUtf8(path), config, &compareConfig);
+    return WriteConfigFileUtf8(path, output);
 }
 
-bool SaveFullConfig(const std::filesystem::path& path, const AppConfig& config) {
+bool SaveFullConfig(const FilePath& path, const AppConfig& config) {
     const std::string output =
         BuildSavedConfigText(LoadEmbeddedConfigTemplate(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
-    return WriteFileUtf8(path, output);
+    return WriteConfigFileUtf8(path, output);
 }

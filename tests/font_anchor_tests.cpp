@@ -1,4 +1,3 @@
-#include <filesystem>
 #include <gtest/gtest.h>
 #include <string>
 #include <tuple>
@@ -10,12 +9,13 @@
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_model/dashboard_overlay_state.h"
 #include "telemetry/impl/collector_fake.h"
+#include "util/file_path.h"
 #include "util/trace.h"
 
 namespace {
 
-std::filesystem::path SourceConfigPath() {
-    return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+FilePath SourceConfigPath() {
+    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext TestConfigParseContext() {
@@ -60,7 +60,7 @@ TEST(FontAnchors, BuiltInLayoutRegistersActiveRegionForEveryFontsSectionRole) {
 
     Trace trace;
     std::unique_ptr<TelemetryCollector> telemetry =
-        CreateFakeTelemetryCollector(std::filesystem::current_path(), {}, nullptr, trace);
+        CreateFakeTelemetryCollector(CurrentDirectoryPath(), {}, nullptr, trace);
     ASSERT_NE(telemetry, nullptr);
     std::string telemetryError;
     ASSERT_TRUE(telemetry->Initialize(ExtractTelemetrySettings(config), &telemetryError)) << telemetryError;

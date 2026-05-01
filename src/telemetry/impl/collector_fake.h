@@ -1,11 +1,9 @@
 #pragma once
 
-#include <filesystem>
 #include <memory>
 
 #include "telemetry/telemetry.h"
+#include "util/file_path.h"
 
-std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(const std::filesystem::path& workingDirectory,
-    const std::filesystem::path& configuredPath,
-    TelemetryDumpLoader loadFakeDump,
-    Trace& trace);
+std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(
+    const FilePath& workingDirectory, const FilePath& configuredPath, TelemetryDumpLoader loadFakeDump, Trace& trace);

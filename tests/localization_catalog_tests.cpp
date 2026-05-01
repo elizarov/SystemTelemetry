@@ -1,10 +1,10 @@
-#include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
 #include <sstream>
 #include <vector>
 
 #include "layout_model/layout_edit_parameter_metadata.h"
+#include "util/file_path.h"
 #include "util/localization_catalog.h"
 #include "util/utf8.h"
 
@@ -34,8 +34,7 @@ TEST(LocalizationCatalog, KeepsFlatKeyLinesOutsideSections) {
 }
 
 TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
-    const std::filesystem::path catalogPath =
-        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    const FilePath catalogPath = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(catalogPath, std::ios::binary);
     ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
 
@@ -116,8 +115,7 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
 }
 
 TEST(LocalizationCatalog, CheckedInCatalogUsesValidUtf8) {
-    const std::filesystem::path catalogPath =
-        std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    const FilePath catalogPath = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(catalogPath, std::ios::binary);
     ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
 

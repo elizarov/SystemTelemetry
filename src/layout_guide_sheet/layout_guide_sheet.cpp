@@ -89,7 +89,7 @@ void WritePipelineStatsTrace(Trace& trace, const LayoutGuideSheetPipelineStats& 
 
 }  // namespace
 
-bool SaveLayoutGuideSheetPng(const std::filesystem::path& imagePath,
+bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,

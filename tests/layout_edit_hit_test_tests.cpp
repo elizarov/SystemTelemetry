@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <filesystem>
 #include <gtest/gtest.h>
 #include <optional>
 #include <sstream>
@@ -14,6 +13,7 @@
 #include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "telemetry/impl/collector_fake.h"
+#include "util/file_path.h"
 #include "util/trace.h"
 
 namespace {
@@ -56,8 +56,8 @@ LayoutEditAnchorRegion BasicAnchor(LayoutEditParameter parameter, RenderRect rec
     return anchor;
 }
 
-std::filesystem::path SourceConfigPath() {
-    return std::filesystem::path(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+FilePath SourceConfigPath() {
+    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext TestConfigParseContext() {
@@ -320,7 +320,7 @@ TEST(LayoutEditHitTest, CpuMetricListClockRowAndContainerReorderAnchorsDoNotOver
 
     Trace trace;
     std::unique_ptr<TelemetryCollector> telemetry =
-        CreateFakeTelemetryCollector(std::filesystem::current_path(), {}, nullptr, trace);
+        CreateFakeTelemetryCollector(CurrentDirectoryPath(), {}, nullptr, trace);
     ASSERT_NE(telemetry, nullptr);
     std::string telemetryError;
     ASSERT_TRUE(telemetry->Initialize(ExtractTelemetrySettings(config), &telemetryError)) << telemetryError;
@@ -370,7 +370,7 @@ TEST(LayoutEditHitTest, BuiltInLayoutsActiveRegionsHaveFourByFourReachableHitZon
 
     Trace trace;
     std::unique_ptr<TelemetryCollector> telemetry =
-        CreateFakeTelemetryCollector(std::filesystem::current_path(), {}, nullptr, trace);
+        CreateFakeTelemetryCollector(CurrentDirectoryPath(), {}, nullptr, trace);
     ASSERT_NE(telemetry, nullptr);
     std::string telemetryError;
     ASSERT_TRUE(telemetry->Initialize(ExtractTelemetrySettings(config), &telemetryError)) << telemetryError;

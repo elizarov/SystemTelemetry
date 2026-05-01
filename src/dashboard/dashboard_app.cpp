@@ -330,7 +330,7 @@ HICON DashboardApp::LoadAppIcon(int width, int height) {
         LoadImageW(instance_, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, width, height, LR_DEFAULTCOLOR));
 }
 
-bool DashboardApp::SaveSnapshotPng(const std::filesystem::path& imagePath, const SystemSnapshot& snapshot) {
+bool DashboardApp::SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot) {
     renderer_.SetConfig(controller_.State().config);
     rendererDashboardOverlayState_.showLayoutEditGuides =
         controller_.State().isEditingLayout || diagnosticsOptions_.editLayout;
@@ -372,7 +372,7 @@ bool DashboardApp::WriteDiagnosticsOutputs() {
     return controller_.WriteDiagnosticsOutputs();
 }
 
-std::optional<std::filesystem::path> DashboardApp::PromptDiagnosticsSavePath(
+std::optional<FilePath> DashboardApp::PromptDiagnosticsSavePath(
     const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const {
     return PromptSavePath(hwnd_, GetWorkingDirectory(), defaultFileName, filter, defaultExtension);
 }

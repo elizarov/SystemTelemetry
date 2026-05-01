@@ -1,4 +1,3 @@
-#include <filesystem>
 #include <string>
 
 #include "dashboard/constants.h"
@@ -6,6 +5,7 @@
 #include "diagnostics/diagnostics.h"
 #include "display/display_config.h"
 #include "main/autostart.h"
+#include "util/file_path.h"
 
 namespace {
 
@@ -44,16 +44,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
     if (const auto elevatedSaveSource = GetSwitchValue(L"/save-config"); elevatedSaveSource.has_value()) {
         const auto elevatedSaveTarget = GetSwitchValue(L"/save-config-target");
-        return RunElevatedSaveConfigMode(*elevatedSaveSource, elevatedSaveTarget.value_or(std::filesystem::path{}));
+        return RunElevatedSaveConfigMode(
+            FilePath(*elevatedSaveSource), elevatedSaveTarget.has_value() ? FilePath(*elevatedSaveTarget) : FilePath{});
     }
     if (const auto configureDisplaySource = GetSwitchValue(L"/configure-display"); configureDisplaySource.has_value()) {
         const auto configureDisplayTarget = GetSwitchValue(L"/configure-display-target");
         const auto configureDisplayDump = GetSwitchValue(L"/configure-display-dump");
         const auto configureDisplayImageTarget = GetSwitchValue(L"/configure-display-image-target");
-        return RunElevatedConfigureDisplayMode(*configureDisplaySource,
-            configureDisplayDump.value_or(std::filesystem::path{}),
-            configureDisplayTarget.value_or(std::filesystem::path{}),
-            configureDisplayImageTarget.value_or(std::filesystem::path{}));
+        return RunElevatedConfigureDisplayMode(FilePath(*configureDisplaySource),
+            configureDisplayDump.has_value() ? FilePath(*configureDisplayDump) : FilePath{},
+            configureDisplayTarget.has_value() ? FilePath(*configureDisplayTarget) : FilePath{},
+            configureDisplayImageTarget.has_value() ? FilePath(*configureDisplayImageTarget) : FilePath{});
     }
     if (const auto autoStartSetting = GetSwitchValue(L"/set-autostart"); autoStartSetting.has_value()) {
         if (_wcsicmp(autoStartSetting->c_str(), L"on") == 0) {

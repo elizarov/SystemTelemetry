@@ -2,7 +2,6 @@
 
 #include <windows.h>
 
-#include <filesystem>
 #include <memory>
 #include <span>
 #include <string>
@@ -11,6 +10,7 @@
 
 #include "config/config.h"
 #include "renderer/render_types.h"
+#include "util/file_path.h"
 #include "util/function_ref.h"
 
 struct TextStyleMetrics {
@@ -50,7 +50,7 @@ public:
     virtual void DiscardWindowTarget(std::string_view reason = {}) = 0;
     virtual bool DrawWindow(int width, int height, const DrawCallback& draw) = 0;
     virtual bool DrawOffscreen(int width, int height, const DrawCallback& draw) = 0;
-    virtual bool SavePng(const std::filesystem::path& imagePath, int width, int height, const DrawCallback& draw) = 0;
+    virtual bool SavePng(const FilePath& imagePath, int width, int height, const DrawCallback& draw) = 0;
     virtual const std::string& LastError() const = 0;
     virtual const TextStyleMetrics& TextMetrics() const = 0;
     virtual int ScaleLogical(int value) const = 0;

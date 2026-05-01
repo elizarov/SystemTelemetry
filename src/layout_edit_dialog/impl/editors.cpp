@@ -600,6 +600,46 @@ std::vector<std::string> ThemeNames(const AppConfig& config) {
     return names;
 }
 
+void ShowLayoutEditSelectionEditors(LayoutEditDialogState* state,
+    HWND hwnd,
+    bool value,
+    bool font,
+    bool color,
+    bool weights,
+    bool metric,
+    bool metricBinding,
+    bool globalFontFamily = false,
+    bool dateTimeFormat = false,
+    bool themeSelector = false) {
+    DestroyMetricListOrderEditorControls(state);
+    ShowLayoutEditEditors(hwnd,
+        value,
+        font,
+        color,
+        weights,
+        metric,
+        metricBinding,
+        false,
+        globalFontFamily,
+        dateTimeFormat,
+        themeSelector);
+    SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+}
+
+void FinishPopulateLayoutEditSelectionUi(LayoutEditDialogState* state, HWND hwnd, const wchar_t* status) {
+    SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, status);
+    state->activeSelectionValid = true;
+    state->updatingControls = false;
+    LayoutLayoutEditRightPane(state, hwnd);
+    UpdateLayoutEditActionState(state, hwnd);
+    RefreshLayoutEditRightPane(hwnd);
+}
+
+void TracePopulateLayoutEditSelection(LayoutEditDialogState* state, const std::string& detail) {
+    state->dialog->Host().TraceLayoutEditDialogEvent(
+        "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + detail);
+}
+
 }  // namespace
 
 LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* state) {
@@ -665,52 +705,29 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     if (IsFontsSectionNode(state)) {
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, L"Family:");
         PopulateFontFaceComboBox(hwnd, CommonFontFamilyText(state->dialog->Host().CurrentConfig().layout.fonts));
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false, true);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, L"Previewing changes in the dashboard.");
-        state->activeSelectionValid = true;
-        state->updatingControls = false;
-        LayoutLayoutEditRightPane(state, hwnd);
-        UpdateLayoutEditActionState(state, hwnd);
-        RefreshLayoutEditRightPane(hwnd);
-        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-            BuildTraceNodeText(state->selectedNode) + " editor=\"font_family\"");
+        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false, true);
+        FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Previewing changes in the dashboard.");
+        TracePopulateLayoutEditSelection(state, " editor=\"font_family\"");
         return;
     }
     if (IsThemeSectionNode(state)) {
         const AppConfig& config = state->dialog->Host().CurrentConfig();
         PopulateTextCombo(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO, ThemeNames(config), config.display.theme);
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false, false, false, true);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, L"Previewing changes in the dashboard.");
-        state->activeSelectionValid = true;
-        state->updatingControls = false;
-        LayoutLayoutEditRightPane(state, hwnd);
-        UpdateLayoutEditActionState(state, hwnd);
-        RefreshLayoutEditRightPane(hwnd);
+        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false, false, false, true);
+        FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Previewing changes in the dashboard.");
         InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_PREVIEW), nullptr, TRUE);
-        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-            BuildTraceNodeText(state->selectedNode) +
-                " editor=\"theme_selector\" theme=" + QuoteTraceText(config.display.theme));
+        TracePopulateLayoutEditSelection(
+            state, " editor=\"theme_selector\" theme=" + QuoteTraceText(config.display.theme));
         return;
     }
     if (state->selectedLeaf == nullptr) {
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false);
-        SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, L"Select a field to edit it here.");
-        state->activeSelectionValid = true;
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        state->updatingControls = false;
-        LayoutLayoutEditRightPane(state, hwnd);
-        UpdateLayoutEditActionState(state, hwnd);
-        RefreshLayoutEditRightPane(hwnd);
-        state->dialog->Host().TraceLayoutEditDialogEvent(
-            "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
+        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false);
+        FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Select a field to edit it here.");
+        TracePopulateLayoutEditSelection(state, " editor=\"none\"");
         return;
     }
 
+    std::string traceDetail;
     if (const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey)) {
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec) {
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, L"Font name:");
@@ -728,11 +745,11 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                 hwnd,
                 std::optional<LayoutEditParameter>(*parameter),
                 font.has_value() && *font != nullptr ? *font : nullptr);
-            state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-                BuildTraceNodeText(state->selectedNode) + " editor=\"font\"" +
-                    " face=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT)) +
-                    " size=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT)) +
-                    " weight=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT)));
+            traceDetail =
+                std::string(" editor=\"font\"") +
+                " face=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT)) +
+                " size=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT)) +
+                " weight=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT));
         } else if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
             const auto value = FindColorRoleValue(state->dialog->Host().CurrentConfig(), *parameter);
             const unsigned int color = value.has_value() ? value->ToRgba() : 0x000000FFu;
@@ -742,28 +759,21 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 16) & 0xFFu);
             SetColorDialogChannel(hwnd, kColorDialogControls[2], (color >> 8) & 0xFFu);
             SetColorDialogChannel(hwnd, kColorDialogControls[3], color & 0xFFu);
-            DestroyMetricListOrderEditorControls(state);
-            ShowLayoutEditEditors(hwnd, false, false, true, false, false, false, false);
-            SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+            ShowLayoutEditSelectionEditors(state, hwnd, false, false, true, false, false, false);
             SetColorSamplePreview(state, hwnd, color);
-            state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-                BuildTraceNodeText(state->selectedNode) + " editor=\"color\"" + BuildColorDialogTraceValues(hwnd) +
-                    " config_value=" +
-                    QuoteTraceText(value.has_value() ? FormatTraceColorHex(value->ToRgba()) : "none") +
-                    " mode=" + QuoteTraceText(IsDerivedColorMode(hwnd) ? "derived" : "literal") + " expression=" +
-                    QuoteTraceText(value.has_value() && !value->expression.empty() ? value->expression : ""));
+            traceDetail = " editor=\"color\"" + BuildColorDialogTraceValues(hwnd) + " config_value=" +
+                          QuoteTraceText(value.has_value() ? FormatTraceColorHex(value->ToRgba()) : "none") +
+                          " mode=" + QuoteTraceText(IsDerivedColorMode(hwnd) ? "derived" : "literal") + " expression=" +
+                          QuoteTraceText(value.has_value() && !value->expression.empty() ? value->expression : "");
         } else {
             const auto value = FindLayoutEditParameterNumericValue(state->dialog->Host().CurrentConfig(), *parameter);
             const std::wstring text =
                 value.has_value() ? WideFromUtf8(FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat))
                                   : L"";
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-            DestroyMetricListOrderEditorControls(state);
-            ShowLayoutEditEditors(hwnd, true, false, false, false, false, false, false);
-            SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-            state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-                BuildTraceNodeText(state->selectedNode) + " editor=\"numeric\"" +
-                    " text=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT)));
+            ShowLayoutEditSelectionEditors(state, hwnd, true, false, false, false, false, false);
+            traceDetail = std::string(" editor=\"numeric\"") +
+                          " text=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
         }
     } else if (const auto* themeColorKey = std::get_if<ThemeColorEditKey>(&state->selectedLeaf->focusKey)) {
         const auto value = FindThemeColorValue(state->dialog->Host().CurrentConfig(), *themeColorKey);
@@ -773,13 +783,10 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 16) & 0xFFu);
         SetColorDialogChannel(hwnd, kColorDialogControls[2], (color >> 8) & 0xFFu);
         SetColorDialogChannel(hwnd, kColorDialogControls[3], color & 0xFFu);
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, false, false, true, false, false, false, false);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+        ShowLayoutEditSelectionEditors(state, hwnd, false, false, true, false, false, false);
         SetColorSamplePreview(state, hwnd, color);
-        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-            BuildTraceNodeText(state->selectedNode) + " editor=\"theme_color\"" + BuildColorDialogTraceValues(hwnd) +
-                " config_value=" + QuoteTraceText(value.has_value() ? FormatTraceColorHex(value->ToRgba()) : "none"));
+        traceDetail = " editor=\"theme_color\"" + BuildColorDialogTraceValues(hwnd) + " config_value=" +
+                      QuoteTraceText(value.has_value() ? FormatTraceColorHex(value->ToRgba()) : "none");
     } else if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&state->selectedLeaf->focusKey)) {
         const auto values = FindWeightEditValues(state->dialog->Host().CurrentConfig(), *weightKey);
         SetDlgItemTextW(
@@ -792,23 +799,17 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT,
             values.has_value() ? WideFromUtf8(std::to_string(values->second)).c_str() : L"");
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, false, false, false, true, false, false, false);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-            BuildTraceNodeText(state->selectedNode) + " editor=\"weights\"" +
-                " first=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT)) +
-                " second=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT)));
+        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, true, false, false);
+        traceDetail = std::string(" editor=\"weights\"") +
+                      " first=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT)) +
+                      " second=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT));
     } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&state->selectedLeaf->focusKey)) {
         const std::wstring text =
             WideFromUtf8(FindCardTitleValue(state->dialog->Host().CurrentConfig(), *cardTitleKey).value_or(""));
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, true, false, false, false, false, false, false);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-            BuildTraceNodeText(state->selectedNode) + " editor=\"text\"" +
-                " text=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT)));
+        ShowLayoutEditSelectionEditors(state, hwnd, true, false, false, false, false, false);
+        traceDetail = std::string(" editor=\"text\"") +
+                      " text=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
     } else if (PopulateDescriptorLayoutEditSelection(state, hwnd)) {
     } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey)) {
         const MetricDefinitionConfig* definition =
@@ -854,30 +855,22 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT), scaleEditable ? TRUE : FALSE);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT), unitEditable ? TRUE : FALSE);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT), definition != nullptr ? TRUE : FALSE);
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, false, false, false, false, true, showBinding, false);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
-            BuildTraceNodeText(state->selectedNode) + " editor=\"metric\"" + BuildMetricDialogTraceValues(hwnd) +
-                " scale_editable=" + QuoteTraceText(scaleEditable ? "true" : "false") +
-                " unit_editable=" + QuoteTraceText(unitEditable ? "true" : "false") +
-                " binding_visible=" + QuoteTraceText(showBinding ? "true" : "false") +
-                " binding_options=" + QuoteTraceText(std::to_string(bindingOptions.size())));
+        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, true, showBinding);
+        traceDetail = " editor=\"metric\"" + BuildMetricDialogTraceValues(hwnd) +
+                      " scale_editable=" + QuoteTraceText(scaleEditable ? "true" : "false") +
+                      " unit_editable=" + QuoteTraceText(unitEditable ? "true" : "false") +
+                      " binding_visible=" + QuoteTraceText(showBinding ? "true" : "false") +
+                      " binding_options=" + QuoteTraceText(std::to_string(bindingOptions.size()));
     } else {
-        DestroyMetricListOrderEditorControls(state);
-        ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false);
-        SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
-        state->dialog->Host().TraceLayoutEditDialogEvent(
-            "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + " editor=\"none\"");
+        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false);
+        traceDetail = " editor=\"none\"";
     }
 
-    SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, L"Previewing changes in the dashboard.");
-    state->activeSelectionValid = true;
+    if (!traceDetail.empty()) {
+        TracePopulateLayoutEditSelection(state, traceDetail);
+    }
     RefreshSelectedColorDerivedControls(state, hwnd);
-    state->updatingControls = false;
-    LayoutLayoutEditRightPane(state, hwnd);
-    UpdateLayoutEditActionState(state, hwnd);
-    RefreshLayoutEditRightPane(hwnd);
+    FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Previewing changes in the dashboard.");
 }
 
 LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* state, HWND hwnd) {

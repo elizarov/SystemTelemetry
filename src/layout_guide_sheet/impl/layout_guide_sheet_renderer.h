@@ -1,12 +1,12 @@
 #pragma once
 
 #include <chrono>
-#include <filesystem>
 #include <string>
 #include <vector>
 
 #include "layout_guide_sheet/impl/layout_guide_sheet_types.h"
 #include "layout_model/layout_edit_active_region.h"
+#include "util/file_path.h"
 #include "util/function_ref.h"
 
 class DashboardRenderer;
@@ -22,7 +22,7 @@ class LayoutGuideSheetRenderer {
 public:
     explicit LayoutGuideSheetRenderer(DashboardRenderer& dashboardRenderer);
 
-    bool SavePng(const std::filesystem::path& imagePath,
+    bool SavePng(const FilePath& imagePath,
         const SystemSnapshot& snapshot,
         const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,
         const std::vector<std::string>& selectedCardIds,

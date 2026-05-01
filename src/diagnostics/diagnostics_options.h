@@ -1,8 +1,9 @@
 #pragma once
 
-#include <filesystem>
 #include <optional>
 #include <string>
+
+#include "util/file_path.h"
 
 enum class DiagnosticsLayoutSimilarityMode {
     None,
@@ -35,13 +36,13 @@ struct DiagnosticsOptions {
     std::string layoutName;
     std::string themeName;
     std::string editLayoutWidgetName;
-    std::filesystem::path tracePath;
-    std::filesystem::path dumpPath;
-    std::filesystem::path screenshotPath;
-    std::filesystem::path layoutGuideSheetPath;
-    std::filesystem::path saveConfigPath;
-    std::filesystem::path saveFullConfigPath;
-    std::filesystem::path fakePath;
+    FilePath tracePath;
+    FilePath dumpPath;
+    FilePath screenshotPath;
+    FilePath layoutGuideSheetPath;
+    FilePath saveConfigPath;
+    FilePath saveFullConfigPath;
+    FilePath fakePath;
 
     bool HasAnyOutput() const;
 };

@@ -77,6 +77,7 @@ add_executable(SystemTelemetry WIN32
     src/display/display_config.cpp
     src/diagnostics/diagnostics_options.cpp
     src/display/monitor.cpp
+    src/util/file_path.cpp
     src/util/paths.cpp
     src/util/scale.cpp
     src/util/strings.cpp
@@ -113,8 +114,10 @@ add_executable(SystemTelemetry WIN32
     src/config/config.cpp
     src/config/color_expression.cpp
     src/config/color_resolver.cpp
+    src/config/config_file_io.cpp
     src/config/metric_catalog.cpp
     src/config/config_parser.cpp
+    src/config/config_runtime_fields.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
     src/util/localization_catalog.cpp
@@ -139,6 +142,7 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/metrics.cpp
     src/layout_model/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp
@@ -219,6 +223,7 @@ set(systemtelemetry_release_speed_sources
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/impl/collector_board.cpp
@@ -257,7 +262,7 @@ set_source_files_properties(${systemtelemetry_release_speed_sources} PROPERTIES
 )
 
 add_library(SystemTelemetryGigabyte OBJECT
-    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv_bridge.cpp
 )
 
 set_target_properties(SystemTelemetryGigabyte PROPERTIES
@@ -304,8 +309,8 @@ target_compile_definitions(SystemTelemetry PRIVATE
 )
 
 target_compile_options(SystemTelemetry PRIVATE
-    /EHsc
     /W4
+    /wd4530
     /permissive-
     /GR-
     /w14505
@@ -397,8 +402,10 @@ add_executable(SystemTelemetryTests
     src/config/config.cpp
     src/config/color_expression.cpp
     src/config/color_resolver.cpp
+    src/config/config_file_io.cpp
     src/config/metric_catalog.cpp
     src/config/config_parser.cpp
+    src/config/config_runtime_fields.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
     src/layout_model/layout_edit_active_region.cpp
@@ -421,6 +428,7 @@ add_executable(SystemTelemetryTests
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
+    src/util/file_path.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/metrics.cpp
@@ -516,8 +524,10 @@ add_executable(SystemTelemetryBenchmarks
     src/config/config.cpp
     src/config/color_expression.cpp
     src/config/color_resolver.cpp
+    src/config/config_file_io.cpp
     src/config/metric_catalog.cpp
     src/config/config_parser.cpp
+    src/config/config_runtime_fields.cpp
     src/config/config_resolution.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
@@ -536,6 +546,7 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
@@ -555,6 +566,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_model/layout_edit_service.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
+    src/util/file_path.cpp
     src/telemetry/metrics.cpp
     src/layout_model/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp
@@ -608,8 +620,8 @@ target_compile_definitions(SystemTelemetryBenchmarks PRIVATE
     SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 target_compile_options(SystemTelemetryBenchmarks PRIVATE
-    /EHsc
     /W4
+    /wd4530
     /permissive-
     /GR-
     /w14505

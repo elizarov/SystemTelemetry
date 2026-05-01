@@ -1,6 +1,7 @@
 #include "util/paths.h"
 
 #include <array>
+#include <utility>
 
 namespace {
 
@@ -9,45 +10,37 @@ extern "C" __declspec(dllimport) unsigned long __stdcall GetModuleFileNameW(
 
 constexpr size_t kModulePathBufferLength = 32768;
 
-std::filesystem::path CaptureLaunchWorkingDirectory() {
-    try {
-        return std::filesystem::current_path();
-    } catch (...) {
-        return {};
-    }
+FilePath CaptureLaunchWorkingDirectory() {
+    return CurrentDirectoryPath();
 }
 
 }  // namespace
 
-std::filesystem::path GetExecutableDirectory() {
+FilePath GetExecutableDirectory() {
     std::array<wchar_t, kModulePathBufferLength> modulePath{};
     const auto length = GetModuleFileNameW(nullptr, modulePath.data(), static_cast<unsigned long>(modulePath.size()));
     if (length == 0 || length >= modulePath.size()) {
-        return std::filesystem::current_path();
+        return CurrentDirectoryPath();
     }
-    return std::filesystem::path(modulePath.data()).parent_path();
+    return FilePath(std::wstring(modulePath.data(), length)).ParentPath();
 }
 
-std::filesystem::path GetWorkingDirectory() {
-    static const std::filesystem::path workingDirectory = CaptureLaunchWorkingDirectory();
-    if (!workingDirectory.empty()) {
+FilePath GetWorkingDirectory() {
+    static const FilePath workingDirectory = CaptureLaunchWorkingDirectory();
+    if (!workingDirectory.Empty()) {
         return workingDirectory;
     }
-    try {
-        return std::filesystem::current_path();
-    } catch (...) {
-        return {};
-    }
+    return CurrentDirectoryPath();
 }
 
-std::filesystem::path ResolveExecutableRelativePath(const std::filesystem::path& configuredPath) {
-    if (configuredPath.empty()) {
+FilePath ResolveExecutableRelativePath(const FilePath& configuredPath) {
+    if (configuredPath.Empty()) {
         return {};
     }
-    if (configuredPath.is_absolute()) {
+    if (configuredPath.IsAbsolute()) {
         return configuredPath;
     }
-    return GetExecutableDirectory() / configuredPath;
+    return JoinPath(GetExecutableDirectory(), configuredPath);
 }
 
 std::optional<std::wstring> GetExecutablePath() {

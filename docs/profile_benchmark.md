@@ -741,6 +741,125 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep theme-preview rendering behind the shared module and compare future theme-selector work against the full theme-change loop rather than a standalone triangle microbenchmark.
 
+### Hypothesis: Keep STL-heavy Gigabyte provider logic out of CLR metadata
+
+- Change:
+  - Split the Gigabyte SIV provider into a native provider implementation and a narrow C++/CLI bridge. The native file keeps the provider settings, sensor maps, metric templates, and sample shaping, while the CLR-enabled bridge owns only managed runtime state and reflection calls into the vendor assemblies. Keep native STL containers out of the CLR method boundary by having the bridge call a native capture sink with pinned UTF-16 strings.
+- Result:
+  - Helped executable size materially while keeping the single executable and the existing `std::unordered_map`-backed provider lookups.
+- Observed effect:
+  - Splitting the provider reduced `build\SystemTelemetry.exe` from `1,440,768` bytes to `1,336,832` bytes and `build\SystemTelemetryBenchmarks.exe` from `1,078,272` bytes to `974,848` bytes.
+  - Narrowing the CLR method boundary further reduced `build\SystemTelemetry.exe` to `1,309,184` bytes and `build\SystemTelemetryBenchmarks.exe` to `947,200` bytes.
+  - The CLR metadata directory in `build\SystemTelemetry.exe` decreased from `126,840` bytes before the split to `45,532` bytes after the split and `25,904` bytes after the sink boundary.
+  - The app section sizes after the sink boundary are `.text=1,057,052`, `.rdata=174,840`, `.pdata=28,320`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,356` bytes.
+- Conclusion:
+  - Keep mixed-mode translation units narrow and avoid STL types in `/clr` method signatures. Native performance containers are fine, but they should stay in native `.cpp` files so their template spellings and provider implementation details do not inflate CLR metadata.
+
+### Hypothesis: Replace `std::filesystem` with a project filesystem utility
+
+- Change:
+  - Add a Win32-backed `FilePath` and filesystem helper module under `src/util/`, then route project and test path operations through that module instead of `std::filesystem`.
+- Result:
+  - Helped executable size modestly.
+- Observed effect:
+  - Removing project `std::filesystem` use reduced `build\SystemTelemetry.exe` from `1,309,184` bytes to `1,303,040` bytes and `build\SystemTelemetryBenchmarks.exe` from `947,200` bytes to `943,104` bytes.
+  - The app section sizes after the filesystem migration are `.text=1,053,628`, `.rdata=172,802`, `.pdata=27,948`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,304` bytes.
+- Conclusion:
+  - Keep common path and file operations in `src/util/file_path.*` instead of reintroducing `std::filesystem`; the size win is small but keeps filesystem-related standard-library machinery out of the single executable.
+
+### Hypothesis: Drive config parsing and writing through runtime field descriptor loops
+
+- Change:
+  - Keep the config declarations in `config.h` as the one-line-per-parameter source of truth, but route structured-section parsing and writing through per-section runtime field descriptor arrays instead of expanding every field into repeated `std::apply` lambda bodies.
+  - Replace exception-based config numeric parsing with `strtol`, `strtod`, and `strtoul` validation.
+- Result:
+  - Helped executable size materially.
+- Observed effect:
+  - The config descriptor-loop rewrite plus non-throwing numeric parsing reduced `build\SystemTelemetry.exe` from `1,303,040` bytes to `1,253,376` bytes and `build\SystemTelemetryBenchmarks.exe` from `943,104` bytes to `939,008` bytes.
+  - The app section sizes after the config rewrite are `.text=1,000,908`, `.rdata=173,580`, `.pdata=28,944`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,328` bytes.
+  - A fresh linker map showed `config_writer.cpp.obj` falling from about `81.8 KiB` to about `35.4 KiB`, while `config_parser.cpp.obj` fell from about `44.6 KiB` to about `37.6 KiB`.
+- Conclusion:
+  - Keep config parser and writer dispatch table-driven at runtime while preserving `config.h` as the metadata source of truth. Avoid reintroducing per-field generated parser/writer lambda chains.
+
+### Hypothesis: Disable native C++ exception handling for app and benchmark targets
+
+- Change:
+  - Remove `/EHsc` from the native app and benchmark targets while leaving the C++/CLI bridge and test target exception model separate.
+  - Suppress expected MSVC C4530 diagnostics on the no-EH native targets because standard-library headers still contain exception-aware code paths.
+- Result:
+  - Helped executable size materially.
+- Observed effect:
+  - Removing native `/EHsc` reduced `build\SystemTelemetry.exe` from `1,253,376` bytes to `1,152,512` bytes and `build\SystemTelemetryBenchmarks.exe` from `939,008` bytes to `868,864` bytes.
+  - The app section sizes after disabling native exception handling are `.text=958,120`, `.rdata=121,074`, `.pdata=23,124`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,332` bytes.
+  - The benchmark section sizes after disabling native exception handling are `.text=709,772`, `.rdata=91,656`, `.pdata=17,532`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,588` bytes.
+- Conclusion:
+  - Keep native production and benchmark code on the no-EH profile. Keep managed exception handling isolated to the C++/CLI provider bridge and keep tests on `/EHsc` where assertion helpers and test support can still use ordinary C++ exceptions.
+
+### Hypothesis: Collapse config writer full-save and diff-save template paths
+
+- Change:
+  - Route full config saves through the same section-difference traversal used by minimal saves, with a null compare config selecting the full-write behavior.
+  - Move duplicated parser and writer UTF-8 config file helpers into `src/config/config_file_io.*`.
+- Result:
+  - Helped executable size through the writer traversal collapse; shared file I/O was neutral after LTCG.
+- Observed effect:
+  - Collapsing the full-save traversal reduced `build\SystemTelemetry.exe` from `1,152,512` bytes to `1,144,832` bytes. `build\SystemTelemetryBenchmarks.exe` stayed at `868,864` bytes because the benchmark target does not link the config writer.
+  - The app section sizes after the writer collapse are `.text=951,016`, `.rdata=120,914`, `.pdata=23,016`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,328` bytes.
+  - A parser experiment replacing the card-reference `std::set` with a flat string-view vector regressed the app to `1,145,856` bytes and was reverted.
+- Conclusion:
+  - Keep full and minimal config saves on one writer traversal so future schema growth does not duplicate save-template code. Do not retry the flat card-reference vector in the parser for size.
+
+### Hypothesis: Unify config parser and writer runtime field descriptors
+
+- Change:
+  - Move structured-section field decoding, encoding, equality checks, and layout-expression formatting into `src/config/config_runtime_fields.*`.
+  - Replace parser-only and writer-only descriptor tables with one `RuntimeConfigFieldDescriptor` table per structured section.
+- Result:
+  - Helped the distributed executable modestly.
+- Observed effect:
+  - Unifying runtime field descriptors reduced `build\SystemTelemetry.exe` from `1,144,832` bytes to `1,142,784` bytes.
+  - The app section sizes after unifying descriptors are `.text=951,048`, `.rdata=119,266`, `.pdata=23,004`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,132` bytes.
+- Conclusion:
+  - Keep parser and writer field dispatch on the shared runtime descriptor table. Future size work should target type-erased codec operations or direct fixed-arity parsing rather than recreating separate parser/writer descriptor tables.
+
+### Hypothesis: Replace per-field config callbacks with offset descriptors
+
+- Change:
+  - Store structured-section runtime field descriptors as `key`, field offset, value kind, and clamp policy.
+  - Replace the generated per-field decode, encode, and equality callbacks with shared switch-based runtime helpers.
+- Result:
+  - Helped the distributed executable by removing per-field callback instantiations.
+- Observed effect:
+  - Offset-based runtime descriptors reduced `build\SystemTelemetry.exe` from `1,142,784` bytes to `1,135,104` bytes.
+- Conclusion:
+  - Keep config parser and writer field dispatch on the offset descriptor table. This preserves the `config.h` metadata source of truth while making runtime config I/O less template-heavy.
+
+### Hypothesis: Compact snapshot dump field I/O
+
+- Change:
+  - Replace repeated flat snapshot dump read/write chains with offset-based field descriptors for scalar CPU, GPU, network, storage, and time fields.
+  - Replace the dump parser's local `std::map<std::string, std::string>` key store with a flat key/value vector while preserving duplicate-key last-writer behavior.
+  - Store descriptor offsets directly with `offsetof` and route field reads and writes through shared typed accessors instead of per-field offset lambdas.
+- Result:
+  - Helped the distributed executable modestly.
+- Observed effect:
+  - Compacting snapshot dump I/O reduced `build\SystemTelemetry.exe` from `1,135,104` bytes to `1,133,568` bytes.
+- Conclusion:
+  - Keep the flat key/value dump parser and descriptor-driven flat field I/O. Further dump-size work should target the larger variable-length dump sections only if the resulting code stays straightforward.
+
+### Hypothesis: Compact layout edit selection population
+
+- Change:
+  - Share the repeated editor visibility, empty font preview, right-pane completion, and populate-selection trace plumbing used by the layout edit selection branches.
+  - Keep the branch-specific control population in `PopulateLayoutEditSelection` so each editor mode still initializes the same values and trace payloads.
+- Result:
+  - Helped the distributed executable modestly.
+- Observed effect:
+  - Compacting layout edit selection population reduced `build\SystemTelemetry.exe` from `1,133,568` bytes to `1,132,544` bytes.
+  - In the fresh linker map, `PopulateLayoutEditSelection` fell from `11,088` bytes to `9,172` bytes before accounting for the small shared helper functions.
+- Conclusion:
+  - Keep the common selection finish and trace plumbing shared. Further layout edit dialog size work should target larger standalone routines rather than adding branch-specific cleverness here.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.

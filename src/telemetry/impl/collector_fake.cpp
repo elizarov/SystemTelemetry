@@ -5,9 +5,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
-#include <filesystem>
 
 #include "telemetry/impl/collector_storage_selection.h"
+#include "util/file_path.h"
 #include "util/strings.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -23,7 +23,7 @@ constexpr size_t kSyntheticHistorySamples = 60;
 constexpr double kSyntheticCpuMemoryTotalGb = 63.943493;
 constexpr double kSyntheticCpuMemoryPeakRatio = 0.75;
 
-std::string ReadBinaryFile(const std::filesystem::path& path) {
+std::string ReadBinaryFile(const FilePath& path) {
     std::FILE* file = nullptr;
     if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr) {
         return {};
@@ -382,8 +382,7 @@ void MarkSelectedStorageDriveCandidates(
     }
 }
 
-std::filesystem::path ResolveFakePath(
-    const std::filesystem::path& workingDirectory, const std::filesystem::path& configuredPath) {
+FilePath ResolveFakePath(const FilePath& workingDirectory, const FilePath& configuredPath) {
     if (configuredPath.empty()) {
         return {};
     }
@@ -395,7 +394,7 @@ std::filesystem::path ResolveFakePath(
 
 class FakeTelemetryCollector : public TelemetryCollector {
 public:
-    FakeTelemetryCollector(std::filesystem::path fakePath, TelemetryDumpLoader loadFakeDump, Trace& trace)
+    FakeTelemetryCollector(FilePath fakePath, TelemetryDumpLoader loadFakeDump, Trace& trace)
         : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), loadFakeDump_(loadFakeDump),
           trace_(trace) {}
 
@@ -538,7 +537,7 @@ private:
         return true;
     }
 
-    std::filesystem::path fakePath_;
+    FilePath fakePath_;
     bool useSyntheticSource_ = false;
     TelemetryDumpLoader loadFakeDump_ = nullptr;
     TelemetrySelectionSettings selectionSettings_{};
@@ -556,10 +555,8 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(const std::filesystem::path& workingDirectory,
-    const std::filesystem::path& configuredPath,
-    TelemetryDumpLoader loadFakeDump,
-    Trace& trace) {
+std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(
+    const FilePath& workingDirectory, const FilePath& configuredPath, TelemetryDumpLoader loadFakeDump, Trace& trace) {
     return std::make_unique<FakeTelemetryCollector>(
         ResolveFakePath(workingDirectory, configuredPath), loadFakeDump, trace);
 }

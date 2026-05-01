@@ -333,7 +333,7 @@ bool D2DRenderer::DrawToWicBitmap(int width,
     return lastError_.empty();
 }
 
-bool D2DRenderer::SavePng(const std::filesystem::path& imagePath, int width, int height, const DrawCallback& draw) {
+bool D2DRenderer::SavePng(const FilePath& imagePath, int width, int height, const DrawCallback& draw) {
     Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
     if (!DrawToWicBitmap(width, height, draw, "screenshot", &bitmap)) {
         return false;
@@ -439,7 +439,7 @@ int D2DRenderer::MeasureTextWidth(TextStyleId style, std::string_view text) cons
     return width;
 }
 
-bool D2DRenderer::SaveWicBitmapPng(IWICBitmap* bitmap, const std::filesystem::path& imagePath) {
+bool D2DRenderer::SaveWicBitmapPng(IWICBitmap* bitmap, const FilePath& imagePath) {
     if (wicFactory_ == nullptr || bitmap == nullptr) {
         lastError_ = "renderer:screenshot_wic_unavailable";
         return false;
