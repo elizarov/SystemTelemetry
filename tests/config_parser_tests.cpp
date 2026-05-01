@@ -90,28 +90,29 @@ TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
 }
 
 TEST(ConfigParser, ResolvesThemeTokensAndDerivedColors) {
-    const std::filesystem::path path = WriteTestConfig("[display]\n"
-                                                       "theme = dark_cyan\n"
-                                                       "\n"
-                                                       "[theme.dark_cyan]\n"
-                                                       "background = #000000FF\n"
-                                                       "foreground = #FFFFFFFF\n"
-                                                       "accent = #00BFFFFF\n"
-                                                       "guide = #FF6A00FF\n"
-                                                       "\n"
-                                                       "[colors]\n"
-                                                       "accent_color = accent\n"
-                                                       "peak_ghost_color = accent(alpha: 0x60)\n"
-                                                       "active_edit_color = guide(rotate_hue: 50)\n"
-                                                       "panel_border_color = background(mix: foreground 0.28)\n"
-                                                       "muted_text_color = accent(mix: guide 0.37)\n");
+    const std::filesystem::path path =
+        WriteTestConfig("[display]\n"
+                        "theme = dark_cyan\n"
+                        "\n"
+                        "[theme.dark_cyan]\n"
+                        "background = #000000FF\n"
+                        "foreground = #FFFFFFFF\n"
+                        "accent = #00BFFFFF\n"
+                        "guide = #FF6A00FF\n"
+                        "\n"
+                        "[colors]\n"
+                        "accent_color = accent\n"
+                        "peak_ghost_color = accent(alpha: 0x60)\n"
+                        "active_edit_color = guide(rotate_hue: 46, mix: foreground 0.22)\n"
+                        "panel_border_color = background(mix: accent 0.34)\n"
+                        "muted_text_color = accent(mix: guide 0.37)\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(config.layout.colors.accentColor.ToRgba(), 0x00BFFFFFu);
     EXPECT_EQ(config.layout.colors.peakGhostColor.ToRgba(), 0x00BFFF60u);
-    EXPECT_EQ(config.layout.colors.activeEditColor.ToRgba(), 0xC79900FFu);
-    EXPECT_EQ(config.layout.colors.panelBorderColor.ToRgba(), 0x292929FFu);
+    EXPECT_EQ(config.layout.colors.activeEditColor.ToRgba(), 0xD9AD5AFFu);
+    EXPECT_EQ(config.layout.colors.panelBorderColor.ToRgba(), 0x002738FFu);
     EXPECT_EQ(config.layout.colors.mutedTextColor.ToRgba(), 0x9FABB9FFu);
 
     std::filesystem::remove(path);
@@ -145,7 +146,7 @@ TEST(ConfigParser, ResolvesLayoutGuideSheetColorsFromThemeAndColorsSection) {
                         "guide = #FF6A00FF\n"
                         "\n"
                         "[colors]\n"
-                        "active_edit_color = guide(rotate_hue: 50)\n"
+                        "active_edit_color = guide(rotate_hue: 46, mix: foreground 0.22)\n"
                         "muted_text_color = accent(mix: guide 0.37)\n"
                         "\n"
                         "[layout_guide_sheet]\n"

@@ -118,7 +118,7 @@ TEST(ConfigWriter, FullExportWritesThemeSections) {
                            "foreground = #FFFFFFFF\r\n"
                            "accent = #00BFFFFF\r\n"
                            "guide = #FF6A00FF\r\n"));
-    EXPECT_THAT(output, testing::HasSubstr("panel_border_color = background(mix: foreground 0.28)\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("panel_border_color = background(mix: accent 0.34)\r\n"));
 }
 
 TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
