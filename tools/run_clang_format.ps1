@@ -56,7 +56,7 @@ function Resolve-ClangFormatPath {
     }
 
     $devenvCmd = Join-Path $RepoRoot 'devenv.cmd'
-    if (Test-Path -LiteralPath $devenvCmd) {
+    if ($env:GITHUB_ACTIONS -ne 'true' -and (Test-Path -LiteralPath $devenvCmd)) {
         $probe = & cmd /c "call `"$devenvCmd`" >nul 2>&1 && where clang-format.exe" 2>$null | Select-Object -First 1
         if ($LASTEXITCODE -eq 0 -and $probe) {
             return $probe.Trim()

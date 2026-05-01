@@ -14,11 +14,13 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
 - `.clang-format` is the single maintained source of truth for C++ formatting policy.
+- `.github/workflows/format-lint-tidy.yml` is the single maintained source of truth for push and pull request format, lint, and tidy automation.
 
 ## Repository Conventions
 
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
 - Keep generated build outputs inside `build\`, with the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
+- Keep pull request merge protection tied to the GitHub `Format And Tidy` job so pushed changes pass formatting and tidy checks on the Windows runner before merge.
 - Keep tracked text files checked out with CRLF line endings through the repo-level `.gitattributes` policy; binary assets are excluded from text normalization there.
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories.
 - Keep C++ includes ordered by `format.cmd`: matching `.cpp` header first, then sorted angle/system includes, quoted `vendor/` includes, and sorted quoted project includes; WinSock and `windows.h` stay ahead of dependent Win32 headers.

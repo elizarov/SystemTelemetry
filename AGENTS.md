@@ -18,6 +18,7 @@
 - Keep all build artifacts and temporary compiler files in `build\` so the repository root stays clean.
 - Keep the repo-level `.clang-format` in sync with the dominant non-vendored C++ style, especially the non-aligned wrapped-parameter and wrapped-argument layout used across the project.
 - Use the top-level `format.cmd` entry point for C++ formatting checks and fixes; `format` checks non-vendored project sources and `format fix` applies the repo style to those files.
+- Do not run `lint.cmd tidy` locally unless the user explicitly asks for a local tidy run; the GitHub `Format And Tidy` workflow owns the slow `clang-tidy` sweep on push and pull request checks.
 - Do not run build steps and validation runs in parallel; always finish the build first, then run validation commands sequentially against the freshly built artifacts.
 
 Validation workflow:
@@ -51,4 +52,5 @@ Validation workflow:
 - If `devenv.cmd` changes between Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run so CMake, MSVC, and the vcpkg-detected compiler do not mix mismatched compiler and STL versions.
 - Git pathspecs such as `tests/**/*.cpp` do not cover top-level files like `tests/benchmarks.cpp`; formatter and hook discovery should start from broad `*.cpp` and `*.h` pathspecs, then apply the repo eligibility filter.
 - When extending clang-tidy to standalone header runs, keep include-cleaner's explicit false-positive filters narrow; Win32 umbrella headers and project macro-provider headers can otherwise hide real unused header includes.
+- GitHub Actions must not call the machine-local `devenv.cmd`; CI bootstraps Visual Studio through runner discovery and gives `clang-tidy` a larger per-file timeout through `SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS`.
 - The repo uses CRLF text checkouts; keep `.githooks/pre-commit` as a minimal CRLF-tolerant shell launcher and put multi-line hook logic in PowerShell.

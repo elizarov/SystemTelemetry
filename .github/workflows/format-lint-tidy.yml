@@ -1,0 +1,40 @@
+name: Format And Tidy
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  format-lint-tidy:
+    name: Format And Tidy
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 240
+
+    env:
+      SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS: 1800
+      SYSTEMTELEMETRY_TIDY_MAX_PARALLEL: 4
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build
+        shell: cmd
+        run: build.cmd
+
+      - name: Check format
+        shell: cmd
+        run: format.cmd
+
+      - name: Run lint tidy
+        shell: cmd
+        run: lint.cmd tidy
+
+      - name: Upload clang-tidy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: build/clang_tidy_report.txt
+          if-no-files-found: ignore

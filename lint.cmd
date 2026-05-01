@@ -61,7 +61,10 @@ goto :usage
 
 :clang_tidy_args_done
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%root%tools\run_clang_tidy.ps1" -Root "%root_arg%" -Mode "%mode%" -Scope "%scope%"
+set "tidy_ps_args="
+if defined SYSTEMTELEMETRY_TIDY_MAX_PARALLEL set "tidy_ps_args=!tidy_ps_args! -MaxParallel !SYSTEMTELEMETRY_TIDY_MAX_PARALLEL!"
+if defined SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS set "tidy_ps_args=!tidy_ps_args! -TimeoutSeconds !SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS!"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%root%tools\run_clang_tidy.ps1" -Root "%root_arg%" -Mode "%mode%" -Scope "%scope%" !tidy_ps_args!
 exit /b !errorlevel!
 
 :usage
