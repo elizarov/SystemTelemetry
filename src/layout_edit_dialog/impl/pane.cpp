@@ -466,14 +466,37 @@ int DialogControlLayoutHeightForVisibleHeight(HWND hwnd, int controlId, int desi
     return desiredVisibleHeight + framePadding;
 }
 
+int MeasureControlFontHeight(HWND hwnd, int controlId) {
+    HWND control = GetDlgItem(hwnd, controlId);
+    if (control == nullptr) {
+        return 0;
+    }
+    HDC dc = GetDC(control);
+    if (dc == nullptr) {
+        return 0;
+    }
+    HFONT font = reinterpret_cast<HFONT>(SendMessageW(control, WM_GETFONT, 0, 0));
+    HFONT previous = font != nullptr ? reinterpret_cast<HFONT>(SelectObject(dc, font)) : nullptr;
+    TEXTMETRICW metrics{};
+    const BOOL measured = GetTextMetricsW(dc, &metrics);
+    if (previous != nullptr) {
+        SelectObject(dc, previous);
+    }
+    ReleaseDC(control, dc);
+    return measured == TRUE ? std::max(1, static_cast<int>(metrics.tmHeight)) : 0;
+}
+
 int MeasureSingleLineFieldVisibleHeight(HWND hwnd) {
+    const int textHeight = MeasureControlFontHeight(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT);
+    const int paddedTextHeight = textHeight > 0 ? textHeight + DialogUnitsToPixelsY(hwnd, 4) : 0;
+    const int comboHeight = DialogComboBoxSelectionHeight(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
+    const int measuredHeight = std::max(paddedTextHeight, comboHeight);
+    if (measuredHeight > 0) {
+        return measuredHeight;
+    }
     const int editHeight = DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT);
     if (editHeight > 0) {
         return editHeight;
-    }
-    const int comboHeight = DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
-    if (comboHeight > 0) {
-        return comboHeight;
     }
     return 14;
 }
