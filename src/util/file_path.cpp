@@ -4,7 +4,6 @@
 
 #include <cstdio>
 #include <utility>
-#include <vector>
 
 #include "util/utf8.h"
 
