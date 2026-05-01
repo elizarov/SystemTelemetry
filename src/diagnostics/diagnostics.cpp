@@ -93,6 +93,43 @@ std::string FormatTracePoint(RenderPoint point) {
     return std::to_string(point.x) + "," + std::to_string(point.y);
 }
 
+void WriteResolvedColorTraceLine(
+    DiagnosticsSession& diagnostics, std::string_view section, std::string_view name, const ColorConfig& color) {
+    std::string text = "diagnostics:resolved_color section=" + QuoteTraceText(section) +
+                       " name=" + QuoteTraceText(name) + " value=" + QuoteTraceText(FormatHexColorText(color.ToRgba()));
+    if (!color.expression.empty()) {
+        text += " expression=" + QuoteTraceText(color.expression);
+    }
+    diagnostics.WriteTraceMarker(text);
+}
+
+void WriteResolvedColorTrace(DiagnosticsSession& diagnostics, const AppConfig& config) {
+    const ColorsConfig& colors = config.layout.colors;
+    WriteResolvedColorTraceLine(diagnostics, "colors", "background_color", colors.backgroundColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "foreground_color", colors.foregroundColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "icon_color", colors.iconColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "accent_color", colors.accentColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "peak_ghost_color", colors.peakGhostColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "layout_guide_color", colors.layoutGuideColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "active_edit_color", colors.activeEditColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "panel_border_color", colors.panelBorderColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "muted_text_color", colors.mutedTextColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "track_color", colors.trackColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "panel_fill_color", colors.panelFillColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "graph_background_color", colors.graphBackgroundColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "graph_axis_color", colors.graphAxisColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "graph_marker_color", colors.graphMarkerColor);
+
+    const LayoutGuideSheetConfig& sheet = config.layout.layoutGuideSheet;
+    WriteResolvedColorTraceLine(diagnostics, "layout_guide_sheet", "callout_leader_color", sheet.calloutLeaderColor);
+    WriteResolvedColorTraceLine(diagnostics, "layout_guide_sheet", "callout_fill_color", sheet.calloutFillColor);
+    WriteResolvedColorTraceLine(diagnostics, "layout_guide_sheet", "callout_border_color", sheet.calloutBorderColor);
+    WriteResolvedColorTraceLine(
+        diagnostics, "layout_guide_sheet", "callout_parameter_color", sheet.calloutParameterColor);
+    WriteResolvedColorTraceLine(
+        diagnostics, "layout_guide_sheet", "callout_description_color", sheet.calloutDescriptionColor);
+}
+
 class DiagnosticsLayoutEditHost final : public LayoutEditHost {
 public:
     DiagnosticsLayoutEditHost(const AppConfig& config, DashboardRenderer& renderer, DashboardOverlayState& overlayState)
@@ -786,6 +823,7 @@ bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
     activeConfig = BuildEffectiveRuntimeConfig(effectiveReloadedConfig, telemetry->ResolvedSelections());
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarker("diagnostics:reload_config_done");
+        WriteResolvedColorTrace(*diagnostics, activeConfig);
     }
     return true;
 }
@@ -890,6 +928,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
 
     diagnostics.WriteTraceMarker(
         "diagnostics:headless_start scale=" + std::to_string(ResolveSavedScreenshotScale(config)));
+    WriteResolvedColorTrace(diagnostics, config);
     diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_begin");
 
     std::string telemetryError;

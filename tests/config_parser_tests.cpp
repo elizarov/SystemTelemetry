@@ -102,17 +102,17 @@ TEST(ConfigParser, ResolvesThemeTokensAndDerivedColors) {
                                                        "[colors]\n"
                                                        "accent_color = accent\n"
                                                        "peak_ghost_color = accent(alpha: 0x60)\n"
-                                                       "active_edit_color = guide(rotate_hue: 35)\n"
-                                                       "panel_border_color = background(mix: accent 0.16)\n"
-                                                       "muted_text_color = foreground(mix: accent 0.22)\n");
+                                                       "active_edit_color = accent(rotate_hue: -140)\n"
+                                                       "panel_border_color = background(mix: foreground 0.28)\n"
+                                                       "muted_text_color = accent(mix: guide 0.37)\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
     EXPECT_EQ(config.layout.colors.accentColor.ToRgba(), 0x00BFFFFFu);
     EXPECT_EQ(config.layout.colors.peakGhostColor.ToRgba(), 0x00BFFF60u);
-    EXPECT_EQ(config.layout.colors.activeEditColor.ToRgba(), 0xDE8A00FFu);
-    EXPECT_EQ(config.layout.colors.panelBorderColor.ToRgba(), 0x00070DFFu);
-    EXPECT_EQ(config.layout.colors.mutedTextColor.ToRgba(), 0xD8F2FFFFu);
+    EXPECT_EQ(config.layout.colors.activeEditColor.ToRgba(), 0xD3AB07FFu);
+    EXPECT_EQ(config.layout.colors.panelBorderColor.ToRgba(), 0x292929FFu);
+    EXPECT_EQ(config.layout.colors.mutedTextColor.ToRgba(), 0x9FABB9FFu);
 
     std::filesystem::remove(path);
 }
@@ -134,29 +134,30 @@ TEST(ColorExpression, ParsesAndFormatsDerivedExpressionsInCanonicalOptionOrder) 
 }
 
 TEST(ConfigParser, ResolvesLayoutGuideSheetColorsFromThemeAndColorsSection) {
-    const std::filesystem::path path = WriteTestConfig("[display]\n"
-                                                       "theme = dark_cyan\n"
-                                                       "\n"
-                                                       "[theme.dark_cyan]\n"
-                                                       "background = #000000FF\n"
-                                                       "foreground = #FFFFFFFF\n"
-                                                       "accent = #00BFFFFF\n"
-                                                       "guide = #FF6A00FF\n"
-                                                       "\n"
-                                                       "[colors]\n"
-                                                       "active_edit_color = guide(rotate_hue: 35)\n"
-                                                       "muted_text_color = foreground(mix: accent 0.22)\n"
-                                                       "\n"
-                                                       "[layout_guide_sheet]\n"
-                                                       "callout_leader_color = guide(rotate_hue: 28, alpha: 0xE6)\n"
-                                                       "callout_border_color = guide(mix: active_edit_color 0.35)\n"
-                                                       "callout_description_color = muted_text_color\n");
+    const std::filesystem::path path =
+        WriteTestConfig("[display]\n"
+                        "theme = dark_cyan\n"
+                        "\n"
+                        "[theme.dark_cyan]\n"
+                        "background = #000000FF\n"
+                        "foreground = #FFFFFFFF\n"
+                        "accent = #00BFFFFF\n"
+                        "guide = #FF6A00FF\n"
+                        "\n"
+                        "[colors]\n"
+                        "active_edit_color = accent(rotate_hue: -140)\n"
+                        "muted_text_color = accent(mix: guide 0.37)\n"
+                        "\n"
+                        "[layout_guide_sheet]\n"
+                        "callout_leader_color = foreground(mix: guide 0.59, alpha: 0xE6)\n"
+                        "callout_border_color = guide(rotate_hue: 53)\n"
+                        "callout_description_color = muted_text_color\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutLeaderColor.ToRgba(), 0xE78300E6u);
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutBorderColor.ToRgba(), 0xF47700FFu);
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutDescriptionColor.ToRgba(), 0xD8F2FFFFu);
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutLeaderColor.ToRgba(), 0xFFAC84E6u);
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutBorderColor.ToRgba(), 0xC19C00FFu);
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutDescriptionColor.ToRgba(), 0x9FABB9FFu);
 
     std::filesystem::remove(path);
 }
