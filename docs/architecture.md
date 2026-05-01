@@ -148,7 +148,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `.github/workflows/format-lint-tidy.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the `windows-2025-vs2026` GitHub runner.
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` builds as a CLR-enabled unit so it can bridge to the vendor .NET assemblies.
-- The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, layout-edit mouse-hover, and telemetry-refresh paths through the same runtime subsystems used by the app. Its supported benchmark names are held in an `enum_string`-backed selector, and each named benchmark owns its top-level command flow in a separate function.
+- The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, theme-change, layout-edit mouse-hover, and telemetry-refresh paths through the same runtime subsystems used by the app. Its supported benchmark names are held in an `enum_string`-backed selector, and each named benchmark owns its top-level command flow in a separate function.
+- `src/layout_edit_dialog/theme_preview.*` owns construction and drawing of the theme selector's color-mix triangle so dialog painting and benchmark coverage use the same preview implementation.
 
 ## Source Dependency Graph
 

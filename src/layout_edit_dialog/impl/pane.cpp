@@ -1,12 +1,12 @@
 #include "layout_edit_dialog/impl/pane.h"
 
 #include <algorithm>
-#include <cmath>
 #include <commctrl.h>
 
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit_dialog/impl/editors.h"
 #include "layout_edit_dialog/impl/util.h"
+#include "layout_edit_dialog/theme_preview.h"
 #include "resource.h"
 #include "util/localization_catalog.h"
 #include "util/utf8.h"
@@ -33,18 +33,6 @@ struct LayoutEditRightPaneMetrics {
 };
 
 constexpr LayoutEditRightPaneMetrics kLayoutEditRightPaneMetrics{};
-
-COLORREF ColorConfigToColorRef(const ColorConfig& color) {
-    const unsigned int rgba = color.ToRgba();
-    return RGB((rgba >> 24) & 0xFFu, (rgba >> 16) & 0xFFu, (rgba >> 8) & 0xFFu);
-}
-
-const ThemeConfig* FindActiveTheme(const AppConfig& config) {
-    const auto it = std::find_if(config.layout.themes.begin(),
-        config.layout.themes.end(),
-        [&](const ThemeConfig& theme) { return theme.name == config.display.theme; });
-    return it != config.layout.themes.end() ? &(*it) : nullptr;
-}
 
 bool DialogControlHasClass(HWND hwnd, int controlId, const wchar_t* expectedClassName) {
     HWND control = GetDlgItem(hwnd, controlId);
@@ -650,83 +638,12 @@ void DrawThemePreview(LayoutEditDialogState* state, const DRAWITEMSTRUCT& drawIt
     if (state == nullptr || drawItem.hDC == nullptr) {
         return;
     }
-    const ThemeConfig* theme = FindActiveTheme(state->dialog->Host().CurrentConfig());
+    const ThemeConfig* theme = FindActiveThemeConfig(state->dialog->Host().CurrentConfig());
     if (theme == nullptr) {
         FillRect(drawItem.hDC, &drawItem.rcItem, GetSysColorBrush(COLOR_3DFACE));
         return;
     }
-
-    const RECT rect = drawItem.rcItem;
-    FillRect(drawItem.hDC, &rect, GetSysColorBrush(COLOR_3DFACE));
-    const int availableWidth = std::max(1, static_cast<int>(rect.right - rect.left - 2));
-    const int availableHeight = std::max(1, static_cast<int>(rect.bottom - rect.top - 2));
-    const int side = std::max(1, std::min(availableWidth, static_cast<int>(availableHeight * 2.0 / std::sqrt(3.0))));
-    const int triangleHeight = std::max(1, static_cast<int>(std::lround(side * std::sqrt(3.0) / 2.0)));
-    const double leftX = rect.left + ((rect.right - rect.left - side) / 2.0);
-    const double rightX = leftX + side;
-    const double topY = rect.top + ((rect.bottom - rect.top - triangleHeight) / 2.0);
-    const double bottomX = (leftX + rightX) / 2.0;
-    const double bottomY = topY + triangleHeight;
-
-    const COLORREF background = ColorConfigToColorRef(theme->background);
-    const COLORREF foreground = ColorConfigToColorRef(theme->foreground);
-    const COLORREF accent = ColorConfigToColorRef(theme->accent);
-    const double denom = (topY - bottomY) * (leftX - bottomX) + (bottomX - rightX) * (topY - bottomY);
-    if (std::abs(denom) < 0.0001) {
-        return;
-    }
-    const int minX = static_cast<int>(std::floor(leftX));
-    const int maxX = static_cast<int>(std::ceil(rightX));
-    const int minY = static_cast<int>(std::floor(topY));
-    const int maxY = static_cast<int>(std::ceil(bottomY));
-    for (int y = minY; y <= maxY; ++y) {
-        for (int x = minX; x <= maxX; ++x) {
-            const double sampleX = x + 0.5;
-            const double sampleY = y + 0.5;
-            const double backgroundWeight =
-                ((topY - bottomY) * (sampleX - bottomX) + (bottomX - rightX) * (sampleY - bottomY)) / denom;
-            const double foregroundWeight =
-                ((bottomY - topY) * (sampleX - bottomX) + (leftX - bottomX) * (sampleY - bottomY)) / denom;
-            const double accentWeight = 1.0 - backgroundWeight - foregroundWeight;
-            if (backgroundWeight < -0.001 || foregroundWeight < -0.001 || accentWeight < -0.001) {
-                continue;
-            }
-            SetPixel(drawItem.hDC,
-                x,
-                y,
-                RGB(std::clamp(static_cast<int>(std::lround(backgroundWeight * GetRValue(background) +
-                                                            foregroundWeight * GetRValue(foreground) +
-                                                            accentWeight * GetRValue(accent))),
-                        0,
-                        255),
-                    std::clamp(static_cast<int>(std::lround(backgroundWeight * GetGValue(background) +
-                                                            foregroundWeight * GetGValue(foreground) +
-                                                            accentWeight * GetGValue(accent))),
-                        0,
-                        255),
-                    std::clamp(static_cast<int>(std::lround(backgroundWeight * GetBValue(background) +
-                                                            foregroundWeight * GetBValue(foreground) +
-                                                            accentWeight * GetBValue(accent))),
-                        0,
-                        255)));
-        }
-    }
-
-    HPEN outlinePen = CreatePen(PS_SOLID, 1, GetSysColor(COLOR_WINDOWTEXT));
-    HPEN guidePen = CreatePen(PS_SOLID, 1, ColorConfigToColorRef(theme->guide));
-    HGDIOBJ oldPen = SelectObject(drawItem.hDC, outlinePen);
-    HGDIOBJ oldBrush = SelectObject(drawItem.hDC, GetStockObject(NULL_BRUSH));
-    POINT points[] = {{static_cast<LONG>(std::lround(leftX)), static_cast<LONG>(std::lround(topY))},
-        {static_cast<LONG>(std::lround(rightX)), static_cast<LONG>(std::lround(topY))},
-        {static_cast<LONG>(std::lround(bottomX)), static_cast<LONG>(std::lround(bottomY))}};
-    Polygon(drawItem.hDC, points, 3);
-    SelectObject(drawItem.hDC, guidePen);
-    MoveToEx(drawItem.hDC, static_cast<int>(std::lround(bottomX)), static_cast<int>(std::lround(topY)), nullptr);
-    LineTo(drawItem.hDC, static_cast<int>(std::lround(bottomX)), static_cast<int>(std::lround(bottomY)));
-    SelectObject(drawItem.hDC, oldBrush);
-    SelectObject(drawItem.hDC, oldPen);
-    DeleteObject(guidePen);
-    DeleteObject(outlinePen);
+    DrawThemePreviewTriangle(drawItem.hDC, drawItem.rcItem, *theme);
 }
 
 void SetFontSamplePreview(

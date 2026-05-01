@@ -13,6 +13,7 @@
 #include <string_view>
 #include <vector>
 
+#include "config/color_resolver.h"
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "dashboard_renderer/dashboard_renderer.h"
@@ -21,6 +22,7 @@
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_trace_session.h"
 #include "layout_edit/layout_edit_tree.h"
+#include "layout_edit_dialog/theme_preview.h"
 #include "layout_guide_sheet/layout_guide_sheet.h"
 #include "layout_model/layout_edit_service.h"
 #include "telemetry/metrics.h"
@@ -33,6 +35,7 @@
     X(LayoutGuideSheet, "layout-guide-sheet")                                                                          \
     X(LayoutSwitch, "layout-switch")                                                                                   \
     X(MouseHover, "mouse-hover")                                                                                       \
+    X(ThemeChange, "theme-change")                                                                                     \
     X(UpdateTelemetry, "update-telemetry")
 
 ENUM_STRING_DECLARE(Benchmark, SYSTEM_TELEMETRY_BENCHMARK_ITEMS);
@@ -418,6 +421,12 @@ public:
         return true;
     }
 
+    void SetRuntimeConfig(const AppConfig& config) {
+        config_ = config;
+        renderer_.SetConfig(config_);
+        dirty_ = true;
+    }
+
 private:
     const AppConfig& LayoutEditConfig() const override {
         return config_;
@@ -559,6 +568,17 @@ std::vector<std::string> CollectLayoutNames(const AppConfig& config) {
     return names;
 }
 
+std::vector<std::string> CollectThemeNames(const AppConfig& config) {
+    std::vector<std::string> names;
+    names.reserve(config.layout.themes.size());
+    for (const ThemeConfig& theme : config.layout.themes) {
+        if (!theme.name.empty()) {
+            names.push_back(theme.name);
+        }
+    }
+    return names;
+}
+
 struct LayoutSwitchPhaseTotals {
     PhaseStats switchApply;
     PhaseStats dialogRefresh;
@@ -568,6 +588,20 @@ struct LayoutSwitchPhaseTotals {
 struct LayoutSwitchBenchTotals {
     BenchResult switchLoop;
     LayoutSwitchPhaseTotals phases;
+};
+
+struct ThemeChangePhaseTotals {
+    PhaseStats configCopy;
+    PhaseStats colorResolve;
+    PhaseStats dashboardReconfigure;
+    PhaseStats dialogTreeRebuild;
+    PhaseStats previewDraw;
+    PhaseStats dashboardPaint;
+};
+
+struct ThemeChangeBenchTotals {
+    BenchResult changeLoop;
+    ThemeChangePhaseTotals phases;
 };
 
 struct LayoutGuideSheetBenchTotals {
@@ -621,6 +655,80 @@ LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
     }
     totals.switchLoop.total = Clock::now() - switchLoopStart;
     totals.switchLoop.perIteration = totals.switchLoop.total / static_cast<double>(iterations);
+    return totals;
+}
+
+ThemeChangeBenchTotals RunThemeChangeBenchmark(
+    BenchmarkHost& host, const std::vector<std::string>& themeNames, size_t iterations) {
+    ThemeChangeBenchTotals totals{};
+    if (themeNames.empty() || iterations == 0) {
+        return totals;
+    }
+
+    HDC screenDc = GetDC(nullptr);
+    HDC previewDc = CreateCompatibleDC(screenDc);
+    constexpr int kPreviewWidth = 420;
+    constexpr int kPreviewHeight = 172;
+    HBITMAP previewBitmap = CreateCompatibleBitmap(screenDc, kPreviewWidth, kPreviewHeight);
+    if (previewDc == nullptr || previewBitmap == nullptr) {
+        if (previewBitmap != nullptr) {
+            DeleteObject(previewBitmap);
+        }
+        if (previewDc != nullptr) {
+            DeleteDC(previewDc);
+        }
+        ReleaseDC(nullptr, screenDc);
+        return totals;
+    }
+    HGDIOBJ oldPreviewBitmap = SelectObject(previewDc, previewBitmap);
+    ReleaseDC(nullptr, screenDc);
+
+    const RECT previewRect{0, 0, kPreviewWidth, kPreviewHeight};
+    host.DrawCurrentSnapshot();
+
+    const auto themeLoopStart = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        const std::string& themeName = themeNames[iteration % themeNames.size()];
+
+        const auto configCopyStart = Clock::now();
+        AppConfig updatedConfig = host.CurrentConfig();
+        updatedConfig.display.theme = themeName;
+        const auto configCopyEnd = Clock::now();
+        RecordPhase(totals.phases.configCopy, configCopyEnd - configCopyStart);
+
+        const auto colorResolveStart = Clock::now();
+        ResolveConfiguredColors(updatedConfig);
+        const auto colorResolveEnd = Clock::now();
+        RecordPhase(totals.phases.colorResolve, colorResolveEnd - colorResolveStart);
+
+        const auto dashboardReconfigureStart = Clock::now();
+        host.SetRuntimeConfig(updatedConfig);
+        const auto dashboardReconfigureEnd = Clock::now();
+        RecordPhase(totals.phases.dashboardReconfigure, dashboardReconfigureEnd - dashboardReconfigureStart);
+
+        const auto dialogTreeRebuildStart = Clock::now();
+        [[maybe_unused]] const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
+        const auto dialogTreeRebuildEnd = Clock::now();
+        RecordPhase(totals.phases.dialogTreeRebuild, dialogTreeRebuildEnd - dialogTreeRebuildStart);
+
+        const auto previewDrawStart = Clock::now();
+        if (const ThemeConfig* activeTheme = FindActiveThemeConfig(host.CurrentConfig()); activeTheme != nullptr) {
+            DrawThemePreviewTriangle(previewDc, previewRect, *activeTheme);
+        }
+        const auto previewDrawEnd = Clock::now();
+        RecordPhase(totals.phases.previewDraw, previewDrawEnd - previewDrawStart);
+
+        const auto paintStart = Clock::now();
+        host.FlushPaintIfDirty();
+        const auto paintEnd = Clock::now();
+        RecordPhase(totals.phases.dashboardPaint, paintEnd - paintStart);
+    }
+    totals.changeLoop.total = Clock::now() - themeLoopStart;
+    totals.changeLoop.perIteration = totals.changeLoop.total / static_cast<double>(iterations);
+
+    SelectObject(previewDc, oldPreviewBitmap);
+    DeleteObject(previewBitmap);
+    DeleteDC(previewDc);
     return totals;
 }
 
@@ -831,6 +939,41 @@ int RunLayoutSwitchBenchmarkCommand(size_t iterations, double renderScale, Trace
     return 0;
 }
 
+int RunThemeChangeBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
+    if (telemetry == nullptr) {
+        std::cerr << "fake telemetry init failed\n";
+        return 1;
+    }
+
+    const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    const std::vector<std::string> themeNames = CollectThemeNames(runtimeConfig);
+    if (themeNames.size() < 2) {
+        std::cerr << "theme-change benchmark requires at least two named themes\n";
+        return 1;
+    }
+
+    BenchmarkHost host(runtimeConfig, renderScale, trace);
+    host.SetSnapshot(telemetry->Snapshot());
+    if (!host.Initialize()) {
+        std::cerr << "renderer init failed: " << host.LayoutRenderer().LastError() << "\n";
+        return 1;
+    }
+
+    std::cout << "theme_change_benchmark themes=" << themeNames.size() << " iterations=" << iterations
+              << " render_scale=" << renderScale << "\n";
+    const ThemeChangeBenchTotals totals = RunThemeChangeBenchmark(host, themeNames, iterations);
+    PrintBenchLoopResult("theme_loop", totals.changeLoop);
+    PrintPhaseResult("config_copy", totals.phases.configCopy);
+    PrintPhaseResult("color_resolve", totals.phases.colorResolve);
+    PrintPhaseResult("dashboard_config", totals.phases.dashboardReconfigure);
+    PrintPhaseResult("edit_tree", totals.phases.dialogTreeRebuild);
+    PrintPhaseResult("theme_preview", totals.phases.previewDraw);
+    PrintPhaseResult("theme_paint", totals.phases.dashboardPaint);
+    return 0;
+}
+
 int RunLayoutGuideSheetBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
     const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
     std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
@@ -945,6 +1088,8 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunLayoutSwitchBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::MouseHover:
             return RunMouseHoverBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::ThemeChange:
+            return RunThemeChangeBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::UpdateTelemetry:
             return RunUpdateTelemetryBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
     }

@@ -84,6 +84,7 @@ add_executable(SystemTelemetry WIN32
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_shell_ui.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
+    src/layout_edit_dialog/theme_preview.cpp
     src/layout_edit_dialog/impl/dialog_proc.cpp
     src/layout_edit_dialog/impl/editors.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
@@ -198,6 +199,7 @@ set(systemtelemetry_release_speed_sources
     src/layout_edit/layout_edit_tooltip_text.cpp
     src/layout_edit/layout_edit_trace_session.cpp
     src/layout_edit/layout_edit_tree.cpp
+    src/layout_edit_dialog/theme_preview.cpp
     src/layout_guide_sheet/layout_guide_sheet.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
@@ -542,6 +544,7 @@ add_executable(SystemTelemetryBenchmarks
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit/layout_edit_parameter_edit.cpp
     src/layout_edit/layout_edit_target_descriptor.cpp
+    src/layout_edit_dialog/theme_preview.cpp
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp

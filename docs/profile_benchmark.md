@@ -14,11 +14,13 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - Measure the in-memory layout-guide-sheet generation benchmark with `build\SystemTelemetryBenchmarks.exe layout-guide-sheet 20 2`.
 - Measure the repeatable layout-switch benchmark with `build\SystemTelemetryBenchmarks.exe layout-switch 240 2`.
 - Measure the repeatable mouse-hover benchmark with `build\SystemTelemetryBenchmarks.exe mouse-hover 240 2`.
+- Measure the repeatable theme-change benchmark with `build\SystemTelemetryBenchmarks.exe theme-change 240 2`.
 - Measure the repeatable telemetry-refresh benchmark with `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`.
-- `SystemTelemetryBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
+- `SystemTelemetryBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
 - The mouse-hover benchmark moves the layout-edit cursor path from the dashboard's top-left corner to bottom-right corner, resolving hover hits and drawing the resulting overlay state on every step.
-- Capture a benchmark-focused CPU profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
+- The theme-change benchmark rotates through all configured themes and measures config copy, color resolution, dashboard reconfiguration, edit-tree rebuild, theme-preview drawing, and dashboard repaint.
+- Capture a benchmark-focused CPU profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, `profile_benchmark.cmd theme-change 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - Capture a layout-guide-sheet CPU profile with `profile_benchmark.cmd layout-guide-sheet 20 2`; the benchmark renders the sheet to an in-memory offscreen surface and deliberately excludes PNG encoding and file I/O.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
@@ -53,6 +55,14 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `switch_apply avg_ms=0.88`
   - `dialog_refresh avg_ms=0.18`
   - `switch_paint avg_ms=2.95`
+- Current repeatable `theme-change` result on the current tree:
+  - `theme_loop per_iter_ms=4.92`
+  - `config_copy avg_ms=0.01`
+  - `color_resolve avg_ms=0.03`
+  - `dashboard_config avg_ms=1.05`
+  - `edit_tree avg_ms=0.18`
+  - `theme_preview avg_ms=1.00`
+  - `theme_paint avg_ms=2.61`
 - Current repeatable `mouse-hover` result on the current tree:
   - `hover_loop per_iter_ms=2.34`
   - `hover_hit_test avg_ms=0.09`
@@ -720,6 +730,17 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep `FunctionRef` for synchronous callbacks that do not escape the call. Continue to use owning callback storage only when a callback must outlive the call stack.
 
+### Hypothesis: Theme preview construction belongs outside the dialog pane
+
+- Change:
+  - Move theme-preview triangle construction and drawing into `src/layout_edit_dialog/theme_preview.*`, replace dialog-path `SetPixel` drawing with a 32-bit DIB transfer, and add a `theme-change` benchmark that rotates all configured themes through the dashboard, edit tree, and theme preview flow.
+- Result:
+  - Helped maintainability and established a whole-flow timing baseline for theme switching.
+- Observed effect:
+  - `build\SystemTelemetryBenchmarks.exe theme-change 240 2` landed at `theme_loop per_iter_ms=4.92`, with `dashboard_config avg_ms=1.05`, `edit_tree avg_ms=0.18`, `theme_preview avg_ms=1.00`, and `theme_paint avg_ms=2.61`.
+- Conclusion:
+  - Keep theme-preview rendering behind the shared module and compare future theme-selector work against the full theme-change loop rather than a standalone triangle microbenchmark.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.
@@ -738,6 +759,6 @@ These changes produced real wins and remain in the codebase:
 
 ## Validation Notes
 
-- Keep the benchmark comparison on the same command line shape: `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` or `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`.
-- Use `profile_benchmark.cmd update-telemetry 240 2` or `profile_benchmark.cmd edit-layout 240 2` directly for profiling validation; it rebuilds automatically through the daemon workflow.
+- Keep the benchmark comparison on the same command line shape, such as `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`, `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`, or `build\SystemTelemetryBenchmarks.exe theme-change 240 2`.
+- Use `profile_benchmark.cmd update-telemetry 240 2`, `profile_benchmark.cmd edit-layout 240 2`, or `profile_benchmark.cmd theme-change 240 2` directly for profiling validation; it rebuilds automatically through the daemon workflow.
 - If an experiment regresses, revert it and record the result here before finishing.
