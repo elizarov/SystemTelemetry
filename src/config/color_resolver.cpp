@@ -1,19 +1,32 @@
 #include "config/color_resolver.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
-#include <functional>
 #include <optional>
 #include <string_view>
 
 #include "config/color_expression.h"
+#include "config/config_runtime_fields.h"
+#include "util/function_ref.h"
 #include "util/strings.h"
 
 namespace {
 
 std::string FormatHexColor(ColorConfig color) {
     return FormatHexColorText(color.ToRgba());
+}
+
+std::optional<unsigned int> HexNibble(char ch) {
+    if (ch >= '0' && ch <= '9') {
+        return static_cast<unsigned int>(ch - '0');
+    }
+    if (ch >= 'a' && ch <= 'f') {
+        return static_cast<unsigned int>(ch - 'a' + 10);
+    }
+    if (ch >= 'A' && ch <= 'F') {
+        return static_cast<unsigned int>(ch - 'A' + 10);
+    }
+    return std::nullopt;
 }
 
 ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallback) {
@@ -24,16 +37,15 @@ ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallbac
     if (text.size() != 8) {
         return fallback;
     }
-    for (unsigned char ch : text) {
-        if (!std::isxdigit(ch)) {
+    unsigned int rgba = 0;
+    for (char ch : text) {
+        const std::optional<unsigned int> nibble = HexNibble(ch);
+        if (!nibble.has_value()) {
             return fallback;
         }
+        rgba = (rgba << 4) | *nibble;
     }
-    try {
-        return ColorConfig::FromRgba(static_cast<unsigned int>(std::stoul(text, nullptr, 16)));
-    } catch (...) {
-        return fallback;
-    }
+    return ColorConfig::FromRgba(rgba);
 }
 
 struct ColorBytes {
@@ -123,18 +135,33 @@ const ThemeConfig* FindTheme(const LayoutConfig& layout, std::string_view name) 
 }
 
 std::optional<ColorConfig> FindThemeToken(const ThemeConfig& theme, std::string_view name) {
-    if (name == "background")
-        return theme.background;
-    if (name == "foreground")
-        return theme.foreground;
-    if (name == "accent")
-        return theme.accent;
-    if (name == "guide")
-        return theme.guide;
+    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<ThemeConfig::Section>()) {
+        if (field.kind == RuntimeConfigFieldValueKind::HexColor && field.key == name) {
+            return *reinterpret_cast<const ColorConfig*>(reinterpret_cast<const char*>(&theme) + field.offset);
+        }
+    }
     return std::nullopt;
 }
 
-using ColorLookup = std::function<std::optional<ColorConfig>(std::string_view)>;
+using ColorLookup = FunctionRef<std::optional<ColorConfig>(std::string_view)>;
+
+ColorConfig& MutableColorField(void* owner, const RuntimeConfigFieldDescriptor& field) {
+    return *reinterpret_cast<ColorConfig*>(static_cast<char*>(owner) + field.offset);
+}
+
+const ColorConfig& ColorField(const void* owner, const RuntimeConfigFieldDescriptor& field) {
+    return *reinterpret_cast<const ColorConfig*>(static_cast<const char*>(owner) + field.offset);
+}
+
+std::optional<ColorConfig> FindColorFieldByKey(
+    std::span<const RuntimeConfigFieldDescriptor> fields, const void* owner, std::string_view name) {
+    for (const RuntimeConfigFieldDescriptor& field : fields) {
+        if (field.kind == RuntimeConfigFieldValueKind::HexColor && field.key == name) {
+            return ColorField(owner, field);
+        }
+    }
+    return std::nullopt;
+}
 
 std::optional<ColorConfig> ResolveColorExpression(const ColorConfig& color, const ColorLookup& lookup) {
     const std::string expression = color.expression.empty() ? FormatHexColor(color) : color.expression;
@@ -196,11 +223,21 @@ void ResolveColorInPlace(ColorConfig& color, const ColorLookup& lookup) {
 }
 
 void ResolveThemeColors(LayoutConfig& layout) {
+    const auto noLookup = [](std::string_view) -> std::optional<ColorConfig> { return std::nullopt; };
     for (ThemeConfig& theme : layout.themes) {
-        ResolveColorInPlace(theme.background, [](std::string_view) { return std::nullopt; });
-        ResolveColorInPlace(theme.foreground, [](std::string_view) { return std::nullopt; });
-        ResolveColorInPlace(theme.accent, [](std::string_view) { return std::nullopt; });
-        ResolveColorInPlace(theme.guide, [](std::string_view) { return std::nullopt; });
+        for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<ThemeConfig::Section>()) {
+            if (field.kind == RuntimeConfigFieldValueKind::HexColor) {
+                ResolveColorInPlace(MutableColorField(&theme, field), noLookup);
+            }
+        }
+    }
+}
+
+void ResolveColorFieldsInPlace(std::span<const RuntimeConfigFieldDescriptor> fields, void* owner, ColorLookup lookup) {
+    for (const RuntimeConfigFieldDescriptor& field : fields) {
+        if (field.kind == RuntimeConfigFieldValueKind::HexColor) {
+            ResolveColorInPlace(MutableColorField(owner, field), lookup);
+        }
     }
 }
 
@@ -218,60 +255,17 @@ void ResolveConfiguredColors(AppConfig& config) {
     }
 
     const auto themeLookup = [activeTheme](std::string_view name) { return FindThemeToken(*activeTheme, name); };
-    ResolveColorInPlace(config.layout.colors.backgroundColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.foregroundColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.iconColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.accentColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.peakGhostColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.layoutGuideColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.activeEditColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.panelBorderColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.mutedTextColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.trackColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.panelFillColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.graphBackgroundColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.graphAxisColor, themeLookup);
-    ResolveColorInPlace(config.layout.colors.graphMarkerColor, themeLookup);
+    ResolveColorFieldsInPlace(
+        RuntimeConfigFieldDescriptors<ColorsConfig::Section>(), &config.layout.colors, themeLookup);
 
     const auto guideSheetLookup = [&config, activeTheme](std::string_view name) -> std::optional<ColorConfig> {
         if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
             return themeColor;
         }
-        const ColorsConfig& colors = config.layout.colors;
-        if (name == "background_color")
-            return colors.backgroundColor;
-        if (name == "foreground_color")
-            return colors.foregroundColor;
-        if (name == "icon_color")
-            return colors.iconColor;
-        if (name == "accent_color")
-            return colors.accentColor;
-        if (name == "peak_ghost_color")
-            return colors.peakGhostColor;
-        if (name == "layout_guide_color")
-            return colors.layoutGuideColor;
-        if (name == "active_edit_color")
-            return colors.activeEditColor;
-        if (name == "panel_border_color")
-            return colors.panelBorderColor;
-        if (name == "muted_text_color")
-            return colors.mutedTextColor;
-        if (name == "track_color")
-            return colors.trackColor;
-        if (name == "panel_fill_color")
-            return colors.panelFillColor;
-        if (name == "graph_background_color")
-            return colors.graphBackgroundColor;
-        if (name == "graph_axis_color")
-            return colors.graphAxisColor;
-        if (name == "graph_marker_color")
-            return colors.graphMarkerColor;
-        return std::nullopt;
+        return FindColorFieldByKey(RuntimeConfigFieldDescriptors<ColorsConfig::Section>(), &config.layout.colors, name);
     };
 
-    ResolveColorInPlace(config.layout.layoutGuideSheet.calloutLeaderColor, guideSheetLookup);
-    ResolveColorInPlace(config.layout.layoutGuideSheet.calloutFillColor, guideSheetLookup);
-    ResolveColorInPlace(config.layout.layoutGuideSheet.calloutBorderColor, guideSheetLookup);
-    ResolveColorInPlace(config.layout.layoutGuideSheet.calloutParameterColor, guideSheetLookup);
-    ResolveColorInPlace(config.layout.layoutGuideSheet.calloutDescriptionColor, guideSheetLookup);
+    ResolveColorFieldsInPlace(RuntimeConfigFieldDescriptors<LayoutGuideSheetConfig::Section>(),
+        &config.layout.layoutGuideSheet,
+        guideSheetLookup);
 }
