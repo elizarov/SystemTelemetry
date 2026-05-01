@@ -21,6 +21,8 @@ uint32_t ColorRefToDibPixel(COLORREF color) {
 struct ThemeTriangleGeometry {
     int side = 1;
     int height = 1;
+    int topLabelBand = 0;
+    int bottomLabelBand = 0;
     double leftX = 0.0;
     double rightX = 0.0;
     double topY = 0.0;
@@ -28,11 +30,15 @@ struct ThemeTriangleGeometry {
     double bottomY = 0.0;
 };
 
-ThemeTriangleGeometry BuildThemeTriangleGeometry(const RECT& rect) {
+int ScaledPreviewPixels(int dpi, int logicalPixels) {
+    return MulDiv(logicalPixels, std::max(1, dpi), USER_DEFAULT_SCREEN_DPI);
+}
+
+ThemeTriangleGeometry BuildThemeTriangleGeometry(const RECT& rect, int dpi) {
     const int rectWidth = std::max(1, static_cast<int>(rect.right - rect.left));
     const int rectHeight = std::max(1, static_cast<int>(rect.bottom - rect.top));
-    const int topLabelBand = rectHeight >= 54 ? 18 : 0;
-    const int bottomLabelBand = rectHeight >= 54 ? 18 : 0;
+    const int topLabelBand = rectHeight >= 54 ? ScaledPreviewPixels(dpi, 24) : 0;
+    const int bottomLabelBand = rectHeight >= 54 ? ScaledPreviewPixels(dpi, 22) : 0;
     const int availableWidth = std::max(1, rectWidth - 2);
     const int availableHeight = std::max(1, rectHeight - 2 - topLabelBand - bottomLabelBand);
     const int side = std::max(1, std::min(availableWidth, static_cast<int>(availableHeight * 2.0 / std::sqrt(3.0))));
@@ -42,7 +48,7 @@ ThemeTriangleGeometry BuildThemeTriangleGeometry(const RECT& rect) {
     const double topY = topLabelBand + (availableHeight - triangleHeight) / 2.0;
     const double bottomX = (leftX + rightX) / 2.0;
     const double bottomY = topY + triangleHeight;
-    return {side, triangleHeight, leftX, rightX, topY, bottomX, bottomY};
+    return {side, triangleHeight, topLabelBand, bottomLabelBand, leftX, rightX, topY, bottomX, bottomY};
 }
 
 void DrawThemePreviewLabel(HDC dc, std::wstring_view text, const RECT& rect, UINT format) {
@@ -50,12 +56,16 @@ void DrawThemePreviewLabel(HDC dc, std::wstring_view text, const RECT& rect, UIN
     DrawTextW(dc, text.data(), static_cast<int>(text.size()), &labelRect, format | DT_SINGLELINE | DT_NOPREFIX);
 }
 
-void FillThemePreviewPixels(std::vector<uint32_t>& pixels, int width, int height, const ThemeConfig& theme) {
+int DeviceDpiY(HDC dc) {
+    return dc != nullptr ? std::max(1, GetDeviceCaps(dc, LOGPIXELSY)) : USER_DEFAULT_SCREEN_DPI;
+}
+
+void FillThemePreviewPixels(std::vector<uint32_t>& pixels, int width, int height, int dpi, const ThemeConfig& theme) {
     const uint32_t backgroundFill = ColorRefToDibPixel(GetSysColor(COLOR_3DFACE));
     std::fill(pixels.begin(), pixels.end(), backgroundFill);
 
     RECT localRect{0, 0, width, height};
-    const ThemeTriangleGeometry geometry = BuildThemeTriangleGeometry(localRect);
+    const ThemeTriangleGeometry geometry = BuildThemeTriangleGeometry(localRect, dpi);
     const COLORREF background = ColorConfigToColorRef(theme.background);
     const COLORREF foreground = ColorConfigToColorRef(theme.foreground);
     const COLORREF accent = ColorConfigToColorRef(theme.accent);
@@ -121,8 +131,9 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
 
     const int width = std::max(1, static_cast<int>(rect.right - rect.left));
     const int height = std::max(1, static_cast<int>(rect.bottom - rect.top));
+    const int dpi = DeviceDpiY(dc);
     std::vector<uint32_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height));
-    FillThemePreviewPixels(pixels, width, height, theme);
+    FillThemePreviewPixels(pixels, width, height, dpi, theme);
 
     BITMAPINFO bitmapInfo{};
     bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
@@ -144,7 +155,7 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
         &bitmapInfo,
         DIB_RGB_COLORS);
 
-    const ThemeTriangleGeometry geometry = BuildThemeTriangleGeometry(RECT{0, 0, width, height});
+    const ThemeTriangleGeometry geometry = BuildThemeTriangleGeometry(RECT{0, 0, width, height}, dpi);
     HPEN outlinePen = CreatePen(PS_SOLID, 1, GetSysColor(COLOR_WINDOWTEXT));
     HPEN guidePen = CreatePen(PS_SOLID, 1, ColorConfigToColorRef(theme.guide));
     HGDIOBJ oldPen = SelectObject(dc, outlinePen);
@@ -172,13 +183,20 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, GetSysColor(COLOR_WINDOWTEXT));
     HFONT oldFont = reinterpret_cast<HFONT>(SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT)));
-    const int labelHeight = std::max(14, static_cast<int>(std::lround(geometry.topY)) - 2);
-    const RECT topLeftLabel{
-        rect.left, rect.top, rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) - 4, rect.top + labelHeight};
-    const RECT topRightLabel{
-        rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) + 4, rect.top, rect.right, rect.top + labelHeight};
-    const RECT bottomLabel{
-        rect.left, rect.top + static_cast<LONG>(std::lround(geometry.bottomY)) + 2, rect.right, rect.bottom};
+    const int labelInset = ScaledPreviewPixels(dpi, 2);
+    const int labelHeight = std::max(1, geometry.topLabelBand - (labelInset * 2));
+    const RECT topLeftLabel{rect.left,
+        rect.top + labelInset,
+        rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) - 4,
+        rect.top + labelInset + labelHeight};
+    const RECT topRightLabel{rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) + 4,
+        rect.top + labelInset,
+        rect.right,
+        rect.top + labelInset + labelHeight};
+    const RECT bottomLabel{rect.left,
+        rect.top + static_cast<LONG>(std::lround(geometry.bottomY)) + labelInset,
+        rect.right,
+        rect.bottom - labelInset};
     DrawThemePreviewLabel(dc, L"background", topLeftLabel, DT_LEFT | DT_TOP | DT_END_ELLIPSIS);
     DrawThemePreviewLabel(dc, L"foreground", topRightLabel, DT_RIGHT | DT_TOP | DT_END_ELLIPSIS);
     DrawThemePreviewLabel(dc, L"accent", bottomLabel, DT_CENTER | DT_TOP | DT_END_ELLIPSIS);
