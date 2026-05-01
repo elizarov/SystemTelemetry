@@ -14,6 +14,7 @@ namespace {
 
 enum class TemplateSectionKind {
     StaticSection,
+    ThemeSectionSlot,
     LayoutSectionSlot,
     CardSectionSlot,
 };
@@ -42,7 +43,13 @@ std::vector<TemplateSectionSlot> ParseTemplateSections(std::string_view text) {
             if (line.front() == '[' && line.back() == ']') {
                 const std::string sectionName = Trim(std::string_view(line).substr(1, line.size() - 2));
                 currentStaticSection = nullptr;
-                if (sectionName.rfind("layout.", 0) == 0) {
+                if (sectionName.rfind("theme.", 0) == 0) {
+                    if (std::none_of(sections.begin(), sections.end(), [](const TemplateSectionSlot& slot) {
+                            return slot.kind == TemplateSectionKind::ThemeSectionSlot;
+                        })) {
+                        sections.push_back({TemplateSectionKind::ThemeSectionSlot, "theme"});
+                    }
+                } else if (sectionName.rfind("layout.", 0) == 0) {
                     if (!layoutSlotAdded) {
                         sections.push_back({TemplateSectionKind::LayoutSectionSlot, "layout"});
                         layoutSlotAdded = true;
@@ -110,6 +117,9 @@ std::optional<LayoutEditSelectionHighlight> SectionSelectionHighlight(std::strin
 std::string SectionDescriptionKey(std::string_view sectionName) {
     if (sectionName.rfind("layout.", 0) == 0) {
         return "layout_edit.section.layout";
+    }
+    if (sectionName.rfind("theme.", 0) == 0) {
+        return "layout_edit.section.theme";
     }
     if (sectionName.rfind("card.", 0) == 0) {
         return "layout_edit.section.card";
@@ -469,6 +479,47 @@ std::optional<LayoutEditTreeNode> BuildActiveLayoutSectionNode(const AppConfig& 
     return sectionNode;
 }
 
+const ThemeConfig* FindActiveTheme(const AppConfig& config) {
+    for (const ThemeConfig& theme : config.layout.themes) {
+        if (theme.name == config.display.theme) {
+            return &theme;
+        }
+    }
+    return nullptr;
+}
+
+std::optional<LayoutEditTreeNode> BuildActiveThemeSectionNode(const AppConfig& config) {
+    const ThemeConfig* theme = FindActiveTheme(config);
+    if (theme == nullptr) {
+        return std::nullopt;
+    }
+
+    LayoutEditTreeNode sectionNode;
+    sectionNode.kind = LayoutEditTreeNodeKind::Section;
+    sectionNode.label = "theme." + theme->name;
+    sectionNode.locationText = SectionLocationText(sectionNode.label);
+    sectionNode.descriptionKey = SectionDescriptionKey(sectionNode.label);
+    sectionNode.initiallyExpanded = true;
+
+    for (const std::string& token : {"background", "foreground", "accent", "guide"}) {
+        LayoutEditTreeNode leafNode;
+        leafNode.kind = LayoutEditTreeNodeKind::Leaf;
+        leafNode.label = token;
+        leafNode.locationText = MemberLocationText(sectionNode.label, token);
+        leafNode.descriptionKey = "config.theme." + token;
+        leafNode.leaf = LayoutEditTreeLeaf{
+            ThemeColorEditKey{theme->name, token},
+            sectionNode.label,
+            token,
+            leafNode.descriptionKey,
+            configschema::ValueFormat::ColorHex,
+        };
+        sectionNode.children.push_back(std::move(leafNode));
+    }
+
+    return sectionNode;
+}
+
 std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& card, bool includeTitleLeaf) {
     LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
@@ -562,6 +613,11 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
             case TemplateSectionKind::StaticSection:
                 if (const auto treeSection = BuildStaticSectionNode(config, section); treeSection.has_value()) {
                     model.roots.push_back(*treeSection);
+                }
+                break;
+            case TemplateSectionKind::ThemeSectionSlot:
+                if (const auto themeSection = BuildActiveThemeSectionNode(config); themeSection.has_value()) {
+                    model.roots.push_back(*themeSection);
                 }
                 break;
             case TemplateSectionKind::LayoutSectionSlot:

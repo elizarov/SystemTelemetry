@@ -1,5 +1,6 @@
 #include "diagnostics/diagnostics.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -8,6 +9,7 @@
 #include <shellapi.h>
 #include <string_view>
 
+#include "config/color_resolver.h"
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "config/config_writer.h"
@@ -267,6 +269,16 @@ std::optional<std::string> GetLayoutSwitchValue() {
     return std::nullopt;
 }
 
+std::optional<std::string> GetThemeSwitchValue() {
+    if (const auto value = GetColonSwitchValue(L"/theme"); value.has_value()) {
+        const std::string themeName = Trim(Utf8FromWide(*value));
+        if (!themeName.empty()) {
+            return themeName;
+        }
+    }
+    return std::nullopt;
+}
+
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options) {
     return options.blank ? DashboardRenderer::RenderMode::Blank : DashboardRenderer::RenderMode::Normal;
 }
@@ -308,6 +320,9 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     }
     if (const auto layoutName = GetLayoutSwitchValue(); layoutName.has_value()) {
         options.layoutName = *layoutName;
+    }
+    if (const auto themeName = GetThemeSwitchValue(); themeName.has_value()) {
+        options.themeName = *themeName;
     }
     if (const auto scale = GetScaleSwitchValue(); scale.has_value()) {
         options.hasScaleOverride = true;
@@ -392,6 +407,33 @@ bool ApplyDiagnosticsLayoutOverride(
     }
 
     const std::wstring message = WideFromUtf8("Unknown layout name:\n" + options.layoutName);
+    MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    return false;
+}
+
+bool ApplyDiagnosticsThemeOverride(
+    AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics) {
+    if (options.themeName.empty()) {
+        return true;
+    }
+    const auto themeIt = std::find_if(config.layout.themes.begin(),
+        config.layout.themes.end(),
+        [&](const ThemeConfig& theme) { return theme.name == options.themeName; });
+    if (themeIt != config.layout.themes.end()) {
+        config.display.theme = options.themeName;
+        ResolveConfiguredColors(config);
+        if (diagnostics != nullptr) {
+            diagnostics->WriteTraceMarker("diagnostics:theme_override name=\"" + options.themeName + "\"");
+        }
+        return true;
+    }
+
+    if (diagnostics != nullptr) {
+        diagnostics->WriteTraceMarker("diagnostics:theme_override_failed name=\"" + options.themeName + "\"");
+        return false;
+    }
+
+    const std::wstring message = WideFromUtf8("Unknown theme name:\n" + options.themeName);
     MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
     return false;
 }
@@ -704,6 +746,12 @@ bool ReloadTelemetryCollectorFromDisk(const std::filesystem::path& configPath,
         }
         return false;
     }
+    if (!ApplyDiagnosticsThemeOverride(effectiveReloadedConfig, diagnosticsOptions, diagnostics)) {
+        if (diagnostics != nullptr) {
+            diagnostics->WriteTraceMarker("diagnostics:reload_config_failed");
+        }
+        return false;
+    }
     ApplyDiagnosticsScaleOverride(effectiveReloadedConfig, diagnosticsOptions);
 
     telemetry.reset();
@@ -826,6 +874,9 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         return 1;
     }
     if (!ApplyDiagnosticsLayoutOverride(config, diagnosticsOptions, &diagnostics)) {
+        return 1;
+    }
+    if (!ApplyDiagnosticsThemeOverride(config, diagnosticsOptions, &diagnostics)) {
         return 1;
     }
 

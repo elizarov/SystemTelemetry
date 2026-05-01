@@ -6,28 +6,9 @@ This specification defines the color theme sublanguage used to select a named th
 
 A configuration contains the active theme selector in `[display]`, one or more theme sections, and color role sections.
 
-```toml
-[display]
-theme = dark_cyan
-
-[theme.dark_cyan]
-background = #000000FF
-foreground = #FFFFFFFF
-accent = #00BFFFFF
-guide = #FF6A00FF
-
-[colors]
-background_color = background
-foreground_color = foreground
-```
-
 ## Theme selection
 
 `theme` names the active theme.
-
-```toml
-theme = dark_cyan
-```
 
 The value must match an existing `[theme.<name>]` section.
 
@@ -40,14 +21,6 @@ Each theme is defined in a section named:
 ```
 
 A standard theme defines these base tokens:
-
-```toml
-[theme.dark_cyan]
-background = #000000FF
-foreground = #FFFFFFFF
-accent = #00BFFFFF
-guide = #FF6A00FF
-```
 
 Token meanings:
 
@@ -84,14 +57,6 @@ identifier
 identifier(option: value, option: value)
 ```
 
-Examples:
-
-```toml
-accent_color = accent
-peak_ghost_color = accent(alpha: 0x60)
-panel_fill_color = background(mix: foreground 0.035)
-```
-
 ## Literal colors
 
 Literal colors use 8-digit hexadecimal RGBA:
@@ -106,31 +71,9 @@ The canonical form is uppercase hex.
 
 Inside color role sections, a bare identifier resolves through the reference rules below.
 
-Example:
+Active theme token identifiers resolve to the matching token in the selected `[theme.<name>]` section.
 
-```toml
-[display]
-theme = dark_cyan
-
-[theme.dark_cyan]
-accent = #00BFFFFF
-
-[colors]
-accent_color = accent
-```
-
-`accent` resolves to `theme.dark_cyan.accent`.
-
-Color roles may reference other color roles:
-
-```toml
-[colors]
-layout_guide_color = guide
-active_edit_color = guide(rotate_hue: 35)
-
-[layout_guide_sheet]
-callout_border_color = guide(mix: active_edit_color 0.35)
-```
+`[layout_guide_sheet]` color roles may reference `[colors]` roles in addition to active theme tokens.
 
 ## Derived Color Expression Syntax
 
@@ -152,10 +95,6 @@ alpha: <alpha>
 
 `rotate_hue` rotates the hue of the base color by a relative number of degrees.
 
-```toml
-active_edit_color = guide(rotate_hue: 35)
-```
-
 Syntax:
 
 ```text
@@ -174,10 +113,6 @@ The language intentionally does not support absolute hue assignment. Theme-relat
 ## `mix`
 
 `mix` blends the base color toward another color.
-
-```toml
-panel_fill_color = background(mix: foreground 0.035)
-```
 
 Syntax:
 
@@ -199,10 +134,6 @@ Alpha is interpolated together with RGB unless an explicit `alpha` option is als
 
 `alpha` replaces the alpha channel of the derived color.
 
-```toml
-peak_ghost_color = accent(alpha: 0x60)
-```
-
 ## Operation Order
 
 When multiple options are present, they are applied in this fixed order:
@@ -211,18 +142,6 @@ When multiple options are present, they are applied in this fixed order:
 2. Apply `rotate_hue`, if present.
 3. Apply `mix`, if present.
 4. Apply `alpha`, if present.
-
-Example:
-
-```toml
-callout_leader_color = guide(rotate_hue: 28, alpha: 0xE6)
-```
-
-means:
-
-1. Start with `guide`.
-2. Rotate hue by `28` degrees.
-3. Replace alpha with `0xE6`.
 
 ## Dependency Rules
 
@@ -236,11 +155,6 @@ Rules:
 ## Overrides
 
 Any color role may be replaced with a literal color.
-
-```toml
-[colors]
-panel_border_color = #1E2837FF
-```
 
 Literal colors are terminal overrides and do not depend on theme tokens.
 
@@ -283,54 +197,3 @@ Theme section behavior:
 - The dialog displays the effective resolved color preview for both literal and derived roles.
 
 `[layout_guide_sheet]` remains diagnostics-only and is not editable through the dialog.
-
-## Complete example
-
-```toml
-[display]
-theme = dark_cyan
-
-[theme.dark_cyan]
-background = #000000FF
-foreground = #FFFFFFFF
-accent = #00BFFFFF
-guide = #FF6A00FF
-
-[theme.dark_green]
-background = #000000FF
-foreground = #FFFFFFFF
-accent = #00E676FF
-guide = #FF6A00FF
-
-[theme.light_blue]
-background = #F8FAFCFF
-foreground = #111827FF
-accent = #007ACCFF
-guide = #E85D04FF
-
-[colors]
-background_color = background
-foreground_color = foreground
-icon_color = foreground
-
-accent_color = accent
-peak_ghost_color = accent(alpha: 0x60)
-
-layout_guide_color = guide
-active_edit_color = guide(rotate_hue: 35)
-
-panel_fill_color = background(mix: foreground 0.035)
-graph_background_color = background(mix: foreground 0.055)
-panel_border_color = background(mix: accent 0.16)
-track_color = background(mix: foreground 0.20)
-muted_text_color = foreground(mix: accent 0.22)
-graph_axis_color = background(mix: foreground 0.36)
-graph_marker_color = background(mix: foreground 0.13)
-
-[layout_guide_sheet]
-callout_leader_color = guide(rotate_hue: 28, alpha: 0xE6)
-callout_fill_color = background(mix: foreground 0.035, alpha: 0xF5)
-callout_border_color = guide(mix: active_edit_color 0.35)
-callout_parameter_color = foreground
-callout_description_color = muted_text_color
-```

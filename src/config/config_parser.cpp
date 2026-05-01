@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <iomanip>
 #include <set>
 #include <sstream>
 #include <type_traits>
 
+#include "config/color_resolver.h"
 #include "config/config_resolution.h"
 #include "config/widget_class.h"
 #include "resource.h"
@@ -54,6 +56,12 @@ ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallbac
     } catch (...) {
         return fallback;
     }
+}
+
+std::string FormatHexColor(ColorConfig color) {
+    std::ostringstream stream;
+    stream << '#' << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << color.ToRgba();
+    return stream.str();
 }
 
 bool ParseIntPair(const std::string& value, int& first, int& second) {
@@ -144,7 +152,16 @@ void DecodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>(
 
 template <>
 void DecodeConfigValue<configschema::HexColorCodec, ColorConfig>(ColorConfig& target, const std::string& value) {
-    target = ParseHexColorOrDefault(value, target);
+    const std::string expression = Trim(value);
+    const ColorConfig parsed = ParseHexColorOrDefault(expression, target);
+    if (parsed != target || (!expression.empty() && expression.front() == '#')) {
+        target = parsed;
+        target.expression = FormatHexColor(target);
+        return;
+    }
+    if (!expression.empty()) {
+        target.expression = expression;
+    }
 }
 
 template <>
@@ -522,6 +539,7 @@ AppConfig LoadConfig(const std::filesystem::path& path, bool includeOverlay, con
     if (includeOverlay) {
         ApplyConfigText(ReadFileUtf8(path), config, context);
     }
+    ResolveConfiguredColors(config);
     MarkCardLayoutReferences(config.layout);
     SelectResolvedLayout(config, config.display.layout);
 

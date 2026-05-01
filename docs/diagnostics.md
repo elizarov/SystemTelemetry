@@ -19,6 +19,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - `/reload` forces a config reload through the normal live-dashboard reload path before exporting outputs.
 - `/fake[:path]` uses the built-in synthetic telemetry source or reloads the selected fake dump file once per second.
 - `/layout:<name>` overrides the active named layout for the current process.
+- `/theme:<name>` overrides the active named theme for the current process.
 - `/default-config` suppresses the executable-side `config.ini` overlay for the current process.
 - `/scale:<value>` overrides the runtime render scale for the current process.
 
@@ -56,7 +57,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - Without `/exit`, the application starts the normal dashboard UI and keeps requested diagnostics outputs refreshed while the process runs.
 - In UI-attached mode, trace logging continues for the process lifetime and dump or screenshot outputs refresh once per second from the latest snapshot.
 - With `/exit`, the application loads config, performs the first update, optionally exports the requested outputs once, and exits without entering the normal GUI lifetime.
-- `/default-config`, `/layout:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
+- `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
 - `/fake:<path>` reloads the selected fake file once per second while the process runs so manual edits affect the next refresh.
 - Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior.
@@ -109,6 +110,7 @@ Recommended checks:
 - Headless `/trace /blank /screenshot /exit`
 - One headless run with explicit output filenames for trace, dump, and screenshot
 - One headless `/trace /default-config /layout:<name> /screenshot /exit`
+- One headless `/trace /default-config /theme:<name> /screenshot /exit`
 - One headless `/trace /default-config /edit-layout /screenshot /exit`
 - One headless `/trace /default-config /layout-guide-sheet /exit`
 - One headless `/trace /default-config /edit-layout /hover:<x>,<y> /screenshot /exit`

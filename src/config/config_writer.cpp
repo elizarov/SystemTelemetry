@@ -76,6 +76,9 @@ std::string EncodeConfigValue<configschema::LogicalSizeCodec, LogicalSizeConfig>
 }
 
 template <> std::string EncodeConfigValue<configschema::HexColorCodec, ColorConfig>(const ColorConfig& value) {
+    if (!value.expression.empty()) {
+        return value.expression;
+    }
     return FormatHexColor(value);
 }
 

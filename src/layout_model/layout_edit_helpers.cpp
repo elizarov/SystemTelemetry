@@ -71,6 +71,10 @@ bool MatchesLayoutCardTitleEditKey(const LayoutCardTitleEditKey& left, const Lay
     return left.cardId == right.cardId;
 }
 
+bool MatchesThemeColorEditKey(const ThemeColorEditKey& left, const ThemeColorEditKey& right) {
+    return left.themeName == right.themeName && left.tokenName == right.tokenName;
+}
+
 bool MatchesLayoutNodeFieldEditKey(const LayoutNodeFieldEditKey& left, const LayoutNodeFieldEditKey& right) {
     return left.editCardId == right.editCardId && left.nodePath == right.nodePath &&
            left.widgetClass == right.widgetClass && left.field == right.field;
@@ -97,6 +101,9 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditF
     }
     if (const auto* leftCardTitle = std::get_if<LayoutCardTitleEditKey>(&left)) {
         return MatchesLayoutCardTitleEditKey(*leftCardTitle, std::get<LayoutCardTitleEditKey>(right));
+    }
+    if (const auto* leftThemeColor = std::get_if<ThemeColorEditKey>(&left)) {
+        return MatchesThemeColorEditKey(*leftThemeColor, std::get<ThemeColorEditKey>(right));
     }
     if (const auto* leftNodeField = std::get_if<LayoutNodeFieldEditKey>(&left)) {
         return MatchesLayoutNodeFieldEditKey(*leftNodeField, std::get<LayoutNodeFieldEditKey>(right));

@@ -226,7 +226,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_HEX_EDIT && HIWORD(wParam) == EN_CHANGE) {
                 if (state != nullptr && !state->updatingControls) {
-                    wchar_t buffer[64] = {};
+                    wchar_t buffer[256] = {};
                     GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, buffer, ARRAYSIZE(buffer));
                     if (const auto color = TryParseDialogHexColor(buffer); color.has_value()) {
                         state->updatingControls = true;
@@ -298,14 +298,13 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                     if (state == nullptr || state->selectedLeaf == nullptr) {
                         return TRUE;
                     }
-                    if (!std::holds_alternative<LayoutEditParameter>(state->selectedLeaf->focusKey) ||
-                        state->selectedLeaf->valueFormat != configschema::ValueFormat::ColorHex) {
+                    const bool colorSelection =
+                        std::holds_alternative<LayoutEditParameter>(state->selectedLeaf->focusKey) ||
+                        std::holds_alternative<ThemeColorEditKey>(state->selectedLeaf->focusKey);
+                    if (!colorSelection || state->selectedLeaf->valueFormat != configschema::ValueFormat::ColorHex) {
                         return TRUE;
                     }
-                    const auto parameter = std::get<LayoutEditParameter>(state->selectedLeaf->focusKey);
-                    const unsigned int currentColor =
-                        FindLayoutEditParameterColorValue(state->dialog->Host().CurrentConfig(), parameter)
-                            .value_or(0x000000FFu);
+                    const unsigned int currentColor = ReadColorDialogValue(hwnd).value_or(0x000000FFu);
                     CHOOSECOLORW chooseColor{};
                     chooseColor.lStructSize = sizeof(chooseColor);
                     chooseColor.hwndOwner = hwnd;

@@ -12,6 +12,7 @@
 
 struct ColorConfig {
     std::uint32_t rgba = 0x000000FFu;
+    std::string expression;
 
     static ColorConfig FromRgba(unsigned int value);
 
@@ -19,7 +20,7 @@ struct ColorConfig {
     unsigned int ToRgba() const;
     std::uint8_t Alpha() const;
 
-    constexpr bool operator==(const ColorConfig& other) const = default;
+    bool operator==(const ColorConfig& other) const = default;
 };
 
 inline bool operator==(const ColorConfig& color, unsigned int value) {
@@ -88,12 +89,26 @@ struct DisplayConfig {
     CONFIG_REFLECTED_STRUCT(DisplayConfig)
     CONFIG_VALUE(std::string, monitorName, "monitor_name");
     CONFIG_VALUE(std::string, layout, "layout");
+    CONFIG_VALUE(std::string, theme, "theme");
     CONFIG_VALUE(std::string, wallpaper, "wallpaper");
     CONFIG_VALUE(LogicalPointConfig, position, "position");
     CONFIG_VALUE(double, scale, "scale");
     CONFIG_SECTION("display");
 
     bool operator==(const DisplayConfig& other) const = default;
+};
+
+struct ThemeConfig {
+    std::string name;
+
+    CONFIG_REFLECTED_STRUCT(ThemeConfig)
+    CONFIG_EDITABLE_VALUE(ColorConfig, background, "background");
+    CONFIG_EDITABLE_VALUE(ColorConfig, foreground, "foreground");
+    CONFIG_EDITABLE_VALUE(ColorConfig, accent, "accent");
+    CONFIG_EDITABLE_VALUE(ColorConfig, guide, "guide");
+    CONFIG_DYNAMIC_SECTION("theme.");
+
+    bool operator==(const ThemeConfig& other) const = default;
 };
 
 struct NetworkConfig {
@@ -344,6 +359,7 @@ struct LayoutConfig {
     CONFIG_REFLECTED_BINDINGS(LayoutConfig)
     CONFIG_SECTION_VALUE(ColorsConfig, colors);
     CONFIG_SECTION_VALUE(LayoutGuideSheetConfig, layoutGuideSheet);
+    CONFIG_DYNAMIC_SECTION_VALUE(ThemeConfig, themes, name);
     CONFIG_SECTION_VALUE(DashboardSectionConfig, dashboard);
     CONFIG_SECTION_VALUE(CardStyleConfig, cardStyle);
     CONFIG_SECTION_VALUE(MetricListWidgetConfig, metricList);

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <string_view>
 
+#include "config/color_resolver.h"
 #include "config/config_resolution.h"
 #include "config/config_writer.h"
 #include "diagnostics/constants.h"
@@ -146,6 +147,9 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     state_.lastError.clear();
     state_.config = LoadRuntimeConfig(diagnosticsOptions);
     if (!ApplyDiagnosticsLayoutOverride(state_.config, diagnosticsOptions)) {
+        return false;
+    }
+    if (!ApplyDiagnosticsThemeOverride(state_.config, diagnosticsOptions)) {
         return false;
     }
     shell.RendererDashboardOverlayState().similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions);
@@ -416,6 +420,26 @@ bool DashboardController::SwitchLayout(
     return true;
 }
 
+bool DashboardController::SwitchTheme(
+    DashboardShellHost& shell, const std::string& themeName, bool diagnosticsEditLayout) {
+    const auto it = std::find_if(state_.config.layout.themes.begin(),
+        state_.config.layout.themes.end(),
+        [&](const ThemeConfig& theme) { return theme.name == themeName; });
+    if (it == state_.config.layout.themes.end()) {
+        return false;
+    }
+
+    state_.config.display.theme = themeName;
+    ResolveConfiguredColors(state_.config);
+    SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
+    if (!shell.Renderer().LastError().empty()) {
+        return false;
+    }
+    shell.RedrawShellNow();
+    RefreshLayoutEditSessionDirtyFlag();
+    return true;
+}
+
 bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scale) {
     const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
     AppConfig updatedConfig = state_.config;
@@ -594,6 +618,7 @@ bool DashboardController::ApplyLayoutEditColor(
     if (!ApplyLayoutEditParameterColorValue(state_.config, parameter, value)) {
         return false;
     }
+    ResolveConfiguredColors(state_.config);
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
     RefreshLayoutEditSessionDirtyFlag();

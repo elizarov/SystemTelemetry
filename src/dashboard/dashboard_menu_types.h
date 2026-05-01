@@ -10,6 +10,12 @@ struct LayoutMenuOption {
     std::string description;
 };
 
+struct ThemeMenuOption {
+    UINT commandId = 0;
+    std::string name;
+    bool selected = false;
+};
+
 struct NetworkMenuOption {
     UINT commandId = 0;
     std::string adapterName;

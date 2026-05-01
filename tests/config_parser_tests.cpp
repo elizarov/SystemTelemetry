@@ -1,6 +1,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 
+#include "config/color_expression.h"
 #include "config/config_parser.h"
 #include "telemetry/metrics.h"
 #include "util/utf8.h"
@@ -83,7 +84,79 @@ TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
     const AppConfig defaults;
 
     EXPECT_EQ(config.layout.colors.accentColor.ToRgba(), 0x12345678u);
-    EXPECT_EQ(config.layout.colors.trackColor, defaults.layout.colors.trackColor);
+    EXPECT_EQ(config.layout.colors.trackColor.ToRgba(), defaults.layout.colors.trackColor.ToRgba());
+
+    std::filesystem::remove(path);
+}
+
+TEST(ConfigParser, ResolvesThemeTokensAndDerivedColors) {
+    const std::filesystem::path path = WriteTestConfig("[display]\n"
+                                                       "theme = dark_cyan\n"
+                                                       "\n"
+                                                       "[theme.dark_cyan]\n"
+                                                       "background = #000000FF\n"
+                                                       "foreground = #FFFFFFFF\n"
+                                                       "accent = #00BFFFFF\n"
+                                                       "guide = #FF6A00FF\n"
+                                                       "\n"
+                                                       "[colors]\n"
+                                                       "accent_color = accent\n"
+                                                       "peak_ghost_color = accent(alpha: 0x60)\n"
+                                                       "active_edit_color = guide(rotate_hue: 35)\n"
+                                                       "panel_border_color = background(mix: accent 0.16)\n"
+                                                       "muted_text_color = foreground(mix: accent 0.22)\n");
+
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+
+    EXPECT_EQ(config.layout.colors.accentColor.ToRgba(), 0x00BFFFFFu);
+    EXPECT_EQ(config.layout.colors.peakGhostColor.ToRgba(), 0x00BFFF60u);
+    EXPECT_EQ(config.layout.colors.activeEditColor.ToRgba(), 0xDE8A00FFu);
+    EXPECT_EQ(config.layout.colors.panelBorderColor.ToRgba(), 0x00070DFFu);
+    EXPECT_EQ(config.layout.colors.mutedTextColor.ToRgba(), 0xD8F2FFFFu);
+
+    std::filesystem::remove(path);
+}
+
+TEST(ColorExpression, ParsesAndFormatsDerivedExpressionsInCanonicalOptionOrder) {
+    const std::optional<ColorExpression> expression =
+        ParseColorExpression("guide(alpha: 230, mix: active_edit_color 0.35, rotate_hue: 28)");
+
+    ASSERT_TRUE(expression.has_value());
+    EXPECT_EQ(expression->base, "guide");
+    ASSERT_TRUE(expression->rotateHue.has_value());
+    EXPECT_DOUBLE_EQ(*expression->rotateHue, 28.0);
+    ASSERT_TRUE(expression->mix.has_value());
+    EXPECT_EQ(expression->mix->target, "active_edit_color");
+    EXPECT_DOUBLE_EQ(expression->mix->amount, 0.35);
+    ASSERT_TRUE(expression->alpha.has_value());
+    EXPECT_EQ(*expression->alpha, 230u);
+    EXPECT_EQ(FormatColorExpression(*expression), "guide(rotate_hue: 28, mix: active_edit_color 0.35, alpha: 0xE6)");
+}
+
+TEST(ConfigParser, ResolvesLayoutGuideSheetColorsFromThemeAndColorsSection) {
+    const std::filesystem::path path = WriteTestConfig("[display]\n"
+                                                       "theme = dark_cyan\n"
+                                                       "\n"
+                                                       "[theme.dark_cyan]\n"
+                                                       "background = #000000FF\n"
+                                                       "foreground = #FFFFFFFF\n"
+                                                       "accent = #00BFFFFF\n"
+                                                       "guide = #FF6A00FF\n"
+                                                       "\n"
+                                                       "[colors]\n"
+                                                       "active_edit_color = guide(rotate_hue: 35)\n"
+                                                       "muted_text_color = foreground(mix: accent 0.22)\n"
+                                                       "\n"
+                                                       "[layout_guide_sheet]\n"
+                                                       "callout_leader_color = guide(rotate_hue: 28, alpha: 0xE6)\n"
+                                                       "callout_border_color = guide(mix: active_edit_color 0.35)\n"
+                                                       "callout_description_color = muted_text_color\n");
+
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutLeaderColor.ToRgba(), 0xE78300E6u);
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutBorderColor.ToRgba(), 0xF47700FFu);
+    EXPECT_EQ(config.layout.layoutGuideSheet.calloutDescriptionColor.ToRgba(), 0xD8F2FFFFu);
 
     std::filesystem::remove(path);
 }

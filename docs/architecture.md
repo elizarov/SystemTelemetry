@@ -6,7 +6,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 ## Top-Level Map
 
 - `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
-- `src/config/` contains the config model, parser, resolver, writer, schema metadata, config-facing enum and DTO contracts, and injected metric-catalog view.
+- `src/config/` contains the config model, parser, writer, schema metadata, color expression parser, theme color resolver, config-facing enum and DTO contracts, and injected metric-catalog view.
 - `src/display/` contains monitor enumeration, placement, configure-display, wallpaper application helpers, and display-owned constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
 - `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, elevation handoff, and main-process constants.
@@ -29,7 +29,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - The core project layers are ordered `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as dashboard, dashboard_renderer, diagnostics, display, layout-edit, layout-edit dialog, and main.
 - Dependencies flow downward only. A higher layer may include lower-layer contracts, but a lower layer must not include or call into a higher layer.
 - `src/util/` is the base layer. It contains domain-neutral helpers for text, paths, resources, enum strings, UTF-8 conversion, localization catalog access, numeric safety, DPI scale conversion, and trace emission. Util modules may depend on other util modules, but must not depend on config, telemetry, rendering, UI, diagnostics, or application packages.
-- `src/config/` is the second layer. It owns the persisted config model, parser, writer, resolver, schema metadata, and config-facing contract types such as widget class, metric display style, and telemetry settings DTOs. Config modules may depend only on config and util modules.
+- `src/config/` is the second layer. It owns the persisted config model, parser, writer, theme color resolver, color expression parser, schema metadata, and config-facing contract types such as widget class, metric display style, and telemetry settings DTOs. Config modules may depend only on config and util modules.
 - Config must not duplicate runtime catalogs or reach upward to validate runtime concepts. When config parsing needs runtime knowledge, it uses config-owned injection contracts such as `ConfigMetricCatalog`; production code supplies the telemetry-backed implementation from above.
 - `src/telemetry/` is the third layer. It owns live collection, fake collection, snapshot and dump-facing telemetry types, provider bridges, retained history, and the single production metric catalog. Telemetry modules may depend on telemetry, config, and util modules, but must not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main modules.
 - Telemetry is allowed to consume config contracts such as telemetry settings and metric display style, and it publishes runtime contracts such as `TelemetryCollector`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.

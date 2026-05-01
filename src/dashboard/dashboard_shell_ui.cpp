@@ -6,6 +6,7 @@
 #include <commdlg.h>
 #include <sstream>
 
+#include "config/color_resolver.h"
 #include "dashboard/constants.h"
 #include "dashboard/dashboard_app.h"
 #include "diagnostics/diagnostics.h"
@@ -345,6 +346,14 @@ public:
 
     bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) override {
         return shellUi_.ApplyColorPreview(parameter, value);
+    }
+
+    bool ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression) override {
+        return shellUi_.ApplyColorExpressionPreview(parameter, expression);
+    }
+
+    bool ApplyThemeColorPreview(const ThemeColorEditKey& key, unsigned int value) override {
+        return shellUi_.ApplyThemeColorPreview(key, value);
     }
 
     bool ApplyMetricPreview(const LayoutMetricEditKey& key,
@@ -691,6 +700,86 @@ bool DashboardShellUi::ApplyColorPreview(LayoutEditParameter parameter, unsigned
     return app_.controller_.ApplyLayoutEditColor(app_, parameter, value);
 }
 
+bool DashboardShellUi::ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression) {
+    AppConfig updatedConfig = CurrentConfig();
+    ColorConfig* target = nullptr;
+    switch (parameter) {
+        case LayoutEditParameter::ColorBackground:
+            target = &updatedConfig.layout.colors.backgroundColor;
+            break;
+        case LayoutEditParameter::ColorForeground:
+            target = &updatedConfig.layout.colors.foregroundColor;
+            break;
+        case LayoutEditParameter::ColorIcon:
+            target = &updatedConfig.layout.colors.iconColor;
+            break;
+        case LayoutEditParameter::ColorPeakGhost:
+            target = &updatedConfig.layout.colors.peakGhostColor;
+            break;
+        case LayoutEditParameter::ColorAccent:
+            target = &updatedConfig.layout.colors.accentColor;
+            break;
+        case LayoutEditParameter::ColorLayoutGuide:
+            target = &updatedConfig.layout.colors.layoutGuideColor;
+            break;
+        case LayoutEditParameter::ColorActiveEdit:
+            target = &updatedConfig.layout.colors.activeEditColor;
+            break;
+        case LayoutEditParameter::ColorPanelBorder:
+            target = &updatedConfig.layout.colors.panelBorderColor;
+            break;
+        case LayoutEditParameter::ColorMutedText:
+            target = &updatedConfig.layout.colors.mutedTextColor;
+            break;
+        case LayoutEditParameter::ColorTrack:
+            target = &updatedConfig.layout.colors.trackColor;
+            break;
+        case LayoutEditParameter::ColorPanelFill:
+            target = &updatedConfig.layout.colors.panelFillColor;
+            break;
+        case LayoutEditParameter::ColorGraphBackground:
+            target = &updatedConfig.layout.colors.graphBackgroundColor;
+            break;
+        case LayoutEditParameter::ColorGraphAxis:
+            target = &updatedConfig.layout.colors.graphAxisColor;
+            break;
+        case LayoutEditParameter::ColorGraphMarker:
+            target = &updatedConfig.layout.colors.graphMarkerColor;
+            break;
+        default:
+            break;
+    }
+    if (target == nullptr) {
+        return false;
+    }
+    target->expression = expression;
+    ResolveConfiguredColors(updatedConfig);
+    RestoreConfigSnapshot(updatedConfig);
+    return true;
+}
+
+bool DashboardShellUi::ApplyThemeColorPreview(const ThemeColorEditKey& key, unsigned int value) {
+    AppConfig updatedConfig = CurrentConfig();
+    auto themeIt = std::find_if(updatedConfig.layout.themes.begin(),
+        updatedConfig.layout.themes.end(),
+        [&](const ThemeConfig& theme) { return theme.name == key.themeName; });
+    if (themeIt == updatedConfig.layout.themes.end()) {
+        return false;
+    }
+    ColorConfig* target = key.tokenName == "background"   ? &themeIt->background
+                          : key.tokenName == "foreground" ? &themeIt->foreground
+                          : key.tokenName == "accent"     ? &themeIt->accent
+                          : key.tokenName == "guide"      ? &themeIt->guide
+                                                          : nullptr;
+    if (target == nullptr) {
+        return false;
+    }
+    *target = ColorConfig::FromRgba(value);
+    ResolveConfiguredColors(updatedConfig);
+    RestoreConfigSnapshot(updatedConfig);
+    return true;
+}
+
 bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
     const std::optional<double>& scale,
     const std::string& unit,
@@ -943,6 +1032,19 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
                 }
                 break;
             }
+            if (selected >= kCommandThemeBase && selected <= kCommandThemeMax) {
+                const auto it = std::find_if(state.themeMenuOptions.begin(),
+                    state.themeMenuOptions.end(),
+                    [selected](const ThemeMenuOption& option) { return option.commandId == selected; });
+                if (it != state.themeMenuOptions.end()) {
+                    if (!app_.controller_.SwitchTheme(app_, it->name, app_.diagnosticsOptions_.editLayout)) {
+                        MessageBoxW(app_.hwnd_, L"Failed to switch theme.", L"System Telemetry", MB_ICONERROR);
+                    } else {
+                        RefreshLayoutEditDialog();
+                    }
+                }
+                break;
+            }
             if (selected >= kCommandStorageDriveBase && selected <= kCommandStorageDriveMax) {
                 const auto it = std::find_if(state.storageDriveMenuOptions.begin(),
                     state.storageDriveMenuOptions.end(),
@@ -991,6 +1093,7 @@ void DashboardShellUi::ShowContextMenu(
     HMENU menu = CreatePopupMenu();
     HMENU diagnosticsMenu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
+    HMENU themeMenu = CreatePopupMenu();
     HMENU networkMenu = CreatePopupMenu();
     HMENU scaleMenu = CreatePopupMenu();
     HMENU storageDrivesMenu = CreatePopupMenu();
@@ -1012,6 +1115,23 @@ void DashboardShellUi::ShowContextMenu(
             const UINT flags = MF_STRING | (state.config.display.layout == option.name ? MF_CHECKED : MF_UNCHECKED);
             AppendMenuW(layoutMenu, flags, option.commandId, label.c_str());
             SetMenuItemRadioStyle(layoutMenu, option.commandId);
+        }
+    }
+    state.themeMenuOptions.clear();
+    for (size_t i = 0; i < state.config.layout.themes.size() && (kCommandThemeBase + i) <= kCommandThemeMax; ++i) {
+        ThemeMenuOption option;
+        option.commandId = kCommandThemeBase + static_cast<UINT>(i);
+        option.name = state.config.layout.themes[i].name;
+        option.selected = option.name == state.config.display.theme;
+        state.themeMenuOptions.push_back(std::move(option));
+    }
+    if (state.themeMenuOptions.empty()) {
+        AppendMenuW(themeMenu, MF_STRING | MF_GRAYED, kCommandThemeBase, L"No themes found");
+    } else {
+        for (const auto& option : state.themeMenuOptions) {
+            const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuW(themeMenu, flags, option.commandId, WideFromUtf8(option.name).c_str());
+            SetMenuItemRadioStyle(themeMenu, option.commandId);
         }
     }
     state.networkMenuOptions.clear();
@@ -1151,6 +1271,7 @@ void DashboardShellUi::ShowContextMenu(
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), L"Layout");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(themeMenu), L"Theme");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), L"Scale");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), L"Network");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), L"Storage drives");

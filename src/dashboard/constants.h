@@ -30,4 +30,6 @@ inline constexpr UINT kCommandStorageDriveMax = 1399;
 inline constexpr UINT kCommandScaleBase = 1400;
 inline constexpr UINT kCommandScaleMax = 1499;
 inline constexpr UINT kCommandCustomScale = 1500;
+inline constexpr UINT kCommandThemeBase = 1600;
+inline constexpr UINT kCommandThemeMax = 1699;
 inline constexpr wchar_t kWindowClassName[] = L"SystemTelemetryDashboard";

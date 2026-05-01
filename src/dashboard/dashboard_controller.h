@@ -25,6 +25,7 @@ struct DashboardSessionState {
     LayoutConfig layoutEditSessionSavedLayout;
     std::vector<DisplayMenuOption> configDisplayOptions;
     std::vector<LayoutMenuOption> layoutMenuOptions;
+    std::vector<ThemeMenuOption> themeMenuOptions;
     std::vector<NetworkMenuOption> networkMenuOptions;
     std::vector<StorageDriveMenuOption> storageDriveMenuOptions;
     std::vector<ScaleMenuOption> scaleMenuOptions;
@@ -71,6 +72,7 @@ public:
     void ToggleAutoStart(DashboardShellHost& shell);
     bool ConfigureDisplay(DashboardShellHost& shell, const DisplayMenuOption& option);
     bool SwitchLayout(DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout);
+    bool SwitchTheme(DashboardShellHost& shell, const std::string& themeName, bool diagnosticsEditLayout);
     bool SetDisplayScale(DashboardShellHost& shell, double scale);
     void SelectNetworkAdapter(DashboardShellHost& shell, const NetworkMenuOption& option);
     void ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option);

@@ -456,6 +456,9 @@ std::wstring BuildLayoutEditHintText(const LayoutEditTreeNode* node) {
     if (std::holds_alternative<LayoutCardTitleEditKey>(node->leaf->focusKey)) {
         return L"Edit the card title text. Changes preview live.";
     }
+    if (std::holds_alternative<ThemeColorEditKey>(node->leaf->focusKey)) {
+        return L"Edit the theme token as #RRGGBBAA or use the RGBA controls and picker.";
+    }
     if (const auto* nodeFieldLeaf = std::get_if<LayoutNodeFieldEditKey>(&node->leaf->focusKey);
         nodeFieldLeaf != nullptr) {
         return LayoutNodeFieldEditHint(*nodeFieldLeaf);

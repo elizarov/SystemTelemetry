@@ -87,6 +87,40 @@ TEST(ConfigWriter, WritesColorAlphaInHexColorValues) {
     EXPECT_THAT(output, testing::HasSubstr("accent_color = #12345678\r\n"));
 }
 
+TEST(ConfigWriter, WritesDerivedColorExpressions) {
+    AppConfig compareConfig;
+    AppConfig currentConfig = compareConfig;
+    currentConfig.layout.colors.accentColor = ColorConfig::FromRgba(0x00BFFFFFu);
+    currentConfig.layout.colors.accentColor.expression = "accent";
+    currentConfig.layout.colors.peakGhostColor = ColorConfig::FromRgba(0x00BFFF60u);
+    currentConfig.layout.colors.peakGhostColor.expression = "accent(alpha: 0x60)";
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::HasSubstr("accent_color = accent\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("peak_ghost_color = accent(alpha: 0x60)\r\n"));
+}
+
+TEST(ConfigWriter, FullExportWritesThemeSections) {
+    AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
+
+    const std::string output = BuildSavedConfigText(
+        ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
+
+    EXPECT_THAT(output,
+        testing::HasSubstr("[display]\r\n"
+                           "monitor_name = \r\n"
+                           "layout = 5x3\r\n"
+                           "theme = dark_cyan\r\n"));
+    EXPECT_THAT(output,
+        testing::HasSubstr("[theme.dark_cyan]\r\n"
+                           "background = #000000FF\r\n"
+                           "foreground = #FFFFFFFF\r\n"
+                           "accent = #00BFFFFF\r\n"
+                           "guide = #FF6A00FF\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("panel_border_color = background(mix: accent 0.16)\r\n"));
+}
+
 TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
 

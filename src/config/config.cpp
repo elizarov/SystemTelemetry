@@ -1,5 +1,6 @@
 #include "config/config.h"
 
+#include <iomanip>
 #include <sstream>
 
 namespace {
@@ -18,7 +19,12 @@ const MetricDefinitionConfig kRuntimePlaceholderMetricDefinition{
 }  // namespace
 
 ColorConfig ColorConfig::FromRgba(unsigned int value) {
-    return ColorConfig{static_cast<std::uint32_t>(value)};
+    std::ostringstream stream;
+    stream << '#' << std::uppercase << std::hex;
+    stream.width(8);
+    stream.fill('0');
+    stream << value;
+    return ColorConfig{static_cast<std::uint32_t>(value), stream.str()};
 }
 
 unsigned int ColorConfig::ToRgb() const {
@@ -91,12 +97,12 @@ AppConfig BuildEffectiveRuntimeConfig(
 }
 
 bool LayoutConfig::operator==(const LayoutConfig& other) const {
-    return colors == other.colors && layoutGuideSheet == other.layoutGuideSheet && dashboard == other.dashboard &&
-           cardStyle == other.cardStyle && metricList == other.metricList && driveUsageList == other.driveUsageList &&
-           throughput == other.throughput && gauge == other.gauge && text == other.text &&
-           networkFooter == other.networkFooter && layoutEditor == other.layoutEditor && fonts == other.fonts &&
-           board == other.board && metrics == other.metrics && layouts == other.layouts && cards == other.cards &&
-           structure == other.structure && cardsLayout == other.cardsLayout;
+    return colors == other.colors && layoutGuideSheet == other.layoutGuideSheet && themes == other.themes &&
+           dashboard == other.dashboard && cardStyle == other.cardStyle && metricList == other.metricList &&
+           driveUsageList == other.driveUsageList && throughput == other.throughput && gauge == other.gauge &&
+           text == other.text && networkFooter == other.networkFooter && layoutEditor == other.layoutEditor &&
+           fonts == other.fonts && board == other.board && metrics == other.metrics && layouts == other.layouts &&
+           cards == other.cards && structure == other.structure && cardsLayout == other.cardsLayout;
 }
 
 bool AppConfig::operator==(const AppConfig& other) const {

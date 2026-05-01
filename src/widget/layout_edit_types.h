@@ -93,6 +93,11 @@ struct LayoutCardTitleEditKey {
     std::string cardId;
 };
 
+struct ThemeColorEditKey {
+    std::string themeName;
+    std::string tokenName;
+};
+
 enum class LayoutNodeField {
     Parameter,
 };
@@ -264,6 +269,7 @@ using LayoutEditFocusKey = std::variant<LayoutEditParameter,
     LayoutWeightEditKey,
     LayoutMetricEditKey,
     LayoutCardTitleEditKey,
+    ThemeColorEditKey,
     LayoutNodeFieldEditKey,
     LayoutContainerEditKey>;
 using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
