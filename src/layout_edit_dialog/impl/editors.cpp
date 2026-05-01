@@ -1141,6 +1141,7 @@ bool PreviewSelectedTheme(LayoutEditDialogState* state, HWND hwnd) {
     if (applied) {
         state->dialog->Refresh();
         SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO));
+        state->dialog->Host().RestackLayoutEditDialogAnchor(hwnd);
     }
     return applied;
 }
@@ -1472,6 +1473,8 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
             const bool applied = state->dialog->Host().ApplyLayoutPreview(state->originalConfig.display.layout);
             if (applied) {
                 state->dialog->Refresh();
+                SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO));
+                state->dialog->Host().RestackLayoutEditDialogAnchor(hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
             }
             return applied;
