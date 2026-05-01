@@ -53,5 +53,6 @@ Validation workflow:
 - Git pathspecs such as `tests/**/*.cpp` do not cover top-level files like `tests/benchmarks.cpp`; formatter and hook discovery should start from broad `*.cpp` and `*.h` pathspecs, then apply the repo eligibility filter.
 - When extending clang-tidy to standalone header runs, keep include-cleaner's explicit false-positive filters narrow; Win32 umbrella headers and project macro-provider headers can otherwise hide real unused header includes.
 - GitHub Actions must not call the machine-local `devenv.cmd`; CI bootstraps Visual Studio through runner discovery and gives `clang-tidy` a larger per-file timeout through `SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS`.
+- When using `vswhere.exe` from a `for /f` command, wrap the quoted executable path in an extra quote pair so `cmd` does not try to execute `C:\Program`.
 - The GitHub Visual Studio runner can lag the local MSVC toolset; keep config-schema reflection descriptors type-derived and default-initialized instead of materializing deeply nested constexpr initializer tuples.
 - The repo uses CRLF text checkouts; keep `.githooks/pre-commit` as a minimal CRLF-tolerant shell launcher and put multi-line hook logic in PowerShell.

@@ -102,11 +102,11 @@ if defined VSCMD_ARG_TGT_ARCH exit /b 0
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 set "VSINSTALL="
 if exist "%VSWHERE%" (
-    for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -products * -version "[18.0,19.0)" -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do (
+    for /f "delims=" %%I in ('""%VSWHERE%" -latest -products * -version "[18.0,19.0)" -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath"') do (
         if not defined VSINSTALL set "VSINSTALL=%%I"
     )
     if not defined VSINSTALL (
-        for /f "usebackq delims=" %%I in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do (
+        for /f "delims=" %%I in ('""%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath"') do (
             if not defined VSINSTALL set "VSINSTALL=%%I"
         )
     )
