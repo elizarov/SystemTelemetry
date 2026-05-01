@@ -1013,18 +1013,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
 
             const int swatchSize = std::max(DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_SWATCH),
                 DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT) + 4);
-            if (derivedMode) {
-                const int baseRowHeight = LayoutLabeledControlRow(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_BASE_LABEL,
-                    IDC_LAYOUT_EDIT_COLOR_BASE_COMBO,
-                    innerLeft,
-                    cursorY,
-                    labelColumnWidth,
-                    metrics.labelGap,
-                    innerWidth - labelColumnWidth - metrics.labelGap,
-                    singleLineFieldHeight);
-                cursorY += baseRowHeight + metrics.rowGap;
-            } else {
+            if (!derivedMode) {
                 const int pickWidth = DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK);
                 const int pickHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK);
                 const int hexLabelWidth = MeasureTextWidthForControl(hwnd,
@@ -1108,6 +1097,17 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             }
 
             if (derivedMode) {
+                const int baseRowHeight = LayoutLabeledControlRow(hwnd,
+                    IDC_LAYOUT_EDIT_COLOR_BASE_LABEL,
+                    IDC_LAYOUT_EDIT_COLOR_BASE_COMBO,
+                    innerLeft,
+                    cursorY,
+                    labelColumnWidth,
+                    metrics.labelGap,
+                    innerWidth - labelColumnWidth - metrics.labelGap,
+                    singleLineFieldHeight);
+                cursorY += baseRowHeight + metrics.rowGap;
+
                 const int checkboxWidth = std::max(labelColumnWidth + metrics.labelGap + 82,
                     MeasureTextWidthForControl(hwnd,
                         IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL,
