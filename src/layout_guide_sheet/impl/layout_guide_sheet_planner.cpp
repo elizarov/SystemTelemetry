@@ -88,34 +88,6 @@ bool PayloadBelongsToSelectedCard(
     return true;
 }
 
-bool RectOverlapsAnyCardChromeColorTarget(
-    const RenderRect& rect, const std::vector<LayoutGuideSheetCardSummary>& cards) {
-    return std::any_of(cards.begin(), cards.end(), [&](const LayoutGuideSheetCardSummary& card) {
-        return card.chromeLayout.hasHeader &&
-               (RectsOverlap(rect, card.chromeLayout.titleRect) || RectsOverlap(rect, card.chromeLayout.iconRect));
-    });
-}
-
-bool IsOverviewPayload(const LayoutEditActiveRegion& region, const std::vector<LayoutGuideSheetCardSummary>& cards) {
-    if (const auto* guide = std::get_if<LayoutEditGuide>(&region.payload)) {
-        return guide->renderCardId.empty();
-    }
-    if (const auto* guide = std::get_if<LayoutEditWidgetGuide>(&region.payload)) {
-        return guide->widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome;
-    }
-    if (const auto* anchor = std::get_if<LayoutEditGapAnchor>(&region.payload)) {
-        return anchor->key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome;
-    }
-    if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&region.payload)) {
-        return anchor->key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome ||
-               anchor->key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome;
-    }
-    if (std::holds_alternative<LayoutEditColorRegion>(region.payload)) {
-        return RectOverlapsAnyCardChromeColorTarget(region.box, cards);
-    }
-    return false;
-}
-
 SourceCardResolution ResolveLayoutGuideSheetSourceCard(const LayoutEditActiveRegion& region,
     const std::vector<LayoutGuideSheetCardSummary>& cards,
     const std::vector<std::string>& selectedCardIds) {
@@ -382,15 +354,11 @@ std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetCallouts(const 
     return callouts;
 }
 
-std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetOverviewCallouts(const AppConfig& config,
-    const LayoutEditActiveRegions& regions,
-    const std::vector<LayoutGuideSheetCardSummary>& cards) {
+std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetOverviewCallouts(
+    const AppConfig& config, const LayoutEditActiveRegions& regions) {
     std::vector<LayoutGuideSheetCalloutRequest> callouts;
     size_t order = 0;
     for (const LayoutEditActiveRegion& region : regions) {
-        if (!IsOverviewPayload(region, cards)) {
-            continue;
-        }
         const std::optional<TooltipPayload> payload = TooltipPayloadFromActiveRegion(region);
         if (!payload.has_value()) {
             continue;

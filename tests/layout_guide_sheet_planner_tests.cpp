@@ -11,6 +11,7 @@
 #include "config/config_resolution.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
+#include "layout_guide_sheet/impl/layout_guide_sheet_renderer.h"
 #include "telemetry/impl/collector_fake.h"
 #include "util/localization_catalog.h"
 #include "util/trace.h"
@@ -38,13 +39,14 @@ void LoadTestLocalizationCatalog() {
 struct BuiltInLayoutGuideSheetContext {
     AppConfig config;
     LayoutEditActiveRegions regions;
+    LayoutEditActiveRegions overviewRegions;
     std::vector<LayoutGuideSheetCardSummary> cards;
 };
 
-BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext() {
+BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* layoutName = "5x3") {
     LoadTestLocalizationCatalog();
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
-    EXPECT_TRUE(SelectLayout(config, "5x3"));
+    EXPECT_TRUE(SelectLayout(config, layoutName));
 
     Trace trace;
     std::unique_ptr<TelemetryCollector> telemetry =
@@ -61,9 +63,12 @@ BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext() {
     overlayState.showLayoutEditGuides = true;
     overlayState.forceLayoutEditAffordances = true;
     EXPECT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
+    LayoutGuideSheetRenderer sheetRenderer(renderer);
 
-    return BuiltInLayoutGuideSheetContext{
-        config, renderer.CollectLayoutEditActiveRegions(overlayState), renderer.CollectLayoutGuideSheetCardSummaries()};
+    return BuiltInLayoutGuideSheetContext{config,
+        renderer.CollectLayoutEditActiveRegions(overlayState),
+        sheetRenderer.CollectOverviewActiveRegions(telemetry->Snapshot()),
+        renderer.CollectLayoutGuideSheetCardSummaries()};
 }
 
 LayoutGuideSheetCardSummary TestCardSummary(std::string id, std::vector<WidgetClass> widgetClasses) {
@@ -143,7 +148,7 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
     const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext();
 
     const std::vector<LayoutGuideSheetCalloutRequest> callouts =
-        BuildLayoutGuideSheetOverviewCallouts(context.config, context.regions, context.cards);
+        BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions);
 
     std::set<std::string> actualTexts;
     bool hasDashboardOuterMargin = false;
@@ -202,12 +207,30 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
     EXPECT_EQ(verticalSizingGuides, 1u);
 }
 
+TEST(LayoutGuideSheetPlanner, OverviewCalloutsDoNotUseWidgetColorTargets) {
+    const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext("3x5");
+
+    const std::vector<LayoutGuideSheetCalloutRequest> callouts =
+        BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions);
+
+    for (const LayoutGuideSheetCalloutRequest& callout : callouts) {
+        if (!callout.hoverColorParameter.has_value()) {
+            continue;
+        }
+        EXPECT_TRUE(*callout.hoverColorParameter == LayoutEditParameter::ColorForeground ||
+                    *callout.hoverColorParameter == LayoutEditParameter::ColorIcon)
+            << callout.parameterLine;
+        EXPECT_EQ(callout.parameterLine.find("track_color"), std::string::npos) << callout.parameterLine;
+        EXPECT_EQ(callout.parameterLine.find("peak_ghost_color"), std::string::npos) << callout.parameterLine;
+    }
+}
+
 TEST(LayoutGuideSheetPlanner, MergedCalloutsDoNotRepeatOverviewColorParametersOnCards) {
     const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext();
 
     const std::vector<std::string> selected = SelectLayoutGuideSheetCards(context.cards);
     const std::vector<LayoutGuideSheetCalloutRequest> overviewCallouts =
-        BuildLayoutGuideSheetOverviewCallouts(context.config, context.regions, context.cards);
+        BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions);
     const std::vector<LayoutGuideSheetCalloutRequest> cardCallouts =
         BuildLayoutGuideSheetCallouts(context.config, context.regions, context.cards, selected);
 

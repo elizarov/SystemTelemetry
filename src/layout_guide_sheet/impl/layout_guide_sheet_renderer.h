@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "layout_guide_sheet/impl/layout_guide_sheet_types.h"
+#include "layout_model/layout_edit_active_region.h"
 
 class DashboardRenderer;
 struct SystemSnapshot;
@@ -34,6 +35,7 @@ public:
         std::vector<std::string>* traceDetails = nullptr,
         std::string* errorText = nullptr,
         LayoutGuideSheetRenderStats* stats = nullptr);
+    LayoutEditActiveRegions CollectOverviewActiveRegions(const SystemSnapshot& snapshot);
 
 private:
     using SurfaceDrawCallback = std::function<void()>;

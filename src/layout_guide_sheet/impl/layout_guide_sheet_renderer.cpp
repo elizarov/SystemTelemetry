@@ -365,6 +365,58 @@ PackedOverview BuildPackedOverview(DashboardRenderer& renderer) {
     return overview;
 }
 
+LayoutEditActiveRegions CollectActiveRegionsFromPackedOverview(const PackedOverview& overview) {
+    LayoutEditActiveRegions regions;
+    size_t activeRegionCount = overview.cards.size() * 2 + overview.guides.size() + overview.gapAnchors.size() +
+                               overview.reorderAnchors.size() * 2;
+    for (const PackedOverviewCard& card : overview.cards) {
+        activeRegionCount += card.chromeArtifacts.widgetGuides.size() + card.chromeArtifacts.anchorRegions.size() * 2 +
+                             card.chromeArtifacts.colorRegions.size();
+    }
+    regions.Reserve(activeRegionCount);
+    const auto appendRegion =
+        [&](const RenderRect& box, LayoutEditActiveRegionKind kind, LayoutEditActiveRegionPayload payload) {
+            if (box.IsEmpty()) {
+                return;
+            }
+            regions.Add(LayoutEditActiveRegion{box, kind, std::move(payload)});
+        };
+
+    for (const PackedOverviewCard& card : overview.cards) {
+        LayoutEditCardRegion cardRegion{card.id,
+            {},
+            card.rect,
+            card.chromeArtifacts.chromeLayout.titleRect,
+            card.chromeArtifacts.chromeLayout.hasHeader};
+        appendRegion(card.rect, LayoutEditActiveRegionKind::Card, cardRegion);
+        if (card.chromeArtifacts.chromeLayout.hasHeader) {
+            appendRegion(
+                card.chromeArtifacts.chromeLayout.titleRect, LayoutEditActiveRegionKind::CardHeader, cardRegion);
+        }
+        for (const LayoutEditWidgetGuide& guide : card.chromeArtifacts.widgetGuides) {
+            appendRegion(guide.hitRect, LayoutEditActiveRegionKind::WidgetGuide, guide);
+        }
+        for (const LayoutEditAnchorRegion& anchor : card.chromeArtifacts.anchorRegions) {
+            appendRegion(anchor.anchorHitRect, LayoutEditActiveRegionKind::StaticEditAnchorHandle, anchor);
+            appendRegion(anchor.targetRect, LayoutEditActiveRegionKind::StaticEditAnchorTarget, anchor);
+        }
+        for (const LayoutEditColorRegion& color : card.chromeArtifacts.colorRegions) {
+            appendRegion(color.targetRect, LayoutEditActiveRegionKind::DynamicColorTarget, color);
+        }
+    }
+    for (const LayoutEditGuide& guide : overview.guides) {
+        appendRegion(guide.hitRect, LayoutEditActiveRegionKind::LayoutWeightGuide, guide);
+    }
+    for (const LayoutEditGapAnchor& anchor : overview.gapAnchors) {
+        appendRegion(anchor.hitRect, LayoutEditActiveRegionKind::GapHandle, anchor);
+    }
+    for (const LayoutEditAnchorRegion& anchor : overview.reorderAnchors) {
+        appendRegion(anchor.anchorHitRect, LayoutEditActiveRegionKind::StaticEditAnchorHandle, anchor);
+        appendRegion(anchor.targetRect, LayoutEditActiveRegionKind::StaticEditAnchorTarget, anchor);
+    }
+    return regions;
+}
+
 void DrawDottedOverviewRect(DashboardRenderer& renderer, const RenderRect& rect) {
     if (rect.IsEmpty()) {
         return;
@@ -525,6 +577,18 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
 
 LayoutGuideSheetRenderer::LayoutGuideSheetRenderer(DashboardRenderer& dashboardRenderer)
     : dashboardRenderer_(dashboardRenderer) {}
+
+LayoutEditActiveRegions LayoutGuideSheetRenderer::CollectOverviewActiveRegions(const SystemSnapshot& snapshot) {
+    PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
+    const MetricSource& metrics = dashboardRenderer_.ResolveMetrics(snapshot);
+    for (PackedOverviewCard& card : overview.cards) {
+        card.chromeArtifacts =
+            dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(card.id, card.rect, &metrics);
+        card.iconRect = card.chromeArtifacts.chromeLayout.iconRect;
+        card.titleRect = card.chromeArtifacts.chromeLayout.titleRect;
+    }
+    return CollectActiveRegionsFromPackedOverview(overview);
+}
 
 bool LayoutGuideSheetRenderer::SavePng(const std::filesystem::path& imagePath,
     const SystemSnapshot& snapshot,
@@ -838,10 +902,6 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                     callout.targetRect = TransformRect(callout.targetRect, sourceCard->rect, packedCard->rect);
                 }
             }
-        } else {
-            callout.targetRect = TransformRect(callout.targetRect,
-                RenderRect{0, 0, dashboardRenderer_.WindowWidth(), dashboardRenderer_.WindowHeight()},
-                overview.rect);
         }
     }
 
