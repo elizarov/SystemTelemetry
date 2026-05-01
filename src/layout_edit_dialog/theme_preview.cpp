@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -30,16 +31,23 @@ struct ThemeTriangleGeometry {
 ThemeTriangleGeometry BuildThemeTriangleGeometry(const RECT& rect) {
     const int rectWidth = std::max(1, static_cast<int>(rect.right - rect.left));
     const int rectHeight = std::max(1, static_cast<int>(rect.bottom - rect.top));
+    const int topLabelBand = rectHeight >= 54 ? 18 : 0;
+    const int bottomLabelBand = rectHeight >= 54 ? 18 : 0;
     const int availableWidth = std::max(1, rectWidth - 2);
-    const int availableHeight = std::max(1, rectHeight - 2);
+    const int availableHeight = std::max(1, rectHeight - 2 - topLabelBand - bottomLabelBand);
     const int side = std::max(1, std::min(availableWidth, static_cast<int>(availableHeight * 2.0 / std::sqrt(3.0))));
     const int triangleHeight = std::max(1, static_cast<int>(std::lround(side * std::sqrt(3.0) / 2.0)));
     const double leftX = (rectWidth - side) / 2.0;
     const double rightX = leftX + side;
-    const double topY = (rectHeight - triangleHeight) / 2.0;
+    const double topY = topLabelBand + (availableHeight - triangleHeight) / 2.0;
     const double bottomX = (leftX + rightX) / 2.0;
     const double bottomY = topY + triangleHeight;
     return {side, triangleHeight, leftX, rightX, topY, bottomX, bottomY};
+}
+
+void DrawThemePreviewLabel(HDC dc, std::wstring_view text, const RECT& rect, UINT format) {
+    RECT labelRect = rect;
+    DrawTextW(dc, text.data(), static_cast<int>(text.size()), &labelRect, format | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 void FillThemePreviewPixels(std::vector<uint32_t>& pixels, int width, int height, const ThemeConfig& theme) {
@@ -160,4 +168,19 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     SelectObject(dc, oldPen);
     DeleteObject(guidePen);
     DeleteObject(outlinePen);
+
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, GetSysColor(COLOR_WINDOWTEXT));
+    HFONT oldFont = reinterpret_cast<HFONT>(SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT)));
+    const int labelHeight = std::max(14, static_cast<int>(std::lround(geometry.topY)) - 2);
+    const RECT topLeftLabel{
+        rect.left, rect.top, rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) - 4, rect.top + labelHeight};
+    const RECT topRightLabel{
+        rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) + 4, rect.top, rect.right, rect.top + labelHeight};
+    const RECT bottomLabel{
+        rect.left, rect.top + static_cast<LONG>(std::lround(geometry.bottomY)) + 2, rect.right, rect.bottom};
+    DrawThemePreviewLabel(dc, L"background", topLeftLabel, DT_LEFT | DT_TOP | DT_END_ELLIPSIS);
+    DrawThemePreviewLabel(dc, L"foreground", topRightLabel, DT_RIGHT | DT_TOP | DT_END_ELLIPSIS);
+    DrawThemePreviewLabel(dc, L"accent", bottomLabel, DT_CENTER | DT_TOP | DT_END_ELLIPSIS);
+    SelectObject(dc, oldFont);
 }
