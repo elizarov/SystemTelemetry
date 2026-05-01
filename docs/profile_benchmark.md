@@ -875,6 +875,19 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep `_USE_STD_VECTOR_ALGORITHMS=0` for the current native targets. The app's hot paths are not helped by the STL vectorized dispatch tables enough to justify the extra single-executable size.
 
+### Hypothesis: Drive color resolution from runtime field metadata
+
+- Change:
+  - Replace hardcoded theme token, `[colors]`, and layout-guide-sheet color chains in `color_resolver.cpp` with loops over `RuntimeConfigFieldDescriptors`.
+  - Use `FunctionRef` for borrowed color lookups and a fixed eight-digit hex parser in the resolver.
+- Result:
+  - Helped executable size modestly and keeps color resolution tied to the config metadata source of truth.
+- Observed effect:
+  - Metadata-driven color resolution reduced `build\SystemTelemetry.exe` from the post-theme baseline of `1,208,320` bytes to `1,203,712` bytes.
+  - In the fresh linker map, `color_resolver.cpp.obj` fell from `8,821` bytes before the refactor to about `7.2 KiB`.
+- Conclusion:
+  - Keep color resolution table-driven through runtime config descriptors so future theme/color fields do not need new resolver-side `if` chains.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.
