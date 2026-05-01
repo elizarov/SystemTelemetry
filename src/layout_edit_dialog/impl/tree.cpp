@@ -84,6 +84,12 @@ HTREEITEM FindFirstTreeItem(const LayoutEditDialogState& state) {
     return state.treeItems.empty() ? nullptr : state.treeItems.front().item;
 }
 
+struct TreeViewportSnapshot {
+    std::string firstVisibleLocation;
+    std::string selectedLocation;
+    int selectedOffsetRows = -1;
+};
+
 std::string TreeNodeViewportLocation(LayoutEditDialogState* state, const LayoutEditTreeNode* node) {
     if (state == nullptr || node == nullptr) {
         return {};
@@ -100,13 +106,27 @@ std::string TreeNodeViewportLocation(LayoutEditDialogState* state, const LayoutE
     return node->locationText;
 }
 
-std::string CaptureFirstVisibleTreeLocation(LayoutEditDialogState* state, HWND tree) {
+TreeViewportSnapshot CaptureTreeViewportSnapshot(LayoutEditDialogState* state, HWND tree) {
+    TreeViewportSnapshot snapshot;
     if (state == nullptr || tree == nullptr) {
-        return {};
+        return snapshot;
     }
 
     const HTREEITEM firstVisible = TreeView_GetFirstVisible(tree);
-    return TreeNodeViewportLocation(state, TreeNodeFromItem(tree, firstVisible));
+    snapshot.firstVisibleLocation = TreeNodeViewportLocation(state, TreeNodeFromItem(tree, firstVisible));
+
+    const HTREEITEM selected = TreeView_GetSelection(tree);
+    const int visibleCount = static_cast<int>(TreeView_GetVisibleCount(tree));
+    int offset = 0;
+    for (HTREEITEM item = firstVisible; item != nullptr && offset < visibleCount;
+        item = TreeView_GetNextVisible(tree, item), ++offset) {
+        if (item == selected) {
+            snapshot.selectedLocation = TreeNodeViewportLocation(state, TreeNodeFromItem(tree, item));
+            snapshot.selectedOffsetRows = offset;
+            break;
+        }
+    }
+    return snapshot;
 }
 
 void ExpandTreeAncestors(HWND tree, HTREEITEM item) {
@@ -114,6 +134,46 @@ void ExpandTreeAncestors(HWND tree, HTREEITEM item) {
         TreeView_Expand(tree, item, TVE_EXPAND);
         item = TreeView_GetParent(tree, item);
     }
+}
+
+HTREEITEM VisibleItemBefore(HWND tree, HTREEITEM item, int rowsBefore) {
+    HTREEITEM anchor = item;
+    for (int row = 0; row < rowsBefore && anchor != nullptr; ++row) {
+        HTREEITEM previous = TreeView_GetPrevVisible(tree, anchor);
+        if (previous == nullptr) {
+            break;
+        }
+        anchor = previous;
+    }
+    return anchor;
+}
+
+bool RestoreTreeViewportFromSnapshot(
+    LayoutEditDialogState* state, HWND tree, HTREEITEM selectedItem, const TreeViewportSnapshot& snapshot) {
+    if (state == nullptr || tree == nullptr) {
+        return false;
+    }
+
+    if (!snapshot.selectedLocation.empty() && snapshot.selectedOffsetRows >= 0) {
+        if (HTREEITEM restoredSelected = FindTreeItemByLocationText(state, snapshot.selectedLocation);
+            restoredSelected == selectedItem) {
+            if (HTREEITEM anchor = VisibleItemBefore(tree, selectedItem, snapshot.selectedOffsetRows);
+                anchor != nullptr) {
+                TreeView_SelectSetFirstVisible(tree, anchor);
+                return true;
+            }
+        }
+    }
+
+    if (!snapshot.firstVisibleLocation.empty()) {
+        if (HTREEITEM firstVisibleItem = FindTreeItemByLocationText(state, snapshot.firstVisibleLocation);
+            firstVisibleItem != nullptr) {
+            TreeView_SelectSetFirstVisible(tree, firstVisibleItem);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 std::optional<LayoutEditSelectionHighlight> SelectionHighlightForTreeNode(const LayoutEditTreeNode* node) {
@@ -145,7 +205,8 @@ void RebuildLayoutEditTree(
     } else if (state->selectedNode != nullptr) {
         preferredLocation = TreeNodeViewportLocation(state, state->selectedNode);
     }
-    const std::string firstVisibleLocation = CaptureFirstVisibleTreeLocation(state, tree);
+    const TreeViewportSnapshot viewportSnapshot =
+        preferredFocus.has_value() ? TreeViewportSnapshot{} : CaptureTreeViewportSnapshot(state, tree);
 
     state->visibleTreeModel = FilterLayoutEditTreeModel(state->treeModel, Utf8FromWide(state->currentFilter));
     state->treeItems.clear();
@@ -169,12 +230,9 @@ void RebuildLayoutEditTree(
     if (selectedItem != nullptr) {
         ExpandTreeAncestors(tree, selectedItem);
         TreeView_SelectItem(tree, selectedItem);
-        if (firstVisibleLocation.empty()) {
+        if (preferredFocus.has_value()) {
             TreeView_EnsureVisible(tree, selectedItem);
-        } else if (HTREEITEM firstVisibleItem = FindTreeItemByLocationText(state, firstVisibleLocation);
-            firstVisibleItem != nullptr) {
-            TreeView_SelectSetFirstVisible(tree, firstVisibleItem);
-        } else {
+        } else if (!RestoreTreeViewportFromSnapshot(state, tree, selectedItem, viewportSnapshot)) {
             TreeView_EnsureVisible(tree, selectedItem);
         }
         HandleLayoutEditTreeSelection(state, hwnd, selectedItem);
