@@ -1,7 +1,7 @@
 # System Telemetry
 
 This document owns user-visible product behavior.
-See also: [docs/layout.md](layout.md) for config language and section ownership, [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/build.md](build.md) for build and setup, and [docs/architecture.md](architecture.md) for code structure.
+See also: [docs/layout.md](layout.md) for config language and section ownership, [docs/theme_configuration.md](theme_configuration.md) for theme selection and derived color behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/build.md](build.md) for build and setup, and [docs/architecture.md](architecture.md) for code structure.
 
 ## Overview
 
@@ -21,13 +21,14 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - `Save Full Config To...` exports a full config in the embedded-template shape with live values filled in.
 - Save and export omit runtime-only placeholder metric metadata such as `nothing`, even when metric-list bindings still reference that placeholder id.
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
-- `Save Config` persists live placement, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
+- `Save Config` persists live placement, active theme selection, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
 - `Config To Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `telemetry_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
 - `Config To Display` marks a display entry with a checkbox when the live config already targets that display at `0,0` and the configured wallpaper path is non-empty, while still allowing that checked entry to be invoked again.
 
 ## Dashboard Composition And Rendering
 
 - The active named layout selects one static dashboard composition at a time.
+- The active named theme selects the base color tokens used by derived dashboard colors.
 - The renderer resolves card and widget rectangles after config load or reload and keeps rendering in those resolved coordinates until the next reload.
 - The dashboard content comes from cards named in the active layout, and each card may show an optional title, optional icon, and a configured widget composition.
 - Cards with no title and no icon reserve no header area.
@@ -47,7 +48,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 
 ## Runtime Controls And Menus
 
-- Right-clicking the dashboard opens a popup menu with move, raise, reload, save, layout, scale, network, storage-drive, config-to-display, auto-start, diagnostics, and exit actions.
+- Right-clicking the dashboard opens a popup menu with move, raise, reload, save, layout, theme, scale, network, storage-drive, config-to-display, auto-start, diagnostics, and exit actions.
 - The `Diagnostics` submenu exposes the same dump, screenshot, layout-guide-sheet, and full-config export formats used by the diagnostics subsystem.
 - The tray icon exposes the same action set as the dashboard menu.
 - The dashboard uses normal window Z-order behavior; `Bring On Top` raises it when needed.
@@ -55,6 +56,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The tray menu shows `Bring On Top` as its default action.
 - Move mode keeps the dashboard attached to the pointer until placement completes and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard.
 - The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless layout-editor refresh work runs.
+- The `Theme` submenu appears immediately after `Layout`, lists configured named themes, marks the active theme, applies a new selection immediately, and repaints the dashboard before any modeless layout-editor refresh work runs.
 - The `Scale` submenu offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog. Changing scale applies immediately.
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.
 - The `Storage drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.
@@ -79,7 +81,8 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - When the modeless `Edit Configuration` window opens or syncs to a targeted dashboard item, the matching tree node becomes selected, its editor opens, and the tree scrolls to keep that node visible.
 - Bringing the `Edit Configuration` window to the foreground also raises the dashboard directly behind it in Z-order so the editor and dashboard stay visually paired, but dashboard-driven refreshes do not raise the editor window unless the user brings it forward.
 - Dashboard hit-testing treats the editor as covering the dashboard only when the editor is actually above the dashboard in window Z-order, not merely because the windows overlap on screen or because the editor still has keyboard focus.
-- The editor supports filtering, per-field revert, config-local descriptions, and specialized editors for numeric values, fonts, global font family, RGBA colors, metrics, date/time formats, weight pairs, and metric-list row ordering. Date/time format selectors include common 24-hour, 12-hour uppercase and lowercase meridiem, numeric date, month-name date, and weekday date styles while preserving a configured custom value. Edit-dialog dropdowns open above neighboring controls with a popup sized for the available options, capped at ten visible rows.
+- The editor supports filtering, per-field revert, config-local descriptions, and specialized editors for numeric values, fonts, global font family, theme-token RGBA colors, literal or derived color roles, metrics, date/time formats, weight pairs, and metric-list row ordering. Date/time format selectors include common 24-hour, 12-hour uppercase and lowercase meridiem, numeric date, month-name date, and weekday date styles while preserving a configured custom value. Edit-dialog dropdowns open above neighboring controls with a popup sized for the available options, capped at ten visible rows.
+- Theme sections expose RGBA edits for their standard tokens, and `[colors]` roles expose a literal-or-derived switch with base-color selection plus optional `rotate_hue`, `mix`, and `alpha` controls as defined in [docs/theme_configuration.md](theme_configuration.md).
 - Selecting the `fonts` section exposes a global font-family selector. It is blank when configured font roles use mixed families, shows the family when all font roles match, applies a selected family to all font roles, and reverts the full font set through `Revert Font Changes`.
 - Metric leaves whose ids begin with `board.temp.` or `board.fan.` also expose a live `Binding` selector for the matching board-sensor mapping.
 - The board-metric `Binding` selector keeps the last discovered provider sensor-name list available for config editing even if a later live board sample omits that metadata.

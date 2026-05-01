@@ -1,7 +1,7 @@
 # System Telemetry Layout Language
 
 This document owns the config language, section ownership, syntax, and validation rules.
-See also: [resources/config.ini](../resources/config.ini) for the maintained shipped example and entry spellings, [docs/specifications.md](specifications.md) for runtime behavior, and [docs/diagnostics.md](diagnostics.md) for diagnostics-only switches and workflows.
+See also: [resources/config.ini](../resources/config.ini) for the maintained shipped example and entry spellings, [docs/theme_configuration.md](theme_configuration.md) for theme and color value syntax, [docs/specifications.md](specifications.md) for runtime behavior, and [docs/diagnostics.md](diagnostics.md) for diagnostics-only switches and workflows.
 
 ## Purpose And Scope
 
@@ -31,7 +31,7 @@ The language is divided by responsibility:
 - `[dashboard]` owns outer dashboard spacing.
 - `[card_style]` owns shared card chrome and in-card spacing.
 - `[colors]` owns the shared dashboard palette.
-- Color values use `#RRGGBBAA`.
+- Color values use the literal and derived color syntax defined in [docs/theme_configuration.md](theme_configuration.md).
 - `[layout_guide_sheet]` owns diagnostics-only guide-sheet callout colors and layout constants; these fields are loaded from config but are not editable through the layout-edit dialog.
 - `[fonts]` owns the shared font roles.
 - `[card.<id>]` owns card-local title, icon, and inner layout composition.
@@ -112,7 +112,7 @@ The language defines static layout behavior rather than live interaction behavio
 - Named layouts resolve one dashboard window size plus a top-level `cards` composition.
 - Dashboard spacing belongs only in `[dashboard]`.
 - Shared card chrome and in-card spacing belong only in `[card_style]`.
-- Shared visual styling belongs only in `[colors]` and `[fonts]`; diagnostics-only layout guide sheet chrome and spacing belongs in `[layout_guide_sheet]`.
+- Shared visual styling belongs only in `[colors]`, `[theme.<name>]`, and `[fonts]`; diagnostics-only layout guide sheet chrome and spacing belongs in `[layout_guide_sheet]`.
 - Card sections define relative composition only: title, icon, layout tree, widget bindings, and child weights.
 - Metric-list row height derives from measured fonts plus `[metric_list]` bar and gap settings.
 - Drive-usage header and row heights derive from measured fonts plus `[drive_usage_list]` geometry settings.
