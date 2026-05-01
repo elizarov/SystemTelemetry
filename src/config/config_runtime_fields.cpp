@@ -10,7 +10,6 @@
 #include <type_traits>
 
 #include "config/config_parser.h"
-#include "config/config_writer.h"
 #include "util/strings.h"
 
 namespace {

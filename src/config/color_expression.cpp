@@ -1,6 +1,8 @@
 #include "config/color_expression.h"
 
+#include <cerrno>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <vector>
 
@@ -9,13 +11,13 @@
 namespace {
 
 double ParseDoubleOrDefault(const std::string& value, double fallback) {
-    try {
-        size_t consumed = 0;
-        const double parsed = std::stod(value, &consumed);
-        return consumed == value.size() ? parsed : fallback;
-    } catch (...) {
+    errno = 0;
+    char* end = nullptr;
+    const double parsed = std::strtod(value.c_str(), &end);
+    if (errno != 0 || end == value.c_str() || *end != '\0') {
         return fallback;
     }
+    return parsed;
 }
 
 std::string FormatDouble(double value) {
@@ -34,14 +36,12 @@ std::string FormatAlphaByte(unsigned int alpha) {
 
 std::optional<unsigned int> ParseColorExpressionAlphaByte(const std::string& text) {
     const std::string value = Trim(text);
-    try {
-        size_t consumed = 0;
-        const int base = value.rfind("0x", 0) == 0 || value.rfind("0X", 0) == 0 ? 16 : 10;
-        const unsigned long parsed = std::stoul(value, &consumed, base);
-        if (consumed == value.size() && parsed <= 0xFFul) {
-            return static_cast<unsigned int>(parsed);
-        }
-    } catch (...) {
+    errno = 0;
+    char* end = nullptr;
+    const int base = value.rfind("0x", 0) == 0 || value.rfind("0X", 0) == 0 ? 16 : 10;
+    const unsigned long parsed = std::strtoul(value.c_str(), &end, base);
+    if (errno == 0 && end != value.c_str() && *end == '\0' && parsed <= 0xFFul) {
+        return static_cast<unsigned int>(parsed);
     }
     return std::nullopt;
 }

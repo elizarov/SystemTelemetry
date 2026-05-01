@@ -15,9 +15,7 @@ std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload&
             using T = std::decay_t<decltype(value)>;
             if constexpr (std::is_same_v<T, LayoutEditGuide>) {
                 return std::nullopt;
-            } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide>) {
-                return value.parameter;
-            } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
+            } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide> || std::is_same_v<T, LayoutEditColorRegion>) {
                 return value.parameter;
             } else if constexpr (std::is_same_v<T, LayoutEditAnchorRegion>) {
                 return LayoutEditAnchorParameter(value.key);
@@ -32,9 +30,7 @@ std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload) 
     return std::visit(
         [](const auto& value) -> std::optional<double> {
             using T = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<T, LayoutEditGuide>) {
-                return std::nullopt;
-            } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
+            if constexpr (std::is_same_v<T, LayoutEditGuide> || std::is_same_v<T, LayoutEditColorRegion>) {
                 return std::nullopt;
             } else if constexpr (std::is_same_v<T, LayoutEditAnchorRegion>) {
                 return LayoutEditAnchorParameter(value.key).has_value()
@@ -47,17 +43,8 @@ std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload) 
         payload);
 }
 
-std::optional<unsigned int> TooltipPayloadColorValue(const TooltipPayload& payload) {
-    return std::visit(
-        [](const auto& value) -> std::optional<unsigned int> {
-            using T = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
-                return std::nullopt;
-            } else {
-                return std::nullopt;
-            }
-        },
-        payload);
+std::optional<unsigned int> TooltipPayloadColorValue(const TooltipPayload&) {
+    return std::nullopt;
 }
 
 RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload) {
@@ -91,9 +78,7 @@ std::optional<LayoutEditFocusKey> TooltipPayloadFocusKey(const TooltipPayload& p
             using T = std::decay_t<decltype(value)>;
             if constexpr (std::is_same_v<T, LayoutEditGuide>) {
                 return LayoutWeightEditKey{value.editCardId, value.nodePath, value.separatorIndex};
-            } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide>) {
-                return value.parameter;
-            } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
+            } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide> || std::is_same_v<T, LayoutEditColorRegion>) {
                 return value.parameter;
             } else if constexpr (std::is_same_v<T, LayoutEditAnchorRegion>) {
                 if (const auto parameter = LayoutEditAnchorParameter(value.key); parameter.has_value()) {

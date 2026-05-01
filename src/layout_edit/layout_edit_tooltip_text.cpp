@@ -35,16 +35,6 @@ std::wstring BuildTooltipText(
 }
 
 std::wstring BuildTooltipText(
-    const LayoutEditTooltipDescriptor& descriptor, unsigned int value, const std::wstring& descriptionText) {
-    std::wstring text = WideFromUtf8(BuildLayoutEditTooltipLine(descriptor, value));
-    if (!descriptionText.empty()) {
-        text += L"\r\n";
-        text += descriptionText;
-    }
-    return text;
-}
-
-std::wstring BuildTooltipText(
     const LayoutEditTooltipDescriptor& descriptor, std::string_view value, const std::wstring& descriptionText) {
     std::wstring text = WideFromUtf8(BuildLayoutEditTooltipLine(descriptor, value));
     if (!descriptionText.empty()) {

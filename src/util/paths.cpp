@@ -1,7 +1,6 @@
 #include "util/paths.h"
 
 #include <array>
-#include <utility>
 
 namespace {
 

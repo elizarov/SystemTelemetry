@@ -10,21 +10,10 @@ param(
 
     [int]$MaxParallel = 0,
 
-    [int]$TimeoutSeconds = 180
+    [int]$TimeoutSeconds = 240
 )
 
 $ErrorActionPreference = 'Stop'
-
-$clangTidySkippedFiles = @(
-    # clang-tidy is intentionally skipped for snapshot_dump.cpp because isolated timings show
-    # that Clang diagnostics, clang-analyzer, and misc-include-cleaner all go pathological on
-    # this translation unit, turning the optional tidy sweep into a multi-minute stall.
-    'src/diagnostics/snapshot_dump.cpp',
-    # The active Clang diagnostics also stall on these template-heavy test translation units.
-    'tests/layout_edit_tooltip_tests.cpp',
-    'tests/layout_edit_types_tests.cpp',
-    'tests/metrics_tests.cpp'
-)
 
 $clangTidyIgnoredUnusedIncludeWarnings = @(
     # The active include-cleaner build does not model these Win32 interface headers correctly.
@@ -44,6 +33,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/layout_edit_dialog/impl/trace.h|windows.h',
     'src/layout_edit_dialog/impl/util.h|windows.h',
     'src/layout_edit_dialog/layout_edit_dialog.h|windows.h',
+    'src/layout_edit_dialog/theme_preview.h|windows.h',
     'src/main/autostart.h|windows.h',
     'src/main/config_io.h|windows.h',
     'src/renderer/impl/d2d_renderer.h|windows.h',
@@ -58,6 +48,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/telemetry/impl/collector_storage_selection.h|windows.h',
     'src/telemetry/impl/system_info_support.h|windows.h',
     'src/telemetry/telemetry.h|windows.h',
+    'src/util/file_path.cpp|windows.h',
     'src/util/scale.h|windows.h',
     'src/util/strings.h|windows.h',
     # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
@@ -78,16 +69,6 @@ function ConvertTo-RepoSlashPath {
     )
 
     return $Path -replace '\\', '/'
-}
-
-function Test-ClangTidySkippedFile {
-    param(
-        [string]$RepoRoot,
-        [string]$FullPath
-    )
-
-    $relativePath = ConvertTo-RepoSlashPath -Path (Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $FullPath)
-    return $relativePath -in $clangTidySkippedFiles
 }
 
 function Test-IgnoredUnusedIncludeDiagnostic {
@@ -271,10 +252,8 @@ function Test-EligibleTidyFile {
     if ($normalizedPath -match '[\\/]vendor[\\/]') {
         return $false
     }
-    if ([System.IO.Path]::GetFileName($normalizedPath) -eq 'board_gigabyte_siv.cpp') {
-        return $false
-    }
-    if (Test-ClangTidySkippedFile -RepoRoot $RepoRoot -FullPath $normalizedPath) {
+    $fileName = [System.IO.Path]::GetFileName($normalizedPath)
+    if ($fileName -eq 'board_gigabyte_siv.cpp' -or $fileName -eq 'board_gigabyte_siv_bridge.cpp') {
         return $false
     }
     return $true

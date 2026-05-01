@@ -4,7 +4,6 @@
 #include <commctrl.h>
 #include <commdlg.h>
 
-#include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit_dialog/impl/editors.h"
 #include "layout_edit_dialog/impl/pane.h"
 #include "layout_edit_dialog/impl/trace.h"
