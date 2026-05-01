@@ -1,8 +1,12 @@
 #include "config/config_parser.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cerrno>
+#include <climits>
 #include <cstdio>
+#include <cstdlib>
 #include <set>
 #include <type_traits>
 
@@ -16,23 +20,23 @@
 namespace {
 
 int ParseIntOrDefault(const std::string& value, int fallback) {
-    try {
-        size_t consumed = 0;
-        const int parsed = std::stoi(value, &consumed, 10);
-        return consumed == value.size() ? parsed : fallback;
-    } catch (...) {
+    errno = 0;
+    char* end = nullptr;
+    const long parsed = std::strtol(value.c_str(), &end, 10);
+    if (errno != 0 || end == value.c_str() || *end != '\0' || parsed < INT_MIN || parsed > INT_MAX) {
         return fallback;
     }
+    return static_cast<int>(parsed);
 }
 
 double ParseDoubleOrDefault(const std::string& value, double fallback) {
-    try {
-        size_t consumed = 0;
-        const double parsed = std::stod(value, &consumed);
-        return consumed == value.size() ? parsed : fallback;
-    } catch (...) {
+    errno = 0;
+    char* end = nullptr;
+    const double parsed = std::strtod(value.c_str(), &end);
+    if (errno != 0 || end == value.c_str() || *end != '\0') {
         return fallback;
     }
+    return parsed;
 }
 
 ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallback) {
@@ -48,11 +52,13 @@ ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallbac
             return fallback;
         }
     }
-    try {
-        return ColorConfig::FromRgba(static_cast<unsigned int>(std::stoul(text, nullptr, 16)));
-    } catch (...) {
+    errno = 0;
+    char* end = nullptr;
+    const unsigned long parsed = std::strtoul(text.c_str(), &end, 16);
+    if (errno != 0 || end == text.c_str() || *end != '\0' || parsed > 0xFFFFFFFFul) {
         return fallback;
     }
+    return ColorConfig::FromRgba(static_cast<unsigned int>(parsed));
 }
 
 bool ParseIntPair(const std::string& value, int& first, int& second) {
@@ -157,24 +163,38 @@ void DecodeConfigValue<configschema::StringCodec, std::vector<std::string>>(
     target = SplitTrimmed(value, ',');
 }
 
+struct RuntimeFieldParser {
+    std::string_view key;
+    void (*decode)(void* owner, const std::string& value);
+};
+
+template <typename Field> void DecodeRuntimeField(void* owner, const std::string& value) {
+    auto& typedOwner = *static_cast<typename Field::owner_type*>(owner);
+    typename Field::field_type decoded = Field::RawGet(typedOwner);
+    DecodeConfigValue<typename Field::codec_type>(decoded, value);
+    Field::Set(typedOwner, std::move(decoded));
+}
+
+template <typename... Field> constexpr auto MakeRuntimeFieldParsers(std::tuple<Field...>) {
+    return std::array<RuntimeFieldParser, sizeof...(Field)>{
+        RuntimeFieldParser{Field::key.view(), &DecodeRuntimeField<Field>}...};
+}
+
+template <typename Section> const auto& RuntimeFieldParsers() {
+    static constexpr auto fields = MakeRuntimeFieldParsers(typename Section::fields_type{});
+    return fields;
+}
+
 template <typename Section>
 bool ApplyStructuredSectionFields(
     typename Section::owner_type& owner, const std::string& key, const std::string& value) {
-    bool handled = false;
-    std::apply(
-        [&](auto... field) {
-            (..., [&] {
-                using Field = std::remove_cvref_t<decltype(field)>;
-                if (!handled && key == Field::key.view()) {
-                    typename Field::field_type decoded = Field::RawGet(owner);
-                    DecodeConfigValue<typename Field::codec_type>(decoded, value);
-                    Field::Set(owner, std::move(decoded));
-                    handled = true;
-                }
-            }());
-        },
-        Section::fields);
-    return handled;
+    for (const RuntimeFieldParser& field : RuntimeFieldParsers<Section>()) {
+        if (key == field.key) {
+            field.decode(&owner, value);
+            return true;
+        }
+    }
+    return false;
 }
 
 template <typename Codec, typename Owner> struct CustomSectionHandler {

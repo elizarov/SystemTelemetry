@@ -1,5 +1,6 @@
 #include "config/config_writer.h"
 
+#include <array>
 #include <cstdio>
 #include <type_traits>
 
@@ -93,6 +94,33 @@ std::string EncodeConfigValue<configschema::StringCodec, std::vector<std::string
 template <>
 std::string EncodeConfigValue<configschema::LayoutExpressionCodec, LayoutNodeConfig>(const LayoutNodeConfig& value) {
     return FormatLayoutExpression(value);
+}
+
+struct RuntimeFieldWriter {
+    std::string_view key;
+    std::string (*encode)(const void* owner);
+    bool (*equals)(const void* owner, const void* compareOwner);
+};
+
+template <typename Field> std::string EncodeRuntimeField(const void* owner) {
+    const auto& typedOwner = *static_cast<const typename Field::owner_type*>(owner);
+    return EncodeConfigValue<typename Field::codec_type>(Field::RawGet(typedOwner));
+}
+
+template <typename Field> bool RuntimeFieldEquals(const void* owner, const void* compareOwner) {
+    const auto& typedOwner = *static_cast<const typename Field::owner_type*>(owner);
+    const auto& typedCompareOwner = *static_cast<const typename Field::owner_type*>(compareOwner);
+    return Field::RawGet(typedOwner) == Field::RawGet(typedCompareOwner);
+}
+
+template <typename... Field> constexpr auto MakeRuntimeFieldWriters(std::tuple<Field...>) {
+    return std::array<RuntimeFieldWriter, sizeof...(Field)>{
+        RuntimeFieldWriter{Field::key.view(), &EncodeRuntimeField<Field>, &RuntimeFieldEquals<Field>}...};
+}
+
+template <typename Section> const auto& RuntimeFieldWriters() {
+    static constexpr auto fields = MakeRuntimeFieldWriters(typename Section::fields_type{});
+    return fields;
 }
 
 template <typename Codec, typename Owner> struct CustomSectionHandler {
@@ -192,15 +220,9 @@ template <typename Section, typename UpdateKeyFn>
 void SaveStructuredSection(const typename Section::owner_type& owner, UpdateKeyFn&& updateKey) {
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
         const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
-        std::apply(
-            [&](auto... field) {
-                (updateKey(sectionName,
-                     std::string(std::remove_cvref_t<decltype(field)>::key.view()),
-                     EncodeConfigValue<typename std::remove_cvref_t<decltype(field)>::codec_type>(
-                         owner.*(std::remove_cvref_t<decltype(field)>::member))),
-                    ...);
-            },
-            Section::fields);
+        for (const RuntimeFieldWriter& field : RuntimeFieldWriters<Section>()) {
+            updateKey(sectionName, std::string(field.key), field.encode(&owner));
+        }
     } else {
         CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::Save(
             owner, std::forward<UpdateKeyFn>(updateKey));
@@ -211,15 +233,9 @@ template <typename Section, typename UpdateKeyFn>
 void SaveDynamicStructuredSection(
     const typename Section::owner_type& owner, std::string_view suffix, UpdateKeyFn&& updateKey) {
     const std::string sectionName = Section::FormatName(suffix);
-    std::apply(
-        [&](auto... field) {
-            (updateKey(sectionName,
-                 std::string(std::remove_cvref_t<decltype(field)>::key.view()),
-                 EncodeConfigValue<typename std::remove_cvref_t<decltype(field)>::codec_type>(
-                     owner.*(std::remove_cvref_t<decltype(field)>::member))),
-                ...);
-        },
-        Section::fields);
+    for (const RuntimeFieldWriter& field : RuntimeFieldWriters<Section>()) {
+        updateKey(sectionName, std::string(field.key), field.encode(&owner));
+    }
 }
 
 template <typename Section, typename CompareOwner, typename UpdateKeyFn>
@@ -227,22 +243,11 @@ void SaveStructuredSectionDifferences(
     const typename Section::owner_type& owner, const CompareOwner* compareOwner, UpdateKeyFn&& updateKey) {
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
         const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
-        std::apply(
-            [&](auto... field) {
-                (..., [&] {
-                    using Field = std::remove_cvref_t<decltype(field)>;
-                    const std::string currentValue =
-                        EncodeConfigValue<typename Field::codec_type>(owner.*(Field::member));
-                    const std::string compareValue =
-                        compareOwner != nullptr
-                            ? EncodeConfigValue<typename Field::codec_type>((*compareOwner).*(Field::member))
-                            : std::string{};
-                    if (compareOwner == nullptr || currentValue != compareValue) {
-                        updateKey(sectionName, std::string(Field::key.view()), currentValue);
-                    }
-                }());
-            },
-            Section::fields);
+        for (const RuntimeFieldWriter& field : RuntimeFieldWriters<Section>()) {
+            if (compareOwner == nullptr || !field.equals(&owner, compareOwner)) {
+                updateKey(sectionName, std::string(field.key), field.encode(&owner));
+            }
+        }
     } else {
         CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::SaveDifferences(
             owner, compareOwner, std::forward<UpdateKeyFn>(updateKey));
@@ -255,21 +260,11 @@ void SaveDynamicStructuredSectionDifferences(const typename Section::owner_type&
     const CompareOwner* compareOwner,
     UpdateKeyFn&& updateKey) {
     const std::string sectionName = Section::FormatName(suffix);
-    std::apply(
-        [&](auto... field) {
-            (..., [&] {
-                using Field = std::remove_cvref_t<decltype(field)>;
-                const std::string currentValue = EncodeConfigValue<typename Field::codec_type>(owner.*(Field::member));
-                const std::string compareValue =
-                    compareOwner != nullptr
-                        ? EncodeConfigValue<typename Field::codec_type>((*compareOwner).*(Field::member))
-                        : std::string{};
-                if (compareOwner == nullptr || currentValue != compareValue) {
-                    updateKey(sectionName, std::string(Field::key.view()), currentValue);
-                }
-            }());
-        },
-        Section::fields);
+    for (const RuntimeFieldWriter& field : RuntimeFieldWriters<Section>()) {
+        if (compareOwner == nullptr || !field.equals(&owner, compareOwner)) {
+            updateKey(sectionName, std::string(field.key), field.encode(&owner));
+        }
+    }
 }
 
 template <typename BindingList, typename Owner, typename Fn> void ForEachKnownBinding(Owner&& owner, Fn&& fn) {

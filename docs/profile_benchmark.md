@@ -746,6 +746,20 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep common path and file operations in `src/util/file_path.*` instead of reintroducing `std::filesystem`; the size win is small but keeps filesystem-related standard-library machinery out of the single executable.
 
+### Hypothesis: Drive config parsing and writing through runtime field descriptor loops
+
+- Change:
+  - Keep the config declarations in `config.h` as the one-line-per-parameter source of truth, but route structured-section parsing and writing through per-section runtime field descriptor arrays instead of expanding every field into repeated `std::apply` lambda bodies.
+  - Replace exception-based config numeric parsing with `strtol`, `strtod`, and `strtoul` validation.
+- Result:
+  - Helped executable size materially.
+- Observed effect:
+  - The config descriptor-loop rewrite plus non-throwing numeric parsing reduced `build\SystemTelemetry.exe` from `1,303,040` bytes to `1,253,376` bytes and `build\SystemTelemetryBenchmarks.exe` from `943,104` bytes to `939,008` bytes.
+  - The app section sizes after the config rewrite are `.text=1,000,908`, `.rdata=173,580`, `.pdata=28,944`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,328` bytes.
+  - A fresh linker map showed `config_writer.cpp.obj` falling from about `81.8 KiB` to about `35.4 KiB`, while `config_parser.cpp.obj` fell from about `44.6 KiB` to about `37.6 KiB`.
+- Conclusion:
+  - Keep config parser and writer dispatch table-driven at runtime while preserving `config.h` as the metadata source of truth. Avoid reintroducing per-field generated parser/writer lambda chains.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.
