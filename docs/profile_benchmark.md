@@ -826,6 +826,19 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - Keep the flat key/value dump parser and descriptor-driven flat field I/O. Further dump-size work should target the larger variable-length dump sections only if the resulting code stays straightforward.
 
+### Hypothesis: Compact layout edit selection population
+
+- Change:
+  - Share the repeated editor visibility, empty font preview, right-pane completion, and populate-selection trace plumbing used by the layout edit selection branches.
+  - Keep the branch-specific control population in `PopulateLayoutEditSelection` so each editor mode still initializes the same values and trace payloads.
+- Result:
+  - Helped the distributed executable modestly.
+- Observed effect:
+  - Compacting layout edit selection population reduced `build\SystemTelemetry.exe` from `1,133,568` bytes to `1,132,544` bytes.
+  - In the fresh linker map, `PopulateLayoutEditSelection` fell from `11,088` bytes to `9,172` bytes before accounting for the small shared helper functions.
+- Conclusion:
+  - Keep the common selection finish and trace plumbing shared. Further layout edit dialog size work should target larger standalone routines rather than adding branch-specific cleverness here.
+
 ## Practical Guidance For Future Experiments
 
 - Do not retry per-segment gauge fills unless the gauge is redesigned to avoid repeated GDI+ path fills entirely.
