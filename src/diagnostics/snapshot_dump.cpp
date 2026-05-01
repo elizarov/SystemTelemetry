@@ -1,6 +1,7 @@
 #include "diagnostics/snapshot_dump.h"
 
 #include <cerrno>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -28,16 +29,9 @@ struct DumpFieldDescriptor {
 
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
 
-template <typename GetField> std::uint32_t DumpFieldOffset(GetField getField) {
-    TelemetryDump dump;
-    const auto* root = reinterpret_cast<const char*>(&dump);
-    const auto* field = reinterpret_cast<const char*>(&getField(dump));
-    return static_cast<std::uint32_t>(field - root);
-}
-
 #define DUMP_FIELD(key, kind, field)                                                                                   \
     DumpFieldDescriptor {                                                                                              \
-        key, DumpFieldOffset([](TelemetryDump& dump) -> auto& { return dump.field; }), kind                            \
+        key, static_cast<std::uint32_t>(offsetof(TelemetryDump, field)), kind                                          \
     }
 
 const std::vector<DumpFieldDescriptor>& FlatDumpFields() {
@@ -79,12 +73,12 @@ const std::vector<DumpFieldDescriptor>& FlatDumpFields() {
 
 #undef DUMP_FIELD
 
-void* DumpFieldAddress(TelemetryDump& dump, const DumpFieldDescriptor& field) {
-    return reinterpret_cast<char*>(&dump) + field.offset;
+template <typename Field> Field& DumpField(TelemetryDump& dump, const DumpFieldDescriptor& field) {
+    return *reinterpret_cast<Field*>(reinterpret_cast<char*>(&dump) + field.offset);
 }
 
-const void* DumpFieldAddress(const TelemetryDump& dump, const DumpFieldDescriptor& field) {
-    return reinterpret_cast<const char*>(&dump) + field.offset;
+template <typename Field> const Field& DumpField(const TelemetryDump& dump, const DumpFieldDescriptor& field) {
+    return *reinterpret_cast<const Field*>(reinterpret_cast<const char*>(&dump) + field.offset);
 }
 
 std::string TrimDumpWhitespace(const std::string& value) {
@@ -232,23 +226,22 @@ void WriteFlatDumpFields(std::string& output, const TelemetryDump& dump, size_t 
     end = (std::min)(end, fields.size());
     for (size_t i = begin; i < end; ++i) {
         const DumpFieldDescriptor& field = fields[i];
-        const void* address = DumpFieldAddress(dump, field);
         const std::string key(field.key);
         switch (field.kind) {
             case DumpFieldKind::String:
-                WriteString(output, key, *reinterpret_cast<const std::string*>(address));
+                WriteString(output, key, DumpField<std::string>(dump, field));
                 break;
             case DumpFieldKind::Double:
-                WriteDouble(output, key, *reinterpret_cast<const double*>(address), 6);
+                WriteDouble(output, key, DumpField<double>(dump, field), 6);
                 break;
             case DumpFieldKind::OptionalDouble:
-                WriteOptionalDouble(output, key, *reinterpret_cast<const std::optional<double>*>(address), 6);
+                WriteOptionalDouble(output, key, DumpField<std::optional<double>>(dump, field), 6);
                 break;
             case DumpFieldKind::ScalarUnit:
-                WriteScalarMetricUnit(output, key, *reinterpret_cast<const ScalarMetricUnit*>(address));
+                WriteScalarMetricUnit(output, key, DumpField<ScalarMetricUnit>(dump, field));
                 break;
             case DumpFieldKind::SystemTimeWord:
-                WriteInteger(output, key, *reinterpret_cast<const WORD*>(address));
+                WriteInteger(output, key, DumpField<WORD>(dump, field));
                 break;
         }
     }
@@ -448,31 +441,30 @@ bool LoadFlatDumpFields(const DumpValues& values, TelemetryDump& dump, size_t be
     end = (std::min)(end, fields.size());
     for (size_t i = begin; i < end; ++i) {
         const DumpFieldDescriptor& field = fields[i];
-        void* address = DumpFieldAddress(dump, field);
         const std::string key(field.key);
         switch (field.kind) {
             case DumpFieldKind::String:
-                if (!LoadString(values, key, *reinterpret_cast<std::string*>(address), error)) {
+                if (!LoadString(values, key, DumpField<std::string>(dump, field), error)) {
                     return false;
                 }
                 break;
             case DumpFieldKind::Double:
-                if (!LoadDouble(values, key, *reinterpret_cast<double*>(address), error)) {
+                if (!LoadDouble(values, key, DumpField<double>(dump, field), error)) {
                     return false;
                 }
                 break;
             case DumpFieldKind::OptionalDouble:
-                if (!LoadOptionalDouble(values, key, *reinterpret_cast<std::optional<double>*>(address), error)) {
+                if (!LoadOptionalDouble(values, key, DumpField<std::optional<double>>(dump, field), error)) {
                     return false;
                 }
                 break;
             case DumpFieldKind::ScalarUnit:
-                if (!LoadScalarMetricUnit(values, key, *reinterpret_cast<ScalarMetricUnit*>(address), error)) {
+                if (!LoadScalarMetricUnit(values, key, DumpField<ScalarMetricUnit>(dump, field), error)) {
                     return false;
                 }
                 break;
             case DumpFieldKind::SystemTimeWord:
-                if (!LoadUnsigned(values, key, *reinterpret_cast<WORD*>(address), error)) {
+                if (!LoadUnsigned(values, key, DumpField<WORD>(dump, field), error)) {
                     return false;
                 }
                 break;

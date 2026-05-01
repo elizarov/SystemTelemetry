@@ -818,10 +818,11 @@ These changes produced real wins and remain in the codebase:
 - Change:
   - Replace repeated flat snapshot dump read/write chains with offset-based field descriptors for scalar CPU, GPU, network, storage, and time fields.
   - Replace the dump parser's local `std::map<std::string, std::string>` key store with a flat key/value vector while preserving duplicate-key last-writer behavior.
+  - Store descriptor offsets directly with `offsetof` and route field reads and writes through shared typed accessors instead of per-field offset lambdas.
 - Result:
   - Helped the distributed executable modestly.
 - Observed effect:
-  - Compacting snapshot dump I/O reduced `build\SystemTelemetry.exe` from `1,135,104` bytes to `1,134,592` bytes.
+  - Compacting snapshot dump I/O reduced `build\SystemTelemetry.exe` from `1,135,104` bytes to `1,133,568` bytes.
 - Conclusion:
   - Keep the flat key/value dump parser and descriptor-driven flat field I/O. Further dump-size work should target the larger variable-length dump sections only if the resulting code stays straightforward.
 
