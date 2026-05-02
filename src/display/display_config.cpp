@@ -9,10 +9,11 @@
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
 #include "display/monitor.h"
-#include "main/config_io.h"
+#include "runtime/config_io.h"
 #include "util/command_line.h"
 #include "util/paths.h"
 #include "util/strings.h"
+#include "util/temp_file.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 

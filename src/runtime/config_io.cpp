@@ -1,12 +1,21 @@
-#include "main/config_io.h"
+#include "runtime/config_io.h"
 
 #include <shellapi.h>
 
 #include "config/config_parser.h"
 #include "config/config_writer.h"
-#include "diagnostics/diagnostics.h"
+#include "diagnostics/diagnostics_options.h"
 #include "telemetry/metrics.h"
 #include "util/paths.h"
+#include "util/temp_file.h"
+
+namespace {
+
+FilePath CreateElevatedSaveConfigTempPath() {
+    return CreateTempFilePath(L"stc");
+}
+
+}  // namespace
 
 FilePath GetRuntimeConfigPath() {
     return GetExecutableDirectory() / L"config.ini";

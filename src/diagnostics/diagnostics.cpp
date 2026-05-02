@@ -18,7 +18,7 @@
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "layout_guide_sheet/layout_guide_sheet.h"
-#include "main/config_io.h"
+#include "runtime/config_io.h"
 #include "telemetry/telemetry.h"
 #include "util/paths.h"
 #include "util/scale.h"
@@ -474,12 +474,6 @@ bool ApplyDiagnosticsThemeOverride(
     return false;
 }
 
-void ApplyDiagnosticsScaleOverride(AppConfig& config, const DiagnosticsOptions& options) {
-    if (options.hasScaleOverride) {
-        config.display.scale = options.scale;
-    }
-}
-
 double ResolveSavedScreenshotScale(const AppConfig& config) {
     return HasExplicitDisplayScale(config.display.scale) ? config.display.scale : 1.0;
 }
@@ -697,24 +691,6 @@ bool CanWriteRuntimeConfig(const FilePath& path) {
     }
     CloseHandle(probe);
     return true;
-}
-
-FilePath CreateTempFilePath(const wchar_t* prefix) {
-    wchar_t tempPathBuffer[MAX_PATH];
-    const DWORD length = GetTempPathW(ARRAYSIZE(tempPathBuffer), tempPathBuffer);
-    if (length == 0 || length >= ARRAYSIZE(tempPathBuffer)) {
-        return {};
-    }
-
-    wchar_t tempFileBuffer[MAX_PATH];
-    if (GetTempFileNameW(tempPathBuffer, prefix, 0, tempFileBuffer) == 0) {
-        return {};
-    }
-    return FilePath(tempFileBuffer);
-}
-
-FilePath CreateElevatedSaveConfigTempPath() {
-    return CreateTempFilePath(L"stc");
 }
 
 TelemetryCollectorOptions BuildTelemetryCollectorOptions(const DiagnosticsOptions& diagnosticsOptions) {

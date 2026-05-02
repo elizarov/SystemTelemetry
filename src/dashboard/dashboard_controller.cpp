@@ -15,7 +15,7 @@
 #include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_service.h"
 #include "main/autostart.h"
-#include "main/config_io.h"
+#include "runtime/config_io.h"
 #include "util/utf8.h"
 
 namespace {
