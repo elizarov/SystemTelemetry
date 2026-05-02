@@ -1,0 +1,20 @@
+<Project Sdk="WixToolset.Sdk/7.0.0">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <AcceptEula>wix7</AcceptEula>
+    <CaseDashVersionText Condition="'$(CaseDashVersionText)' == ''">0.0</CaseDashVersionText>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.0.0</ProductVersion>
+    <CaseDashExePath Condition="'$(CaseDashExePath)' == ''">$(MSBuildThisFileDirectory)..\build\CaseDash.exe</CaseDashExePath>
+    <OutputName>CaseDash-$(CaseDashVersionText)</OutputName>
+    <OutputPath Condition="'$(OutputPath)' == ''">$(MSBuildThisFileDirectory)..\build\</OutputPath>
+    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer\obj\</BaseIntermediateOutputPath>
+    <IntermediateOutputPath Condition="'$(IntermediateOutputPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer\</IntermediateOutputPath>
+    <DefineConstants>ProductVersion=$(ProductVersion);CaseDashExePath=$(CaseDashExePath)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
+  </ItemGroup>
+</Project>

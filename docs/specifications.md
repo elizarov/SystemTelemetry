@@ -60,6 +60,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The tray icon exposes the same action set as the dashboard menu.
 - `About CaseDash` shows the compiled version, build kind, and commit when available.
 - The dashboard uses normal window Z-order behavior; `Bring to Front` raises it when needed.
+- The installer completion launch starts the dashboard with the same front-and-focus behavior as `Bring to Front`.
 - Double-clicking the tray icon performs `Bring to Front`.
 - The tray menu shows `Bring to Front` as its default action.
 - Move mode keeps the dashboard attached to the pointer until placement completes and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard.
@@ -126,4 +127,5 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Retained histories feed throughput plots plus recent-peak or recent-max overlays for supported widgets.
 - Dashboard formatting uses the configured metric display definitions, while dump serialization keeps its own stable machine-facing unit contract.
 - The dashboard runs as a single-instance application. Starting a new UI instance closes the existing one and continues startup in the replacement instance.
+- Starting with `/bring-to-front` uses the normal UI startup path and raises the dashboard after creating the tray icon.
 - Headless diagnostics `/exit` runs are outside that normal single-instance replacement path; diagnostics-specific behavior is defined in [docs/diagnostics.md](diagnostics.md).

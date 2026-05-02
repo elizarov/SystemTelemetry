@@ -72,9 +72,9 @@ std::string FormatTracePoint(RenderPoint point) {
 
 }  // namespace
 
-DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions)
+DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions, bool bringToFrontOnRun)
     : renderer_(trace_), diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this),
-      shellUi_(std::make_unique<DashboardShellUi>(*this)) {}
+      shellUi_(std::make_unique<DashboardShellUi>(*this)), bringToFrontOnRun_(bringToFrontOnRun) {}
 
 DashboardApp::~DashboardApp() = default;
 
@@ -887,7 +887,11 @@ void DashboardApp::RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wPara
 }
 
 int DashboardApp::Run() {
-    ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+    if (bringToFrontOnRun_) {
+        BringOnTop();
+    } else {
+        ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+    }
     UpdateWindow(hwnd_);
 
     MSG msg{};
