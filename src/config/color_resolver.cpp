@@ -1,6 +1,5 @@
 #include "config/color_resolver.h"
 
-#include <algorithm>
 #include <optional>
 #include <string_view>
 
