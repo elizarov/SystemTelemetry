@@ -93,6 +93,7 @@ If AMD GPU metrics are missing:
 ### NVIDIA GPU telemetry
 
 NVIDIA GPU metrics come from the NVML runtime installed with current NVIDIA display drivers.
+The NVIDIA FPS value comes from Windows DXGI/D3D9 ETW present events, so the process needs permission to start a real-time ETW session, such as elevation or membership in the local `Performance Log Users` group.
 
 If NVIDIA GPU metrics are missing:
 

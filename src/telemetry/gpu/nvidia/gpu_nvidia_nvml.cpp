@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 
+#include "telemetry/fps/fps_etw_provider.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -228,10 +229,20 @@ public:
             totalVramGb_ = static_cast<double>(memory.total) / (1024.0 * 1024.0 * 1024.0);
         }
 
-        diagnostics_ =
-            "NVML GPU=" + gpuName_ + " fan_rpm_supported=" + (HasFanSpeedRpm() ? "yes" : "no") + " fps_supported=no";
+        diagnostics_ = "NVML GPU=" + gpuName_ + " fan_rpm_supported=" + (HasFanSpeedRpm() ? "yes" : "no") +
+                       " native_fps_supported=no";
+        fpsProvider_ = CreatePresentedFpsEtwProvider(trace_);
+        if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
+            fpsDiagnostics_ = "Presented FPS ETW provider active.";
+        } else {
+            const FpsTelemetrySample fpsSample =
+                fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
+            fpsDiagnostics_ =
+                fpsSample.diagnostics.empty() ? "Presented FPS ETW provider unavailable." : fpsSample.diagnostics;
+        }
         initialized_ = true;
-        trace_.Write("nvidia_nvml:initialize_done diagnostics=\"" + diagnostics_ + "\"");
+        trace_.Write(
+            "nvidia_nvml:initialize_done diagnostics=\"" + diagnostics_ + "\" fps=\"" + fpsDiagnostics_ + "\"");
         return true;
     }
 
@@ -309,7 +320,24 @@ public:
             hasAnyMetric = true;
         }
 
+        if (fpsProvider_ != nullptr) {
+            const FpsTelemetrySample fpsSample = fpsProvider_->Sample();
+            fpsDiagnostics_ = fpsSample.diagnostics;
+            if (fpsSample.fps.has_value()) {
+                sample.fps = *fpsSample.fps;
+                hasAnyMetric = true;
+            }
+            trace_.WriteLazy([&] {
+                return "nvidia_nvml:get_presented_fps available=" + Trace::BoolText(fpsSample.fps.has_value()) +
+                       " value=" +
+                       (fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1)
+                                                  : std::string("fps=N/A")) +
+                       " process=\"" + fpsSample.processName + "\" diagnostics=\"" + fpsSample.diagnostics + "\"";
+            });
+        }
+
         sample.available = hasAnyMetric;
+        sample.diagnostics += " fps=" + fpsDiagnostics_;
         trace_.WriteLazy([&] {
             return "nvidia_nvml:sample_done available=" + Trace::BoolText(sample.available) + " diagnostics=\"" +
                    sample.diagnostics + "\"";
@@ -329,7 +357,9 @@ private:
     NvmlDevice device_ = nullptr;
     std::string gpuName_;
     std::string diagnostics_ = "NVML provider not initialized.";
+    std::string fpsDiagnostics_ = "Presented FPS ETW provider not initialized.";
     std::optional<double> totalVramGb_;
+    std::unique_ptr<FpsTelemetryProvider> fpsProvider_;
     bool initialized_ = false;
 };
 
