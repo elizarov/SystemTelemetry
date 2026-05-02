@@ -35,6 +35,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 ### Control flow
 
 - `/exit` runs the one-shot headless diagnostics path and does not start the interactive dashboard UI.
+- `/elevate` relaunches the current command through the Windows `runas` verb, preserves all other arguments, preserves the current working directory for relative diagnostics paths, waits for the elevated child to exit, and returns the child exit code. If the process is already elevated, the switch is ignored and the current process continues.
 
 ### Invalid combinations
 
@@ -57,6 +58,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - Without `/exit`, the application starts the normal dashboard UI and keeps requested diagnostics outputs refreshed while the process runs.
 - In UI-attached mode, trace logging continues for the process lifetime and dump or screenshot outputs refresh once per second from the latest snapshot.
 - With `/exit`, the application loads config, performs the first update, optionally exports the requested outputs once, and exits without entering the normal GUI lifetime.
+- With `/elevate`, trace, dump, screenshot, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
 - `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
 - `/fake:<path>` reloads the selected fake file once per second while the process runs so manual edits affect the next refresh.
@@ -70,7 +72,8 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 
 ## Failure And Trace Policy
 
-- The diagnostics trace covers startup, reload, output export, renderer layout data, telemetry collection, vendor-provider activity including `msi_center`, `gigabyte_siv`, and `unsupported_board` board-provider markers, and focused interactive layout-edit UI markers for layout switches, modal-menu scope, dialog-tree refresh, hover refresh, tooltip show or hide, and capture-state transitions when `/trace` is enabled.
+- The diagnostics trace covers startup, reload, output export, renderer layout data, telemetry collection, vendor-provider activity including GPU adapter vendor selection, AMD ADLX, NVIDIA NVML, NVIDIA presented-FPS ETW probes, `unsupported_gpu`, `msi_center`, `gigabyte_siv`, and `unsupported_board` provider markers, and focused interactive layout-edit UI markers for layout switches, modal-menu scope, dialog-tree refresh, hover refresh, tooltip show or hide, and capture-state transitions when `/trace` is enabled.
+- NVIDIA FPS tracing reports `fps_etw:*` startup, provider-enable, sampled-present, and shutdown markers when the ETW session can be opened. NVIDIA FPS sample diagnostics include cumulative source-event counts and the selected process window count. If Windows denies ETW access, diagnostics leave `gpu.fps` unavailable and record the Win32 failure in the NVIDIA provider diagnostics.
 - Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
 - When `/trace` is enabled, diagnostics failures prefer trace logging plus a failure exit code over blocking modal behavior.
 - Required fake-file load failures follow that same rule so `/fake:<path> /exit` returns promptly under trace.

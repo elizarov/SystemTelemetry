@@ -18,7 +18,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/dashboard_renderer/dashboard_renderer.*` owns dashboard scene traversal, renderer style input selection, drawing-mode state, widget-host services, and layout-edit active-region collection. It implements `WidgetHost`, owns a `Renderer` instance, and keeps graphics-backend details encapsulated in `src/renderer/`.
 - `src/layout_edit/` contains runtime layout-edit interaction, active-region hit testing, drag flow, controller-host integration, tooltip payload interpretation and text formatting, edit-tree construction, config-field mutation helpers, guide and reorder config helpers, diagnostics active-region trace formatting, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
-- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
+- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, `src/telemetry/fps/` contains the Windows ETW presented-FPS provider, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
@@ -63,7 +63,9 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `TelemetryCollector` owns steady-state snapshot refresh, provider composition, and runtime target resolution for network and storage.
 - Windows-native collection covers generic CPU, memory, network, storage, and clock data.
-- Vendor providers extend that collector with AMD GPU support plus MSI Center and Gigabyte board-metric paths without changing the renderer-facing snapshot model.
+- Vendor providers extend that collector with AMD and NVIDIA GPU support plus MSI Center and Gigabyte board-metric paths without changing the renderer-facing snapshot model.
+- GPU telemetry selects one vendor provider from the primary non-software DXGI adapter identity instead of probing every vendor bridge; unsupported GPU vendors use a telemetry-owned fallback provider that exposes only presented FPS.
+- NVIDIA GPU telemetry uses NVML for device metrics and uses the telemetry-owned ETW presented-FPS provider for FPS because NVML has no native game-FPS metric. The FPS provider counts runtime DXGI/D3D9 presents first and uses DxgKrnl presents as the fallback path when runtime present events are not visible.
 - Board telemetry keeps the last discovered provider sensor-name lists cached alongside live samples so layout-edit binding pickers stay populated across transient board-sample gaps.
 - Fake-runtime support bypasses live providers and serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot.
 
@@ -101,7 +103,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Startup and config flow
 
-- `src/main/main.cpp` initializes process-wide shell settings, parses command-line options, and chooses either the normal UI path or the headless diagnostics path.
+- `src/main/main.cpp` initializes process-wide shell settings, parses command-line options, relays `/elevate` runs to an elevated child process, and chooses either the normal UI path or the headless diagnostics path.
 - Config load starts from embedded `resources/config.ini`, applies the executable-side overlay unless suppressed, and resolves the active layout plus runtime selections before telemetry and rendering start.
 - The executable manifest disables file virtualization and keeps config reads and writes pointed at the executable-side location.
 
@@ -123,6 +125,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - The diagnostics path optionally reloads config through the same live reload logic used by the dashboard.
 - Requested outputs write trace, dump, screenshot, minimal-config, or full-config artifacts using the same runtime state the live app would use.
+- `/elevate` preserves diagnostics arguments and current working directory for the elevated child before diagnostics outputs are opened.
 - `/exit` performs one update-and-export pass and exits without joining the normal single-instance UI lifetime.
 
 ### Layout-edit flow

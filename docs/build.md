@@ -12,6 +12,7 @@ See also: [docs/project.md](project.md) for repository policy, [docs/diagnostics
 - vcpkg available either through the active Visual Studio developer environment or through `VCPKG_ROOT`
 - Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
 - AMD Software: Adrenalin Edition when AMD GPU telemetry is required
+- NVIDIA display driver with NVML when NVIDIA GPU telemetry is required
 - Gigabyte SIV installed when Gigabyte board temperature or fan telemetry is required
 - GitHub Actions uses the `windows-2025-vs2026` runner for push and pull request build, test, format, lint, and tidy validation.
 
@@ -86,6 +87,18 @@ If AMD GPU metrics are missing:
 
 1. Install or update AMD Software: Adrenalin Edition.
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
+3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
+4. Inspect the exported dump and trace outputs for the provider state on that machine.
+
+### NVIDIA GPU telemetry
+
+NVIDIA GPU metrics come from the NVML runtime installed with current NVIDIA display drivers.
+The NVIDIA FPS value comes from Windows DXGI/D3D9 ETW present events, so the process needs permission to start a real-time ETW session, such as elevation or membership in the local `Performance Log Users` group.
+
+If NVIDIA GPU metrics are missing:
+
+1. Install or update the NVIDIA display driver.
+2. Confirm `nvml.dll` is present in `C:\Windows\System32` or the NVIDIA NVSMI install directory.
 3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
 4. Inspect the exported dump and trace outputs for the provider state on that machine.
 

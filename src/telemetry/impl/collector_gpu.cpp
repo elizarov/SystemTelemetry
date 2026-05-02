@@ -179,8 +179,10 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
                                " available=" + Trace::BoolText(state.gpu_.providerAvailable) + " diagnostics=\"" +
                                state.gpu_.providerDiagnostics + "\"");
         } else {
-            state.gpu_.providerName = "AMD ADLX";
-            state.gpu_.providerDiagnostics = "Provider initialization failed.";
+            const GpuVendorTelemetrySample sample = state.gpu_.provider->Sample();
+            state.gpu_.providerName = sample.providerName.empty() ? "GPU vendor" : sample.providerName;
+            state.gpu_.providerDiagnostics =
+                sample.diagnostics.empty() ? "Provider initialization failed." : sample.diagnostics;
             state.trace_.Write("telemetry:gpu_provider_initialize_failed provider=" + state.gpu_.providerName +
                                " diagnostics=\"" + state.gpu_.providerDiagnostics + "\"");
         }
