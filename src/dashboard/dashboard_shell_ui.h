@@ -62,6 +62,7 @@ private:
     bool HandleReloadConfig();
     bool HandleConfigureDisplay(const DisplayMenuOption& option);
     bool StopLayoutEditSession(UnsavedLayoutEditPrompt prompt);
+    bool OpenLayoutEditDialog();
     bool EnsureLayoutEditDialog(
         const std::optional<LayoutEditFocusKey>& focusKey = std::nullopt, bool bringToFront = false);
     void RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus = std::nullopt);

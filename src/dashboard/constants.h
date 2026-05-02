@@ -21,6 +21,7 @@ inline constexpr UINT kCommandSaveFullConfigAs = 1009;
 inline constexpr UINT kCommandEditLayout = 1010;
 inline constexpr UINT kCommandEditLayoutTarget = 1011;
 inline constexpr UINT kCommandSaveLayoutGuideSheetAs = 1012;
+inline constexpr UINT kCommandEditLayoutDialog = 1013;
 inline constexpr UINT kCommandLayoutBase = 1100;
 inline constexpr UINT kCommandLayoutMax = 1199;
 inline constexpr UINT kCommandNetworkAdapterBase = 1200;

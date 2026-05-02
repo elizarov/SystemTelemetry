@@ -523,6 +523,23 @@ bool DashboardShellUi::HandleEditLayoutToggle() {
     return StopLayoutEditSession(UnsavedLayoutEditPrompt::StopEditing);
 }
 
+bool DashboardShellUi::OpenLayoutEditDialog() {
+    DashboardSessionState& state = app_.controller_.State();
+    const bool startedLayoutEdit = !state.isEditingLayout;
+    if (startedLayoutEdit) {
+        app_.controller_.StartLayoutEditMode(app_, app_.layoutEditController_);
+    }
+
+    if (!EnsureLayoutEditDialog(std::nullopt, true)) {
+        if (startedLayoutEdit) {
+            app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
+        }
+        MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"System Telemetry", MB_ICONERROR);
+        return false;
+    }
+    return true;
+}
+
 bool DashboardShellUi::HandleReloadConfig() {
     if (app_.controller_.State().isEditingLayout && app_.controller_.HasUnsavedLayoutEditChanges()) {
         const auto action = PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt::ReloadConfig);
@@ -947,6 +964,10 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
             HandleEditLayoutToggle();
             app_.UpdateLayoutEditTooltip();
             break;
+        case kCommandEditLayoutDialog:
+            OpenLayoutEditDialog();
+            app_.UpdateLayoutEditTooltip();
+            break;
         case kCommandEditLayoutTarget:
             if (layoutEditTarget.has_value()) {
                 PromptAndApplyLayoutEditTarget(*layoutEditTarget);
@@ -1268,7 +1289,8 @@ void DashboardShellUi::ShowContextMenu(
     }
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
     AppendMenuW(
-        menu, MF_STRING | (state.isEditingLayout ? MF_CHECKED : MF_UNCHECKED), kCommandEditLayout, L"Edit layout");
+        menu, MF_STRING | (state.isEditingLayout ? MF_CHECKED : MF_UNCHECKED), kCommandEditLayout, L"Edit layout mode");
+    AppendMenuW(menu, MF_STRING, kCommandEditLayoutDialog, L"Edit layout dialog...");
     AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
     AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
     AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
