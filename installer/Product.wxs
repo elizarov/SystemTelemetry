@@ -1,6 +1,4 @@
-<Wix
-  xmlns="http://wixtoolset.org/schemas/v4/wxs"
-  xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package
     Name="CaseDash"
     Manufacturer="Roman Elizarov"
@@ -12,6 +10,7 @@
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run CaseDash now" />
     <Property Id="WixShellExecTarget" Value="[#CaseDashExeFile]" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <CustomAction
       Id="LaunchCaseDash"
       BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
@@ -30,7 +29,7 @@
       Execute="deferred"
       Impersonate="no"
       Return="ignore" />
-    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UIRef Id="CaseDashUI_InstallDirNoLicense_$(sys.BUILDARCHSHORT)" />
 
     <UI>
       <Publish
