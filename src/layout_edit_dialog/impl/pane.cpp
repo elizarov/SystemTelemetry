@@ -403,28 +403,6 @@ COLORREF ColorRefFromBytes(ColorBytes color) {
         static_cast<int>(std::lround(color.b)));
 }
 
-COLORREF PureHueColor(double hueDegrees) {
-    const double hue = std::fmod(std::max(0.0, hueDegrees), 360.0) / 60.0;
-    const double chroma = 255.0;
-    const double x = chroma * (1.0 - std::abs(std::fmod(hue, 2.0) - 1.0));
-    if (hue < 1.0) {
-        return RgbColor(255, static_cast<int>(std::lround(x)), 0);
-    }
-    if (hue < 2.0) {
-        return RgbColor(static_cast<int>(std::lround(x)), 255, 0);
-    }
-    if (hue < 3.0) {
-        return RgbColor(0, 255, static_cast<int>(std::lround(x)));
-    }
-    if (hue < 4.0) {
-        return RgbColor(0, static_cast<int>(std::lround(x)), 255);
-    }
-    if (hue < 5.0) {
-        return RgbColor(static_cast<int>(std::lround(x)), 0, 255);
-    }
-    return RgbColor(255, 0, static_cast<int>(std::lround(x)));
-}
-
 std::optional<OklchColor> ReadDialogLchForGradient(HWND hwnd) {
     const auto lightness =
         TryParseDialogDouble(ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT).c_str());
@@ -470,9 +448,24 @@ COLORREF ColorGradientBarColor(HWND hwnd, int controlId, double position) {
                 ColorBytesFromOklch(OklchColor{current.l, t * kLchGradientChromaMax, current.h}, 255.0));
         }
         case IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT:
-            return PureHueColor(t * 360.0);
+            return ColorRefFromBytes(ColorBytesFromOklch(OklchColor{0.65, kLchGradientChromaMax, t * 360.0}, 255.0));
     }
     return GetSysColor(COLOR_3DFACE);
+}
+
+std::pair<int, int> SliderTrackHorizontalBounds(HWND hwnd, int sliderId, int fallbackLeft, int fallbackWidth) {
+    HWND slider = GetDlgItem(hwnd, sliderId);
+    if (slider == nullptr) {
+        return {fallbackLeft, fallbackWidth};
+    }
+
+    RECT channelRect{};
+    SendMessageW(slider, TBM_GETCHANNELRECT, 0, reinterpret_cast<LPARAM>(&channelRect));
+    const int channelWidth = static_cast<int>(channelRect.right - channelRect.left);
+    if (channelWidth <= 0) {
+        return {fallbackLeft, fallbackWidth};
+    }
+    return {fallbackLeft + static_cast<int>(channelRect.left), channelWidth};
 }
 
 int LayoutLabeledControlRow(HWND hwnd,
@@ -1550,11 +1543,13 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                         true);
                     SetDialogControlBounds(
                         hwnd, channelSliderIds[i], rowSliderLeft, tabCursorY, rowSliderWidth, channelSliderHeights[i]);
+                    const auto [gradientLeft, gradientWidth] =
+                        SliderTrackHorizontalBounds(hwnd, channelSliderIds[i], rowSliderLeft, rowSliderWidth);
                     SetDialogControlBounds(hwnd,
                         channelGradientIds[i],
-                        rowSliderLeft,
+                        gradientLeft,
                         tabCursorY + channelSliderHeights[i] + gradientGap,
-                        rowSliderWidth,
+                        gradientWidth,
                         gradientBarHeight);
                     SetDialogControlBounds(hwnd,
                         channelLabelIds[i],
