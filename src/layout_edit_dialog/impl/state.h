@@ -69,6 +69,7 @@ struct LayoutEditDialogState {
     ColorEditViewMode colorEditViewMode = ColorEditViewMode::Rgb;
     std::vector<LayoutEditMetricListRowControls> metricListRowControls;
     HWND metricListAddRowButton = nullptr;
+    bool suppressTreeSelectionNotification = false;
 };
 
 LayoutEditDialogState* DialogStateFromWindow(HWND hwnd);

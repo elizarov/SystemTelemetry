@@ -254,6 +254,7 @@ void RebuildLayoutEditTree(
     if (tree == nullptr) {
         return;
     }
+    const DialogDescendantRedrawScope redrawScope(hwnd);
     state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:tree_rebuild_begin",
         "preferred_focus=" + QuoteTraceText(preferredFocus.has_value() ? "set" : "none") +
             " filter=" + QuoteTraceText(Utf8FromWide(state->currentFilter)));
@@ -308,7 +309,9 @@ void RebuildLayoutEditTree(
                 tree,
                 "layout_edit_dialog:tree_select_item_before",
                 "target={" + BuildTreeItemTraceText(state, tree, selectedItem) + "}");
+            state->suppressTreeSelectionNotification = true;
             TreeView_SelectItem(tree, selectedItem);
+            state->suppressTreeSelectionNotification = false;
             TraceTreeViewport(state, tree, "layout_edit_dialog:tree_select_item_after");
         }
     }
@@ -345,6 +348,10 @@ void RebuildLayoutEditTree(
 }
 
 void HandleLayoutEditTreeSelection(LayoutEditDialogState* state, HWND hwnd, HTREEITEM item) {
+    if (state == nullptr || state->suppressTreeSelectionNotification) {
+        return;
+    }
+    const DialogDescendantRedrawScope redrawScope(hwnd);
     HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE);
     TraceTreeViewport(state, tree, "layout_edit_dialog:tree_selection_handle_begin");
     const LayoutEditTreeNode* node = TreeNodeFromItem(tree, item);
@@ -403,7 +410,9 @@ void RefreshLayoutEditDialogControls(LayoutEditDialogState* state,
                     tree,
                     "layout_edit_dialog:tree_select_item_before",
                     "target={" + BuildTreeItemTraceText(state, tree, item) + "} reason=\"refresh_controls\"");
+                state->suppressTreeSelectionNotification = true;
                 TreeView_SelectItem(tree, item);
+                state->suppressTreeSelectionNotification = false;
                 TraceTreeViewport(
                     state, tree, "layout_edit_dialog:tree_select_item_after", "reason=\"refresh_controls\"");
                 TraceTreeViewport(
