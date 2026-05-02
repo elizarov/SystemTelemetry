@@ -14,7 +14,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
 - `.clang-format` is the single maintained source of truth for C++ formatting policy.
-- `.github/workflows/format-lint-tidy.yml` is the single maintained source of truth for push and pull request build, test, format, lint, and tidy automation.
+- `.github/workflows/validation.yml` is the single maintained source of truth for push and pull request build, test, format, lint, and tidy automation.
 
 ## Repository Conventions
 

@@ -227,17 +227,17 @@ double ResolveDisplayedThroughputValue(double fallbackValue, const std::vector<d
 }
 
 double GetThroughputGraphMax(const std::vector<const std::vector<double>*>& histories) {
-    double rawMax = 10.0;
+    double maxSmoothedValue = 10.0;
     for (const auto* history : histories) {
         if (history == nullptr) {
             continue;
         }
         for (double value : *history) {
-            rawMax = std::max(rawMax, FiniteNonNegativeOr(value));
+            maxSmoothedValue = std::max(maxSmoothedValue, FiniteNonNegativeOr(value));
         }
     }
-    const double roundingStep = rawMax > 100.0 ? 50.0 : 5.0;
-    return std::max(10.0, std::ceil(rawMax / roundingStep) * roundingStep);
+    const double roundingStep = maxSmoothedValue > 100.0 ? 50.0 : 5.0;
+    return std::max(10.0, std::ceil(maxSmoothedValue / roundingStep) * roundingStep);
 }
 
 double GetStorageGuideStep(double maxGraph) {
