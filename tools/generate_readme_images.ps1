@@ -24,7 +24,7 @@ New-Item -ItemType Directory -Force -Path $imageDir | Out-Null
 
 $images = @(
     @{ Theme = 'dark_cyan'; FileName = 'casedash-screenshot-dark.png' },
-    @{ Theme = 'cobalt_white'; FileName = 'casedash-screenshot-light.png' }
+    @{ Theme = 'blueprint_light'; FileName = 'casedash-screenshot-light.png' }
 )
 
 function Wait-GeneratedFile {
