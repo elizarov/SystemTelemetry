@@ -5,9 +5,9 @@ cd /d "%~dp0"
 
 set "INSTALL_ROOT=%ProgramW6432%"
 if not defined INSTALL_ROOT set "INSTALL_ROOT=%ProgramFiles%"
-set "INSTALL_DIR=%INSTALL_ROOT%\SystemTelemetry"
-set "SOURCE_EXE=%~dp0build\SystemTelemetry.exe"
-set "TARGET_EXE=%INSTALL_DIR%\SystemTelemetry.exe"
+set "INSTALL_DIR=%INSTALL_ROOT%\CaseDash"
+set "SOURCE_EXE=%~dp0build\CaseDash.exe"
+set "TARGET_EXE=%INSTALL_DIR%\CaseDash.exe"
 
 if not exist "%SOURCE_EXE%" (
     echo Missing build output: "%SOURCE_EXE%"
@@ -27,25 +27,25 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Stopping SystemTelemetry FPS service...
+echo Stopping CaseDash FPS service...
 call :stop_fps_service
 if errorlevel 1 (
-    echo Failed to stop SystemTelemetryFpsService.
+    echo Failed to stop CaseDashFpsService.
     exit /b 1
 )
 
-echo Stopping running SystemTelemetry instances...
-taskkill /f /im "SystemTelemetry.exe" >nul 2>nul
+echo Stopping running CaseDash instances...
+taskkill /f /im "CaseDash.exe" >nul 2>nul
 set "TASKKILL_RC=%errorlevel%"
 if not "%TASKKILL_RC%"=="0" (
     if not "%TASKKILL_RC%"=="128" (
-        echo Failed to stop running SystemTelemetry.exe instances.
+        echo Failed to stop running CaseDash.exe instances.
         exit /b 1
     )
 )
 call :wait_for_process_exit
 if errorlevel 1 (
-    echo Timed out waiting for running SystemTelemetry.exe instances to exit.
+    echo Timed out waiting for running CaseDash.exe instances to exit.
     exit /b 1
 )
 
@@ -78,11 +78,11 @@ exit /b 2
 
 :stop_fps_service
 setlocal EnableExtensions
-sc query "SystemTelemetryFpsService" >nul 2>nul
+sc query "CaseDashFpsService" >nul 2>nul
 if errorlevel 1060 exit /b 0
 if errorlevel 1 exit /b 1
 
-sc stop "SystemTelemetryFpsService" >nul 2>nul
+sc stop "CaseDashFpsService" >nul 2>nul
 set "STOP_RC=%errorlevel%"
 if not "%STOP_RC%"=="0" (
     if not "%STOP_RC%"=="1062" (
@@ -93,7 +93,7 @@ if not "%STOP_RC%"=="0" (
 set /a SERVICE_WAIT_RETRIES=30
 :stop_fps_service_wait_loop
 set "SERVICE_STATE="
-for /f "tokens=4" %%S in ('sc query "SystemTelemetryFpsService" ^| findstr /R /C:"STATE"') do set "SERVICE_STATE=%%S"
+for /f "tokens=4" %%S in ('sc query "CaseDashFpsService" ^| findstr /R /C:"STATE"') do set "SERVICE_STATE=%%S"
 if "%SERVICE_STATE%"=="STOPPED" exit /b 0
 if "%SERVICE_WAIT_RETRIES%"=="0" exit /b 1
 timeout /t 1 /nobreak >nul
@@ -104,7 +104,7 @@ goto stop_fps_service_wait_loop
 setlocal EnableExtensions
 set /a WAIT_RETRIES=30
 :wait_for_process_exit_loop
-tasklist /fi "IMAGENAME eq SystemTelemetry.exe" 2>nul | find /i "SystemTelemetry.exe" >nul
+tasklist /fi "IMAGENAME eq CaseDash.exe" 2>nul | find /i "CaseDash.exe" >nul
 if errorlevel 1 (
     exit /b 0
 )

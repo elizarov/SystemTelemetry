@@ -395,7 +395,7 @@ DWORD InstallOrUpdateFpsService() {
 
     ServiceHandle service(CreateServiceW(manager.Get(),
         kFpsServiceName,
-        L"System Telemetry FPS Service",
+        L"CaseDash FPS Service",
         SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START,
         SERVICE_WIN32_OWN_PROCESS,
         SERVICE_AUTO_START,
@@ -427,7 +427,7 @@ DWORD InstallOrUpdateFpsService() {
                 nullptr,
                 nullptr,
                 nullptr,
-                L"System Telemetry FPS Service")) {
+                L"CaseDash FPS Service")) {
             return GetLastError();
         }
     }

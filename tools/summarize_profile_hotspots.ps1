@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$CallTreePath,
 
-    [string]$ProcessName = "SystemTelemetryBenchmarks.exe",
+    [string]$ProcessName = "CaseDashBenchmarks.exe",
 
     [int]$Top = 12
 )

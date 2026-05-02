@@ -183,7 +183,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         const std::wstring& message = app.LastError();
         MessageBoxW(nullptr,
             message.empty() ? L"Failed to initialize the telemetry dashboard." : message.c_str(),
-            L"System Telemetry",
+            L"CaseDash",
             MB_ICONERROR);
         return 1;
     }

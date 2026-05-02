@@ -34,7 +34,7 @@ TEST(LocalizationCatalog, KeepsFlatKeyLinesOutsideSections) {
 }
 
 TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
-    const FilePath catalogPath = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    const FilePath catalogPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(catalogPath, std::ios::binary);
     ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
 
@@ -117,7 +117,7 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
 }
 
 TEST(LocalizationCatalog, CheckedInCatalogUsesValidUtf8) {
-    const FilePath catalogPath = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    const FilePath catalogPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(catalogPath, std::ios::binary);
     ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
 

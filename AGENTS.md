@@ -41,9 +41,9 @@ Validation workflow:
 ## Pitfall Notes
 
 - Keep fake-runtime startup failures aligned with the diagnostics dialog policy; a direct modal dialog in `/fake /exit` can look like `/exit` is broken because the headless process waits behind it.
-- Win32 dialog templates and control ids live in `resources/SystemTelemetry.rc` and `resources/resource.h`; when a shell dialog layout or control placement looks wrong, check those files before tracing through `src/dashboard_shell_ui.cpp`.
+- Win32 dialog templates and control ids live in `resources/CaseDash.rc` and `resources/resource.h`; when a shell dialog layout or control placement looks wrong, check those files before tracing through `src/dashboard_shell_ui.cpp`.
 - If rebuilt defaults seem unchanged, check the executable-side `config.ini` first; it overlays the embedded `resources/config.ini` template and `Save Config` preserves that live file.
-- If embedded `config.ini` or `localization.ini` edits seem ignored after an incremental build, keep `resources/SystemTelemetry.rc` wired to those payload files through explicit CMake dependencies so the resource object rebuilds.
+- If embedded `config.ini` or `localization.ini` edits seem ignored after an incremental build, keep `resources/CaseDash.rc` wired to those payload files through explicit CMake dependencies so the resource object rebuilds.
 - When restoring saved placement across monitors with different DPI scales, do not pre-scale the destination window size before the move; let `WM_DPICHANGED` apply the monitor transition first or the bounds can be double-scaled.
 - Login startup and monitor hotplug can race ahead of monitor enumeration; when `display.monitor_name` is configured, keep a placement watch armed until the target display becomes enumerable instead of locking in a fallback monitor.
 - Gigabyte SIV assembly loading may temporarily need the SIV install directory as the process current directory, but always restore the original launch working directory afterward so diagnostics paths and Save dialogs keep using the startup folder.
@@ -52,7 +52,7 @@ Validation workflow:
 - If `devenv.cmd` changes between Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run so CMake, MSVC, and the vcpkg-detected compiler do not mix mismatched compiler and STL versions.
 - Git pathspecs such as `tests/**/*.cpp` do not cover top-level files like `tests/benchmarks.cpp`; formatter and hook discovery should start from broad `*.cpp` and `*.h` pathspecs, then apply the repo eligibility filter.
 - When extending clang-tidy to standalone header runs, keep include-cleaner's explicit false-positive filters narrow; Win32 umbrella headers and project macro-provider headers can otherwise hide real unused header includes.
-- GitHub Actions must not call the machine-local `devenv.cmd`; CI bootstraps Visual Studio through runner discovery and gives `clang-tidy` a larger per-file timeout through `SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS`.
+- GitHub Actions must not call the machine-local `devenv.cmd`; CI bootstraps Visual Studio through runner discovery and gives `clang-tidy` a larger per-file timeout through `CASEDASH_TIDY_TIMEOUT_SECONDS`.
 - When using `vswhere.exe` from a `for /f` command, invoke it through `call "%VSWHERE%" ...` so `cmd` does not try to execute `C:\Program`.
 - The GitHub Visual Studio runner can lag the local MSVC toolset; keep config-schema reflection descriptors type-derived and default-initialized instead of materializing deeply nested constexpr initializer tuples.
 - The repo uses CRLF text checkouts; keep `.githooks/pre-commit` as a minimal CRLF-tolerant shell launcher and put multi-line hook logic in PowerShell.

@@ -1,4 +1,4 @@
-# System Telemetry Layout Language
+# CaseDash Layout Language
 
 This document owns the config language, section ownership, syntax, and validation rules.
 See also: [resources/config.ini](../resources/config.ini) for the maintained shipped example and entry spellings, [docs/theme_configuration.md](theme_configuration.md) for theme and color value syntax, [docs/specifications.md](specifications.md) for runtime behavior, and [docs/diagnostics.md](diagnostics.md) for diagnostics-only switches and workflows.

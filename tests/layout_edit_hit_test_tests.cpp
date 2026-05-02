@@ -57,7 +57,7 @@ LayoutEditAnchorRegion BasicAnchor(LayoutEditParameter parameter, RenderRect rec
 }
 
 FilePath SourceConfigPath() {
-    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    return FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext TestConfigParseContext() {

@@ -324,12 +324,12 @@ std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
     return text;
 }
 
-#define SYSTEMTELEMETRY_DEFINE_RUNTIME_FIELDS(section_type)                                                            \
+#define CASEDASH_DEFINE_RUNTIME_FIELDS(section_type)                                                                   \
     template <> std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFieldDescriptors<section_type>() {          \
         static const auto fields = MakeRuntimeFieldDescriptors(typename section_type::fields_type{});                  \
         return fields;                                                                                                 \
     }
 
-SYSTEMTELEMETRY_CONFIG_FIELD_SECTIONS(SYSTEMTELEMETRY_DEFINE_RUNTIME_FIELDS)
+CASEDASH_CONFIG_FIELD_SECTIONS(CASEDASH_DEFINE_RUNTIME_FIELDS)
 
-#undef SYSTEMTELEMETRY_DEFINE_RUNTIME_FIELDS
+#undef CASEDASH_DEFINE_RUNTIME_FIELDS

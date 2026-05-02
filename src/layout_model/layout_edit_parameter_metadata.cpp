@@ -123,12 +123,12 @@ template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata()
     return metadata;
 }
 
-#define SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_INFO(name, meta) {Parameter::name, &GetFieldMetadata<meta>()},
+#define CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_INFO(name, meta) {Parameter::name, &GetFieldMetadata<meta>()},
 
 const LayoutEditParameterInfo kParameterInfo[] = {
-    SYSTEM_TELEMETRY_LAYOUT_EDIT_PARAMETER_ITEMS(SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_INFO)};
+    CASEDASH_LAYOUT_EDIT_PARAMETER_ITEMS(CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_INFO)};
 
-#undef SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_INFO
+#undef CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_INFO
 
 constexpr size_t kParameterInfoCount = sizeof(kParameterInfo) / sizeof(kParameterInfo[0]);
 static_assert(kParameterInfoCount == static_cast<size_t>(Parameter::Count));

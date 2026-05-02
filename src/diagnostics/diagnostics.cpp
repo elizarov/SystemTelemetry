@@ -411,16 +411,14 @@ DiagnosticsOptions GetDiagnosticsOptions() {
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
     if (options.blank && options.fake) {
         if (!options.trace) {
-            MessageBoxW(nullptr, L"/blank cannot be used together with /fake.", L"System Telemetry", MB_ICONERROR);
+            MessageBoxW(nullptr, L"/blank cannot be used together with /fake.", L"CaseDash", MB_ICONERROR);
         }
         return false;
     }
     if (options.blank && options.layoutGuideSheet) {
         if (!options.trace) {
-            MessageBoxW(nullptr,
-                L"/blank cannot be used together with /layout-guide-sheet.",
-                L"System Telemetry",
-                MB_ICONERROR);
+            MessageBoxW(
+                nullptr, L"/blank cannot be used together with /layout-guide-sheet.", L"CaseDash", MB_ICONERROR);
         }
         return false;
     }
@@ -445,7 +443,7 @@ bool ApplyDiagnosticsLayoutOverride(
     }
 
     const std::wstring message = WideFromUtf8("Unknown layout name:\n" + options.layoutName);
-    MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    MessageBoxW(nullptr, message.c_str(), L"CaseDash", MB_ICONERROR);
     return false;
 }
 
@@ -472,7 +470,7 @@ bool ApplyDiagnosticsThemeOverride(
     }
 
     const std::wstring message = WideFromUtf8("Unknown theme name:\n" + options.themeName);
-    MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    MessageBoxW(nullptr, message.c_str(), L"CaseDash", MB_ICONERROR);
     return false;
 }
 
@@ -539,7 +537,7 @@ void DiagnosticsSession::WriteTraceMarker(const std::string& text) {
 void DiagnosticsSession::ReportError(const std::string& traceText, const std::wstring& message) {
     WriteTraceMarker(traceText);
     if (ShouldShowDialogs()) {
-        MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+        MessageBoxW(nullptr, message.c_str(), L"CaseDash", MB_ICONERROR);
     }
 }
 
@@ -940,7 +938,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         diagnostics.WriteTraceMarker(traceText);
         if (diagnostics.ShouldShowDialogs()) {
             const std::wstring message = FormatTelemetryInitializeError(telemetryError);
-            MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+            MessageBoxW(nullptr, message.c_str(), L"CaseDash", MB_ICONERROR);
         }
         return 1;
     }
@@ -956,7 +954,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
                 GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, trace, &diagnostics, &reloadError)) {
             if (diagnostics.ShouldShowDialogs() && !reloadError.empty()) {
                 const std::wstring message = FormatTelemetryInitializeError(reloadError);
-                MessageBoxW(nullptr, message.c_str(), L"System Telemetry", MB_ICONERROR);
+                MessageBoxW(nullptr, message.c_str(), L"CaseDash", MB_ICONERROR);
             }
             return 1;
         }

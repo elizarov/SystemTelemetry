@@ -13,7 +13,7 @@
 namespace {
 
 std::string ReadConfigTemplateFromSourceTree() {
-    const FilePath configPath = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    const FilePath configPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
     std::ifstream input(configPath, std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
@@ -21,7 +21,7 @@ std::string ReadConfigTemplateFromSourceTree() {
 }
 
 FilePath SourceConfigPath() {
-    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    return FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext TestConfigParseContext() {

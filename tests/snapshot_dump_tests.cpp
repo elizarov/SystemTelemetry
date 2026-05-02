@@ -50,7 +50,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
 }
 
 TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {
-    const std::string input = "format=system_telemetry_snapshot_v10\n"
+    const std::string input = "format=casedash_snapshot_v10\n"
                               "cpu.name=\"CPU\"\n"
                               "cpu.load_percent=0\n"
                               "cpu.clock.value=null\n"
@@ -115,7 +115,7 @@ TEST(SnapshotDump, RoundTripsRawRetainedHistorySamples) {
 }
 
 TEST(SnapshotDump, RejectsPreviousNormalizedHistoryFormatVersion) {
-    const std::string input = "format=system_telemetry_snapshot_v9\n";
+    const std::string input = "format=casedash_snapshot_v9\n";
 
     TelemetryDump loaded;
     std::string error;

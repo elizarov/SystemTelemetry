@@ -12,9 +12,9 @@ jobs:
     timeout-minutes: 240
 
     env:
-      SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS: 1800
-      SYSTEMTELEMETRY_TIDY_MAX_PARALLEL: 4
-      SYSTEMTELEMETRY_CACHE_ROOT: ${{ github.workspace }}\.github-cache\SystemTelemetry
+      CASEDASH_TIDY_TIMEOUT_SECONDS: 1800
+      CASEDASH_TIDY_MAX_PARALLEL: 4
+      CASEDASH_CACHE_ROOT: ${{ github.workspace }}\.github-cache\CaseDash
 
     steps:
       - name: Check out repository
@@ -25,8 +25,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ${{ github.workspace }}\.github-cache\SystemTelemetry\vcpkg\downloads
-            ${{ github.workspace }}\.github-cache\SystemTelemetry\vcpkg\registries
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
           key: vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/validation.yml') }}-${{ github.run_id }}
           restore-keys: |
             vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/validation.yml') }}-
@@ -48,11 +48,11 @@ jobs:
         shell: cmd
         run: lint.cmd tidy
 
-      - name: Upload SystemTelemetry executable
+      - name: Upload CaseDash executable
         uses: actions/upload-artifact@v4
         with:
-          name: SystemTelemetry-exe
-          path: build/SystemTelemetry.exe
+          name: CaseDash-exe
+          path: build/CaseDash.exe
           if-no-files-found: error
 
       - name: Upload clang-tidy report
@@ -68,6 +68,6 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: |
-            ${{ github.workspace }}\.github-cache\SystemTelemetry\vcpkg\downloads
-            ${{ github.workspace }}\.github-cache\SystemTelemetry\vcpkg\registries
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
           key: ${{ steps.vcpkg-cache-restore.outputs.cache-primary-key }}

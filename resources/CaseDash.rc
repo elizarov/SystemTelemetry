@@ -1,7 +1,7 @@
 #include <winres.h>
 #include "resource.h"
 
-1 24 "SystemTelemetry.manifest"
+1 24 "CaseDash.manifest"
 IDI_APP_ICON ICON "app.ico"
 IDR_PANEL_ICON_CPU PNG "cpu.png"
 IDR_PANEL_ICON_GPU PNG "gpu.png"
@@ -135,7 +135,7 @@ END
 IDD_UNSAVED_LAYOUT_EDIT DIALOGEX 0, 0, 220, 84
 STYLE WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_DLGMODALFRAME
-CAPTION "System Telemetry"
+CAPTION "CaseDash"
 FONT 9, "Segoe UI"
 BEGIN
     LTEXT           "", IDC_UNSAVED_LAYOUT_EDIT_MAIN, 8, 8, 204, 16

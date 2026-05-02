@@ -1,4 +1,4 @@
-# System Telemetry Architecture
+# CaseDash Architecture
 
 This document owns code structure, subsystem boundaries, major runtime flows, and build-graph shape.
 See also: [docs/specifications.md](specifications.md) for normative product behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics contracts, [docs/layout.md](layout.md) for config language, and [docs/build.md](build.md) for developer setup and commands.
@@ -112,7 +112,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - The controller owns one runtime collector instance.
 - Each refresh produces a `SystemSnapshot` that becomes the renderer input for live paint and diagnostics export.
 - Runtime network and storage selections are resolved from current machine candidates and surfaced back to menu-building code for user selection.
-- The FPS service hosts only privileged presented-FPS ETW collection and serves sample snapshots through `\\.\pipe\SystemTelemetryFps`; normal UI processes continue to collect all non-FPS telemetry locally.
+- The FPS service hosts only privileged presented-FPS ETW collection and serves sample snapshots through `\\.\pipe\CaseDashFps`; normal UI processes continue to collect all non-FPS telemetry locally.
 
 ### Render and layout flow
 
@@ -145,7 +145,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ## Resources And Build Graph
 
-- `resources/SystemTelemetry.rc` is the single resource script for the manifest, dialogs, icons, embedded config, and embedded localization catalog.
+- `resources/CaseDash.rc` is the single resource script for the manifest, dialogs, icons, embedded config, and embedded localization catalog.
 - `resources/resource.h` owns the resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and the mixed-mode board-provider bridge object libraries.
 - `CMakeLists.txt` enables C4505 as an error for MSVC C++ targets, disables native C++ RTTI with `/GR-`, and keeps Release app and benchmark links non-incremental with `/OPT:REF` and `/LTCG`; those targets compile Release objects with `/Os` and `/GL` by default so benchmarks measure the same size-oriented whole-program optimization profile as the shipped executable. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` within that profile, and the C++/CLI board-provider bridges keep their managed cast support in `/clr` translation units.
@@ -154,7 +154,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `.github/workflows/validation.yml` restores and saves that shared vcpkg cache root through `actions/cache` on the `windows-2025-vs2026` GitHub runner before and after the normal format, build, test, and tidy steps.
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `src/telemetry/board/board_vendor.cpp` selects a board provider from the baseboard manufacturer and creates the unsupported-board provider when no supported vendor matches. `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` and `src/telemetry/board/msi/board_msi_center.cpp` own native provider state, sensor-name maps, metric templates, and sample shaping. Their matching `*_bridge.cpp` files are the CLR-enabled units for vendor .NET assembly reflection calls, keeping STL-heavy provider state out of CLR metadata.
-- The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, theme-change, layout-edit mouse-hover, and telemetry-refresh paths through the same runtime subsystems used by the app. Its supported benchmark names are held in an `enum_string`-backed selector, and each named benchmark owns its top-level command flow in a separate function.
+- The test build also produces `CaseDashBenchmarks`, which exercises the layout-edit drag, layout-switch, theme-change, layout-edit mouse-hover, and telemetry-refresh paths through the same runtime subsystems used by the app. Its supported benchmark names are held in an `enum_string`-backed selector, and each named benchmark owns its top-level command flow in a separate function.
 - `src/layout_edit_dialog/theme_preview.*` owns construction and drawing of the theme selector's color-mix triangle so dialog painting and benchmark coverage use the same preview implementation. The preview uses the shared config color-math module for OKLab color mixing.
 
 ## Source Dependency Graph

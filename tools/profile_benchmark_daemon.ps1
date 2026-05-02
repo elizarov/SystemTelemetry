@@ -11,7 +11,7 @@ $statusPath = Join-Path $daemonRoot "status.env"
 $readyPath = Join-Path $daemonRoot "ready.flag"
 $stopPath = Join-Path $daemonRoot "stop.flag"
 $profileScript = Join-Path $RepoRoot "profile_benchmark.cmd"
-$host.UI.RawUI.WindowTitle = "SystemTelemetry Benchmark Daemon"
+$host.UI.RawUI.WindowTitle = "CaseDash Benchmark Daemon"
 
 function Test-AdminPrivilege {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()

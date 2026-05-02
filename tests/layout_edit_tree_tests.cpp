@@ -10,7 +10,7 @@
 namespace {
 
 std::string ReadTemplateText() {
-    const FilePath path = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    const FilePath path = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
     std::ifstream input(path, std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
@@ -18,7 +18,7 @@ std::string ReadTemplateText() {
 }
 
 LocalizationCatalogMap ReadLocalizationCatalog() {
-    const FilePath path = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    const FilePath path = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(path, std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();

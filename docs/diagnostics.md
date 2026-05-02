@@ -1,4 +1,4 @@
-# System Telemetry Diagnostics
+# CaseDash Diagnostics
 
 This document owns diagnostics CLI behavior, output contracts, failure policy, and validation recipes.
 See also: [docs/specifications.md](specifications.md) for user-visible runtime behavior, [docs/layout.md](layout.md) for config language, [docs/layout_guide_sheet.md](layout_guide_sheet.md) for the layout guide sheet feature spec, and [docs/build.md](build.md) for build and test entrypoints.
@@ -46,7 +46,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 
 - Without an explicit path, output switches write in the current working directory.
 - Relative explicit paths also resolve from the current working directory.
-- Default filenames are `telemetry_trace.txt`, `telemetry_dump.txt`, `telemetry_screenshot.png`, `telemetry_layout_guide_sheet.png`, `telemetry_config.ini`, and `telemetry_full_config.ini`.
+- Default filenames are `casedash_trace.txt`, `casedash_dump.txt`, `casedash_screenshot.png`, `casedash_layout_guide_sheet.png`, `casedash_config.ini`, and `casedash_full_config.ini`.
 - Trace output appends UTF-8 text without a BOM and uses the `[trace yyyy-mm-dd hh:mm:ss.mmm]` prefix format.
 - Dump, screenshot, minimal-config, and full-config exports overwrite only their requested target file.
 - `/fake` without a path uses the built-in synthetic baseline and reads no external file.
@@ -86,7 +86,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - The dump contains only the runtime snapshot model that the dashboard renders and that `/fake` reloads.
 - The dump includes retained histories, configured drive rows, and local date and time down to milliseconds.
 - Retained histories store raw sampled values in native runtime units.
-- The current dump format version is `system_telemetry_snapshot_v10`.
+- The current dump format version is `casedash_snapshot_v10`.
 - Dump scalar-unit fields use only the canonical dump tokens: the empty string plus `C`, `GHz`, `MHz`, `FPS`, and `RPM`.
 - Dump scalar issue fields use `none` or `permission_required`.
 - Provider-specific diagnostics and trace-only debug details do not appear in the dump schema.

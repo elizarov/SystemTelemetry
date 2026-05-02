@@ -205,7 +205,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
 
     hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
         wc.lpszClassName,
-        L"System Telemetry",
+        L"CaseDash",
         WS_POPUP,
         placement.left,
         placement.top,
@@ -431,7 +431,7 @@ bool DashboardApp::CreateTrayIcon() {
     trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     trayIcon_.uCallbackMessage = kTrayMessage;
     trayIcon_.hIcon = appIconSmall_ != nullptr ? appIconSmall_ : LoadIconW(nullptr, IDI_APPLICATION);
-    wcscpy_s(trayIcon_.szTip, L"System Telemetry");
+    wcscpy_s(trayIcon_.szTip, L"CaseDash");
     return Shell_NotifyIconW(NIM_ADD, &trayIcon_) == TRUE;
 }
 
@@ -549,7 +549,7 @@ MonitorPlacementInfo DashboardApp::GetWindowPlacementInfo() const {
 }
 
 void DashboardApp::ShowError(const std::wstring& message) const {
-    MessageBoxW(hwnd_, message.c_str(), L"System Telemetry", MB_ICONERROR);
+    MessageBoxW(hwnd_, message.c_str(), L"CaseDash", MB_ICONERROR);
 }
 
 bool DashboardApp::CreateLayoutEditTooltip() {

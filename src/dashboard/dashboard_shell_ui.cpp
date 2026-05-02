@@ -268,7 +268,7 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
                     GetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, buffer, ARRAYSIZE(buffer));
                     const std::optional<double> percentage = TryParseScaleValue(buffer);
                     if (!percentage.has_value()) {
-                        MessageBoxW(hwnd, L"Enter a positive percentage scale.", L"System Telemetry", MB_ICONERROR);
+                        MessageBoxW(hwnd, L"Enter a positive percentage scale.", L"CaseDash", MB_ICONERROR);
                         SetFocus(GetDlgItem(hwnd, IDC_CUSTOM_SCALE_EDIT));
                         SendDlgItemMessageW(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
                         return TRUE;
@@ -451,7 +451,7 @@ void DashboardShellUi::RefreshLayoutEditDialogSelection() {
 void DashboardShellUi::SyncLayoutEditDialogSelection(
     const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront) {
     if (layoutEditDialog_ != nullptr && !layoutEditDialog_->SyncSelection(target, bringToFront)) {
-        MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"System Telemetry", MB_ICONERROR);
+        MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"CaseDash", MB_ICONERROR);
     }
 }
 
@@ -509,8 +509,7 @@ bool DashboardShellUi::StopLayoutEditSession(UnsavedLayoutEditPrompt prompt) {
                 return false;
             }
         } else if (!app_.controller_.RestoreLayoutEditSessionSavedLayout(app_)) {
-            MessageBoxW(
-                app_.hwnd_, L"Failed to restore the saved layout edit state.", L"System Telemetry", MB_ICONERROR);
+            MessageBoxW(app_.hwnd_, L"Failed to restore the saved layout edit state.", L"CaseDash", MB_ICONERROR);
             return false;
         }
     }
@@ -542,7 +541,7 @@ bool DashboardShellUi::OpenLayoutEditDialog() {
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
-        MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"System Telemetry", MB_ICONERROR);
+        MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"CaseDash", MB_ICONERROR);
         return false;
     }
     return true;
@@ -560,7 +559,7 @@ bool DashboardShellUi::HandleReloadConfig() {
     }
 
     if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_)) {
-        MessageBoxW(app_.hwnd_, L"Failed to reload config.ini.", L"System Telemetry", MB_ICONERROR);
+        MessageBoxW(app_.hwnd_, L"Failed to reload config.ini.", L"CaseDash", MB_ICONERROR);
         return false;
     }
     RefreshLayoutEditDialog();
@@ -929,11 +928,11 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
-        MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"System Telemetry", MB_ICONERROR);
+        MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"CaseDash", MB_ICONERROR);
         return false;
     }
     if (IsMetricListAddRowTarget(target) && !ApplyMetricListAddRowPreview(target)) {
-        MessageBoxW(app_.hwnd_, L"Failed to add a metric list row.", L"System Telemetry", MB_ICONERROR);
+        MessageBoxW(app_.hwnd_, L"Failed to add a metric list row.", L"CaseDash", MB_ICONERROR);
         return false;
     }
     return true;
@@ -1045,7 +1044,7 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
                         }
                         app_.TraceLayoutEditUiEvent(
                             "layout_switch:menu_failed", "selected_layout=" + QuoteTraceText(it->name));
-                        MessageBoxW(app_.hwnd_, L"Failed to switch layout.", L"System Telemetry", MB_ICONERROR);
+                        MessageBoxW(app_.hwnd_, L"Failed to switch layout.", L"CaseDash", MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
                         if (suppressTooltipRefresh) {
@@ -1072,7 +1071,7 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
                     [selected](const ThemeMenuOption& option) { return option.commandId == selected; });
                 if (it != state.themeMenuOptions.end()) {
                     if (!app_.controller_.SwitchTheme(app_, it->name, app_.diagnosticsOptions_.editLayout)) {
-                        MessageBoxW(app_.hwnd_, L"Failed to switch theme.", L"System Telemetry", MB_ICONERROR);
+                        MessageBoxW(app_.hwnd_, L"Failed to switch theme.", L"CaseDash", MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
                     }

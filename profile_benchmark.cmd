@@ -358,8 +358,8 @@ set "TRACE_HOTSPOTS=%~4"
 set "BENCHMARK_OUTPUT=%~5"
 set "WPR_EXE=%SystemRoot%\System32\wpr.exe"
 call :resolve_xperf
-set "BENCHMARK_EXE=%REPO_ROOT%\build\SystemTelemetryBenchmarks.exe"
-set "BENCHMARK_PDB_DIR=%REPO_ROOT%\build\cmake\CMakeFiles\SystemTelemetryBenchmarks.dir\Release"
+set "BENCHMARK_EXE=%REPO_ROOT%\build\CaseDashBenchmarks.exe"
+set "BENCHMARK_PDB_DIR=%REPO_ROOT%\build\cmake\CMakeFiles\CaseDashBenchmarks.dir\Release"
 set "FORCE_BUILD=%PROFILE_BENCHMARK_FORCE_BUILD%"
 set "PROFILE_MAX_FILE_MB=%PROFILE_BENCHMARK_MAX_FILE_MB%"
 set "PROFILE_STACK_MIN_HITS=%PROFILE_BENCHMARK_STACK_MIN_HITS%"
@@ -435,13 +435,13 @@ if errorlevel 1 (
 )
 
 echo Exporting benchmark call tree to "%TRACE_CALLTREE_HTML%"...
-"%XPERF_EXE%" -i "%TRACE_ETL%" -symbols -a stack -process "SystemTelemetryBenchmarks.exe" -butterfly %PROFILE_STACK_MIN_HITS% > "%TRACE_CALLTREE_HTML%"
+"%XPERF_EXE%" -i "%TRACE_ETL%" -symbols -a stack -process "CaseDashBenchmarks.exe" -butterfly %PROFILE_STACK_MIN_HITS% > "%TRACE_CALLTREE_HTML%"
 if errorlevel 1 (
     echo Failed to export the benchmark call tree.
     exit /b %errorlevel%
 )
 echo Writing hotspot summary to "%TRACE_HOTSPOTS%"...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%HOTSPOT_SCRIPT%" -CallTreePath "%TRACE_CALLTREE_HTML%" -ProcessName "SystemTelemetryBenchmarks.exe" > "%TRACE_HOTSPOTS%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%HOTSPOT_SCRIPT%" -CallTreePath "%TRACE_CALLTREE_HTML%" -ProcessName "CaseDashBenchmarks.exe" > "%TRACE_HOTSPOTS%"
 if errorlevel 1 (
     echo Failed to write the hotspot summary.
     exit /b %errorlevel%

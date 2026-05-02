@@ -1,4 +1,4 @@
-# System Telemetry Project Notes
+# CaseDash Project Notes
 
 This document owns documentation ownership rules, repository conventions, and engineering constraints.
 See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](layout.md) for config language, [docs/diagnostics.md](diagnostics.md) for diagnostics behavior, and [docs/architecture.md](architecture.md) for code structure.
@@ -33,7 +33,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 ## Engineering Constraints
 
 - Keep `resources/config.ini` as the embedded default configuration resource.
-- Keep `resources/SystemTelemetry.rc` explicitly dependent on embedded payload files such as `resources/config.ini` and `resources/localization.ini`.
+- Keep `resources/CaseDash.rc` explicitly dependent on embedded payload files such as `resources/config.ini` and `resources/localization.ini`.
 - Do not add C++-side synthesized fallback layout, card, widget, font, color, or styling defaults that duplicate the embedded template.
 - Keep runtime text internally as UTF-8 `std::string` and convert to UTF-16 only at Windows API boundaries.
 - Keep config-file I/O on standard C++ streams and preserve strict UTF-8 handling without ANSI code-page fallback.

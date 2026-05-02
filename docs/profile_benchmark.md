@@ -10,24 +10,24 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 ## Benchmark Workflow
 
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
-- Measure the repeatable layout-edit benchmark with `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`.
-- Measure the in-memory layout-guide-sheet generation benchmark with `build\SystemTelemetryBenchmarks.exe layout-guide-sheet 20 2`.
-- Measure the repeatable layout-switch benchmark with `build\SystemTelemetryBenchmarks.exe layout-switch 240 2`.
-- Measure the repeatable mouse-hover benchmark with `build\SystemTelemetryBenchmarks.exe mouse-hover 240 2`.
-- Measure the repeatable theme-change benchmark with `build\SystemTelemetryBenchmarks.exe theme-change 240 2`.
-- Measure the repeatable telemetry-refresh benchmark with `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`.
-- `SystemTelemetryBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
+- Measure the repeatable layout-edit benchmark with `build\CaseDashBenchmarks.exe edit-layout 240 2`.
+- Measure the in-memory layout-guide-sheet generation benchmark with `build\CaseDashBenchmarks.exe layout-guide-sheet 20 2`.
+- Measure the repeatable layout-switch benchmark with `build\CaseDashBenchmarks.exe layout-switch 240 2`.
+- Measure the repeatable mouse-hover benchmark with `build\CaseDashBenchmarks.exe mouse-hover 240 2`.
+- Measure the repeatable theme-change benchmark with `build\CaseDashBenchmarks.exe theme-change 240 2`.
+- Measure the repeatable telemetry-refresh benchmark with `build\CaseDashBenchmarks.exe update-telemetry 240 2`.
+- `CaseDashBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
 - The mouse-hover benchmark moves the layout-edit cursor path from the dashboard's top-left corner to bottom-right corner, resolving hover hits and drawing the resulting overlay state on every step.
 - The theme-change benchmark rotates through all configured themes and measures config copy, color resolution, dashboard reconfiguration, edit-tree rebuild, theme-preview drawing, and dashboard repaint.
 - Capture a benchmark-focused CPU profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, `profile_benchmark.cmd theme-change 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - Capture a layout-guide-sheet CPU profile with `profile_benchmark.cmd layout-guide-sheet 20 2`; the benchmark renders the sheet to an in-memory offscreen surface and deliberately excludes PNG encoding and file I/O.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
-- Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\SystemTelemetryBenchmarks.exe` runs instead.
+- Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\CaseDashBenchmarks.exe` runs instead.
 - Daemon-backed and one-shot elevated runs persist the benchmark stdout and hotspot summary in the request directory and replay both in the caller window after the request finishes, so the requesting shell sees the same timing lines and top hotspots that the elevated process produced.
-- Profile captures use a minimal xperf CPU sample trace with process and image-load metadata, profile stack walking, process-filtered stack export for `SystemTelemetryBenchmarks.exe`, a `256 MB` circular ETL cap by default, and a compact hotspot summary generated from the filtered call tree.
+- Profile captures use a minimal xperf CPU sample trace with process and image-load metadata, profile stack walking, process-filtered stack export for `CaseDashBenchmarks.exe`, a `256 MB` circular ETL cap by default, and a compact hotspot summary generated from the filtered call tree.
 - Override the circular ETL cap with `PROFILE_BENCHMARK_MAX_FILE_MB=<size>` and the call-tree cutoff with `PROFILE_BENCHMARK_STACK_MIN_HITS=<hits>` when a specific investigation needs a different tradeoff.
-- Treat direct `build\SystemTelemetryBenchmarks.exe <benchmark> 240 2` runs as the fast comparison loop and the xperf profile as hotspot validation.
+- Treat direct `build\CaseDashBenchmarks.exe <benchmark> 240 2` runs as the fast comparison loop and the xperf profile as hotspot validation.
 
 ## Current Known Baseline
 
@@ -129,8 +129,8 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Did not regress the direct layout-edit drag benchmark, and batching avoided an extra paint cost in mouse-hover.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=2.37` to `2.39`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.09` to `2.11`.
-  - `build\SystemTelemetryBenchmarks.exe mouse-hover 240 2` landed at `hover_loop per_iter_ms=2.34`, `hover_hit_test avg_ms=0.21`, and `paint_draw avg_ms=2.13`; the confirmation `480`-point run landed at `hover_loop per_iter_ms=2.32`, `hover_hit_test avg_ms=0.21`, and `paint_draw avg_ms=2.12`.
+  - `build\CaseDashBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=2.37` to `2.39`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.09` to `2.11`.
+  - `build\CaseDashBenchmarks.exe mouse-hover 240 2` landed at `hover_loop per_iter_ms=2.34`, `hover_hit_test avg_ms=0.21`, and `paint_draw avg_ms=2.13`; the confirmation `480`-point run landed at `hover_loop per_iter_ms=2.32`, `hover_hit_test avg_ms=0.21`, and `paint_draw avg_ms=2.12`.
 - Conclusion:
   - The collision-aware anchor placement is safe for the drag benchmark and normal repaint cost; the follow-up hover-resolver optimization below addresses the active-region hit-test cost separately.
 
@@ -142,13 +142,13 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped materially.
 - Observed effect:
-  - Before the placement scoring change, `build\SystemTelemetryBenchmarks.exe layout-guide-sheet 1 2` ran at `sheet_loop per_iter_ms=53444.32`; older benchmark builds reported placement and drawing together as `sheet_render`.
+  - Before the placement scoring change, `build\CaseDashBenchmarks.exe layout-guide-sheet 1 2` ran at `sheet_loop per_iter_ms=53444.32`; older benchmark builds reported placement and drawing together as `sheet_render`.
   - The daemon-backed profile under `build\profile_benchmark_daemon\requests\31300_11234_18822\` put almost all samples in `PlaceLayoutGuideSheetCallouts`, especially `SegmentIntersectsRect` and `LeaderSegmentsIntersect`.
-  - Removing exhaustive stack-order permutation reduced `build\SystemTelemetryBenchmarks.exe layout-guide-sheet 20 2` to about `sheet_loop per_iter_ms=534.93`.
+  - Removing exhaustive stack-order permutation reduced `build\CaseDashBenchmarks.exe layout-guide-sheet 20 2` to about `sheet_loop per_iter_ms=534.93`.
   - Adding safe-rectangle caching and a segment bounding-box reject reduced the same direct benchmark to about `sheet_loop per_iter_ms=193.40`.
   - The confirmation daemon-backed profile under `build\profile_benchmark_daemon\requests\23902_22739_322\` landed at `sheet_loop per_iter_ms=198.19`, with remaining cost still led by placement scoring but with Direct2D/WIC offscreen rendering now visible as the next significant bucket.
   - Disabling global side repair entirely reduced the direct benchmark to about `sheet_loop per_iter_ms=39.92`, but increased leader-intersection warnings and worsened routing quality, so that more aggressive shortcut was rejected.
-  - Splitting the benchmark timing showed the current direct `build\SystemTelemetryBenchmarks.exe layout-guide-sheet 3 2` run at `sheet_loop per_iter_ms=328.70`, `sheet_measure avg_ms=4.51`, `sheet_place avg_ms=299.16`, and `sheet_draw avg_ms=16.97`; placement remains the optimization target.
+  - Splitting the benchmark timing showed the current direct `build\CaseDashBenchmarks.exe layout-guide-sheet 3 2` run at `sheet_loop per_iter_ms=328.70`, `sheet_measure avg_ms=4.51`, `sheet_place avg_ms=299.16`, and `sheet_draw avg_ms=16.97`; placement remains the optimization target.
 - Conclusion:
   - Layout guide sheet generation should avoid factorial or high-order callout stack permutation. The radial target-Y stack order is the scalable default; future routing improvements should operate on a small set of problematic leaders rather than trying every stack permutation or every side split globally.
 
@@ -163,10 +163,10 @@ These changes produced real wins and remain in the codebase:
 - Observed effect:
   - The initial daemon-backed hotspot capture `profile_benchmark.cmd mouse-hover 240 2` under `build\profile_benchmark_daemon\requests\6091_2699_22676\` reported `hover_hit_test avg_ms=0.22` and showed app-side time in active-region construction, variant/vector payload churn, `ResolveLayoutEditHover`, and anchor hit testing.
   - Per-child reorder payloads and active-region reservation reduced `profile_benchmark.cmd mouse-hover 240 2` to `hover_hit_test avg_ms=0.14`.
-  - The direct renderer hover resolver reduced direct `build\SystemTelemetryBenchmarks.exe mouse-hover 240 2` reruns to `hover_loop per_iter_ms=2.20` to `2.21`, `hover_hit_test avg_ms=0.08`, and `paint_draw avg_ms=2.12` to `2.13`.
+  - The direct renderer hover resolver reduced direct `build\CaseDashBenchmarks.exe mouse-hover 240 2` reruns to `hover_loop per_iter_ms=2.20` to `2.21`, `hover_hit_test avg_ms=0.08`, and `paint_draw avg_ms=2.12` to `2.13`.
   - Daemon-backed confirmation runs under `build\profile_benchmark_daemon\requests\8240_30030_13589\` and `build\profile_benchmark_daemon\requests\8367_23234_22164\` landed at `hover_hit_test avg_ms=0.09` and `0.08`; the remaining profile is dominated by the Direct2D, DirectWrite, and driver paint frame rather than active-region payload construction.
   - A circle-anchor bounding-box guard was neutral within noise, but remains because it avoids needless ring-distance math outside the padded handle bounds.
-  - `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` stayed in range at `drag_loop per_iter_ms=2.36` to `2.38`, `snap avg_ms=0.17` to `0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.09` to `2.11`; daemon-backed `profile_benchmark.cmd edit-layout 240 2` landed at `drag_loop per_iter_ms=2.52`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.24`.
+  - `build\CaseDashBenchmarks.exe edit-layout 240 2` stayed in range at `drag_loop per_iter_ms=2.36` to `2.38`, `snap avg_ms=0.17` to `0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.09` to `2.11`; daemon-backed `profile_benchmark.cmd edit-layout 240 2` landed at `drag_loop per_iter_ms=2.52`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.24`.
 - Conclusion:
   - Ordinary hover should resolve against renderer-owned layout/edit collections directly. `LayoutEditActiveRegions` remain the diagnostic and validation surface, but rebuilding that payload set on every mouse move duplicates already-resolved renderer state and makes hover hit testing pay for trace-friendly structures it does not need.
 
@@ -177,34 +177,34 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped materially and fixed a refactor regression.
 - Observed effect:
-  - Before the fix, `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=3.34` to `3.35`, `snap avg_ms=0.18`, `apply avg_ms=0.54`, and `paint_draw avg_ms=2.62` to `2.63`.
-  - Before the fix, `build\SystemTelemetryBenchmarks.exe layout-switch 240 2` reruns landed at `switch_loop per_iter_ms=4.32` to `4.33`, `switch_apply avg_ms=1.18` to `1.19`, `dialog_refresh avg_ms=0.15` to `0.16`, and `switch_paint avg_ms=2.96` to `2.99`.
-  - After the fix, `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=2.46` to `2.49`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.23`.
-  - After the fix, `build\SystemTelemetryBenchmarks.exe layout-switch 240 2` reruns landed at `switch_loop per_iter_ms=3.60` to `3.66`, `switch_apply avg_ms=0.73` to `0.74`, `dialog_refresh avg_ms=0.15`, and `switch_paint avg_ms=2.72` to `2.76`.
+  - Before the fix, `build\CaseDashBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=3.34` to `3.35`, `snap avg_ms=0.18`, `apply avg_ms=0.54`, and `paint_draw avg_ms=2.62` to `2.63`.
+  - Before the fix, `build\CaseDashBenchmarks.exe layout-switch 240 2` reruns landed at `switch_loop per_iter_ms=4.32` to `4.33`, `switch_apply avg_ms=1.18` to `1.19`, `dialog_refresh avg_ms=0.15` to `0.16`, and `switch_paint avg_ms=2.96` to `2.99`.
+  - After the fix, `build\CaseDashBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=2.46` to `2.49`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.23`.
+  - After the fix, `build\CaseDashBenchmarks.exe layout-switch 240 2` reruns landed at `switch_loop per_iter_ms=3.60` to `3.66`, `switch_apply avg_ms=0.73` to `0.74`, `dialog_refresh avg_ms=0.15`, and `switch_paint avg_ms=2.72` to `2.76`.
 - Conclusion:
   - Layout-only config updates must keep renderer-owned resources hot. Rebuilding DirectWrite formats and tinted icon sources inside every `SetConfig` call dominates the apply phase and shows up immediately in both edit-layout drag and layout switching.
 
 ### Hypothesis: Caching the embedded layout-edit template materially improves layout switching while the edit dialog is open
 
 - Change:
-  - Add a `layout-switch` benchmark mode to `SystemTelemetryBenchmarks` and `profile_benchmark.cmd`, cycle the configured named layouts through `SelectLayout()` plus `DashboardRenderer::SetConfig()`, rebuild the edit-dialog tree model each iteration, and compare cached versus uncached template-tree rebuild timings while measuring the full switch loop.
+  - Add a `layout-switch` benchmark mode to `CaseDashBenchmarks` and `profile_benchmark.cmd`, cycle the configured named layouts through `SelectLayout()` plus `DashboardRenderer::SetConfig()`, rebuild the edit-dialog tree model each iteration, and compare cached versus uncached template-tree rebuild timings while measuring the full switch loop.
 - Result:
   - Rejected.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe layout-switch 240 2` ran at `switch_loop per_iter_ms=3.63`, `switch_apply avg_ms=0.76`, `dialog_refresh avg_ms=0.15`, `switch_paint avg_ms=2.71`, while the isolated cached and uncached tree rebuild reruns both landed at `0.13 ms` per iteration.
-  - `build\SystemTelemetryBenchmarks.exe layout-switch 480 2` reran at `switch_loop per_iter_ms=3.48`, `switch_apply avg_ms=0.74`, `dialog_refresh avg_ms=0.14`, `switch_paint avg_ms=2.59`, while the isolated cached and uncached tree rebuild reruns again both landed at `0.13 ms` per iteration.
+  - `build\CaseDashBenchmarks.exe layout-switch 240 2` ran at `switch_loop per_iter_ms=3.63`, `switch_apply avg_ms=0.76`, `dialog_refresh avg_ms=0.15`, `switch_paint avg_ms=2.71`, while the isolated cached and uncached tree rebuild reruns both landed at `0.13 ms` per iteration.
+  - `build\CaseDashBenchmarks.exe layout-switch 480 2` reran at `switch_loop per_iter_ms=3.48`, `switch_apply avg_ms=0.74`, `dialog_refresh avg_ms=0.14`, `switch_paint avg_ms=2.59`, while the isolated cached and uncached tree rebuild reruns again both landed at `0.13 ms` per iteration.
 - Conclusion:
   - The embedded-template cache does not buy a meaningful steady-state layout-switch win on this machine. The tree rebuild itself is already small, the cached-versus-uncached delta stays inside run-to-run noise, the dominant cost in the benchmarked open-dialog path is repaint rather than template loading, and the app now uses the simpler uncached path.
 
 ### Hypothesis: Steady-state telemetry refresh cost is mostly repaint, not snapshot mutation
 
 - Change:
-  - Add a second `update-telemetry` benchmark mode to `SystemTelemetryBenchmarks`, thread that selector through `profile_benchmark.cmd`, and measure a loop that constructs the real `TelemetryCollector`, uses the collector-resolved runtime config, calls `TelemetryCollector::UpdateSnapshot()` each iteration, and repaints the collector-owned snapshot without inserting any timer wait.
+  - Add a second `update-telemetry` benchmark mode to `CaseDashBenchmarks`, thread that selector through `profile_benchmark.cmd`, and measure a loop that constructs the real `TelemetryCollector`, uses the collector-resolved runtime config, calls `TelemetryCollector::UpdateSnapshot()` each iteration, and repaints the collector-owned snapshot without inserting any timer wait.
 - Result:
   - Rejected.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe update-telemetry 60 2` ran at `update_loop per_iter_ms=12.01`, `telemetry_update avg_ms=9.97`, and `paint_draw avg_ms=2.04`.
-  - `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=10.90`, `telemetry_update avg_ms=8.90`, and `paint_draw avg_ms=2.00`.
+  - `build\CaseDashBenchmarks.exe update-telemetry 60 2` ran at `update_loop per_iter_ms=12.01`, `telemetry_update avg_ms=9.97`, and `paint_draw avg_ms=2.04`.
+  - `build\CaseDashBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=10.90`, `telemetry_update avg_ms=8.90`, and `paint_draw avg_ms=2.00`.
 - Conclusion:
   - The earlier repaint-bound result came from a synthetic snapshot-mutation loop and does not describe the real app path. With the real collector in place, steady-state telemetry refresh is collector-bound on this tree, so future `update-telemetry` wins should focus on `TelemetryCollector::UpdateSnapshot()` and its provider work before chasing another millisecond out of repaint.
 
@@ -215,8 +215,8 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped materially, but was backed out.
 - Observed effect:
-  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=10.08`, `telemetry_update avg_ms=8.06`, and `paint_draw avg_ms=2.02`.
-  - After the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=4.17`, `telemetry_update avg_ms=2.34`, and `paint_draw avg_ms=1.83`.
+  - Before the change, `build\CaseDashBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=10.08`, `telemetry_update avg_ms=8.06`, and `paint_draw avg_ms=2.02`.
+  - After the change, `build\CaseDashBenchmarks.exe update-telemetry 120 2` ran at `update_loop per_iter_ms=4.17`, `telemetry_update avg_ms=2.34`, and `paint_draw avg_ms=1.83`.
   - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=4.41`, `telemetry_update avg_ms=2.42`, and `paint_draw avg_ms=2.00`.
 - Conclusion:
   - The cache-backed version proves those sources are expensive, but the current benchmark intentionally leaves board, GPU-vendor, and drive metadata uncached so steady-state profiles keep stressing the full telemetry path and expose which source is intrinsically slow.
@@ -228,8 +228,8 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped materially.
 - Observed effect:
-  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=7.75`, `telemetry_update avg_ms=5.58`, and `paint_draw avg_ms=2.18`.
-  - After the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
+  - Before the change, `build\CaseDashBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=7.75`, `telemetry_update avg_ms=5.58`, and `paint_draw avg_ms=2.18`.
+  - After the change, `build\CaseDashBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
   - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=6.16`, `telemetry_update avg_ms=4.22`, and `paint_draw avg_ms=1.94`.
 - Conclusion:
   - The no-cache benchmark still spends most of its time in the real telemetry APIs, but a meaningful slice of the old cost was collector-side scaffolding around those calls. Lazy trace formatting and reusable per-provider scratch state are worth keeping because they reduce benchmark noise without hiding the real source-update cost.
@@ -241,7 +241,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Regressed and was reverted.
 - Observed effect:
-  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
+  - Before the change, `build\CaseDashBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
   - With the collapsed GPU PDH path in place, the same benchmark regressed to about `update_loop per_iter_ms=7.07`, `telemetry_update avg_ms=5.06`, and `paint_draw avg_ms=2.01`.
 - Why it failed:
   - Combining the GPU memory and engine counters onto one PDH query and scanning the shared wildcard arrays together increased the measured hot-path cost instead of reducing it, likely because the merged query shape or the broader array fetch paid more than the saved call count.
@@ -255,11 +255,11 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped materially, but one attempted sub-change was backed out after real-provider validation.
 - Observed effect:
-  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
+  - Before the change, `build\CaseDashBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=6.19`, `telemetry_update avg_ms=4.28`, and `paint_draw avg_ms=1.91`.
   - The first version of the change, which also passed the SIV collection parameter as a null by-ref out value, benchmarked at `update_loop per_iter_ms=5.16`, `telemetry_update avg_ms=3.33`, and `paint_draw avg_ms=1.84`, with a confirmation rerun at `update_loop per_iter_ms=5.34`, `telemetry_update avg_ms=3.48`, and `paint_draw avg_ms=1.86`.
-  - A fresh real headless validation run on April 18, 2026 with `SystemTelemetry.exe /trace:build\gigabyte_fixed_trace.txt /dump:build\gigabyte_fixed_dump.txt /default-config /exit` showed that null by-ref out value faulted inside SIV as `gigabyte_siv:snapshot_exception ... NullReferenceException`, so the collection-instance part of the optimization was reverted while keeping the reused argument arrays and cached unit strings.
-  - With the live collection instance restored, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` now runs at `update_loop per_iter_ms=4.05`, `telemetry_update avg_ms=2.19`, and `paint_draw avg_ms=1.86`.
-  - A confirmation rerun `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` lands at `update_loop per_iter_ms=4.14`, `telemetry_update avg_ms=2.22`, and `paint_draw avg_ms=1.92`.
+  - A fresh real headless validation run on April 18, 2026 with `CaseDash.exe /trace:build\gigabyte_fixed_trace.txt /dump:build\gigabyte_fixed_dump.txt /default-config /exit` showed that null by-ref out value faulted inside SIV as `gigabyte_siv:snapshot_exception ... NullReferenceException`, so the collection-instance part of the optimization was reverted while keeping the reused argument arrays and cached unit strings.
+  - With the live collection instance restored, `build\CaseDashBenchmarks.exe update-telemetry 240 2` now runs at `update_loop per_iter_ms=4.05`, `telemetry_update avg_ms=2.19`, and `paint_draw avg_ms=1.86`.
+  - A confirmation rerun `build\CaseDashBenchmarks.exe update-telemetry 120 2` lands at `update_loop per_iter_ms=4.14`, `telemetry_update avg_ms=2.22`, and `paint_draw avg_ms=1.92`.
   - The latest daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` lands at `update_loop per_iter_ms=4.28`, `telemetry_update avg_ms=2.29`, and `paint_draw avg_ms=2.00`.
 - Conclusion:
   - The live-update benchmark still spends most of its time inside real telemetry APIs, but the Gigabyte provider was paying meaningful extra CPU for per-sample reflection argument setup and managed-string churn. Reusing those internal resources is worth keeping, but `GetCurrentMonitoredData` still requires a live collection instance even on its by-reference parameter, so that specific null-out shortcut must stay reverted.
@@ -271,9 +271,9 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped materially.
 - Observed effect:
-  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=5.16`, `telemetry_update avg_ms=3.33`, and `paint_draw avg_ms=1.84`.
+  - Before the change, `build\CaseDashBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=5.16`, `telemetry_update avg_ms=3.33`, and `paint_draw avg_ms=1.84`.
   - After the change, the same benchmark ran at `update_loop per_iter_ms=4.43`, `telemetry_update avg_ms=2.59`, and `paint_draw avg_ms=1.84`.
-  - A confirmation rerun `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` landed at `update_loop per_iter_ms=4.68`, `telemetry_update avg_ms=2.82`, and `paint_draw avg_ms=1.87`.
+  - A confirmation rerun `build\CaseDashBenchmarks.exe update-telemetry 120 2` landed at `update_loop per_iter_ms=4.68`, `telemetry_update avg_ms=2.82`, and `paint_draw avg_ms=1.87`.
 - Conclusion:
   - The earlier failed merged-query experiment did not mean the duplicated GPU engine-array fetch was free. Keeping the memory counter on its own query while collapsing the duplicated engine-array fetch removes real PDH CPU without changing the live data source.
 
@@ -284,9 +284,9 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped materially.
 - Observed effect:
-  - Before the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=4.43`, `telemetry_update avg_ms=2.59`, and `paint_draw avg_ms=1.84`.
-  - After the change, `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=3.27`, `telemetry_update avg_ms=1.44`, and `paint_draw avg_ms=1.83`.
-  - A confirmation rerun `build\SystemTelemetryBenchmarks.exe update-telemetry 120 2` landed at `update_loop per_iter_ms=3.39`, `telemetry_update avg_ms=1.55`, and `paint_draw avg_ms=1.84`.
+  - Before the change, `build\CaseDashBenchmarks.exe update-telemetry 240 2` ran at about `update_loop per_iter_ms=4.43`, `telemetry_update avg_ms=2.59`, and `paint_draw avg_ms=1.84`.
+  - After the change, `build\CaseDashBenchmarks.exe update-telemetry 240 2` ran at `update_loop per_iter_ms=3.27`, `telemetry_update avg_ms=1.44`, and `paint_draw avg_ms=1.83`.
+  - A confirmation rerun `build\CaseDashBenchmarks.exe update-telemetry 120 2` landed at `update_loop per_iter_ms=3.39`, `telemetry_update avg_ms=1.55`, and `paint_draw avg_ms=1.84`.
   - The follow-up daemon-backed run `profile_benchmark.cmd update-telemetry 240 2` landed at `update_loop per_iter_ms=3.55`, `telemetry_update avg_ms=1.59`, and `paint_draw avg_ms=1.96`.
 - Conclusion:
   - The redundant AMD path was asking two different live APIs for the same GPU load and used-VRAM facts every refresh. Preferring ADLX for those supported vendor metrics and keeping PDH only as fallback is the highest-value no-cache win in this workstream, and it pushes telemetry update below repaint on the target machine.
@@ -396,8 +396,8 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Neutral to slightly helpful, and kept.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` ran at `drag_loop per_iter_ms=2.48`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=2.00`.
-  - `build\SystemTelemetryBenchmarks.exe edit-layout 480 2` ran at `drag_loop per_iter_ms=2.45`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=1.98`.
+  - `build\CaseDashBenchmarks.exe edit-layout 240 2` ran at `drag_loop per_iter_ms=2.48`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=2.00`.
+  - `build\CaseDashBenchmarks.exe edit-layout 480 2` ran at `drag_loop per_iter_ms=2.45`, `snap avg_ms=0.20`, `apply avg_ms=0.27`, and `paint_draw avg_ms=1.98`.
   - `profile_benchmark.cmd edit-layout 240 2` kept the benchmark hotspot shape in `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, the display driver, and `win32kfull.sys`, with no new GDI text hotspot.
 - Conclusion:
   - The type migration is safe to keep. It simplifies the Direct2D renderer boundary without costing measurable draw-path time and keeps raw Win32 types confined to the shell message-handling and placement-tracking edge.
@@ -484,7 +484,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` reruns improved from about `drag_loop per_iter_ms=2.60-2.68`, `snap avg_ms=0.19-0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.28-2.35` down to about `drag_loop per_iter_ms=2.54-2.57`, `snap avg_ms=0.18-0.19`, `apply avg_ms=0.12`, and `paint_draw avg_ms=2.22-2.27`.
+  - `build\CaseDashBenchmarks.exe edit-layout 240 2` reruns improved from about `drag_loop per_iter_ms=2.60-2.68`, `snap avg_ms=0.19-0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.28-2.35` down to about `drag_loop per_iter_ms=2.54-2.57`, `snap avg_ms=0.18-0.19`, `apply avg_ms=0.12`, and `paint_draw avg_ms=2.22-2.27`.
   - `profile_benchmark.cmd edit-layout 240 2` stayed on the same Direct2D, DirectWrite, text-shaping, and driver-stack hotspot shape, with no new app-owned hotspot overtaking the frame.
 - Conclusion:
   - Single-line labels that only need placement width should stay on the cheaper `DrawText` path; using `DrawTextBlock` for those labels adds measurable DirectWrite layout work without paying for any anchor or wrapped-layout benefit.
@@ -655,12 +655,12 @@ These changes produced real wins and remain in the codebase:
   - Initially regressed the maintained layout-edit draw benchmark, then recovered after switching gauge segments from filled annular paths to widget-owned neutral arc primitives and batching those arcs into one renderer-private D2D path.
 - Observed effect:
   - Before this change, the current direct baseline was `drag_loop per_iter_ms=2.41` to `2.48`, `snap avg_ms=0.19` to `0.20`, `apply avg_ms=0.13`, and `paint_draw avg_ms=2.09` to `2.15`.
-  - After this change, `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` first landed at `drag_loop per_iter_ms=2.60`, `snap avg_ms=0.18`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.30`; a confirmation rerun landed at `drag_loop per_iter_ms=2.59`, `snap avg_ms=0.18`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.29`.
-  - `build\SystemTelemetryBenchmarks.exe edit-layout 480 2` landed at `drag_loop per_iter_ms=2.58`, `snap avg_ms=0.19`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.28`.
+  - After this change, `build\CaseDashBenchmarks.exe edit-layout 240 2` first landed at `drag_loop per_iter_ms=2.60`, `snap avg_ms=0.18`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.30`; a confirmation rerun landed at `drag_loop per_iter_ms=2.59`, `snap avg_ms=0.18`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.29`.
+  - `build\CaseDashBenchmarks.exe edit-layout 480 2` landed at `drag_loop per_iter_ms=2.58`, `snap avg_ms=0.19`, `apply avg_ms=0.11`, and `paint_draw avg_ms=2.28`.
   - A small follow-up that keeps common `RenderPath` commands inline and stores arc endpoints in the path command did not recover the regression; reruns landed between `drag_loop per_iter_ms=2.52` and `2.60` and `paint_draw avg_ms=2.25` and `2.31`.
   - The daemon-backed `profile_benchmark.cmd edit-layout 240 2` capture was noisy and reported lost ETW events, while a shorter `profile_benchmark.cmd edit-layout 60 2` capture still pointed the frame cost at the Direct2D, DirectWrite, and driver stack rather than snap, apply, or app-owned helper logic.
-  - Replacing gauge filled annular segment paths with widget-owned `RenderArc` geometry and neutral `DrawArc`/`DrawArcs` renderer primitives recovered most of the regression: `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` landed at `drag_loop per_iter_ms=2.43`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.17`; confirmation reruns landed at `drag_loop per_iter_ms=2.47` to `2.48`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.22`.
-  - Batching `DrawArcs` through a single renderer-private D2D path geometry instead of one path per arc plus a geometry group recovered the remaining cost: `build\SystemTelemetryBenchmarks.exe edit-layout 240 2` landed at `drag_loop per_iter_ms=2.39` to `2.41`, `snap avg_ms=0.18` to `0.19`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.13` to `2.14`, while `build\SystemTelemetryBenchmarks.exe edit-layout 480 2` landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.10`.
+  - Replacing gauge filled annular segment paths with widget-owned `RenderArc` geometry and neutral `DrawArc`/`DrawArcs` renderer primitives recovered most of the regression: `build\CaseDashBenchmarks.exe edit-layout 240 2` landed at `drag_loop per_iter_ms=2.43`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.17`; confirmation reruns landed at `drag_loop per_iter_ms=2.47` to `2.48`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.22`.
+  - Batching `DrawArcs` through a single renderer-private D2D path geometry instead of one path per arc plus a geometry group recovered the remaining cost: `build\CaseDashBenchmarks.exe edit-layout 240 2` landed at `drag_loop per_iter_ms=2.39` to `2.41`, `snap avg_ms=0.18` to `0.19`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.13` to `2.14`, while `build\CaseDashBenchmarks.exe edit-layout 480 2` landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.10`.
 - Conclusion:
   - Keep the primitive-only widget renderer boundary, but avoid representing every widget-specific shape as a filled generic path when a neutral primitive maps to a cheaper renderer operation. Widgets still own gauge and capsule-bar geometry, while the renderer owns only generic path, arc, rounded-rect, ellipse, and polyline drawing; renderer-private batching is the right place to recover performance without reintroducing widget-specific renderer helpers.
 
@@ -709,7 +709,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size and did not introduce a meaningful additional benchmark regression relative to the same `/GL` plus `/LTCG` benchmark profile.
 - Observed effect:
-  - `build\SystemTelemetry.exe` decreased from `1,783,808` bytes with `/O2`, `/GL`, and `/LTCG` to `1,465,344` bytes with the size-oriented profile.
+  - `build\CaseDash.exe` decreased from `1,783,808` bytes with `/O2`, `/GL`, and `/LTCG` to `1,465,344` bytes with the size-oriented profile.
   - A full `/Os` probe without hot-source `/O2` overrides also produced `1,465,344` bytes, but was noisier on paint-heavy loops; retaining `/O2` on benchmark-sensitive files kept the same executable size in this build.
   - The pre-change direct benchmark binary, which did not yet use the app's `/GL` plus `/LTCG` profile, measured `edit-layout` at `drag_loop per_iter_ms=2.57`, `layout-switch` at `switch_loop per_iter_ms=3.94`, `mouse-hover` at `hover_loop per_iter_ms=2.36`, `update-telemetry` at `update_loop per_iter_ms=5.39`, and `layout-guide-sheet` at `sheet_loop per_iter_ms=108.38`.
   - A temporary `/O2`, `/GL`, and `/LTCG` benchmark build measured `edit-layout` at `drag_loop per_iter_ms=2.62`, `layout-switch` at `switch_loop per_iter_ms=3.98`, `mouse-hover` at `hover_loop per_iter_ms=2.39`, `update-telemetry` at `update_loop per_iter_ms=5.68`, and `layout-guide-sheet` at `sheet_loop per_iter_ms=101.14`.
@@ -725,8 +725,8 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size modestly.
 - Observed effect:
-  - Removing only local helper type erasure reduced `build\SystemTelemetry.exe` from `1,451,008` bytes to `1,445,888` bytes.
-  - Removing production `std::function` entirely reduced `build\SystemTelemetry.exe` further to `1,440,768` bytes and `build\SystemTelemetryBenchmarks.exe` to `1,078,272` bytes.
+  - Removing only local helper type erasure reduced `build\CaseDash.exe` from `1,451,008` bytes to `1,445,888` bytes.
+  - Removing production `std::function` entirely reduced `build\CaseDash.exe` further to `1,440,768` bytes and `build\CaseDashBenchmarks.exe` to `1,078,272` bytes.
 - Conclusion:
   - Keep `FunctionRef` for synchronous callbacks that do not escape the call. Continue to use owning callback storage only when a callback must outlive the call stack.
 
@@ -737,7 +737,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped maintainability and established a whole-flow timing baseline for theme switching.
 - Observed effect:
-  - `build\SystemTelemetryBenchmarks.exe theme-change 240 2` landed at `theme_loop per_iter_ms=4.92`, with `dashboard_config avg_ms=1.05`, `edit_tree avg_ms=0.18`, `theme_preview avg_ms=1.00`, and `theme_paint avg_ms=2.61`.
+  - `build\CaseDashBenchmarks.exe theme-change 240 2` landed at `theme_loop per_iter_ms=4.92`, with `dashboard_config avg_ms=1.05`, `edit_tree avg_ms=0.18`, `theme_preview avg_ms=1.00`, and `theme_paint avg_ms=2.61`.
 - Conclusion:
   - Keep theme-preview rendering behind the shared module and compare future theme-selector work against the full theme-change loop rather than a standalone triangle microbenchmark.
 
@@ -748,9 +748,9 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size materially while keeping the single executable and the existing `std::unordered_map`-backed provider lookups.
 - Observed effect:
-  - Splitting the provider reduced `build\SystemTelemetry.exe` from `1,440,768` bytes to `1,336,832` bytes and `build\SystemTelemetryBenchmarks.exe` from `1,078,272` bytes to `974,848` bytes.
-  - Narrowing the CLR method boundary further reduced `build\SystemTelemetry.exe` to `1,309,184` bytes and `build\SystemTelemetryBenchmarks.exe` to `947,200` bytes.
-  - The CLR metadata directory in `build\SystemTelemetry.exe` decreased from `126,840` bytes before the split to `45,532` bytes after the split and `25,904` bytes after the sink boundary.
+  - Splitting the provider reduced `build\CaseDash.exe` from `1,440,768` bytes to `1,336,832` bytes and `build\CaseDashBenchmarks.exe` from `1,078,272` bytes to `974,848` bytes.
+  - Narrowing the CLR method boundary further reduced `build\CaseDash.exe` to `1,309,184` bytes and `build\CaseDashBenchmarks.exe` to `947,200` bytes.
+  - The CLR metadata directory in `build\CaseDash.exe` decreased from `126,840` bytes before the split to `45,532` bytes after the split and `25,904` bytes after the sink boundary.
   - The app section sizes after the sink boundary are `.text=1,057,052`, `.rdata=174,840`, `.pdata=28,320`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,356` bytes.
 - Conclusion:
   - Keep mixed-mode translation units narrow and avoid STL types in `/clr` method signatures. Native performance containers are fine, but they should stay in native `.cpp` files so their template spellings and provider implementation details do not inflate CLR metadata.
@@ -762,7 +762,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size modestly.
 - Observed effect:
-  - Removing project `std::filesystem` use reduced `build\SystemTelemetry.exe` from `1,309,184` bytes to `1,303,040` bytes and `build\SystemTelemetryBenchmarks.exe` from `947,200` bytes to `943,104` bytes.
+  - Removing project `std::filesystem` use reduced `build\CaseDash.exe` from `1,309,184` bytes to `1,303,040` bytes and `build\CaseDashBenchmarks.exe` from `947,200` bytes to `943,104` bytes.
   - The app section sizes after the filesystem migration are `.text=1,053,628`, `.rdata=172,802`, `.pdata=27,948`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,304` bytes.
 - Conclusion:
   - Keep common path and file operations in `src/util/file_path.*` instead of reintroducing `std::filesystem`; the size win is small but keeps filesystem-related standard-library machinery out of the single executable.
@@ -775,7 +775,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size materially.
 - Observed effect:
-  - The config descriptor-loop rewrite plus non-throwing numeric parsing reduced `build\SystemTelemetry.exe` from `1,303,040` bytes to `1,253,376` bytes and `build\SystemTelemetryBenchmarks.exe` from `943,104` bytes to `939,008` bytes.
+  - The config descriptor-loop rewrite plus non-throwing numeric parsing reduced `build\CaseDash.exe` from `1,303,040` bytes to `1,253,376` bytes and `build\CaseDashBenchmarks.exe` from `943,104` bytes to `939,008` bytes.
   - The app section sizes after the config rewrite are `.text=1,000,908`, `.rdata=173,580`, `.pdata=28,944`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,328` bytes.
   - A fresh linker map showed `config_writer.cpp.obj` falling from about `81.8 KiB` to about `35.4 KiB`, while `config_parser.cpp.obj` fell from about `44.6 KiB` to about `37.6 KiB`.
 - Conclusion:
@@ -789,7 +789,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size materially.
 - Observed effect:
-  - Removing native `/EHsc` reduced `build\SystemTelemetry.exe` from `1,253,376` bytes to `1,152,512` bytes and `build\SystemTelemetryBenchmarks.exe` from `939,008` bytes to `868,864` bytes.
+  - Removing native `/EHsc` reduced `build\CaseDash.exe` from `1,253,376` bytes to `1,152,512` bytes and `build\CaseDashBenchmarks.exe` from `939,008` bytes to `868,864` bytes.
   - The app section sizes after disabling native exception handling are `.text=958,120`, `.rdata=121,074`, `.pdata=23,124`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,332` bytes.
   - The benchmark section sizes after disabling native exception handling are `.text=709,772`, `.rdata=91,656`, `.pdata=17,532`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,588` bytes.
 - Conclusion:
@@ -803,7 +803,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size through the writer traversal collapse; shared file I/O was neutral after LTCG.
 - Observed effect:
-  - Collapsing the full-save traversal reduced `build\SystemTelemetry.exe` from `1,152,512` bytes to `1,144,832` bytes. `build\SystemTelemetryBenchmarks.exe` stayed at `868,864` bytes because the benchmark target does not link the config writer.
+  - Collapsing the full-save traversal reduced `build\CaseDash.exe` from `1,152,512` bytes to `1,144,832` bytes. `build\CaseDashBenchmarks.exe` stayed at `868,864` bytes because the benchmark target does not link the config writer.
   - The app section sizes after the writer collapse are `.text=951,016`, `.rdata=120,914`, `.pdata=23,016`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,328` bytes.
   - A parser experiment replacing the card-reference `std::set` with a flat string-view vector regressed the app to `1,145,856` bytes and was reverted.
 - Conclusion:
@@ -817,7 +817,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped the distributed executable modestly.
 - Observed effect:
-  - Unifying runtime field descriptors reduced `build\SystemTelemetry.exe` from `1,144,832` bytes to `1,142,784` bytes.
+  - Unifying runtime field descriptors reduced `build\CaseDash.exe` from `1,144,832` bytes to `1,142,784` bytes.
   - The app section sizes after unifying descriptors are `.text=951,048`, `.rdata=119,266`, `.pdata=23,004`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,132` bytes.
 - Conclusion:
   - Keep parser and writer field dispatch on the shared runtime descriptor table. Future size work should target type-erased codec operations or direct fixed-arity parsing rather than recreating separate parser/writer descriptor tables.
@@ -830,7 +830,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped the distributed executable by removing per-field callback instantiations.
 - Observed effect:
-  - Offset-based runtime descriptors reduced `build\SystemTelemetry.exe` from `1,142,784` bytes to `1,135,104` bytes.
+  - Offset-based runtime descriptors reduced `build\CaseDash.exe` from `1,142,784` bytes to `1,135,104` bytes.
 - Conclusion:
   - Keep config parser and writer field dispatch on the offset descriptor table. This preserves the `config.h` metadata source of truth while making runtime config I/O less template-heavy.
 
@@ -843,7 +843,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped the distributed executable modestly.
 - Observed effect:
-  - Compacting snapshot dump I/O reduced `build\SystemTelemetry.exe` from `1,135,104` bytes to `1,133,568` bytes.
+  - Compacting snapshot dump I/O reduced `build\CaseDash.exe` from `1,135,104` bytes to `1,133,568` bytes.
 - Conclusion:
   - Keep the flat key/value dump parser and descriptor-driven flat field I/O. Further dump-size work should target the larger variable-length dump sections only if the resulting code stays straightforward.
 
@@ -855,7 +855,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped the distributed executable modestly.
 - Observed effect:
-  - Compacting layout edit selection population reduced `build\SystemTelemetry.exe` from `1,133,568` bytes to `1,132,544` bytes.
+  - Compacting layout edit selection population reduced `build\CaseDash.exe` from `1,133,568` bytes to `1,132,544` bytes.
   - In the fresh linker map, `PopulateLayoutEditSelection` fell from `11,088` bytes to `9,172` bytes before accounting for the small shared helper functions.
 - Conclusion:
   - Keep the common selection finish and trace plumbing shared. Further layout edit dialog size work should target larger standalone routines rather than adding branch-specific cleverness here.
@@ -868,7 +868,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size materially without a confirmed benchmark regression.
 - Observed effect:
-  - Disabling vectorized STL algorithm dispatch reduced `build\SystemTelemetry.exe` from `1,132,544` bytes to `1,107,456` bytes and `build\SystemTelemetryBenchmarks.exe` from `868,864` bytes to `846,848` bytes.
+  - Disabling vectorized STL algorithm dispatch reduced `build\CaseDash.exe` from `1,132,544` bytes to `1,107,456` bytes and `build\CaseDashBenchmarks.exe` from `868,864` bytes to `846,848` bytes.
   - A fresh linker map no longer contains `msvcprt:vector_algorithms.obj`, which previously contributed about `25.7 KiB` across code and read-only data.
   - Same-session baseline before the flag landed at `edit-layout drag_loop=6.18 ms`, `update-telemetry update_loop=6.16 ms`, `layout-switch switch_loop=4.46 ms`, `mouse-hover hover_loop=2.61 ms`, and `layout-guide-sheet sheet_loop=110.14 ms`; this pass was noisy but gives the local before-change measurement.
   - Confirmation reruns with `_USE_STD_VECTOR_ALGORITHMS=0` landed at `edit-layout drag_loop=2.70 ms`, `update-telemetry update_loop=4.89 ms`, `layout-switch switch_loop=4.08 ms`, `mouse-hover hover_loop=2.59 ms`, and `layout-guide-sheet sheet_loop=91.23 ms`.
@@ -883,7 +883,7 @@ These changes produced real wins and remain in the codebase:
 - Result:
   - Helped executable size modestly and keeps color resolution tied to the config metadata source of truth.
 - Observed effect:
-  - Metadata-driven color resolution reduced `build\SystemTelemetry.exe` from the post-theme baseline of `1,208,320` bytes to `1,203,712` bytes.
+  - Metadata-driven color resolution reduced `build\CaseDash.exe` from the post-theme baseline of `1,208,320` bytes to `1,203,712` bytes.
   - In the fresh linker map, `color_resolver.cpp.obj` fell from `8,821` bytes before the refactor to about `7.2 KiB`.
 - Conclusion:
   - Keep color resolution table-driven through runtime config descriptors so future theme/color fields do not need new resolver-side `if` chains.
@@ -906,6 +906,6 @@ These changes produced real wins and remain in the codebase:
 
 ## Validation Notes
 
-- Keep the benchmark comparison on the same command line shape, such as `build\SystemTelemetryBenchmarks.exe update-telemetry 240 2`, `build\SystemTelemetryBenchmarks.exe edit-layout 240 2`, or `build\SystemTelemetryBenchmarks.exe theme-change 240 2`.
+- Keep the benchmark comparison on the same command line shape, such as `build\CaseDashBenchmarks.exe update-telemetry 240 2`, `build\CaseDashBenchmarks.exe edit-layout 240 2`, or `build\CaseDashBenchmarks.exe theme-change 240 2`.
 - Use `profile_benchmark.cmd update-telemetry 240 2`, `profile_benchmark.cmd edit-layout 240 2`, or `profile_benchmark.cmd theme-change 240 2` directly for profiling validation; it rebuilds automatically through the daemon workflow.
 - If an experiment regresses, revert it and record the result here before finishing.

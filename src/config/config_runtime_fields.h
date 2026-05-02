@@ -41,7 +41,7 @@ bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const v
 
 template <typename Section> std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFieldDescriptors();
 
-#define SYSTEMTELEMETRY_CONFIG_FIELD_SECTIONS(X)                                                                       \
+#define CASEDASH_CONFIG_FIELD_SECTIONS(X)                                                                              \
     X(DisplayConfig::Section)                                                                                          \
     X(NetworkConfig::Section)                                                                                          \
     X(StorageConfig::Section)                                                                                          \
@@ -61,9 +61,9 @@ template <typename Section> std::span<const RuntimeConfigFieldDescriptor> Runtim
     X(NetworkFooterWidgetConfig::Section)                                                                              \
     X(LayoutEditorConfig::Section)
 
-#define SYSTEMTELEMETRY_DECLARE_RUNTIME_FIELDS(section_type)                                                           \
+#define CASEDASH_DECLARE_RUNTIME_FIELDS(section_type)                                                                  \
     template <> std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFieldDescriptors<section_type>();
 
-SYSTEMTELEMETRY_CONFIG_FIELD_SECTIONS(SYSTEMTELEMETRY_DECLARE_RUNTIME_FIELDS)
+CASEDASH_CONFIG_FIELD_SECTIONS(CASEDASH_DECLARE_RUNTIME_FIELDS)
 
-#undef SYSTEMTELEMETRY_DECLARE_RUNTIME_FIELDS
+#undef CASEDASH_DECLARE_RUNTIME_FIELDS

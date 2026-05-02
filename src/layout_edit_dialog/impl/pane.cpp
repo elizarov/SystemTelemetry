@@ -35,7 +35,7 @@ struct LayoutEditRightPaneMetrics {
 };
 
 constexpr LayoutEditRightPaneMetrics kLayoutEditRightPaneMetrics{};
-constexpr wchar_t kDialogRedrawSuspendCountProperty[] = L"SystemTelemetry.LayoutEdit.RedrawSuspendCount";
+constexpr wchar_t kDialogRedrawSuspendCountProperty[] = L"CaseDash.LayoutEdit.RedrawSuspendCount";
 constexpr double kLchGradientChromaMax = 0.4;
 
 int WindowRedrawSuspendCount(HWND hwnd) {

@@ -10,7 +10,7 @@
 namespace {
 
 FilePath WriteTestConfig(const std::string& text) {
-    const FilePath path = TempDirectoryPath() / "systemtelemetry_config_parser_test.ini";
+    const FilePath path = TempDirectoryPath() / "casedash_config_parser_test.ini";
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     output << text;
     return path;
@@ -347,7 +347,7 @@ TEST(ConfigParser, RejectsUnknownMetricIdsWithoutMetadataStyle) {
 }
 
 TEST(ConfigParser, CheckedInConfigTemplateUsesValidUtf8) {
-    const FilePath path = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    const FilePath path = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
     std::ifstream input(path, std::ios::binary);
     ASSERT_TRUE(input.is_open()) << "failed to open " << path.string();
 

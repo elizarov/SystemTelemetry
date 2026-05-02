@@ -2,7 +2,7 @@
 
 #include "util/enum_string.h"
 
-#define SYSTEM_TELEMETRY_WIDGET_CLASS_ITEMS(X)                                                                         \
+#define CASEDASH_WIDGET_CLASS_ITEMS(X)                                                                                 \
     X(Unknown, "")                                                                                                     \
     X(Text, "text")                                                                                                    \
     X(Gauge, "gauge")                                                                                                  \
@@ -15,6 +15,6 @@
     X(ClockTime, "clock_time")                                                                                         \
     X(ClockDate, "clock_date")
 
-ENUM_STRING_DECLARE(WidgetClass, SYSTEM_TELEMETRY_WIDGET_CLASS_ITEMS);
+ENUM_STRING_DECLARE(WidgetClass, CASEDASH_WIDGET_CLASS_ITEMS);
 
-#undef SYSTEM_TELEMETRY_WIDGET_CLASS_ITEMS
+#undef CASEDASH_WIDGET_CLASS_ITEMS

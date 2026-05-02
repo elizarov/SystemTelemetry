@@ -29,7 +29,7 @@
 #include "util/file_path.h"
 #include "util/trace.h"
 
-#define SYSTEM_TELEMETRY_BENCHMARK_ITEMS(X)                                                                            \
+#define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
     X(EditLayout, "edit-layout")                                                                                       \
     X(LayoutGuideSheet, "layout-guide-sheet")                                                                          \
     X(LayoutSwitch, "layout-switch")                                                                                   \
@@ -37,9 +37,9 @@
     X(ThemeChange, "theme-change")                                                                                     \
     X(UpdateTelemetry, "update-telemetry")
 
-ENUM_STRING_DECLARE(Benchmark, SYSTEM_TELEMETRY_BENCHMARK_ITEMS);
+ENUM_STRING_DECLARE(Benchmark, CASEDASH_BENCHMARK_ITEMS);
 
-#undef SYSTEM_TELEMETRY_BENCHMARK_ITEMS
+#undef CASEDASH_BENCHMARK_ITEMS
 
 namespace {
 
@@ -80,7 +80,7 @@ struct BenchmarkCommandLine {
 };
 
 FilePath SourceConfigPath() {
-    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    return FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext BenchmarkConfigParseContext() {
@@ -326,7 +326,7 @@ public:
     bool Initialize() {
         hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
             L"STATIC",
-            L"SystemTelemetryBenchmarkHost",
+            L"CaseDashBenchmarkHost",
             WS_POPUP,
             0,
             0,

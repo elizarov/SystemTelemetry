@@ -523,7 +523,7 @@ def write_dot(modules: dict[str, Module], edges: dict[tuple[str, str], str], out
 
     lines = [
         "digraph SourceDependencies {",
-        "  graph [rankdir=LR, compound=true, newrank=true, fontname=\"Segoe UI\", labelloc=t, label=\"SystemTelemetry src module dependencies\"];",
+        "  graph [rankdir=LR, compound=true, newrank=true, fontname=\"Segoe UI\", labelloc=t, label=\"CaseDash src module dependencies\"];",
         "  node [shape=box, style=\"rounded,filled\", fillcolor=\"#f8fafc\", color=\"#64748b\", fontname=\"Segoe UI\", fontsize=10];",
         "  edge [fontname=\"Segoe UI\", fontsize=9, arrowsize=0.7];",
         "",

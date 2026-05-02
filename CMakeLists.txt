@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.26)
 
-project(SystemTelemetry LANGUAGES CXX RC)
+project(CaseDash LANGUAGES CXX RC)
 
 if(NOT MSVC)
-    message(FATAL_ERROR "SystemTelemetry currently supports MSVC builds only.")
+    message(FATAL_ERROR "CaseDash currently supports MSVC builds only.")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -65,8 +65,8 @@ find_library(MSCOREE_LIB
 if(NOT MSCOREE_LIB)
     message(FATAL_ERROR "mscoree.lib was not found. Install the .NET Framework SDK through Visual Studio Build Tools 2022 and run build.cmd from a configured developer prompt.")
 endif()
-add_executable(SystemTelemetry WIN32
-    resources/SystemTelemetry.rc
+add_executable(CaseDash WIN32
+    resources/CaseDash.rc
     src/main/main.cpp
     src/diagnostics/diagnostics.cpp
     src/layout_guide_sheet/layout_guide_sheet.cpp
@@ -185,11 +185,11 @@ add_executable(SystemTelemetry WIN32
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
 )
 
-set_source_files_properties(resources/SystemTelemetry.rc PROPERTIES
+set_source_files_properties(resources/CaseDash.rc PROPERTIES
     OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/config.ini;${CMAKE_SOURCE_DIR}/resources/localization.ini"
 )
 
-set(systemtelemetry_release_speed_sources
+set(casedash_release_speed_sources
     src/config/config.cpp
     src/config/config_resolution.cpp
     src/config/metric_catalog.cpp
@@ -271,53 +271,53 @@ set(systemtelemetry_release_speed_sources
     tests/benchmarks.cpp
 )
 
-set_source_files_properties(${systemtelemetry_release_speed_sources} PROPERTIES
+set_source_files_properties(${casedash_release_speed_sources} PROPERTIES
     COMPILE_OPTIONS "$<$<CONFIG:Release>:/O2>"
 )
 
-add_library(SystemTelemetryGigabyte OBJECT
+add_library(CaseDashGigabyte OBJECT
     src/telemetry/board/gigabyte/board_gigabyte_siv_bridge.cpp
 )
 
-add_library(SystemTelemetryMsi OBJECT
+add_library(CaseDashMsi OBJECT
     src/telemetry/board/msi/board_msi_center_bridge.cpp
 )
 
-set_target_properties(SystemTelemetryGigabyte PROPERTIES
+set_target_properties(CaseDashGigabyte PROPERTIES
     COMMON_LANGUAGE_RUNTIME ""
     VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.0"
 )
 
-set_target_properties(SystemTelemetryMsi PROPERTIES
+set_target_properties(CaseDashMsi PROPERTIES
     COMMON_LANGUAGE_RUNTIME ""
     VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.0"
 )
 
-target_include_directories(SystemTelemetryGigabyte PRIVATE
+target_include_directories(CaseDashGigabyte PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
 )
 
-target_include_directories(SystemTelemetryMsi PRIVATE
+target_include_directories(CaseDashMsi PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
 )
 
-target_compile_definitions(SystemTelemetryGigabyte PRIVATE
+target_compile_definitions(CaseDashGigabyte PRIVATE
     UNICODE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
 )
 
-target_compile_definitions(SystemTelemetryMsi PRIVATE
+target_compile_definitions(CaseDashMsi PRIVATE
     UNICODE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
 )
 
-target_compile_options(SystemTelemetryGigabyte PRIVATE
+target_compile_options(CaseDashGigabyte PRIVATE
     /clr
     /W4
     /permissive-
@@ -326,7 +326,7 @@ target_compile_options(SystemTelemetryGigabyte PRIVATE
     /Zi
 )
 
-target_compile_options(SystemTelemetryMsi PRIVATE
+target_compile_options(CaseDashMsi PRIVATE
     /clr
     /W4
     /permissive-
@@ -335,18 +335,18 @@ target_compile_options(SystemTelemetryMsi PRIVATE
     /Zi
 )
 
-target_sources(SystemTelemetry PRIVATE
-    $<TARGET_OBJECTS:SystemTelemetryGigabyte>
-    $<TARGET_OBJECTS:SystemTelemetryMsi>
+target_sources(CaseDash PRIVATE
+    $<TARGET_OBJECTS:CaseDashGigabyte>
+    $<TARGET_OBJECTS:CaseDashMsi>
 )
 
-target_include_directories(SystemTelemetry PRIVATE
+target_include_directories(CaseDash PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
 )
 
-target_compile_definitions(SystemTelemetry PRIVATE
+target_compile_definitions(CaseDash PRIVATE
     UNICODE
     _UNICODE
     NOMINMAX
@@ -354,7 +354,7 @@ target_compile_definitions(SystemTelemetry PRIVATE
     _USE_STD_VECTOR_ALGORITHMS=0
 )
 
-target_compile_options(SystemTelemetry PRIVATE
+target_compile_options(CaseDash PRIVATE
     /W4
     /wd4530
     /permissive-
@@ -366,7 +366,7 @@ target_compile_options(SystemTelemetry PRIVATE
     $<$<CONFIG:Release>:/GL>
 )
 
-target_link_options(SystemTelemetry PRIVATE
+target_link_options(CaseDash PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/OPT:REF>
@@ -377,7 +377,7 @@ target_link_options(SystemTelemetry PRIVATE
     /MANIFEST:NO
 )
 
-target_link_libraries(SystemTelemetry PRIVATE
+target_link_libraries(CaseDash PRIVATE
     user32
     gdi32
     d2d1
@@ -395,35 +395,35 @@ target_link_libraries(SystemTelemetry PRIVATE
     ${MSCOREE_LIB}
 )
 
-set_target_properties(SystemTelemetry PROPERTIES
-    OUTPUT_NAME "SystemTelemetry"
+set_target_properties(CaseDash PROPERTIES
+    OUTPUT_NAME "CaseDash"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
 
 enable_testing()
 
-set(systemtelemetry_vcpkg_triplet "x64-windows")
+set(casedash_vcpkg_triplet "x64-windows")
 if(DEFINED VCPKG_TARGET_TRIPLET AND NOT VCPKG_TARGET_TRIPLET STREQUAL "")
-    set(systemtelemetry_vcpkg_triplet "${VCPKG_TARGET_TRIPLET}")
+    set(casedash_vcpkg_triplet "${VCPKG_TARGET_TRIPLET}")
 endif()
 
-set(systemtelemetry_vcpkg_installed_dir "")
+set(casedash_vcpkg_installed_dir "")
 if(DEFINED VCPKG_INSTALLED_DIR AND NOT VCPKG_INSTALLED_DIR STREQUAL "")
-    set(systemtelemetry_vcpkg_installed_dir "${VCPKG_INSTALLED_DIR}")
-elseif(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg/${systemtelemetry_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
-    set(systemtelemetry_vcpkg_installed_dir "${CMAKE_SOURCE_DIR}/vcpkg")
-elseif(EXISTS "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/${systemtelemetry_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
-    set(systemtelemetry_vcpkg_installed_dir "${CMAKE_SOURCE_DIR}/build/vcpkg_installed")
+    set(casedash_vcpkg_installed_dir "${VCPKG_INSTALLED_DIR}")
+elseif(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg/${casedash_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
+    set(casedash_vcpkg_installed_dir "${CMAKE_SOURCE_DIR}/vcpkg")
+elseif(EXISTS "${CMAKE_SOURCE_DIR}/build/vcpkg_installed/${casedash_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
+    set(casedash_vcpkg_installed_dir "${CMAKE_SOURCE_DIR}/build/vcpkg_installed")
 endif()
 
-if(NOT systemtelemetry_vcpkg_installed_dir STREQUAL "" AND
-   EXISTS "${systemtelemetry_vcpkg_installed_dir}/${systemtelemetry_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
-    list(PREPEND CMAKE_PREFIX_PATH "${systemtelemetry_vcpkg_installed_dir}/${systemtelemetry_vcpkg_triplet}")
+if(NOT casedash_vcpkg_installed_dir STREQUAL "" AND
+   EXISTS "${casedash_vcpkg_installed_dir}/${casedash_vcpkg_triplet}/share/gtest/GTestConfig.cmake")
+    list(PREPEND CMAKE_PREFIX_PATH "${casedash_vcpkg_installed_dir}/${casedash_vcpkg_triplet}")
 endif()
 
 find_package(GTest CONFIG REQUIRED)
 
-add_executable(SystemTelemetryTests
+add_executable(CaseDashTests
     tests/enum_string_tests.cpp
     tests/metrics_tests.cpp
     tests/snapshot_dump_tests.cpp
@@ -516,19 +516,19 @@ add_executable(SystemTelemetryTests
     src/util/trace.cpp
     src/telemetry/fps_service_protocol.cpp
   )
-target_include_directories(SystemTelemetryTests PRIVATE
+target_include_directories(CaseDashTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
 )
-target_compile_definitions(SystemTelemetryTests PRIVATE
+target_compile_definitions(CaseDashTests PRIVATE
     UNICODE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0
-    SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    CASEDASH_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
-target_compile_options(SystemTelemetryTests PRIVATE
+target_compile_options(CaseDashTests PRIVATE
     /EHsc
     /W4
     /permissive-
@@ -537,7 +537,7 @@ target_compile_options(SystemTelemetryTests PRIVATE
     /we4505
     /Zi
 )
-target_link_options(SystemTelemetryTests PRIVATE
+target_link_options(CaseDashTests PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/OPT:REF>
@@ -545,7 +545,7 @@ target_link_options(SystemTelemetryTests PRIVATE
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
 )
-target_link_libraries(SystemTelemetryTests PRIVATE
+target_link_libraries(CaseDashTests PRIVATE
     GTest::gtest_main
     user32
     gdi32
@@ -554,20 +554,20 @@ target_link_libraries(SystemTelemetryTests PRIVATE
     windowscodecs
     ole32
 )
-set_target_properties(SystemTelemetryTests PROPERTIES
+set_target_properties(CaseDashTests PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
-add_custom_command(TARGET SystemTelemetryTests POST_BUILD
+add_custom_command(TARGET CaseDashTests POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-        $<TARGET_RUNTIME_DLLS:SystemTelemetryTests>
-        $<TARGET_FILE_DIR:SystemTelemetryTests>
+        $<TARGET_RUNTIME_DLLS:CaseDashTests>
+        $<TARGET_FILE_DIR:CaseDashTests>
     COMMAND_EXPAND_LISTS
 )
 
-add_test(NAME SystemTelemetryTests COMMAND SystemTelemetryTests)
+add_test(NAME CaseDashTests COMMAND CaseDashTests)
 
-add_executable(SystemTelemetryBenchmarks
-    resources/SystemTelemetry.rc
+add_executable(CaseDashBenchmarks
+    resources/CaseDash.rc
     tests/benchmarks.cpp
     src/util/strings.cpp
     src/util/scale.cpp
@@ -661,24 +661,24 @@ add_executable(SystemTelemetryBenchmarks
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
 )
-target_sources(SystemTelemetryBenchmarks PRIVATE
-    $<TARGET_OBJECTS:SystemTelemetryGigabyte>
-    $<TARGET_OBJECTS:SystemTelemetryMsi>
+target_sources(CaseDashBenchmarks PRIVATE
+    $<TARGET_OBJECTS:CaseDashGigabyte>
+    $<TARGET_OBJECTS:CaseDashMsi>
 )
-target_include_directories(SystemTelemetryBenchmarks PRIVATE
+target_include_directories(CaseDashBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
 )
-target_compile_definitions(SystemTelemetryBenchmarks PRIVATE
+target_compile_definitions(CaseDashBenchmarks PRIVATE
     UNICODE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0
-    SYSTEMTELEMETRY_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    CASEDASH_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
-target_compile_options(SystemTelemetryBenchmarks PRIVATE
+target_compile_options(CaseDashBenchmarks PRIVATE
     /W4
     /wd4530
     /permissive-
@@ -689,7 +689,7 @@ target_compile_options(SystemTelemetryBenchmarks PRIVATE
     $<$<CONFIG:Release>:/Os>
     $<$<CONFIG:Release>:/GL>
 )
-target_link_options(SystemTelemetryBenchmarks PRIVATE
+target_link_options(CaseDashBenchmarks PRIVATE
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/DEBUG:FULL>
@@ -700,7 +700,7 @@ target_link_options(SystemTelemetryBenchmarks PRIVATE
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
     /MANIFEST:NO
 )
-target_link_libraries(SystemTelemetryBenchmarks PRIVATE
+target_link_libraries(CaseDashBenchmarks PRIVATE
     user32
     gdi32
     d2d1
@@ -715,8 +715,8 @@ target_link_libraries(SystemTelemetryBenchmarks PRIVATE
     advapi32
     ${MSCOREE_LIB}
 )
-set_target_properties(SystemTelemetryBenchmarks PROPERTIES
-    PDB_NAME_RELEASE "SystemTelemetryBenchmarks"
+set_target_properties(CaseDashBenchmarks PROPERTIES
+    PDB_NAME_RELEASE "CaseDashBenchmarks"
     PDB_OUTPUT_DIRECTORY_RELEASE "${output_root}"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )

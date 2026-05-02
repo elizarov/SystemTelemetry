@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v10";
+constexpr char kDumpFormatVersion[] = "casedash_snapshot_v10";
 
 enum class DumpFieldKind : std::uint8_t {
     String,

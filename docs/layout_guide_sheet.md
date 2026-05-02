@@ -163,7 +163,7 @@ The algorithm favors readable bubbles and deterministic output while preserving 
 - A headless `/exit` run that requests a guide sheet exports it once and exits.
 - A UI-attached run that requests a guide sheet refreshes it on the same cadence as other diagnostics screenshots unless the implementation defines a cheaper explicit-refresh policy in diagnostics docs.
 - Explicit output paths resolve by the same current-working-directory rules as other diagnostics outputs.
-- The default output filename is `telemetry_layout_guide_sheet.png`.
+- The default output filename is `casedash_layout_guide_sheet.png`.
 - The output overwrite behavior matches ordinary screenshot export.
 - When `/trace` is enabled, guide-sheet export writes a start event, an end event, the selected layout name, selected card ids, covered widget types, output dimensions, placed callout count, and any callout-placement warnings.
 - Guide-sheet trace events use `diagnostics:layout_guide_sheet` as the event family.

@@ -16,7 +16,7 @@ if ($LASTEXITCODE -ne 0) {
 $hasStagedCppFiles = [bool]$stagedFiles
 
 $stashCreated = $false
-$stashMessage = 'systemtelemetry-pre-commit-format'
+$stashMessage = 'casedash-pre-commit-format'
 
 & git -C $repoRoot diff --quiet --no-ext-diff --ignore-submodules --
 $hasUnstagedChanges = ($LASTEXITCODE -ne 0)

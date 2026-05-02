@@ -2,14 +2,14 @@
 
 #include "util/enum_string.h"
 
-#define SYSTEM_TELEMETRY_TEST_ENUM_ITEMS(X)                                                                            \
+#define CASEDASH_TEST_ENUM_ITEMS(X)                                                                                    \
     X(Zero, "zero")                                                                                                    \
     X(One, "one")                                                                                                      \
     X(Two, "two")
 
-ENUM_STRING_DECLARE(TestEnumStringValue, SYSTEM_TELEMETRY_TEST_ENUM_ITEMS);
+ENUM_STRING_DECLARE(TestEnumStringValue, CASEDASH_TEST_ENUM_ITEMS);
 
-#undef SYSTEM_TELEMETRY_TEST_ENUM_ITEMS
+#undef CASEDASH_TEST_ENUM_ITEMS
 
 TEST(EnumString, CanonicalRoundTripsInBothDirections) {
     EXPECT_EQ(EnumToString(TestEnumStringValue::Zero), "zero");

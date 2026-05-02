@@ -68,7 +68,7 @@ bool IsPermissionDenied(ULONG status) {
 }
 
 std::wstring BuildSessionName() {
-    return L"SystemTelemetryPresentedFps-" + std::to_wstring(GetCurrentProcessId());
+    return L"CaseDashPresentedFps-" + std::to_wstring(GetCurrentProcessId());
 }
 
 std::wstring LowerAscii(std::wstring value) {
@@ -103,7 +103,7 @@ std::wstring QueryProcessBaseName(DWORD processId) {
 
 bool IsExcludedProcessName(const std::wstring& processName) {
     const std::wstring lowerName = LowerAscii(processName);
-    return lowerName.empty() || lowerName == L"systemtelemetry.exe" || lowerName == L"dwm.exe";
+    return lowerName.empty() || lowerName == L"casedash.exe" || lowerName == L"dwm.exe";
 }
 
 class PresentedFpsEtwProvider final : public FpsTelemetryProvider {

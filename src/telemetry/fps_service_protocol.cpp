@@ -4,7 +4,7 @@
 
 namespace {
 
-constexpr char kFpsServiceRequestText[] = "system_telemetry_fps_sample_v1";
+constexpr char kFpsServiceRequestText[] = "casedash_fps_sample_v1";
 constexpr uint32_t kFpsServiceResponseMagic = 0x31535046;  // "FPS1" little-endian.
 constexpr uint32_t kFpsServiceProtocolVersion = 1;
 constexpr uint32_t kFpsServiceFlagAvailable = 1u << 0u;

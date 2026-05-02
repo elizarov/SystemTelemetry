@@ -1,17 +1,17 @@
-# System Telemetry
+# CaseDash
 
 This document owns user-visible product behavior.
 See also: [docs/layout.md](layout.md) for config language and section ownership, [docs/theme_configuration.md](theme_configuration.md) for theme selection and derived color behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/build.md](build.md) for build and setup, and [docs/architecture.md](architecture.md) for code structure.
 
 ## Overview
 
-System Telemetry is a compact real-time Windows dashboard for a small secondary display. It presents CPU, GPU, network, storage, and clock data in a static card layout that favors glanceable values, restrained chrome, and stable composition over dense detail.
+CaseDash is a compact real-time Windows dashboard for a small secondary display. It presents CPU, GPU, network, storage, and clock data in a static card layout that favors glanceable values, restrained chrome, and stable composition over dense detail.
 
 The dashboard uses only Windows-native telemetry plus supported vendor APIs. It does not depend on LibreHardwareMonitor or OpenHardwareMonitor.
 
 ## Runtime Configuration Behavior
 
-- The runtime loads the embedded `resources/config.ini` defaults first, then overlays `config.ini` beside `SystemTelemetry.exe` when that file exists.
+- The runtime loads the embedded `resources/config.ini` defaults first, then overlays `config.ini` beside `CaseDash.exe` when that file exists.
 - The embedded template remains the shipped default source, while [resources/config.ini](../resources/config.ini) remains the maintained example and spelling authority for config entries.
 - The runtime treats window size, placement, and UI geometry as logical units and converts them to device pixels through either the current monitor DPI scale or the active explicit scale override.
 - When the configured target monitor is temporarily unavailable, the runtime keeps watching for it and restores the saved placement there once the monitor becomes enumerable.
@@ -24,7 +24,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Save and export omit runtime-only placeholder metric metadata such as `nothing`, even when metric-list bindings still reference that placeholder id.
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
 - `Save Config` persists live placement, active theme selection, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
-- `Config To Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `telemetry_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
+- `Config To Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `casedash_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
 - `Config To Display` marks a display entry with a checkbox when the live config already targets that display at `0,0` and the configured wallpaper path is non-empty, while still allowing that checked entry to be invoked again.
 
 ## Dashboard Composition And Rendering

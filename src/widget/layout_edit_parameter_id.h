@@ -2,7 +2,7 @@
 
 #include "config/config.h"
 
-#define SYSTEM_TELEMETRY_LAYOUT_EDIT_PARAMETER_ITEMS(X)                                                                \
+#define CASEDASH_LAYOUT_EDIT_PARAMETER_ITEMS(X)                                                                        \
     /* Fonts */                                                                                                        \
     X(FontTitle, UiFontSetConfig::titleMeta)                                                                           \
     X(FontBig, UiFontSetConfig::bigMeta)                                                                               \
@@ -77,11 +77,11 @@
     X(ColorGraphAxis, ColorsConfig::graphAxisColorMeta)                                                                \
     X(ColorGraphMarker, ColorsConfig::graphMarkerColorMeta)
 
-#define SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_ENUM(name, meta) name,
+#define CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_ENUM(name, meta) name,
 
 enum class LayoutEditParameter {
     // Hit-testing priority follows this declaration order for actionable widget-local handles and guides.
-    SYSTEM_TELEMETRY_LAYOUT_EDIT_PARAMETER_ITEMS(SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_ENUM) Count,
+    CASEDASH_LAYOUT_EDIT_PARAMETER_ITEMS(CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_ENUM) Count,
 };
 
-#undef SYSTEM_TELEMETRY_DECLARE_LAYOUT_EDIT_PARAMETER_ENUM
+#undef CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_ENUM

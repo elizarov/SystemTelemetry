@@ -19,7 +19,7 @@
 namespace {
 
 FilePath SourceConfigPath() {
-    return FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "config.ini";
+    return FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
 }
 
 ConfigParseContext TestConfigParseContext() {
@@ -27,7 +27,7 @@ ConfigParseContext TestConfigParseContext() {
 }
 
 void LoadTestLocalizationCatalog() {
-    const FilePath path = FilePath(SYSTEMTELEMETRY_SOURCE_DIR) / "resources" / "localization.ini";
+    const FilePath path = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(path, std::ios::binary);
     ASSERT_TRUE(input.good());
     std::ostringstream buffer;

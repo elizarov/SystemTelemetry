@@ -33,7 +33,7 @@ build.cmd
 
 `build.cmd` configures and builds the maintained CMake tree under `build\cmake\`, keeps the final executable under `build\`, preserves the repo-root `vcpkg\` manifest install tree across clean builds, restores `build\cmake\compile_commands.json` for `clangd`-based editors, and keeps vcpkg download plus registry caches in a user-local cache root so fresh worktrees reuse the same bootstrap downloads.
 
-By default the shared cache root is `%LOCALAPPDATA%\SystemTelemetry\cache`, falls back to `%USERPROFILE%\.systemtelemetry\cache` when `LOCALAPPDATA` is unavailable, and can be overridden with `SYSTEMTELEMETRY_CACHE_ROOT`. `build.cmd` exports `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE` from that root unless the caller already set them.
+By default the shared cache root is `%LOCALAPPDATA%\CaseDash\cache`, falls back to `%USERPROFILE%\.casedash\cache` when `LOCALAPPDATA` is unavailable, and can be overridden with `CASEDASH_CACHE_ROOT`. `build.cmd` exports `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE` from that root unless the caller already set them.
 
 ## Test
 
@@ -53,7 +53,7 @@ Install the already-built runtime through the repository entrypoint:
 install.cmd
 ```
 
-`install.cmd` requests elevation, stops running `SystemTelemetry.exe` instances, waits for them to exit, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and leaves auto-start registration to the runtime menu toggle. The auto-start toggle installs the machine-wide Run entry for per-user dashboard startup and the `SystemTelemetryFpsService` LocalSystem service used for privileged FPS collection.
+`install.cmd` requests elevation, stops running `CaseDash.exe` instances, waits for them to exit, installs `build\CaseDash.exe` into `C:\Program Files\CaseDash`, and leaves auto-start registration to the runtime menu toggle. The auto-start toggle installs the machine-wide Run entry for per-user dashboard startup and the `CaseDashFpsService` LocalSystem service used for privileged FPS collection.
 
 ## Developer Tooling Entrypoints
 
@@ -61,7 +61,7 @@ install.cmd
 - `test.cmd` is the maintained entrypoint for running the CTest suite against the built Release tree, and it prints verbose CTest output so GitHub runner logs show each test command and its stdout even when tests pass.
 - The repo `pre-commit` hook launches `tools\pre_commit_checks.ps1`, which formats staged eligible C++ files through `tools\run_clang_format.ps1` and runs `lint.cmd` before each commit. Git file discovery starts from all staged `.cpp` and `.h` paths, then the shared formatter filter limits work to maintained non-vendored `src\` and `tests\` files. The hook temporarily stashes unstaged and untracked files while it formats and lints the staged snapshot, restores them before exit, and aborts the commit when formatting or lint checks fail.
 - `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep checks maintained non-vendored `.cpp` and `.h` files under `src\` and `tests\`, excludes `board_gigabyte_siv.cpp`, `board_gigabyte_siv_bridge.cpp`, and `board_msi_center_bridge.cpp`, writes `build\clang_tidy_report.txt`, uses a four-minute per-file timeout, reports enabled analyzer, bugprone, unused internal function, and unused include findings as errors, and filters maintained include-cleaner false positives.
-- `lint.cmd tidy` runs a full optional `clang-tidy` sweep and commonly needs at least eight minutes on the current toolchain before it can report success or failure. Local development avoids this slow sweep unless explicitly requested. GitHub Actions owns the routine tidy sweep with `SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS` set to a larger per-file timeout and `SYSTEMTELEMETRY_TIDY_MAX_PARALLEL` set for runner stability.
+- `lint.cmd tidy` runs a full optional `clang-tidy` sweep and commonly needs at least eight minutes on the current toolchain before it can report success or failure. Local development avoids this slow sweep unless explicitly requested. GitHub Actions owns the routine tidy sweep with `CASEDASH_TIDY_TIMEOUT_SECONDS` set to a larger per-file timeout and `CASEDASH_TIDY_MAX_PARALLEL` set for runner stability.
 - CMake enables MSVC warning C4505 and treats it as an error so unreferenced internal functions are caught during normal builds when MSVC can diagnose them.
 - Native C++ targets compile with `/GR-`; production code uses explicit project type tags instead of native RTTI. The C++/CLI Gigabyte bridge keeps managed casts in its `/clr` translation unit.
 - Release app and benchmark builds compile size-oriented code with `/Os` and `/GL`, then link with `/LTCG`, `/OPT:REF`, and non-incremental linking so whole-program optimization and reference elimination reduce the shipped executable while benchmarks measure the same optimization profile. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` inside that Release profile so size work does not distort the maintained performance loops. Tests keep the normal Release compile/link path for faster local validation.
@@ -71,10 +71,10 @@ install.cmd
 ## GitHub Validation
 
 - The `Validation` workflow runs on every push, pull request, and manual dispatch.
-- The workflow restores the shared vcpkg download and registry caches under `.github-cache\SystemTelemetry` inside the checked-out workspace before validation, then saves the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads.
+- The workflow restores the shared vcpkg download and registry caches under `.github-cache\CaseDash` inside the checked-out workspace before validation, then saves the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads.
 - The workflow checks formatting first with `format.cmd`, then builds with `build.cmd`, runs tests with `test.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
 - The repository branch protection requires the `Validation` job before pull requests can merge.
-- The workflow uploads `build\SystemTelemetry.exe` as the `SystemTelemetry-exe` artifact after validation succeeds.
+- The workflow uploads `build\CaseDash.exe` as the `CaseDash-exe` artifact after validation succeeds.
 - The workflow uploads `build\clang_tidy_report.txt` as an artifact when it is produced.
 
 ## Provider Notes
@@ -93,7 +93,7 @@ If AMD GPU metrics are missing:
 ### NVIDIA GPU telemetry
 
 NVIDIA GPU metrics come from the NVML runtime installed with current NVIDIA display drivers.
-The NVIDIA FPS value comes from Windows DXGI/D3D9 ETW present events. When auto-start is enabled, the same executable also runs as the `SystemTelemetryFpsService` LocalSystem service and serves only the FPS sample to unelevated dashboards through a named pipe. Without that service, the dashboard falls back to local ETW collection, so the process needs permission to start a real-time ETW session, such as elevation or membership in the local `Performance Log Users` group. When Windows denies that access, the dashboard reports `Need admin` for FPS instead of treating it as ordinary unavailable data.
+The NVIDIA FPS value comes from Windows DXGI/D3D9 ETW present events. When auto-start is enabled, the same executable also runs as the `CaseDashFpsService` LocalSystem service and serves only the FPS sample to unelevated dashboards through a named pipe. Without that service, the dashboard falls back to local ETW collection, so the process needs permission to start a real-time ETW session, such as elevation or membership in the local `Performance Log Users` group. When Windows denies that access, the dashboard reports `Need admin` for FPS instead of treating it as ordinary unavailable data.
 
 If NVIDIA GPU metrics are missing:
 

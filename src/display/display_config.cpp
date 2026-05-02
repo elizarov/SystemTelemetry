@@ -142,8 +142,8 @@ bool ConfigureDisplay(
                ApplyConfiguredWallpaper(config, trace);
     }
 
-    const FilePath tempConfigPath = CreateTempFilePath(L"SystemTelemetryConfigureDisplayConfig");
-    const FilePath tempDumpPath = CreateTempFilePath(L"SystemTelemetryConfigureDisplayDump");
+    const FilePath tempConfigPath = CreateTempFilePath(L"CaseDashConfigureDisplayConfig");
+    const FilePath tempDumpPath = CreateTempFilePath(L"CaseDashConfigureDisplayDump");
     if (tempConfigPath.empty() || tempDumpPath.empty()) {
         return false;
     }
