@@ -89,7 +89,7 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
         DWORD read = 0;
         if (!ReadFile(pipe.Get(), buffer, static_cast<DWORD>(std::size(buffer)), &read, nullptr)) {
             const DWORD error = GetLastError();
-            if (error == ERROR_BROKEN_PIPE) {
+            if (error == ERROR_BROKEN_PIPE || error == ERROR_PIPE_NOT_CONNECTED) {
                 break;
             }
             diagnostics = "Failed to read FPS service response: " + Win32ErrorText(error);

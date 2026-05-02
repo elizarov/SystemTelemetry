@@ -44,7 +44,7 @@ bool IsAutoStartEnabledForCurrentExecutable() {
         return false;
     }
     return NormalizeWindowsPath(*registeredCommand) == NormalizeWindowsPath(*executablePath) &&
-           IsFpsServiceInstalledForCurrentExecutable();
+           IsFpsServiceRunningForCurrentExecutable();
 }
 
 LSTATUS WriteAutoStartRegistryValue(bool enabled) {

@@ -61,7 +61,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The `Scale` submenu offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog. Changing scale applies immediately.
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.
 - The `Storage drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.
-- The `Auto-start` command installs machine-wide logon startup for the dashboard UI through `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` and installs the machine-wide FPS service used for privileged presented-FPS capture. Enabling or disabling auto-start uses the elevated helper path when administrator rights are required.
+- The `Auto-start` command installs machine-wide logon startup for the dashboard UI through `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` and installs and starts the machine-wide FPS service used for privileged presented-FPS capture. The command is checked only when the Run entry targets the current executable and the matching FPS service is currently running. Enabling or disabling auto-start uses the elevated helper path when administrator rights are required.
 
 ## Layout-Edit Behavior
 

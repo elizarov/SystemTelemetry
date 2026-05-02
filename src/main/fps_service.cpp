@@ -457,14 +457,27 @@ DWORD StopAndDeleteFpsService() {
     return ERROR_SUCCESS;
 }
 
-bool IsFpsServiceInstalledForCurrentExecutable() {
+bool IsFpsServiceRunningForCurrentExecutable() {
     ServiceHandle manager;
     ServiceHandle service;
-    const DWORD status = OpenInstalledService(manager, SERVICE_QUERY_CONFIG, service);
+    const DWORD status = OpenInstalledService(manager, SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS, service);
     if (status != ERROR_SUCCESS) {
         return false;
     }
 
     const std::optional<std::wstring> binaryPath = QueryServiceBinaryPath(service.Get());
-    return binaryPath.has_value() && IsExpectedServiceBinaryPath(*binaryPath);
+    if (!binaryPath.has_value() || !IsExpectedServiceBinaryPath(*binaryPath)) {
+        return false;
+    }
+
+    SERVICE_STATUS_PROCESS serviceStatus{};
+    DWORD bytesNeeded = 0;
+    if (!QueryServiceStatusEx(service.Get(),
+            SC_STATUS_PROCESS_INFO,
+            reinterpret_cast<LPBYTE>(&serviceStatus),
+            sizeof(serviceStatus),
+            &bytesNeeded)) {
+        return false;
+    }
+    return serviceStatus.dwCurrentState == SERVICE_RUNNING;
 }

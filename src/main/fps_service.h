@@ -6,4 +6,4 @@ bool IsFpsServiceCommandLine();
 int RunFpsServiceMode();
 DWORD InstallOrUpdateFpsService();
 DWORD StopAndDeleteFpsService();
-bool IsFpsServiceInstalledForCurrentExecutable();
+bool IsFpsServiceRunningForCurrentExecutable();
