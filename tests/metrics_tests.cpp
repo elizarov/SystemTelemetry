@@ -246,6 +246,36 @@ TEST(Metrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
     EXPECT_EQ(rows[0].freeText, "1.5 TB");
 }
 
+TEST(Metrics, ScalesThroughputGraphsFromSmoothedHistoryInsteadOfCurrentSamples) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.network.uploadMbps = 1000.0;
+    snapshot.network.downloadMbps = 900.0;
+    snapshot.storage.readMbps = 700.0;
+    snapshot.storage.writeMbps = 600.0;
+
+    AddHistorySeries(snapshot, "network.upload", {5.0, 5.0, 5.0});
+    AddHistorySeries(snapshot, "network.download", {4.0, 4.0, 4.0});
+    AddHistorySeries(snapshot, "storage.read", {3.0, 3.0, 3.0});
+    AddHistorySeries(snapshot, "storage.write", {2.0, 2.0, 2.0});
+
+    MetricSource source(snapshot, metrics);
+
+    EXPECT_DOUBLE_EQ(source.ResolveThroughput("network.upload").maxGraph, 10.0);
+    EXPECT_DOUBLE_EQ(source.ResolveThroughput("network.download").maxGraph, 10.0);
+    EXPECT_DOUBLE_EQ(source.ResolveThroughput("storage.read").maxGraph, 10.0);
+    EXPECT_DOUBLE_EQ(source.ResolveThroughput("storage.write").maxGraph, 10.0);
+
+    SystemSnapshot spikingSnapshot;
+    AddHistorySeries(spikingSnapshot, "network.upload", {0.0, 0.0, 1000.0});
+    AddHistorySeries(spikingSnapshot, "network.download", {0.0, 0.0, 0.0});
+
+    MetricSource spikingSource(spikingSnapshot, metrics);
+
+    EXPECT_DOUBLE_EQ(spikingSource.ResolveThroughput("network.upload").history.back(), 500.0);
+    EXPECT_DOUBLE_EQ(spikingSource.ResolveThroughput("network.upload").maxGraph, 500.0);
+}
+
 TEST(Metrics, FormatsClockTimeAndDateFromConfiguredTokens) {
     SYSTEMTIME time{};
     time.wYear = 2026;
