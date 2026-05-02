@@ -7,6 +7,8 @@
     Scope="perMachine">
     <MajorUpgrade AllowDowngrades="yes" />
     <MediaTemplate EmbedCab="yes" />
+    <WixVariable Id="WixUIDialogBmp" Value="CaseDash_WixUIDialogBmp.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="CaseDash_WixUIBannerBmp.bmp" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run CaseDash now" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
