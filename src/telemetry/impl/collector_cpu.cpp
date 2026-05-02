@@ -72,10 +72,11 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
 
     PDH_FMT_COUNTERVALUE value{};
     PDH_STATUS loadStatus = PDH_INVALID_DATA;
-    if (state.cpu_.loadCounter != nullptr &&
-        (loadStatus = PdhGetFormattedCounterValue(state.cpu_.loadCounter, PDH_FMT_DOUBLE, nullptr, &value)) ==
-            ERROR_SUCCESS) {
-        state.snapshot_.cpu.loadPercent = ClampFinite(value.doubleValue, 0.0, 100.0);
+    if (state.cpu_.loadCounter != nullptr) {
+        loadStatus = PdhGetFormattedCounterValue(state.cpu_.loadCounter, PDH_FMT_DOUBLE, nullptr, &value);
+        if (loadStatus == ERROR_SUCCESS) {
+            state.snapshot_.cpu.loadPercent = ClampFinite(value.doubleValue, 0.0, 100.0);
+        }
     }
     state.trace_.WriteLazy([&] {
         return "telemetry:cpu_load status=" + PdhStatusCodeString(loadStatus) + " " +
@@ -84,11 +85,12 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
     state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.load", state.snapshot_.cpu.loadPercent);
 
     PDH_STATUS clockStatus = PDH_INVALID_DATA;
-    if (state.cpu_.frequencyCounter != nullptr &&
-        (clockStatus = PdhGetFormattedCounterValue(state.cpu_.frequencyCounter, PDH_FMT_DOUBLE, nullptr, &value)) ==
-            ERROR_SUCCESS) {
-        state.snapshot_.cpu.clock.value = FiniteOptional(value.doubleValue / 1000.0);
-        state.snapshot_.cpu.clock.unit = ScalarMetricUnit::Gigahertz;
+    if (state.cpu_.frequencyCounter != nullptr) {
+        clockStatus = PdhGetFormattedCounterValue(state.cpu_.frequencyCounter, PDH_FMT_DOUBLE, nullptr, &value);
+        if (clockStatus == ERROR_SUCCESS) {
+            state.snapshot_.cpu.clock.value = FiniteOptional(value.doubleValue / 1000.0);
+            state.snapshot_.cpu.clock.unit = ScalarMetricUnit::Gigahertz;
+        }
     }
     state.trace_.WriteLazy([&] {
         return "telemetry:cpu_clock status=" + PdhStatusCodeString(clockStatus) + " value=" +

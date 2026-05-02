@@ -109,9 +109,10 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
     for (const auto parameter : parameters) {
         const auto descriptor = FindLayoutEditTooltipDescriptor(parameter);
         ASSERT_TRUE(descriptor.has_value());
-        const auto it = catalog.find(descriptor->configKey);
-        ASSERT_TRUE(it != catalog.end()) << "missing localization key: " << descriptor->configKey;
-        EXPECT_FALSE(it->second.empty()) << "empty localization text for key: " << descriptor->configKey;
+        const LayoutEditTooltipDescriptor& tooltipDescriptor = *descriptor;
+        const auto it = catalog.find(tooltipDescriptor.configKey);
+        ASSERT_TRUE(it != catalog.end()) << "missing localization key: " << tooltipDescriptor.configKey;
+        EXPECT_FALSE(it->second.empty()) << "empty localization text for key: " << tooltipDescriptor.configKey;
     }
 }
 

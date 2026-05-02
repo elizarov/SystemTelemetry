@@ -237,7 +237,8 @@ public:
         }
 
         MsiCenterCapture capture(trace());
-        const bool captured = runtime_.Capture(msiCenterDirectory_->c_str(), capture);
+        const std::wstring& msiCenterDirectory = *msiCenterDirectory_;
+        const bool captured = runtime_.Capture(msiCenterDirectory.c_str(), capture);
         MsiCenterSnapshot snapshot = captured ? capture.FinishSuccess() : capture.FinishFailure();
         if (!captured) {
             diagnostics_ = snapshot.diagnostics;

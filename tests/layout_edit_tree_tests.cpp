@@ -291,8 +291,9 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     ASSERT_EQ(alphaRoot->children.size(), 2u);
     EXPECT_EQ(alphaRoot->children[0].label, "title");
     ASSERT_TRUE(alphaRoot->children[0].leaf.has_value());
-    EXPECT_TRUE(std::holds_alternative<LayoutCardTitleEditKey>(alphaRoot->children[0].leaf->focusKey));
-    EXPECT_EQ(std::get<LayoutCardTitleEditKey>(alphaRoot->children[0].leaf->focusKey).cardId, "alpha");
+    const LayoutEditTreeLeaf& alphaTitleLeaf = *alphaRoot->children[0].leaf;
+    EXPECT_TRUE(std::holds_alternative<LayoutCardTitleEditKey>(alphaTitleLeaf.focusKey));
+    EXPECT_EQ(std::get<LayoutCardTitleEditKey>(alphaTitleLeaf.focusKey).cardId, "alpha");
     EXPECT_EQ(alphaRoot->children[1].label, "layout");
     ASSERT_TRUE(alphaRoot->children[1].selectionHighlight.has_value());
     ASSERT_TRUE(std::holds_alternative<LayoutEditWidgetIdentity>(*alphaRoot->children[1].selectionHighlight));

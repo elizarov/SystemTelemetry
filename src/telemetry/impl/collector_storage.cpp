@@ -146,18 +146,24 @@ void UpdateStorageThroughput(RealTelemetryCollectorState& state, bool initialize
     PDH_STATUS readStatus = PDH_INVALID_DATA;
     PDH_STATUS writeStatus = PDH_INVALID_DATA;
 
-    if (state.storage_.readCounter != nullptr &&
-        (readStatus = PdhGetFormattedCounterValue(state.storage_.readCounter, PDH_FMT_DOUBLE, nullptr, &value)) ==
-            ERROR_SUCCESS) {
-        state.snapshot_.storage.readMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
+    if (state.storage_.readCounter != nullptr) {
+        readStatus = PdhGetFormattedCounterValue(state.storage_.readCounter, PDH_FMT_DOUBLE, nullptr, &value);
+        if (readStatus == ERROR_SUCCESS) {
+            state.snapshot_.storage.readMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
+        } else if (!initializeOnly) {
+            state.snapshot_.storage.readMbps = 0.0;
+        }
     } else if (!initializeOnly) {
         state.snapshot_.storage.readMbps = 0.0;
     }
 
-    if (state.storage_.writeCounter != nullptr &&
-        (writeStatus = PdhGetFormattedCounterValue(state.storage_.writeCounter, PDH_FMT_DOUBLE, nullptr, &value)) ==
-            ERROR_SUCCESS) {
-        state.snapshot_.storage.writeMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
+    if (state.storage_.writeCounter != nullptr) {
+        writeStatus = PdhGetFormattedCounterValue(state.storage_.writeCounter, PDH_FMT_DOUBLE, nullptr, &value);
+        if (writeStatus == ERROR_SUCCESS) {
+            state.snapshot_.storage.writeMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
+        } else if (!initializeOnly) {
+            state.snapshot_.storage.writeMbps = 0.0;
+        }
     } else if (!initializeOnly) {
         state.snapshot_.storage.writeMbps = 0.0;
     }

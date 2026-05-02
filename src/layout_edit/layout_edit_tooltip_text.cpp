@@ -309,17 +309,18 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
     }
 
     if (!metricKey.has_value() && !nodeFieldKey.has_value()) {
-        const std::wstring description = WideFromUtf8(FindLocalizedText(descriptor->configKey));
-        if (descriptor->valueFormat == configschema::ValueFormat::String && stringValue.has_value()) {
-            return BuildTooltipText(*descriptor, *stringValue, description);
+        const LayoutEditTooltipDescriptor& tooltipDescriptor = *descriptor;
+        const std::wstring description = WideFromUtf8(FindLocalizedText(tooltipDescriptor.configKey));
+        if (tooltipDescriptor.valueFormat == configschema::ValueFormat::String && stringValue.has_value()) {
+            return BuildTooltipText(tooltipDescriptor, *stringValue, description);
         }
-        if (descriptor->valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()) {
-            return BuildTooltipText(*descriptor, *fontValue, description);
+        if (tooltipDescriptor.valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()) {
+            return BuildTooltipText(tooltipDescriptor, *fontValue, description);
         }
-        if (descriptor->valueFormat == configschema::ValueFormat::ColorHex && colorExpressionValue.has_value()) {
-            return BuildTooltipText(*descriptor, *colorExpressionValue, description);
+        if (tooltipDescriptor.valueFormat == configschema::ValueFormat::ColorHex && colorExpressionValue.has_value()) {
+            return BuildTooltipText(tooltipDescriptor, *colorExpressionValue, description);
         }
-        return BuildTooltipText(*descriptor, value, description);
+        return BuildTooltipText(tooltipDescriptor, value, description);
     }
 
     return AbortTooltipBuild(errorReason, "unsupported_target");

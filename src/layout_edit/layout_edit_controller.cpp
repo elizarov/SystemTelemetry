@@ -60,10 +60,10 @@ std::string DescribeGapEditAnchor(const LayoutEditGapAnchor& anchor) {
 }
 
 std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
-    const std::string subject = LayoutEditAnchorParameter(key).has_value()
-                                    ? "parameter=" + DescribeWidgetParameter(*LayoutEditAnchorParameter(key))
-                                : LayoutEditAnchorMetricKey(key).has_value()
-                                    ? "metric=" + LayoutEditAnchorMetricKey(key)->metricId
+    const std::optional<LayoutEditParameter> parameter = LayoutEditAnchorParameter(key);
+    const std::optional<LayoutMetricEditKey> metricKey = LayoutEditAnchorMetricKey(key);
+    const std::string subject = parameter.has_value()   ? "parameter=" + DescribeWidgetParameter(*parameter)
+                                : metricKey.has_value() ? "metric=" + metricKey->metricId
                                 : LayoutEditAnchorNodeFieldKey(key).has_value()           ? "node_field"
                                 : LayoutEditAnchorContainerChildOrderKey(key).has_value() ? "container_child_reorder"
                                                                                           : "subject=unknown";

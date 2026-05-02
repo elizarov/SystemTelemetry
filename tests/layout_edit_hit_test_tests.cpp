@@ -225,7 +225,8 @@ TEST(LayoutEditHitTest, AnchorHandleBeatsOverlappingGapAndWidgetGuideByPriority)
     const LayoutEditHoverResolution hover = ResolveLayoutEditHover(regions, RenderPoint{15, 15});
 
     ASSERT_TRUE(hover.actionableAnchorHandle.has_value());
-    EXPECT_EQ(std::get<LayoutEditParameter>(hover.actionableAnchorHandle->subject), LayoutEditParameter::FontLabel);
+    const LayoutEditAnchorKey& actionableAnchorHandle = *hover.actionableAnchorHandle;
+    EXPECT_EQ(std::get<LayoutEditParameter>(actionableAnchorHandle.subject), LayoutEditParameter::FontLabel);
     EXPECT_FALSE(hover.actionableGapEditAnchor.has_value());
     EXPECT_FALSE(hover.hoveredWidgetEditGuide.has_value());
 }
@@ -250,7 +251,8 @@ TEST(LayoutEditHitTest, AnchorTargetUsesSmallestContainingArea) {
     const auto hit = HitTestEditableAnchorTarget(regions, RenderPoint{25, 25});
 
     ASSERT_TRUE(hit.has_value());
-    EXPECT_EQ(std::get<LayoutEditParameter>(hit->key.subject), LayoutEditParameter::FontLabel);
+    const LayoutEditAnchorRegion& targetHit = *hit;
+    EXPECT_EQ(std::get<LayoutEditParameter>(targetHit.key.subject), LayoutEditParameter::FontLabel);
 }
 
 TEST(LayoutEditHitTest, ColorRegionUsesPriorityThenSmallestArea) {
@@ -262,7 +264,8 @@ TEST(LayoutEditHitTest, ColorRegionUsesPriorityThenSmallestArea) {
     const auto hit = HitTestEditableColorRegion(regions, RenderPoint{25, 25});
 
     ASSERT_TRUE(hit.has_value());
-    EXPECT_EQ(hit->parameter, LayoutEditParameter::ColorForeground);
+    const LayoutEditColorRegion& colorHit = *hit;
+    EXPECT_EQ(colorHit.parameter, LayoutEditParameter::ColorForeground);
 }
 
 TEST(LayoutEditHitTest, FindsGuideFamiliesByIdentity) {
@@ -354,14 +357,15 @@ TEST(LayoutEditHitTest, CpuMetricListClockRowAndContainerReorderAnchorsDoNotOver
     }
 
     ASSERT_TRUE(clockRowAnchor.has_value());
+    const LayoutEditAnchorRegion& clockRowAnchorValue = *clockRowAnchor;
     const auto containerAnchor = std::find_if(containerAnchors.begin(),
         containerAnchors.end(),
-        [&](const auto& anchor) { return anchor.targetRect.Contains(clockRowAnchor->anchorRect.Center()); });
+        [&](const auto& anchor) { return anchor.targetRect.Contains(clockRowAnchorValue.anchorRect.Center()); });
     ASSERT_NE(containerAnchor, containerAnchors.end());
 
-    EXPECT_FALSE(RectsOverlap(clockRowAnchor->anchorRect, containerAnchor->anchorRect));
-    EXPECT_FALSE(RectsOverlap(clockRowAnchor->anchorHitRect, containerAnchor->anchorHitRect));
-    EXPECT_TRUE(HasFourByFourHitBlock(regions, AnchorHandleRegion(*clockRowAnchor)));
+    EXPECT_FALSE(RectsOverlap(clockRowAnchorValue.anchorRect, containerAnchor->anchorRect));
+    EXPECT_FALSE(RectsOverlap(clockRowAnchorValue.anchorHitRect, containerAnchor->anchorHitRect));
+    EXPECT_TRUE(HasFourByFourHitBlock(regions, AnchorHandleRegion(clockRowAnchorValue)));
     EXPECT_TRUE(HasFourByFourHitBlock(regions, AnchorHandleRegion(*containerAnchor)));
 }
 

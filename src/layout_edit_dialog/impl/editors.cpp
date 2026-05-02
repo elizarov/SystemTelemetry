@@ -1437,7 +1437,8 @@ bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd,
         const int rowIndex = MetricListRowIndexFromControlId(controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE);
         return MutateMetricListOrderRows(state, hwnd, [&](std::vector<std::string>& metricRefs) {
             if (rowIndex >= 0 && rowIndex + 1 < static_cast<int>(metricRefs.size())) {
-                std::swap(metricRefs[static_cast<size_t>(rowIndex)], metricRefs[static_cast<size_t>(rowIndex + 1)]);
+                const size_t index = static_cast<size_t>(rowIndex);
+                std::swap(metricRefs[index], metricRefs[index + 1]);
             }
         });
     }
