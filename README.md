@@ -23,7 +23,7 @@ It's me, [Roman Elizarov](https://github.com/elizarov), of ICPC and Kotlin fame.
 - Theme system that derives a full dashboard palette from a small set of key colors.
 - Small, fast native executable optimized for dashboard use: just over a 1 MB `.exe`, with frame drawing measured in milliseconds.
 - Layouts for small panels from 5-inch 800x480 screens up to wide 9-inch 1920x480 screens.
-- Built-in secondary-display setup through `Config To Display`, including wallpaper setup so the dash screen looks intentional even while the app starts.
+- Built-in secondary-display setup through `Configure Display`, including wallpaper setup so the dash screen looks intentional even while the app starts.
 - Keeps its configured monitor, position, and scale without extra placement software.
 - Machine-wide auto-start setup works for all users on the PC out of the box.
 - Tray and dashboard menus for layout, theme, scale, device selection, display setup, and auto-start.
@@ -48,8 +48,8 @@ Motherboards:
 1. Download and run `CaseDash.exe`.
 2. Right-click the dashboard or tray icon.
 3. Pick a layout and theme.
-4. Use `Config To Display` to choose the small screen. It computes the correct full-screen scale and configures its startup wallpaper.
-5. Enable `Auto-start on user logon` when the panel is ready for daily use.
+4. Use `Configure Display` to choose the small screen. It computes the correct full-screen scale and configures its startup wallpaper.
+5. Enable `Start with Windows` when the panel is ready for daily use.
 
 Configuration is saved beside the executable as `config.ini`; the embedded default config remains the baseline when no local config exists.
 
@@ -63,9 +63,14 @@ Good areas to explore:
 - New layouts for different screen sizes and mounting styles.
 - New GPU telemetry modules.
 - New motherboard sensor modules.
+- Localization: does it need translation? Which languages, and which parts of the UI?
 - All great ideas are welcome. Open an issue and write what you want to achieve.
 
 Linux users: are you interested? What hardware do you have? A Linux port would be a cool project to undertake; write up your use cases.
+
+## Technical Debt
+
+There is code here that I am not proud of, but it works. I do not clean code just for the sake of it; I clean it gradually when adding features or fixing bugs.
 
 ## Build And Docs
 
