@@ -6,6 +6,12 @@ It is not a generic hardware-monitoring suite. CaseDash is focused on making a p
 
 It works on my machines, with the hardware I have. Contributions are welcome for everything else.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/image/casedash-screenshot-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/image/casedash-screenshot-light.png">
+  <img alt="CaseDash dashboard with built-in fake telemetry" src="docs/image/casedash-screenshot-light.png" width="800">
+</picture>
+
 ## Who and why?
 
 It's me, [Roman Elizarov](https://github.com/elizarov), of ICPC and Kotlin fame. Why a native C++ app? Because I can. It is an experiment for myself in what is possible to build: a tiny, fast, native dashboard with a real layout system, rich themes, and no painful pixel pushing. I'd be glad if it is useful for you, too.
