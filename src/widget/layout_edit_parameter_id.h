@@ -65,6 +65,7 @@
     X(ColorForeground, ColorsConfig::foregroundColorMeta)                                                              \
     X(ColorIcon, ColorsConfig::iconColorMeta)                                                                          \
     X(ColorPeakGhost, ColorsConfig::peakGhostColorMeta)                                                                \
+    X(ColorWarning, ColorsConfig::warningColorMeta)                                                                    \
     X(ColorAccent, ColorsConfig::accentColorMeta)                                                                      \
     X(ColorLayoutGuide, ColorsConfig::layoutGuideColorMeta)                                                            \
     X(ColorActiveEdit, ColorsConfig::activeEditColorMeta)                                                              \

@@ -30,6 +30,7 @@ enum class RenderColorId {
     Icon,
     Accent,
     PeakGhost,
+    Warning,
     MutedText,
     Track,
     LayoutGuide,

@@ -35,6 +35,8 @@ Token meanings:
 
 Color role sections map application-specific color names to literal colors or to colors derived from the active theme.
 
+The dashboard `[colors]` roles include text, icon, accent, peak ghost, warning, panel, track, graph, and layout-edit guide colors. `warning_color` is used for short permission-required indicators such as `Need admin`.
+
 Sections are:
 
 ```toml

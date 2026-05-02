@@ -12,6 +12,7 @@ struct FpsTelemetrySample {
     std::string processName;
     std::string diagnostics = "FPS ETW provider not initialized.";
     bool available = false;
+    bool permissionRequired = false;
 };
 
 class FpsTelemetryProvider {

@@ -150,6 +150,7 @@ public:
         if (fpsProvider_ != nullptr) {
             const FpsTelemetrySample fpsSample = fpsProvider_->Sample();
             fpsDiagnostics_ = fpsSample.diagnostics;
+            sample.fpsPermissionRequired = fpsSample.permissionRequired;
             if (fpsSample.fps.has_value()) {
                 sample.fps = *fpsSample.fps;
                 sample.available = true;

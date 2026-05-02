@@ -63,6 +63,10 @@ std::string Win32ErrorText(ULONG status) {
     return text;
 }
 
+bool IsPermissionDenied(ULONG status) {
+    return status == ERROR_ACCESS_DENIED;
+}
+
 std::wstring BuildSessionName() {
     return L"SystemTelemetryPresentedFps-" + std::to_wstring(GetCurrentProcessId());
 }
@@ -143,6 +147,7 @@ public:
             trace_.Write("fps_etw:start_trace_retry status=" + Win32ErrorText(status));
         }
         if (status != ERROR_SUCCESS) {
+            permissionRequired_ = IsPermissionDenied(status);
             diagnostics_ = "Failed to start FPS ETW session: " + Win32ErrorText(status);
             return false;
         }
@@ -157,6 +162,8 @@ public:
         trace_.Write("fps_etw:enable dxgi=" + Win32ErrorText(dxgiStatus) + " d3d9=" + Win32ErrorText(d3d9Status) +
                      " dxgkrnl=" + Win32ErrorText(dxgkrnlStatus));
         if (!dxgiEnabled_ && !d3d9Enabled_ && !dxgkrnlEnabled_) {
+            permissionRequired_ =
+                IsPermissionDenied(dxgiStatus) || IsPermissionDenied(d3d9Status) || IsPermissionDenied(dxgkrnlStatus);
             diagnostics_ = "Failed to enable FPS ETW providers: dxgi=" + Win32ErrorText(dxgiStatus) +
                            " d3d9=" + Win32ErrorText(d3d9Status) + " dxgkrnl=" + Win32ErrorText(dxgkrnlStatus);
             StopLocked();
@@ -187,6 +194,7 @@ public:
         });
 
         diagnostics_ = "Presented FPS ETW provider active.";
+        permissionRequired_ = false;
         initialized_ = true;
         trace_.Write("fps_etw:initialize_done dxgi=" + Trace::BoolText(dxgiEnabled_) +
                      " d3d9=" + Trace::BoolText(d3d9Enabled_) + " dxgkrnl=" + Trace::BoolText(dxgkrnlEnabled_));
@@ -201,6 +209,7 @@ public:
         FpsTelemetrySample sample;
         sample.diagnostics = diagnostics_;
         sample.available = initialized_;
+        sample.permissionRequired = permissionRequired_;
         if (!initialized_ || qpcFrequency_ <= 0) {
             return sample;
         }
@@ -379,6 +388,7 @@ private:
     bool dxgiEnabled_ = false;
     bool d3d9Enabled_ = false;
     bool dxgkrnlEnabled_ = false;
+    bool permissionRequired_ = false;
     bool initialized_ = false;
 };
 

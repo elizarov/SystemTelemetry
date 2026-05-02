@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <optional>
 
 #include "telemetry/metrics.h"
 
@@ -120,6 +121,7 @@ TEST(Metrics, ResolvesNothingPlaceholderMetricAsUnavailableValue) {
     const MetricValue& metric = source.ResolveMetric("nothing");
     EXPECT_EQ(metric.label, "Nothing");
     EXPECT_EQ(metric.valueText, "N/A");
+    EXPECT_EQ(metric.state, MetricValueState::Unavailable);
     EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.0);
 }
@@ -160,6 +162,7 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     const MetricValue& fps = source.ResolveMetric("gpu.fps");
     EXPECT_EQ(fps.label, "FPS");
     EXPECT_EQ(fps.valueText, "144 FPS");
+    EXPECT_EQ(fps.state, MetricValueState::Available);
     EXPECT_DOUBLE_EQ(fps.ratio, 0.6);
     EXPECT_DOUBLE_EQ(fps.peakRatio, 0.6);
 
@@ -168,6 +171,21 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     EXPECT_EQ(metricList[0].label, "Load");
     EXPECT_EQ(metricList[1].label, "VRAM");
     EXPECT_EQ(metricList[2].label, "FPS");
+}
+
+TEST(Metrics, ResolvesGpuFpsPermissionIssueAsNeedAdmin) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.gpu.fps = ScalarMetric{std::nullopt, ScalarMetricUnit::Fps, ScalarMetricIssue::PermissionRequired};
+    AddHistorySeries(snapshot, "gpu.fps", {72.0, 144.0, 120.0});
+
+    MetricSource source(snapshot, metrics);
+
+    const MetricValue& fps = source.ResolveMetric("gpu.fps");
+    EXPECT_EQ(fps.label, "FPS");
+    EXPECT_EQ(fps.valueText, "Need admin");
+    EXPECT_EQ(fps.state, MetricValueState::PermissionRequired);
+    EXPECT_DOUBLE_EQ(fps.ratio, 0.0);
 }
 
 TEST(Metrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
