@@ -20,12 +20,12 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - For color values, `Save Config` compares the persisted color expression or literal text, so switching themes does not write derived color roles whose expressions are unchanged.
 - Saved config text has no leading empty lines; retained comments and sections are separated by a single empty line when a new section is inserted after them.
 - When `Save Config` creates a new executable-side `config.ini`, it writes only the values that differ from the embedded defaults.
-- `Save Full Config To...` exports a full config in the embedded-template shape with live values filled in.
+- `Export Full Config...` exports a full config in the embedded-template shape with live values filled in.
 - Save and export omit runtime-only placeholder metric metadata such as `nothing`, even when metric-list bindings still reference that placeholder id.
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
 - `Save Config` persists live placement, active theme selection, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
-- `Config To Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `casedash_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
-- `Config To Display` marks a display entry with a checkbox when the live config already targets that display at `0,0` and the configured wallpaper path is non-empty, while still allowing that checked entry to be invoked again.
+- `Configure Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `casedash_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
+- `Configure Display` marks a display entry with a checkbox when the live config already targets that display at `0,0` and the configured wallpaper path is non-empty, while still allowing that checked entry to be invoked again.
 
 ## Dashboard Composition And Rendering
 
@@ -51,25 +51,28 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 
 ## Runtime Controls And Menus
 
-- Right-clicking the dashboard opens a popup menu with move, raise, reload, save, layout, theme, scale, network, storage-drive, config-to-display, auto-start, diagnostics, about, and exit actions.
-- The `Diagnostics` submenu exposes the same dump, screenshot, layout-guide-sheet, and full-config export formats used by the diagnostics subsystem.
+- Right-clicking the dashboard opens a popup menu with `Move`, `Bring to Front`, `Layout`, `Theme`, `Display`, `Devices`, `Edit Layout`, `Start with Windows`, `About CaseDash`, and `Exit` actions.
+- The `Display` submenu contains `Configure Display` and `Scale`; `Configure Display` lists target displays, and `Scale` offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog.
+- The `Devices` submenu contains `Network` and `Storage Drives`.
+- The `Edit Layout` submenu contains the checked `Edit Layout` mode toggle, `Layout Editor...`, and `Save Config`.
+- Holding Alt while opening the dashboard or tray popup menu adds an `Advanced` submenu with `Reload Config`, `Save Config`, `Export Full Config...`, `Export Snapshot Dump...`, `Save Screenshot...`, and `Save Layout Guide Sheet...`.
 - The tray icon exposes the same action set as the dashboard menu.
 - `About CaseDash` shows the compiled version, build kind, and commit when available.
-- The dashboard uses normal window Z-order behavior; `Bring On Top` raises it when needed.
-- Double-clicking the tray icon performs `Bring On Top`.
-- The tray menu shows `Bring On Top` as its default action.
+- The dashboard uses normal window Z-order behavior; `Bring to Front` raises it when needed.
+- Double-clicking the tray icon performs `Bring to Front`.
+- The tray menu shows `Bring to Front` as its default action.
 - Move mode keeps the dashboard attached to the pointer until placement completes and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard.
 - The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless layout-editor refresh work runs.
 - The `Layout` and `Theme` submenus list configured named sections as `name - description` when a description is configured, mark the active entry, apply a new selection immediately, and repaint the dashboard before any modeless layout-editor refresh work runs. The `Theme` submenu appears immediately after `Layout`.
-- The `Scale` submenu offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog. Changing scale applies immediately.
+- The `Scale` submenu changes scale immediately.
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.
-- The `Storage drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.
-- The `Auto-start` command installs machine-wide logon startup for the dashboard UI through `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` and installs and starts the machine-wide FPS service used for privileged presented-FPS capture. The command is checked only when the Run entry targets the current executable and the matching FPS service is currently running. Enabling or disabling auto-start uses the elevated helper path when administrator rights are required.
+- The `Storage Drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.
+- The `Start with Windows` command installs machine-wide logon startup for the dashboard UI through `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` and installs and starts the machine-wide FPS service used for privileged presented-FPS capture. The command is checked only when the Run entry targets the current executable and the matching FPS service is currently running. Enabling or disabling auto-start uses the elevated helper path when administrator rights are required.
 
 ## Layout-Edit Behavior
 
-- `Edit layout mode` toggles interactive layout-edit mode from the popup menu, `Edit layout dialog...` starts layout-edit mode when needed and opens the edit configuration dialog, and the command line can also start the dashboard in that mode for live UI or screenshot diagnostics.
-- Layout-edit mode stays active across move mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Config To Display` completes successfully.
+- `Edit Layout` toggles interactive layout-edit mode from the popup menu, `Layout Editor...` starts layout-edit mode when needed and opens the edit configuration dialog, and the command line can also start the dashboard in that mode for live UI or screenshot diagnostics.
+- Layout-edit mode stays active across move mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Configure Display` completes successfully.
 - While layout-edit mode is active, the renderer shows container guides, a thin single-line outline around the hovered widget or hovered card header content, supported widget-local guides, and matching edit cursors.
 - Hovering actionable text, card chrome, bars, metric rows, reorder handles, or widget-local geometry exposes the matching highlight and edit affordance for that target class.
 - Hovering actionable text or pillbar targets draws the dotted outline around that text or pillbar target regardless of which overlapping handle, wedge, color region, or context action wins the focused edit action.

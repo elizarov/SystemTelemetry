@@ -1151,13 +1151,17 @@ void DashboardShellUi::ShowContextMenu(
     DashboardShellUiModalScope scopedModalUi(*this);
     DashboardSessionState& state = app_.controller_.State();
     HMENU menu = CreatePopupMenu();
-    HMENU diagnosticsMenu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
     HMENU themeMenu = CreatePopupMenu();
     HMENU networkMenu = CreatePopupMenu();
     HMENU scaleMenu = CreatePopupMenu();
     HMENU storageDrivesMenu = CreatePopupMenu();
     HMENU configureDisplayMenu = CreatePopupMenu();
+    HMENU displayMenu = CreatePopupMenu();
+    HMENU devicesMenu = CreatePopupMenu();
+    HMENU editLayoutMenu = CreatePopupMenu();
+    const bool showAdvancedMenu = (::GetKeyState(VK_MENU) & 0x8000) != 0;
+    HMENU advancedMenu = showAdvancedMenu ? CreatePopupMenu() : nullptr;
     const UINT autoStartFlags = MF_STRING | (app_.controller_.IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     state.layoutMenuOptions.clear();
     for (size_t i = 0; i < state.config.layout.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax; ++i) {
@@ -1286,11 +1290,24 @@ void DashboardShellUi::ShowContextMenu(
             AppendMenuW(configureDisplayMenu, flags, option.commandId, label.c_str());
         }
     }
-    AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveFullConfigAs, L"Save Full Config To...");
-    AppendMenuW(diagnosticsMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveDumpAs, L"Save Dump To...");
-    AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot To...");
-    AppendMenuW(diagnosticsMenu, MF_STRING, kCommandSaveLayoutGuideSheetAs, L"Save Layout Guide Sheet To...");
+    AppendMenuW(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), L"Configure Display");
+    AppendMenuW(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), L"Scale");
+    AppendMenuW(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), L"Network");
+    AppendMenuW(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), L"Storage Drives");
+    AppendMenuW(editLayoutMenu,
+        MF_STRING | (state.isEditingLayout ? MF_CHECKED : MF_UNCHECKED),
+        kCommandEditLayout,
+        L"Edit Layout");
+    AppendMenuW(editLayoutMenu, MF_STRING, kCommandEditLayoutDialog, L"Layout Editor...");
+    AppendMenuW(editLayoutMenu, MF_STRING, kCommandSaveConfig, L"Save Config");
+    if (advancedMenu != nullptr) {
+        AppendMenuW(advancedMenu, MF_STRING, kCommandReloadConfig, L"Reload Config");
+        AppendMenuW(advancedMenu, MF_STRING, kCommandSaveConfig, L"Save Config");
+        AppendMenuW(advancedMenu, MF_STRING, kCommandSaveFullConfigAs, L"Export Full Config...");
+        AppendMenuW(advancedMenu, MF_STRING, kCommandSaveDumpAs, L"Export Snapshot Dump...");
+        AppendMenuW(advancedMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot...");
+        AppendMenuW(advancedMenu, MF_STRING, kCommandSaveLayoutGuideSheetAs, L"Save Layout Guide Sheet...");
+    }
     if (layoutEditTarget.has_value()) {
         std::wstring label;
         if (const auto* guide = std::get_if<LayoutEditGuide>(&layoutEditTarget->payload)) {
@@ -1327,20 +1344,16 @@ void DashboardShellUi::ShowContextMenu(
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     }
     AppendMenuW(menu, MF_STRING, kCommandMove, L"Move");
-    AppendMenuW(
-        menu, MF_STRING | (state.isEditingLayout ? MF_CHECKED : MF_UNCHECKED), kCommandEditLayout, L"Edit layout mode");
-    AppendMenuW(menu, MF_STRING, kCommandEditLayoutDialog, L"Edit layout dialog...");
-    AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring On Top");
-    AppendMenuW(menu, MF_STRING, kCommandReloadConfig, L"Reload Config");
-    AppendMenuW(menu, MF_STRING, kCommandSaveConfig, L"Save Config");
+    AppendMenuW(menu, MF_STRING, kCommandBringOnTop, L"Bring to Front");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), L"Layout");
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(themeMenu), L"Theme");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), L"Scale");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), L"Network");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), L"Storage drives");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), L"Config To Display");
-    AppendMenuW(menu, autoStartFlags, kCommandAutoStart, L"Auto-start on user logon");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(diagnosticsMenu), L"Diagnostics");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(displayMenu), L"Display");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(devicesMenu), L"Devices");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(editLayoutMenu), L"Edit Layout");
+    AppendMenuW(menu, autoStartFlags, kCommandAutoStart, L"Start with Windows");
+    if (advancedMenu != nullptr) {
+        AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(advancedMenu), L"Advanced");
+    }
     AppendMenuW(menu, MF_STRING, kCommandAbout, L"About CaseDash");
     AppendMenuW(menu, MF_STRING, kCommandExit, L"Exit");
     const UINT defaultCommand = ResolveDefaultCommand(source, layoutEditTarget);
