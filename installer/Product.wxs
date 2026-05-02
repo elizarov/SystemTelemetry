@@ -1,4 +1,6 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix
+  xmlns="http://wixtoolset.org/schemas/v4/wxs"
+  xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
     Name="CaseDash"
     Manufacturer="Roman Elizarov"
@@ -7,6 +9,41 @@
     Scope="perMachine">
     <MajorUpgrade DowngradeErrorMessage="A newer version of CaseDash is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run CaseDash now" />
+    <Property Id="WixShellExecTarget" Value="[#CaseDashExeFile]" />
+    <CustomAction
+      Id="LaunchCaseDash"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixShellExec"
+      Impersonate="yes" />
+    <SetProperty
+      Id="RemoveCaseDashRunValue"
+      Value="&quot;[SystemFolder]reg.exe&quot; delete &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run&quot; /v CaseDash /f"
+      Before="RemoveCaseDashRunValue"
+      Sequence="execute"
+      Condition="REMOVE=&quot;ALL&quot;" />
+    <CustomAction
+      Id="RemoveCaseDashRunValue"
+      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+      DllEntry="WixQuietExec64"
+      Execute="deferred"
+      Impersonate="no"
+      Return="ignore" />
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+    <UI>
+      <Publish
+        Dialog="ExitDialog"
+        Control="Finish"
+        Event="DoAction"
+        Value="LaunchCaseDash"
+        Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+
+    <InstallExecuteSequence>
+      <Custom Action="RemoveCaseDashRunValue" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
 
     <Feature Id="MainFeature" Title="CaseDash" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
@@ -21,6 +58,15 @@
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="CaseDashExeComponent" Guid="71D937AF-A37F-43E9-BE22-20C6E4C6554B" Bitness="always64">
         <File Id="CaseDashExeFile" Source="$(var.CaseDashExePath)" KeyPath="yes" />
+        <RemoveFile Id="RemoveExecutableConfig" Name="config.ini" On="uninstall" />
+        <RemoveFile Id="RemoveBlankWallpaper" Name="casedash_blank.png" On="uninstall" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+        <ServiceControl
+          Id="RemoveCaseDashFpsService"
+          Name="CaseDashFpsService"
+          Stop="uninstall"
+          Remove="uninstall"
+          Wait="yes" />
       </Component>
     </ComponentGroup>
   </Fragment>

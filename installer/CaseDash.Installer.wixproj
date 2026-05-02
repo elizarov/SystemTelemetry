@@ -12,4 +12,9 @@
     <IntermediateOutputPath Condition="'$(IntermediateOutputPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer\</IntermediateOutputPath>
     <DefineConstants>ProductVersion=$(ProductVersion);CaseDashExePath=$(CaseDashExePath)</DefineConstants>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
+  </ItemGroup>
 </Project>
