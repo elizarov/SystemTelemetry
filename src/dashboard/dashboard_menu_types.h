@@ -13,6 +13,7 @@ struct LayoutMenuOption {
 struct ThemeMenuOption {
     UINT commandId = 0;
     std::string name;
+    std::string description;
     bool selected = false;
 };
 

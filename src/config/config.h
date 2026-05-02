@@ -102,6 +102,7 @@ struct ThemeConfig {
     std::string name;
 
     CONFIG_REFLECTED_STRUCT(ThemeConfig)
+    CONFIG_VALUE(std::string, description, "description");
     CONFIG_EDITABLE_VALUE(ColorConfig, background, "background");
     CONFIG_EDITABLE_VALUE(ColorConfig, foreground, "foreground");
     CONFIG_EDITABLE_VALUE(ColorConfig, accent, "accent");

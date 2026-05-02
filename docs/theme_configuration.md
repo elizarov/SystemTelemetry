@@ -20,7 +20,9 @@ Each theme is defined in a section named:
 [theme.<name>]
 ```
 
-A standard theme defines these base tokens:
+A standard theme defines a `description` value and these base tokens:
+
+`description` is the user-visible summary shown next to the theme name in menus and in the theme section editor.
 
 Token meanings:
 
@@ -165,6 +167,7 @@ The dashboard popup menu and tray menu include a `Theme` submenu immediately aft
 The `Theme` submenu:
 
 - Lists all configured `[theme.<name>]` sections.
+- Shows each theme description after its name when one is configured.
 - Marks the active `[display] theme` value.
 - Applies a selected theme immediately and repaints the dashboard.
 - Keeps layout-edit mode active when a theme is selected.
@@ -177,6 +180,7 @@ The modeless `Edit Configuration` dialog exposes theme editing through the exist
 Theme section behavior:
 
 - Only the active `[theme.<name>]` section selected by `[display] theme` appears in the dialog tree.
+- The active theme section description is shown in the right-hand editor pane.
 - Selecting the active theme section shows a theme selector dropdown listing all configured themes. Changing the selector updates `[display] theme`, previews immediately, refreshes the tree to the newly active theme section, and keeps the edit session active.
 - The active theme section editor shows an equilateral triangle preview below the dropdown. The triangle top edge blends from `background` at the left vertex to `foreground` at the right vertex, the bottom-center vertex is `accent`, and a thin vertical line through the triangle uses `guide`.
 - Expanding the active theme section shows one literal color editor for each standard theme token: `background`, `foreground`, `accent`, and `guide`.

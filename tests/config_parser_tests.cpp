@@ -257,6 +257,30 @@ TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
     RemoveFileIfExists(path);
 }
 
+TEST(ConfigParser, ParsesNamedThemeSectionsThroughReflectedDynamicBindings) {
+    const FilePath path = WriteTestConfig("[display]\n"
+                                          "theme = dusk\n"
+                                          "\n"
+                                          "[theme.dusk]\n"
+                                          "description = Dusk Contrast\n"
+                                          "background = #101820FF\n"
+                                          "foreground = #F2F5F8FF\n"
+                                          "accent = #FFB000FF\n"
+                                          "guide = #00A6FFFF\n");
+
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+
+    ASSERT_EQ(config.layout.themes.size(), 1u);
+    EXPECT_EQ(config.layout.themes[0].name, "dusk");
+    EXPECT_EQ(config.layout.themes[0].description, "Dusk Contrast");
+    EXPECT_EQ(config.layout.themes[0].background, 0x101820FFu);
+    EXPECT_EQ(config.layout.themes[0].foreground, 0xF2F5F8FFu);
+    EXPECT_EQ(config.layout.themes[0].accent, 0xFFB000FFu);
+    EXPECT_EQ(config.layout.themes[0].guide, 0x00A6FFFFu);
+
+    RemoveFileIfExists(path);
+}
+
 TEST(ConfigParser, ParsesDateTimeWidgetFormatParameters) {
     const FilePath path = WriteTestConfig("[display]\n"
                                           "layout = test\n"

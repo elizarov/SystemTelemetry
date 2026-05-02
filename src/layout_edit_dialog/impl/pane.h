@@ -77,4 +77,4 @@ void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state);
 void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd, size_t rowCount);
 void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd);
 void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd);
-void SetLayoutEditDescription(HWND hwnd, const LayoutEditTreeNode* node);
+void SetLayoutEditDescription(LayoutEditDialogState* state, HWND hwnd, const LayoutEditTreeNode* node);

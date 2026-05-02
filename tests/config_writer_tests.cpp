@@ -166,6 +166,7 @@ TEST(ConfigWriter, FullExportWritesThemeSections) {
                            "theme = dark_cyan\r\n"));
     EXPECT_THAT(output,
         testing::HasSubstr("[theme.dark_cyan]\r\n"
+                           "description = Black dashboard with cyan highlights\r\n"
                            "background = #000000FF\r\n"
                            "foreground = #FFFFFFFF\r\n"
                            "accent = #00BFFFFF\r\n"
@@ -255,6 +256,25 @@ TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughReflectedDynamicBindings
                            "description = Portrait Test\r\n"
                            "window = 600,900\r\n"
                            "cards = columns(cpu,gpu)\r\n"));
+}
+
+TEST(ConfigWriter, SavesNamedThemeSectionChangesThroughReflectedDynamicBindings) {
+    AppConfig compareConfig = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
+    AppConfig currentConfig = compareConfig;
+
+    const auto it = std::find_if(currentConfig.layout.themes.begin(),
+        currentConfig.layout.themes.end(),
+        [](const ThemeConfig& theme) { return theme.name == "dark_cyan"; });
+    ASSERT_NE(it, currentConfig.layout.themes.end());
+    it->description = "Test theme description";
+    it->accent = ColorConfig::FromRgba(0x123456FFu);
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output,
+        testing::HasSubstr("[theme.dark_cyan]\r\n"
+                           "description = Test theme description\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("accent = #123456FF\r\n"));
 }
 
 TEST(ConfigWriter, PreservesDateTimeWidgetFormatParameters) {

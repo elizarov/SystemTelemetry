@@ -1918,7 +1918,28 @@ void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd) {
     EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_REVERT), canRevert ? TRUE : FALSE);
 }
 
-void SetLayoutEditDescription(HWND hwnd, const LayoutEditTreeNode* node) {
+std::wstring LayoutEditConfiguredSectionDescription(
+    const LayoutEditDialogState* state, const LayoutEditTreeNode* node) {
+    if (state == nullptr || node == nullptr || node->kind != LayoutEditTreeNodeKind::Section) {
+        return {};
+    }
+    const AppConfig& config = state->dialog->Host().CurrentConfig();
+    if (node->label.rfind("theme.", 0) == 0) {
+        const auto it = std::find_if(config.layout.themes.begin(),
+            config.layout.themes.end(),
+            [&](const ThemeConfig& theme) { return theme.name == config.display.theme; });
+        return it != config.layout.themes.end() ? WideFromUtf8(it->description) : L"";
+    }
+    if (node->label.rfind("layout.", 0) == 0) {
+        const auto it = std::find_if(config.layout.layouts.begin(),
+            config.layout.layouts.end(),
+            [&](const LayoutSectionConfig& layout) { return layout.name == config.display.layout; });
+        return it != config.layout.layouts.end() ? WideFromUtf8(it->description) : L"";
+    }
+    return {};
+}
+
+void SetLayoutEditDescription(LayoutEditDialogState* state, HWND hwnd, const LayoutEditTreeNode* node) {
     if (node == nullptr) {
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_TITLE, L"No matching setting");
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_LOCATION, L"");
@@ -1930,7 +1951,10 @@ void SetLayoutEditDescription(HWND hwnd, const LayoutEditTreeNode* node) {
 
     SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_TITLE, BuildLayoutEditNodeTitle(node).c_str());
     const std::wstring location = WideFromUtf8(node->locationText);
-    const std::wstring description = WideFromUtf8(FindLocalizedText(node->descriptionKey));
+    std::wstring description = LayoutEditConfiguredSectionDescription(state, node);
+    if (description.empty()) {
+        description = WideFromUtf8(FindLocalizedText(node->descriptionKey));
+    }
     SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_LOCATION, location.c_str());
     SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, description.c_str());
     SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_SUMMARY, BuildLayoutEditSummaryText(node).c_str());

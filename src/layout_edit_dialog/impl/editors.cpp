@@ -721,7 +721,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     }
 
     state->updatingControls = true;
-    SetLayoutEditDescription(hwnd, state->selectedNode);
+    SetLayoutEditDescription(state, hwnd, state->selectedNode);
     if (IsFontsSectionNode(state)) {
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, L"Family:");
         PopulateFontFaceComboBox(hwnd, CommonFontFamilyText(state->dialog->Host().CurrentConfig().layout.fonts));

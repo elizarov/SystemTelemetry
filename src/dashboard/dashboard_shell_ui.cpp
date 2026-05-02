@@ -164,13 +164,21 @@ std::wstring FormatScalePercentageValue(double scale) {
     return WideFromUtf8(FormatDoubleGeneral(scale * 100.0, 12));
 }
 
-std::wstring FormatLayoutMenuLabel(const LayoutMenuOption& option) {
-    std::wstring label = WideFromUtf8(option.name);
-    if (!option.description.empty()) {
+std::wstring FormatNamedMenuLabel(std::string_view name, std::string_view description) {
+    std::wstring label = WideFromUtf8(name);
+    if (!description.empty()) {
         label += L" - ";
-        label += WideFromUtf8(option.description);
+        label += WideFromUtf8(description);
     }
     return label;
+}
+
+std::wstring FormatLayoutMenuLabel(const LayoutMenuOption& option) {
+    return FormatNamedMenuLabel(option.name, option.description);
+}
+
+std::wstring FormatThemeMenuLabel(const ThemeMenuOption& option) {
+    return FormatNamedMenuLabel(option.name, option.description);
 }
 
 void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
@@ -1145,6 +1153,7 @@ void DashboardShellUi::ShowContextMenu(
         ThemeMenuOption option;
         option.commandId = kCommandThemeBase + static_cast<UINT>(i);
         option.name = state.config.layout.themes[i].name;
+        option.description = state.config.layout.themes[i].description;
         option.selected = option.name == state.config.display.theme;
         state.themeMenuOptions.push_back(std::move(option));
     }
@@ -1153,7 +1162,8 @@ void DashboardShellUi::ShowContextMenu(
     } else {
         for (const auto& option : state.themeMenuOptions) {
             const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuW(themeMenu, flags, option.commandId, WideFromUtf8(option.name).c_str());
+            const std::wstring label = FormatThemeMenuLabel(option);
+            AppendMenuW(themeMenu, flags, option.commandId, label.c_str());
             SetMenuItemRadioStyle(themeMenu, option.commandId);
         }
     }
