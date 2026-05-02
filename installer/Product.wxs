@@ -10,6 +10,14 @@
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run CaseDash now" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="CASEDASH_INSTALLFOLDER">
+      <RegistrySearch
+        Id="FindRememberedInstallFolder"
+        Root="HKLM"
+        Key="SOFTWARE\Roman Elizarov\CaseDash"
+        Name="InstallFolder"
+        Type="raw" />
+    </Property>
     <CustomAction
       Id="LaunchCaseDash"
       FileRef="CaseDashExeFile"
@@ -72,6 +80,13 @@
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="CaseDashExeComponent" Guid="71D937AF-A37F-43E9-BE22-20C6E4C6554B" Bitness="always64">
         <File Id="CaseDashExeFile" Source="$(var.CaseDashExePath)" KeyPath="yes" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Roman Elizarov\CaseDash"
+          Name="InstallFolder"
+          Type="string"
+          Value="[INSTALLFOLDER]" />
+        <util:RemoveFolderEx Id="RemoveInstallFolderTree" Property="CASEDASH_INSTALLFOLDER" On="uninstall" />
         <RemoveFile Id="RemoveExecutableConfig" Name="config.ini" On="uninstall" />
         <RemoveFile Id="RemoveBlankWallpaper" Name="casedash_blank.png" On="uninstall" />
         <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
