@@ -174,6 +174,7 @@ struct ColorsConfig {
     CONFIG_EDITABLE_VALUE(ColorConfig, iconColor, "icon_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, accentColor, "accent_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, peakGhostColor, "peak_ghost_color");
+    CONFIG_EDITABLE_VALUE(ColorConfig, warningColor, "warning_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, layoutGuideColor, "layout_guide_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, activeEditColor, "active_edit_color");
     CONFIG_EDITABLE_VALUE(ColorConfig, panelBorderColor, "panel_border_color");

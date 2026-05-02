@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-#include "telemetry/fps/fps_etw_provider.h"
+#include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/amd/gpu_amd_adl.h"
 #include "telemetry/gpu/nvidia/gpu_nvidia_nvml.h"
 #include "util/strings.h"
@@ -123,7 +123,7 @@ public:
         sample_.providerName = "Unsupported GPU";
         sample_.available = false;
         sample_.diagnostics = "No supported GPU telemetry provider matches the primary adapter vendor.";
-        fpsProvider_ = CreatePresentedFpsEtwProvider(trace_);
+        fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = "Presented FPS ETW provider active.";
         } else {
@@ -150,6 +150,7 @@ public:
         if (fpsProvider_ != nullptr) {
             const FpsTelemetrySample fpsSample = fpsProvider_->Sample();
             fpsDiagnostics_ = fpsSample.diagnostics;
+            sample.fpsPermissionRequired = fpsSample.permissionRequired;
             if (fpsSample.fps.has_value()) {
                 sample.fps = *fpsSample.fps;
                 sample.available = true;

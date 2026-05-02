@@ -36,6 +36,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/layout_edit_dialog/theme_preview.h|windows.h',
     'src/main/autostart.h|windows.h',
     'src/main/config_io.h|windows.h',
+    'src/main/fps_service.h|windows.h',
     'src/main/main.cpp|windows.h',
     'src/renderer/impl/d2d_renderer.h|windows.h',
     'src/renderer/renderer.h|windows.h',
@@ -64,7 +65,8 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/layout_edit/layout_edit_parameter_edit.h|layout_edit_parameter_metadata.h',
     'src/widget/layout_edit_parameter_id.h|config.h',
     'src/util/resource_loader.cpp|windows.h',
-    'src/util/utf8.cpp|windows.h'
+    'src/util/utf8.cpp|windows.h',
+    'src/telemetry/fps/fps_service_client_provider.cpp|windows.h'
 )
 
 function ConvertTo-RepoSlashPath {

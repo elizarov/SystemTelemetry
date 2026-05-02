@@ -27,6 +27,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo Stopping SystemTelemetry FPS service...
+call :stop_fps_service
+if errorlevel 1 (
+    echo Failed to stop SystemTelemetryFpsService.
+    exit /b 1
+)
+
 echo Stopping running SystemTelemetry instances...
 taskkill /f /im "SystemTelemetry.exe" >nul 2>nul
 set "TASKKILL_RC=%errorlevel%"
@@ -68,6 +75,30 @@ if errorlevel 1 (
     exit /b 1
 )
 exit /b 2
+
+:stop_fps_service
+setlocal EnableExtensions
+sc query "SystemTelemetryFpsService" >nul 2>nul
+if errorlevel 1060 exit /b 0
+if errorlevel 1 exit /b 1
+
+sc stop "SystemTelemetryFpsService" >nul 2>nul
+set "STOP_RC=%errorlevel%"
+if not "%STOP_RC%"=="0" (
+    if not "%STOP_RC%"=="1062" (
+        exit /b 1
+    )
+)
+
+set /a SERVICE_WAIT_RETRIES=30
+:stop_fps_service_wait_loop
+set "SERVICE_STATE="
+for /f "tokens=4" %%S in ('sc query "SystemTelemetryFpsService" ^| findstr /R /C:"STATE"') do set "SERVICE_STATE=%%S"
+if "%SERVICE_STATE%"=="STOPPED" exit /b 0
+if "%SERVICE_WAIT_RETRIES%"=="0" exit /b 1
+timeout /t 1 /nobreak >nul
+set /a SERVICE_WAIT_RETRIES-=1
+goto stop_fps_service_wait_loop
 
 :wait_for_process_exit
 setlocal EnableExtensions

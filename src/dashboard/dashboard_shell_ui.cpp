@@ -743,6 +743,9 @@ bool DashboardShellUi::ApplyColorExpressionPreview(LayoutEditParameter parameter
         case LayoutEditParameter::ColorPeakGhost:
             target = &updatedConfig.layout.colors.peakGhostColor;
             break;
+        case LayoutEditParameter::ColorWarning:
+            target = &updatedConfig.layout.colors.warningColor;
+            break;
         case LayoutEditParameter::ColorAccent:
             target = &updatedConfig.layout.colors.accentColor;
             break;

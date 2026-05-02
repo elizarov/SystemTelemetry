@@ -44,7 +44,8 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The UI style stays high-contrast and minimal: dark background, bright foreground text, restrained separators, rounded cards, compact headers, and shared visual rhythm across comparable cards.
 - CPU and GPU gauges share one fitted gauge size within the active layout even when their surrounding cards differ in height.
 - Metric rows and usage bars render as rounded horizontal fills, throughput widgets render scrolling retained-history lines with shared time markers, and drive activity renders as stacked whole-segment indicators.
-- Palette colors include alpha, and gauge peak segments and metric-list recent-peak markers use the shared peak ghost color from the palette.
+- Palette colors include alpha. Gauge peak segments and metric-list recent-peak markers use the shared peak ghost color from the palette, and short permission-required metric indicators use the shared warning color.
+- Metric rows and gauges draw only their background track when a metric value is unavailable or permission-gated; a permission-gated value displays the short text `Need admin` instead of `N/A`.
 - Rendering rejects non-finite telemetry values by treating them as unavailable rather than propagating invalid math into layout or draw paths.
 - Blank rendering mode keeps the dashboard chrome, headers, static labels, device names, and empty tracks while omitting dynamic metric text, time, date, plot lines, leaders, peak ghosts, gauge fill, and drive-activity or usage fill.
 
@@ -62,6 +63,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The `Scale` submenu offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog. Changing scale applies immediately.
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.
 - The `Storage drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.
+- The `Auto-start` command installs machine-wide logon startup for the dashboard UI through `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` and installs and starts the machine-wide FPS service used for privileged presented-FPS capture. The command is checked only when the Run entry targets the current executable and the matching FPS service is currently running. Enabling or disabling auto-start uses the elevated helper path when administrator rights are required.
 
 ## Layout-Edit Behavior
 
@@ -104,7 +106,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 ## Telemetry And Content Behavior
 
 - CPU content includes model name, load, clock, RAM usage, and any requested board temperature or fan metrics that resolve successfully through the active board provider.
-- GPU content includes model name, load, dedicated VRAM usage, total dedicated VRAM capacity, and vendor metrics such as temperature, clock, fan speed, and game FPS when available from the active AMD or NVIDIA provider. GPU telemetry selects the vendor provider from the primary non-software DXGI adapter vendor. If no supported GPU vendor matches, the unsupported GPU provider keeps vendor metrics unavailable and supplies only the shared presented-FPS metric when ETW access and present events are available. NVIDIA FPS is the rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events for the busiest presenting non-dashboard process because NVML has no native game-FPS metric.
+- GPU content includes model name, load, dedicated VRAM usage, total dedicated VRAM capacity, and vendor metrics such as temperature, clock, fan speed, and game FPS when available from the active AMD or NVIDIA provider. GPU telemetry selects the vendor provider from the primary non-software DXGI adapter vendor. If no supported GPU vendor matches, the unsupported GPU provider keeps vendor metrics unavailable and supplies only the shared presented-FPS metric when ETW access and present events are available. NVIDIA FPS is the rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events for the busiest presenting non-dashboard process because NVML has no native game-FPS metric. The dashboard asks the machine-wide LocalSystem FPS service for this value when the service is installed, and falls back to local ETW collection when the service is absent or unreachable. When Windows denies ETW access to local collection, `gpu.fps` reports `Need admin`.
 - Board telemetry selects the vendor provider from the baseboard manufacturer, reads MSI board temperatures and fan speeds through the local MSI Center SDK, reads Gigabyte board temperatures and fan speeds through the local Gigabyte SIV assemblies, and uses an unsupported-board provider with unavailable values when no supported board vendor matches.
 - If a vendor provider is unavailable or unsupported, the dashboard stays running and shows those provider-owned values as unavailable instead of failing the app.
 - Network content shows current upload and download throughput plus a footer line with the selected adapter name and IPv4 address when available.

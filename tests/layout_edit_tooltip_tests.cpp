@@ -255,6 +255,7 @@ TEST(LayoutEditParameter, BuildsDisplayNamesForMenuActions) {
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::CardRowGap), "row gap");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::DashboardColumnGap), "column gap");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::ColorIcon), "icon color");
+    EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::ColorWarning), "warning color");
     EXPECT_EQ(GetLayoutEditParameterDisplayName(LayoutEditParameter::ColorGraphMarker), "graph marker color");
 }
 

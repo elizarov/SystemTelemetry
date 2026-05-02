@@ -3,6 +3,7 @@
 #include <shellapi.h>
 
 #include "main/constants.h"
+#include "main/fps_service.h"
 #include "util/command_line.h"
 #include "util/paths.h"
 
@@ -42,7 +43,8 @@ bool IsAutoStartEnabledForCurrentExecutable() {
     if (!executablePath.has_value() || !registeredCommand.has_value()) {
         return false;
     }
-    return NormalizeWindowsPath(*registeredCommand) == NormalizeWindowsPath(*executablePath);
+    return NormalizeWindowsPath(*registeredCommand) == NormalizeWindowsPath(*executablePath) &&
+           IsFpsServiceRunningForCurrentExecutable();
 }
 
 LSTATUS WriteAutoStartRegistryValue(bool enabled) {
@@ -88,7 +90,12 @@ LSTATUS WriteAutoStartRegistryValue(bool enabled) {
 
 int RunElevatedAutoStartMode(bool enabled) {
     const LSTATUS status = WriteAutoStartRegistryValue(enabled);
-    return status == ERROR_SUCCESS ? 0 : 1;
+    if (status != ERROR_SUCCESS) {
+        return 1;
+    }
+
+    const DWORD serviceStatus = enabled ? InstallOrUpdateFpsService() : StopAndDeleteFpsService();
+    return serviceStatus == ERROR_SUCCESS ? 0 : 1;
 }
 
 bool UpdateAutoStartElevated(bool enabled, HWND owner) {
@@ -119,11 +126,16 @@ bool UpdateAutoStartElevated(bool enabled, HWND owner) {
 
 bool UpdateAutoStartRegistration(bool enabled, HWND owner) {
     const LSTATUS status = WriteAutoStartRegistryValue(enabled);
-    if (status == ERROR_SUCCESS) {
-        return true;
-    }
     if (status == ERROR_ACCESS_DENIED) {
         return UpdateAutoStartElevated(enabled, owner);
     }
-    return false;
+    if (status != ERROR_SUCCESS) {
+        return false;
+    }
+
+    const DWORD serviceStatus = enabled ? InstallOrUpdateFpsService() : StopAndDeleteFpsService();
+    if (serviceStatus == ERROR_ACCESS_DENIED) {
+        return UpdateAutoStartElevated(enabled, owner);
+    }
+    return serviceStatus == ERROR_SUCCESS;
 }

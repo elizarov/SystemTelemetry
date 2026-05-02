@@ -41,6 +41,7 @@ void RendererPalette::Rebuild(const ColorsConfig& colors, const LayoutGuideSheet
     colors_[ColorSlot(RenderColorId::Icon)] = ToRenderColor(colors.iconColor);
     colors_[ColorSlot(RenderColorId::Accent)] = ToRenderColor(colors.accentColor);
     colors_[ColorSlot(RenderColorId::PeakGhost)] = ToRenderColor(colors.peakGhostColor);
+    colors_[ColorSlot(RenderColorId::Warning)] = ToRenderColor(colors.warningColor);
     colors_[ColorSlot(RenderColorId::MutedText)] = ToRenderColor(colors.mutedTextColor);
     colors_[ColorSlot(RenderColorId::Track)] = ToRenderColor(colors.trackColor);
     colors_[ColorSlot(RenderColorId::LayoutGuide)] = ToRenderColor(colors.layoutGuideColor);

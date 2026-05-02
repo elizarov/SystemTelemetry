@@ -85,10 +85,12 @@ void DrawMetricListRow(WidgetHost& renderer,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
     if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
+        const RenderColorId valueColor =
+            row.state == MetricValueState::PermissionRequired ? RenderColorId::Warning : RenderColorId::Foreground;
         const WidgetHost::TextLayoutResult valueLayout = renderer.Renderer().DrawTextBlock(valueRect,
             row.valueText,
             TextStyleId::Value,
-            RenderColorId::Foreground,
+            valueColor,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
         if (registerEditRegions) {
             renderer.EditArtifacts().RegisterDynamicTextAnchor(valueLayout,
@@ -96,7 +98,8 @@ void DrawMetricListRow(WidgetHost& renderer,
                     WidgetHost::LayoutEditParameter::FontValue,
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size),
-                WidgetHost::LayoutEditParameter::ColorForeground);
+                row.state == MetricValueState::PermissionRequired ? WidgetHost::LayoutEditParameter::ColorWarning
+                                                                  : WidgetHost::LayoutEditParameter::ColorForeground);
             if (rowIndex < static_cast<int>(metricRefs.size()) && !IsRuntimePlaceholderMetricId(metricRefs[rowIndex])) {
                 renderer.EditArtifacts().RegisterDynamicTextAnchor(
                     valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs[rowIndex], rowIndex * 2 + 101));
@@ -105,8 +108,10 @@ void DrawMetricListRow(WidgetHost& renderer,
     }
 
     const RenderRect barRect = OffsetRect(layout.barRects[rowIndex], yOffset);
-    const std::optional<RenderRect> peakMarkerRect = DrawMetricCapsuleBar(
-        renderer, barRect, row.ratio, row.peakRatio, renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank);
+    const bool drawValue =
+        row.state == MetricValueState::Available && renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank;
+    const std::optional<RenderRect> peakMarkerRect =
+        DrawMetricCapsuleBar(renderer, barRect, row.ratio, row.peakRatio, drawValue);
     if (!registerEditRegions) {
         return;
     }

@@ -80,6 +80,8 @@ std::optional<ColorConfig> FindColorRoleValue(const AppConfig& config, LayoutEdi
             return config.layout.colors.iconColor;
         case LayoutEditParameter::ColorPeakGhost:
             return config.layout.colors.peakGhostColor;
+        case LayoutEditParameter::ColorWarning:
+            return config.layout.colors.warningColor;
         case LayoutEditParameter::ColorAccent:
             return config.layout.colors.accentColor;
         case LayoutEditParameter::ColorLayoutGuide:
@@ -128,6 +130,7 @@ std::string DefaultDerivedBase(LayoutEditParameter parameter) {
             return "accent";
         case LayoutEditParameter::ColorLayoutGuide:
         case LayoutEditParameter::ColorActiveEdit:
+        case LayoutEditParameter::ColorWarning:
             return "guide";
         default:
             return "accent";

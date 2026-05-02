@@ -157,6 +157,7 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
             "icon_color",
             "accent_color",
             "peak_ghost_color",
+            "warning_color",
             "layout_guide_color",
             "active_edit_color",
             "panel_border_color",

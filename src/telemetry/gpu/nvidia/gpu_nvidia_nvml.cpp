@@ -7,7 +7,7 @@
 #include <optional>
 #include <string>
 
-#include "telemetry/fps/fps_etw_provider.h"
+#include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -230,7 +230,7 @@ public:
 
         diagnostics_ = "NVML GPU=" + gpuName_ + " fan_rpm_supported=" + (HasFanSpeedRpm() ? "yes" : "no") +
                        " native_fps_supported=no";
-        fpsProvider_ = CreatePresentedFpsEtwProvider(trace_);
+        fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = "Presented FPS ETW provider active.";
         } else {
@@ -322,6 +322,7 @@ public:
         if (fpsProvider_ != nullptr) {
             const FpsTelemetrySample fpsSample = fpsProvider_->Sample();
             fpsDiagnostics_ = fpsSample.diagnostics;
+            sample.fpsPermissionRequired = fpsSample.permissionRequired;
             if (fpsSample.fps.has_value()) {
                 sample.fps = *fpsSample.fps;
                 hasAnyMetric = true;

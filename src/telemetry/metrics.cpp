@@ -339,18 +339,27 @@ std::string BuildMetricSampleValueText(const MetricDefinitionConfig& definition,
     return {};
 }
 
+MetricValueState InferMetricValueState(std::string_view valueText) {
+    return valueText.empty() || valueText == "N/A" ? MetricValueState::Unavailable : MetricValueState::Available;
+}
+
 MetricValue BuildResolvedMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
     std::string valueText,
     double ratio,
-    double telemetryScale = 0.0) {
+    double telemetryScale = 0.0,
+    MetricValueState state = MetricValueState::Available) {
+    if (state == MetricValueState::Available) {
+        state = InferMetricValueState(valueText);
+    }
     return MetricValue{definition.label,
         std::move(valueText),
         BuildMetricSampleValueText(definition, metricRef),
         definition.unit,
         ratio,
-        ResolvePeakRatio(snapshot, definition, metricRef, ratio, telemetryScale)};
+        ResolvePeakRatio(snapshot, definition, metricRef, ratio, telemetryScale),
+        state};
 }
 
 MetricValue ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
@@ -461,6 +470,11 @@ MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
     std::string_view) {
+    if (!snapshot.gpu.fps.value.has_value() && snapshot.gpu.fps.issue == ScalarMetricIssue::PermissionRequired) {
+        return BuildResolvedMetric(
+            snapshot, definition, metricRef, "Need admin", 0.0, 0.0, MetricValueState::PermissionRequired);
+    }
+
     const double value = FiniteNonNegativeOr(snapshot.gpu.fps.value.value_or(0.0));
     const double ratio = ResolveMetricRatio(definition, value);
     return BuildResolvedMetric(

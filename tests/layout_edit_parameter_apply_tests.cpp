@@ -197,6 +197,7 @@ TEST(LayoutEditParameterApply, AppliesColorFieldsViaMetadata) {
         {LayoutEditParameter::ColorIcon, 0x55667730u},
         {LayoutEditParameter::ColorAccent, 0x77889940u},
         {LayoutEditParameter::ColorPeakGhost, 0x8899AA50u},
+        {LayoutEditParameter::ColorWarning, 0x99AABB58u},
         {LayoutEditParameter::ColorLayoutGuide, 0xAABBCC60u},
         {LayoutEditParameter::ColorActiveEdit, 0xDDEEFF70u},
         {LayoutEditParameter::ColorPanelBorder, 0x12345680u},

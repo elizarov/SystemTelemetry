@@ -110,6 +110,7 @@ void WriteResolvedColorTrace(DiagnosticsSession& diagnostics, const AppConfig& c
     WriteResolvedColorTraceLine(diagnostics, "colors", "icon_color", colors.iconColor);
     WriteResolvedColorTraceLine(diagnostics, "colors", "accent_color", colors.accentColor);
     WriteResolvedColorTraceLine(diagnostics, "colors", "peak_ghost_color", colors.peakGhostColor);
+    WriteResolvedColorTraceLine(diagnostics, "colors", "warning_color", colors.warningColor);
     WriteResolvedColorTraceLine(diagnostics, "colors", "layout_guide_color", colors.layoutGuideColor);
     WriteResolvedColorTraceLine(diagnostics, "colors", "active_edit_color", colors.activeEditColor);
     WriteResolvedColorTraceLine(diagnostics, "colors", "panel_border_color", colors.panelBorderColor);

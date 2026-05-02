@@ -53,7 +53,7 @@ Install the already-built runtime through the repository entrypoint:
 install.cmd
 ```
 
-`install.cmd` requests elevation, stops running `SystemTelemetry.exe` instances, waits for them to exit, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and leaves auto-start registration to the runtime menu toggle.
+`install.cmd` requests elevation, stops running `SystemTelemetry.exe` instances, waits for them to exit, installs `build\SystemTelemetry.exe` into `C:\Program Files\SystemTelemetry`, and leaves auto-start registration to the runtime menu toggle. The auto-start toggle installs the machine-wide Run entry for per-user dashboard startup and the `SystemTelemetryFpsService` LocalSystem service used for privileged FPS collection.
 
 ## Developer Tooling Entrypoints
 
@@ -93,7 +93,7 @@ If AMD GPU metrics are missing:
 ### NVIDIA GPU telemetry
 
 NVIDIA GPU metrics come from the NVML runtime installed with current NVIDIA display drivers.
-The NVIDIA FPS value comes from Windows DXGI/D3D9 ETW present events, so the process needs permission to start a real-time ETW session, such as elevation or membership in the local `Performance Log Users` group.
+The NVIDIA FPS value comes from Windows DXGI/D3D9 ETW present events. When auto-start is enabled, the same executable also runs as the `SystemTelemetryFpsService` LocalSystem service and serves only the FPS sample to unelevated dashboards through a named pipe. Without that service, the dashboard falls back to local ETW collection, so the process needs permission to start a real-time ETW session, such as elevation or membership in the local `Performance Log Users` group. When Windows denies that access, the dashboard reports `Need admin` for FPS instead of treating it as ordinary unavailable data.
 
 If NVIDIA GPU metrics are missing:
 

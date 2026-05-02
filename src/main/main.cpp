@@ -10,6 +10,7 @@
 #include "diagnostics/diagnostics.h"
 #include "display/display_config.h"
 #include "main/autostart.h"
+#include "main/fps_service.h"
 #include "util/command_line.h"
 #include "util/file_path.h"
 
@@ -132,6 +133,10 @@ std::optional<int> RelaunchElevatedIfRequested() {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
+    if (IsFpsServiceCommandLine()) {
+        return RunFpsServiceMode();
+    }
+
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     const DiagnosticsOptions diagnosticsOptions = GetDiagnosticsOptions();

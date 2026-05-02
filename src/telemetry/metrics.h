@@ -10,6 +10,12 @@
 #include "config/metric_catalog.h"
 #include "telemetry/telemetry.h"
 
+enum class MetricValueState {
+    Unavailable,
+    Available,
+    PermissionRequired,
+};
+
 struct MetricValue {
     std::string label;
     std::string valueText;
@@ -17,6 +23,7 @@ struct MetricValue {
     std::string unit;
     double ratio = 0.0;
     double peakRatio = 0.0;
+    MetricValueState state = MetricValueState::Unavailable;
 };
 
 struct ThroughputMetric {

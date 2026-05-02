@@ -285,15 +285,16 @@ void GaugeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const M
     const RenderStroke trackStroke =
         RenderStroke::Solid(RenderColorId::Track, static_cast<float>(layoutState_.ringThickness));
     renderer.Renderer().DrawArcs(layoutState_.ringSegments, trackStroke);
-    if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank && filledSegments > 0) {
+    const bool drawMetricValue =
+        metric.state == MetricValueState::Available && renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank;
+    if (drawMetricValue && filledSegments > 0) {
         const RenderStroke accentStroke =
             RenderStroke::Solid(RenderColorId::Accent, static_cast<float>(layoutState_.ringThickness));
         renderer.Renderer().DrawArcs(
             std::span<const RenderArc>(layoutState_.ringSegments.data(), static_cast<size_t>(filledSegments)),
             accentStroke);
     }
-    if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank && peakSegment >= 0 &&
-        static_cast<size_t>(peakSegment) < layoutState_.ringSegments.size()) {
+    if (drawMetricValue && peakSegment >= 0 && static_cast<size_t>(peakSegment) < layoutState_.ringSegments.size()) {
         const size_t peakSegmentIndex = static_cast<size_t>(peakSegment);
         renderer.Renderer().DrawArc(layoutState_.ringSegments[peakSegmentIndex],
             RenderStroke::Solid(RenderColorId::PeakGhost, static_cast<float>(layoutState_.ringThickness)));
@@ -305,15 +306,18 @@ void GaugeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const M
     }
 
     if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
+        const RenderColorId valueColor =
+            metric.state == MetricValueState::PermissionRequired ? RenderColorId::Warning : RenderColorId::Foreground;
         const WidgetHost::TextLayoutResult valueLayout = renderer.Renderer().DrawTextBlock(layoutState_.valueRect,
             metric.valueText,
             TextStyleId::Big,
-            RenderColorId::Foreground,
+            valueColor,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
         renderer.EditArtifacts().RegisterDynamicTextAnchor(valueLayout,
             renderer.MakeEditableTextBinding(
                 widget, WidgetHost::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size),
-            WidgetHost::LayoutEditParameter::ColorForeground);
+            metric.state == MetricValueState::PermissionRequired ? WidgetHost::LayoutEditParameter::ColorWarning
+                                                                 : WidgetHost::LayoutEditParameter::ColorForeground);
         renderer.EditArtifacts().RegisterDynamicTextAnchor(
             valueLayout, renderer.MakeMetricTextBinding(widget, metric_, 100));
     }

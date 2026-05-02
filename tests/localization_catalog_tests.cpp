@@ -94,6 +94,7 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
         LayoutEditParameter::ColorIcon,
         LayoutEditParameter::ColorAccent,
         LayoutEditParameter::ColorPeakGhost,
+        LayoutEditParameter::ColorWarning,
         LayoutEditParameter::ColorLayoutGuide,
         LayoutEditParameter::ColorActiveEdit,
         LayoutEditParameter::ColorPanelBorder,

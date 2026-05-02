@@ -11,13 +11,14 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v9";
+constexpr char kDumpFormatVersion[] = "system_telemetry_snapshot_v10";
 
 enum class DumpFieldKind : std::uint8_t {
     String,
     Double,
     OptionalDouble,
     ScalarUnit,
+    ScalarIssue,
     SystemTimeWord,
 };
 
@@ -52,6 +53,7 @@ const std::vector<DumpFieldDescriptor>& FlatDumpFields() {
         DUMP_FIELD("gpu.fan.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fan.unit),
         DUMP_FIELD("gpu.fps.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fps.value),
         DUMP_FIELD("gpu.fps.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fps.unit),
+        DUMP_FIELD("gpu.fps.issue", DumpFieldKind::ScalarIssue, snapshot.gpu.fps.issue),
         DUMP_FIELD("gpu.vram.used_gb", DumpFieldKind::Double, snapshot.gpu.vram.usedGb),
         DUMP_FIELD("gpu.vram.total_gb", DumpFieldKind::Double, snapshot.gpu.vram.totalGb),
         DUMP_FIELD("network.adapter_name", DumpFieldKind::String, snapshot.network.adapterName),
@@ -221,6 +223,10 @@ void WriteScalarMetricUnit(std::string& output, const std::string& key, ScalarMe
     WriteString(output, key, std::string(ScalarMetricUnitDumpText(unit)));
 }
 
+void WriteScalarMetricIssue(std::string& output, const std::string& key, ScalarMetricIssue issue) {
+    WriteString(output, key, std::string(EnumToString(issue)));
+}
+
 void WriteFlatDumpFields(std::string& output, const TelemetryDump& dump, size_t begin, size_t end) {
     const std::vector<DumpFieldDescriptor>& fields = FlatDumpFields();
     end = (std::min)(end, fields.size());
@@ -239,6 +245,9 @@ void WriteFlatDumpFields(std::string& output, const TelemetryDump& dump, size_t 
                 break;
             case DumpFieldKind::ScalarUnit:
                 WriteScalarMetricUnit(output, key, DumpField<ScalarMetricUnit>(dump, field));
+                break;
+            case DumpFieldKind::ScalarIssue:
+                WriteScalarMetricIssue(output, key, DumpField<ScalarMetricIssue>(dump, field));
                 break;
             case DumpFieldKind::SystemTimeWord:
                 WriteInteger(output, key, DumpField<WORD>(dump, field));
@@ -421,6 +430,22 @@ bool LoadScalarMetricUnit(
     return true;
 }
 
+bool LoadScalarMetricIssue(
+    const DumpValues& values, const std::string& key, ScalarMetricIssue& field, std::string* error) {
+    std::string text;
+    if (!TryGetValue(values, key, text)) {
+        return true;
+    }
+    std::string parsed;
+    if (!UnescapeQuotedString(text, parsed) || !TryEnumFromString(parsed, field)) {
+        if (error != nullptr) {
+            *error = "Invalid scalar issue for key: " + key;
+        }
+        return false;
+    }
+    return true;
+}
+
 bool LoadDoubleArrayField(
     const DumpValues& values, const std::string& key, std::vector<double>& field, std::string* error) {
     std::string text;
@@ -460,6 +485,11 @@ bool LoadFlatDumpFields(const DumpValues& values, TelemetryDump& dump, size_t be
                 break;
             case DumpFieldKind::ScalarUnit:
                 if (!LoadScalarMetricUnit(values, key, DumpField<ScalarMetricUnit>(dump, field), error)) {
+                    return false;
+                }
+                break;
+            case DumpFieldKind::ScalarIssue:
+                if (!LoadScalarMetricIssue(values, key, DumpField<ScalarMetricIssue>(dump, field), error)) {
                     return false;
                 }
                 break;
@@ -536,7 +566,7 @@ bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
     WriteNamedScalarMetrics(output, "board.temperatures", dump.snapshot.boardTemperatures);
     WriteNamedScalarMetrics(output, "board.fans", dump.snapshot.boardFans);
     WriteRetainedHistories(output, "retained_histories", dump.snapshot.retainedHistories);
-    WriteFlatDumpFields(output, dump, 6, 24);
+    WriteFlatDumpFields(output, dump, 6, 25);
 
     WriteInteger(output, "drives.count", dump.snapshot.drives.size());
     for (size_t i = 0; i < dump.snapshot.drives.size(); ++i) {
@@ -548,7 +578,7 @@ bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
         WriteDouble(output, prefix + ".write_mbps", dump.snapshot.drives[i].writeMbps, 6);
     }
 
-    WriteFlatDumpFields(output, dump, 24, FlatDumpFields().size());
+    WriteFlatDumpFields(output, dump, 25, FlatDumpFields().size());
     return true;
 }
 
@@ -611,7 +641,7 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         !LoadNamedScalarMetrics(values, "board.temperatures", parsed.snapshot.boardTemperatures, error) ||
         !LoadNamedScalarMetrics(values, "board.fans", parsed.snapshot.boardFans, error) ||
         !LoadRetainedHistories(values, "retained_histories", parsed.snapshot.retainedHistories, error) ||
-        !LoadFlatDumpFields(values, parsed, 6, 24, error)) {
+        !LoadFlatDumpFields(values, parsed, 6, 25, error)) {
         return false;
     }
 
@@ -634,7 +664,7 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         parsed.snapshot.drives.push_back(std::move(drive));
     }
 
-    if (!LoadFlatDumpFields(values, parsed, 24, FlatDumpFields().size(), error)) {
+    if (!LoadFlatDumpFields(values, parsed, 25, FlatDumpFields().size(), error)) {
         return false;
     }
 
