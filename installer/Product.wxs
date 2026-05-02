@@ -1,4 +1,4 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="CaseDash"
     Manufacturer="Roman Elizarov"
@@ -9,13 +9,24 @@
     <MediaTemplate EmbedCab="yes" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run CaseDash now" />
-    <Property Id="WixShellExecTarget" Value="[#CaseDashExeFile]" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <CustomAction
       Id="LaunchCaseDash"
-      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
-      DllEntry="WixShellExec"
-      Impersonate="yes" />
+      FileRef="CaseDashExeFile"
+      ExeCommand="/bring-to-front"
+      Execute="immediate"
+      Impersonate="yes"
+      Return="asyncNoWait" />
+    <util:CloseApplication
+      Id="CloseCaseDashOnUninstall"
+      Target="CaseDash.exe"
+      Description="CaseDash is running and must close before uninstall can finish."
+      Condition="REMOVE=&quot;ALL&quot;"
+      CloseMessage="yes"
+      ElevatedCloseMessage="yes"
+      Timeout="10"
+      TerminateProcess="1"
+      RebootPrompt="no" />
     <SetProperty
       Id="RemoveCaseDashRunValue"
       Value="&quot;[SystemFolder]reg.exe&quot; delete &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run&quot; /v CaseDash /f"
@@ -41,6 +52,10 @@
     </UI>
 
     <InstallExecuteSequence>
+      <Custom
+        Action="override Wix4CloseApplications_$(sys.BUILDARCHSHORT)"
+        Before="RemoveFiles"
+        Condition="REMOVE=&quot;ALL&quot; AND VersionNT &gt; 400" />
       <Custom Action="RemoveCaseDashRunValue" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
     </InstallExecuteSequence>
 

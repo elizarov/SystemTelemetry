@@ -64,7 +64,7 @@ Build the runtime and MSI package through the repository entrypoint:
 package.cmd
 ```
 
-`package.cmd` runs `build.cmd`, restores the WiX Toolset SDK through MSBuild, builds the minimal x64 per-machine MSI from `installer\`, writes `build\CaseDash-<VERSION>.msi`, and writes the matching SHA-256 checksum. The MSI uses a no-license install-directory UI, installs only `CaseDash.exe` into `C:\Program Files\CaseDash`, and shows a default-enabled completion option to run CaseDash immediately. Runtime auto-start and FPS service registration remain owned by the app menu. MSI uninstall removes the installed executable, executable-side `config.ini`, the executable-side `casedash_blank.png` wallpaper image, the `CaseDash` machine-wide Run value, and the `CaseDashFpsService` service when present.
+`package.cmd` runs `build.cmd`, restores the WiX Toolset SDK through MSBuild, builds the minimal x64 per-machine MSI from `installer\`, writes `build\CaseDash-<VERSION>.msi`, and writes the matching SHA-256 checksum. The MSI uses a no-license install-directory UI, installs only `CaseDash.exe` into `C:\Program Files\CaseDash`, and shows a default-enabled completion option to run CaseDash immediately in front. Runtime auto-start and FPS service registration remain owned by the app menu. MSI uninstall closes a running `CaseDash.exe` before file removal, then removes the installed executable, executable-side `config.ini`, the executable-side `casedash_blank.png` wallpaper image, the `CaseDash` machine-wide Run value, and the `CaseDashFpsService` service when present.
 
 ## Developer Tooling Entrypoints
 
