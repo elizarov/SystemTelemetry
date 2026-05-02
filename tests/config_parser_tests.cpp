@@ -122,15 +122,20 @@ TEST(ColorExpression, ParsesAndFormatsDerivedExpressionsInCanonicalOptionOrder) 
         ParseColorExpression("guide(alpha: 230, mix: 0.35 active_edit_color, rotate_hue: 28)");
 
     ASSERT_TRUE(expression.has_value());
-    EXPECT_EQ(expression->base, "guide");
-    ASSERT_TRUE(expression->rotateHue.has_value());
-    EXPECT_DOUBLE_EQ(*expression->rotateHue, 28.0);
-    ASSERT_TRUE(expression->mix.has_value());
-    EXPECT_EQ(expression->mix->target, "active_edit_color");
-    EXPECT_DOUBLE_EQ(expression->mix->amount, 0.35);
-    ASSERT_TRUE(expression->alpha.has_value());
-    EXPECT_EQ(*expression->alpha, 230u);
-    EXPECT_EQ(FormatColorExpression(*expression), "guide(rotate_hue: 28, mix: 0.35 active_edit_color, alpha: 0xE6)");
+    const ColorExpression& parsedExpression = *expression;
+    EXPECT_EQ(parsedExpression.base, "guide");
+    ASSERT_TRUE(parsedExpression.rotateHue.has_value());
+    const double rotateHue = *parsedExpression.rotateHue;
+    EXPECT_DOUBLE_EQ(rotateHue, 28.0);
+    ASSERT_TRUE(parsedExpression.mix.has_value());
+    const ColorMixExpression& mixExpression = *parsedExpression.mix;
+    EXPECT_EQ(mixExpression.target, "active_edit_color");
+    EXPECT_DOUBLE_EQ(mixExpression.amount, 0.35);
+    ASSERT_TRUE(parsedExpression.alpha.has_value());
+    const uint32_t alpha = *parsedExpression.alpha;
+    EXPECT_EQ(alpha, 230u);
+    EXPECT_EQ(
+        FormatColorExpression(parsedExpression), "guide(rotate_hue: 28, mix: 0.35 active_edit_color, alpha: 0xE6)");
 }
 
 TEST(ColorMath, ConvertsHsvAndRgbRoundTrip) {

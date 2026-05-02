@@ -10,49 +10,54 @@ TEST(LayoutEditTooltip, BuildsMetricListGuideDescriptor) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::MetricListLabelWidth);
 
     ASSERT_TRUE(descriptor.has_value());
-    EXPECT_EQ(descriptor->configKey, "config.metric_list.label_width");
-    EXPECT_EQ(descriptor->sectionName, "metric_list");
-    EXPECT_EQ(descriptor->memberName, "label_width");
-    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
+    const LayoutEditTooltipDescriptor& tooltipDescriptor = *descriptor;
+    EXPECT_EQ(tooltipDescriptor.configKey, "config.metric_list.label_width");
+    EXPECT_EQ(tooltipDescriptor.sectionName, "metric_list");
+    EXPECT_EQ(tooltipDescriptor.memberName, "label_width");
+    EXPECT_EQ(tooltipDescriptor.valueFormat, configschema::ValueFormat::Integer);
 }
 
 TEST(LayoutEditTooltip, BuildsCardStyleDescriptor) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::CardHeaderIconGap);
 
     ASSERT_TRUE(descriptor.has_value());
-    EXPECT_EQ(descriptor->configKey, "config.card_style.header_icon_gap");
-    EXPECT_EQ(descriptor->sectionName, "card_style");
-    EXPECT_EQ(descriptor->memberName, "header_icon_gap");
-    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
+    const LayoutEditTooltipDescriptor& tooltipDescriptor = *descriptor;
+    EXPECT_EQ(tooltipDescriptor.configKey, "config.card_style.header_icon_gap");
+    EXPECT_EQ(tooltipDescriptor.sectionName, "card_style");
+    EXPECT_EQ(tooltipDescriptor.memberName, "header_icon_gap");
+    EXPECT_EQ(tooltipDescriptor.valueFormat, configschema::ValueFormat::Integer);
 }
 
 TEST(LayoutEditTooltip, BuildsDashboardDescriptor) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::DashboardColumnGap);
 
     ASSERT_TRUE(descriptor.has_value());
-    EXPECT_EQ(descriptor->configKey, "config.dashboard.column_gap");
-    EXPECT_EQ(descriptor->sectionName, "dashboard");
-    EXPECT_EQ(descriptor->memberName, "column_gap");
-    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
+    const LayoutEditTooltipDescriptor& tooltipDescriptor = *descriptor;
+    EXPECT_EQ(tooltipDescriptor.configKey, "config.dashboard.column_gap");
+    EXPECT_EQ(tooltipDescriptor.sectionName, "dashboard");
+    EXPECT_EQ(tooltipDescriptor.memberName, "column_gap");
+    EXPECT_EQ(tooltipDescriptor.valueFormat, configschema::ValueFormat::Integer);
 }
 
 TEST(LayoutEditTooltip, BuildsDashboardOuterMarginDescriptor) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::DashboardOuterMargin);
 
     ASSERT_TRUE(descriptor.has_value());
-    EXPECT_EQ(descriptor->configKey, "config.dashboard.outer_margin");
-    EXPECT_EQ(descriptor->sectionName, "dashboard");
-    EXPECT_EQ(descriptor->memberName, "outer_margin");
-    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::Integer);
+    const LayoutEditTooltipDescriptor& tooltipDescriptor = *descriptor;
+    EXPECT_EQ(tooltipDescriptor.configKey, "config.dashboard.outer_margin");
+    EXPECT_EQ(tooltipDescriptor.sectionName, "dashboard");
+    EXPECT_EQ(tooltipDescriptor.memberName, "outer_margin");
+    EXPECT_EQ(tooltipDescriptor.valueFormat, configschema::ValueFormat::Integer);
 }
 
 TEST(LayoutEditTooltip, IncludesFontAnchors) {
     const auto descriptor = FindLayoutEditTooltipDescriptor(LayoutEditParameter::FontLabel);
     ASSERT_TRUE(descriptor.has_value());
-    EXPECT_EQ(descriptor->configKey, "config.fonts.label");
-    EXPECT_EQ(descriptor->sectionName, "fonts");
-    EXPECT_EQ(descriptor->memberName, "label");
-    EXPECT_EQ(descriptor->valueFormat, configschema::ValueFormat::FontSpec);
+    const LayoutEditTooltipDescriptor& tooltipDescriptor = *descriptor;
+    EXPECT_EQ(tooltipDescriptor.configKey, "config.fonts.label");
+    EXPECT_EQ(tooltipDescriptor.sectionName, "fonts");
+    EXPECT_EQ(tooltipDescriptor.memberName, "label");
+    EXPECT_EQ(tooltipDescriptor.valueFormat, configschema::ValueFormat::FontSpec);
 }
 
 TEST(LayoutEditTooltip, FormatsFloatingPointValuesWithoutTrailingZeros) {
@@ -96,8 +101,9 @@ TEST(LayoutEditTooltip, BuildsColorTooltipTextFromColorExpression) {
     const std::optional<std::wstring> tooltip = BuildLayoutEditTooltipTextForPayload(config, region, nullptr);
 
     ASSERT_TRUE(tooltip.has_value());
-    EXPECT_EQ(
-        tooltip->substr(0, tooltip->find(L"\r\n")), L"[colors] panel_border_color = background(mix: 0.34 accent)");
+    const std::wstring& tooltipText = *tooltip;
+    EXPECT_EQ(tooltipText.substr(0, tooltipText.find(L"\r\n")),
+        L"[colors] panel_border_color = background(mix: 0.34 accent)");
 }
 
 TEST(LayoutEditTooltip, BuildsStringTooltipFirstLine) {

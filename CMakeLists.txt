@@ -140,10 +140,13 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/impl/collector_real.cpp
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
+    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/metrics.cpp
     src/layout_model/dashboard_overlay_state.cpp
     src/widget/card_chrome_layout.cpp
@@ -225,7 +228,10 @@ set(systemtelemetry_release_speed_sources
     src/renderer/impl/text_width_cache.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/msi/board_msi_center.cpp
+    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/impl/collector_board.cpp
     src/telemetry/impl/collector_cpu.cpp
@@ -266,7 +272,16 @@ add_library(SystemTelemetryGigabyte OBJECT
     src/telemetry/board/gigabyte/board_gigabyte_siv_bridge.cpp
 )
 
+add_library(SystemTelemetryMsi OBJECT
+    src/telemetry/board/msi/board_msi_center_bridge.cpp
+)
+
 set_target_properties(SystemTelemetryGigabyte PROPERTIES
+    COMMON_LANGUAGE_RUNTIME ""
+    VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.0"
+)
+
+set_target_properties(SystemTelemetryMsi PROPERTIES
     COMMON_LANGUAGE_RUNTIME ""
     VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.0"
 )
@@ -276,7 +291,19 @@ target_include_directories(SystemTelemetryGigabyte PRIVATE
     "${CMAKE_SOURCE_DIR}/resources"
 )
 
+target_include_directories(SystemTelemetryMsi PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/resources"
+)
+
 target_compile_definitions(SystemTelemetryGigabyte PRIVATE
+    UNICODE
+    _UNICODE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+)
+
+target_compile_definitions(SystemTelemetryMsi PRIVATE
     UNICODE
     _UNICODE
     NOMINMAX
@@ -292,8 +319,18 @@ target_compile_options(SystemTelemetryGigabyte PRIVATE
     /Zi
 )
 
+target_compile_options(SystemTelemetryMsi PRIVATE
+    /clr
+    /W4
+    /permissive-
+    /w14505
+    /we4505
+    /Zi
+)
+
 target_sources(SystemTelemetry PRIVATE
     $<TARGET_OBJECTS:SystemTelemetryGigabyte>
+    $<TARGET_OBJECTS:SystemTelemetryMsi>
 )
 
 target_include_directories(SystemTelemetry PRIVATE
@@ -548,10 +585,13 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/impl/collector_real.cpp
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
+    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/msi/board_msi_center.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
@@ -611,6 +651,7 @@ add_executable(SystemTelemetryBenchmarks
 )
 target_sources(SystemTelemetryBenchmarks PRIVATE
     $<TARGET_OBJECTS:SystemTelemetryGigabyte>
+    $<TARGET_OBJECTS:SystemTelemetryMsi>
 )
 target_include_directories(SystemTelemetryBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src"

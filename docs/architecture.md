@@ -18,7 +18,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/dashboard_renderer/dashboard_renderer.*` owns dashboard scene traversal, renderer style input selection, drawing-mode state, widget-host services, and layout-edit active-region collection. It implements `WidgetHost`, owns a `Renderer` instance, and keeps graphics-backend details encapsulated in `src/renderer/`.
 - `src/layout_edit/` contains runtime layout-edit interaction, active-region hit testing, drag flow, controller-host integration, tooltip payload interpretation and text formatting, edit-tree construction, config-field mutation helpers, guide and reorder config helpers, diagnostics active-region trace formatting, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
 - `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
-- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
+- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, `src/telemetry/fps/` contains the Windows ETW presented-FPS provider, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
@@ -63,7 +63,9 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `TelemetryCollector` owns steady-state snapshot refresh, provider composition, and runtime target resolution for network and storage.
 - Windows-native collection covers generic CPU, memory, network, storage, and clock data.
-- Vendor providers extend that collector with AMD GPU support and the Gigabyte board-metric path without changing the renderer-facing snapshot model.
+- Vendor providers extend that collector with AMD and NVIDIA GPU support plus MSI Center and Gigabyte board-metric paths without changing the renderer-facing snapshot model.
+- GPU telemetry selects one vendor provider from the primary non-software DXGI adapter identity instead of probing every vendor bridge; unsupported GPU vendors use a telemetry-owned fallback provider that exposes only presented FPS.
+- NVIDIA GPU telemetry uses NVML for device metrics and uses the telemetry-owned ETW presented-FPS provider for FPS because NVML has no native game-FPS metric. The FPS provider counts runtime DXGI/D3D9 presents first and uses DxgKrnl presents as the fallback path when runtime present events are not visible.
 - Board telemetry keeps the last discovered provider sensor-name lists cached alongside live samples so layout-edit binding pickers stay populated across transient board-sample gaps.
 - Fake-runtime support bypasses live providers and serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot.
 
@@ -101,7 +103,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Startup and config flow
 
-- `src/main/main.cpp` initializes process-wide shell settings, parses command-line options, and chooses either the normal UI path or the headless diagnostics path.
+- `src/main/main.cpp` initializes process-wide shell settings, parses command-line options, relays `/elevate` runs to an elevated child process, and chooses either the normal UI path or the headless diagnostics path.
 - Config load starts from embedded `resources/config.ini`, applies the executable-side overlay unless suppressed, and resolves the active layout plus runtime selections before telemetry and rendering start.
 - The executable manifest disables file virtualization and keeps config reads and writes pointed at the executable-side location.
 
@@ -123,6 +125,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - The diagnostics path optionally reloads config through the same live reload logic used by the dashboard.
 - Requested outputs write trace, dump, screenshot, minimal-config, or full-config artifacts using the same runtime state the live app would use.
+- `/elevate` preserves diagnostics arguments and current working directory for the elevated child before diagnostics outputs are opened.
 - `/exit` performs one update-and-export pass and exits without joining the normal single-instance UI lifetime.
 
 ### Layout-edit flow
@@ -143,13 +146,13 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 - `resources/SystemTelemetry.rc` is the single resource script for the manifest, dialogs, icons, embedded config, and embedded localization catalog.
 - `resources/resource.h` owns the resource and control ids used by shell and dialog code.
-- `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and the mixed-mode Gigabyte SIV bridge object library.
-- `CMakeLists.txt` enables C4505 as an error for MSVC C++ targets, disables native C++ RTTI with `/GR-`, and keeps Release app and benchmark links non-incremental with `/OPT:REF` and `/LTCG`; those targets compile Release objects with `/Os` and `/GL` by default so benchmarks measure the same size-oriented whole-program optimization profile as the shipped executable. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` within that profile, and the C++/CLI Gigabyte bridge keeps its managed cast support in the `/clr` translation unit.
-- `.github/workflows/format-lint-tidy.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the `windows-2025-vs2026` GitHub runner.
+- `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and the mixed-mode board-provider bridge object libraries.
+- `CMakeLists.txt` enables C4505 as an error for MSVC C++ targets, disables native C++ RTTI with `/GR-`, and keeps Release app and benchmark links non-incremental with `/OPT:REF` and `/LTCG`; those targets compile Release objects with `/Os` and `/GL` by default so benchmarks measure the same size-oriented whole-program optimization profile as the shipped executable. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` within that profile, and the C++/CLI board-provider bridges keep their managed cast support in `/clr` translation units.
+- `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the `windows-2025-vs2026` GitHub runner.
 - `build.cmd` keeps the manifest-installed dependency tree in the repo-root `vcpkg\` directory, while vcpkg download archives and registry clones live under the shared cache root exported as `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE` so fresh worktrees reuse bootstrap downloads.
-- `.github/workflows/format-lint-tidy.yml` restores and saves that shared vcpkg cache root through `actions/cache` on the `windows-2025-vs2026` GitHub runner before and after the normal format, build, test, and tidy steps.
+- `.github/workflows/validation.yml` restores and saves that shared vcpkg cache root through `actions/cache` on the `windows-2025-vs2026` GitHub runner before and after the normal format, build, test, and tidy steps.
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
-- `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` owns the native Gigabyte board provider, sensor-name maps, metric templates, and sample shaping. `src/telemetry/board/gigabyte/board_gigabyte_siv_bridge.cpp` is the only CLR-enabled unit for the vendor .NET assembly reflection calls, keeping STL-heavy provider state out of CLR metadata.
+- `src/telemetry/board/board_vendor.cpp` selects a board provider from the baseboard manufacturer and creates the unsupported-board provider when no supported vendor matches. `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` and `src/telemetry/board/msi/board_msi_center.cpp` own native provider state, sensor-name maps, metric templates, and sample shaping. Their matching `*_bridge.cpp` files are the CLR-enabled units for vendor .NET assembly reflection calls, keeping STL-heavy provider state out of CLR metadata.
 - The test build also produces `SystemTelemetryBenchmarks`, which exercises the layout-edit drag, layout-switch, theme-change, layout-edit mouse-hover, and telemetry-refresh paths through the same runtime subsystems used by the app. Its supported benchmark names are held in an `enum_string`-backed selector, and each named benchmark owns its top-level command flow in a separate function.
 - `src/layout_edit_dialog/theme_preview.*` owns construction and drawing of the theme selector's color-mix triangle so dialog painting and benchmark coverage use the same preview implementation. The preview uses the shared config color-math module for OKLab color mixing.
 

@@ -14,7 +14,7 @@ jobs:
     env:
       SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS: 1800
       SYSTEMTELEMETRY_TIDY_MAX_PARALLEL: 4
-      SYSTEMTELEMETRY_CACHE_ROOT: ${{ runner.tool_cache }}\SystemTelemetry-cache
+      SYSTEMTELEMETRY_CACHE_ROOT: ${{ github.workspace }}\.github-cache\SystemTelemetry
 
     steps:
       - name: Check out repository
@@ -25,11 +25,11 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ${{ env.SYSTEMTELEMETRY_CACHE_ROOT }}\vcpkg\downloads
-            ${{ env.SYSTEMTELEMETRY_CACHE_ROOT }}\vcpkg\registries
-          key: vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/format-lint-tidy.yml') }}-${{ github.run_id }}
+            ${{ github.workspace }}\.github-cache\SystemTelemetry\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\SystemTelemetry\vcpkg\registries
+          key: vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/validation.yml') }}-${{ github.run_id }}
           restore-keys: |
-            vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/format-lint-tidy.yml') }}-
+            vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/validation.yml') }}-
             vcpkg-windows-2025-vs2026-
 
       - name: Check format
@@ -68,6 +68,6 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: |
-            ${{ env.SYSTEMTELEMETRY_CACHE_ROOT }}\vcpkg\downloads
-            ${{ env.SYSTEMTELEMETRY_CACHE_ROOT }}\vcpkg\registries
+            ${{ github.workspace }}\.github-cache\SystemTelemetry\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\SystemTelemetry\vcpkg\registries
           key: ${{ steps.vcpkg-cache-restore.outputs.cache-primary-key }}

@@ -36,8 +36,12 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/layout_edit_dialog/theme_preview.h|windows.h',
     'src/main/autostart.h|windows.h',
     'src/main/config_io.h|windows.h',
+    'src/main/main.cpp|windows.h',
     'src/renderer/impl/d2d_renderer.h|windows.h',
     'src/renderer/renderer.h|windows.h',
+    'src/telemetry/board/msi/board_msi_center.cpp|windows.h',
+    'src/telemetry/fps/fps_etw_provider.cpp|windows.h',
+    'src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp|windows.h',
     'src/telemetry/impl/collector_state.h|winsock2.h',
     'src/telemetry/impl/collector_state.h|ws2tcpip.h',
     'src/telemetry/impl/collector_state.h|windows.h',
@@ -253,7 +257,8 @@ function Test-EligibleTidyFile {
         return $false
     }
     $fileName = [System.IO.Path]::GetFileName($normalizedPath)
-    if ($fileName -eq 'board_gigabyte_siv.cpp' -or $fileName -eq 'board_gigabyte_siv_bridge.cpp') {
+    if ($fileName -eq 'board_gigabyte_siv.cpp' -or $fileName -eq 'board_gigabyte_siv_bridge.cpp' -or
+        $fileName -eq 'board_msi_center_bridge.cpp') {
         return $false
     }
     return $true

@@ -12,6 +12,7 @@ See also: [docs/project.md](project.md) for repository policy, [docs/diagnostics
 - vcpkg available either through the active Visual Studio developer environment or through `VCPKG_ROOT`
 - Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
 - AMD Software: Adrenalin Edition when AMD GPU telemetry is required
+- NVIDIA display driver with NVML when NVIDIA GPU telemetry is required
 - Gigabyte SIV installed when Gigabyte board temperature or fan telemetry is required
 - GitHub Actions uses the `windows-2025-vs2026` runner for push and pull request build, test, format, lint, and tidy validation.
 
@@ -59,7 +60,7 @@ install.cmd
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources. Its changed-file mode keeps Git CRLF normalization warnings out of formatter file discovery.
 - `test.cmd` is the maintained entrypoint for running the CTest suite against the built Release tree, and it prints verbose CTest output so GitHub runner logs show each test command and its stdout even when tests pass.
 - The repo `pre-commit` hook launches `tools\pre_commit_checks.ps1`, which formats staged eligible C++ files through `tools\run_clang_format.ps1` and runs `lint.cmd` before each commit. Git file discovery starts from all staged `.cpp` and `.h` paths, then the shared formatter filter limits work to maintained non-vendored `src\` and `tests\` files. The hook temporarily stashes unstaged and untracked files while it formats and lints the staged snapshot, restores them before exit, and aborts the commit when formatting or lint checks fail.
-- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep checks maintained non-vendored `.cpp` and `.h` files except the Gigabyte SIV provider bridge files, writes `build\clang_tidy_report.txt`, uses a four-minute per-file timeout, reports unused internal functions as errors, reports unused includes as errors, reports duplicated branch bodies as errors, and filters maintained include-cleaner false positives.
+- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep checks maintained non-vendored `.cpp` and `.h` files under `src\` and `tests\`, excludes `board_gigabyte_siv.cpp`, `board_gigabyte_siv_bridge.cpp`, and `board_msi_center_bridge.cpp`, writes `build\clang_tidy_report.txt`, uses a four-minute per-file timeout, reports enabled analyzer, bugprone, unused internal function, and unused include findings as errors, and filters maintained include-cleaner false positives.
 - `lint.cmd tidy` runs a full optional `clang-tidy` sweep and commonly needs at least eight minutes on the current toolchain before it can report success or failure. Local development avoids this slow sweep unless explicitly requested. GitHub Actions owns the routine tidy sweep with `SYSTEMTELEMETRY_TIDY_TIMEOUT_SECONDS` set to a larger per-file timeout and `SYSTEMTELEMETRY_TIDY_MAX_PARALLEL` set for runner stability.
 - CMake enables MSVC warning C4505 and treats it as an error so unreferenced internal functions are caught during normal builds when MSVC can diagnose them.
 - Native C++ targets compile with `/GR-`; production code uses explicit project type tags instead of native RTTI. The C++/CLI Gigabyte bridge keeps managed casts in its `/clr` translation unit.
@@ -70,7 +71,7 @@ install.cmd
 ## GitHub Validation
 
 - The `Validation` workflow runs on every push, pull request, and manual dispatch.
-- The workflow restores the shared vcpkg download and registry caches under `%RUNNER_TOOL_CACHE%\SystemTelemetry-cache` before validation, then saves the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads.
+- The workflow restores the shared vcpkg download and registry caches under `.github-cache\SystemTelemetry` inside the checked-out workspace before validation, then saves the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads.
 - The workflow checks formatting first with `format.cmd`, then builds with `build.cmd`, runs tests with `test.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
 - The repository branch protection requires the `Validation` job before pull requests can merge.
 - The workflow uploads `build\SystemTelemetry.exe` as the `SystemTelemetry-exe` artifact after validation succeeds.
@@ -86,6 +87,18 @@ If AMD GPU metrics are missing:
 
 1. Install or update AMD Software: Adrenalin Edition.
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
+3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
+4. Inspect the exported dump and trace outputs for the provider state on that machine.
+
+### NVIDIA GPU telemetry
+
+NVIDIA GPU metrics come from the NVML runtime installed with current NVIDIA display drivers.
+The NVIDIA FPS value comes from Windows DXGI/D3D9 ETW present events, so the process needs permission to start a real-time ETW session, such as elevation or membership in the local `Performance Log Users` group.
+
+If NVIDIA GPU metrics are missing:
+
+1. Install or update the NVIDIA display driver.
+2. Confirm `nvml.dll` is present in `C:\Windows\System32` or the NVIDIA NVSMI install directory.
 3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
 4. Inspect the exported dump and trace outputs for the provider state on that machine.
 
