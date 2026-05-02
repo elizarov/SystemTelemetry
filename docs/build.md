@@ -71,7 +71,7 @@ install.cmd
 ## GitHub Validation
 
 - The `Validation` workflow runs on every push, pull request, and manual dispatch.
-- The workflow restores the shared vcpkg download and registry caches under `.github-cache\SystemTelemetry` before validation, then saves the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads.
+- The workflow restores the shared vcpkg download and registry caches under `.github-cache\SystemTelemetry` inside the checked-out workspace before validation, then saves the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads.
 - The workflow checks formatting first with `format.cmd`, then builds with `build.cmd`, runs tests with `test.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
 - The repository branch protection requires the `Validation` job before pull requests can merge.
 - The workflow uploads `build\SystemTelemetry.exe` as the `SystemTelemetry-exe` artifact after validation succeeds.
