@@ -72,7 +72,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 
 ## Failure And Trace Policy
 
-- The diagnostics trace covers startup, reload, output export, renderer layout data, telemetry collection, vendor-provider activity including AMD ADLX, NVIDIA NVML, and NVIDIA presented-FPS ETW probes, and focused interactive layout-edit UI markers for layout switches, modal-menu scope, dialog-tree refresh, hover refresh, tooltip show or hide, and capture-state transitions when `/trace` is enabled.
+- The diagnostics trace covers startup, reload, output export, renderer layout data, telemetry collection, vendor-provider activity including GPU adapter vendor selection, AMD ADLX, NVIDIA NVML, NVIDIA presented-FPS ETW probes, `unsupported_gpu`, `msi_center`, `gigabyte_siv`, and `unsupported_board` provider markers, and focused interactive layout-edit UI markers for layout switches, modal-menu scope, dialog-tree refresh, hover refresh, tooltip show or hide, and capture-state transitions when `/trace` is enabled.
 - NVIDIA FPS tracing reports `fps_etw:*` startup, provider-enable, sampled-present, and shutdown markers when the ETW session can be opened. NVIDIA FPS sample diagnostics include cumulative source-event counts and the selected process window count. If Windows denies ETW access, diagnostics leave `gpu.fps` unavailable and record the Win32 failure in the NVIDIA provider diagnostics.
 - Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
 - When `/trace` is enabled, diagnostics failures prefer trace logging plus a failure exit code over blocking modal behavior.
