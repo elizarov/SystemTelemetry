@@ -123,7 +123,7 @@ public:
         sample_.providerName = "Unsupported GPU";
         sample_.available = false;
         sample_.diagnostics = "No supported GPU telemetry provider matches the primary adapter vendor.";
-        fpsProvider_ = CreatePresentedFpsEtwProvider(trace_);
+        fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = "Presented FPS ETW provider active.";
         } else {

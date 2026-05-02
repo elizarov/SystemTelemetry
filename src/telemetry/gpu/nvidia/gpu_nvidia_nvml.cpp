@@ -230,7 +230,7 @@ public:
 
         diagnostics_ = "NVML GPU=" + gpuName_ + " fan_rpm_supported=" + (HasFanSpeedRpm() ? "yes" : "no") +
                        " native_fps_supported=no";
-        fpsProvider_ = CreatePresentedFpsEtwProvider(trace_);
+        fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = "Presented FPS ETW provider active.";
         } else {

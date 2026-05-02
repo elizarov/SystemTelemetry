@@ -72,6 +72,7 @@ add_executable(SystemTelemetry WIN32
     src/layout_guide_sheet/layout_guide_sheet.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
     src/main/autostart.cpp
+    src/main/fps_service.cpp
     src/util/command_line.cpp
     src/main/config_io.cpp
     src/display/display_config.cpp
@@ -140,6 +141,8 @@ add_executable(SystemTelemetry WIN32
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/fps_service_client_provider.cpp
+    src/telemetry/fps/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
@@ -229,6 +232,8 @@ set(systemtelemetry_release_speed_sources
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/fps_service_client_provider.cpp
+    src/telemetry/fps/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
@@ -436,6 +441,7 @@ add_executable(SystemTelemetryTests
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
     tests/system_info_support_tests.cpp
+    tests/fps_service_protocol_tests.cpp
     tests/telemetry_retained_history_tests.cpp
     src/config/config.cpp
     src/config/color_expression.cpp
@@ -504,6 +510,7 @@ add_executable(SystemTelemetryTests
     src/telemetry/impl/retained_history.cpp
     src/util/utf8.cpp
     src/util/trace.cpp
+    src/telemetry/fps/fps_service_protocol.cpp
   )
 target_include_directories(SystemTelemetryTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
@@ -583,6 +590,8 @@ add_executable(SystemTelemetryBenchmarks
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/fps_service_client_provider.cpp
+    src/telemetry/fps/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp

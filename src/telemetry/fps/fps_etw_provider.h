@@ -23,3 +23,4 @@ public:
 };
 
 std::unique_ptr<FpsTelemetryProvider> CreatePresentedFpsEtwProvider(Trace& trace);
+std::unique_ptr<FpsTelemetryProvider> CreatePresentedFpsProvider(Trace& trace);
