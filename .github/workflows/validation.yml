@@ -27,9 +27,9 @@ jobs:
           path: |
             ${{ env.SYSTEMTELEMETRY_CACHE_ROOT }}\vcpkg\downloads
             ${{ env.SYSTEMTELEMETRY_CACHE_ROOT }}\vcpkg\registries
-          key: vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/format-lint-tidy.yml') }}-${{ github.run_id }}
+          key: vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/validation.yml') }}-${{ github.run_id }}
           restore-keys: |
-            vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/format-lint-tidy.yml') }}-
+            vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/validation.yml') }}-
             vcpkg-windows-2025-vs2026-
 
       - name: Check format
