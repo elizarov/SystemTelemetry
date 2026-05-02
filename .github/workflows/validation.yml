@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  format-lint-tidy:
+  validation:
     name: Validation
     runs-on: windows-2025-vs2026
     timeout-minutes: 240
