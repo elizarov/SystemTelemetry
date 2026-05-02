@@ -217,6 +217,12 @@ std::string JoinConfigLines(const std::vector<std::string>& lines) {
     return output;
 }
 
+void RemoveLeadingEmptyLines(std::vector<std::string>& lines) {
+    while (!lines.empty() && Trim(lines.front()).empty()) {
+        lines.erase(lines.begin());
+    }
+}
+
 template <typename UpdateKeyFn>
 void SaveKnownStructuredSectionDifferences(
     const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn&& updateKey) {
@@ -324,6 +330,7 @@ std::string BuildSavedConfigText(
     };
 
     SaveKnownStructuredSectionDifferences(config, compareConfig, updateKey);
+    RemoveLeadingEmptyLines(lines);
     return JoinConfigLines(lines);
 }
 

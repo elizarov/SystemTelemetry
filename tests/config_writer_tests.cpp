@@ -132,6 +132,27 @@ TEST(ConfigWriter, MinimalSaveIgnoresThemeResolvedColorChangesWhenExpressionsAre
     EXPECT_THAT(output, testing::Not(testing::HasSubstr("background_color = ")));
 }
 
+TEST(ConfigWriter, MinimalSaveDoesNotEmitLeadingEmptyLineForEmptyInitialText) {
+    AppConfig compareConfig;
+    AppConfig currentConfig = compareConfig;
+    currentConfig.display.theme = "light_blue";
+
+    const std::string output = BuildSavedConfigText("", currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::StartsWith("[display]\r\n"));
+    EXPECT_THAT(output, testing::Not(testing::StartsWith("\r\n")));
+}
+
+TEST(ConfigWriter, MinimalSavePreservesLeadingCommentsWithoutLeadingEmptyLine) {
+    AppConfig compareConfig;
+    AppConfig currentConfig = compareConfig;
+    currentConfig.display.theme = "light_blue";
+
+    const std::string output = BuildSavedConfigText("\r\n; local overrides\r\n", currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::StartsWith("; local overrides\r\n\r\n[display]\r\n"));
+}
+
 TEST(ConfigWriter, FullExportWritesThemeSections) {
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
 
