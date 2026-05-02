@@ -203,6 +203,10 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 DrawThemePreview(state, *draw);
                 return TRUE;
             }
+            if (draw != nullptr && IsColorGradientBarControlId(static_cast<int>(draw->CtlID))) {
+                DrawColorGradientBar(hwnd, *draw);
+                return TRUE;
+            }
             if (draw != nullptr && IsMetricListOrderButtonId(static_cast<int>(draw->CtlID))) {
                 return DrawMetricListOrderButton(draw);
             }

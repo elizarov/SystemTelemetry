@@ -56,6 +56,8 @@ void ConfigureDialogFonts(LayoutEditDialogState* state, HWND hwnd);
 void DestroyDialogFonts(LayoutEditDialogState* state);
 void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, const std::wstring& text);
 void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int color);
+bool IsColorGradientBarControlId(int controlId);
+void DrawColorGradientBar(HWND hwnd, const DRAWITEMSTRUCT& drawItem);
 void DrawThemePreview(LayoutEditDialogState* state, const DRAWITEMSTRUCT& drawItem);
 void SetFontSamplePreview(
     LayoutEditDialogState* state, HWND hwnd, std::optional<LayoutEditParameter> parameter, const UiFontConfig* font);

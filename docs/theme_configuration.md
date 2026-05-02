@@ -186,7 +186,7 @@ Theme section behavior:
 `[colors]` section behavior:
 
 - Each color role has a mode switch with exactly two choices: `Literal` and `Derived`.
-- `Literal` mode shows the shared literal color editor and stores `#RRGGBBAA`. The editor exposes dialog-local `RGB` and `LCH` tabs for the same color value, with alpha below the tabs as the shared channel.
+- `Literal` mode shows the shared literal color editor and stores `#RRGGBBAA`. The editor exposes dialog-local `RGB` and `LCH` tabs for the same color value, with alpha below the tabs as the shared channel. Each RGB or LCH slider has a text-height gradient preview below it that illustrates the slider effect.
 - `Derived` mode shows controls for the base color and for each supported transformation: `rotate_hue`, `mix`, and `alpha`.
 - The base color selector offers the standard active-theme token identifiers: `background`, `foreground`, `accent`, and `guide`.
 - Each transformation has an enable switch. Disabled transformations are omitted from the saved color expression.

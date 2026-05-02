@@ -1,8 +1,10 @@
 #include "layout_edit_dialog/impl/pane.h"
 
 #include <algorithm>
+#include <cmath>
 #include <commctrl.h>
 
+#include "config/color_math.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit_dialog/impl/editors.h"
 #include "layout_edit_dialog/impl/util.h"
@@ -34,6 +36,7 @@ struct LayoutEditRightPaneMetrics {
 
 constexpr LayoutEditRightPaneMetrics kLayoutEditRightPaneMetrics{};
 constexpr wchar_t kDialogRedrawSuspendCountProperty[] = L"SystemTelemetry.LayoutEdit.RedrawSuspendCount";
+constexpr double kLchGradientChromaMax = 0.4;
 
 int WindowRedrawSuspendCount(HWND hwnd) {
     return static_cast<int>(reinterpret_cast<intptr_t>(GetPropW(hwnd, kDialogRedrawSuspendCountProperty)));
@@ -337,21 +340,27 @@ void ShowColorEditorControls(HWND hwnd, bool showColor, bool supportsDerived, bo
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_LABEL, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_SLIDER, showRgb);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER, showRgb);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_GRADIENT, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER, showRgb);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT, showRgb);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_LABEL, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER, showLch);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_LABEL, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_EDIT, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER, showLch);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_GRADIENT, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_HUE_LABEL, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_HUE_EDIT, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER, showLch);
+    ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT, showLch);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL, showLiteral);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT, showLiteral);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER, showLiteral);
@@ -382,6 +391,88 @@ void EnableStaticVerticalCentering(HWND hwnd, int labelId) {
 
 int RowLabelVisualTopAdjustment(HWND hwnd) {
     return -DialogUnitsToPixelsY(hwnd, 2);
+}
+
+COLORREF RgbColor(int red, int green, int blue) {
+    return RGB(std::clamp(red, 0, 255), std::clamp(green, 0, 255), std::clamp(blue, 0, 255));
+}
+
+COLORREF ColorRefFromBytes(ColorBytes color) {
+    return RgbColor(static_cast<int>(std::lround(color.r)),
+        static_cast<int>(std::lround(color.g)),
+        static_cast<int>(std::lround(color.b)));
+}
+
+COLORREF PureHueColor(double hueDegrees) {
+    const double hue = std::fmod(std::max(0.0, hueDegrees), 360.0) / 60.0;
+    const double chroma = 255.0;
+    const double x = chroma * (1.0 - std::abs(std::fmod(hue, 2.0) - 1.0));
+    if (hue < 1.0) {
+        return RgbColor(255, static_cast<int>(std::lround(x)), 0);
+    }
+    if (hue < 2.0) {
+        return RgbColor(static_cast<int>(std::lround(x)), 255, 0);
+    }
+    if (hue < 3.0) {
+        return RgbColor(0, 255, static_cast<int>(std::lround(x)));
+    }
+    if (hue < 4.0) {
+        return RgbColor(0, static_cast<int>(std::lround(x)), 255);
+    }
+    if (hue < 5.0) {
+        return RgbColor(static_cast<int>(std::lround(x)), 0, 255);
+    }
+    return RgbColor(255, 0, static_cast<int>(std::lround(x)));
+}
+
+std::optional<OklchColor> ReadDialogLchForGradient(HWND hwnd) {
+    const auto lightness =
+        TryParseDialogDouble(ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT).c_str());
+    const auto chroma =
+        TryParseDialogDouble(ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_EDIT).c_str());
+    const auto hue = TryParseDialogDouble(ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_HUE_EDIT).c_str());
+    if (!lightness.has_value() || !chroma.has_value() || !hue.has_value()) {
+        return std::nullopt;
+    }
+    return OklchColor{
+        std::clamp(*lightness, 0.0, 1.0),
+        std::max(0.0, *chroma),
+        std::clamp(*hue, 0.0, 360.0),
+    };
+}
+
+OklchColor CurrentLchForGradient(HWND hwnd) {
+    if (const auto lch = ReadDialogLchForGradient(hwnd); lch.has_value()) {
+        return *lch;
+    }
+    if (const auto color = ReadColorDialogValue(hwnd); color.has_value()) {
+        return OklchFromColorBytes(ColorBytesFromRgba(*color));
+    }
+    return OklchColor{0.5, 0.0, 0.0};
+}
+
+COLORREF ColorGradientBarColor(HWND hwnd, int controlId, double position) {
+    const double t = std::clamp(position, 0.0, 1.0);
+    switch (controlId) {
+        case IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT:
+            return RgbColor(static_cast<int>(std::lround(t * 255.0)), 0, 0);
+        case IDC_LAYOUT_EDIT_COLOR_GREEN_GRADIENT:
+            return RgbColor(0, static_cast<int>(std::lround(t * 255.0)), 0);
+        case IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT:
+            return RgbColor(0, 0, static_cast<int>(std::lround(t * 255.0)));
+        case IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT: {
+            const int value = static_cast<int>(std::lround(t * 255.0));
+            return RgbColor(value, value, value);
+        }
+        case IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_GRADIENT: {
+            const OklchColor current = CurrentLchForGradient(hwnd);
+            return ColorRefFromBytes(
+                ColorBytesFromOklch(OklchColor{current.l, t * kLchGradientChromaMax, current.h}, 255.0));
+        }
+        case IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT:
+            return PureHueColor(t * 360.0);
+    }
+    return GetSysColor(COLOR_3DFACE);
 }
 
 int LayoutLabeledControlRow(HWND hwnd,
@@ -695,6 +786,39 @@ void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int
     InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_SWATCH), nullptr, TRUE);
     InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL), nullptr, TRUE);
     InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE), nullptr, TRUE);
+    InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT), nullptr, TRUE);
+    InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_GRADIENT), nullptr, TRUE);
+    InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT), nullptr, TRUE);
+    InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT), nullptr, TRUE);
+    InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_GRADIENT), nullptr, TRUE);
+    InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT), nullptr, TRUE);
+}
+
+bool IsColorGradientBarControlId(int controlId) {
+    return controlId == IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT || controlId == IDC_LAYOUT_EDIT_COLOR_GREEN_GRADIENT ||
+           controlId == IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT ||
+           controlId == IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT ||
+           controlId == IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_GRADIENT ||
+           controlId == IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT;
+}
+
+void DrawColorGradientBar(HWND hwnd, const DRAWITEMSTRUCT& drawItem) {
+    if (drawItem.hDC == nullptr) {
+        return;
+    }
+
+    const int width = std::max(1, static_cast<int>(drawItem.rcItem.right - drawItem.rcItem.left));
+    RECT lineRect = drawItem.rcItem;
+    for (int x = 0; x < width; ++x) {
+        const double position = width <= 1 ? 0.0 : static_cast<double>(x) / static_cast<double>(width - 1);
+        lineRect.left = drawItem.rcItem.left + x;
+        lineRect.right = lineRect.left + 1;
+        HBRUSH brush = CreateSolidBrush(ColorGradientBarColor(hwnd, static_cast<int>(drawItem.CtlID), position));
+        FillRect(drawItem.hDC, &lineRect, brush);
+        DeleteObject(brush);
+    }
+
+    FrameRect(drawItem.hDC, &drawItem.rcItem, GetSysColorBrush(COLOR_3DSHADOW));
 }
 
 void DrawThemePreview(LayoutEditDialogState* state, const DRAWITEMSTRUCT& drawItem) {
@@ -1372,9 +1496,20 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     lchView ? IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER : IDC_LAYOUT_EDIT_COLOR_RED_SLIDER,
                     lchView ? IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER : IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER,
                     lchView ? IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER : IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER};
+                const int channelGradientIds[] = {
+                    lchView ? IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT : IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT,
+                    lchView ? IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_GRADIENT : IDC_LAYOUT_EDIT_COLOR_GREEN_GRADIENT,
+                    lchView ? IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT : IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT};
                 const int alphaEditHeight = DialogControlLayoutHeightForVisibleHeight(
                     hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT, singleLineFieldHeight);
                 const int alphaSliderHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER);
+                const int gradientBarHeight = std::max(1,
+                    MeasureTextHeightForControl(hwnd,
+                        channelLabelIds[0],
+                        ReadDialogControlTextWide(hwnd, channelLabelIds[0]),
+                        labelColumnWidth,
+                        true));
+                const int gradientGap = DialogUnitsToPixelsY(hwnd, 2);
                 int tabContentHeight = 0;
                 int channelRowHeights[3] = {};
                 int channelLabelHeights[3] = {};
@@ -1389,8 +1524,9 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                         ReadDialogControlTextWide(hwnd, channelLabelIds[i]),
                         labelColumnWidth,
                         true);
+                    const int sliderColumnHeight = channelSliderHeights[i] + gradientGap + gradientBarHeight;
                     channelRowHeights[i] =
-                        std::max({channelEditHeights[i], channelSliderHeights[i], channelLabelHeights[i]});
+                        std::max({channelEditHeights[i], sliderColumnHeight, channelLabelHeights[i]});
                     tabContentHeight += channelRowHeights[i] + (i < 2 ? metrics.rowGap : 0);
                 }
                 const int tabHeaderHeight = DialogUnitsToPixelsY(hwnd, 16);
@@ -1412,27 +1548,30 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                         ReadDialogControlTextWide(hwnd, channelLabelIds[i]),
                         rowLabelWidth,
                         true);
+                    SetDialogControlBounds(
+                        hwnd, channelSliderIds[i], rowSliderLeft, tabCursorY, rowSliderWidth, channelSliderHeights[i]);
                     SetDialogControlBounds(hwnd,
-                        channelEditIds[i],
-                        rowEditLeft,
-                        tabCursorY + ((rowHeight - channelEditHeights[i]) / 2),
-                        valueEditWidth,
-                        channelEditHeights[i]);
-                    SetDialogControlBounds(hwnd,
-                        channelSliderIds[i],
+                        channelGradientIds[i],
                         rowSliderLeft,
-                        tabCursorY + ((rowHeight - channelSliderHeights[i]) / 2),
+                        tabCursorY + channelSliderHeights[i] + gradientGap,
                         rowSliderWidth,
-                        channelSliderHeights[i]);
+                        gradientBarHeight);
                     SetDialogControlBounds(hwnd,
                         channelLabelIds[i],
                         rowLeft,
-                        tabCursorY + ((rowHeight - labelHeight) / 2),
+                        tabCursorY + ((channelSliderHeights[i] - labelHeight) / 2),
                         rowLabelWidth,
                         labelHeight);
+                    SetDialogControlBounds(hwnd,
+                        channelEditIds[i],
+                        rowEditLeft,
+                        tabCursorY + ((channelSliderHeights[i] - channelEditHeights[i]) / 2),
+                        valueEditWidth,
+                        channelEditHeights[i]);
                     BringDialogControlToTop(hwnd, channelLabelIds[i]);
                     BringDialogControlToTop(hwnd, channelEditIds[i]);
                     BringDialogControlToTop(hwnd, channelSliderIds[i]);
+                    BringDialogControlToTop(hwnd, channelGradientIds[i]);
                     tabCursorY += rowHeight + metrics.rowGap;
                 }
                 cursorY += tabHeight + metrics.rowGap;
