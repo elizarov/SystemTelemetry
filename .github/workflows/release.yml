@@ -71,6 +71,10 @@ jobs:
         shell: cmd
         run: test.cmd
 
+      - name: Build MSI
+        shell: cmd
+        run: package.cmd
+
       - name: Package release
         shell: pwsh
         run: |
@@ -97,6 +101,8 @@ jobs:
             build\CaseDash.exe.sha256 `
             "build\CaseDash-$env:CASE_DASH_RELEASE_VERSION.zip" `
             "build\CaseDash-$env:CASE_DASH_RELEASE_VERSION.zip.sha256" `
+            "build\CaseDash-$env:CASE_DASH_RELEASE_VERSION.msi" `
+            "build\CaseDash-$env:CASE_DASH_RELEASE_VERSION.msi.sha256" `
             --title "CaseDash $env:CASE_DASH_RELEASE_VERSION" `
             --notes "CaseDash $env:CASE_DASH_RELEASE_VERSION"
 

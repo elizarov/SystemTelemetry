@@ -13,6 +13,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and experiment history.
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
+- `installer\` is the single maintained source of truth for the WiX MSI package.
 - `.clang-format` is the single maintained source of truth for C++ formatting policy.
 - `.github/workflows/validation.yml` is the single maintained source of truth for push and pull request build, test, format, lint, and tidy automation.
 

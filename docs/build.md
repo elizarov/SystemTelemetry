@@ -10,6 +10,7 @@ See also: [docs/project.md](project.md) for repository policy, [docs/diagnostics
 - Visual Studio 2026 Insiders (`18`) C++/CLI support
 - .NET Framework 4.8 SDK
 - vcpkg available either through the active Visual Studio developer environment or through `VCPKG_ROOT`
+- NuGet package restore access for the WiX Toolset SDK when building the MSI package; the installer project accepts the WiX 7 OSMF EULA for non-interactive local and CI builds.
 - Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
 - AMD Software: Adrenalin Edition when AMD GPU telemetry is required
 - NVIDIA display driver with NVML when NVIDIA GPU telemetry is required
@@ -55,6 +56,16 @@ install.cmd
 
 `install.cmd` requests elevation, stops running `CaseDash.exe` instances, waits for them to exit, installs `build\CaseDash.exe` into `C:\Program Files\CaseDash`, and leaves auto-start registration to the runtime menu toggle. The auto-start toggle installs the machine-wide Run entry for per-user dashboard startup and the `CaseDashFpsService` LocalSystem service used for privileged FPS collection.
 
+## Package
+
+Build the runtime and MSI package through the repository entrypoint:
+
+```bat
+package.cmd
+```
+
+`package.cmd` runs `build.cmd`, restores the WiX Toolset SDK through MSBuild, builds the minimal x64 per-machine MSI from `installer\`, writes `build\CaseDash-<VERSION>.msi`, and writes the matching SHA-256 checksum. The MSI uses a no-license install-directory UI, installs only `CaseDash.exe` into `C:\Program Files\CaseDash`, and shows a default-enabled completion option to run CaseDash immediately. Runtime auto-start and FPS service registration remain owned by the app menu. MSI uninstall removes the installed executable, executable-side `config.ini`, the executable-side `casedash_blank.png` wallpaper image, the `CaseDash` machine-wide Run value, and the `CaseDashFpsService` service when present.
+
 ## Developer Tooling Entrypoints
 
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources. Its changed-file mode keeps Git CRLF normalization warnings out of formatter file discovery.
@@ -63,6 +74,7 @@ install.cmd
 - `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep checks maintained non-vendored `.cpp` and `.h` files under `src\` and `tests\`, excludes `board_gigabyte_siv.cpp`, `board_gigabyte_siv_bridge.cpp`, and `board_msi_center_bridge.cpp`, writes `build\clang_tidy_report.txt`, uses a four-minute per-file timeout, reports enabled analyzer, bugprone, unused internal function, and unused include findings as errors, and filters maintained include-cleaner false positives.
 - `lint.cmd tidy` runs a full optional `clang-tidy` sweep and commonly needs at least eight minutes on the current toolchain before it can report success or failure. Local development avoids this slow sweep unless explicitly requested. GitHub Actions owns the routine tidy sweep with `CASEDASH_TIDY_TIMEOUT_SECONDS` set to a larger per-file timeout and `CASEDASH_TIDY_MAX_PARALLEL` set for runner stability.
 - `tools\generate_readme_images.ps1` builds the app by default and exports the light and dark README screenshots from built-in fake telemetry with fixed `/scale:2` rendering. Use `-SkipBuild` only when `build\CaseDash.exe` is already current.
+- `package.cmd` is the maintained local entrypoint for producing the release MSI outside the GitHub Release workflow. It normalizes `major.minor` versions from `VERSION` to `major.minor.0` for Windows Installer product-version rules while keeping the output filename on the original `VERSION` text.
 - CMake enables MSVC warning C4505 and treats it as an error so unreferenced internal functions are caught during normal builds when MSVC can diagnose them.
 - Native C++ targets compile with `/GR-`; production code uses explicit project type tags instead of native RTTI. The C++/CLI Gigabyte bridge keeps managed casts in its `/clr` translation unit.
 - Release app and benchmark builds compile size-oriented code with `/Os` and `/GL`, then link with `/LTCG`, `/OPT:REF`, and non-incremental linking so whole-program optimization and reference elimination reduce the shipped executable while benchmarks measure the same optimization profile. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` inside that Release profile so size work does not distort the maintained performance loops. Tests keep the normal Release compile/link path for faster local validation.
@@ -73,9 +85,10 @@ install.cmd
 
 - The `Validation` workflow runs on every push, pull request, and manual dispatch.
 - The workflow restores the shared vcpkg download and registry caches under `.github-cache\CaseDash` inside the checked-out workspace before validation, then saves the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads.
-- The workflow checks formatting first with `format.cmd`, then builds with `build.cmd`, runs tests with `test.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
+- The workflow checks formatting first with `format.cmd`, then builds with `build.cmd`, runs tests with `test.cmd`, builds the WiX MSI with `package.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
 - The repository branch protection requires the `Validation` job before pull requests can merge.
 - The workflow uploads `build\CaseDash.exe` as the `CaseDash-exe` artifact after validation succeeds.
+- The workflow uploads `build\CaseDash-<VERSION>.msi` and its checksum as the `CaseDash-msi` artifact after validation succeeds.
 - The workflow uploads `build\clang_tidy_report.txt` as an artifact when it is produced.
 
 ## Releases
@@ -83,7 +96,7 @@ install.cmd
 - [docs/release.md](release.md) owns the official release workflow.
 - `VERSION` is the maintained base version used by CMake-generated build metadata.
 - Tagged release builds use tags in the form `v<VERSION>`, such as `v0.1`.
-- The `Release` workflow validates the tag, builds and tests CaseDash, packages `CaseDash.exe`, writes SHA-256 checksums, and creates the GitHub Release.
+- The `Release` workflow validates the tag, builds and tests CaseDash, packages `CaseDash.exe`, builds the WiX MSI, writes SHA-256 checksums, and creates the GitHub Release.
 
 ## Provider Notes
 

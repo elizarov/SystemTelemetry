@@ -9,6 +9,7 @@ See also: [docs/build.md](build.md) for local build setup and [docs/project.md](
 - Version text uses `major.minor` or `major.minor.patch`.
 - CMake reads `VERSION` and Git metadata during configure, then generates build metadata under `build\cmake\generated`.
 - The generated metadata is compiled into the executable as C++ constants, a Windows `VERSIONINFO` resource, and the application manifest assembly version.
+- The MSI package uses the same `VERSION` text as its filename version and normalizes `major.minor` to `major.minor.0` for the Windows Installer product version.
 
 ## Build Kinds
 
@@ -35,6 +36,8 @@ release.cmd <version>
 
 `release.cmd` asks for keyboard confirmation, updates [VERSION](../VERSION), commits the version change, runs format, lint, build, and tests, creates the matching annotated `v<VERSION>` tag, pushes the current branch, and pushes the tag.
 
-The `Release` GitHub Actions workflow checks that the tag matches `VERSION`, builds and tests CaseDash, packages the executable, writes SHA-256 checksums, and creates the GitHub Release.
+The `Release` GitHub Actions workflow checks that the tag matches `VERSION`, builds and tests CaseDash, packages the executable, builds the minimal x64 WiX MSI, writes SHA-256 checksums, and creates the GitHub Release.
+
+The release assets are the standalone executable, ZIP package, MSI installer, and matching `.sha256` files. The MSI uses a no-license install-directory UI, installs only `CaseDash.exe` into `C:\Program Files\CaseDash`, and shows a default-enabled completion option to run CaseDash immediately. Runtime auto-start and FPS service registration remain owned by the app menu. MSI uninstall removes the installed executable, executable-side `config.ini`, the executable-side `casedash_blank.png` wallpaper image, the `CaseDash` machine-wide Run value, and the `CaseDashFpsService` service when present.
 
 The workflow can also be started manually with a tag input, but the tag must still match `VERSION`.
