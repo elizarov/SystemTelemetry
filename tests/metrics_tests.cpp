@@ -164,6 +164,7 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     EXPECT_EQ(fps.label, "FPS");
     EXPECT_EQ(fps.valueText, "144 FPS");
     EXPECT_EQ(fps.annotationText, "dota");
+    EXPECT_FALSE(fps.warningAnnotation);
     EXPECT_EQ(fps.state, MetricValueState::Available);
     EXPECT_DOUBLE_EQ(fps.ratio, 0.6);
     EXPECT_DOUBLE_EQ(fps.peakRatio, 0.6);
@@ -188,6 +189,23 @@ TEST(Metrics, ResolvesGpuFpsPermissionIssueAsNeedAdmin) {
     EXPECT_EQ(fps.valueText, "Need admin");
     EXPECT_EQ(fps.state, MetricValueState::PermissionRequired);
     EXPECT_DOUBLE_EQ(fps.ratio, 0.0);
+}
+
+TEST(Metrics, ResolvesNativeFpsFallbackPermissionIssueAsWarningAnnotation) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.gpu.fps = ScalarMetric{90.0, ScalarMetricUnit::Fps, ScalarMetricIssue::PermissionRequired};
+    snapshot.gpu.fpsAppName = "ignored";
+
+    MetricSource source(snapshot, metrics);
+
+    const MetricValue& fps = source.ResolveMetric("gpu.fps");
+    EXPECT_EQ(fps.label, "FPS");
+    EXPECT_EQ(fps.valueText, "90 FPS");
+    EXPECT_EQ(fps.annotationText, "Need admin");
+    EXPECT_TRUE(fps.warningAnnotation);
+    EXPECT_EQ(fps.state, MetricValueState::Available);
+    EXPECT_DOUBLE_EQ(fps.ratio, 0.375);
 }
 
 TEST(Metrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {

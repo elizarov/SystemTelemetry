@@ -25,6 +25,7 @@ struct MetricValue {
     double ratio = 0.0;
     double peakRatio = 0.0;
     MetricValueState state = MetricValueState::Unavailable;
+    bool warningAnnotation = false;
 };
 
 struct ThroughputMetric {

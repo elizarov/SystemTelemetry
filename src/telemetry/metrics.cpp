@@ -350,7 +350,8 @@ MetricValue BuildResolvedMetric(const SystemSnapshot& snapshot,
     double ratio,
     double telemetryScale = 0.0,
     MetricValueState state = MetricValueState::Available,
-    std::string annotationText = {}) {
+    std::string annotationText = {},
+    bool warningAnnotation = false) {
     if (state == MetricValueState::Available) {
         state = InferMetricValueState(valueText);
     }
@@ -361,7 +362,8 @@ MetricValue BuildResolvedMetric(const SystemSnapshot& snapshot,
         definition.unit,
         ratio,
         ResolvePeakRatio(snapshot, definition, metricRef, ratio, telemetryScale),
-        state};
+        state,
+        warningAnnotation};
 }
 
 MetricValue ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
@@ -472,7 +474,8 @@ MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
     std::string_view) {
-    if (!snapshot.gpu.fps.value.has_value() && snapshot.gpu.fps.issue == ScalarMetricIssue::PermissionRequired) {
+    const bool permissionRequired = snapshot.gpu.fps.issue == ScalarMetricIssue::PermissionRequired;
+    if (!snapshot.gpu.fps.value.has_value() && permissionRequired) {
         return BuildResolvedMetric(snapshot,
             definition,
             metricRef,
@@ -497,7 +500,8 @@ MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
         ratio,
         0.0,
         MetricValueState::Available,
-        snapshot.gpu.fpsAppName);
+        permissionRequired ? std::string("Need admin") : snapshot.gpu.fpsAppName,
+        permissionRequired);
 }
 
 MetricValue ResolveGpuMemoryMetric(const SystemSnapshot& snapshot,
