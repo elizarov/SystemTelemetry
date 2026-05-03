@@ -50,7 +50,7 @@ code {
 
 .nav {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 1rem;
   width: min(1160px, calc(100% - 2rem));
@@ -109,12 +109,17 @@ code {
   border-bottom-color: var(--accent);
 }
 
+.section-picker,
 .theme-picker {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.section-picker {
+  display: none;
 }
 
 select {
@@ -348,13 +353,17 @@ p {
 
 @media (max-width: 860px) {
   .nav {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 56px;
   }
 
   .nav-links {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-    padding-bottom: 0.75rem;
+    display: none;
+  }
+
+  .section-picker {
+    display: flex;
+    justify-content: end;
   }
 
   .hero,
@@ -381,8 +390,13 @@ p {
     width: min(100% - 1rem, 1160px);
   }
 
+  .section-picker span,
   .theme-picker span {
     display: none;
+  }
+
+  select {
+    max-width: 8.5rem;
   }
 
   .feature-grid,

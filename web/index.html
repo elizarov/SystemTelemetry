@@ -21,6 +21,16 @@
           <a href="#layout" data-section-link="layout">Layout</a>
           <a href="#contribute" data-section-link="contribute">Contribute</a>
         </div>
+        <label class="section-picker">
+          <span>Section</span>
+          <select id="sectionSelect" aria-label="Section">
+            <option value="intro">Download</option>
+            <option value="features">Features</option>
+            <option value="hardware">Hardware</option>
+            <option value="layout">Layout</option>
+            <option value="contribute">Contribute</option>
+          </select>
+        </label>
         <label class="theme-picker">
           <span>Theme</span>
           <select id="themeSelect" aria-label="Theme"></select>
@@ -118,6 +128,11 @@
           <p>
             Contributions are welcome in code, issues, sketches, and plain ideas:
             themes, layouts, telemetry providers, localization, and practical feedback.
+          </p>
+          <p>
+            The most useful code contributions are new hardware providers. CaseDash currently has
+            board telemetry for Gigabyte and MSI, and GPU telemetry for AMD and NVIDIA. More board
+            vendors and GPU vendors need owners with the hardware, SDKs, and patience to wire them in.
           </p>
         </div>
         <div class="link-stack">
