@@ -66,7 +66,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Windows-native collection covers generic CPU, memory, network, storage, and clock data.
 - Vendor providers extend that collector with AMD and NVIDIA GPU support plus MSI Center and Gigabyte board-metric paths without changing the renderer-facing snapshot model.
 - GPU telemetry selects one vendor provider from the primary non-software DXGI adapter identity instead of probing every vendor bridge; unsupported GPU vendors use a telemetry-owned fallback provider that exposes only presented FPS.
-- NVIDIA GPU telemetry uses NVML for device metrics and uses the telemetry-owned presented-FPS provider for FPS because NVML has no native game-FPS metric. The FPS provider asks the machine-wide `CashDashService` LocalSystem service over the versioned named-pipe protocol first, then falls back to local ETW collection when the service is absent or unreachable. The ETW path counts runtime DXGI/D3D9 presents first and uses DxgKrnl presents as the fallback path when runtime present events are not visible.
+- NVIDIA GPU telemetry uses NVML for device metrics and uses the telemetry-owned presented-FPS provider for FPS because NVML has no native game-FPS metric. The FPS provider asks the machine-wide `CashDashService` LocalSystem service over the versioned named-pipe protocol first, then falls back to local ETW collection when the service is absent or unreachable. The pipe protocol uses a generic request envelope with a stable request id and request name; the current FPS query is `PresentedFpsSample` / `presented_fps_sample`. The ETW path counts runtime DXGI/D3D9 presents first and uses DxgKrnl presents as the fallback path when runtime present events are not visible.
 - Board telemetry keeps the last discovered provider sensor-name lists cached alongside live samples so layout-edit binding pickers stay populated across transient board-sample gaps.
 - Fake-runtime support bypasses live providers and serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot.
 
@@ -113,7 +113,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - The controller owns one runtime collector instance.
 - Each refresh produces a `SystemSnapshot` that becomes the renderer input for live paint and diagnostics export.
 - Runtime network and storage selections are resolved from current machine candidates and surfaced back to menu-building code for user selection.
-- `CashDashService` hosts privileged telemetry collection and currently serves presented-FPS sample snapshots through `\\.\pipe\CaseDashFps`; normal UI processes continue to collect all non-FPS telemetry locally.
+- `CashDashService` hosts privileged telemetry collection and serves versioned request/response payloads through `\\.\pipe\CashDashService`; normal UI processes continue to collect all non-privileged telemetry locally. The service currently implements the `presented_fps_sample` request and returns presented-FPS sample snapshots in an FPS-specific response payload inside the generic response envelope.
 
 ### Render and layout flow
 

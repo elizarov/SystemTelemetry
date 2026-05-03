@@ -15,6 +15,27 @@ TEST(FpsServiceProtocol, RecognizesVersionedRequest) {
     EXPECT_FALSE(IsFpsServiceRequest("wrong", 5));
 }
 
+TEST(FpsServiceProtocol, ParsesGenericRequestEnvelope) {
+    const std::vector<char> request = BuildCashDashServiceRequest(CashDashServiceRequestId::PresentedFpsSample);
+
+    std::string diagnostics;
+    const std::optional<CashDashServiceRequest> parsed =
+        ParseCashDashServiceRequest(request.data(), request.size(), diagnostics);
+
+    ASSERT_TRUE(parsed.has_value()) << diagnostics;
+    EXPECT_EQ(parsed->id, CashDashServiceRequestId::PresentedFpsSample);
+    EXPECT_EQ(parsed->name, "presented_fps_sample");
+}
+
+TEST(FpsServiceProtocol, RejectsRequestNameMismatch) {
+    std::vector<char> request = BuildCashDashServiceRequest(CashDashServiceRequestId::PresentedFpsSample);
+    request.back() = 'x';
+
+    std::string diagnostics;
+    EXPECT_FALSE(ParseCashDashServiceRequest(request.data(), request.size(), diagnostics).has_value());
+    EXPECT_NE(diagnostics.find("name"), std::string::npos);
+}
+
 TEST(FpsServiceProtocol, RoundTripsAvailableSample) {
     FpsTelemetrySample sample;
     sample.available = true;

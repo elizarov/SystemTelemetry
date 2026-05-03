@@ -66,14 +66,14 @@ private:
 std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
     diagnostics.clear();
     if (!WaitNamedPipeW(kFpsServicePipeName, kPipeConnectTimeoutMs)) {
-        diagnostics = "FPS service pipe is unavailable: " + Win32ErrorText(GetLastError());
+        diagnostics = "CashDash service pipe is unavailable: " + Win32ErrorText(GetLastError());
         return std::nullopt;
     }
 
     Handle pipe(CreateFileW(
         kFpsServicePipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (pipe.Get() == INVALID_HANDLE_VALUE) {
-        diagnostics = "Failed to connect to FPS service pipe: " + Win32ErrorText(GetLastError());
+        diagnostics = "Failed to connect to CashDash service pipe: " + Win32ErrorText(GetLastError());
         return std::nullopt;
     }
 
@@ -81,7 +81,7 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
     DWORD written = 0;
     if (!WriteFile(pipe.Get(), request.data(), static_cast<DWORD>(request.size()), &written, nullptr) ||
         written != request.size()) {
-        diagnostics = "Failed to write FPS service request: " + Win32ErrorText(GetLastError());
+        diagnostics = "Failed to write CashDash service request: " + Win32ErrorText(GetLastError());
         return std::nullopt;
     }
 
