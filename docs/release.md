@@ -46,6 +46,7 @@ The release assets are the standalone executable, ZIP package, MSI installer, an
 - The MSI installs only `CaseDash.exe` into `C:\Program Files\CaseDash`.
 - The completion page offers a default-enabled option to run CaseDash immediately in front.
 - Any other CaseDash MSI product version is replaceable so dev and release packages do not register side by side.
+- MSI upgrades keep runtime-owned files beside `CaseDash.exe`, including the executable-side `config.ini` and `casedash_blank.png`, while replacing the executable.
 - Runtime auto-start and service registration remain owned by the app menu.
 - MSI uninstall closes a running `CaseDash.exe` before file removal, then removes the install directory tree, the `CaseDash` machine-wide Run value, and the `CashDashService` service when present.
 

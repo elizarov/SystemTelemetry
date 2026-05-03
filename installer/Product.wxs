@@ -88,9 +88,11 @@
           Name="InstallFolder"
           Type="string"
           Value="[INSTALLFOLDER]" />
-        <util:RemoveFolderEx Id="RemoveInstallFolderTree" Property="CASEDASH_INSTALLFOLDER" On="uninstall" />
-        <RemoveFile Id="RemoveExecutableConfig" Name="config.ini" On="uninstall" />
-        <RemoveFile Id="RemoveBlankWallpaper" Name="casedash_blank.png" On="uninstall" />
+        <util:RemoveFolderEx
+          Id="RemoveInstallFolderTree"
+          Property="CASEDASH_INSTALLFOLDER"
+          On="uninstall"
+          Condition="NOT UPGRADINGPRODUCTCODE" />
         <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
         <ServiceControl
           Id="RemoveCashDashService"
