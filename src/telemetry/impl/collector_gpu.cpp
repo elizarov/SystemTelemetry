@@ -94,7 +94,7 @@ void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTel
     state.snapshot_.gpu.fps.issue = state.snapshot_.gpu.fps.value.has_value() || !sample.fpsPermissionRequired
                                         ? ScalarMetricIssue::None
                                         : ScalarMetricIssue::PermissionRequired;
-    state.snapshot_.gpu.fpsAppName = state.snapshot_.gpu.fps.value.has_value() ? sample.fpsAppName : std::string{};
+    state.snapshot_.gpu.fpsAppName = sample.fpsAppName;
     if (sample.usedVramGb.has_value()) {
         state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(*sample.usedVramGb);
     }

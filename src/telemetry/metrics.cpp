@@ -473,8 +473,19 @@ MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
     const std::string& metricRef,
     std::string_view) {
     if (!snapshot.gpu.fps.value.has_value() && snapshot.gpu.fps.issue == ScalarMetricIssue::PermissionRequired) {
+        return BuildResolvedMetric(snapshot,
+            definition,
+            metricRef,
+            "Need admin",
+            0.0,
+            0.0,
+            MetricValueState::PermissionRequired,
+            snapshot.gpu.fpsAppName);
+    }
+
+    if (!snapshot.gpu.fps.value.has_value()) {
         return BuildResolvedMetric(
-            snapshot, definition, metricRef, "Need admin", 0.0, 0.0, MetricValueState::PermissionRequired);
+            snapshot, definition, metricRef, "N/A", 0.0, 0.0, MetricValueState::Unavailable, snapshot.gpu.fpsAppName);
     }
 
     const double value = FiniteNonNegativeOr(snapshot.gpu.fps.value.value_or(0.0));

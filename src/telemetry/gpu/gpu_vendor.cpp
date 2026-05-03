@@ -151,9 +151,9 @@ public:
             const FpsTelemetrySample fpsSample = fpsProvider_->Sample();
             fpsDiagnostics_ = fpsSample.diagnostics;
             sample.fpsPermissionRequired = fpsSample.permissionRequired;
+            sample.fpsAppName = fpsSample.processName;
             if (fpsSample.fps.has_value()) {
                 sample.fps = *fpsSample.fps;
-                sample.fpsAppName = fpsSample.processName;
                 sample.available = true;
             }
             trace_.WriteLazy([&] {
