@@ -8,11 +8,11 @@ namespace {
 
 AppConfig TestIconConfig() {
     AppConfig config;
-    config.layout.colors.backgroundColor = ColorConfig::FromRgba(0x000000FFu);
+    config.layout.colors.backgroundColor = ColorConfig::FromRgba(0x203040FFu);
     config.layout.colors.foregroundColor = ColorConfig::FromRgba(0xFFFFFFFFu);
     config.layout.colors.accentColor = ColorConfig::FromRgba(0x00BFFFFFu);
     config.layout.colors.mutedTextColor = ColorConfig::FromRgba(0x607080FFu);
-    config.layout.colors.panelFillColor = ColorConfig::FromRgba(0x101820FFu);
+    config.layout.colors.panelFillColor = ColorConfig::FromRgba(0x10203080u);
     return config;
 }
 
@@ -53,7 +53,9 @@ TEST(AppIconRenderer, UsesConfiguredForegroundAndAccentColors) {
 
 TEST(AppIconRenderer, UsesCardBackgroundForIconBackground) {
     const AppIconBitmap bitmap = RenderAppIconBitmap(TestIconConfig(), 256);
-    EXPECT_TRUE(PixelIsNear(bitmap, 128, 30, 0x10, 0x18, 0x20));
+    EXPECT_TRUE(PixelIsNear(bitmap, 128, 30, 0x18, 0x28, 0x38));
+    EXPECT_EQ(AlphaAt(bitmap, 128, 30), 255);
+    EXPECT_EQ(AlphaAt(bitmap, 128, 128), 255);
 }
 
 TEST(AppIconRenderer, ValidatesSupportedSizes) {

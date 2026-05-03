@@ -31,7 +31,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 
 - The active named layout selects one static dashboard composition at a time.
 - The active named theme selects the base color tokens used by derived dashboard colors.
-- The live window, tray, and owned dialog icons are rendered programmatically from the active resolved theme colors, with the icon background using the same resolved card background color as dashboard cards; the embedded `resources/app.ico` remains the Windows shell fallback used before runtime theme application and by executable metadata.
+- The live window, tray, and owned dialog icons are rendered programmatically from the active resolved theme colors, with the icon background matching the dashboard card fill composited over the app background; the embedded `resources/app.ico` remains the Windows shell fallback used before runtime theme application and by executable metadata.
 - The renderer resolves card and widget rectangles after config load or reload and keeps rendering in those resolved coordinates until the next reload.
 - The dashboard content comes from cards named in the active layout, and each card may show an optional title, optional icon, and a configured widget composition.
 - Cards with no title and no icon reserve no header area.

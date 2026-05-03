@@ -16,7 +16,8 @@ struct IconColor {
 };
 
 struct IconPalette {
-    IconColor background;
+    IconColor appBackground;
+    IconColor cardBackground;
     IconColor foreground;
     IconColor accent;
     IconColor muted;
@@ -49,11 +50,13 @@ IconColor Mix(IconColor left, IconColor right, double amount) {
 
 IconPalette PaletteFromConfig(const AppConfig& config) {
     const ColorsConfig& colors = config.layout.colors;
+    const IconColor background = WithAlpha(ColorFromConfig(colors.backgroundColor), 1.0);
     const IconColor foreground = ColorFromConfig(colors.foregroundColor);
     const IconColor accent = ColorFromConfig(colors.accentColor);
     const IconColor panel = ColorFromConfig(colors.panelFillColor);
     const IconColor muted = ColorFromConfig(colors.mutedTextColor);
     return IconPalette{
+        background,
         panel,
         foreground,
         accent,
@@ -149,7 +152,8 @@ IconColor RenderSample(double x, double y, const IconPalette& palette) {
         return color;
     }
 
-    Blend(color, palette.background);
+    Blend(color, palette.appBackground);
+    Blend(color, palette.cardBackground);
     const double innerDistance = RoundedRectDistance(x, y, 10.0, 10.0, 246.0, 246.0, 52.0);
     if (innerDistance > 0.0) {
         Blend(color, palette.foreground);
@@ -212,17 +216,31 @@ AppIconBitmap RenderAppIconBitmap(const AppConfig& config, int size) {
     constexpr double kSampleWeight = 1.0 / static_cast<double>(kSupersample * kSupersample);
     for (int y = 0; y < iconSize; ++y) {
         for (int x = 0; x < iconSize; ++x) {
-            IconColor pixel;
+            double premultipliedR = 0.0;
+            double premultipliedG = 0.0;
+            double premultipliedB = 0.0;
+            double alpha = 0.0;
             for (int sy = 0; sy < kSupersample; ++sy) {
                 for (int sx = 0; sx < kSupersample; ++sx) {
                     const double sampleX = (static_cast<double>(x) + (static_cast<double>(sx) + 0.5) / kSupersample) *
                                            256.0 / static_cast<double>(iconSize);
                     const double sampleY = (static_cast<double>(y) + (static_cast<double>(sy) + 0.5) / kSupersample) *
                                            256.0 / static_cast<double>(iconSize);
-                    IconColor sample = RenderSample(sampleX, sampleY, palette);
-                    sample.a *= kSampleWeight;
-                    Blend(pixel, sample);
+                    const IconColor sample = RenderSample(sampleX, sampleY, palette);
+                    premultipliedR += sample.r * sample.a * kSampleWeight;
+                    premultipliedG += sample.g * sample.a * kSampleWeight;
+                    premultipliedB += sample.b * sample.a * kSampleWeight;
+                    alpha += sample.a * kSampleWeight;
                 }
+            }
+            IconColor pixel;
+            if (alpha > 0.0) {
+                pixel = IconColor{
+                    premultipliedR / alpha,
+                    premultipliedG / alpha,
+                    premultipliedB / alpha,
+                    alpha,
+                };
             }
             StoreBgra(
                 &bitmap.bgra[(static_cast<size_t>(y) * static_cast<size_t>(iconSize) + static_cast<size_t>(x)) * 4u],
