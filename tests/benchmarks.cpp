@@ -211,6 +211,8 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
 
 std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config, Trace& trace) {
     TelemetryCollectorOptions options;
+    // The update-telemetry benchmark intentionally uses the package-private synchronous collector. It measures provider
+    // collection CPU directly; the production TelemetryRuntime thread would hide that cost behind scheduling waits.
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
     if (telemetry == nullptr) {
         return nullptr;
@@ -1066,7 +1068,8 @@ int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Tr
         return 1;
     }
 
-    std::cout << "update_telemetry_benchmark iterations=" << iterations << " render_scale=" << renderScale << "\n";
+    std::cout << "update_telemetry_benchmark mode=sync_collector iterations=" << iterations
+              << " render_scale=" << renderScale << "\n";
     const BenchResult result = RunTelemetryUpdateBenchmark(host, *telemetry, iterations);
     PrintTelemetryBenchResult(result);
 

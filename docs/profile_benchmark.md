@@ -15,7 +15,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - Measure the repeatable layout-switch benchmark with `build\CaseDashBenchmarks.exe layout-switch 240 2`.
 - Measure the repeatable mouse-hover benchmark with `build\CaseDashBenchmarks.exe mouse-hover 240 2`.
 - Measure the repeatable theme-change benchmark with `build\CaseDashBenchmarks.exe theme-change 240 2`.
-- Measure the repeatable telemetry-refresh benchmark with `build\CaseDashBenchmarks.exe update-telemetry 240 2`.
+- Measure the repeatable telemetry-refresh benchmark with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; this benchmark deliberately uses the package-private synchronous collector to measure provider collection CPU instead of the production telemetry runtime thread scheduler.
 - `CaseDashBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
 - The mouse-hover benchmark moves the layout-edit cursor path from the dashboard's top-left corner to bottom-right corner, resolving hover hits and drawing the resulting overlay state on every step.
