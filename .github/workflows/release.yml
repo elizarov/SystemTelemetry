@@ -96,6 +96,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          gh release view $env:CASE_DASH_RELEASE_TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release delete $env:CASE_DASH_RELEASE_TAG --yes
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
           gh release create $env:CASE_DASH_RELEASE_TAG `
             build\CaseDash.exe `
             build\CaseDash.exe.sha256 `

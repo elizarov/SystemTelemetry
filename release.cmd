@@ -2,12 +2,27 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 if "%~1"=="" (
-    echo Usage: release.cmd ^<version^>
+    echo Usage: release.cmd ^<version^> [--force]
     echo Example: release.cmd 0.1
     exit /b 1
 )
 
 set "RELEASE_VERSION=%~1"
+set "RELEASE_FORCE="
+if not "%~2"=="" (
+    if /I "%~2"=="--force" (
+        set "RELEASE_FORCE=1"
+    ) else (
+        echo Unknown release option: %~2
+        echo Usage: release.cmd ^<version^> [--force]
+        exit /b 1
+    )
+)
+if not "%~3"=="" (
+    echo Unknown release option: %~3
+    echo Usage: release.cmd ^<version^> [--force]
+    exit /b 1
+)
 set "RELEASE_VERSION_VALID="
 echo %RELEASE_VERSION%| findstr /R "^[0-9][0-9]*\.[0-9][0-9]*$" >nul
 if not errorlevel 1 set "RELEASE_VERSION_VALID=1"
@@ -31,6 +46,10 @@ git diff --quiet -- VERSION
 if errorlevel 1 (
     echo VERSION has uncommitted changes. Commit or restore it before release.
     exit /b 1
+)
+
+if defined RELEASE_FORCE (
+    echo Force release enabled; existing tag v%RELEASE_VERSION% will be replaced.
 )
 
 set /p "CONFIRM=Prepare CaseDash %RELEASE_VERSION% release, update VERSION if needed, run validation, tag, and push? Type %RELEASE_VERSION% to continue: "
@@ -70,18 +89,26 @@ if errorlevel 1 (
 
 set "RELEASE_TAG=v%RELEASE_VERSION%"
 git rev-parse -q --verify "refs/tags/%RELEASE_TAG%" >nul 2>nul
-if not errorlevel 1 (
+if not errorlevel 1 if not defined RELEASE_FORCE (
     echo Tag %RELEASE_TAG% already exists.
     exit /b 1
 )
 
-git tag -a "%RELEASE_TAG%" -m "CaseDash %RELEASE_VERSION%"
+if defined RELEASE_FORCE (
+    git tag -f -a "%RELEASE_TAG%" -m "CaseDash %RELEASE_VERSION%"
+) else (
+    git tag -a "%RELEASE_TAG%" -m "CaseDash %RELEASE_VERSION%"
+)
 if errorlevel 1 exit /b %errorlevel%
 
 git push origin HEAD
 if errorlevel 1 exit /b %errorlevel%
 
-git push origin "%RELEASE_TAG%"
+if defined RELEASE_FORCE (
+    git push --force origin "%RELEASE_TAG%"
+) else (
+    git push origin "%RELEASE_TAG%"
+)
 if errorlevel 1 exit /b %errorlevel%
 
 echo Release tag %RELEASE_TAG% pushed. GitHub Actions will build and publish the release.

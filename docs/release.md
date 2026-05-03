@@ -31,10 +31,12 @@ See also: [docs/build.md](build.md) for local build setup and [docs/project.md](
 Use the repository release entrypoint:
 
 ```bat
-release.cmd <version>
+release.cmd <version> [--force]
 ```
 
 `release.cmd` asks for keyboard confirmation, updates [VERSION](../VERSION) when needed, commits that version change when it exists, runs format, lint, build, and tests, creates the matching annotated `v<VERSION>` tag, pushes the current branch, and pushes the tag.
+
+Pass `--force` to replace an existing local or remote `v<VERSION>` tag after validation. The release workflow replaces an existing GitHub Release for that tag before publishing the rebuilt assets.
 
 The `Release` GitHub Actions workflow checks that the tag matches `VERSION`, builds and tests CaseDash, packages the executable, builds the minimal x64 WiX MSI, writes SHA-256 checksums, creates the GitHub Release, builds the static website, and deploys `web\dist\` to GitHub Pages.
 
