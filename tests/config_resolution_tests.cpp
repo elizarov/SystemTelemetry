@@ -111,12 +111,16 @@ TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingReso
     ResolvedTelemetrySelections resolvedSelections;
     resolvedSelections.adapterName = "Resolved Ethernet";
     resolvedSelections.drives = {"C", "D"};
+    resolvedSelections.boardTemperatureSensorNames["cpu"] = "CPU";
+    resolvedSelections.boardFanSensorNames["system"] = "SYS_FAN";
 
     const AppConfig effectiveConfig = BuildEffectiveRuntimeConfig(uiConfig, resolvedSelections);
     const MetricDefinitionConfig* metric = FindMetricDefinition(effectiveConfig.layout.metrics, "gpu.temp");
 
     EXPECT_EQ(effectiveConfig.network.adapterName, "Resolved Ethernet");
     EXPECT_EQ(effectiveConfig.storage.drives, (std::vector<std::string>{"C", "D"}));
+    EXPECT_EQ(effectiveConfig.layout.board.temperatureSensorNames.at("cpu"), "CPU");
+    EXPECT_EQ(effectiveConfig.layout.board.fanSensorNames.at("system"), "SYS_FAN");
     EXPECT_EQ(effectiveConfig.layout.gauge.labelBottom, 42);
     ASSERT_NE(metric, nullptr);
     EXPECT_EQ(metric->label, "Core Temp");

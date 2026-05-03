@@ -23,7 +23,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - `Export Full Config...` exports a full config in the embedded-template shape with live values filled in.
 - Save and export omit runtime-only placeholder metric metadata such as `nothing`, even when metric-list bindings still reference that placeholder id.
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
-- `Save Config` persists live placement, active theme selection, runtime network selection, runtime storage-drive selection, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
+- `Save Config` persists live placement, active theme selection, runtime network selection, runtime storage-drive selection, auto-detected board metric bindings, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
 - `Configure Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `casedash_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
 - `Configure Display` marks a display entry with a checkbox when the live config already targets that display at `0,0` and the configured wallpaper path is non-empty, while still allowing that checked entry to be invoked again.
 
@@ -99,6 +99,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Theme sections expose a theme selector with an equilateral color-mix preview, show the active theme description in the editor pane, keep their standard tokens expandable as color edits, and `[colors]` roles expose a literal-or-derived switch with base-color selection plus optional `rotate_hue`, `mix`, and `alpha` controls as defined in [docs/theme_configuration.md](theme_configuration.md).
 - Selecting the `fonts` section exposes a global font-family selector. It is blank when configured font roles use mixed families, shows the family when all font roles match, applies a selected family to all font roles, and reverts the full font set through `Revert Font Changes`.
 - Metric leaves whose ids begin with `board.temp.` or `board.fan.` also expose a live `Binding` selector for the matching board-sensor mapping.
+- Empty board-metric bindings are auto-detected from the provider sensor-name list: `cpu` logical bindings use the first sensor name containing `cpu`, and `system` logical bindings use the first fan sensor name containing `system` or `sys`. Auto-detected bindings become live configuration and are saved by the next `Save Config`.
 - The board-metric `Binding` selector keeps the last discovered provider sensor-name list available for config editing even if a later live board sample omits that metadata.
 - Multiple logical board metrics can bind to the same provider sensor name, and each bound row shows that same live value.
 - Metric-list widgets support row reorder handles and add-row affordances when a complete new row fits inside the widget bounds. Dragging a row reorder handle keeps that row and its active handle under the pointer with the active dashed outline, draws the widget underneath with the dragged row's current slot empty, reorders as soon as the pointer reaches another row slot, and snaps the row into its slot on release.
@@ -121,7 +122,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - Network content shows current upload and download throughput plus a footer line with the selected adapter name and IPv4 address when available.
 - Storage throughput uses system-wide disk I/O counters, while per-drive rows use the currently selected drive set.
 - Layout metric references are the only source of truth for which logical board metrics are requested from the board provider.
-- The board mapping section connects those logical names to provider-specific sensor names, but the user-visible effect is simply that bound board metrics resolve when the mapped sensor exists.
+- The board mapping section connects those logical names to provider-specific sensor names. Empty CPU and system bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists.
 
 ## Refresh, Units, And Instance Behavior
 

@@ -30,6 +30,8 @@ struct TelemetrySettings {
 struct ResolvedTelemetrySelections {
     std::string adapterName;
     std::vector<std::string> drives;
+    std::unordered_map<std::string, std::string> boardTemperatureSensorNames;
+    std::unordered_map<std::string, std::string> boardFanSensorNames;
 
     bool operator==(const ResolvedTelemetrySelections& other) const = default;
 };

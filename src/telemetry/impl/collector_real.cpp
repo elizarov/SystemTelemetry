@@ -96,6 +96,8 @@ public:
         const bool boardChanged = state_->settings_.board != settings.board;
         const bool selectionChanged = state_->settings_.selection != settings.selection;
         state_->settings_ = settings;
+        state_->resolvedSelections_.boardTemperatureSensorNames.clear();
+        state_->resolvedSelections_.boardFanSensorNames.clear();
 
         if (selectionChanged) {
             SetPreferredNetworkAdapterName(settings.selection.preferredAdapterName);

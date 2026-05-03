@@ -1,9 +1,12 @@
 #include "telemetry/impl/collector_board.h"
 
+#include <algorithm>
+
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/numeric_safety.h"
+#include "util/strings.h"
 
 namespace {
 
@@ -34,6 +37,58 @@ void InitializeRequestedBoardMetrics(RealTelemetryCollectorState& state, const B
     state.snapshot_.boardFans = CreateRequestedBoardMetrics(settings.requestedFanNames, ScalarMetricUnit::Rpm);
 }
 
+bool HasConfiguredSensorName(const std::unordered_map<std::string, std::string>& sensorNames, const std::string& name) {
+    const auto it = sensorNames.find(name);
+    return it != sensorNames.end() && !it->second.empty();
+}
+
+std::optional<std::string> FindAutoBoardSensorName(
+    const std::string& logicalName, const std::vector<std::string>& availableSensorNames) {
+    const auto findContaining = [&](const std::string& text) -> std::optional<std::string> {
+        const auto it = std::find_if(availableSensorNames.begin(), availableSensorNames.end(), [&](const auto& name) {
+            return ContainsInsensitive(name, text);
+        });
+        return it != availableSensorNames.end() ? std::optional<std::string>(*it) : std::nullopt;
+    };
+
+    if (EqualsInsensitive(logicalName, "cpu")) {
+        return findContaining("cpu");
+    }
+    if (EqualsInsensitive(logicalName, "system")) {
+        if (auto match = findContaining("system"); match.has_value()) {
+            return match;
+        }
+        return findContaining("sys");
+    }
+    return std::nullopt;
+}
+
+bool ResolveAutoBoardSensorBindings(RealTelemetryCollectorState& state) {
+    bool resolved = false;
+    for (const std::string& name : state.settings_.board.requestedTemperatureNames) {
+        if (HasConfiguredSensorName(state.settings_.board.temperatureSensorNames, name)) {
+            continue;
+        }
+        if (auto sensorName = FindAutoBoardSensorName(name, state.board_.availableTemperatureNames);
+            sensorName.has_value()) {
+            state.settings_.board.temperatureSensorNames[name] = *sensorName;
+            state.resolvedSelections_.boardTemperatureSensorNames[name] = *sensorName;
+            resolved = true;
+        }
+    }
+    for (const std::string& name : state.settings_.board.requestedFanNames) {
+        if (HasConfiguredSensorName(state.settings_.board.fanSensorNames, name)) {
+            continue;
+        }
+        if (auto sensorName = FindAutoBoardSensorName(name, state.board_.availableFanNames); sensorName.has_value()) {
+            state.settings_.board.fanSensorNames[name] = *sensorName;
+            state.resolvedSelections_.boardFanSensorNames[name] = *sensorName;
+            resolved = true;
+        }
+    }
+    return resolved;
+}
+
 }  // namespace
 
 void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
@@ -44,6 +99,10 @@ void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTel
         state.trace_.Write("telemetry:board_provider_initialize_begin");
         if (state.board_.provider->Initialize(settings)) {
             ApplyBoardVendorSample(state, state.board_.provider->Sample());
+            if (ResolveAutoBoardSensorBindings(state)) {
+                state.board_.provider->Initialize(state.settings_.board);
+                ApplyBoardVendorSample(state, state.board_.provider->Sample());
+            }
             state.trace_.Write("telemetry:board_provider_initialize_done provider=" + state.board_.providerName +
                                " available=" + Trace::BoolText(state.board_.providerAvailable) + " diagnostics=\"" +
                                state.board_.providerDiagnostics + "\"");
@@ -67,6 +126,10 @@ void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTe
     state.trace_.Write("telemetry:board_provider_reconfigure_begin");
     if (state.board_.provider->Initialize(settings)) {
         ApplyBoardVendorSample(state, state.board_.provider->Sample());
+        if (ResolveAutoBoardSensorBindings(state)) {
+            state.board_.provider->Initialize(state.settings_.board);
+            ApplyBoardVendorSample(state, state.board_.provider->Sample());
+        }
         state.trace_.Write("telemetry:board_provider_reconfigure_done provider=" + state.board_.providerName +
                            " available=" + Trace::BoolText(state.board_.providerAvailable) + " diagnostics=\"" +
                            state.board_.providerDiagnostics + "\"");
@@ -80,6 +143,10 @@ void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTe
 void UpdateBoardMetrics(RealTelemetryCollectorState& state) {
     if (state.board_.provider != nullptr) {
         ApplyBoardVendorSample(state, state.board_.provider->Sample());
+        if (ResolveAutoBoardSensorBindings(state)) {
+            state.board_.provider->Initialize(state.settings_.board);
+            ApplyBoardVendorSample(state, state.board_.provider->Sample());
+        }
         state.trace_.WriteLazy([&] {
             return "telemetry:board_vendor_sample provider=" + state.board_.providerName +
                    " available=" + Trace::BoolText(state.board_.providerAvailable) + " diagnostics=\"" +

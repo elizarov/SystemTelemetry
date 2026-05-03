@@ -87,6 +87,16 @@ AppConfig BuildEffectiveRuntimeConfig(
         config.network.adapterName = resolvedSelections.adapterName;
     }
     config.storage.drives = resolvedSelections.drives;
+    for (const auto& [logicalName, sensorName] : resolvedSelections.boardTemperatureSensorNames) {
+        if (!sensorName.empty()) {
+            config.layout.board.temperatureSensorNames[logicalName] = sensorName;
+        }
+    }
+    for (const auto& [logicalName, sensorName] : resolvedSelections.boardFanSensorNames) {
+        if (!sensorName.empty()) {
+            config.layout.board.fanSensorNames[logicalName] = sensorName;
+        }
+    }
     return config;
 }
 

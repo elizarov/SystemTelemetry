@@ -78,6 +78,27 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceCo
     EXPECT_THAT(output, testing::HasSubstr("[network]\r\nadapter_name = Ethernet\r\n"));
 }
 
+TEST(ConfigWriter, MinimalSavePersistsResolvedBoardBindingsAgainstEmptySourceConfig) {
+    AppConfig compareConfig;
+    compareConfig.layout.board.requestedTemperatureNames = {"cpu"};
+    compareConfig.layout.board.requestedFanNames = {"cpu", "system"};
+    compareConfig.layout.board.temperatureSensorNames["cpu"] = "";
+    compareConfig.layout.board.fanSensorNames["cpu"] = "";
+    compareConfig.layout.board.fanSensorNames["system"] = "";
+
+    AppConfig currentConfig = compareConfig;
+    currentConfig.layout.board.temperatureSensorNames["cpu"] = "CPU";
+    currentConfig.layout.board.fanSensorNames["cpu"] = "CPU";
+    currentConfig.layout.board.fanSensorNames["system"] = "System 1";
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::HasSubstr("[board]\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("board.temp.cpu = CPU\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("board.fan.cpu = CPU\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("board.fan.system = System 1\r\n"));
+}
+
 TEST(ConfigWriter, WritesColorAlphaInHexColorValues) {
     AppConfig compareConfig;
     AppConfig currentConfig = compareConfig;
