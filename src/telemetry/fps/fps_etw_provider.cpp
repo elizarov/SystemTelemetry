@@ -91,6 +91,15 @@ std::wstring BaseName(std::wstring path) {
     return path;
 }
 
+std::wstring CleanProcessDisplayName(std::wstring processName) {
+    processName = BaseName(processName);
+    const size_t dot = processName.find_last_of(L'.');
+    if (dot != std::wstring::npos) {
+        processName.erase(dot);
+    }
+    return LowerAscii(processName);
+}
+
 std::wstring QueryProcessBaseName(DWORD processId) {
     HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
     if (process == nullptr) {
@@ -101,12 +110,12 @@ std::wstring QueryProcessBaseName(DWORD processId) {
     DWORD pathLength = static_cast<DWORD>(std::size(path));
     const BOOL ok = QueryFullProcessImageNameW(process, 0, path, &pathLength);
     CloseHandle(process);
-    return ok ? BaseName(std::wstring(path, pathLength)) : std::wstring{};
+    return ok ? CleanProcessDisplayName(std::wstring(path, pathLength)) : std::wstring{};
 }
 
 bool IsExcludedProcessName(const std::wstring& processName) {
     const std::wstring lowerName = LowerAscii(processName);
-    return lowerName.empty() || lowerName == L"casedash.exe" || lowerName == L"dwm.exe";
+    return lowerName.empty() || lowerName == L"casedash" || lowerName == L"dwm";
 }
 
 class PresentedFpsEtwProvider final : public FpsTelemetryProvider {

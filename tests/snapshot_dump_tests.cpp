@@ -22,6 +22,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     dump.snapshot.gpu.clock = ScalarMetric{2450.0, ScalarMetricUnit::Megahertz};
     dump.snapshot.gpu.fan = ScalarMetric{1500.0, ScalarMetricUnit::Rpm};
     dump.snapshot.gpu.fps = ScalarMetric{std::nullopt, ScalarMetricUnit::Fps, ScalarMetricIssue::PermissionRequired};
+    dump.snapshot.gpu.fpsAppName = "dota";
     dump.snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
     dump.snapshot.boardFans.push_back({"system", ScalarMetric{900.0, ScalarMetricUnit::Rpm}});
 
@@ -33,6 +34,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     EXPECT_NE(text.find("gpu.fan.unit=\"RPM\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fps.unit=\"FPS\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fps.issue=\"permission_required\""), std::string::npos);
+    EXPECT_NE(text.find("gpu.fps.app_name=\"dota\""), std::string::npos);
 
     TelemetryDump loaded;
     std::string error;
@@ -43,6 +45,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     EXPECT_EQ(loaded.snapshot.gpu.fan.unit, ScalarMetricUnit::Rpm);
     EXPECT_EQ(loaded.snapshot.gpu.fps.unit, ScalarMetricUnit::Fps);
     EXPECT_EQ(loaded.snapshot.gpu.fps.issue, ScalarMetricIssue::PermissionRequired);
+    EXPECT_EQ(loaded.snapshot.gpu.fpsAppName, "dota");
     ASSERT_EQ(loaded.snapshot.boardTemperatures.size(), 1u);
     ASSERT_EQ(loaded.snapshot.boardFans.size(), 1u);
     EXPECT_EQ(loaded.snapshot.boardTemperatures[0].metric.unit, ScalarMetricUnit::Celsius);
@@ -50,7 +53,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
 }
 
 TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {
-    const std::string input = "format=casedash_snapshot_v10\n"
+    const std::string input = "format=casedash_snapshot_v11\n"
                               "cpu.name=\"CPU\"\n"
                               "cpu.load_percent=0\n"
                               "cpu.clock.value=null\n"
@@ -74,6 +77,7 @@ TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {
                               "gpu.fps.value=null\n"
                               "gpu.fps.unit=\"FPS\"\n"
                               "gpu.fps.issue=\"none\"\n"
+                              "gpu.fps.app_name=\"\"\n"
                               "gpu.vram.used_gb=0\n"
                               "gpu.vram.total_gb=0\n"
                               "network.adapter_name=\"Auto\"\n"
@@ -115,7 +119,7 @@ TEST(SnapshotDump, RoundTripsRawRetainedHistorySamples) {
 }
 
 TEST(SnapshotDump, RejectsPreviousNormalizedHistoryFormatVersion) {
-    const std::string input = "format=casedash_snapshot_v9\n";
+    const std::string input = "format=casedash_snapshot_v10\n";
 
     TelemetryDump loaded;
     std::string error;

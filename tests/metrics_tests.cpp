@@ -133,6 +133,7 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     snapshot.cpu.clock = ScalarMetric{4.25, ScalarMetricUnit::Gigahertz};
     snapshot.cpu.memory = MemoryMetric{18.5, 32.0};
     snapshot.gpu.fps = ScalarMetric{144.0, ScalarMetricUnit::Fps};
+    snapshot.gpu.fpsAppName = "dota";
     snapshot.gpu.vram = MemoryMetric{8.4, 16.0};
 
     AddHistorySeries(snapshot, "cpu.load", {20.0, 91.0, 63.0});
@@ -162,6 +163,7 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     const MetricValue& fps = source.ResolveMetric("gpu.fps");
     EXPECT_EQ(fps.label, "FPS");
     EXPECT_EQ(fps.valueText, "144 FPS");
+    EXPECT_EQ(fps.annotationText, "dota");
     EXPECT_EQ(fps.state, MetricValueState::Available);
     EXPECT_DOUBLE_EQ(fps.ratio, 0.6);
     EXPECT_DOUBLE_EQ(fps.peakRatio, 0.6);

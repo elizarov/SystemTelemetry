@@ -19,6 +19,7 @@ enum class MetricValueState {
 struct MetricValue {
     std::string label;
     std::string valueText;
+    std::string annotationText;
     std::string sampleValueText;
     std::string unit;
     double ratio = 0.0;

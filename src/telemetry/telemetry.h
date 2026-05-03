@@ -60,6 +60,7 @@ struct GpuTelemetry {
     ScalarMetric clock{std::nullopt, ScalarMetricUnit::Megahertz};
     ScalarMetric fan{std::nullopt, ScalarMetricUnit::Rpm};
     ScalarMetric fps{std::nullopt, ScalarMetricUnit::Fps};
+    std::string fpsAppName;
     MemoryMetric vram;
 };
 

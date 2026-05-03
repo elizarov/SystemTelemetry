@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "casedash_snapshot_v10";
+constexpr char kDumpFormatVersion[] = "casedash_snapshot_v11";
 
 enum class DumpFieldKind : std::uint8_t {
     String,
@@ -54,6 +54,7 @@ const std::vector<DumpFieldDescriptor>& FlatDumpFields() {
         DUMP_FIELD("gpu.fps.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fps.value),
         DUMP_FIELD("gpu.fps.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fps.unit),
         DUMP_FIELD("gpu.fps.issue", DumpFieldKind::ScalarIssue, snapshot.gpu.fps.issue),
+        DUMP_FIELD("gpu.fps.app_name", DumpFieldKind::String, snapshot.gpu.fpsAppName),
         DUMP_FIELD("gpu.vram.used_gb", DumpFieldKind::Double, snapshot.gpu.vram.usedGb),
         DUMP_FIELD("gpu.vram.total_gb", DumpFieldKind::Double, snapshot.gpu.vram.totalGb),
         DUMP_FIELD("network.adapter_name", DumpFieldKind::String, snapshot.network.adapterName),
@@ -566,7 +567,7 @@ bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
     WriteNamedScalarMetrics(output, "board.temperatures", dump.snapshot.boardTemperatures);
     WriteNamedScalarMetrics(output, "board.fans", dump.snapshot.boardFans);
     WriteRetainedHistories(output, "retained_histories", dump.snapshot.retainedHistories);
-    WriteFlatDumpFields(output, dump, 6, 25);
+    WriteFlatDumpFields(output, dump, 6, 26);
 
     WriteInteger(output, "drives.count", dump.snapshot.drives.size());
     for (size_t i = 0; i < dump.snapshot.drives.size(); ++i) {
@@ -578,7 +579,7 @@ bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
         WriteDouble(output, prefix + ".write_mbps", dump.snapshot.drives[i].writeMbps, 6);
     }
 
-    WriteFlatDumpFields(output, dump, 25, FlatDumpFields().size());
+    WriteFlatDumpFields(output, dump, 26, FlatDumpFields().size());
     return true;
 }
 
@@ -641,7 +642,7 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         !LoadNamedScalarMetrics(values, "board.temperatures", parsed.snapshot.boardTemperatures, error) ||
         !LoadNamedScalarMetrics(values, "board.fans", parsed.snapshot.boardFans, error) ||
         !LoadRetainedHistories(values, "retained_histories", parsed.snapshot.retainedHistories, error) ||
-        !LoadFlatDumpFields(values, parsed, 6, 25, error)) {
+        !LoadFlatDumpFields(values, parsed, 6, 26, error)) {
         return false;
     }
 
@@ -664,7 +665,7 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         parsed.snapshot.drives.push_back(std::move(drive));
     }
 
-    if (!LoadFlatDumpFields(values, parsed, 25, FlatDumpFields().size(), error)) {
+    if (!LoadFlatDumpFields(values, parsed, 26, FlatDumpFields().size(), error)) {
         return false;
     }
 

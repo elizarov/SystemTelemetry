@@ -79,7 +79,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 ## Failure And Trace Policy
 
 - The diagnostics trace covers startup, reload, output export, renderer layout data, telemetry collection, vendor-provider activity including GPU adapter vendor selection, AMD ADLX, NVIDIA NVML, NVIDIA presented-FPS service client probes, NVIDIA presented-FPS ETW probes, `unsupported_gpu`, `msi_center`, `gigabyte_siv`, and `unsupported_board` provider markers, and focused interactive layout-edit UI markers for layout switches, modal-menu scope, dialog-tree refresh, tooltip show or hide, and capture-state transitions when `/trace` is enabled.
-- NVIDIA FPS tracing reports `fps_service_client:*` service-client startup and sample failures when the `CashDashService` LocalSystem service is unavailable or stops responding, and reports `fps_etw:*` startup, provider-enable, sampled-present, and shutdown markers when local ETW collection is used. NVIDIA FPS sample diagnostics include cumulative source-event counts, the selected process window count, the raw rolling FPS value, and the smoothed displayed FPS value. If Windows denies ETW access, diagnostics mark `gpu.fps` with the `permission_required` issue and record the Win32 failure in the NVIDIA provider diagnostics.
+- NVIDIA FPS tracing reports `fps_service_client:*` service-client startup and sample failures when the `CashDashService` LocalSystem service is unavailable or stops responding, and reports `fps_etw:*` startup, provider-enable, sampled-present, and shutdown markers when local ETW collection is used. NVIDIA FPS sample diagnostics include cumulative source-event counts, the cleaned selected process name, the selected process window count, the raw rolling FPS value, and the smoothed displayed FPS value. If Windows denies ETW access, diagnostics mark `gpu.fps` with the `permission_required` issue and record the Win32 failure in the NVIDIA provider diagnostics.
 - Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
 - When `/trace` is enabled, diagnostics failures prefer trace logging plus a failure exit code over blocking modal behavior.
 - Required fake-file load failures follow that same rule so `/fake:<path> /exit` returns promptly under trace.
@@ -92,7 +92,8 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - The dump contains only the runtime snapshot model that the dashboard renders and that `/fake` reloads.
 - The dump includes retained histories, configured drive rows, and local date and time down to milliseconds.
 - Retained histories store raw sampled values in native runtime units.
-- The current dump format version is `casedash_snapshot_v10`.
+- The current dump format version is `casedash_snapshot_v11`.
+- Dump GPU FPS fields include the optional cleaned presenting application name as `gpu.fps.app_name`.
 - Dump scalar-unit fields use only the canonical dump tokens: the empty string plus `C`, `GHz`, `MHz`, `FPS`, and `RPM`.
 - Dump scalar issue fields use `none` or `permission_required`.
 - Provider-specific diagnostics and trace-only debug details do not appear in the dump schema.

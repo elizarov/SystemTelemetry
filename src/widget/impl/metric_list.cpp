@@ -87,7 +87,13 @@ void DrawMetricListRow(WidgetHost& renderer,
     if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
         const RenderColorId valueColor =
             row.state == MetricValueState::PermissionRequired ? RenderColorId::Warning : RenderColorId::Foreground;
-        const WidgetHost::TextLayoutResult valueLayout = renderer.Renderer().DrawTextBlock(valueRect,
+        RenderRect metricValueRect = valueRect;
+        if (!row.annotationText.empty()) {
+            const int annotationWidth = renderer.Renderer().MeasureTextWidth(TextStyleId::Label, row.annotationText);
+            const int annotationGap = renderer.Renderer().ScaleLogical(6);
+            metricValueRect.right = std::max(metricValueRect.left, valueRect.right - annotationWidth - annotationGap);
+        }
+        const WidgetHost::TextLayoutResult valueLayout = renderer.Renderer().DrawTextBlock(metricValueRect,
             row.valueText,
             TextStyleId::Value,
             valueColor,
@@ -104,6 +110,13 @@ void DrawMetricListRow(WidgetHost& renderer,
                 renderer.EditArtifacts().RegisterDynamicTextAnchor(
                     valueLayout, renderer.MakeMetricTextBinding(widget, metricRefs[rowIndex], rowIndex * 2 + 101));
             }
+        }
+        if (!row.annotationText.empty()) {
+            renderer.Renderer().DrawText(valueRect,
+                row.annotationText,
+                TextStyleId::Label,
+                RenderColorId::MutedText,
+                TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
         }
     }
 

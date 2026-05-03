@@ -349,12 +349,14 @@ MetricValue BuildResolvedMetric(const SystemSnapshot& snapshot,
     std::string valueText,
     double ratio,
     double telemetryScale = 0.0,
-    MetricValueState state = MetricValueState::Available) {
+    MetricValueState state = MetricValueState::Available,
+    std::string annotationText = {}) {
     if (state == MetricValueState::Available) {
         state = InferMetricValueState(valueText);
     }
     return MetricValue{definition.label,
         std::move(valueText),
+        std::move(annotationText),
         BuildMetricSampleValueText(definition, metricRef),
         definition.unit,
         ratio,
@@ -477,8 +479,14 @@ MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
 
     const double value = FiniteNonNegativeOr(snapshot.gpu.fps.value.value_or(0.0));
     const double ratio = ResolveMetricRatio(definition, value);
-    return BuildResolvedMetric(
-        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.gpu.fps.value), ratio);
+    return BuildResolvedMetric(snapshot,
+        definition,
+        metricRef,
+        FormatMetricValueText(definition, metricRef, snapshot.gpu.fps.value),
+        ratio,
+        0.0,
+        MetricValueState::Available,
+        snapshot.gpu.fpsAppName);
 }
 
 MetricValue ResolveGpuMemoryMetric(const SystemSnapshot& snapshot,

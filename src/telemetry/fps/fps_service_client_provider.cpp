@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "telemetry/fps/fps_etw_provider.h"
@@ -18,6 +19,23 @@ constexpr DWORD kPipeConnectTimeoutMs = 100;
 constexpr DWORD kPipeReadChunkBytes = 4096;
 constexpr DWORD kMaximumPipeResponseBytes = 16 * 1024;
 constexpr int kServiceRetrySampleInterval = 10;
+
+std::string CleanProcessDisplayName(std::string processName) {
+    const size_t slash = processName.find_last_of("\\/");
+    if (slash != std::string::npos) {
+        processName.erase(0, slash + 1);
+    }
+    const size_t dot = processName.find_last_of('.');
+    if (dot != std::string::npos) {
+        processName.erase(dot);
+    }
+    for (char& ch : processName) {
+        if (ch >= 'A' && ch <= 'Z') {
+            ch = static_cast<char>(ch - 'A' + 'a');
+        }
+    }
+    return processName;
+}
 
 std::string Win32ErrorText(DWORD status) {
     char message[256]{};
@@ -107,7 +125,11 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
         response.insert(response.end(), buffer, buffer + read);
     }
 
-    return ParseFpsServiceResponse(response.data(), response.size(), diagnostics);
+    std::optional<FpsTelemetrySample> sample = ParseFpsServiceResponse(response.data(), response.size(), diagnostics);
+    if (sample.has_value()) {
+        sample->processName = CleanProcessDisplayName(std::move(sample->processName));
+    }
+    return sample;
 }
 
 class FpsServiceClientProvider final : public FpsTelemetryProvider {

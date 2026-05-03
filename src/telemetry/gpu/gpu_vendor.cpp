@@ -153,6 +153,7 @@ public:
             sample.fpsPermissionRequired = fpsSample.permissionRequired;
             if (fpsSample.fps.has_value()) {
                 sample.fps = *fpsSample.fps;
+                sample.fpsAppName = fpsSample.processName;
                 sample.available = true;
             }
             trace_.WriteLazy([&] {

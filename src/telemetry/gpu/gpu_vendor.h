@@ -13,6 +13,7 @@ struct GpuVendorTelemetrySample {
     std::optional<double> coreClockMhz;
     std::optional<double> fanRpm;
     std::optional<double> fps;
+    std::string fpsAppName;
     bool fpsPermissionRequired = false;
     std::optional<double> usedVramGb;
     std::optional<double> totalVramGb;
