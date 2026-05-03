@@ -588,7 +588,7 @@ private:
         bool permissionRequired = false;
         std::wstring processName = QueryProcessBaseName(processId, permissionRequired);
         if (processName.empty()) {
-            processName = permissionRequired ? L"Need admin" : L"pid:" + std::to_wstring(processId);
+            processName = permissionRequired ? L"!admin" : L"pid:" + std::to_wstring(processId);
         }
         processNamePermissionRequiredByProcess_[processId] = permissionRequired;
         return processNames_.emplace(processId, std::move(processName)).first->second;

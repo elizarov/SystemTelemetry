@@ -272,7 +272,7 @@ public:
                 const std::optional<double> nativeFps = ReadNativeAmdFps();
                 if (nativeFps.has_value()) {
                     sample.fps = *nativeFps;
-                    sample.fpsAppName = "Need admin";
+                    sample.fpsAppName = "!admin";
                     sample.fpsPermissionRequired = true;
                     hasAnyMetric = true;
                 }

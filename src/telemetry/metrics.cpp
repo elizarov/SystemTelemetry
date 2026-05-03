@@ -14,6 +14,7 @@ namespace {
 
 constexpr std::string_view kBoardTemperaturePrefix = "board.temp.";
 constexpr std::string_view kBoardFanPrefix = "board.fan.";
+constexpr std::string_view kPermissionRequiredText = "!admin";
 
 enum class MetricPayloadKind : unsigned int {
     Text = 1u,
@@ -479,7 +480,7 @@ MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
         return BuildResolvedMetric(snapshot,
             definition,
             metricRef,
-            "Need admin",
+            std::string(kPermissionRequiredText),
             0.0,
             0.0,
             MetricValueState::PermissionRequired,
@@ -500,7 +501,7 @@ MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
         ratio,
         0.0,
         MetricValueState::Available,
-        permissionRequired ? std::string("Need admin") : snapshot.gpu.fpsAppName,
+        permissionRequired ? std::string(kPermissionRequiredText) : snapshot.gpu.fpsAppName,
         permissionRequired);
 }
 

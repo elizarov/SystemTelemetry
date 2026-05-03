@@ -176,7 +176,7 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     EXPECT_EQ(metricList[2].label, "FPS");
 }
 
-TEST(Metrics, ResolvesGpuFpsPermissionIssueAsNeedAdmin) {
+TEST(Metrics, ResolvesGpuFpsPermissionIssueAsAdminIndicator) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.gpu.fps = ScalarMetric{std::nullopt, ScalarMetricUnit::Fps, ScalarMetricIssue::PermissionRequired};
@@ -186,7 +186,7 @@ TEST(Metrics, ResolvesGpuFpsPermissionIssueAsNeedAdmin) {
 
     const MetricValue& fps = source.ResolveMetric("gpu.fps");
     EXPECT_EQ(fps.label, "FPS");
-    EXPECT_EQ(fps.valueText, "Need admin");
+    EXPECT_EQ(fps.valueText, "!admin");
     EXPECT_EQ(fps.state, MetricValueState::PermissionRequired);
     EXPECT_DOUBLE_EQ(fps.ratio, 0.0);
 }
@@ -202,7 +202,7 @@ TEST(Metrics, ResolvesNativeFpsFallbackPermissionIssueAsWarningAnnotation) {
     const MetricValue& fps = source.ResolveMetric("gpu.fps");
     EXPECT_EQ(fps.label, "FPS");
     EXPECT_EQ(fps.valueText, "90 FPS");
-    EXPECT_EQ(fps.annotationText, "Need admin");
+    EXPECT_EQ(fps.annotationText, "!admin");
     EXPECT_TRUE(fps.warningAnnotation);
     EXPECT_EQ(fps.state, MetricValueState::Available);
     EXPECT_DOUBLE_EQ(fps.ratio, 0.375);
