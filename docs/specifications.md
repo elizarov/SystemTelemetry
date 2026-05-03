@@ -61,6 +61,9 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - `About CaseDash` shows the compiled version, build kind, and commit when available.
 - The dashboard uses normal window Z-order behavior; `Bring to Front` raises it when needed.
 - The installer completion launch starts the dashboard with the same front-and-focus behavior as `Bring to Front`.
+- The MSI setup UI uses CaseDash-branded dialog and banner artwork.
+- Installing a CaseDash MSI replaces any existing CaseDash MSI registration, including newer, older, and same-version packages.
+- MSI uninstall closes the running dashboard when needed and removes the install directory tree.
 - Double-clicking the tray icon performs `Bring to Front`.
 - The tray menu shows `Bring to Front` as its default action.
 - Move mode keeps the dashboard attached to the pointer until placement completes and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard.
