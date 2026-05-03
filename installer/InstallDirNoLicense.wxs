@@ -102,5 +102,13 @@
     </UI>
 
     <UIRef Id="WixUI_Common" />
+
+    <InstallUISequence>
+      <Show Dialog="override UserExit" OnExit="cancel" Condition="0" />
+    </InstallUISequence>
+
+    <AdminUISequence>
+      <Show Dialog="override UserExit" OnExit="cancel" Condition="0" />
+    </AdminUISequence>
   </Fragment>
 </Wix>

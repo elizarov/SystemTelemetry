@@ -9,6 +9,8 @@
     <MediaTemplate EmbedCab="yes" />
     <WixVariable Id="WixUIDialogBmp" Value="CaseDash_WixUIDialogBmp.bmp" />
     <WixVariable Id="WixUIBannerBmp" Value="CaseDash_WixUIBannerBmp.bmp" />
+    <Icon Id="CaseDashAppIcon" SourceFile="..\resources\app.ico" />
+    <Property Id="ARPPRODUCTICON" Value="CaseDashAppIcon" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run CaseDash now" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
