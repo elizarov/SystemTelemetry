@@ -33,6 +33,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Keep pull request merge protection tied to the GitHub `Validation` job so pushed changes pass build, test, formatting, and tidy checks on the Windows runner before merge.
 - Keep tracked text files checked out with CRLF line endings through the repo-level `.gitattributes` policy; binary assets are excluded from text normalization there.
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories.
+- Keep local `NOLINT` suppressions out of source files; maintained clang-tidy false positives live in the lint tool allowlist.
 - Keep C++ includes ordered by `format.cmd`: matching `.cpp` header first, then sorted angle/system includes, quoted `vendor/` includes, and sorted quoted project includes; WinSock and `windows.h` stay ahead of dependent Win32 headers.
 - Keep Win32 hygiene macros such as `NOMINMAX` and `WIN32_LEAN_AND_MEAN` in target compile definitions instead of local include preambles.
 - Keep each project `.cpp` paired with a matching header that owns its out-of-line declarations; `src/main/main.cpp` is the only headerless translation unit.

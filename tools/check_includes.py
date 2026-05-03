@@ -11,6 +11,7 @@ import re
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 INCLUDE_RE = re.compile(r'^\s*#include\s*"([^"]+)"')
+NOLINT_RE = re.compile(r"\bNOLINT(?:NEXTLINE|BEGIN|END)?\b")
 CHECKED_SUFFIXES = {".h", ".cpp", ".rc"}
 SCANNED_ROOTS = ("src", "tests", "resources")
 EXCLUDED_PREFIXES = ("src/vendor/",)
@@ -96,6 +97,17 @@ def collect_violations(files: list[Path]) -> list[Violation]:
         text = path.read_text(encoding="utf-8")
         file_rel = relpath(path)
         for line_number, line in enumerate(text.splitlines(), start=1):
+            if NOLINT_RE.search(line):
+                violations.append(
+                    Violation(
+                        relpath=file_rel,
+                        line=line_number,
+                        message=(
+                            "Local NOLINT suppressions are not allowed; add maintained false positives to the "
+                            "lint tool allowlist instead."
+                        ),
+                    )
+                )
             match = INCLUDE_RE.match(line)
             if not match:
                 continue
