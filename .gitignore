@@ -4,3 +4,4 @@ vcpkg
 $null
 __pycache__/
 *.py[cod]
+.claude/
