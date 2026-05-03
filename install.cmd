@@ -27,10 +27,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Stopping CaseDash FPS service...
-call :stop_fps_service
+echo Stopping CaseDash service...
+call :stop_service
 if errorlevel 1 (
-    echo Failed to stop CaseDashFpsService.
+    echo Failed to stop CashDashService.
     exit /b 1
 )
 
@@ -76,13 +76,13 @@ if errorlevel 1 (
 )
 exit /b 2
 
-:stop_fps_service
+:stop_service
 setlocal EnableExtensions
-sc query "CaseDashFpsService" >nul 2>nul
+sc query "CashDashService" >nul 2>nul
 if errorlevel 1060 exit /b 0
 if errorlevel 1 exit /b 1
 
-sc stop "CaseDashFpsService" >nul 2>nul
+sc stop "CashDashService" >nul 2>nul
 set "STOP_RC=%errorlevel%"
 if not "%STOP_RC%"=="0" (
     if not "%STOP_RC%"=="1062" (
@@ -91,14 +91,14 @@ if not "%STOP_RC%"=="0" (
 )
 
 set /a SERVICE_WAIT_RETRIES=30
-:stop_fps_service_wait_loop
+:stop_service_wait_loop
 set "SERVICE_STATE="
-for /f "tokens=4" %%S in ('sc query "CaseDashFpsService" ^| findstr /R /C:"STATE"') do set "SERVICE_STATE=%%S"
+for /f "tokens=4" %%S in ('sc query "CashDashService" ^| findstr /R /C:"STATE"') do set "SERVICE_STATE=%%S"
 if "%SERVICE_STATE%"=="STOPPED" exit /b 0
 if "%SERVICE_WAIT_RETRIES%"=="0" exit /b 1
 timeout /t 1 /nobreak >nul
 set /a SERVICE_WAIT_RETRIES-=1
-goto stop_fps_service_wait_loop
+goto stop_service_wait_loop
 
 :wait_for_process_exit
 setlocal EnableExtensions

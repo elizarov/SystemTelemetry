@@ -93,8 +93,8 @@
         <RemoveFile Id="RemoveBlankWallpaper" Name="casedash_blank.png" On="uninstall" />
         <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
         <ServiceControl
-          Id="RemoveCaseDashFpsService"
-          Name="CaseDashFpsService"
+          Id="RemoveCashDashService"
+          Name="CashDashService"
           Stop="uninstall"
           Remove="uninstall"
           Wait="yes" />

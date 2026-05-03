@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CaseDash</title>
+    <meta name="description" content="CaseDash is a compact Windows telemetry dashboard for small dedicated PC displays.">
+    <link rel="stylesheet" href="src/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav" aria-label="Primary navigation">
+        <div class="brand-lockup">
+          <a class="brand" href="#intro">CaseDash</a>
+          <span class="brand-version">v{{VERSION}}</span>
+        </div>
+        <div class="nav-links">
+          <a href="#intro" data-section-link="intro">Download</a>
+          <a href="#features" data-section-link="features">Features</a>
+          <a href="#hardware" data-section-link="hardware">Hardware</a>
+          <a href="#layout" data-section-link="layout">Layout</a>
+          <a href="#contribute" data-section-link="contribute">Contribute</a>
+        </div>
+        <label class="theme-picker">
+          <span>Theme</span>
+          <select id="themeSelect" aria-label="Theme"></select>
+        </label>
+      </nav>
+    </header>
+
+    <main>
+      <section id="intro" class="hero section">
+        <div class="hero-copy">
+          <p class="eyebrow">Windows telemetry for small displays</p>
+          <h1>CaseDash</h1>
+          <p class="lead">
+            A compact dashboard for dedicated PC telemetry screens: small USB/HDMI panels,
+            case-mounted displays, or a secondary screen beside the main monitor.
+          </p>
+          <div class="actions" aria-label="Primary actions">
+            <a class="button primary" href="https://github.com/casedash/casedash/releases/latest">Download</a>
+            <a class="button secondary" href="https://github.com/casedash/casedash">GitHub</a>
+          </div>
+          <ol class="first-use" aria-label="First use">
+            <li>Install the MSI.</li>
+            <li>Run CaseDash.</li>
+            <li>Right-click, choose a layout and theme.</li>
+            <li>Configure the display and enable startup when ready.</li>
+          </ol>
+        </div>
+        <figure class="hero-image">
+          <img id="dashboardImage" src="assets/generated/dark_cyan-dashboard.png" width="1600" height="960" alt="CaseDash dashboard with built-in fake telemetry">
+        </figure>
+      </section>
+
+      <section id="features" class="section">
+        <p class="eyebrow">Features</p>
+        <h2>Built to sit on a panel and stay useful</h2>
+        <div class="feature-grid">
+          <article>
+            <h3>Glanceable telemetry</h3>
+            <p>CPU, GPU, memory, network, storage, board sensors, and time in a stable native dashboard.</p>
+          </article>
+          <article>
+            <h3>Live layout editing</h3>
+            <p>Constraint-based layouts with guides for cards, widgets, spacing, and text anchors.</p>
+          </article>
+          <article>
+            <h3>Theme system</h3>
+            <p>Every app theme is available here, derived from the same base colors used by CaseDash.</p>
+          </article>
+          <article>
+            <h3>Small native app</h3>
+            <p>A focused Windows executable with fast rendering and no generic monitoring-suite sprawl.</p>
+          </article>
+          <article>
+            <h3>Small-screen layouts</h3>
+            <p>Shipped layouts cover 5-inch 800x480 panels, portrait displays, and wide 1920x480 screens.</p>
+          </article>
+          <article>
+            <h3>Display setup</h3>
+            <p>Configure Display fits the dashboard, remembers placement, and prepares a matching wallpaper.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="hardware" class="section">
+        <p class="eyebrow">Hardware</p>
+        <h2>Supported telemetry</h2>
+        <div class="hardware-list">
+          <div><strong>Graphics</strong><span>AMD Radeon through ADLX. NVIDIA through NVML, with presented-FPS capture through ETW.</span></div>
+          <div><strong>Motherboards</strong><span>Gigabyte SIV and MSI Center SDK temperature and fan telemetry.</span></div>
+          <div><strong>Windows</strong><span>CPU, memory, network, storage, clock, display placement, and startup behavior.</span></div>
+        </div>
+      </section>
+
+      <section id="layout" class="section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Layout</p>
+            <h2>Edit the layout live</h2>
+          </div>
+          <a class="text-link" href="https://github.com/casedash/casedash/blob/main/docs/layout.md">Layout reference</a>
+        </div>
+        <p>
+          CaseDash uses named static layouts sized for small displays. The guide sheet below is generated
+          from the app and shows editable cards, widget guides, spacing controls, and hover-style callouts.
+        </p>
+        <figure class="guide-sheet">
+          <img id="guideImage" src="assets/generated/dark_cyan-guide.png" width="2763" height="4276" alt="CaseDash layout guide sheet">
+        </figure>
+      </section>
+
+      <section id="contribute" class="section split-section">
+        <div>
+          <p class="eyebrow">Contributions</p>
+          <h2>Bring your hardware and ideas</h2>
+          <p>
+            Contributions are welcome in code, issues, sketches, and plain ideas:
+            themes, layouts, telemetry providers, localization, and practical feedback.
+          </p>
+        </div>
+        <div class="link-stack">
+          <a class="text-link" href="https://github.com/casedash/casedash">Repository</a>
+          <a class="text-link" href="https://github.com/casedash/casedash/issues">Issues</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>(c) <a href="https://github.com/elizarov">Roman Elizarov</a></span>
+      <span>Apache License 2.0</span>
+      <a href="https://github.com/casedash/casedash/blob/main/LICENSE">License</a>
+    </footer>
+
+    <script src="assets/site-data.js"></script>
+    <script src="src/main.js"></script>
+  </body>
+</html>

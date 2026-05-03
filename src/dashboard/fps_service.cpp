@@ -282,27 +282,41 @@ bool ConnectPipeOrStop(HANDLE pipe, HANDLE stopEvent) {
 }
 
 void ServePipeClient(HANDLE pipe, FpsTelemetryProvider& fpsProvider) {
-    const std::vector<char> expectedRequest = BuildFpsServiceRequest();
     std::vector<char> request;
-    request.reserve(expectedRequest.size());
-    while (request.size() < expectedRequest.size()) {
+    request.reserve(kPipeRequestBytes);
+    std::optional<CashDashServiceRequest> serviceRequest;
+    while (request.size() < kPipeRequestBytes) {
         char buffer[kPipeRequestBytes]{};
         DWORD read = 0;
         if (!ReadFile(pipe, buffer, static_cast<DWORD>(std::size(buffer)), &read, nullptr) || read == 0) {
             return;
         }
         request.insert(request.end(), buffer, buffer + read);
-        if (request.size() > expectedRequest.size()) {
+
+        std::string diagnostics;
+        serviceRequest = ParseCashDashServiceRequest(request.data(), request.size(), diagnostics);
+        if (serviceRequest.has_value()) {
+            break;
+        }
+        if (diagnostics.find("too short") == std::string::npos &&
+            diagnostics.find("payload is malformed") == std::string::npos) {
             return;
         }
     }
-
-    if (!IsFpsServiceRequest(request.data(), request.size())) {
+    if (!serviceRequest.has_value()) {
         return;
     }
 
-    const FpsTelemetrySample sample = fpsProvider.Sample();
-    const std::vector<char> response = SerializeFpsServiceSample(sample);
+    std::vector<char> response;
+    switch (serviceRequest->id) {
+        case CashDashServiceRequestId::PresentedFpsSample:
+            response = SerializeFpsServiceSample(fpsProvider.Sample());
+            break;
+    }
+    if (response.empty()) {
+        return;
+    }
+
     DWORD written = 0;
     WriteFile(pipe, response.data(), static_cast<DWORD>(response.size()), &written, nullptr);
     FlushFileBuffers(pipe);
@@ -394,7 +408,7 @@ DWORD InstallOrUpdateFpsService() {
 
     ServiceHandle service(CreateServiceW(manager.Get(),
         kFpsServiceName,
-        L"CaseDash FPS Service",
+        L"CaseDash Service",
         SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START,
         SERVICE_WIN32_OWN_PROCESS,
         SERVICE_AUTO_START,
@@ -426,7 +440,7 @@ DWORD InstallOrUpdateFpsService() {
                 nullptr,
                 nullptr,
                 nullptr,
-                L"CaseDash FPS Service")) {
+                L"CaseDash Service")) {
             return GetLastError();
         }
     }

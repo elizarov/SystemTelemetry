@@ -10,17 +10,21 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `docs/diagnostics.md` owns diagnostics CLI behavior, output contracts, and diagnostics validation recipes.
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
 - `docs/architecture.md` owns subsystem structure, code boundaries, runtime flows, and build-graph shape.
+- `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
 - `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and experiment history.
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
 - `installer\` is the single maintained source of truth for the WiX MSI package.
+- `web\` is the single maintained source of truth for the static website source and website build script.
 - `.clang-format` is the single maintained source of truth for C++ formatting policy.
 - `.github/workflows/validation.yml` is the single maintained source of truth for push and pull request build, test, format, lint, and tidy automation.
+- `.github/workflows/release.yml` and `.github/workflows/pages.yml` are the single maintained sources of truth for website deployment automation.
 
 ## Repository Conventions
 
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
-- Keep generated build outputs inside `build\`, with the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
+- Keep reusable agent or automation skills in `tools\skills`.
+- Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the validation workflow.
 - Keep pull request merge protection tied to the GitHub `Validation` job so pushed changes pass build, test, formatting, and tidy checks on the Windows runner before merge.

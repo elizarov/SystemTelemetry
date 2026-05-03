@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs Review"
+  short_description: "Review repository docs for concise steady-state guidance"
+  default_prompt: "Use $docs-review to review and fix this repository's documentation."

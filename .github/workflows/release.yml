@@ -114,3 +114,68 @@ jobs:
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
           key: ${{ steps.vcpkg-cache-restore.outputs.cache-primary-key }}
+
+  build-pages:
+    name: Build Pages
+    needs: release
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 240
+    permissions:
+      contents: read
+
+    env:
+      CASEDASH_CACHE_ROOT: ${{ github.workspace }}\.github-cache\CaseDash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Restore vcpkg caches
+        id: vcpkg-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
+          key: vcpkg-windows-2025-vs2026-release-pages-${{ hashFiles('vcpkg.json', 'build.cmd', 'web-build.cmd', '.github/workflows/release.yml') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-windows-2025-vs2026-release-pages-${{ hashFiles('vcpkg.json', 'build.cmd', 'web-build.cmd', '.github/workflows/release.yml') }}-
+            vcpkg-windows-2025-vs2026-
+
+      - name: Build website
+        shell: cmd
+        run: web-build.cmd
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: web/dist
+
+      - name: Save vcpkg caches
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
+          key: ${{ steps.vcpkg-cache-restore.outputs.cache-primary-key }}
+
+  deploy-pages:
+    name: Deploy Pages
+    needs: build-pages
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

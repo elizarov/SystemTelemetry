@@ -1,4 +1,5 @@
 build
+web/dist
 vcpkg
 .github-cache
 $null

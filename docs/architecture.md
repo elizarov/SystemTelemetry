@@ -9,7 +9,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/config/` contains the config model, parser, writer, schema metadata, shared OKLab/OKLCH and HSV color math, color expression parser, theme color resolver, config-facing enum and DTO contracts, and injected metric-catalog view.
 - `src/display/` contains monitor enumeration, placement, configure-display, wallpaper application helpers, and display-owned constants.
 - `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, and diagnostics-owned support modules.
-- `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, FPS service host and SCM helpers, elevation handoff, and main-process constants.
+- `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, service host and SCM helpers, elevation handoff, and main-process constants.
 - `src/widget/widget.*` owns the widget interface plus the enum-backed and special widget factories, `src/widget/widget_host.h` owns the widget-facing host boundary, `src/widget/card_chrome_layout.*` owns shared card-chrome layout geometry, `src/widget/layout_edit_types.h` owns widget-facing edit-artifact DTO contracts, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the dashboard renderer.
 - `src/layout_model/` contains renderer-safe shared layout-edit model contracts and behavior, including edit-target identity, artifact matching, hit priority, read-only parameter metadata, guide-weight preview helpers, and dashboard overlay state.
 - `src/util/` contains pure shared utilities for the Win32-backed `FilePath` and filesystem helpers, command-line text, string trimming, splitting, case folding, whitespace normalization, enum string conversion, UTF-8 conversion, embedded resource loading, localization catalog access, numeric safety, DPI scale conversion, trace emission, and non-owning callback views.
@@ -21,7 +21,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/fps_provider.*` and `src/telemetry/fps_service_protocol.*` publish the FPS provider and service IPC contracts, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, `src/telemetry/fps/` contains package-private Windows ETW presented-FPS and service-client provider implementations, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
+- `tools/` contains shared formatting, lint, tidy, profiling, source dependency graph helper scripts, and reusable agent or automation skills under `tools/skills/`.
+- `web/` contains the static website source, browser-side theme switching code, CSS, and website build script that generates `web/dist/` from app-rendered diagnostics assets.
 - `.github/workflows/` contains push and pull request automation for runner-hosted build, test, format, lint, and tidy validation.
 
 ## Layered Core
@@ -65,7 +66,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Windows-native collection covers generic CPU, memory, network, storage, and clock data.
 - Vendor providers extend that collector with AMD and NVIDIA GPU support plus MSI Center and Gigabyte board-metric paths without changing the renderer-facing snapshot model.
 - GPU telemetry selects one vendor provider from the primary non-software DXGI adapter identity instead of probing every vendor bridge; unsupported GPU vendors use a telemetry-owned fallback provider that exposes only presented FPS.
-- NVIDIA GPU telemetry uses NVML for device metrics and uses the telemetry-owned presented-FPS provider for FPS because NVML has no native game-FPS metric. The FPS provider asks the machine-wide LocalSystem FPS service over the versioned named-pipe protocol first, then falls back to local ETW collection when the service is absent or unreachable. The ETW path counts runtime DXGI/D3D9 presents first and uses DxgKrnl presents as the fallback path when runtime present events are not visible.
+- NVIDIA GPU telemetry uses NVML for device metrics and uses the telemetry-owned presented-FPS provider for FPS because NVML has no native game-FPS metric. The FPS provider asks the machine-wide `CashDashService` LocalSystem service over the versioned named-pipe protocol first, then falls back to local ETW collection when the service is absent or unreachable. The pipe protocol uses a generic request envelope with a stable request id and request name; the current FPS query is `PresentedFpsSample` / `presented_fps_sample`. The ETW path counts runtime DXGI/D3D9 presents first and uses DxgKrnl presents as the fallback path when runtime present events are not visible.
 - Board telemetry keeps the last discovered provider sensor-name lists cached alongside live samples so layout-edit binding pickers stay populated across transient board-sample gaps.
 - Fake-runtime support bypasses live providers and serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot.
 
@@ -103,7 +104,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Startup and config flow
 
-- `src/main/main.cpp` enters the single-executable FPS service host when launched with `/service`; otherwise it initializes process-wide shell settings, parses command-line options, relays `/elevate` runs to an elevated child process, and chooses either the normal UI path or the headless diagnostics path.
+- `src/main/main.cpp` enters the single-executable service host when launched with `/service`; otherwise it initializes process-wide shell settings, parses command-line options, relays `/elevate` runs to an elevated child process, and chooses either the normal UI path or the headless diagnostics path.
 - Config load starts from embedded `resources/config.ini`, applies the executable-side overlay unless suppressed, and resolves the active layout plus runtime selections before telemetry and rendering start.
 - The executable manifest disables file virtualization and keeps config reads and writes pointed at the executable-side location.
 
@@ -112,7 +113,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - The controller owns one runtime collector instance.
 - Each refresh produces a `SystemSnapshot` that becomes the renderer input for live paint and diagnostics export.
 - Runtime network and storage selections are resolved from current machine candidates and surfaced back to menu-building code for user selection.
-- The FPS service hosts only privileged presented-FPS ETW collection and serves sample snapshots through `\\.\pipe\CaseDashFps`; normal UI processes continue to collect all non-FPS telemetry locally.
+- `CashDashService` hosts privileged telemetry collection and serves versioned request/response payloads through `\\.\pipe\CashDashService`; normal UI processes continue to collect all non-privileged telemetry locally. The service currently implements the `presented_fps_sample` request and returns presented-FPS sample snapshots in an FPS-specific response payload inside the generic response envelope.
 
 ### Render and layout flow
 
@@ -141,7 +142,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - Minimal saves diff live state against the loaded target INI text and preserve unrelated lines.
 - Full exports start from the embedded template text.
 - When the executable-side config file is not writable, the save path relaunches the executable through the maintained elevated helper route and hands off the write through a temporary file.
-- Auto-start registration and configure-display writes use their package-owned elevated helper paths when the current process cannot write the target registry value, service registration, or executable-side files directly. Auto-start enablement writes the machine-wide Run entry for per-user dashboard UI startup and installs or starts the LocalSystem FPS service; disabling auto-start removes both.
+- Auto-start registration and configure-display writes use their package-owned elevated helper paths when the current process cannot write the target registry value, service registration, or executable-side files directly. Auto-start enablement writes the machine-wide Run entry for per-user dashboard UI startup and installs or starts the `CashDashService` LocalSystem service; disabling auto-start removes both.
 
 ## Resources And Build Graph
 
@@ -152,6 +153,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `CMakeLists.txt` enables C4505 as an error for MSVC C++ targets, disables native C++ RTTI with `/GR-`, and keeps Release app and benchmark links non-incremental with `/OPT:REF` and `/LTCG`; those targets compile Release objects with `/Os` and `/GL` by default so benchmarks measure the same size-oriented whole-program optimization profile as the shipped executable. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` within that profile, and the C++/CLI board-provider bridges keep their managed cast support in `/clr` translation units.
 - `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the `windows-2025-vs2026` GitHub runner.
 - `build.cmd` keeps the manifest-installed dependency tree in the repo-root `vcpkg\` directory, while vcpkg download archives and registry clones live under the shared cache root exported as `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE` so fresh worktrees reuse bootstrap downloads.
+- `web-build.cmd` runs the native build, exports theme-specific screenshots and layout guide sheets through the built executable's headless diagnostics path, writes website metadata, and keeps generated website output under `web\dist\`.
 - `.github/workflows/validation.yml` restores and saves that shared vcpkg cache root through `actions/cache` on the `windows-2025-vs2026` GitHub runner before and after the normal format, build, test, and tidy steps.
 - The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `src/telemetry/board/board_vendor.cpp` selects a board provider from the baseboard manufacturer and creates the unsupported-board provider when no supported vendor matches. `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` and `src/telemetry/board/msi/board_msi_center.cpp` own native provider state, sensor-name maps, metric templates, and sample shaping. Their matching `*_bridge.cpp` files are the CLR-enabled units for vendor .NET assembly reflection calls, keeping STL-heavy provider state out of CLR metadata.

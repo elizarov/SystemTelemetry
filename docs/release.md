@@ -36,8 +36,17 @@ release.cmd <version>
 
 `release.cmd` asks for keyboard confirmation, updates [VERSION](../VERSION), commits the version change, runs format, lint, build, and tests, creates the matching annotated `v<VERSION>` tag, pushes the current branch, and pushes the tag.
 
-The `Release` GitHub Actions workflow checks that the tag matches `VERSION`, builds and tests CaseDash, packages the executable, builds the minimal x64 WiX MSI, writes SHA-256 checksums, and creates the GitHub Release.
+The `Release` GitHub Actions workflow checks that the tag matches `VERSION`, builds and tests CaseDash, packages the executable, builds the minimal x64 WiX MSI, writes SHA-256 checksums, creates the GitHub Release, builds the static website, and deploys `web\dist\` to GitHub Pages.
 
-The release assets are the standalone executable, ZIP package, MSI installer, and matching `.sha256` files. The MSI uses a branded no-license install-directory UI, installs only the `CaseDash.exe` payload into `C:\Program Files\CaseDash`, shows a default-enabled completion option to run CaseDash immediately in front, and treats any other CaseDash MSI product version as replaceable so dev and release packages do not register side by side. Runtime auto-start and FPS service registration remain owned by the app menu. MSI uninstall closes a running `CaseDash.exe` before file removal, then removes the install directory tree, the `CaseDash` machine-wide Run value, and the `CaseDashFpsService` service when present.
+The release assets are the standalone executable, ZIP package, MSI installer, and matching `.sha256` files.
 
-The workflow can also be started manually with a tag input, but the tag must still match `VERSION`.
+## Installer Behavior
+
+- The MSI uses a branded no-license install-directory UI.
+- The MSI installs only `CaseDash.exe` into `C:\Program Files\CaseDash`.
+- The completion page offers a default-enabled option to run CaseDash immediately in front.
+- Any other CaseDash MSI product version is replaceable so dev and release packages do not register side by side.
+- Runtime auto-start and service registration remain owned by the app menu.
+- MSI uninstall closes a running `CaseDash.exe` before file removal, then removes the install directory tree, the `CaseDash` machine-wide Run value, and the `CashDashService` service when present.
+
+The release workflow can also be started manually with a tag input, but the tag must still match `VERSION`. The separate `Pages` workflow is manual-only and rebuilds and deploys the website from a selected branch, tag, or commit without creating a release.
