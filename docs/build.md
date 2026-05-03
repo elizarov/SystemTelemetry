@@ -64,7 +64,7 @@ Build the static website through the repository entrypoint:
 web-build.cmd
 ```
 
-`web-build.cmd` runs `build.cmd`, reads themes from `resources\config.ini`, exports one dashboard screenshot and one layout guide sheet per theme through headless diagnostics when the generated file is missing, writes theme metadata, and produces the directly openable static site under `web\dist\`. Generated website output is not committed. `web-build.cmd clean` deletes `web\dist\` first and forces all generated website assets to be rebuilt.
+`web-build.cmd` runs `build.cmd`, reads themes from `resources\config.ini`, exports one dashboard screenshot, one layout guide sheet, and one app icon per theme through headless diagnostics when the generated file is missing, writes theme metadata, and produces the directly openable static site under `web\dist\`. Generated website output is not committed. `web-build.cmd clean` deletes `web\dist\` first and forces all generated website assets to be rebuilt.
 
 The `Release` workflow deploys the generated site after a successful tagged release. The manual-only `Pages` workflow rebuilds and deploys the generated site from a selected branch, tag, or commit without creating a release.
 

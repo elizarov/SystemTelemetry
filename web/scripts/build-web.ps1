@@ -137,7 +137,8 @@ function Invoke-CaseDashExport {
     param(
         [string]$Theme,
         [string]$SwitchName,
-        [string]$OutputPath
+        [string]$OutputPath,
+        [string[]]$AdditionalArguments = @()
     )
 
     if (-not $Clean -and (Test-GeneratedFile $OutputPath)) {
@@ -145,7 +146,8 @@ function Invoke-CaseDashExport {
         return
     }
 
-    $arguments = @('/fake', '/default-config', "/theme:$Theme", '/scale:2', "/$SwitchName`:$OutputPath", '/exit')
+    $arguments = @('/fake', '/default-config', "/theme:$Theme", '/scale:2', "/$SwitchName`:$OutputPath") +
+        $AdditionalArguments + @('/exit')
     $process = Start-Process -FilePath $exePath -ArgumentList $arguments -Wait -PassThru -NoNewWindow
     if ($process.ExitCode -ne 0) {
         throw "CaseDash $SwitchName export failed for theme '$Theme' with exit code $($process.ExitCode)."
@@ -183,11 +185,18 @@ foreach ($theme in $themeConfig.themes) {
     $themeId = $theme['id']
     $dashboardName = "$themeId-dashboard.png"
     $guideName = "$themeId-guide.png"
+    $iconName = "$themeId-icon.png"
     $dashboardPath = Join-Path $generatedDir $dashboardName
     $guidePath = Join-Path $generatedDir $guideName
+    $iconPath = Join-Path $generatedDir $iconName
 
     Invoke-CaseDashExport -Theme $themeId -SwitchName 'screenshot' -OutputPath $dashboardPath
     Invoke-CaseDashExport -Theme $themeId -SwitchName 'layout-guide-sheet' -OutputPath $guidePath
+    Invoke-CaseDashExport `
+        -Theme $themeId `
+        -SwitchName 'app-icon' `
+        -OutputPath $iconPath `
+        -AdditionalArguments @('/app-icon-size:128')
 
     $siteThemes += [ordered]@{
         id = $themeId
@@ -197,6 +206,7 @@ foreach ($theme in $themeConfig.themes) {
         assets = [ordered]@{
             dashboard = "assets/generated/$dashboardName"
             guide = "assets/generated/$guideName"
+            icon = "assets/generated/$iconName"
         }
     }
 }

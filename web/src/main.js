@@ -3,6 +3,7 @@
   const themes = data.themes || [];
   const select = document.getElementById("themeSelect");
   const sectionSelect = document.getElementById("sectionSelect");
+  const brandIcon = document.getElementById("brandIcon");
   const dashboardImage = document.getElementById("dashboardImage");
   const guideImage = document.getElementById("guideImage");
   const storageKey = "casedash.theme";
@@ -80,6 +81,7 @@
     root.style.setProperty("--accent-soft", rgbToCss(accent, 0.18));
     root.style.setProperty("--guide-soft", rgbToCss(guide, 0.2));
 
+    brandIcon.src = theme.assets.icon;
     dashboardImage.src = theme.assets.dashboard;
     guideImage.src = theme.assets.guide;
     dashboardImage.alt = `CaseDash dashboard using the ${theme.name} theme`;

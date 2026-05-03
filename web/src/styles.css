@@ -60,15 +60,25 @@ code {
 
 .brand-lockup {
   display: inline-flex;
-  align-items: baseline;
-  gap: 0.45rem;
+  align-items: center;
+  gap: 0.5rem;
   white-space: nowrap;
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   font-weight: 700;
   text-decoration: none;
   letter-spacing: 0;
+}
+
+.brand-icon {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
 }
 
 .brand-version {
