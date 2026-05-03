@@ -21,7 +21,7 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/fps_provider.*` and `src/telemetry/fps_service_protocol.*` publish the FPS provider and service IPC contracts, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, `src/telemetry/fps/` contains package-private Windows ETW presented-FPS and service-client provider implementations, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
 - `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and image assets.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `tools/` contains shared formatting, lint, tidy, profiling, and source dependency graph helper scripts.
+- `tools/` contains shared formatting, lint, tidy, profiling, source dependency graph helper scripts, and reusable agent or automation skills under `tools/skills/`.
 - `web/` contains the static website source, browser-side theme switching code, CSS, and website build script that generates `web/dist/` from app-rendered diagnostics assets.
 - `.github/workflows/` contains push and pull request automation for runner-hosted build, test, format, lint, and tidy validation.
 

@@ -18,7 +18,7 @@ Use this skill to make repository docs factual, current, and easy to maintain. A
 
 2. Map ownership before editing.
    - Determine which file owns each requirement, behavior, command, format, or example.
-   - Treat README as a user-facing summary; it may repeat brief high-level information but should point to maintained docs for details.
+   - Treat README as a special user-facing summary and project introduction. It may keep a personal voice and concise high-level repeats for readers, but it should point to maintained docs for details.
    - Replace detailed duplicates with links or short references to the owning file.
 
 3. Review language.
@@ -29,6 +29,7 @@ Use this skill to make repository docs factual, current, and easy to maintain. A
 4. Review concision.
    - Prefer short factual sentences.
    - Remove marketing phrasing, embellishment, praise, and implementation trivia that does not help the reader use or maintain the project.
+   - Preserve intentional README voice when it helps introduce the project, author, motivation, or contribution path.
    - Keep examples only when they are the maintained source of truth or materially clarify behavior.
 
 5. Review structure.
