@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <shellapi.h>
 #include <string_view>
 
 #include "config/color_resolver.h"
@@ -17,6 +18,8 @@
 #include "layout_model/layout_edit_service.h"
 #include "main/autostart.h"
 #include "telemetry/metrics.h"
+#include "util/paths.h"
+#include "util/temp_file.h"
 #include "util/utf8.h"
 
 namespace {
@@ -56,6 +59,49 @@ std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOp
         return nullptr;
     }
     return session;
+}
+
+bool SaveConfigElevated(
+    const FilePath& targetPath, const AppConfig& config, HWND owner, const ConfigParseContext& context) {
+    const FilePath tempPath = CreateTempFilePath(L"stc");
+    if (tempPath.empty() || targetPath.empty()) {
+        return false;
+    }
+    if (!SaveConfig(tempPath, config, context)) {
+        RemoveFileIfExists(tempPath);
+        return false;
+    }
+
+    std::wstring parameters = L"/save-config \"";
+    parameters += tempPath.wstring();
+    parameters += L"\" /save-config-target \"";
+    parameters += targetPath.wstring();
+    parameters += L"\"";
+
+    SHELLEXECUTEINFOW executeInfo{};
+    executeInfo.cbSize = sizeof(executeInfo);
+    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+    executeInfo.hwnd = owner;
+    executeInfo.lpVerb = L"runas";
+    const auto executablePath = GetExecutablePath();
+    if (!executablePath.has_value()) {
+        RemoveFileIfExists(tempPath);
+        return false;
+    }
+    executeInfo.lpFile = executablePath->c_str();
+    executeInfo.lpParameters = parameters.c_str();
+    executeInfo.nShow = SW_HIDE;
+    if (!ShellExecuteExW(&executeInfo)) {
+        RemoveFileIfExists(tempPath);
+        return false;
+    }
+
+    WaitForSingleObject(executeInfo.hProcess, INFINITE);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(executeInfo.hProcess, &exitCode);
+    CloseHandle(executeInfo.hProcess);
+    RemoveFileIfExists(tempPath);
+    return exitCode == 0;
 }
 
 bool SaveRuntimeConfig(const FilePath& path, const AppConfig& config, HWND owner) {

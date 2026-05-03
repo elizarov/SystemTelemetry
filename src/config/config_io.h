@@ -9,5 +9,3 @@
 
 FilePath GetRuntimeConfigPath();
 AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options, const ConfigParseContext& context);
-bool SaveConfigElevated(
-    const FilePath& targetPath, const AppConfig& config, HWND owner, const ConfigParseContext& context);
