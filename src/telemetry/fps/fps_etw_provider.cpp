@@ -107,16 +107,20 @@ std::wstring CleanProcessDisplayName(std::wstring processName) {
     return LowerAscii(processName);
 }
 
-std::wstring QueryProcessBaseName(DWORD processId) {
+std::wstring QueryProcessBaseName(DWORD processId, bool& permissionRequired) {
+    permissionRequired = false;
     HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
     if (process == nullptr) {
+        permissionRequired = GetLastError() == ERROR_ACCESS_DENIED;
         return {};
     }
 
     wchar_t path[MAX_PATH]{};
     DWORD pathLength = static_cast<DWORD>(std::size(path));
     const BOOL ok = QueryFullProcessImageNameW(process, 0, path, &pathLength);
+    const DWORD error = ok ? ERROR_SUCCESS : GetLastError();
     CloseHandle(process);
+    permissionRequired = error == ERROR_ACCESS_DENIED;
     return ok ? CleanProcessDisplayName(std::wstring(path, pathLength)) : std::wstring{};
 }
 
@@ -279,6 +283,7 @@ public:
         const double fps = SmoothFpsLocked(rawFps, bestSelection);
         sample.processId = bestSelection.processId;
         sample.processName = Utf8FromWide(ResolveProcessNameLocked(bestSelection.processId));
+        sample.permissionRequired = IsProcessNamePermissionRequiredLocked(bestSelection.processId);
         sample.available = true;
         sample.fps = fps;
         sample.diagnostics =
@@ -308,6 +313,7 @@ private:
             }
             if (events.empty()) {
                 processNames_.erase(it->first);
+                processNamePermissionRequiredByProcess_.erase(it->first);
                 it = eventsByProcess.erase(it);
                 continue;
             }
@@ -377,7 +383,7 @@ private:
         sample.processId = topGpu3dProcessId_;
         sample.processName = Utf8FromWide(ResolveProcessNameLocked(topGpu3dProcessId_));
         sample.available = false;
-        sample.permissionRequired = false;
+        sample.permissionRequired = IsProcessNamePermissionRequiredLocked(topGpu3dProcessId_);
         sample.diagnostics = BuildDiagnosticsLocked(
             " top GPU 3D application has no matching present events. process=" + sample.processName +
             " selected_process=" + Utf8FromWide(ResolveProcessNameLocked(selected.processId)) +
@@ -579,11 +585,18 @@ private:
             return cached->second;
         }
 
-        std::wstring processName = QueryProcessBaseName(processId);
+        bool permissionRequired = false;
+        std::wstring processName = QueryProcessBaseName(processId, permissionRequired);
         if (processName.empty()) {
-            processName = L"pid:" + std::to_wstring(processId);
+            processName = permissionRequired ? L"Need admin" : L"pid:" + std::to_wstring(processId);
         }
+        processNamePermissionRequiredByProcess_[processId] = permissionRequired;
         return processNames_.emplace(processId, std::move(processName)).first->second;
+    }
+
+    bool IsProcessNamePermissionRequiredLocked(DWORD processId) const {
+        const auto it = processNamePermissionRequiredByProcess_.find(processId);
+        return it != processNamePermissionRequiredByProcess_.end() && it->second;
     }
 
     std::string BuildDiagnosticsLocked(const std::string& suffix) const {
@@ -649,6 +662,7 @@ private:
     std::unordered_map<DWORD, std::deque<uint64_t>> runtimeEventsByProcess_;
     std::unordered_map<DWORD, std::deque<uint64_t>> kernelEventsByProcess_;
     std::unordered_map<DWORD, std::wstring> processNames_;
+    std::unordered_map<DWORD, bool> processNamePermissionRequiredByProcess_;
     std::unordered_map<DWORD, double> gpu3dUsageByProcess_;
     std::vector<unsigned char> gpuCounterArrayBuffer_;
     std::optional<double> smoothedFps_;
