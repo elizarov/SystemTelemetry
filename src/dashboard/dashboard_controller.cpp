@@ -211,8 +211,12 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     }
 
     std::string telemetryError;
-    state_.telemetry =
-        InitializeTelemetryCollectorInstance(state_.config, diagnosticsOptions, shell.TraceLog(), &telemetryError);
+    state_.telemetry = InitializeTelemetryRuntimeInstance(
+        state_.config,
+        diagnosticsOptions,
+        shell.TraceLog(),
+        [&](const TelemetryUpdate& update) { shell.EnqueueTelemetryUpdate(update); },
+        &telemetryError);
     if (state_.telemetry == nullptr) {
         if (state_.diagnostics != nullptr) {
             std::string traceText = "diagnostics:telemetry_initialize_failed";
@@ -225,12 +229,13 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         return false;
     }
 
+    state_.telemetryUpdate = state_.telemetry->Latest();
     if (state_.diagnostics != nullptr) {
         state_.diagnostics->WriteTraceMarker("diagnostics:telemetry_initialized");
         state_.lastDiagnosticsOutput = std::chrono::steady_clock::now();
     }
 
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     SyncRenderer(shell, diagnosticsOptions.editLayout);
     state_.isEditingLayout = diagnosticsOptions.editLayout;
     if (state_.isEditingLayout) {
@@ -240,11 +245,12 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
     return true;
 }
 
-bool DashboardController::HandleRefreshTimer(DashboardShellHost& shell) {
+bool DashboardController::HandleTelemetryUpdate(DashboardShellHost& shell, const TelemetryUpdate& update) {
     if (state_.telemetry == nullptr) {
         return false;
     }
-    state_.telemetry->UpdateSnapshot();
+    state_.telemetryUpdate = update;
+    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     if (state_.diagnostics != nullptr &&
         std::chrono::steady_clock::now() - state_.lastDiagnosticsOutput >= std::chrono::seconds(1)) {
         if (!WriteDiagnosticsOutputs()) {
@@ -261,8 +267,8 @@ bool DashboardController::WriteDiagnosticsOutputs() {
         return true;
     }
     state_.diagnostics->WriteTraceMarker("diagnostics:write_outputs_begin");
-    const bool ok = state_.diagnostics->WriteOutputs(
-        state_.telemetry->Dump(), BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections()));
+    const bool ok = state_.diagnostics->WriteOutputs(state_.telemetryUpdate.dump,
+        BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections));
     state_.diagnostics->WriteTraceMarker(ok ? "diagnostics:write_outputs_done" : "diagnostics:write_outputs_failed");
     return ok;
 }
@@ -270,12 +276,14 @@ bool DashboardController::WriteDiagnosticsOutputs() {
 bool DashboardController::ReloadConfigFromDisk(
     DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
     std::string telemetryError;
-    if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
+    if (!ReloadTelemetryCollectorFromDisk(
+            GetRuntimeConfigPath(),
             state_.config,
             state_.telemetry,
             diagnosticsOptions,
             shell.TraceLog(),
             state_.diagnostics.get(),
+            [&](const TelemetryUpdate& update) { shell.EnqueueTelemetryUpdate(update); },
             &telemetryError)) {
         if (!telemetryError.empty() && (state_.diagnostics == nullptr || state_.diagnostics->ShouldShowDialogs())) {
             shell.ShowError(FormatTelemetryInitializeError(telemetryError));
@@ -315,7 +323,7 @@ void DashboardController::SaveDumpAs(DashboardShellHost& shell) {
         shell.ShowError(WideFromUtf8("Failed to open dump file:\n" + Utf8FromWide(path->wstring())));
         return;
     }
-    const bool written = WriteTelemetryDump(output, state_.telemetry->Dump());
+    const bool written = WriteTelemetryDump(output, state_.telemetryUpdate.dump);
     fclose(output);
     if (!written) {
         shell.ShowError(WideFromUtf8("Failed to write dump file:\n" + Utf8FromWide(path->wstring())));
@@ -333,7 +341,7 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
     }
     std::string errorText;
     if (!SaveDumpScreenshot(*path,
-            state_.telemetry->Dump().snapshot,
+            state_.telemetryUpdate.dump.snapshot,
             BuildCurrentConfigForSaving(shell),
             shell.CurrentRenderScale(),
             GetDiagnosticsRenderMode(diagnosticsOptions),
@@ -365,7 +373,7 @@ void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
     }
     std::string errorText;
     if (!SaveLayoutGuideSheet(*path,
-            state_.telemetry->Dump().snapshot,
+            state_.telemetryUpdate.dump.snapshot,
             BuildCurrentConfigForSaving(shell),
             shell.CurrentRenderScale(),
             shell.TraceLog(),
@@ -408,13 +416,13 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
         return false;
     }
 
-    AppConfig updatedConfig = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+    AppConfig updatedConfig = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     updatedConfig.display.monitorName = option.configMonitorName;
     updatedConfig.display.position = {};
     updatedConfig.display.scale = option.fittedScale;
     updatedConfig.display.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
     if (!::ConfigureDisplay(
-            updatedConfig, state_.telemetry->Dump(), option.fittedScale, shell.TraceLog(), shell.WindowHandle())) {
+            updatedConfig, state_.telemetryUpdate.dump, option.fittedScale, shell.TraceLog(), shell.WindowHandle())) {
         shell.ShowError(L"Failed to configure the selected display.");
         return false;
     }
@@ -513,9 +521,9 @@ void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const 
     }
     state_.config.network.adapterName = option.adapterName;
     state_.telemetry->SetPreferredNetworkAdapterName(option.adapterName);
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+    state_.telemetryUpdate = state_.telemetry->Latest();
+    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     SyncRenderer(shell, state_.isEditingLayout);
-    state_.telemetry->UpdateSnapshot();
     shell.InvalidateShell();
     RefreshLayoutEditSessionDirtyFlag();
 }
@@ -534,9 +542,9 @@ void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const St
     std::sort(driveLetters.begin(), driveLetters.end());
     state_.config.storage.drives = driveLetters;
     state_.telemetry->SetSelectedStorageDrives(driveLetters);
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+    state_.telemetryUpdate = state_.telemetry->Latest();
+    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     SyncRenderer(shell, state_.isEditingLayout);
-    state_.telemetry->UpdateSnapshot();
     shell.InvalidateShell();
     RefreshLayoutEditSessionDirtyFlag();
 }
@@ -545,8 +553,9 @@ void DashboardController::RefreshTelemetrySelections(DashboardShellHost& shell) 
     if (state_.telemetry == nullptr) {
         return;
     }
-    state_.telemetry->RefreshSelectionsAndSnapshot();
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+    state_.telemetry->RefreshSelections();
+    state_.telemetryUpdate = state_.telemetry->Latest();
+    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     SyncRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
     if (state_.isEditingLayout && !state_.hasUnsavedLayoutEditChanges) {
@@ -592,8 +601,9 @@ bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost
     if (state_.telemetry != nullptr) {
         state_.telemetry->SetPreferredNetworkAdapterName(state_.config.network.adapterName);
         state_.telemetry->SetSelectedStorageDrives(state_.config.storage.drives);
-        state_.telemetry->RefreshSelectionsAndSnapshot();
-        state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+        state_.telemetry->RefreshSelections();
+        state_.telemetryUpdate = state_.telemetry->Latest();
+        state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
@@ -681,9 +691,9 @@ void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const A
         const TelemetrySettings previousSettings = ExtractTelemetrySettings(previousConfig);
         const TelemetrySettings nextSettings = ExtractTelemetrySettings(state_.config);
         if (previousSettings != nextSettings) {
-            state_.telemetry->ApplySettings(nextSettings);
-            state_.telemetry->UpdateSnapshot();
-            state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+            state_.telemetry->Reconfigure(nextSettings);
+            state_.telemetryUpdate = state_.telemetry->Latest();
+            state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
         }
     }
     SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
@@ -706,7 +716,7 @@ std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(Das
 AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {
     AppConfig config = state_.config;
     if (state_.telemetry != nullptr) {
-        config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetry->ResolvedSelections());
+        config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     }
     const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
     config.display.monitorName =

@@ -32,8 +32,9 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 - `src/util/` is the base layer. It contains domain-neutral helpers for text, Win32-backed path and filesystem operations, resources, enum strings, UTF-8 conversion, localization catalog access, numeric safety, DPI scale conversion, and trace emission. Util modules may depend on other util modules, but must not depend on config, telemetry, rendering, UI, diagnostics, or application packages.
 - `src/config/` is the second layer. It owns the persisted config model, parser, writer, resolver, shared OKLab/OKLCH and HSV color math, theme color resolver, color expression parser, schema metadata, and config-facing contract types such as widget class, metric display style, and telemetry settings DTOs. Config modules may depend only on config and util modules.
 - Config must not duplicate runtime catalogs or reach upward to validate runtime concepts. When config parsing needs runtime knowledge, it uses config-owned injection contracts such as `ConfigMetricCatalog`; production code supplies the telemetry-backed implementation from above.
-- `src/telemetry/` is the third layer. It owns live collection, fake collection, snapshot and dump-facing telemetry types, provider bridges, retained history, and the single production metric catalog. Telemetry modules may depend on telemetry, config, and util modules, but must not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main modules.
-- Telemetry is allowed to consume config contracts such as telemetry settings and metric display style, and it publishes runtime contracts such as `TelemetryCollector`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
+- `src/telemetry/` is the third layer. It owns live collection, fake collection, the telemetry collection thread, snapshot and dump-facing telemetry types, provider bridges, retained history, and the single production metric catalog. Telemetry modules may depend on telemetry, config, and util modules, but must not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main modules.
+- Telemetry is allowed to consume config contracts such as telemetry settings and metric display style, and it publishes runtime contracts such as `TelemetryRuntime`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
+- Public cross-thread contracts document thread affinity, callback thread, blocking behavior, and ownership or lifetime guarantees directly in the declaring header before the relevant method or callback.
 - `src/renderer/` owns render-space DTOs, renderer style DTOs, the D2D-free `Renderer` interface, and the only Direct2D, DirectWrite, WIC, and WRL implementation modules. Renderer modules may depend only on renderer, config, and util modules.
 - `src/widget/` is the widget layer. It owns widget contracts, widget-local layout and drawing behavior, widget-facing layout-edit DTO contracts, and the D2D-free `WidgetHost` interface. Widget modules may depend on widget, renderer, telemetry, config, and util modules, but must not depend on dashboard, diagnostics, display, layout-edit, main, Direct2D, DirectWrite, WIC, or WRL modules.
 - `src/layout_model/` is the shared layout-edit model layer. It may depend on layout_model, widget, renderer, and config modules, but must not depend on dashboard, dashboard_renderer, diagnostics, display, layout-edit, layout-edit dialog, main, telemetry, util, Direct2D, DirectWrite, WIC, or WRL modules.
@@ -62,7 +63,8 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Telemetry
 
-- `TelemetryCollector` owns steady-state snapshot refresh, provider composition, and runtime target resolution for network and storage.
+- `TelemetryRuntime` owns the steady-state collection thread, snapshot publishing callback, provider composition, and runtime target resolution for network and storage.
+- Package-private telemetry collectors perform the synchronous provider work behind `TelemetryRuntime`; higher layers do not create or drive telemetry collection threads.
 - Windows-native collection covers generic CPU, memory, network, storage, and clock data.
 - Vendor providers extend that collector with AMD and NVIDIA GPU support plus MSI Center and Gigabyte board-metric paths without changing the renderer-facing snapshot model.
 - GPU telemetry selects one vendor provider from the primary non-software DXGI adapter identity instead of probing every vendor bridge; unsupported GPU vendors use a telemetry-owned fallback provider that exposes only presented FPS.
@@ -110,8 +112,9 @@ See also: [docs/specifications.md](specifications.md) for normative product beha
 
 ### Telemetry flow
 
-- The controller owns one runtime collector instance.
-- Each refresh produces a `SystemSnapshot` that becomes the renderer input for live paint and diagnostics export.
+- The controller owns one telemetry runtime instance.
+- The telemetry runtime collects on fixed 0.5 second boundaries, skips overlapping collection when provider work runs long, and publishes copied updates to higher layers through its callback.
+- Each published update contains the latest `SystemSnapshot`, provider dump state, resolved selections, and menu candidates that become the renderer input for live paint and diagnostics export.
 - Runtime network and storage selections are resolved from current machine candidates and surfaced back to menu-building code for user selection.
 - `CashDashService` hosts privileged telemetry collection and serves versioned request/response payloads through `\\.\pipe\CashDashService`; normal UI processes continue to collect all non-privileged telemetry locally. The service currently implements the `presented_fps_sample` request and returns presented-FPS sample snapshots in an FPS-specific response payload inside the generic response envelope.
 

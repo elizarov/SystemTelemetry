@@ -84,14 +84,16 @@ std::optional<FilePath> PromptSavePath(HWND owner,
 int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& targetPath);
 std::wstring FormatTelemetryInitializeError(std::string_view errorText);
 
-std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(const AppConfig& runtimeConfig,
+std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
+    TelemetryUpdateCallback callback,
     std::string* errorText = nullptr);
 bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     AppConfig& activeConfig,
-    std::unique_ptr<TelemetryCollector>& telemetry,
+    std::unique_ptr<TelemetryRuntime>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
     DiagnosticsSession* diagnostics,
+    TelemetryUpdateCallback callback,
     std::string* errorText = nullptr);

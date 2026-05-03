@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "telemetry/telemetry.h"
+#include "telemetry/impl/collector.h"
 #include "util/file_path.h"
 
 std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(

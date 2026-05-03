@@ -2,6 +2,6 @@
 
 #include <memory>
 
-#include "telemetry/telemetry.h"
+#include "telemetry/impl/collector.h"
 
 std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace);

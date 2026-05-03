@@ -1,11 +1,14 @@
 #include "diagnostics/diagnostics.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cwctype>
 #include <limits>
+#include <mutex>
 #include <shellapi.h>
 #include <string_view>
 
@@ -644,30 +647,29 @@ std::wstring FormatTelemetryInitializeError(std::string_view errorText) {
     return WideFromUtf8(message);
 }
 
-std::unique_ptr<TelemetryCollector> InitializeTelemetryCollectorInstance(const AppConfig& runtimeConfig,
+std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
+    TelemetryUpdateCallback callback,
     std::string* errorText) {
     if (errorText != nullptr) {
         errorText->clear();
     }
-    std::unique_ptr<TelemetryCollector> telemetry =
-        CreateTelemetryCollector(BuildTelemetryCollectorOptions(diagnosticsOptions), GetWorkingDirectory(), trace);
-    if (telemetry == nullptr) {
-        return nullptr;
-    }
-    if (!telemetry->Initialize(ExtractTelemetrySettings(runtimeConfig), errorText)) {
-        return nullptr;
-    }
-    return telemetry;
+    return CreateTelemetryRuntime(BuildTelemetryCollectorOptions(diagnosticsOptions),
+        GetWorkingDirectory(),
+        ExtractTelemetrySettings(runtimeConfig),
+        trace,
+        std::move(callback),
+        errorText);
 }
 
 bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     AppConfig& activeConfig,
-    std::unique_ptr<TelemetryCollector>& telemetry,
+    std::unique_ptr<TelemetryRuntime>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
     DiagnosticsSession* diagnostics,
+    TelemetryUpdateCallback callback,
     std::string* errorText) {
     if (errorText != nullptr) {
         errorText->clear();
@@ -694,10 +696,10 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
 
     telemetry.reset();
     std::string reloadError;
-    std::unique_ptr<TelemetryCollector> reloadedTelemetry =
-        InitializeTelemetryCollectorInstance(effectiveReloadedConfig, diagnosticsOptions, trace, &reloadError);
+    std::unique_ptr<TelemetryRuntime> reloadedTelemetry =
+        InitializeTelemetryRuntimeInstance(effectiveReloadedConfig, diagnosticsOptions, trace, callback, &reloadError);
     if (reloadedTelemetry == nullptr) {
-        telemetry = InitializeTelemetryCollectorInstance(activeConfig, diagnosticsOptions, trace);
+        telemetry = InitializeTelemetryRuntimeInstance(activeConfig, diagnosticsOptions, trace, std::move(callback));
         if (errorText != nullptr) {
             *errorText = reloadError;
         }
@@ -712,8 +714,8 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     }
 
     telemetry = std::move(reloadedTelemetry);
-    telemetry->UpdateSnapshot();
-    activeConfig = BuildEffectiveRuntimeConfig(effectiveReloadedConfig, telemetry->ResolvedSelections());
+    const TelemetryUpdate reloadedUpdate = telemetry->Latest();
+    activeConfig = BuildEffectiveRuntimeConfig(effectiveReloadedConfig, reloadedUpdate.resolvedSelections);
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarker("diagnostics:reload_config_done");
         WriteResolvedColorTrace(*diagnostics, activeConfig);
@@ -824,9 +826,22 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     WriteResolvedColorTrace(diagnostics, config);
     diagnostics.WriteTraceMarker("diagnostics:telemetry_initialize_begin");
 
+    std::mutex telemetryMutex;
+    std::condition_variable telemetryCv;
+    TelemetryUpdate telemetryUpdate;
+    bool telemetryUpdated = false;
+    auto telemetryCallback = [&](const TelemetryUpdate& update) {
+        {
+            const std::lock_guard lock(telemetryMutex);
+            telemetryUpdate = update;
+            telemetryUpdated = true;
+        }
+        telemetryCv.notify_all();
+    };
+
     std::string telemetryError;
-    std::unique_ptr<TelemetryCollector> telemetry =
-        InitializeTelemetryCollectorInstance(config, diagnosticsOptions, trace, &telemetryError);
+    std::unique_ptr<TelemetryRuntime> telemetry =
+        InitializeTelemetryRuntimeInstance(config, diagnosticsOptions, trace, telemetryCallback, &telemetryError);
     if (telemetry == nullptr) {
         std::string traceText = "diagnostics:telemetry_initialize_failed";
         if (!telemetryError.empty()) {
@@ -843,22 +858,34 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     diagnostics.WriteTraceMarker("diagnostics:telemetry_initialized");
     Sleep(1000);
     diagnostics.WriteTraceMarker("diagnostics:update_snapshot_begin");
-    telemetry->UpdateSnapshot();
+    {
+        std::unique_lock lock(telemetryMutex);
+        telemetryUpdated = false;
+        telemetryCv.wait_for(lock, std::chrono::seconds(2), [&] { return telemetryUpdated; });
+    }
+    telemetryUpdate = telemetry->Latest();
     diagnostics.WriteTraceMarker("diagnostics:update_snapshot_done");
     if (diagnosticsOptions.reload) {
         std::string reloadError;
-        if (!ReloadTelemetryCollectorFromDisk(
-                GetRuntimeConfigPath(), config, telemetry, diagnosticsOptions, trace, &diagnostics, &reloadError)) {
+        if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
+                config,
+                telemetry,
+                diagnosticsOptions,
+                trace,
+                &diagnostics,
+                telemetryCallback,
+                &reloadError)) {
             if (diagnostics.ShouldShowDialogs() && !reloadError.empty()) {
                 const std::wstring message = FormatTelemetryInitializeError(reloadError);
                 MessageBoxW(nullptr, message.c_str(), L"CaseDash", MB_ICONERROR);
             }
             return 1;
         }
+        telemetryUpdate = telemetry->Latest();
     }
     diagnostics.WriteTraceMarker("diagnostics:write_outputs_begin");
     if (!diagnostics.WriteOutputs(
-            telemetry->Dump(), BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections()))) {
+            telemetryUpdate.dump, BuildEffectiveRuntimeConfig(config, telemetryUpdate.resolvedSelections))) {
         diagnostics.WriteTraceMarker("diagnostics:write_outputs_failed");
         return 1;
     }

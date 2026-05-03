@@ -56,12 +56,12 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 ## Runtime Mode Behavior
 
 - Without `/exit`, the application starts the normal dashboard UI and keeps requested diagnostics outputs refreshed while the process runs.
-- In UI-attached mode, trace logging continues for the process lifetime and dump or screenshot outputs refresh once per second from the latest snapshot.
+- In UI-attached mode, trace logging continues for the process lifetime and dump or screenshot outputs refresh once per second from the latest telemetry-published snapshot.
 - With `/exit`, the application loads config, performs the first update, optionally exports the requested outputs once, and exits without entering the normal GUI lifetime.
 - With `/elevate`, trace, dump, screenshot, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
 - `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
-- `/fake:<path>` reloads the selected fake file once per second while the process runs so manual edits affect the next refresh.
+- `/fake:<path>` reloads the selected fake file from the telemetry-owned refresh path while the process runs so manual edits affect a later telemetry-published snapshot.
 - Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior.
 - Layout guide sheet exports select the smallest practical card subset that covers the visible widget types in the selected layout, render those cards as separate specimens with forced layout-edit affordances, and use the same active-region geometry and shared layout-edit tooltip text as live editing; callouts document active areas inside rendered representative cards, render each documented target in its hover-equivalent state, group equivalent metric-definition rows into one representative hovered row, omit callouts for non-rendered cards and outside-card layout guides, use local left and right side stacks with one promoted top and one promoted bottom callout per annotated block when available, grow the canvas to fit tooltip-style callouts around the card column, and refresh once per second in UI-attached diagnostics mode.
 - When `/trace` and `/screenshot` are both enabled, each screenshot export writes `diagnostics:active_region` trace lines from the `LayoutEditActiveRegions` snapshot for mouse-reactive dashboard regions that are present in the exported frame, including card and widget hover regions, layout guides, container-child reorder targets, gap handles, widget guides, text anchors, and color targets. Each line includes the client-coordinate box, visual type, config or layout path, and a short detail string; a `diagnostics:active_regions` summary records the exported count.
@@ -77,7 +77,7 @@ See also: [docs/specifications.md](specifications.md) for user-visible runtime b
 - Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
 - When `/trace` is enabled, diagnostics failures prefer trace logging plus a failure exit code over blocking modal behavior.
 - Required fake-file load failures follow that same rule so `/fake:<path> /exit` returns promptly under trace.
-- Telemetry collectors report initialization failure detail to their caller; diagnostics and dashboard callers own trace or dialog reporting.
+- Telemetry runtime creation reports initialization failure detail to its caller; diagnostics and dashboard callers own trace or dialog reporting.
 - Layout-edit drag profiling writes one start marker and one end marker per drag with summarized timing instead of high-volume per-frame renderer trace spam.
 - The modeless layout-edit dialog writes focused trace markers for tree rebuild, tree viewport restoration, tree selection, layout/theme preview, field preview, and color-picker flows when trace is enabled.
 

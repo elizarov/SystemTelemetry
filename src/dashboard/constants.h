@@ -2,13 +2,12 @@
 
 #include <windows.h>
 
-inline constexpr UINT_PTR kRefreshTimerId = 1;
 inline constexpr UINT_PTR kMoveTimerId = 2;
 inline constexpr UINT_PTR kPlacementTimerId = 3;
-inline constexpr UINT kRefreshTimerMs = 500;
 inline constexpr UINT kMoveTimerMs = 16;
 inline constexpr UINT kPlacementTimerMs = 2000;
 inline constexpr UINT kTrayMessage = WM_APP + 1;
+inline constexpr UINT kTelemetryUpdateMessage = WM_APP + 2;
 inline constexpr UINT kCommandMove = 1001;
 inline constexpr UINT kCommandBringOnTop = 1002;
 inline constexpr UINT kCommandReloadConfig = 1003;

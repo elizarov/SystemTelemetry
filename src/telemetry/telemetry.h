@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -106,29 +107,11 @@ struct TelemetryDump {
     BoardVendorTelemetrySample boardProvider;
 };
 
-class TelemetryCollector {
-public:
-    virtual ~TelemetryCollector() = default;
-
-    TelemetryCollector(const TelemetryCollector&) = delete;
-    TelemetryCollector& operator=(const TelemetryCollector&) = delete;
-    TelemetryCollector(TelemetryCollector&&) = delete;
-    TelemetryCollector& operator=(TelemetryCollector&&) = delete;
-
-    virtual bool Initialize(const TelemetrySettings& settings, std::string* errorText = nullptr) = 0;
-    virtual const SystemSnapshot& Snapshot() const = 0;
-    virtual TelemetryDump Dump() const = 0;
-    virtual const ResolvedTelemetrySelections& ResolvedSelections() const = 0;
-    virtual const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const = 0;
-    virtual const std::vector<StorageDriveCandidate>& StorageDriveCandidates() const = 0;
-    virtual void ApplySettings(const TelemetrySettings& settings) = 0;
-    virtual void SetPreferredNetworkAdapterName(std::string adapterName) = 0;
-    virtual void SetSelectedStorageDrives(std::vector<std::string> driveLetters) = 0;
-    virtual void RefreshSelectionsAndSnapshot() = 0;
-    virtual void UpdateSnapshot() = 0;
-
-protected:
-    TelemetryCollector() = default;
+struct TelemetryUpdate {
+    TelemetryDump dump;
+    ResolvedTelemetrySelections resolvedSelections;
+    std::vector<NetworkAdapterCandidate> networkAdapterCandidates;
+    std::vector<StorageDriveCandidate> storageDriveCandidates;
 };
 
 using TelemetryDumpLoader = bool (*)(std::string_view input, TelemetryDump& dump, std::string* error);
@@ -139,5 +122,49 @@ struct TelemetryCollectorOptions {
     TelemetryDumpLoader loadFakeDump = nullptr;
 };
 
-std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
-    const TelemetryCollectorOptions& options, const FilePath& workingDirectory, Trace& trace);
+using TelemetryUpdateCallback = std::function<void(const TelemetryUpdate& update)>;
+
+class TelemetryRuntime {
+public:
+    virtual ~TelemetryRuntime() = default;
+
+    TelemetryRuntime(const TelemetryRuntime&) = delete;
+    TelemetryRuntime& operator=(const TelemetryRuntime&) = delete;
+    TelemetryRuntime(TelemetryRuntime&&) = delete;
+    TelemetryRuntime& operator=(TelemetryRuntime&&) = delete;
+
+    // Thread-safe. Blocks until the telemetry worker has stopped, then guarantees no later callback invocations.
+    virtual void Shutdown() = 0;
+
+    // Thread-safe. Blocks behind any active telemetry collection, applies settings on the telemetry-owned collector,
+    // publishes one fresh update, and leaves the 500 ms worker cadence running.
+    virtual void Reconfigure(const TelemetrySettings& settings) = 0;
+
+    // Thread-safe. Blocks behind any active telemetry collection, changes the network selection on the telemetry-owned
+    // collector, publishes one fresh update, and leaves the 500 ms worker cadence running.
+    virtual void SetPreferredNetworkAdapterName(std::string adapterName) = 0;
+
+    // Thread-safe. Blocks behind any active telemetry collection, changes the storage selection on the telemetry-owned
+    // collector, publishes one fresh update, and leaves the 500 ms worker cadence running.
+    virtual void SetSelectedStorageDrives(std::vector<std::string> driveLetters) = 0;
+
+    // Thread-safe. Blocks behind any active telemetry collection, refreshes runtime selections on the telemetry-owned
+    // collector, publishes one fresh update, and leaves the 500 ms worker cadence running.
+    virtual void RefreshSelections() = 0;
+
+    // Thread-safe. Returns a copy of the latest published telemetry update without invoking the callback.
+    virtual TelemetryUpdate Latest() const = 0;
+
+protected:
+    TelemetryRuntime() = default;
+};
+
+// The callback is invoked from the telemetry worker thread. It must not call back into TelemetryRuntime, touch UI state
+// directly, or retain references from the passed update after returning; copy any data needed by another thread.
+// Creation initializes telemetry synchronously before returning so startup errors are reported deterministically.
+std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollectorOptions& options,
+    const FilePath& workingDirectory,
+    const TelemetrySettings& settings,
+    Trace& trace,
+    TelemetryUpdateCallback callback,
+    std::string* errorText = nullptr);

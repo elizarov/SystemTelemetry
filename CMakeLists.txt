@@ -135,6 +135,7 @@ add_executable(CaseDash WIN32
     src/util/scale.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
+    src/telemetry/impl/collector.cpp
     src/telemetry/impl/collector_state.cpp
     src/telemetry/impl/collector_board.cpp
     src/telemetry/impl/collector_cpu.cpp
@@ -145,6 +146,7 @@ add_executable(CaseDash WIN32
     src/telemetry/impl/collector_storage_selection.cpp
     src/telemetry/impl/collector_network.cpp
     src/telemetry/impl/collector_real.cpp
+    src/telemetry/impl/collector.cpp
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
@@ -457,6 +459,7 @@ add_executable(CaseDashTests
     tests/system_info_support_tests.cpp
     tests/fps_service_protocol_tests.cpp
     tests/telemetry_retained_history_tests.cpp
+    tests/telemetry_runtime_tests.cpp
     src/config/config.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -490,6 +493,8 @@ add_executable(CaseDashTests
     src/util/file_path.cpp
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
+    src/telemetry/telemetry.cpp
+    src/telemetry/impl/collector.cpp
     src/telemetry/metrics.cpp
     src/widget/card_chrome_layout.cpp
     src/renderer/renderer.cpp
@@ -594,6 +599,7 @@ add_executable(CaseDashBenchmarks
     src/config/config_resolution.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
+    src/telemetry/impl/collector.cpp
     src/telemetry/impl/collector_state.cpp
     src/telemetry/impl/collector_board.cpp
     src/telemetry/impl/collector_cpu.cpp

@@ -23,6 +23,7 @@
 #include "layout_edit_dialog/theme_preview.h"
 #include "layout_guide_sheet/layout_guide_sheet.h"
 #include "layout_model/layout_edit_service.h"
+#include "telemetry/impl/collector.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
 #include "util/enum_string.h"

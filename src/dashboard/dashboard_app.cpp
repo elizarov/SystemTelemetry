@@ -543,6 +543,26 @@ void DashboardApp::RedrawShellNow() {
     RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
 }
 
+void DashboardApp::EnqueueTelemetryUpdate(const TelemetryUpdate& update) {
+    {
+        const std::lock_guard lock(pendingTelemetryMutex_);
+        pendingTelemetryUpdate_ = update;
+    }
+    if (hwnd_ != nullptr) {
+        PostMessageW(hwnd_, kTelemetryUpdateMessage, 0, 0);
+    }
+}
+
+bool DashboardApp::DrainPendingTelemetryUpdate(TelemetryUpdate& update) {
+    const std::lock_guard lock(pendingTelemetryMutex_);
+    if (!pendingTelemetryUpdate_.has_value()) {
+        return false;
+    }
+    update = std::move(*pendingTelemetryUpdate_);
+    pendingTelemetryUpdate_.reset();
+    return true;
+}
+
 MonitorPlacementInfo DashboardApp::GetWindowPlacementInfo() const {
     return hwnd_ != nullptr ? GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale)
                             : movePlacementInfo_;
@@ -934,7 +954,6 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             RegisterSessionNotifications();
             StartPlacementWatch();
             ApplyConfigPlacement();
-            SetTimer(hwnd_, kRefreshTimerId, kRefreshTimerMs, nullptr);
             CreateTrayIcon();
             return 0;
         case WM_TIMER:
@@ -947,11 +966,17 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 RetryConfigPlacementIfPending();
                 return 0;
             }
-            if (!controller_.HandleRefreshTimer(*this)) {
-                DestroyWindow(hwnd_);
-                return 0;
+            return 0;
+        case kTelemetryUpdateMessage: {
+            TelemetryUpdate update;
+            while (DrainPendingTelemetryUpdate(update)) {
+                if (!controller_.HandleTelemetryUpdate(*this, update)) {
+                    DestroyWindow(hwnd_);
+                    return 0;
+                }
             }
             return 0;
+        }
         case WM_ACTIVATE:
             if (shellUi_ != nullptr) {
                 TraceLayoutEditUiEvent("layout_edit_ui:wm_activate",
@@ -1209,9 +1234,11 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_ERASEBKGND:
             return 1;
         case WM_DESTROY:
-            KillTimer(hwnd_, kRefreshTimerId);
             KillTimer(hwnd_, kMoveTimerId);
             KillTimer(hwnd_, kPlacementTimerId);
+            if (state.telemetry != nullptr) {
+                state.telemetry->Shutdown();
+            }
             UnregisterSessionNotifications();
             DestroyLayoutEditTooltip();
             if (state.diagnostics != nullptr) {
@@ -1244,7 +1271,7 @@ void DashboardApp::Paint() {
     const auto paintStart = std::chrono::steady_clock::now();
     PAINTSTRUCT ps{};
     BeginPaint(hwnd_, &ps);
-    const SystemSnapshot& snapshot = controller_.State().telemetry->Snapshot();
+    const SystemSnapshot& snapshot = controller_.State().telemetryUpdate.dump.snapshot;
     const auto drawStart = std::chrono::steady_clock::now();
     SyncDashboardMoveOverlayState();
     renderer_.DrawWindow(snapshot, rendererDashboardOverlayState_);

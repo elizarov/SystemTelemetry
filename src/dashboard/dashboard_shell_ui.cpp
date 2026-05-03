@@ -689,7 +689,7 @@ std::vector<std::string> DashboardShellUi::AvailableBoardMetricSensorBindings(co
         return {};
     }
 
-    const BoardVendorTelemetrySample sample = state.telemetry->Dump().boardProvider;
+    const BoardVendorTelemetrySample sample = state.telemetryUpdate.dump.boardProvider;
     return target->kind == BoardMetricBindingKind::Temperature ? sample.availableTemperatureNames
                                                                : sample.availableFanNames;
 }
@@ -1201,7 +1201,7 @@ void DashboardShellUi::ShowContextMenu(
         }
     }
     state.networkMenuOptions.clear();
-    const auto& networkCandidates = state.telemetry->NetworkAdapterCandidates();
+    const auto& networkCandidates = state.telemetryUpdate.networkAdapterCandidates;
     for (size_t i = 0; i < networkCandidates.size() && (kCommandNetworkAdapterBase + i) <= kCommandNetworkAdapterMax;
         ++i) {
         NetworkMenuOption option;
@@ -1222,7 +1222,7 @@ void DashboardShellUi::ShowContextMenu(
         }
     }
     state.storageDriveMenuOptions.clear();
-    const auto& storageDriveCandidates = state.telemetry->StorageDriveCandidates();
+    const auto& storageDriveCandidates = state.telemetryUpdate.storageDriveCandidates;
     for (size_t i = 0; i < storageDriveCandidates.size() && (kCommandStorageDriveBase + i) <= kCommandStorageDriveMax;
         ++i) {
         StorageDriveMenuOption option;

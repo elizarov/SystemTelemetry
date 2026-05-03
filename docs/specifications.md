@@ -126,8 +126,9 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 
 ## Refresh, Units, And Instance Behavior
 
-- The runtime updates the shared telemetry snapshot on a 0.5 second cadence.
-- CPU, GPU, network, storage, drive activity, retained histories, and the clock all refresh from that shared cadence.
+- The telemetry runtime owns collection on a 0.5 second cadence and publishes each new snapshot to the dashboard when collection finishes.
+- CPU, GPU, network, storage, drive activity, retained histories, and the clock all refresh from that telemetry-owned cadence.
+- The dashboard redraws after receiving a new telemetry snapshot instead of driving collection from the UI message loop.
 - Retained histories feed throughput plots plus recent-peak or recent-max overlays for supported widgets.
 - Dashboard formatting uses the configured metric display definitions, while dump serialization keeps its own stable machine-facing unit contract.
 - The dashboard runs as a single-instance application. Starting a new UI instance closes the existing one and continues startup in the replacement instance.

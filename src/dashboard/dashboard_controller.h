@@ -13,7 +13,8 @@
 
 struct DashboardSessionState {
     AppConfig config;
-    std::unique_ptr<TelemetryCollector> telemetry;
+    std::unique_ptr<TelemetryRuntime> telemetry;
+    TelemetryUpdate telemetryUpdate;
     std::unique_ptr<DiagnosticsSession> diagnostics;
     std::chrono::steady_clock::time_point lastDiagnosticsOutput{};
     UINT currentDpi = kDefaultDpi;
@@ -48,6 +49,9 @@ public:
     virtual void ApplyConfigPlacement() = 0;
     virtual void InvalidateShell() = 0;
     virtual void RedrawShellNow() = 0;
+    // May be called from the telemetry worker thread. Implementations must only copy the update into a thread-safe
+    // handoff and marshal any UI work back to the UI thread.
+    virtual void EnqueueTelemetryUpdate(const TelemetryUpdate& update) = 0;
     virtual MonitorPlacementInfo GetWindowPlacementInfo() const = 0;
     virtual std::optional<FilePath> PromptDiagnosticsSavePath(
         const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const = 0;
@@ -61,7 +65,7 @@ public:
     DashboardSessionState& State();
     const DashboardSessionState& State() const;
     bool InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
-    bool HandleRefreshTimer(DashboardShellHost& shell);
+    bool HandleTelemetryUpdate(DashboardShellHost& shell, const TelemetryUpdate& update);
     bool WriteDiagnosticsOutputs();
     bool ReloadConfigFromDisk(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     void SaveDumpAs(DashboardShellHost& shell);

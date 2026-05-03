@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <shellapi.h>
 #include <string>
@@ -41,6 +42,7 @@ public:
     void ApplyConfigPlacement() override;
     void InvalidateShell() override;
     void RedrawShellNow() override;
+    void EnqueueTelemetryUpdate(const TelemetryUpdate& update) override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
     std::optional<FilePath> PromptDiagnosticsSavePath(
         const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const override;
@@ -90,6 +92,7 @@ private:
     void StartPlacementWatch();
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
+    bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
 
     void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
@@ -138,5 +141,7 @@ private:
     int layoutEditModalUiDepth_ = 0;
     std::optional<POINT> moveCursorAnchorClientPoint_;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
+    std::mutex pendingTelemetryMutex_;
+    std::optional<TelemetryUpdate> pendingTelemetryUpdate_;
     LayoutEditTraceSession layoutEditTraceSession_{};
 };
