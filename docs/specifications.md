@@ -63,6 +63,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - `About CaseDash` shows the current themed app icon in a square slot, compiled version, build kind, and commit when available.
 - The dashboard uses normal window Z-order behavior; `Bring to Front` raises it when needed.
 - The installer completion launch starts the dashboard with the same front-and-focus behavior as `Bring to Front`.
+- Canceling the MSI setup from a setup wizard page and confirming exit closes the installer immediately.
 - The MSI setup UI uses CaseDash-branded dialog and banner artwork. The welcome dialog bitmap uses the WiX dialog bitmap size and background, places the dark_cyan app icon and black `CaseDash` wordmark on the left side, and leaves the right-side WiX text area unobscured.
 - The MSI registration uses the embedded CaseDash app icon for the Windows installed-apps entry.
 - Installing a CaseDash MSI replaces any existing CaseDash MSI registration, including newer, older, and same-version packages.
