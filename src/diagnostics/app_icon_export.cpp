@@ -1,6 +1,6 @@
 #include "diagnostics/app_icon_export.h"
 
-#include <windows.h>  // NOLINT(misc-include-cleaner): Win32 leaf headers require target-architecture setup here.
+#include <windows.h>
 
 #include <algorithm>
 #include <cstdint>
