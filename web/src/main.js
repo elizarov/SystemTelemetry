@@ -112,6 +112,13 @@
       return;
     }
 
+    const pageBottom = window.scrollY + window.innerHeight;
+    const nearPageEnd = pageBottom >= document.documentElement.scrollHeight - 4;
+    if (nearPageEnd) {
+      setCurrentSection(sections[sections.length - 1].id);
+      return;
+    }
+
     const marker = window.scrollY + Math.max(120, window.innerHeight * 0.32);
     let current = sections[0];
     sections.forEach((section) => {
