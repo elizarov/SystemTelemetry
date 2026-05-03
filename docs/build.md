@@ -54,7 +54,7 @@ Build the runtime and MSI package through the repository entrypoint:
 package.cmd
 ```
 
-`package.cmd` runs `build.cmd`, restores the WiX Toolset SDK through MSBuild, builds the x64 per-machine MSI from `installer\`, writes `build\CaseDash-<VERSION>.msi`, and writes the matching SHA-256 checksum. Local installation uses that MSI package. Release asset and installer behavior is maintained in [docs/release.md](release.md).
+`package.cmd` runs `build.cmd`, restores the WiX Toolset SDK through MSBuild, builds the x64 per-machine MSI from `installer\`, writes `build\CaseDash-<VERSION>.msi`, and writes the matching SHA-256 checksum. Local installation uses that MSI package. Release asset and installer behavior, including upgrade preservation of runtime-owned executable-side files, is maintained in [docs/release.md](release.md).
 
 ## Website
 

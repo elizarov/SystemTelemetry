@@ -88,7 +88,7 @@ if not exist "%OUTPUT_MSI%" (
 set "CASEDASH_OUTPUT_MSI=%OUTPUT_MSI%"
 set "CASEDASH_OUTPUT_NAME=CaseDash-%CASEDASH_VERSION_TEXT%.msi"
 set "CASEDASH_OUTPUT_SHA=%OUTPUT_SHA%"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$hash = Get-FileHash -LiteralPath $env:CASEDASH_OUTPUT_MSI -Algorithm SHA256; ('{0}  {1}' -f $hash.Hash, $env:CASEDASH_OUTPUT_NAME) | Set-Content -LiteralPath $env:CASEDASH_OUTPUT_SHA"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$stream = [System.IO.File]::OpenRead($env:CASEDASH_OUTPUT_MSI); try { $hashBytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash($stream) } finally { $stream.Dispose() }; $hash = -join ($hashBytes | ForEach-Object { $_.ToString('X2') }); ('{0}  {1}' -f $hash, $env:CASEDASH_OUTPUT_NAME) | Set-Content -LiteralPath $env:CASEDASH_OUTPUT_SHA"
 if errorlevel 1 exit /b %errorlevel%
 
 echo MSI package: "%OUTPUT_MSI%"
