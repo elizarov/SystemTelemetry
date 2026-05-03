@@ -4,7 +4,7 @@
 
 #include "config/config.h"
 #include "config/metric_catalog.h"
-#include "diagnostics/diagnostics_options.h"
+#include "runtime/diagnostics_options.h"
 #include "util/file_path.h"
 
 FilePath GetRuntimeConfigPath();

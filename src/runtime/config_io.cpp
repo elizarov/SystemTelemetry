@@ -4,7 +4,7 @@
 
 #include "config/config_parser.h"
 #include "config/config_writer.h"
-#include "diagnostics/diagnostics_options.h"
+#include "runtime/diagnostics_options.h"
 #include "telemetry/metrics.h"
 #include "util/paths.h"
 #include "util/temp_file.h"

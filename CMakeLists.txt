@@ -80,8 +80,8 @@ add_executable(CaseDash WIN32
     src/main/fps_service.cpp
     src/util/command_line.cpp
     src/runtime/config_io.cpp
+    src/runtime/diagnostics_options.cpp
     src/display/display_config.cpp
-    src/diagnostics/diagnostics_options.cpp
     src/display/monitor.cpp
     src/util/file_path.cpp
     src/util/paths.cpp
