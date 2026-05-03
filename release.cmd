@@ -8,8 +8,12 @@ if "%~1"=="" (
 )
 
 set "RELEASE_VERSION=%~1"
-echo %RELEASE_VERSION%| findstr /R "^[0-9][0-9]*\.[0-9][0-9]*\(\.[0-9][0-9]*\)\?$" >nul
-if errorlevel 1 (
+set "RELEASE_VERSION_VALID="
+echo %RELEASE_VERSION%| findstr /R "^[0-9][0-9]*\.[0-9][0-9]*$" >nul
+if not errorlevel 1 set "RELEASE_VERSION_VALID=1"
+echo %RELEASE_VERSION%| findstr /R "^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$" >nul
+if not errorlevel 1 set "RELEASE_VERSION_VALID=1"
+if not defined RELEASE_VERSION_VALID (
     echo Version must use major.minor or major.minor.patch format.
     exit /b 1
 )
