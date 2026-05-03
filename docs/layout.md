@@ -27,6 +27,7 @@ The language is divided by responsibility:
 - Runtime selection sections own runtime target choice: `[display]`, `[network]`, and `[storage]`.
 - `[board]` owns logical board-metric to provider-sensor bindings.
 - `[metrics]` owns metric presentation and normalization definitions.
+- `[theme.<name>]` owns base color tokens and the user-visible theme description.
 - `[layout.<name>]` owns named dashboard geometry and top-level card placement.
 - `[dashboard]` owns outer dashboard spacing.
 - `[card_style]` owns shared card chrome and in-card spacing.

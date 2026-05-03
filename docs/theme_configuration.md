@@ -181,6 +181,7 @@ The modeless `Edit Configuration` dialog exposes theme editing through the exist
 
 Theme section behavior:
 
+- The dialog tree follows the embedded config template order; the active theme section appears at the position of the shipped `[theme.<name>]` section group.
 - Only the active `[theme.<name>]` section selected by `[display] theme` appears in the dialog tree.
 - The active theme section description is shown in the right-hand editor pane.
 - Selecting the active theme section shows a theme selector dropdown listing all configured themes. Changing the selector updates `[display] theme`, previews immediately, refreshes the tree to the newly active theme section, and keeps the edit session active.
