@@ -91,6 +91,31 @@ struct AboutDialogState {
     HICON icon = nullptr;
 };
 
+int MakeAboutIconSlotSquare(HWND hwnd) {
+    HWND iconHwnd = GetDlgItem(hwnd, IDC_ABOUT_ICON);
+    if (iconHwnd == nullptr) {
+        return 0;
+    }
+
+    RECT iconRect{};
+    if (!GetWindowRect(iconHwnd, &iconRect)) {
+        return 0;
+    }
+
+    POINT topLeft{iconRect.left, iconRect.top};
+    ScreenToClient(hwnd, &topLeft);
+
+    const int width = iconRect.right - iconRect.left;
+    const int height = iconRect.bottom - iconRect.top;
+    const int size = std::min(width, height);
+    if (size <= 0) {
+        return 0;
+    }
+
+    SetWindowPos(iconHwnd, nullptr, topLeft.x, topLeft.y, size, size, SWP_NOACTIVATE | SWP_NOZORDER);
+    return size;
+}
+
 std::optional<BoardMetricBindingTarget> ParseBoardMetricBindingTarget(std::string_view metricId) {
     if (metricId.rfind(kBoardTemperatureMetricPrefix, 0) == 0) {
         return BoardMetricBindingTarget{
@@ -167,6 +192,10 @@ INT_PTR CALLBACK AboutDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
                 state->app->ApplyThemedIconsToWindow(hwnd);
             }
             SetDlgItemTextW(hwnd, IDC_ABOUT_TEXT, state != nullptr ? state->text.c_str() : L"");
+            if (state != nullptr && state->app != nullptr) {
+                const int iconSize = MakeAboutIconSlotSquare(hwnd);
+                state->icon = state->app->CreateThemedAppIconForSize(iconSize);
+            }
             if (state != nullptr && state->icon != nullptr) {
                 SendDlgItemMessageW(
                     hwnd, IDC_ABOUT_ICON, STM_SETIMAGE, IMAGE_ICON, reinterpret_cast<LPARAM>(state->icon));
@@ -686,7 +715,6 @@ void DashboardShellUi::ShowAboutDialog() const {
     AboutDialogState state;
     state.app = &app_;
     state.text = BuildAboutText();
-    state.icon = app_.CreateThemedAppIconForSize(64);
     DialogBoxParamW(
         app_.instance_, MAKEINTRESOURCEW(IDD_ABOUT), app_.hwnd_, AboutDialogProc, reinterpret_cast<LPARAM>(&state));
     if (state.icon != nullptr) {
