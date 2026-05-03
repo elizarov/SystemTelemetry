@@ -112,10 +112,12 @@ void DrawMetricListRow(WidgetHost& renderer,
             }
         }
         if (!row.annotationText.empty()) {
+            const RenderColorId annotationColor =
+                row.warningAnnotation ? RenderColorId::Warning : RenderColorId::MutedText;
             renderer.Renderer().DrawText(valueRect,
                 row.annotationText,
                 TextStyleId::Label,
-                RenderColorId::MutedText,
+                annotationColor,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
         }
     }

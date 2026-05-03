@@ -7,6 +7,7 @@
 #include "vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.h"
 #include "vendor/adlx/SDK/Include/IPerformanceMonitoring.h"
 
+#include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -130,8 +131,17 @@ public:
             "(" + std::to_string(static_cast<int>(fanResult)) + ")" +
             " vram_supported=" + (vramSupported ? "yes" : "no") + "(" + std::to_string(static_cast<int>(vramResult)) +
             ")";
+        fpsProvider_ = CreatePresentedFpsProvider(trace_);
+        if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
+            fpsDiagnostics_ = "Presented FPS ETW provider active.";
+        } else {
+            const FpsTelemetrySample fpsSample =
+                fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
+            fpsDiagnostics_ =
+                fpsSample.diagnostics.empty() ? "Presented FPS ETW provider unavailable." : fpsSample.diagnostics;
+        }
         initialized_ = true;
-        trace().Write("amd_adlx:initialize_done diagnostics=\"" + diagnostics_ + "\"");
+        trace().Write("amd_adlx:initialize_done diagnostics=\"" + diagnostics_ + "\" fps=\"" + fpsDiagnostics_ + "\"");
         return true;
     }
 
@@ -251,31 +261,33 @@ public:
             }
         }
 
-        IADLXFPSPtr fpsMetric;
-        trace().Write("amd_adlx:get_fps_begin");
-        const ADLX_RESULT fpsMetricResult = performanceMonitoring_->GetCurrentFPS(&fpsMetric);
-        trace().WriteLazy([&] {
-            return "amd_adlx:get_fps_metric_done result=" + AdlxResultCodeString(fpsMetricResult) +
-                   " available=" + Trace::BoolText(fpsMetric != nullptr);
-        });
-        if (ADLX_SUCCEEDED(fpsMetricResult) && fpsMetric) {
-            adlx_int fps = 0;
-            const ADLX_RESULT fpsResult = fpsMetric->FPS(&fps);
-            trace().WriteLazy([&] {
-                char buffer[128];
-                sprintf_s(buffer,
-                    "amd_adlx:get_fps_done result=%d value=%d",
-                    static_cast<int>(fpsResult),
-                    static_cast<int>(fps));
-                return std::string(buffer);
-            });
-            if (ADLX_SUCCEEDED(fpsResult) && fps >= 0) {
-                sample.fps = static_cast<double>(fps);
+        if (fpsProvider_ != nullptr) {
+            const FpsTelemetrySample fpsSample = fpsProvider_->Sample();
+            fpsDiagnostics_ = fpsSample.diagnostics;
+            sample.fpsAppName = fpsSample.processName;
+            if (fpsSample.fps.has_value()) {
+                sample.fps = *fpsSample.fps;
                 hasAnyMetric = true;
+            } else if (fpsSample.permissionRequired) {
+                const std::optional<double> nativeFps = ReadNativeAmdFps();
+                if (nativeFps.has_value()) {
+                    sample.fps = *nativeFps;
+                    sample.fpsAppName = "!admin";
+                    sample.fpsPermissionRequired = true;
+                    hasAnyMetric = true;
+                }
             }
+            trace().WriteLazy([&] {
+                return "amd_adlx:get_presented_fps available=" + Trace::BoolText(fpsSample.fps.has_value()) +
+                       " permission_required=" + Trace::BoolText(fpsSample.permissionRequired) + " value=" +
+                       (fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1)
+                                                  : std::string("fps=N/A")) +
+                       " process=\"" + fpsSample.processName + "\" diagnostics=\"" + fpsSample.diagnostics + "\"";
+            });
         }
 
         sample.available = hasAnyMetric;
+        sample.diagnostics += " fps=" + fpsDiagnostics_;
         trace().WriteLazy([&] {
             return "amd_adlx:sample_done available=" + Trace::BoolText(sample.available) + " diagnostics=\"" +
                    sample.diagnostics + "\"";
@@ -284,6 +296,31 @@ public:
     }
 
 private:
+    std::optional<double> ReadNativeAmdFps() {
+        IADLXFPSPtr fpsMetric;
+        trace().Write("amd_adlx:get_native_fps_begin");
+        const ADLX_RESULT fpsMetricResult = performanceMonitoring_->GetCurrentFPS(&fpsMetric);
+        trace().WriteLazy([&] {
+            return "amd_adlx:get_native_fps_metric_done result=" + AdlxResultCodeString(fpsMetricResult) +
+                   " available=" + Trace::BoolText(fpsMetric != nullptr);
+        });
+        if (ADLX_FAILED(fpsMetricResult) || !fpsMetric) {
+            return std::nullopt;
+        }
+
+        adlx_int fps = 0;
+        const ADLX_RESULT fpsResult = fpsMetric->FPS(&fps);
+        trace().WriteLazy([&] {
+            char buffer[128];
+            sprintf_s(buffer,
+                "amd_adlx:get_native_fps_done result=%d value=%d",
+                static_cast<int>(fpsResult),
+                static_cast<int>(fps));
+            return std::string(buffer);
+        });
+        return ADLX_SUCCEEDED(fpsResult) && fps >= 0 ? std::optional<double>{static_cast<double>(fps)} : std::nullopt;
+    }
+
     Trace& trace() {
         return trace_;
     }
@@ -295,7 +332,9 @@ private:
     Trace& trace_;
     std::string gpuName_;
     std::string diagnostics_ = "ADLX provider not initialized.";
+    std::string fpsDiagnostics_ = "Presented FPS ETW provider not initialized.";
     std::optional<double> totalVramGb_;
+    std::unique_ptr<FpsTelemetryProvider> fpsProvider_;
     bool usageSupported_ = false;
     bool temperatureSupported_ = false;
     bool clockSupported_ = false;
