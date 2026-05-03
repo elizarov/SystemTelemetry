@@ -27,7 +27,6 @@ The website is a single static page with continuous top-to-bottom scrolling and 
 Required sections:
 
 - `Intro`
-- `Download`
 - `Features`
 - `Hardware`
 - `Layout`
@@ -42,25 +41,11 @@ The intro section is the first viewport signal and identifies the product as `Ca
 The section includes:
 
 - A short product description aligned with the README overview.
-- Primary links for download and the GitHub repository.
+- Primary links for the latest release download and the GitHub repository.
 - A dashboard screenshot for the active website theme.
 - A short first-use path: download the installer, run CaseDash, right-click, choose layout and theme, configure display, enable startup when ready.
 
 The intro copy stays practical and avoids marketing-only language. The screenshot is the dominant visual object.
-
-## Download Section
-
-The download section follows the intro section. It includes:
-
-- A primary link to `https://github.com/casedash/casedash/releases/latest`.
-- A secondary link to `https://github.com/casedash/casedash/releases`.
-- A short note that the recommended download is the x64 MSI installer.
-- A short note that standalone executable and ZIP artifacts remain available on the release page.
-- A short note that the MSI installs `CaseDash.exe` into `C:\Program Files\CaseDash`, can run CaseDash after installation, and leaves startup setup to the app menu.
-- A short note that CaseDash stores its editable configuration beside `CaseDash.exe` as `config.ini`.
-- A link to the repository for users who want to inspect source or build locally.
-
-The section keeps release details brief and links to GitHub as the source of truth for MSI, standalone executable, ZIP, and checksum artifacts.
 
 ## Features Section
 
@@ -112,8 +97,6 @@ It includes links for:
 
 - Repository.
 - Issues.
-- Releases.
-- Project documentation.
 
 Suggested contribution areas:
 
