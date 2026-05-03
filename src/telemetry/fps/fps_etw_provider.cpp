@@ -470,6 +470,35 @@ private:
         }
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuQuery_);
         gpuUsageDiagnostics_ = " gpu3d_collect=" + PdhStatusCodeString(collectStatus);
+        CapturePreviousGpu3dRawValuesLocked();
+    }
+
+    void CapturePreviousGpu3dRawValuesLocked() {
+        previousGpuRawByInstance_.clear();
+        if (gpuQuery_ == nullptr || gpu3dCounter_ == nullptr) {
+            return;
+        }
+
+        DWORD bufferSize = 0;
+        DWORD itemCount = 0;
+        PDH_STATUS status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, nullptr);
+        if (status != PDH_MORE_DATA) {
+            return;
+        }
+
+        gpuCounterArrayBuffer_.resize(bufferSize);
+        auto* items = reinterpret_cast<PDH_RAW_COUNTER_ITEM_W*>(gpuCounterArrayBuffer_.data());
+        status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, items);
+        if (status != ERROR_SUCCESS) {
+            return;
+        }
+
+        previousGpuRawByInstance_.reserve(itemCount);
+        for (DWORD i = 0; i < itemCount; ++i) {
+            if (IsGpu3dEngineInstance(items[i].szName) && items[i].RawValue.CStatus == ERROR_SUCCESS) {
+                previousGpuRawByInstance_[items[i].szName] = items[i].RawValue;
+            }
+        }
     }
 
     void UpdateGpu3dUsageLocked() {
@@ -484,8 +513,7 @@ private:
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuQuery_);
         DWORD bufferSize = 0;
         DWORD itemCount = 0;
-        PDH_STATUS status =
-            PdhGetFormattedCounterArrayW(gpu3dCounter_, PDH_FMT_DOUBLE, &bufferSize, &itemCount, nullptr);
+        PDH_STATUS status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, nullptr);
         if (status != PDH_MORE_DATA) {
             gpuUsageDiagnostics_ = " gpu3d_collect=" + PdhStatusCodeString(collectStatus) +
                                    " gpu3d_prepare=" + PdhStatusCodeString(status);
@@ -493,24 +521,43 @@ private:
         }
 
         gpuCounterArrayBuffer_.resize(bufferSize);
-        auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W*>(gpuCounterArrayBuffer_.data());
-        status = PdhGetFormattedCounterArrayW(gpu3dCounter_, PDH_FMT_DOUBLE, &bufferSize, &itemCount, items);
+        auto* items = reinterpret_cast<PDH_RAW_COUNTER_ITEM_W*>(gpuCounterArrayBuffer_.data());
+        status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, items);
         if (status != ERROR_SUCCESS) {
             gpuUsageDiagnostics_ =
                 " gpu3d_collect=" + PdhStatusCodeString(collectStatus) + " gpu3d_fetch=" + PdhStatusCodeString(status);
             return;
         }
 
+        currentGpuRawByInstance_.clear();
+        currentGpuRawByInstance_.reserve(itemCount);
         for (DWORD i = 0; i < itemCount; ++i) {
             const wchar_t* instance = items[i].szName;
-            if (!IsGpu3dEngineInstance(instance) || items[i].FmtValue.CStatus != ERROR_SUCCESS) {
+            if (!IsGpu3dEngineInstance(instance) || items[i].RawValue.CStatus != ERROR_SUCCESS) {
                 continue;
             }
+            currentGpuRawByInstance_[instance] = items[i].RawValue;
+
             const DWORD processId = ExtractProcessIdFromGpuEngineInstance(instance);
             if (processId == 0 || IsExcludedProcessName(ResolveProcessNameLocked(processId))) {
                 continue;
             }
-            const double value = items[i].FmtValue.doubleValue;
+
+            const auto previousIt = previousGpuRawByInstance_.find(instance);
+            if (previousIt == previousGpuRawByInstance_.end()) {
+                continue;
+            }
+
+            PDH_FMT_COUNTERVALUE formatted{};
+            PDH_RAW_COUNTER previousRaw = previousIt->second;
+            PDH_RAW_COUNTER currentRaw = items[i].RawValue;
+            const PDH_STATUS formatStatus =
+                PdhCalculateCounterFromRawValue(gpu3dCounter_, PDH_FMT_DOUBLE, &previousRaw, &currentRaw, &formatted);
+            if (formatStatus != ERROR_SUCCESS || formatted.CStatus != ERROR_SUCCESS) {
+                continue;
+            }
+
+            const double value = formatted.doubleValue;
             if (value <= 0.0) {
                 continue;
             }
@@ -521,6 +568,7 @@ private:
                 topGpu3dProcessId_ = processId;
             }
         }
+        previousGpuRawByInstance_.swap(currentGpuRawByInstance_);
 
         gpuUsageDiagnostics_ = " gpu3d_collect=" + PdhStatusCodeString(collectStatus) +
                                " gpu3d_fetch=" + PdhStatusCodeString(status) +
@@ -575,6 +623,8 @@ private:
             gpuQuery_ = nullptr;
             gpu3dCounter_ = nullptr;
             gpuQueryInitialized_ = false;
+            previousGpuRawByInstance_.clear();
+            currentGpuRawByInstance_.clear();
         }
         initialized_ = false;
     }
@@ -664,6 +714,8 @@ private:
     std::unordered_map<DWORD, std::wstring> processNames_;
     std::unordered_map<DWORD, bool> processNamePermissionRequiredByProcess_;
     std::unordered_map<DWORD, double> gpu3dUsageByProcess_;
+    std::unordered_map<std::wstring, PDH_RAW_COUNTER> previousGpuRawByInstance_;
+    std::unordered_map<std::wstring, PDH_RAW_COUNTER> currentGpuRawByInstance_;
     std::vector<unsigned char> gpuCounterArrayBuffer_;
     std::optional<double> smoothedFps_;
     PDH_HQUERY gpuQuery_ = nullptr;

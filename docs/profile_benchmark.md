@@ -46,10 +46,10 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.09`
   - `paint_draw avg_ms=2.02`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.18`
-  - `telemetry_update avg_ms=2.10`
-  - `paint_total avg_ms=2.08`
-  - `paint_draw avg_ms=2.08`
+  - `update_loop per_iter_ms=4.57`
+  - `telemetry_update avg_ms=2.50`
+  - `paint_total avg_ms=2.06`
+  - `paint_draw avg_ms=2.06`
 - Current repeatable `layout-switch` result on the current tree:
   - `switch_loop per_iter_ms=3.59`
   - `switch_apply avg_ms=0.80`
@@ -80,7 +80,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\22655_18646_22144\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `DWrite.dll`, `clr.dll`, `TextShaping.dll`, `amdxx64.dll`, and a much smaller remaining `pdh.dll` slice.
+- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\26329_243_6102\` reports `update_loop per_iter_ms=4.64`, `telemetry_update avg_ms=2.56`, and `paint_draw avg_ms=2.08`; the benchmark-process inclusive module weight is centered on `d2d1.dll`, `DWrite.dll`, `Kernelbase.dll`, `PDH.DLL`, `advapi32.dll`, `clr.dll`, and `mscorlib.dll`. The app-inclusive call tree keeps `AmdAdlxGpuTelemetryProvider::Sample`, `FpsHybridProvider::Sample`, and `PresentedFpsEtwProvider::Sample` visible, so the capture still includes the real presented-FPS ETW sample overhead while using raw GPU Engine PDH values.
 - The latest direct `layout-guide-sheet` run splits generation into `sheet_measure`, `sheet_place`, and `sheet_draw`; it reports `sheet_loop per_iter_ms=328.70`, with `sheet_place avg_ms=299.16` dominating and actual offscreen drawing isolated at `sheet_draw avg_ms=16.97`.
 - The latest usable daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\21425_18089_27400\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, `amdxx64.dll`, and `D3D11.dll`; the exported call tree still under-symbolizes most app-owned leaf functions and does not surface a new dominant geometry-builder hotspot inside the benchmark process.
 - The latest daemon-backed `edit-layout` timing capture under `build\profile_benchmark_daemon\requests\18269_30044_21338\` reports `drag_loop per_iter_ms=2.54`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.27`; its WPR ETL is present, but the exported text summary and call-tree HTML are empty, so it does not replace the latest usable hotspot attribution above.
@@ -94,7 +94,7 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.18 ms` in `TelemetryCollector::UpdateSnapshot()` versus `2.04 ms` in repaint on this machine.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.50 ms` in `TelemetryCollector::UpdateSnapshot()` versus `2.06 ms` in repaint on this machine.
 - The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.72` to `2.76 ms` of the `3.60` to `3.66 ms` loop while the dialog refresh work stays around `0.15 ms`.
 - The direct `layout-guide-sheet` benchmark remains placement-score bound after removing the pathological exhaustive stack-order search: measured callout preparation and offscreen drawing are separate timing buckets, and the remaining cost is mostly leader intersection scoring inside `sheet_place`.
 - The direct `edit-layout` benchmark remains paint-bound on this tree after restoring incremental renderer style updates: confirmation reruns land around `drag_loop per_iter_ms=2.46` to `2.49`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.23`, so the remaining time sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
@@ -119,8 +119,36 @@ These changes produced real wins and remain in the codebase:
 - Decode embedded panel icons through WIC and scale them with `IWICBitmapScaler` before upload into render-target-local Direct2D bitmaps, so the renderer no longer depends on GDI+ for icon resources.
 - Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
 - Keep renderer style updates incremental so layout-only config changes do not rebuild DirectWrite text formats, palette state, or tinted icon sources during edit-layout drag apply and layout switching.
+- Read presented-FPS GPU Engine 3D usage as raw PDH counter arrays and calculate per-instance percentages from previous/current raw values, so process selection still favors the highest GPU consumer while avoiding the heavier formatted wildcard array path.
 
 ## Tested Hypotheses
+
+### Hypothesis: Use raw PDH arrays for presented-FPS GPU Engine process selection
+
+- Change:
+  - Replace `PdhGetFormattedCounterArrayW(PDH_FMT_DOUBLE)` in the local presented-FPS ETW provider's GPU Engine 3D selector with `PdhGetRawCounterArrayW`, keep previous and current raw values per GPU Engine instance, and calculate the percentage with `PdhCalculateCounterFromRawValue`.
+  - Seed the previous raw values immediately after the initial GPU Engine PDH collect so the first real sample can still compare GPU Engine usage, and reuse the raw-value maps between samples to avoid rebuilding their storage.
+- Result:
+  - Helped materially while preserving the requirement that FPS process selection prefers the process with dominant GPU Engine 3D usage.
+- Observed effect:
+  - Before the change, the reverted-code direct run landed at `update_loop per_iter_ms=5.25`, `telemetry_update avg_ms=3.09`, and `paint_draw avg_ms=2.16`; the daemon-backed profile under `build\profile_benchmark_daemon\requests\24121_8816_21315\` landed at `update_loop per_iter_ms=5.25`, `telemetry_update avg_ms=3.11`, and `paint_draw avg_ms=2.15`, with `PDH.DLL` at about `7.73%` exclusive hits.
+  - The final direct run with raw GPU Engine PDH values landed at `update_loop per_iter_ms=4.57`, `telemetry_update avg_ms=2.50`, and `paint_draw avg_ms=2.06`.
+  - The final daemon-backed profile under `build\profile_benchmark_daemon\requests\26329_243_6102\` landed at `update_loop per_iter_ms=4.64`, `telemetry_update avg_ms=2.56`, and `paint_draw avg_ms=2.08`, with `PDH.DLL` at about `2.41%` exclusive hits.
+- Conclusion:
+  - Keep raw GPU Engine PDH sampling for presented-FPS process selection. The benchmark still pays the real synchronous ETW/FPS selector work on every telemetry sample, but avoids the more expensive formatted wildcard array conversion.
+
+### Hypothesis: Cache the presented-FPS GPU Engine cross-check within one telemetry cadence
+
+- Change:
+  - Temporarily cached the FPS ETW provider's GPU Engine 3D PDH cross-check for 0.5 seconds while leaving ETW event ingestion and present-event selection active.
+- Result:
+  - Rejected and reverted because it made the tight-loop benchmark hide cost that the real app pays on each 0.5 second telemetry sample.
+- Observed effect:
+  - With the cache, `build\CaseDashBenchmarks.exe update-telemetry 240 2` appeared to improve to about `update_loop per_iter_ms=4.14`, `telemetry_update avg_ms=2.10`, and `paint_draw avg_ms=2.04`, and the daemon-backed profile no longer showed `PresentedFpsEtwProvider::Sample` as a top app-inclusive function.
+  - After reverting the cache, `build\CaseDashBenchmarks.exe update-telemetry 240 2` landed at `update_loop per_iter_ms=5.25`, `telemetry_update avg_ms=3.09`, and `paint_draw avg_ms=2.16`.
+  - The reverted-code daemon-backed profile under `build\profile_benchmark_daemon\requests\24121_8816_21315\` landed at `update_loop per_iter_ms=5.25`, `telemetry_update avg_ms=3.11`, and `paint_draw avg_ms=2.15`; `PresentedFpsEtwProvider::Sample` and `PDH.DLL` are visible again.
+- Conclusion:
+  - Do not cache or cadence-gate telemetry provider work just to improve `update-telemetry`. This benchmark is intended to measure the synchronous cost of one real telemetry sample plus one draw, so future improvements should reduce the actual per-sample FPS/PDH work or change production behavior deliberately with matching spec updates.
 
 ### Hypothesis: Collision-aware container anchors regress layout-edit benchmark paths
 
