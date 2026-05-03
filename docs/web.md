@@ -27,6 +27,7 @@ The website is a single static page with continuous top-to-bottom scrolling and 
 Required sections:
 
 - `Intro`
+- `Download` navigation to the intro section
 - `Features`
 - `Hardware`
 - `Layout`
@@ -72,11 +73,7 @@ The hardware section lists currently supported telemetry families:
 - MSI board telemetry through MSI Center SDK.
 - Windows-native CPU, memory, network, storage, clock, and display behavior.
 
-The section also sets expectations:
-
-- Unsupported vendor-specific sensors show unavailable values instead of making the app unusable.
-- Contributions are welcome for additional GPU, motherboard, and sensor providers.
-- Linux support is not currently a shipped target.
+The section also notes that contributions are welcome for additional GPU, motherboard, and sensor providers.
 
 ## Layout Section
 
@@ -195,7 +192,7 @@ When the build needs screenshots or guide sheets, diagnostics output paths point
 
 The generated site is directly openable from `web/dist/index.html` in a local browser. No preview server is required.
 
-The release workflow publishes `web/dist/` to GitHub Pages at:
+The release workflow and the manual-only `Pages` workflow publish `web/dist/` to GitHub Pages through `actions/upload-pages-artifact` and `actions/deploy-pages` at:
 
 ```text
 https://casedash.github.io/casedash/
@@ -225,7 +222,3 @@ The page respects reduced-motion preferences. Smooth scrolling and theme transit
 Generated images are optimized for web delivery and include width and height metadata. The active theme's screenshot is loaded eagerly in the intro section; non-active theme images may load lazily.
 
 The color derivation used by the website maintains readable contrast for body text, navigation text, buttons, and links for every generated app theme. If a theme cannot satisfy minimum contrast through derived colors, the build reports the theme and role that failed.
-
-## Open Decisions
-
-- Decide the exact GitHub Pages publication mechanism in the release workflow.

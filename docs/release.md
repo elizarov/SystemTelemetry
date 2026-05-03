@@ -36,8 +36,8 @@ release.cmd <version>
 
 `release.cmd` asks for keyboard confirmation, updates [VERSION](../VERSION), commits the version change, runs format, lint, build, and tests, creates the matching annotated `v<VERSION>` tag, pushes the current branch, and pushes the tag.
 
-The `Release` GitHub Actions workflow checks that the tag matches `VERSION`, builds and tests CaseDash, packages the executable, builds the minimal x64 WiX MSI, writes SHA-256 checksums, and creates the GitHub Release.
+The `Release` GitHub Actions workflow checks that the tag matches `VERSION`, builds and tests CaseDash, packages the executable, builds the minimal x64 WiX MSI, writes SHA-256 checksums, creates the GitHub Release, builds the static website, and deploys `web\dist\` to GitHub Pages.
 
 The release assets are the standalone executable, ZIP package, MSI installer, and matching `.sha256` files. The MSI uses a no-license install-directory UI, installs only `CaseDash.exe` into `C:\Program Files\CaseDash`, and shows a default-enabled completion option to run CaseDash immediately. Runtime auto-start and FPS service registration remain owned by the app menu. MSI uninstall removes the installed executable, executable-side `config.ini`, the executable-side `casedash_blank.png` wallpaper image, the `CaseDash` machine-wide Run value, and the `CaseDashFpsService` service when present.
 
-The workflow can also be started manually with a tag input, but the tag must still match `VERSION`.
+The release workflow can also be started manually with a tag input, but the tag must still match `VERSION`. The separate `Pages` workflow is manual-only and rebuilds and deploys the website from a selected branch, tag, or commit without creating a release.

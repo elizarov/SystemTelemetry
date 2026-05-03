@@ -76,6 +76,8 @@ web-build.cmd
 
 `web-build.cmd` runs `build.cmd`, reads themes from `resources\config.ini`, exports one dashboard screenshot and one layout guide sheet per theme through headless diagnostics, writes theme metadata, and produces the directly openable static site under `web\dist\`. Generated website output is not committed.
 
+The `Release` workflow deploys the generated site after a successful tagged release. The manual-only `Pages` workflow rebuilds and deploys the generated site from a selected branch, tag, or commit without creating a release.
+
 ## Developer Tooling Entrypoints
 
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources. Its changed-file mode keeps Git CRLF normalization warnings out of formatter file discovery.
