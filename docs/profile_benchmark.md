@@ -41,40 +41,40 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.08`
   - `paint_draw avg_ms=2.09`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.70`
-  - `snap avg_ms=0.22`
-  - `apply avg_ms=0.10`
-  - `paint_draw avg_ms=2.37`
+  - `drag_loop per_iter_ms=2.32`
+  - `snap avg_ms=0.19`
+  - `apply avg_ms=0.09`
+  - `paint_draw avg_ms=2.02`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.89`
-  - `telemetry_update avg_ms=2.63`
-  - `paint_total avg_ms=2.26`
-  - `paint_draw avg_ms=2.26`
+  - `update_loop per_iter_ms=4.18`
+  - `telemetry_update avg_ms=2.10`
+  - `paint_total avg_ms=2.08`
+  - `paint_draw avg_ms=2.08`
 - Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=4.08`
-  - `switch_apply avg_ms=0.86`
+  - `switch_loop per_iter_ms=3.59`
+  - `switch_apply avg_ms=0.80`
   - `dialog_refresh avg_ms=0.18`
-  - `switch_paint avg_ms=3.01`
+  - `switch_paint avg_ms=2.59`
 - Current repeatable `theme-change` result on the current tree:
-  - `theme_loop per_iter_ms=4.92`
+  - `theme_loop per_iter_ms=4.60`
   - `config_copy avg_ms=0.01`
-  - `color_resolve avg_ms=0.03`
-  - `dashboard_config avg_ms=1.05`
+  - `color_resolve avg_ms=0.04`
+  - `dashboard_config avg_ms=1.09`
   - `edit_tree avg_ms=0.18`
-  - `theme_preview avg_ms=1.00`
-  - `theme_paint avg_ms=2.61`
+  - `theme_preview avg_ms=0.80`
+  - `theme_paint avg_ms=2.46`
 - Current repeatable `mouse-hover` result on the current tree:
-  - `hover_loop per_iter_ms=2.59`
-  - `hover_hit_test avg_ms=0.10`
-  - `paint_total avg_ms=2.49`
-  - `paint_draw avg_ms=2.49`
+  - `hover_loop per_iter_ms=2.16`
+  - `hover_hit_test avg_ms=0.07`
+  - `paint_total avg_ms=2.08`
+  - `paint_draw avg_ms=2.08`
 - Current repeatable `layout-guide-sheet` result on the current tree:
-  - `sheet_loop per_iter_ms=91.23`
-  - `active_regions avg_ms=5.38`
-  - `sheet_plan avg_ms=1.13`
-  - `sheet_measure avg_ms=4.60`
-  - `sheet_place avg_ms=46.20`
-  - `sheet_draw avg_ms=33.76`
+  - `sheet_loop per_iter_ms=84.04`
+  - `active_regions avg_ms=5.17`
+  - `sheet_plan avg_ms=1.14`
+  - `sheet_measure avg_ms=4.33`
+  - `sheet_place avg_ms=42.59`
+  - `sheet_draw avg_ms=30.65`
 
 ## Current Confirmed Hotspots
 
