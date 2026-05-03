@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <commctrl.h>
+#include <cstring>
 #include <string_view>
 #include <vector>
 #include <windowsx.h>
@@ -17,6 +18,7 @@
 #include "util/paths.h"
 #include "util/trace.h"
 #include "util/utf8.h"
+#include "widget/app_icon_geometry.h"
 
 namespace {
 
@@ -68,6 +70,48 @@ std::string FormatTracePoint(POINT point) {
 
 std::string FormatTracePoint(RenderPoint point) {
     return std::to_string(point.x) + "," + std::to_string(point.y);
+}
+
+HICON CreateThemedAppIcon(const AppConfig& config, int size) {
+    if (!IsValidAppIconSize(size)) {
+        return nullptr;
+    }
+    const AppIconBitmap bitmap = RenderAppIconBitmap(config, size);
+
+    BITMAPV5HEADER header{};
+    header.bV5Size = sizeof(header);
+    header.bV5Width = bitmap.size;
+    header.bV5Height = -bitmap.size;
+    header.bV5Planes = 1;
+    header.bV5BitCount = 32;
+    header.bV5Compression = BI_BITFIELDS;
+    header.bV5RedMask = 0x00FF0000;
+    header.bV5GreenMask = 0x0000FF00;
+    header.bV5BlueMask = 0x000000FF;
+    header.bV5AlphaMask = 0xFF000000;
+
+    void* bits = nullptr;
+    HBITMAP colorBitmap =
+        CreateDIBSection(nullptr, reinterpret_cast<BITMAPINFO*>(&header), DIB_RGB_COLORS, &bits, nullptr, 0);
+    if (colorBitmap == nullptr || bits == nullptr) {
+        return nullptr;
+    }
+    std::memcpy(bits, bitmap.bgra.data(), bitmap.bgra.size());
+
+    HBITMAP maskBitmap = CreateBitmap(bitmap.size, bitmap.size, 1, 1, nullptr);
+    if (maskBitmap == nullptr) {
+        DeleteObject(colorBitmap);
+        return nullptr;
+    }
+
+    ICONINFO iconInfo{};
+    iconInfo.fIcon = TRUE;
+    iconInfo.hbmColor = colorBitmap;
+    iconInfo.hbmMask = maskBitmap;
+    HICON icon = CreateIconIndirect(&iconInfo);
+    DeleteObject(maskBitmap);
+    DeleteObject(colorBitmap);
+    return icon;
 }
 
 }  // namespace
@@ -179,8 +223,12 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     wc.lpszClassName = kWindowClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = nullptr;
-    appIconLarge_ = LoadAppIcon(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
-    appIconSmall_ = LoadAppIcon(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+    if (appIconLarge_ == nullptr) {
+        appIconLarge_ = LoadAppIcon(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+    }
+    if (appIconSmall_ == nullptr) {
+        appIconSmall_ = LoadAppIcon(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+    }
     wc.hIcon = appIconLarge_;
     wc.hIconSm = appIconSmall_;
     if (!RegisterClassExW(&wc)) {
@@ -328,6 +376,53 @@ void DashboardApp::ReleaseFonts() {
 HICON DashboardApp::LoadAppIcon(int width, int height) {
     return static_cast<HICON>(
         LoadImageW(instance_, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, width, height, LR_DEFAULTCOLOR));
+}
+
+void DashboardApp::DestroyLoadedIcons(HICON largeIcon, HICON smallIcon) const {
+    if (largeIcon != nullptr) {
+        DestroyIcon(largeIcon);
+    }
+    if (smallIcon != nullptr && smallIcon != largeIcon) {
+        DestroyIcon(smallIcon);
+    }
+}
+
+void DashboardApp::ApplyThemedIconsToWindow(HWND target) const {
+    if (target == nullptr || !IsWindow(target)) {
+        return;
+    }
+    if (appIconLarge_ != nullptr) {
+        SendMessageW(target, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(appIconLarge_));
+    }
+    if (appIconSmall_ != nullptr) {
+        SendMessageW(target, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(appIconSmall_));
+    }
+}
+
+void DashboardApp::RefreshThemedIcons() {
+    const AppConfig& config = controller_.State().config;
+    HICON largeIcon = CreateThemedAppIcon(config, GetSystemMetrics(SM_CXICON));
+    HICON smallIcon = CreateThemedAppIcon(config, GetSystemMetrics(SM_CXSMICON));
+    if (largeIcon == nullptr || smallIcon == nullptr) {
+        DestroyLoadedIcons(largeIcon, smallIcon);
+        return;
+    }
+
+    HICON previousLarge = appIconLarge_;
+    HICON previousSmall = appIconSmall_;
+    appIconLarge_ = largeIcon;
+    appIconSmall_ = smallIcon;
+
+    ApplyThemedIconsToWindow(hwnd_);
+    if (trayIcon_.cbSize != 0) {
+        trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+        trayIcon_.hIcon = appIconSmall_;
+        Shell_NotifyIconW(NIM_MODIFY, &trayIcon_);
+    }
+    if (shellUi_ != nullptr) {
+        shellUi_->RefreshDialogIcons();
+    }
+    DestroyLoadedIcons(previousLarge, previousSmall);
 }
 
 bool DashboardApp::SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot) {
@@ -954,6 +1049,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             RegisterSessionNotifications();
             StartPlacementWatch();
             ApplyConfigPlacement();
+            RefreshThemedIcons();
             CreateTrayIcon();
             return 0;
         case WM_TIMER:
@@ -1251,12 +1347,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 HICON smallIcon = appIconSmall_;
                 appIconLarge_ = nullptr;
                 appIconSmall_ = nullptr;
-                if (largeIcon != nullptr) {
-                    DestroyIcon(largeIcon);
-                }
-                if (smallIcon != nullptr && smallIcon != largeIcon) {
-                    DestroyIcon(smallIcon);
-                }
+                DestroyLoadedIcons(largeIcon, smallIcon);
             }
             PostQuitMessage(0);
             return 0;

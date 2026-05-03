@@ -286,6 +286,13 @@ void LayoutEditDialog::RestackAnchor() {
     host_.RestackLayoutEditDialogAnchor(hwnd_);
 }
 
+void LayoutEditDialog::RefreshIcons() {
+    if (hwnd_ == nullptr || !IsWindow(hwnd_)) {
+        return;
+    }
+    host_.ApplyLayoutEditDialogIcons(hwnd_);
+}
+
 bool LayoutEditDialog::SyncSelection(
     const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront) {
     if (!target.has_value()) {
@@ -348,6 +355,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
         SetWindowTextW(hwnd, L"Edit Configuration");
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_COMPOSITED);
         state->dialog->UpdateSelectionHighlight(std::nullopt);
+        state->dialog->Host().ApplyLayoutEditDialogIcons(hwnd);
         ConfigureColorSliders(hwnd);
         ConfigureColorViewTabs(hwnd, state->colorEditViewMode);
         ConfigureDialogFonts(state, hwnd);

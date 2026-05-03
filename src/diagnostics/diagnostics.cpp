@@ -17,6 +17,7 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "config/config_writer.h"
+#include "diagnostics/app_icon_export.h"
 #include "diagnostics/constants.h"
 #include "layout_edit/layout_edit_active_region_trace.h"
 #include "layout_edit/layout_edit_controller.h"
@@ -29,6 +30,7 @@
 #include "util/scale.h"
 #include "util/strings.h"
 #include "util/utf8.h"
+#include "widget/app_icon_geometry.h"
 
 namespace {
 
@@ -256,6 +258,14 @@ std::optional<double> GetScaleSwitchValue() {
     return std::nullopt;
 }
 
+std::optional<int> TryParseAppIconSizeValue(const std::wstring& text) {
+    const std::optional<int> value = TryParseInteger(text);
+    if (!value.has_value() || !IsValidAppIconSize(*value)) {
+        return std::nullopt;
+    }
+    return *value;
+}
+
 std::optional<std::string> GetLayoutSwitchValue() {
     if (const auto value = GetColonSwitchValue(L"/layout"); value.has_value()) {
         const std::string layoutName = Trim(Utf8FromWide(*value));
@@ -274,6 +284,25 @@ std::optional<std::string> GetThemeSwitchValue() {
         }
     }
     return std::nullopt;
+}
+
+void WriteValidationFailureTrace(
+    const DiagnosticsOptions& options, const std::string& reason, const std::string& message) {
+    if (!options.trace) {
+        return;
+    }
+
+    const FilePath tracePath =
+        ResolveDiagnosticsOutputPath(GetWorkingDirectory(), options.tracePath, kDefaultTraceFileName);
+    std::FILE* traceFile = nullptr;
+    if (_wfopen_s(&traceFile, tracePath.c_str(), L"ab") != 0 || traceFile == nullptr) {
+        return;
+    }
+
+    Trace trace(traceFile);
+    trace.Write(
+        "diagnostics:validation_failed reason=" + QuoteTraceText(reason) + " message=" + QuoteTraceText(message));
+    fclose(traceFile);
 }
 
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options) {
@@ -298,6 +327,7 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     options.dump = HasSwitch("/dump");
     options.screenshot = HasSwitch("/screenshot");
     options.layoutGuideSheet = HasSwitch("/layout-guide-sheet");
+    options.appIcon = HasSwitch("/app-icon");
     options.exit = HasSwitch("/exit");
     options.fake = HasSwitch("/fake");
     options.blank = HasSwitch("/blank");
@@ -325,6 +355,14 @@ DiagnosticsOptions GetDiagnosticsOptions() {
         options.hasScaleOverride = true;
         options.scale = *scale;
     }
+    if (const auto appIconSizeValue = GetColonSwitchValue(L"/app-icon-size"); appIconSizeValue.has_value()) {
+        options.hasAppIconSize = true;
+        if (const auto appIconSize = TryParseAppIconSizeValue(*appIconSizeValue); appIconSize.has_value()) {
+            options.appIconSize = *appIconSize;
+        } else {
+            options.appIconSize = 0;
+        }
+    }
     if (const auto hoverValue = GetColonSwitchValue(L"/hover"); hoverValue.has_value()) {
         if (const auto hoverPoint = TryParseHoverPointValue(*hoverValue); hoverPoint.has_value()) {
             options.hoverPoint = *hoverPoint;
@@ -347,6 +385,10 @@ DiagnosticsOptions GetDiagnosticsOptions() {
         layoutGuideSheetPath.has_value()) {
         options.layoutGuideSheet = true;
         options.layoutGuideSheetPath = *layoutGuideSheetPath;
+    }
+    if (const auto appIconPath = GetColonSwitchValue(L"/app-icon"); appIconPath.has_value()) {
+        options.appIcon = true;
+        options.appIconPath = *appIconPath;
     }
     if (const auto saveConfigPath = GetColonSwitchValue(L"/save-config"); saveConfigPath.has_value()) {
         options.saveConfig = true;
@@ -372,6 +414,7 @@ bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
         if (!options.trace) {
             MessageBoxW(nullptr, L"/blank cannot be used together with /fake.", L"CaseDash", MB_ICONERROR);
         }
+        WriteValidationFailureTrace(options, "blank_fake_conflict", "/blank cannot be used together with /fake.");
         return false;
     }
     if (options.blank && options.layoutGuideSheet) {
@@ -379,6 +422,15 @@ bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
             MessageBoxW(
                 nullptr, L"/blank cannot be used together with /layout-guide-sheet.", L"CaseDash", MB_ICONERROR);
         }
+        WriteValidationFailureTrace(
+            options, "blank_layout_guide_sheet_conflict", "/blank cannot be used together with /layout-guide-sheet.");
+        return false;
+    }
+    if (options.hasAppIconSize && !IsValidAppIconSize(options.appIconSize)) {
+        if (!options.trace) {
+            MessageBoxW(nullptr, L"/app-icon-size must be between 16 and 1024 pixels.", L"CaseDash", MB_ICONERROR);
+        }
+        WriteValidationFailureTrace(options, "app_icon_size", "/app-icon-size must be between 16 and 1024 pixels.");
         return false;
     }
     return true;
@@ -468,6 +520,9 @@ bool DiagnosticsSession::Initialize() {
         layoutGuideSheetPath_ = ResolveDiagnosticsOutputPath(
             workingDirectory, options_.layoutGuideSheetPath, kDefaultLayoutGuideSheetFileName);
     }
+    if (options_.appIcon) {
+        appIconPath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.appIconPath, kDefaultAppIconFileName);
+    }
     if (options_.saveConfig) {
         saveConfigPath_ =
             ResolveDiagnosticsOutputPath(workingDirectory, options_.saveConfigPath, kDefaultSavedConfigFileName);
@@ -553,6 +608,22 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
         }
         ReportError(traceText, message);
         return false;
+    }
+
+    std::string appIconError;
+    if (options_.appIcon && !SaveRenderedAppIcon(appIconPath_, config, options_.appIconSize, &appIconError)) {
+        const std::wstring message = WideFromUtf8("Failed to save app icon:\n" + Utf8FromWide(appIconPath_.wstring()));
+        std::string traceText = "diagnostics:app_icon_save_failed path=\"" + Utf8FromWide(appIconPath_.wstring()) +
+                                "\" size=" + std::to_string(options_.appIconSize);
+        if (!appIconError.empty()) {
+            traceText += " detail=\"" + appIconError + "\"";
+        }
+        ReportError(traceText, message);
+        return false;
+    }
+    if (options_.appIcon) {
+        WriteTraceMarker("diagnostics:app_icon_saved path=\"" + Utf8FromWide(appIconPath_.wstring()) +
+                         "\" size=" + std::to_string(options_.appIconSize));
     }
 
     if (options_.saveConfig && !SaveConfig(saveConfigPath_, config, ConfigParseContext{TelemetryMetricCatalog()})) {
@@ -805,6 +876,10 @@ bool SaveLayoutGuideSheet(const FilePath& imagePath,
     Trace& trace,
     std::string* errorText) {
     return SaveLayoutGuideSheetPng(imagePath, snapshot, config, scale, trace, errorText);
+}
+
+bool SaveRenderedAppIcon(const FilePath& imagePath, const AppConfig& config, int size, std::string* errorText) {
+    return SaveAppIconPng(imagePath, config, size, errorText);
 }
 
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {

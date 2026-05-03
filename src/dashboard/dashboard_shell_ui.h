@@ -40,6 +40,7 @@ public:
     bool HandleEditLayoutToggle();
     bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
     void SetLayoutEditTreeSelectionHighlightVisible(bool visible);
+    void RefreshDialogIcons();
     void SyncLayoutEditDialogSelection(
         const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
 

@@ -24,6 +24,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
 - Keep reusable agent or automation skills in `tools\skills`.
+- Use `update_app_icon.cmd` to rebuild the app, export default-theme app-icon PNGs under `build\app_icon\`, and regenerate `resources\app.ico` from those rendered assets.
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the validation workflow.
@@ -38,7 +39,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 ## Engineering Constraints
 
 - Keep `resources/config.ini` as the embedded default configuration resource.
-- Keep `resources/CaseDash.rc` explicitly dependent on embedded payload files such as `resources/config.ini` and `resources/localization.ini`.
+- Keep `resources/CaseDash.rc` explicitly dependent on embedded payload files such as `resources/app.ico`, `resources/config.ini`, and `resources/localization.ini`.
 - Keep `VERSION` as the single maintained base product version; generated headers, manifests, and version resources derive their build metadata from it plus Git state.
 - Do not add C++-side synthesized fallback layout, card, widget, font, color, or styling defaults that duplicate the embedded template.
 - Keep runtime text internally as UTF-8 `std::string` and convert to UTF-16 only at Windows API boundaries.

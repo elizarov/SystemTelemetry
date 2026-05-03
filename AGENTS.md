@@ -44,6 +44,7 @@ Validation workflow:
 - Win32 dialog templates and control ids live in `resources/CaseDash.rc` and `resources/resource.h`; when a shell dialog layout or control placement looks wrong, check those files before tracing through `src/dashboard_shell_ui.cpp`.
 - If rebuilt defaults seem unchanged, check the executable-side `config.ini` first; it overlays the embedded `resources/config.ini` template and `Save Config` preserves that live file.
 - If embedded `config.ini` or `localization.ini` edits seem ignored after an incremental build, keep `resources/CaseDash.rc` wired to those payload files through explicit CMake dependencies so the resource object rebuilds.
+- If regenerated icon resources seem ignored after an incremental build, keep `resources/CaseDash.rc` explicitly dependent on `resources/app.ico` so the resource object rebuilds.
 - When restoring saved placement across monitors with different DPI scales, do not pre-scale the destination window size before the move; let `WM_DPICHANGED` apply the monitor transition first or the bounds can be double-scaled.
 - Login startup and monitor hotplug can race ahead of monitor enumeration; when `display.monitor_name` is configured, keep a placement watch armed until the target display becomes enumerable instead of locking in a fallback monitor.
 - Gigabyte SIV assembly loading may temporarily need the SIV install directory as the process current directory, but always restore the original launch working directory afterward so diagnostics paths and Save dialogs keep using the startup folder.

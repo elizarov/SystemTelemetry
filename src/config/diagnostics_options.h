@@ -23,6 +23,7 @@ struct DiagnosticsOptions {
     bool dump = false;
     bool screenshot = false;
     bool layoutGuideSheet = false;
+    bool appIcon = false;
     bool exit = false;
     bool fake = false;
     bool blank = false;
@@ -32,9 +33,11 @@ struct DiagnosticsOptions {
     bool saveConfig = false;
     bool saveFullConfig = false;
     bool hasScaleOverride = false;
+    bool hasAppIconSize = false;
     std::optional<DiagnosticsHoverPoint> hoverPoint;
     DiagnosticsLayoutSimilarityMode layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::None;
     double scale = 1.0;
+    int appIconSize = 256;
     std::string layoutName;
     std::string themeName;
     std::string editLayoutWidgetName;
@@ -42,6 +45,7 @@ struct DiagnosticsOptions {
     FilePath dumpPath;
     FilePath screenshotPath;
     FilePath layoutGuideSheetPath;
+    FilePath appIconPath;
     FilePath saveConfigPath;
     FilePath saveFullConfigPath;
     FilePath fakePath;

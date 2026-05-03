@@ -3,7 +3,7 @@
 #include "config/config.h"
 
 bool DiagnosticsOptions::HasAnyOutput() const {
-    return trace || dump || screenshot || layoutGuideSheet || saveConfig || saveFullConfig;
+    return trace || dump || screenshot || layoutGuideSheet || appIcon || saveConfig || saveFullConfig;
 }
 
 void ApplyDiagnosticsScaleOverride(AppConfig& config, const DiagnosticsOptions& options) {

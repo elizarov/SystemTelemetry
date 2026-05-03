@@ -40,6 +40,8 @@ public:
     UINT CurrentWindowDpi() const override;
     double CurrentRenderScale() const override;
     void ApplyConfigPlacement() override;
+    void RefreshThemedIcons() override;
+    void ApplyThemedIconsToWindow(HWND target) const;
     void InvalidateShell() override;
     void RedrawShellNow() override;
     void EnqueueTelemetryUpdate(const TelemetryUpdate& update) override;
@@ -84,6 +86,7 @@ private:
     bool CreateTrayIcon();
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);
+    void DestroyLoadedIcons(HICON largeIcon, HICON smallIcon) const;
     int WindowWidth() const;
     int WindowHeight() const;
     bool HandleRenderEnvironmentChange(const char* reason);

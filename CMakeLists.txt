@@ -77,8 +77,10 @@ add_executable(CaseDash WIN32
     src/layout_guide_sheet/layout_guide_sheet.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
     src/dashboard/autostart.cpp
+    src/diagnostics/app_icon_export.cpp
     src/dashboard/fps_service.cpp
     src/util/command_line.cpp
+    src/widget/app_icon_geometry.cpp
     src/config/config_io.cpp
     src/config/diagnostics_options.cpp
     src/display/display_config.cpp
@@ -194,7 +196,7 @@ add_executable(CaseDash WIN32
 )
 
 set_source_files_properties(resources/CaseDash.rc PROPERTIES
-    OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/config.ini;${CMAKE_SOURCE_DIR}/resources/localization.ini"
+    OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/app.ico;${CMAKE_SOURCE_DIR}/resources/config.ini;${CMAKE_SOURCE_DIR}/resources/localization.ini"
 )
 
 set_source_files_properties(${CASEDASH_VERSION_RC} ${CASEDASH_BENCHMARKS_VERSION_RC} PROPERTIES
@@ -208,6 +210,8 @@ set(casedash_release_speed_sources
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_shell_ui.cpp
+    src/diagnostics/app_icon_export.cpp
+    src/widget/app_icon_geometry.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
@@ -437,6 +441,7 @@ endif()
 find_package(GTest CONFIG REQUIRED)
 
 add_executable(CaseDashTests
+    tests/app_icon_renderer_tests.cpp
     tests/enum_string_tests.cpp
     tests/metrics_tests.cpp
     tests/snapshot_dump_tests.cpp
@@ -470,6 +475,7 @@ add_executable(CaseDashTests
     src/config/config_runtime_fields.cpp
     src/config/config_writer.cpp
     src/config/config_resolution.cpp
+    src/widget/app_icon_geometry.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp

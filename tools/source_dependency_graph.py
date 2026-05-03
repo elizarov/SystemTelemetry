@@ -30,7 +30,7 @@ PACKAGE_DEPENDENCY_LIMITS = {
     "main": {"dashboard", "diagnostics", "display", "util"},
     "dashboard": {"config", "diagnostics", "display", "layout_edit", "layout_edit_dialog", "layout_model", "telemetry", "util", "widget"},
     "display": {"config", "diagnostics", "telemetry", "util"},
-    "diagnostics": {"config", "dashboard_renderer", "layout_edit", "layout_guide_sheet", "telemetry", "util"},
+    "diagnostics": {"config", "dashboard_renderer", "layout_edit", "layout_guide_sheet", "telemetry", "util", "widget"},
     "layout_edit_dialog": {"config", "layout_edit", "layout_model", "telemetry", "util", "widget"},
     "layout_guide_sheet": {"config", "dashboard_renderer", "layout_edit", "layout_model", "renderer", "util", "widget"},
     "dashboard_renderer": {"config", "layout_model", "renderer", "telemetry", "util", "widget"},

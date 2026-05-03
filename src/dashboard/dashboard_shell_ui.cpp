@@ -79,6 +79,7 @@ struct BoardMetricBindingTarget {
 };
 
 struct UnsavedLayoutEditDialogState {
+    const DashboardApp* app = nullptr;
     const wchar_t* mainInstruction = L"";
     const wchar_t* content = L"";
     int selectedButton = IDCANCEL;
@@ -118,6 +119,9 @@ INT_PTR CALLBACK UnsavedLayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wPa
         case WM_INITDIALOG:
             state = reinterpret_cast<UnsavedLayoutEditDialogState*>(lParam);
             SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+            if (state->app != nullptr) {
+                state->app->ApplyThemedIconsToWindow(hwnd);
+            }
             SetDlgItemTextW(hwnd, IDC_UNSAVED_LAYOUT_EDIT_MAIN, state->mainInstruction);
             SetDlgItemTextW(hwnd, IDC_UNSAVED_LAYOUT_EDIT_CONTENT, state->content);
             return TRUE;
@@ -260,6 +264,7 @@ std::string QuoteTraceText(std::string_view text) {
 }
 
 struct CustomScaleDialogState {
+    const DashboardApp* app = nullptr;
     double initialScale = 1.0;
     std::optional<double> result;
 };
@@ -275,6 +280,9 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
         case WM_INITDIALOG: {
             state = reinterpret_cast<CustomScaleDialogState*>(lParam);
             SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+            if (state->app != nullptr) {
+                state->app->ApplyThemedIconsToWindow(hwnd);
+            }
             const std::wstring initialText = FormatScalePercentageValue(state->initialScale);
             SetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, initialText.c_str());
             SendDlgItemMessageW(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
@@ -395,6 +403,10 @@ public:
         shellUi_.UpdateLayoutEditSelectionHighlight(highlight);
     }
 
+    void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const override {
+        shellUi_.app_.ApplyThemedIconsToWindow(dialogHwnd);
+    }
+
     void RestackLayoutEditDialogAnchor(HWND dialogHwnd) override {
         const HWND anchorHwnd = shellUi_.app_.WindowHandle();
         if (dialogHwnd == nullptr || anchorHwnd == nullptr || !IsWindow(dialogHwnd) || !IsWindow(anchorHwnd) ||
@@ -440,6 +452,12 @@ void DashboardShellUi::SetLayoutEditTreeSelectionHighlightVisible(bool visible) 
     }
 }
 
+void DashboardShellUi::RefreshDialogIcons() {
+    if (layoutEditDialog_ != nullptr) {
+        layoutEditDialog_->RefreshIcons();
+    }
+}
+
 void DashboardShellUi::DestroyLayoutEditDialogWindow() {
     if (layoutEditDialog_ != nullptr) {
         layoutEditDialog_->Close();
@@ -478,6 +496,7 @@ std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::Promp
     UnsavedLayoutEditPrompt prompt) const {
     DashboardShellUiModalScope scopedModalUi(const_cast<DashboardShellUi&>(*this));
     UnsavedLayoutEditDialogState state;
+    state.app = &app_;
     switch (prompt) {
         case UnsavedLayoutEditPrompt::StopEditing:
             state.mainInstruction = L"Save modified changes before turning off layout edit mode?";
@@ -964,6 +983,7 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
 
 std::optional<double> DashboardShellUi::PromptCustomScale() {
     CustomScaleDialogState state;
+    state.app = &app_;
     state.initialScale = HasExplicitDisplayScale(app_.controller_.State().config.display.scale)
                              ? app_.controller_.State().config.display.scale
                              : app_.ResolveCurrentDisplayScale(app_.CurrentWindowDpi());

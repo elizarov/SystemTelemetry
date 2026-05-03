@@ -44,6 +44,7 @@ public:
 
     virtual std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const = 0;
     virtual void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) = 0;
+    virtual void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const = 0;
     virtual void RestackLayoutEditDialogAnchor(HWND dialogHwnd) = 0;
     virtual void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const = 0;
     virtual void OnLayoutEditDialogCloseRequested() = 0;
@@ -62,6 +63,7 @@ public:
     void Refresh(const std::optional<LayoutEditFocusKey>& preferredFocus = std::nullopt);
     void RefreshSelection();
     void RestackAnchor();
+    void RefreshIcons();
     bool SyncSelection(const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
     bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
     void SetSelectionHighlightVisible(bool visible);

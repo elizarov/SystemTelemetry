@@ -47,6 +47,7 @@ public:
     virtual bool InitializeFonts() = 0;
     virtual void ReleaseFonts() = 0;
     virtual void ApplyConfigPlacement() = 0;
+    virtual void RefreshThemedIcons() = 0;
     virtual void InvalidateShell() = 0;
     virtual void RedrawShellNow() = 0;
     // May be called from the telemetry worker thread. Implementations must only copy the update into a thread-safe

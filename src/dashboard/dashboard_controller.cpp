@@ -180,6 +180,7 @@ void DashboardController::MarkLayoutEditSessionSaved() {
 void DashboardController::SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides) {
     shell.Renderer().SetConfig(state_.config);
     shell.RendererDashboardOverlayState().showLayoutEditGuides = showLayoutEditGuides;
+    shell.RefreshThemedIcons();
 }
 
 void DashboardController::SyncRuntimeAndRenderer(DashboardShellHost& shell, bool showLayoutEditGuides) {

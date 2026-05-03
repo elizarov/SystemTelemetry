@@ -33,6 +33,8 @@ bool SaveLayoutGuideSheet(const FilePath& imagePath,
     double scale,
     Trace& trace,
     std::string* errorText = nullptr);
+bool SaveRenderedAppIcon(
+    const FilePath& imagePath, const AppConfig& config, int size, std::string* errorText = nullptr);
 
 DiagnosticsOptions GetDiagnosticsOptions();
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
@@ -60,12 +62,14 @@ private:
     FilePath dumpPath_;
     FilePath screenshotPath_;
     FilePath layoutGuideSheetPath_;
+    FilePath appIconPath_;
     FilePath saveConfigPath_;
     FilePath saveFullConfigPath_;
     std::FILE* traceFile_ = nullptr;
 };
 
 std::optional<double> TryParseScaleValue(const std::wstring& text);
+std::optional<int> TryParseAppIconSizeValue(const std::wstring& text);
 std::optional<double> GetScaleSwitchValue();
 std::optional<std::string> GetLayoutSwitchValue();
 std::optional<std::string> GetThemeSwitchValue();
