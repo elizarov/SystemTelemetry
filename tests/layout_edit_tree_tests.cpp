@@ -125,6 +125,8 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
 
     EXPECT_EQ(RootLabels(model),
         (std::vector<std::string>{"metrics",
+            "colors",
+            "fonts",
             "metric_list",
             "drive_usage_list",
             "throughput",
@@ -133,8 +135,6 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
             "network_footer",
             "dashboard",
             "card_style",
-            "colors",
-            "fonts",
             "layout.primary",
             "card.alpha",
             "card.beta"}));
