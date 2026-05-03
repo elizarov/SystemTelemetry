@@ -23,6 +23,8 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/dashboard/dashboard_shell_ui.h|windows.h',
     'src/dashboard_renderer/dashboard_renderer.h|windows.h',
     'src/diagnostics/app_icon_export.cpp|windows.h',
+    'src/diagnostics/crash_report.cpp|windows.h',
+    'src/diagnostics/crash_report.cpp|dbghelp.h',
     'src/diagnostics/diagnostics.h|windows.h',
     'src/display/constants.h|windows.h',
     'src/display/display_config.h|windows.h',

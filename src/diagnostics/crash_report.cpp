@@ -1,10 +1,10 @@
 #include "diagnostics/crash_report.h"
 
-#include <windows.h>  // NOLINT(misc-include-cleaner): Win32 crash handlers use declarations from leaf headers.
+#include <windows.h>
 
 #include <cstdint>
 #include <cstdio>
-#include <dbghelp.h>  // NOLINT(misc-include-cleaner): MiniDumpWriteDump declarations are reported through Win32 macros.
+#include <dbghelp.h>
 #include <string>
 
 #include "build_version.h"
