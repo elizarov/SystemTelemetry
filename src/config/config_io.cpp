@@ -1,7 +1,6 @@
 #include "config/config_io.h"
 
 #include "config/config_parser.h"
-#include "config/config_writer.h"
 #include "util/paths.h"
 
 FilePath GetRuntimeConfigPath() {
