@@ -499,14 +499,28 @@ bool D2DRenderer::SaveWicBitmapPng(IWICBitmap* bitmap, const FilePath& imagePath
         return false;
     }
 
-    WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat32bppPBGRA;
+    Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+    hr = wicFactory_->CreateFormatConverter(converter.GetAddressOf());
+    if (FAILED(hr) || converter == nullptr) {
+        lastError_ = "renderer:screenshot_converter_failed hr=" + FormatHresult(hr);
+        return false;
+    }
+
+    hr = converter->Initialize(
+        bitmap, GUID_WICPixelFormat24bppBGR, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
+    if (FAILED(hr)) {
+        lastError_ = "renderer:screenshot_converter_init_failed hr=" + FormatHresult(hr);
+        return false;
+    }
+
+    WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat24bppBGR;
     hr = frame->SetPixelFormat(&pixelFormat);
     if (FAILED(hr)) {
         lastError_ = "renderer:screenshot_frame_format_failed hr=" + FormatHresult(hr);
         return false;
     }
 
-    hr = frame->WriteSource(bitmap, nullptr);
+    hr = frame->WriteSource(converter.Get(), nullptr);
     if (FAILED(hr)) {
         lastError_ = "renderer:screenshot_frame_write_failed hr=" + FormatHresult(hr);
         return false;

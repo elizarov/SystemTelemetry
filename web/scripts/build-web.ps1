@@ -138,7 +138,9 @@ function Invoke-CaseDashThemeAssetExport {
         [string]$Theme,
         [string]$DashboardPath,
         [string]$GuidePath,
-        [string]$IconPath
+        [string]$IconPath,
+        [int]$ThemeIndex,
+        [int]$ThemeCount
     )
 
     $outputPaths = @($DashboardPath, $GuidePath, $IconPath)
@@ -150,11 +152,13 @@ function Invoke-CaseDashThemeAssetExport {
         }
     }
 
+    $progressLabel = "[$ThemeIndex/$ThemeCount] $Theme"
     if (-not $Clean -and $hasAllOutputs) {
-        Write-Host "Reusing generated assets for $Theme"
+        Write-Host "Reusing generated assets for $progressLabel"
         return
     }
 
+    Write-Host "Generating theme assets for $progressLabel"
     $arguments = @('/fake',
         '/default-config',
         "/theme:$Theme",
@@ -171,6 +175,7 @@ function Invoke-CaseDashThemeAssetExport {
     foreach ($path in $outputPaths) {
         Wait-GeneratedFile $path
     }
+    Write-Host "Generated theme assets for $progressLabel"
 }
 
 & (Join-Path $repoRoot 'build.cmd')
@@ -199,7 +204,10 @@ Remove-DirectoryIfPresent (Join-Path $distDir 'src')
 Copy-Directory -Source (Join-Path $webDir 'src') -Destination (Join-Path $distDir 'src')
 
 $siteThemes = @()
+$themeIndex = 0
+$themeCount = $themeConfig.themes.Count
 foreach ($theme in $themeConfig.themes) {
+    $themeIndex += 1
     $themeId = $theme['id']
     $dashboardName = "$themeId-dashboard.png"
     $guideName = "$themeId-guide.png"
@@ -212,7 +220,9 @@ foreach ($theme in $themeConfig.themes) {
         -Theme $themeId `
         -DashboardPath $dashboardPath `
         -GuidePath $guidePath `
-        -IconPath $iconPath
+        -IconPath $iconPath `
+        -ThemeIndex $themeIndex `
+        -ThemeCount $themeCount
 
     $siteThemes += [ordered]@{
         id = $themeId

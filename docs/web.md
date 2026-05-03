@@ -148,7 +148,7 @@ Generated dashboard screenshots use:
 
 Generated layout guide sheets use the same config, fake/default data, scale, and selected theme. The guide sheet generation uses the diagnostics layout-guide-sheet output instead of a separate web-only renderer.
 
-Generated screenshots and guide sheets are not committed. Generated files are written under the web build output so repository roots and documentation image folders stay clean.
+Generated screenshots and guide sheets are not committed. Generated files are written under the web build output so repository roots and documentation image folders stay clean. Generated dashboard screenshots and layout guide sheets are encoded as opaque 24-bit PNGs; generated app icons retain alpha.
 
 ## Source Layout
 
@@ -189,6 +189,8 @@ The website build:
 
 `web-build.cmd clean` removes `web/dist/` before the build and forces every generated screenshot, guide sheet, and app icon to be rebuilt.
 
+The build prints one progress line per theme while generating or reusing that theme's dashboard screenshot, layout guide sheet, and app icon.
+
 When the build needs generated app assets, diagnostics output paths point under `build\` or `web\dist\` so generated diagnostics files do not pollute the repository root.
 
 The generated site is directly openable from `web/dist/index.html` in a local browser. No preview server is required.
@@ -220,6 +222,6 @@ The page is usable without JavaScript except for theme switching and theme-speci
 
 The page respects reduced-motion preferences. Smooth scrolling and theme transitions are disabled or shortened when the visitor prefers reduced motion.
 
-Generated images are optimized for web delivery and include width and height metadata. The active theme's screenshot is loaded eagerly in the intro section; non-active theme images may load lazily.
+Generated images are optimized for web delivery, avoid alpha channels for opaque dashboard and guide-sheet assets, and include width and height metadata. The active theme's screenshot is loaded eagerly in the intro section; non-active theme images may load lazily.
 
 The color derivation used by the website maintains readable contrast for body text, navigation text, buttons, and links for every generated app theme. If a theme cannot satisfy minimum contrast through derived colors, the build reports the theme and role that failed.
