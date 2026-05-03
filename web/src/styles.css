@@ -351,10 +351,11 @@ p {
   color: var(--foreground);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 700px) {
   .nav {
     grid-template-columns: auto minmax(0, 1fr) auto;
     min-height: 56px;
+    gap: 0.5rem;
   }
 
   .nav-links {
@@ -364,6 +365,11 @@ p {
   .section-picker {
     display: flex;
     justify-content: end;
+  }
+
+  .section-picker select,
+  .theme-picker select {
+    max-width: 7.7rem;
   }
 
   .hero,
@@ -396,7 +402,7 @@ p {
   }
 
   select {
-    max-width: 8.5rem;
+    max-width: 7rem;
   }
 
   .feature-grid,
