@@ -111,6 +111,7 @@ The website uses a minimal visual style that echoes CaseDash itself and stays co
 - High-contrast dashboard-like surfaces.
 - Compact typography.
 - Restrained separators and rounded card chrome.
+- Minimal feature cards use plain panel surfaces and separators instead of decorative gradients.
 - Glanceable metric-style blocks where useful.
 - Copy and spacing inspired by the README's directness.
 - No large marketing-card composition that competes with the product screenshot.

@@ -297,9 +297,12 @@ p {
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, var(--accent-soft), transparent 44%),
-    var(--panel);
+  background: var(--panel);
+}
+
+.feature-grid h3 {
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .feature-grid p {
