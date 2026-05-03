@@ -1,5 +1,6 @@
 #include "dashboard/dashboard_app.h"
 
+#include <algorithm>
 #include <cmath>
 #include <commctrl.h>
 #include <cstring>
@@ -70,6 +71,14 @@ std::string FormatTracePoint(POINT point) {
 
 std::string FormatTracePoint(RenderPoint point) {
     return std::to_string(point.x) + "," + std::to_string(point.y);
+}
+
+POINT ClampPointToWindowBounds(POINT point, int width, int height) {
+    const int maxX = std::max(0, width - 1);
+    const int maxY = std::max(0, height - 1);
+    point.x = std::clamp(point.x, 0L, static_cast<LONG>(maxX));
+    point.y = std::clamp(point.y, 0L, static_cast<LONG>(maxY));
+    return point;
 }
 
 HICON CreateThemedAppIcon(const AppConfig& config, int size) {
@@ -569,19 +578,21 @@ void DashboardApp::UpdateMoveTracking() {
         return;
     }
 
-    int x = 0;
-    int y = 0;
+    POINT cursorClientOffset{};
     if (moveCursorAnchorClientPoint_.has_value()) {
-        x = cursor.x - moveCursorAnchorClientPoint_->x;
-        y = cursor.y - moveCursorAnchorClientPoint_->y;
+        cursorClientOffset = ClampPointToWindowBounds(*moveCursorAnchorClientPoint_, WindowWidth(), WindowHeight());
+        moveCursorAnchorClientPoint_ = cursorClientOffset;
     } else {
         int cursorOffset = ScaleLogicalToPhysical(24, CurrentWindowDpi());
         cursorOffset = std::max(
             cursorOffset, renderer_.Renderer().TextMetrics().smallText + ScaleLogicalToPhysical(8, CurrentWindowDpi()));
 
-        x = cursor.x - (WindowWidth() / 2);
-        y = cursor.y - cursorOffset;
+        cursorClientOffset.x = WindowWidth() / 2;
+        cursorClientOffset.y = cursorOffset;
+        cursorClientOffset = ClampPointToWindowBounds(cursorClientOffset, WindowWidth(), WindowHeight());
     }
+    const int x = cursor.x - cursorClientOffset.x;
+    const int y = cursor.y - cursorClientOffset.y;
     SetWindowPos(hwnd_, HWND_TOP, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE);
     movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
     SyncDashboardMoveOverlayState();
@@ -1296,7 +1307,11 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                     layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
             }
             UpdateLayoutEditTooltip();
-            movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
+            if (state.isMoving) {
+                UpdateMoveTracking();
+            } else {
+                movePlacementInfo_ = GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale);
+            }
             InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
         case WM_DISPLAYCHANGE:
