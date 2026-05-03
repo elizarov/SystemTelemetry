@@ -178,7 +178,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
     ShutdownPreviousInstance();
 
-    DashboardApp app(diagnosticsOptions);
+    DashboardApp app(diagnosticsOptions, HasSwitch("/bring-to-front"));
     if (!app.Initialize(instance)) {
         const std::wstring& message = app.LastError();
         MessageBoxW(nullptr,

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Set-Location D:\\\\Projects\\\\CaseDash-claude; & cmd.exe /c \"D:\\\\Projects\\\\CaseDash-claude\\\\build.cmd Release 2>&1\" | Select-Object -Last 30; Write-Output \"Exit: $LASTEXITCODE\")",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "PowerShell(Set-Location D:\\\\Projects\\\\CaseDash-claude; & cmd.exe /c \"D:\\\\Projects\\\\CaseDash-claude\\\\build.cmd Release 2>&1\" | Select-Object -Last 20; Write-Output \"Exit: $LASTEXITCODE\")"
+    ]
+  }
+}

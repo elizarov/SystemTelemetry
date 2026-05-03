@@ -4,15 +4,17 @@
 #include <shellapi.h>
 #include <shobjidl.h>
 
+#include "config/config_io.h"
 #include "config/config_parser.h"
 #include "config/config_writer.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
 #include "display/monitor.h"
-#include "main/config_io.h"
+#include "telemetry/metrics.h"
 #include "util/command_line.h"
 #include "util/paths.h"
 #include "util/strings.h"
+#include "util/temp_file.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -138,7 +140,7 @@ bool ConfigureDisplay(
             trace,
             std::nullopt,
             &screenshotError);
-        return imageSaved && SaveConfig(configPath, config, RuntimeConfigParseContext()) &&
+        return imageSaved && SaveConfig(configPath, config, ConfigParseContext{TelemetryMetricCatalog()}) &&
                ApplyConfiguredWallpaper(config, trace);
     }
 
@@ -148,7 +150,7 @@ bool ConfigureDisplay(
         return false;
     }
 
-    bool prepared = SaveConfig(tempConfigPath, config, RuntimeConfigParseContext());
+    bool prepared = SaveConfig(tempConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});
     if (prepared) {
         std::FILE* output = nullptr;
         prepared = _wfopen_s(&output, tempDumpPath.c_str(), L"wb") == 0 && output != nullptr;
@@ -210,7 +212,7 @@ int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
         return 2;
     }
 
-    const AppConfig config = LoadConfig(sourceConfigPath, true, RuntimeConfigParseContext());
+    const AppConfig config = LoadConfig(sourceConfigPath, true, ConfigParseContext{TelemetryMetricCatalog()});
     TelemetryDump dump;
     {
         const std::string input = ReadBinaryFile(sourceDumpPath);
@@ -247,7 +249,8 @@ int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
         trace,
         std::nullopt,
         &screenshotError);
-    const bool configSaved = imageSaved && SaveConfig(targetConfigPath, config, RuntimeConfigParseContext());
+    const bool configSaved =
+        imageSaved && SaveConfig(targetConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});
     const bool wallpaperApplied = configSaved && ApplyConfiguredWallpaper(config, trace);
     RemoveFileIfExists(sourceConfigPath);
     RemoveFileIfExists(sourceDumpPath);

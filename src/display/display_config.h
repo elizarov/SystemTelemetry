@@ -3,7 +3,7 @@
 #include <windows.h>
 
 #include "config/config.h"
-#include "diagnostics/snapshot_dump.h"
+#include "telemetry/telemetry.h"
 #include "util/file_path.h"
 #include "util/trace.h"
 

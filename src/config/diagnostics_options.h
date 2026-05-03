@@ -5,6 +5,8 @@
 
 #include "util/file_path.h"
 
+struct AppConfig;
+
 enum class DiagnosticsLayoutSimilarityMode {
     None,
     HorizontalSizes,
@@ -46,3 +48,5 @@ struct DiagnosticsOptions {
 
     bool HasAnyOutput() const;
 };
+
+void ApplyDiagnosticsScaleOverride(AppConfig& config, const DiagnosticsOptions& options);

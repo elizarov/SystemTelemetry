@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "config/config.h"
+#include "config/diagnostics_options.h"
 #include "dashboard_renderer/dashboard_renderer.h"
-#include "diagnostics/diagnostics_options.h"
 #include "diagnostics/snapshot_dump.h"
 #include "util/file_path.h"
 #include "util/trace.h"
@@ -78,7 +78,6 @@ bool ApplyDiagnosticsLayoutOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
 bool ApplyDiagnosticsThemeOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
-void ApplyDiagnosticsScaleOverride(AppConfig& config, const DiagnosticsOptions& options);
 FilePath ResolveDiagnosticsOutputPath(
     const FilePath& workingDirectory, const FilePath& configuredPath, const wchar_t* defaultFileName);
 std::optional<FilePath> PromptSavePath(HWND owner,
@@ -87,8 +86,6 @@ std::optional<FilePath> PromptSavePath(HWND owner,
     const wchar_t* filter,
     const wchar_t* defaultExtension);
 bool CanWriteRuntimeConfig(const FilePath& path);
-FilePath CreateTempFilePath(const wchar_t* prefix);
-FilePath CreateElevatedSaveConfigTempPath();
 int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& targetPath);
 std::wstring FormatTelemetryInitializeError(std::string_view errorText);
 

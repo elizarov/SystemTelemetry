@@ -10,6 +10,7 @@
 #include <string_view>
 
 #include "config/color_resolver.h"
+#include "config/config_io.h"
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "config/config_writer.h"
@@ -18,7 +19,7 @@
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "layout_guide_sheet/layout_guide_sheet.h"
-#include "main/config_io.h"
+#include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
 #include "util/paths.h"
 #include "util/scale.h"
@@ -474,12 +475,6 @@ bool ApplyDiagnosticsThemeOverride(
     return false;
 }
 
-void ApplyDiagnosticsScaleOverride(AppConfig& config, const DiagnosticsOptions& options) {
-    if (options.hasScaleOverride) {
-        config.display.scale = options.scale;
-    }
-}
-
 double ResolveSavedScreenshotScale(const AppConfig& config) {
     return HasExplicitDisplayScale(config.display.scale) ? config.display.scale : 1.0;
 }
@@ -602,7 +597,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
         return false;
     }
 
-    if (options_.saveConfig && !SaveConfig(saveConfigPath_, config, RuntimeConfigParseContext())) {
+    if (options_.saveConfig && !SaveConfig(saveConfigPath_, config, ConfigParseContext{TelemetryMetricCatalog()})) {
         const std::wstring message =
             WideFromUtf8("Failed to save config file:\n" + Utf8FromWide(saveConfigPath_.wstring()));
         ReportError("diagnostics:config_save_failed path=\"" + Utf8FromWide(saveConfigPath_.wstring()) + "\"", message);
@@ -699,24 +694,6 @@ bool CanWriteRuntimeConfig(const FilePath& path) {
     return true;
 }
 
-FilePath CreateTempFilePath(const wchar_t* prefix) {
-    wchar_t tempPathBuffer[MAX_PATH];
-    const DWORD length = GetTempPathW(ARRAYSIZE(tempPathBuffer), tempPathBuffer);
-    if (length == 0 || length >= ARRAYSIZE(tempPathBuffer)) {
-        return {};
-    }
-
-    wchar_t tempFileBuffer[MAX_PATH];
-    if (GetTempFileNameW(tempPathBuffer, prefix, 0, tempFileBuffer) == 0) {
-        return {};
-    }
-    return FilePath(tempFileBuffer);
-}
-
-FilePath CreateElevatedSaveConfigTempPath() {
-    return CreateTempFilePath(L"stc");
-}
-
 TelemetryCollectorOptions BuildTelemetryCollectorOptions(const DiagnosticsOptions& diagnosticsOptions) {
     TelemetryCollectorOptions options;
     options.fake = diagnosticsOptions.fake;
@@ -730,8 +707,8 @@ int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& target
         return 2;
     }
 
-    const AppConfig config = LoadConfig(sourcePath, true, RuntimeConfigParseContext());
-    if (!SaveConfig(targetPath, config, RuntimeConfigParseContext())) {
+    const AppConfig config = LoadConfig(sourcePath, true, ConfigParseContext{TelemetryMetricCatalog()});
+    if (!SaveConfig(targetPath, config, ConfigParseContext{TelemetryMetricCatalog()})) {
         return 1;
     }
     RemoveFileIfExists(sourcePath);
@@ -776,7 +753,7 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
         errorText->clear();
     }
     const AppConfig reloadedConfig =
-        LoadConfig(configPath, !diagnosticsOptions.defaultConfig, RuntimeConfigParseContext());
+        LoadConfig(configPath, !diagnosticsOptions.defaultConfig, ConfigParseContext{TelemetryMetricCatalog()});
     AppConfig effectiveReloadedConfig = reloadedConfig;
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarker("diagnostics:reload_config_begin");
@@ -909,7 +886,7 @@ bool SaveLayoutGuideSheet(const FilePath& imagePath,
 }
 
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
-    AppConfig config = LoadRuntimeConfig(diagnosticsOptions);
+    AppConfig config = LoadRuntimeConfig(diagnosticsOptions, ConfigParseContext{TelemetryMetricCatalog()});
     Trace trace;
     DiagnosticsSession diagnostics(diagnosticsOptions, trace);
     if (!diagnostics.Initialize()) {

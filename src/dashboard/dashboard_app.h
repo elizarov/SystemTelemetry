@@ -8,8 +8,8 @@
 #include <shellapi.h>
 #include <string>
 
+#include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
-#include "diagnostics/diagnostics_options.h"
 #include "display/constants.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
@@ -20,7 +20,7 @@ class DashboardShellUi;
 
 class DashboardApp : private LayoutEditHost, public DashboardShellHost {
 public:
-    explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {});
+    explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {}, bool bringToFrontOnRun = false);
     ~DashboardApp();
     bool Initialize(HINSTANCE instance);
     const std::wstring& LastError() const;
@@ -122,6 +122,7 @@ private:
     HICON appIconLarge_ = nullptr;
     HICON appIconSmall_ = nullptr;
     DiagnosticsOptions diagnosticsOptions_;
+    bool bringToFrontOnRun_ = false;
     UINT currentDpi_ = kDefaultDpi;
     LayoutEditController layoutEditController_;
     std::unique_ptr<DashboardShellUi> shellUi_;

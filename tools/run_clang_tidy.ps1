@@ -34,8 +34,8 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/layout_edit_dialog/impl/util.h|windows.h',
     'src/layout_edit_dialog/layout_edit_dialog.h|windows.h',
     'src/layout_edit_dialog/theme_preview.h|windows.h',
+    'src/config/config_io.h|windows.h',
     'src/main/autostart.h|windows.h',
-    'src/main/config_io.h|windows.h',
     'src/main/fps_service.h|windows.h',
     'src/main/main.cpp|windows.h',
     'src/renderer/impl/d2d_renderer.h|windows.h',
@@ -56,6 +56,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/util/file_path.cpp|windows.h',
     'src/util/scale.h|windows.h',
     'src/util/strings.h|windows.h',
+    'src/util/temp_file.cpp|windows.h',
     # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
     'src/dashboard/dashboard_app.h|constants.h',
     'src/dashboard/dashboard_shell_ui.h|dashboard_menu_types.h',

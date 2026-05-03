@@ -1,21 +1,42 @@
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="CaseDash"
     Manufacturer="Roman Elizarov"
     Version="$(var.ProductVersion)"
     UpgradeCode="4E1B19A7-7B3F-4E1F-8B2E-7E6B3B0E57A5"
     Scope="perMachine">
-    <MajorUpgrade DowngradeErrorMessage="A newer version of CaseDash is already installed." />
+    <MajorUpgrade AllowDowngrades="yes" />
     <MediaTemplate EmbedCab="yes" />
+    <WixVariable Id="WixUIDialogBmp" Value="CaseDash_WixUIDialogBmp.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="CaseDash_WixUIBannerBmp.bmp" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run CaseDash now" />
-    <Property Id="WixShellExecTarget" Value="[#CaseDashExeFile]" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="CASEDASH_INSTALLFOLDER">
+      <RegistrySearch
+        Id="FindRememberedInstallFolder"
+        Root="HKLM"
+        Key="SOFTWARE\Roman Elizarov\CaseDash"
+        Name="InstallFolder"
+        Type="raw" />
+    </Property>
     <CustomAction
       Id="LaunchCaseDash"
-      BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
-      DllEntry="WixShellExec"
-      Impersonate="yes" />
+      FileRef="CaseDashExeFile"
+      ExeCommand="/bring-to-front"
+      Execute="immediate"
+      Impersonate="yes"
+      Return="asyncNoWait" />
+    <util:CloseApplication
+      Id="CloseCaseDashOnUninstall"
+      Target="CaseDash.exe"
+      Description="CaseDash is running and must close before uninstall can finish."
+      Condition="REMOVE=&quot;ALL&quot;"
+      CloseMessage="yes"
+      ElevatedCloseMessage="yes"
+      Timeout="10"
+      TerminateProcess="1"
+      RebootPrompt="no" />
     <SetProperty
       Id="RemoveCaseDashRunValue"
       Value="&quot;[SystemFolder]reg.exe&quot; delete &quot;HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run&quot; /v CaseDash /f"
@@ -41,6 +62,10 @@
     </UI>
 
     <InstallExecuteSequence>
+      <Custom
+        Action="override Wix4CloseApplications_$(sys.BUILDARCHSHORT)"
+        Before="RemoveFiles"
+        Condition="REMOVE=&quot;ALL&quot; AND VersionNT &gt; 400" />
       <Custom Action="RemoveCaseDashRunValue" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
     </InstallExecuteSequence>
 
@@ -57,6 +82,13 @@
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="CaseDashExeComponent" Guid="71D937AF-A37F-43E9-BE22-20C6E4C6554B" Bitness="always64">
         <File Id="CaseDashExeFile" Source="$(var.CaseDashExePath)" KeyPath="yes" />
+        <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Roman Elizarov\CaseDash"
+          Name="InstallFolder"
+          Type="string"
+          Value="[INSTALLFOLDER]" />
+        <util:RemoveFolderEx Id="RemoveInstallFolderTree" Property="CASEDASH_INSTALLFOLDER" On="uninstall" />
         <RemoveFile Id="RemoveExecutableConfig" Name="config.ini" On="uninstall" />
         <RemoveFile Id="RemoveBlankWallpaper" Name="casedash_blank.png" On="uninstall" />
         <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />

@@ -11,6 +11,7 @@
     <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer\obj\</BaseIntermediateOutputPath>
     <IntermediateOutputPath Condition="'$(IntermediateOutputPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer\</IntermediateOutputPath>
     <DefineConstants>ProductVersion=$(ProductVersion);CaseDashExePath=$(CaseDashExePath)</DefineConstants>
+    <SuppressIces>ICE61</SuppressIces>
   </PropertyGroup>
 
   <ItemGroup>

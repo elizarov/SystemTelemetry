@@ -79,14 +79,15 @@ add_executable(CaseDash WIN32
     src/main/autostart.cpp
     src/main/fps_service.cpp
     src/util/command_line.cpp
-    src/main/config_io.cpp
+    src/config/config_io.cpp
+    src/config/diagnostics_options.cpp
     src/display/display_config.cpp
-    src/diagnostics/diagnostics_options.cpp
     src/display/monitor.cpp
     src/util/file_path.cpp
     src/util/paths.cpp
     src/util/scale.cpp
     src/util/strings.cpp
+    src/util/temp_file.cpp
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_shell_ui.cpp
