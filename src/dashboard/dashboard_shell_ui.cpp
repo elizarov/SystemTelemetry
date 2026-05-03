@@ -85,6 +85,12 @@ struct UnsavedLayoutEditDialogState {
     int selectedButton = IDCANCEL;
 };
 
+struct AboutDialogState {
+    const DashboardApp* app = nullptr;
+    std::wstring text;
+    HICON icon = nullptr;
+};
+
 std::optional<BoardMetricBindingTarget> ParseBoardMetricBindingTarget(std::string_view metricId) {
     if (metricId.rfind(kBoardTemperatureMetricPrefix, 0) == 0) {
         return BoardMetricBindingTarget{
@@ -145,6 +151,34 @@ INT_PTR CALLBACK UnsavedLayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wPa
             if (state != nullptr) {
                 state->selectedButton = IDCANCEL;
             }
+            EndDialog(hwnd, IDCANCEL);
+            return TRUE;
+    }
+    return FALSE;
+}
+
+INT_PTR CALLBACK AboutDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    auto* state = reinterpret_cast<AboutDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
+    switch (message) {
+        case WM_INITDIALOG:
+            state = reinterpret_cast<AboutDialogState*>(lParam);
+            SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+            if (state != nullptr && state->app != nullptr) {
+                state->app->ApplyThemedIconsToWindow(hwnd);
+            }
+            SetDlgItemTextW(hwnd, IDC_ABOUT_TEXT, state != nullptr ? state->text.c_str() : L"");
+            if (state != nullptr && state->icon != nullptr) {
+                SendDlgItemMessageW(
+                    hwnd, IDC_ABOUT_ICON, STM_SETIMAGE, IMAGE_ICON, reinterpret_cast<LPARAM>(state->icon));
+            }
+            return TRUE;
+        case WM_COMMAND:
+            if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL) {
+                EndDialog(hwnd, LOWORD(wParam));
+                return TRUE;
+            }
+            break;
+        case WM_CLOSE:
             EndDialog(hwnd, IDCANCEL);
             return TRUE;
     }
@@ -649,8 +683,15 @@ bool DashboardShellUi::IsLayoutEditModalUiActive() const {
 }
 
 void DashboardShellUi::ShowAboutDialog() const {
-    const std::wstring text = BuildAboutText();
-    MessageBoxW(app_.hwnd_, text.c_str(), L"About CaseDash", MB_OK | MB_ICONINFORMATION);
+    AboutDialogState state;
+    state.app = &app_;
+    state.text = BuildAboutText();
+    state.icon = app_.CreateThemedAppIconForSize(64);
+    DialogBoxParamW(
+        app_.instance_, MAKEINTRESOURCEW(IDD_ABOUT), app_.hwnd_, AboutDialogProc, reinterpret_cast<LPARAM>(&state));
+    if (state.icon != nullptr) {
+        DestroyIcon(state.icon);
+    }
 }
 
 void DashboardShellUi::BeginLayoutEditModalUi() {

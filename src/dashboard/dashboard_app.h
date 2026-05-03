@@ -42,6 +42,7 @@ public:
     void ApplyConfigPlacement() override;
     void RefreshThemedIcons() override;
     void ApplyThemedIconsToWindow(HWND target) const;
+    HICON CreateThemedAppIconForSize(int size) const;
     void InvalidateShell() override;
     void RedrawShellNow() override;
     void EnqueueTelemetryUpdate(const TelemetryUpdate& update) override;

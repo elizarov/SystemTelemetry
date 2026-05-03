@@ -24,7 +24,7 @@ See also: [docs/build.md](build.md) for local build setup and [docs/project.md](
 - Windows file properties show the numeric file version plus the full CaseDash version string.
 - The application manifest uses the four-part Windows numeric version derived from `VERSION`.
 - The dashboard menu exposes `About CaseDash` immediately before `Exit`.
-- The About dialog shows the full version, release kind, and commit when available.
+- The About dialog shows the current themed app icon, full version, release kind, and commit when available.
 
 ## Official Release Steps
 

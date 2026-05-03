@@ -60,7 +60,7 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 - The `Edit Layout` submenu contains the checked `Edit Layout` mode toggle, `Layout Editor...`, and `Save Config`.
 - Holding Alt while opening the dashboard or tray popup menu adds an `Advanced` submenu with `Reload Config`, `Save Config`, `Export Full Config...`, `Export Snapshot Dump...`, `Save Screenshot...`, and `Save Layout Guide Sheet...`.
 - The tray icon exposes the same action set as the dashboard menu.
-- `About CaseDash` shows the compiled version, build kind, and commit when available.
+- `About CaseDash` shows the current themed app icon, compiled version, build kind, and commit when available.
 - The dashboard uses normal window Z-order behavior; `Bring to Front` raises it when needed.
 - The installer completion launch starts the dashboard with the same front-and-focus behavior as `Bring to Front`.
 - The MSI setup UI uses CaseDash-branded dialog and banner artwork.

@@ -408,6 +408,10 @@ void DashboardApp::ApplyThemedIconsToWindow(HWND target) const {
     }
 }
 
+HICON DashboardApp::CreateThemedAppIconForSize(int size) const {
+    return CreateThemedAppIcon(controller_.State().config, size);
+}
+
 void DashboardApp::RefreshThemedIcons() {
     const AppConfig& config = controller_.State().config;
     HICON largeIcon = CreateThemedAppIcon(config, GetSystemMetrics(SM_CXICON));
