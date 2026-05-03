@@ -8,6 +8,7 @@
 #include <evntcons.h>
 #include <evntrace.h>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -27,8 +28,10 @@ constexpr USHORT kDxgiPresentStartEventId = 0x002a;
 constexpr USHORT kDxgiPresentMultiplaneOverlayStartEventId = 0x0037;
 constexpr USHORT kD3d9PresentStartEventId = 0x0001;
 constexpr USHORT kDxgKrnlPresentInfoEventId = 0x00b8;
-constexpr double kFpsWindowSeconds = 2.0;
-constexpr size_t kMaximumEventsPerProcess = 1024;
+constexpr double kFpsWindowSeconds = 3.0;
+constexpr double kFpsSmoothingAlpha = 0.35;
+constexpr double kProcessSwitchHysteresisRatio = 1.35;
+constexpr size_t kMaximumEventsPerProcess = 4096;
 
 struct EtwSessionProperties {
     EVENT_TRACE_PROPERTIES properties{};
@@ -220,22 +223,28 @@ public:
 
         const ProcessEventSelection runtimeSelection = SelectBestProcessLocked(runtimeEventsByProcess_, minimumQpc);
         const ProcessEventSelection kernelSelection = SelectBestProcessLocked(kernelEventsByProcess_, minimumQpc);
-        const ProcessEventSelection bestSelection =
-            runtimeSelection.processId != 0 ? runtimeSelection : kernelSelection;
+        ProcessEventSelection bestSelection = runtimeSelection.processId != 0 ? runtimeSelection : kernelSelection;
+        bestSelection = ApplyProcessHysteresisLocked(bestSelection, minimumQpc);
 
         if (bestSelection.processId == 0 || bestSelection.count < 2) {
+            smoothedFps_.reset();
+            selectedProcessId_ = 0;
+            selectedSourceName_.clear();
             sample.available = false;
             sample.diagnostics = BuildDiagnosticsLocked(" No presenting application selected.");
             return sample;
         }
 
-        sample.fps = static_cast<double>(bestSelection.count) / kFpsWindowSeconds;
+        const double rawFps = static_cast<double>(bestSelection.count) / kFpsWindowSeconds;
+        const double fps = SmoothFpsLocked(rawFps, bestSelection);
         sample.processId = bestSelection.processId;
         sample.processName = Utf8FromWide(ResolveProcessNameLocked(bestSelection.processId));
         sample.available = true;
-        sample.diagnostics =
-            BuildDiagnosticsLocked(" process=" + sample.processName + " source=" + bestSelection.sourceName +
-                                   " window_count=" + std::to_string(bestSelection.count));
+        sample.fps = fps;
+        sample.diagnostics = BuildDiagnosticsLocked(
+            " process=" + sample.processName + " source=" + bestSelection.sourceName +
+            " window_count=" + std::to_string(bestSelection.count) + " " +
+            Trace::FormatValueDouble("raw_fps", rawFps, 1) + " " + Trace::FormatValueDouble("smoothed_fps", fps, 1));
         return sample;
     }
 
@@ -271,6 +280,50 @@ private:
         }
 
         return selection;
+    }
+
+    ProcessEventSelection ApplyProcessHysteresisLocked(const ProcessEventSelection& candidate, uint64_t minimumQpc) {
+        if (selectedProcessId_ == 0 || selectedSourceName_.empty() || candidate.processId == selectedProcessId_) {
+            return candidate;
+        }
+
+        auto& previousEvents = selectedSourceName_ == "runtime" ? runtimeEventsByProcess_ : kernelEventsByProcess_;
+        const auto previousIt = previousEvents.find(selectedProcessId_);
+        if (previousIt == previousEvents.end()) {
+            return candidate;
+        }
+
+        auto& events = previousIt->second;
+        while (!events.empty() && events.front() < minimumQpc) {
+            events.pop_front();
+        }
+        if (events.size() < 2) {
+            return candidate;
+        }
+
+        ProcessEventSelection previous;
+        previous.processId = selectedProcessId_;
+        previous.count = events.size();
+        previous.sourceName = selectedSourceName_;
+        // Preserve the active presenter through short ETW delivery bursts and near-ties between presenting apps.
+        if (candidate.processId == 0 || static_cast<double>(candidate.count) <
+                                            static_cast<double>(previous.count) * kProcessSwitchHysteresisRatio) {
+            return previous;
+        }
+        return candidate;
+    }
+
+    double SmoothFpsLocked(double rawFps, const ProcessEventSelection& selection) {
+        const bool sameSelection =
+            selection.processId == selectedProcessId_ && selection.sourceName == selectedSourceName_;
+        if (!sameSelection || !smoothedFps_.has_value()) {
+            smoothedFps_ = rawFps;
+        } else {
+            smoothedFps_ = (*smoothedFps_ * (1.0 - kFpsSmoothingAlpha)) + (rawFps * kFpsSmoothingAlpha);
+        }
+        selectedProcessId_ = selection.processId;
+        selectedSourceName_ = selection.sourceName;
+        return *smoothedFps_;
     }
 
     ULONG EnableProvider(const GUID& providerGuid, uint64_t anyKeyword, UCHAR level) const {
@@ -381,6 +434,9 @@ private:
     std::unordered_map<DWORD, std::deque<uint64_t>> runtimeEventsByProcess_;
     std::unordered_map<DWORD, std::deque<uint64_t>> kernelEventsByProcess_;
     std::unordered_map<DWORD, std::wstring> processNames_;
+    std::optional<double> smoothedFps_;
+    DWORD selectedProcessId_ = 0;
+    std::string selectedSourceName_;
     std::string diagnostics_ = "FPS ETW provider not initialized.";
     uint64_t runtimePresentEvents_ = 0;
     uint64_t kernelPresentEvents_ = 0;
