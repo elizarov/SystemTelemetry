@@ -24,7 +24,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
 - Keep reusable agent or automation skills in `tools\skills`.
-- Use `update_app_icon.cmd` to rebuild the app, export default-theme app-icon PNGs under `build\app_icon\`, and regenerate `resources\app.ico` from those rendered assets.
+- Use `update_app_icon.cmd` to rebuild the app, export compressed default-theme app-icon PNGs under `build\app_icon\`, and regenerate `resources\app.ico` from those rendered assets.
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the validation workflow.

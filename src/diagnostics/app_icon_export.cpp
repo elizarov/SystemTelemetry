@@ -1,104 +1,136 @@
 #include "diagnostics/app_icon_export.h"
 
-#include <algorithm>
-#include <cstdint>
-#include <fstream>
-#include <vector>
+#include <windows.h>
 
+#include <cstdint>
+#include <vector>
+#include <wincodec.h>
+#include <wrl/client.h>
+
+#include "util/strings.h"
 #include "util/utf8.h"
 #include "widget/app_icon_geometry.h"
 
 namespace {
 
-void AppendBigEndian32(std::vector<std::uint8_t>& bytes, std::uint32_t value) {
-    bytes.push_back(static_cast<std::uint8_t>((value >> 24) & 0xFFu));
-    bytes.push_back(static_cast<std::uint8_t>((value >> 16) & 0xFFu));
-    bytes.push_back(static_cast<std::uint8_t>((value >> 8) & 0xFFu));
-    bytes.push_back(static_cast<std::uint8_t>(value & 0xFFu));
-}
+class ScopedComInitialize {
+public:
+    ScopedComInitialize() : result_(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)) {}
 
-std::uint32_t Crc32(const std::uint8_t* data, size_t size) {
-    std::uint32_t crc = 0xFFFFFFFFu;
-    for (size_t index = 0; index < size; ++index) {
-        crc ^= data[index];
-        for (int bit = 0; bit < 8; ++bit) {
-            crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
-        }
-    }
-    return crc ^ 0xFFFFFFFFu;
-}
-
-std::uint32_t Adler32(const std::vector<std::uint8_t>& data) {
-    std::uint32_t a = 1;
-    std::uint32_t b = 0;
-    for (std::uint8_t byte : data) {
-        a = (a + byte) % 65521u;
-        b = (b + a) % 65521u;
-    }
-    return (b << 16) | a;
-}
-
-void AppendChunk(std::vector<std::uint8_t>& png, const char type[4], const std::vector<std::uint8_t>& data) {
-    AppendBigEndian32(png, static_cast<std::uint32_t>(data.size()));
-    const size_t chunkStart = png.size();
-    png.insert(png.end(), type, type + 4);
-    png.insert(png.end(), data.begin(), data.end());
-    AppendBigEndian32(png, Crc32(png.data() + chunkStart, png.size() - chunkStart));
-}
-
-std::vector<std::uint8_t> DeflateStored(const std::vector<std::uint8_t>& data) {
-    std::vector<std::uint8_t> output;
-    output.reserve(data.size() + (data.size() / 65535u + 1u) * 5u + 6u);
-    output.push_back(0x78);
-    output.push_back(0x01);
-    size_t offset = 0;
-    while (offset < data.size()) {
-        const size_t remaining = data.size() - offset;
-        const std::uint16_t blockSize = static_cast<std::uint16_t>(std::min<size_t>(remaining, 65535u));
-        const bool finalBlock = offset + blockSize >= data.size();
-        output.push_back(finalBlock ? 0x01 : 0x00);
-        output.push_back(static_cast<std::uint8_t>(blockSize & 0xFFu));
-        output.push_back(static_cast<std::uint8_t>((blockSize >> 8) & 0xFFu));
-        const std::uint16_t inverse = static_cast<std::uint16_t>(~blockSize);
-        output.push_back(static_cast<std::uint8_t>(inverse & 0xFFu));
-        output.push_back(static_cast<std::uint8_t>((inverse >> 8) & 0xFFu));
-        output.insert(output.end(),
-            data.begin() + static_cast<std::ptrdiff_t>(offset),
-            data.begin() + static_cast<std::ptrdiff_t>(offset + blockSize));
-        offset += blockSize;
-    }
-    AppendBigEndian32(output, Adler32(data));
-    return output;
-}
-
-std::vector<std::uint8_t> EncodePngRgba(const AppIconBitmap& bitmap) {
-    std::vector<std::uint8_t> scanlines;
-    scanlines.reserve(static_cast<size_t>(bitmap.size) * (static_cast<size_t>(bitmap.size) * 4u + 1u));
-    for (int y = 0; y < bitmap.size; ++y) {
-        scanlines.push_back(0);
-        for (int x = 0; x < bitmap.size; ++x) {
-            const size_t offset =
-                (static_cast<size_t>(y) * static_cast<size_t>(bitmap.size) + static_cast<size_t>(x)) * 4u;
-            scanlines.push_back(bitmap.bgra[offset + 2u]);
-            scanlines.push_back(bitmap.bgra[offset + 1u]);
-            scanlines.push_back(bitmap.bgra[offset + 0u]);
-            scanlines.push_back(bitmap.bgra[offset + 3u]);
+    ~ScopedComInitialize() {
+        if (result_ == S_OK || result_ == S_FALSE) {
+            CoUninitialize();
         }
     }
 
-    std::vector<std::uint8_t> png = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-    std::vector<std::uint8_t> ihdr;
-    AppendBigEndian32(ihdr, static_cast<std::uint32_t>(bitmap.size));
-    AppendBigEndian32(ihdr, static_cast<std::uint32_t>(bitmap.size));
-    ihdr.push_back(8);
-    ihdr.push_back(6);
-    ihdr.push_back(0);
-    ihdr.push_back(0);
-    ihdr.push_back(0);
-    AppendChunk(png, "IHDR", ihdr);
-    AppendChunk(png, "IDAT", DeflateStored(scanlines));
-    AppendChunk(png, "IEND", {});
-    return png;
+    bool Failed() const {
+        return FAILED(result_) && result_ != RPC_E_CHANGED_MODE;
+    }
+
+    HRESULT Result() const {
+        return result_;
+    }
+
+private:
+    HRESULT result_ = S_OK;
+};
+
+bool SetError(std::string* errorText, std::string text) {
+    if (errorText != nullptr) {
+        *errorText = std::move(text);
+    }
+    return false;
+}
+
+bool SaveBitmapAsCompressedPng(const AppIconBitmap& bitmap, const FilePath& imagePath, std::string* errorText) {
+    const ScopedComInitialize com;
+    if (com.Failed()) {
+        return SetError(errorText, "app_icon:wic_com_init_failed hr=" + FormatHresult(com.Result()));
+    }
+
+    Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+    HRESULT hr =
+        CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.GetAddressOf()));
+    if (FAILED(hr) || factory == nullptr) {
+        return SetError(errorText, "app_icon:wic_factory_failed hr=" + FormatHresult(hr));
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmap> source;
+    const UINT size = static_cast<UINT>(bitmap.size);
+    const UINT stride = size * 4u;
+    hr = factory->CreateBitmapFromMemory(size,
+        size,
+        GUID_WICPixelFormat32bppBGRA,
+        stride,
+        static_cast<UINT>(bitmap.bgra.size()),
+        const_cast<BYTE*>(reinterpret_cast<const BYTE*>(bitmap.bgra.data())),
+        source.GetAddressOf());
+    if (FAILED(hr) || source == nullptr) {
+        return SetError(errorText, "app_icon:wic_bitmap_failed hr=" + FormatHresult(hr));
+    }
+
+    Microsoft::WRL::ComPtr<IWICStream> stream;
+    hr = factory->CreateStream(stream.GetAddressOf());
+    if (FAILED(hr) || stream == nullptr) {
+        return SetError(errorText, "app_icon:wic_stream_failed hr=" + FormatHresult(hr));
+    }
+
+    hr = stream->InitializeFromFilename(imagePath.c_str(), GENERIC_WRITE);
+    if (FAILED(hr)) {
+        return SetError(errorText,
+            "app_icon:wic_stream_open_failed hr=" + FormatHresult(hr) + " path=\"" + Utf8FromWide(imagePath.wstring()) +
+                "\"");
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
+    hr = factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.GetAddressOf());
+    if (FAILED(hr) || encoder == nullptr) {
+        return SetError(errorText, "app_icon:wic_encoder_failed hr=" + FormatHresult(hr));
+    }
+
+    hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
+    if (FAILED(hr)) {
+        return SetError(errorText, "app_icon:wic_encoder_init_failed hr=" + FormatHresult(hr));
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
+    hr = encoder->CreateNewFrame(frame.GetAddressOf(), nullptr);
+    if (FAILED(hr) || frame == nullptr) {
+        return SetError(errorText, "app_icon:wic_frame_failed hr=" + FormatHresult(hr));
+    }
+
+    hr = frame->Initialize(nullptr);
+    if (FAILED(hr)) {
+        return SetError(errorText, "app_icon:wic_frame_init_failed hr=" + FormatHresult(hr));
+    }
+
+    hr = frame->SetSize(size, size);
+    if (FAILED(hr)) {
+        return SetError(errorText, "app_icon:wic_frame_size_failed hr=" + FormatHresult(hr));
+    }
+
+    WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat32bppBGRA;
+    hr = frame->SetPixelFormat(&pixelFormat);
+    if (FAILED(hr)) {
+        return SetError(errorText, "app_icon:wic_frame_format_failed hr=" + FormatHresult(hr));
+    }
+
+    hr = frame->WriteSource(source.Get(), nullptr);
+    if (FAILED(hr)) {
+        return SetError(errorText, "app_icon:wic_frame_write_failed hr=" + FormatHresult(hr));
+    }
+
+    hr = frame->Commit();
+    if (FAILED(hr)) {
+        return SetError(errorText, "app_icon:wic_frame_commit_failed hr=" + FormatHresult(hr));
+    }
+
+    hr = encoder->Commit();
+    if (FAILED(hr)) {
+        return SetError(errorText, "app_icon:wic_commit_failed hr=" + FormatHresult(hr));
+    }
+
+    return true;
 }
 
 }  // namespace
@@ -112,20 +144,5 @@ bool SaveAppIconPng(const FilePath& imagePath, const AppConfig& config, int size
     }
 
     const AppIconBitmap bitmap = RenderAppIconBitmap(config, size);
-    const std::vector<std::uint8_t> png = EncodePngRgba(bitmap);
-    std::ofstream output(imagePath.c_str(), std::ios::binary | std::ios::trunc);
-    if (!output) {
-        if (errorText != nullptr) {
-            *errorText = "app_icon:file_open_failed path=\"" + Utf8FromWide(imagePath.wstring()) + "\"";
-        }
-        return false;
-    }
-    output.write(reinterpret_cast<const char*>(png.data()), static_cast<std::streamsize>(png.size()));
-    if (!output) {
-        if (errorText != nullptr) {
-            *errorText = "app_icon:file_write_failed path=\"" + Utf8FromWide(imagePath.wstring()) + "\"";
-        }
-        return false;
-    }
-    return true;
+    return SaveBitmapAsCompressedPng(bitmap, imagePath, errorText);
 }
