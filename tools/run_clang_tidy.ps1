@@ -41,6 +41,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/dashboard/autostart.h|windows.h',
     'src/dashboard/fps_service.h|windows.h',
     'src/main/main.cpp|windows.h',
+    'src/renderer/png_export.cpp|windows.h',
     'src/renderer/impl/d2d_renderer.h|windows.h',
     'src/renderer/renderer.h|windows.h',
     'src/telemetry/board/msi/board_msi_center.cpp|windows.h',

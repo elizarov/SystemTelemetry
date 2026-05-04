@@ -1,6 +1,8 @@
+#include <cstdint>
 #include <cstdlib>
 #include <gtest/gtest.h>
 #include <optional>
+#include <string>
 
 #include "config/config.h"
 #include "diagnostics/app_icon_export.h"
@@ -77,9 +79,10 @@ TEST(AppIconRenderer, SavesCompressedPng) {
 
     const std::optional<std::string> png = ReadFileBinary(outputPath);
     ASSERT_TRUE(png.has_value());
-    ASSERT_GE(png->size(), 8u);
-    EXPECT_EQ(png->substr(0, 8), std::string("\x89PNG\r\n\x1A\n", 8u));
-    EXPECT_LT(png->size(), 20u * 1024u);
+    const std::string pngBytes = png.value_or(std::string());
+    ASSERT_GE(pngBytes.size(), 8u);
+    EXPECT_EQ(pngBytes.substr(0, 8), std::string("\x89PNG\r\n\x1A\n", 8u));
+    EXPECT_LT(pngBytes.size(), 20u * 1024u);
 
     RemoveFileIfExists(outputPath);
 }
