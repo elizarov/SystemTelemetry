@@ -1,188 +1,80 @@
 # CaseDash Architecture
 
-This document owns code structure, subsystem boundaries, major runtime flows, and build-graph shape.
-See also: [docs/specifications.md](specifications.md) for normative product behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics contracts, [docs/layout.md](layout.md) for config language, and [docs/build.md](build.md) for developer setup and commands.
+This document routes code-organization, subsystem-boundary, and build-graph notes. Source code is the implementation authority, and `lint.cmd` is the maintained architecture-check entrypoint.
+See also: [docs/specifications.md](specifications.md) for product behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics contracts, [docs/layout.md](layout.md) for config language, [docs/build.md](build.md) for developer commands, and the package notes under [docs/architecture/](architecture/).
 
-## Top-Level Map
+## Top-Level Packages
 
-- `src/` contains the runtime application, configuration, telemetry, rendering, diagnostics, and layout-edit implementation.
-- `src/config/` contains the config model, parser, writer, schema metadata, shared OKLab/OKLCH and HSV color math, color expression parser, theme color resolver, config-facing enum and DTO contracts, and injected metric-catalog view.
-- `src/display/` contains monitor enumeration, placement, configure-display, wallpaper application helpers, and display-owned constants.
-- `src/diagnostics/` contains diagnostics session and headless-run orchestration, command-line option parsing, default diagnostics output filenames, snapshot dump I/O, app-icon PNG export support, native crash report writing, and diagnostics-owned support modules.
-- `src/main/` contains the application entry point, runtime config I/O, login auto-start registry updates, service host and SCM helpers, elevation handoff, and main-process constants.
-- `src/widget/widget.*` owns the widget interface plus the enum-backed and special widget factories, `src/widget/widget_host.h` owns the widget-facing host boundary, `src/widget/card_chrome_layout.*` owns shared card-chrome layout geometry, `src/widget/app_icon_geometry.*` owns the programmatic CaseDash app-icon drawing geometry, `src/widget/layout_edit_types.h` owns widget-facing edit-artifact DTO contracts, and `src/widget/impl/` contains the concrete widget draw and layout-state modules used by the dashboard renderer.
-- `src/layout_model/` contains renderer-safe shared layout-edit model contracts and behavior, including edit-target identity, artifact matching, hit priority, read-only parameter metadata, guide-weight preview helpers, and dashboard overlay state.
-- `src/util/` contains pure shared utilities for the Win32-backed `FilePath` and filesystem helpers, command-line text, string trimming, splitting, case folding, whitespace normalization, enum string conversion, UTF-8 conversion, embedded resource loading, localization catalog access, numeric safety, DPI scale conversion, trace emission, and non-owning callback views.
-- `src/dashboard/` contains the dashboard application, controller, shell UI, dashboard command and timer constants, menu types, and shared layout-edit overlay state.
-- `src/renderer/` owns render-space contract types, the `Renderer` drawing interface, renderer style resources, render-target lifecycle, and the Direct2D/DirectWrite/WIC implementation under `src/renderer/impl/`. It does not own dashboard drawing modes, overlay policy, or trace emission.
-- `src/dashboard_renderer/dashboard_renderer.*` owns dashboard scene traversal, renderer style input selection, drawing-mode state, widget-host services, and layout-edit active-region collection. It implements `WidgetHost`, owns a `Renderer` instance, and keeps graphics-backend details encapsulated in `src/renderer/`.
-- `src/layout_edit/` contains runtime layout-edit interaction, active-region hit testing, drag flow, controller-host integration, tooltip payload interpretation and text formatting, edit-tree construction, config-field mutation helpers, guide and reorder config helpers, diagnostics active-region trace formatting, and trace-session modules; `src/layout_edit/impl/` contains package-private layout-edit implementation modules such as the snap solver.
-- `src/layout_edit_dialog/layout_edit_dialog.*` owns the modeless `Edit Configuration` window boundary, and `src/layout_edit_dialog/impl/` contains its internal dialog modules.
-- `src/telemetry/telemetry.*` owns the telemetry collector boundary, `src/telemetry/metrics.*` owns the single production metric catalog and adapts snapshots and metric definitions into widget-facing metric values, `src/telemetry/metric_types.h` owns telemetry snapshot enums, `src/telemetry/fps_provider.*` and `src/telemetry/fps_service_protocol.*` publish the FPS provider and service IPC contracts, `src/telemetry/board/` and `src/telemetry/gpu/` contain vendor-provider bridges, `src/telemetry/fps/` contains package-private Windows ETW presented-FPS and service-client provider implementations, and `src/telemetry/impl/` contains collector submodules plus system-info support for CPU, GPU, board, network, storage, and fake-runtime support.
-- `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and the fallback executable icon.
+- [config](architecture/config.md) - persisted configuration model, INI parsing and writing, schema metadata, theme and color resolution, and config-facing contracts.
+- [dashboard](architecture/dashboard.md) - shell UI, controller orchestration, tray integration, menus, auto-start, service registration, and user-facing command flow.
+- [dashboard_renderer](architecture/dashboard_renderer.md) - dashboard scene traversal, layout resolution, widget host services, drawing-mode state, and active-region collection.
+- [diagnostics](architecture/diagnostics.md) - diagnostics CLI parsing, headless runs, trace-owned exports, snapshot dumps, app-icon export, and native crash reports.
+- [display](architecture/display.md) - monitor enumeration, display targeting, placement, scale, and wallpaper/configure-display helpers.
+- [layout_edit](architecture/layout_edit.md) - live layout-edit interaction, hit testing, drag flow, config mutation helpers, tooltip text, and active-region trace output.
+- [layout_edit_dialog](architecture/layout_edit_dialog.md) - modeless configuration editor window, editor controls, preview/revert flow, and theme preview drawing.
+- [layout_guide_sheet](architecture/layout_guide_sheet.md) - diagnostics guide-sheet planning, representative-card selection, callout layout, leader routing, and sheet rendering.
+- [layout_model](architecture/layout_model.md) - renderer-safe layout-edit contracts, edit-target identity, active-region behavior, hit priority, and overlay state.
+- [main](architecture/main.md) - process entry point, command-line startup mode selection, elevation handoff, service host entry, and runtime config loading.
+- [renderer](architecture/renderer.md) - D2D-free renderer interface, render-space DTOs, style resources, Direct2D/DirectWrite/WIC backend, text measurement, and bitmap export support.
+- [telemetry](architecture/telemetry.md) - telemetry runtime, snapshot contracts, metric catalog, provider bridges, FPS service protocol, fake runtime, and retained histories.
+- [util](architecture/util.md) - domain-neutral file path, command-line, string, enum, UTF-8, resource, localization, numeric, trace, and callback helpers.
+- [vendor](architecture/vendor.md) - narrow vendored source kept outside project layering rules where package-managed dependencies are not practical.
+- [widget](architecture/widget.md) - widget contracts, widget factories, widget-local drawing/layout behavior, edit-artifact registration, and app-icon/card-chrome geometry.
+
+Other top-level areas:
+
+- `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and fallback executable icon.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, generated asset, and source dependency graph helper scripts.
 - `.agents/skills/` contains reusable agent or automation skills.
-- `web/` contains the static website source, browser-side theme switching code, CSS, and website build script that generates `web/dist/` from app-rendered diagnostics assets.
-- `.github/workflows/` contains branch push and pull request automation for runner-hosted build, test, format, lint, and tidy validation.
+- `web/` contains the static website source, browser-side theme switching code, CSS, and the website build script that generates `web/dist/`.
+- `.github/workflows/` contains runner-hosted build, test, format, lint, tidy, package, release, and website deployment automation.
 
 ## Layered Core
 
-- The core project layers are ordered `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as dashboard, dashboard_renderer, diagnostics, display, layout-edit, layout-edit dialog, and main.
-- Dependencies flow downward only. A higher layer may include lower-layer contracts, but a lower layer must not include or call into a higher layer.
-- `src/util/` is the base layer. It contains domain-neutral helpers for text, Win32-backed path and filesystem operations, resources, enum strings, UTF-8 conversion, localization catalog access, numeric safety, DPI scale conversion, and trace emission. Util modules may depend on other util modules, but must not depend on config, telemetry, rendering, UI, diagnostics, or application packages.
-- `src/config/` is the second layer. It owns the persisted config model, parser, writer, resolver, shared OKLab/OKLCH and HSV color math, theme color resolver, color expression parser, schema metadata, and config-facing contract types such as widget class, metric display style, and telemetry settings DTOs. Config modules may depend only on config and util modules.
-- Config must not duplicate runtime catalogs or reach upward to validate runtime concepts. When config parsing needs runtime knowledge, it uses config-owned injection contracts such as `ConfigMetricCatalog`; production code supplies the telemetry-backed implementation from above.
-- `src/telemetry/` is the third layer. It owns live collection, fake collection, the telemetry collection thread, snapshot and dump-facing telemetry types, provider bridges, retained history, and the single production metric catalog. Telemetry modules may depend on telemetry, config, and util modules, but must not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main modules.
-- Telemetry is allowed to consume config contracts such as telemetry settings and metric display style, and it publishes runtime contracts such as `TelemetryRuntime`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
-- Public cross-thread contracts document thread affinity, callback thread, blocking behavior, and ownership or lifetime guarantees directly in the declaring header before the relevant method or callback.
-- `src/renderer/` owns render-space DTOs, renderer style DTOs, the D2D-free `Renderer` interface, and the only Direct2D, DirectWrite, WIC, and WRL implementation modules. Renderer modules may depend only on renderer, config, and util modules.
-- `src/widget/` is the widget layer. It owns widget contracts, widget-local layout and drawing behavior, widget-facing layout-edit DTO contracts, and the D2D-free `WidgetHost` interface. Widget modules may depend on widget, renderer, telemetry, config, and util modules, but must not depend on dashboard, diagnostics, display, layout-edit, main, Direct2D, DirectWrite, WIC, or WRL modules.
-- `src/layout_model/` is the shared layout-edit model layer. It may depend on layout_model, widget, renderer, and config modules, but must not depend on dashboard, dashboard_renderer, diagnostics, display, layout-edit, layout-edit dialog, main, telemetry, util, Direct2D, DirectWrite, WIC, or WRL modules.
-- `src/dashboard_renderer/` is the dashboard scene and layout-rendering layer. It may depend on dashboard_renderer, layout_model, widget, renderer, telemetry, config, and util modules, but must not depend on dashboard, diagnostics, display, layout-edit, layout-edit dialog, main, Direct2D, DirectWrite, WIC, or WRL modules.
-- `src/layout_edit/` is the runtime layout-edit interaction layer. It may depend on layout_edit, config, layout_model, util, and widget modules, but must not depend on dashboard, dashboard_renderer, diagnostics, display, layout-edit dialog, main, renderer, telemetry, Direct2D, DirectWrite, WIC, or WRL modules.
-- `src/layout_edit_dialog/` is the modeless layout-editor dialog layer. It may depend on layout_edit_dialog, config, layout_edit, layout_model, telemetry, util, and widget modules, but must not depend on dashboard, dashboard_renderer, diagnostics, display, main, renderer, Direct2D, DirectWrite, WIC, or WRL modules.
-- Cross-layer shared types belong in the lowest layer that semantically owns them. Move config-language DTOs to config, runtime telemetry DTOs to telemetry, and domain-neutral helpers to util; do not copy catalogs or enums across layers to avoid a dependency violation.
-- `lint.cmd` enforces the util, config, renderer, telemetry, widget, layout-model, dashboard-renderer, layout-edit, layout-edit-dialog, and renderer-only D2D rules through the source dependency graph before reporting success.
+- Dependencies flow downward. Higher layers may include lower-layer contracts, but lower layers do not include or call higher layers.
+- The core layer order is `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as `dashboard`, `dashboard_renderer`, `diagnostics`, `display`, `layout_edit`, `layout_edit_dialog`, and `main`.
+- Cross-layer shared types belong in the lowest layer that semantically owns them. Config-language DTOs live in `config`, runtime telemetry DTOs live in `telemetry`, and domain-neutral helpers live in `util`.
+- Public cross-thread contracts document thread affinity, callback thread, blocking behavior, and ownership or lifetime guarantees in the declaring header before the relevant method or callback.
+- `lint.cmd` enforces package dependencies, package-private implementation boundaries, header-body rules, include-path rules, local `NOLINT` policy, and the renderer-only Direct2D boundary before reporting success.
 
-## Major Subsystems
+## Package Dependency Rules
 
-### App shell and session orchestration
-
-- `DashboardApp` owns HWND lifetime, message dispatch, tray integration, repaint invalidation, move-mode presentation, and the shell side of layout-edit interaction.
-- `DashboardController` owns active config state, runtime instance lifetime, diagnostics session lifetime, save and reload actions, layout and scale switching, runtime target selection, and layout-edit session state.
-- `DashboardShellUi` owns popup-menu construction, focused command dispatch, custom prompts, and the host bridge for the modeless editor window.
-- `src/widget/app_icon_geometry.*` draws the shared CaseDash icon mark from resolved theme colors. The dashboard shell converts that bitmap into live `HICON` instances, while diagnostics owns PNG export of the same geometry.
-
-### Config model and persistence
-
-- The config subsystem parses the embedded template first, overlays executable-side config, resolves the active named layout, and writes either minimal overlay saves or full embedded-template-shaped exports.
-- `LayoutConfig` is the layout-edit session boundary and includes layout-owned sections such as widget geometry, shared styling, board bindings, and metric definitions.
-- `AppConfig` layers runtime display, network, storage, and active-layout selection around the shared layout-owned state.
-- Runtime-only placeholder metric metadata stays synthesized outside persisted config so `[metrics]` remains limited to configurable metric definitions.
-- Config metric validation uses an injected catalog view; the metric id and display-style source of truth lives in telemetry metrics.
-- Parser and writer code share config-owned offset-based runtime field descriptors and UTF-8 file helpers while keeping overlay behavior and text-preserving saves separate from higher-level config resolution.
-
-### Telemetry
-
-- `TelemetryRuntime` owns the steady-state collection thread, snapshot publishing callback, provider composition, and runtime target resolution for network and storage.
-- Package-private telemetry collectors perform the synchronous provider work behind `TelemetryRuntime`; higher layers do not create or drive telemetry collection threads.
-- Windows-native collection covers generic CPU, memory, network, storage, and clock data.
-- Vendor providers extend that collector with AMD and NVIDIA GPU support plus MSI Center and Gigabyte board-metric paths without changing the renderer-facing snapshot model.
-- GPU telemetry selects one vendor provider from the primary non-software DXGI adapter identity instead of probing every vendor bridge; unsupported GPU vendors use a telemetry-owned fallback provider that exposes only presented FPS.
-- NVIDIA GPU telemetry uses NVML for device metrics and uses the telemetry-owned presented-FPS provider for FPS because NVML has no native game-FPS metric. The FPS provider asks the machine-wide `CashDashService` LocalSystem service over the versioned named-pipe protocol first, then falls back to local ETW collection when the service is absent or unreachable. The pipe protocol uses a generic request envelope with a stable request id and request name; the current FPS query is `PresentedFpsSample` / `presented_fps_sample`. The response carries the selected presenter's cleaned process name alongside the FPS value. The ETW path counts runtime DXGI/D3D9 presents first, uses DxgKrnl presents as the fallback path when runtime present events are not visible, and cross-checks Windows GPU Engine 3D usage so the active 3D application can outrank background presenters.
-- Board telemetry keeps the last discovered provider sensor-name lists cached alongside live samples so layout-edit binding pickers stay populated across transient board-sample gaps.
-- Fake-runtime support bypasses live providers and serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot.
-
-### Rendering and layout resolution
-
-- `Renderer` owns renderer style resources, icon loading, text measurement, live HWND rendering, shared offscreen bitmap rendering for screenshot export and validation priming, and primitive drawing such as text, rectangles, rounded rectangles, ellipses, lines, arcs, polylines, filled paths, clips, and translations. It stays independent of application trace sinks and dashboard-specific drawing modes.
-- Renderer and layout-guide rendering callbacks use non-owning `FunctionRef` views for synchronous draw and measurement hooks; callback storage remains owned by the caller.
-- `DashboardRenderer` owns renderer style input selection, resolved scene traversal, drawing-mode state, widget-host services, layout guide sheet drawing from prepared callout requests, and production of the `LayoutEditActiveRegions` snapshot used by layout-edit interaction.
-- `DashboardLayoutResolver` owns static layout resolution plus resolved dashboard, card, widget, guide, anchor, and dynamic edit-artifact geometry inside the dashboard-renderer package. It implements the widget-facing edit-artifact registrar because it owns the registered artifact storage, shared affordance presets, and low-level anchor-region construction.
-- `DashboardLayoutEditOverlayRenderer` owns layout-edit overlay presentation inside the dashboard-renderer package, including selected and hovered highlights, layout and widget guides, gap anchors, size similarity indicator policy, dotted outlines, and dragged container-child replay.
-- Shared renderer-owned render-space contract types isolate the rest of the codebase from low-level Direct2D and DirectWrite structs.
-- `WidgetHost` is the widget-facing host interface consumed by widgets; it exposes config, render mode, a dedicated edit-artifact registrar, metric lookup, metric-list reorder state, and a `Renderer` reference. Widgets call drawing and text operations through that renderer reference.
-- Widget draw modules refer to colors by render color id; the renderer keeps the resolved RGBA palette private and maps ids to colors internally.
-- Widget modules own widget-local preferred-size logic, draw behavior, layout-edit artifact registration, and shared card-chrome geometry used both by layout resolution and by the special card-chrome widget.
-- `MetricSource` adapts `SystemSnapshot` into widget-facing values, histories, drive rows, and formatted text while caching per-frame derived results.
-
-### Layout editing
-
-- `LayoutEditController` owns hover state, active drags, capture, cursor choice, and drag-session flow. Layout-edit hit testing and snap-candidate discovery operate on renderer-produced `LayoutEditActiveRegions` snapshots inside the layout-edit package.
-- Layout-model helpers own renderer-safe edit-artifact matching, focus and selection resolution, anchor subject extraction, and edit-artifact ordering policy. Layout-edit modules own tooltip-payload interpretation, tooltip formatting, edit-tree construction, current-value lookup, and preview application.
-- Widget layout-node parameter edits use `LayoutNodeFieldEditKey` plus descriptors owned by `src/layout_edit/layout_edit_target_descriptor.*` so tree labels, editor kind, title, hint, tooltip description, trace identity, and value format are declared in one place.
-- Layout-node config mutations stay in `src/layout_edit/layout_edit_service.*`, resolve `{editCardId,nodePath}` through shared helpers, and mirror dashboard-layout edits into the active named layout when the edit targets the live dashboard layout.
-- `LayoutEditDialog` owns the modeless editor window, config-tree selection, right-pane editing, and preview or revert flow, with focused helper modules under `src/layout_edit_dialog/impl/`; descriptor-backed editors route populate, validate, preview, and revert work through editor handlers. Color editors reuse the shared config color-math module for RGB/LCH/HSV conversion instead of carrying dialog-local color-space math.
-- The dashboard renderer exposes copied active-region geometry as a `LayoutEditActiveRegions` value object used by live interaction and diagnostics screenshot validation; layout-edit modules interpret that snapshot for hit testing, snap discovery, tooltip targets, and active-region trace output.
-
-### Diagnostics
-
-- The diagnostics subsystem parses diagnostics CLI switches, manages headless `/exit` runs, owns requested output exports, creates the top-level trace session when trace is enabled, and decides whether telemetry initialization failures are reported through trace or modal UI.
-- The crash report handler is installed from the application entry point after diagnostics options are parsed and writes best-effort native minidumps plus text reports without depending on dashboard initialization.
-- `src/util/trace.*` owns trace line emission plus generic trace value formatting and quoting helpers. Runtime flows create a top-level `Trace` object and pass it by non-null reference; disabled output and stream-null handling stay inside `Trace`.
-- Snapshot dumps and fake-runtime imports share the same dump serializer and parser.
-- Diagnostics screenshot export uses the same renderer scene, layout-edit hover resolver, and tooltip text builder as the live window path instead of a separate rendering implementation. The layout guide sheet package in `src/layout_guide_sheet/` exposes a pipeline API at the package root; planner, renderer, callout request types, and placement modules live under `src/layout_guide_sheet/impl/` with matching `.h` and `.cpp` files kept together when both exist. The package owns packed-overview active-region collection, overview callout selection, representative card selection, callout candidate filtering, equivalent metric-definition grouping, draw-free callout side geometry, leader routing, and sheet rendering. The public pipeline runs measured active-region collection, callout planning, rendering measurement, placement, and final drawing; benchmark stats report those stages as `active_regions`, `sheet_plan`, `sheet_measure`, `sheet_place`, and `sheet_draw`. Diagnostics and benchmarks invoke that shared pipeline instead of constructing callout requests directly. `impl/layout_guide_sheet_placement.*` owns callout stack placement, promotion, leader scoring, side-split repair, and placement trace data. Diagnostics orchestrates the export command and trace records, while `DashboardRenderer` exposes only the resolved-card summaries, card-chrome artifact hooks, and rendering hooks needed by the layout guide sheet package. Representative-card sheet rendering uses the dashboard renderer's layout-guide-sheet render mode so widget-owned edit affordances follow hover-equivalent styling, suppresses exposed dashboard-chrome affordances, and preserves explicit hovered artifacts for callout targets.
-- `LayoutGuideSheetConfig` owns diagnostics-only callout palette and sheet layout constants. The renderer palette receives those colors separately from the editable dashboard `ColorsConfig`, so guide-sheet callout styling is configurable without adding edit-dialog color targets.
+- `util` may depend on `util` only.
+- `config` may depend on `config` and `util`.
+- `telemetry` may depend on `telemetry`, `config`, and `util`.
+- `renderer` may depend on `renderer`, `config`, `util`, and the synthetic `d2d` package.
+- `widget` may depend on `widget`, `renderer`, `telemetry`, `config`, and `util`.
+- `layout_model` may depend on `layout_model`, `config`, `renderer`, and `widget`.
+- `dashboard_renderer` may depend on `dashboard_renderer`, `config`, `layout_model`, `renderer`, `telemetry`, `util`, and `widget`.
+- `layout_edit` may depend on `layout_edit`, `config`, `layout_model`, `util`, and `widget`.
+- `layout_edit_dialog` may depend on `layout_edit_dialog`, `config`, `layout_edit`, `layout_model`, `telemetry`, `util`, and `widget`.
+- Application-facing packages such as `dashboard`, `diagnostics`, `display`, and `main` may compose lower-layer services but do not move reusable lower-layer logic upward into shell code.
+- Files below package subdirectories are package-private implementation modules. Dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.
 
 ## Runtime Flows
 
-### Startup and config flow
-
-- `src/main/main.cpp` enters the single-executable service host when launched with `/service`; otherwise it initializes process-wide shell settings, parses command-line options, relays `/elevate` runs to an elevated child process, and chooses either the normal UI path or the headless diagnostics path.
-- Config load starts from embedded `resources/config.ini`, applies the executable-side overlay unless suppressed, and resolves the active layout plus runtime selections before telemetry and rendering start.
-- The executable manifest disables file virtualization and keeps config reads and writes pointed at the executable-side location.
-
-### Telemetry flow
-
-- The controller owns one telemetry runtime instance.
-- The telemetry runtime collects on fixed 0.5 second boundaries, skips overlapping collection when provider work runs long, and publishes copied updates to higher layers through its callback.
-- Each published update contains the latest `SystemSnapshot`, provider dump state, resolved selections, and menu candidates that become the renderer input for live paint and diagnostics export.
-- Runtime network and storage selections are resolved from current machine candidates and surfaced back to menu-building code for user selection.
-- `CashDashService` hosts privileged telemetry collection and serves versioned request/response payloads through `\\.\pipe\CashDashService`; normal UI processes continue to collect all non-privileged telemetry locally. The service currently implements the `presented_fps_sample` request and returns presented-FPS sample snapshots in an FPS-specific response payload inside the generic response envelope.
-
-### Render and layout flow
-
-- Layout resolution converts the active config into static dashboard, card, and widget rectangles.
-- Draw-time metric binding uses the latest snapshot plus the current metric registry.
-- Live paints and screenshot exports share the same renderer-owned layout resolution and widget draw code.
-- Layout, scale, reload, and configure-display actions reconfigure the live renderer in place and force a dashboard repaint before any follow-on modeless layout-editor refresh work runs.
-- While the modeless layout editor stays open, its tree refreshes rebuild directly from the current live config and the shared uncached tree-model builder.
-
-### Diagnostics flow
-
-- The diagnostics path optionally reloads config through the same live reload logic used by the dashboard.
-- Requested outputs write trace, dump, screenshot, minimal-config, or full-config artifacts using the same runtime state the live app would use.
-- `/elevate` preserves diagnostics arguments and current working directory for the elevated child before diagnostics outputs are opened.
-- `/exit` performs one update-and-export pass and exits without joining the normal single-instance UI lifetime.
-
-### Layout-edit flow
-
-- The shell forwards pointer events into the layout-edit controller, which resolves actionable targets from renderer-provided `LayoutEditActiveRegions` snapshots.
-- Package-private layout-edit interaction helpers live under `src/layout_edit/impl/` when they have no incoming production dependencies from outside `src/layout_edit/`.
-- Edits preview through shared config mutation helpers and the same renderer resolution path used by ordinary runtime rendering.
-- The modeless editor window uses the same config mutation and preview path as drag-based editing so both interaction styles operate on the same session state, and post-menu hover recovery relies on explicit cursor refresh instead of rebuilding hover inside `WM_MOUSELEAVE`.
-
-### Persistence and elevation flow
-
-- Minimal saves diff live state against the loaded target INI text and preserve unrelated lines.
-- Full exports start from the embedded template text.
-- When the executable-side config file is not writable, the save path relaunches the executable through the maintained elevated helper route and hands off the write through a temporary file.
-- Auto-start registration and configure-display writes use their package-owned elevated helper paths when the current process cannot write the target registry value, service registration, or executable-side files directly. Auto-start enablement writes the machine-wide Run entry for per-user dashboard UI startup and installs or starts the `CashDashService` LocalSystem service; disabling auto-start removes both.
+- Startup begins in `main`, parses command-line options, handles service and elevation modes, loads config from the embedded template plus executable-side overlay, then chooses the normal UI path or the diagnostics `/exit` path.
+- Telemetry collects through `telemetry`, publishes copied snapshots and resolved runtime selections, and supplies the metric data consumed by renderer-facing flows.
+- Rendering flows through `dashboard_renderer`, which combines the active config, latest telemetry snapshot, renderer style input, and widget draw contracts into live paints and diagnostics screenshot exports.
+- Layout editing starts from shell pointer events, resolves targets from renderer-produced active regions, mutates config through `layout_edit`, and shares preview behavior with `layout_edit_dialog`.
+- Diagnostics owns requested trace, dump, screenshot, layout-guide-sheet, app-icon, and config exports, using the same runtime state and render paths as the live dashboard.
+- Persistence compares minimal saves against the loaded INI text, uses the embedded template for full exports, and relaunches through maintained elevation helpers when target files or registry/service state require elevation.
 
 ## Resources And Build Graph
 
 - `resources/CaseDash.rc` owns dialogs, icons, embedded config, and the embedded localization catalog.
-- CMake reads `VERSION` and Git metadata during configure, then generates `build\cmake\generated\build_version.h`, target-specific version resource scripts, and the application manifest used by the resource build.
-- `resources/resource.h` owns the resource and control ids used by shell and dialog code.
-- `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and the mixed-mode board-provider bridge object libraries.
-- `CMakeLists.txt` enables C4505 as an error for MSVC C++ targets, disables native C++ RTTI with `/GR-`, and keeps Release app and benchmark links non-incremental with `/OPT:REF` and `/LTCG`; those targets compile Release objects with `/Os` and `/GL` by default so benchmarks measure the same size-oriented whole-program optimization profile as the shipped executable. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` within that profile, and the C++/CLI board-provider bridges keep their managed cast support in `/clr` translation units.
-- `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the `windows-2025-vs2026` GitHub runner.
-- `build.cmd` keeps the manifest-installed dependency tree in the repo-root `vcpkg\` directory, while vcpkg download archives and registry clones live under the shared cache root exported as `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE` so fresh worktrees reuse bootstrap downloads.
-- `web-build.cmd` runs the native build, exports theme-specific screenshots, layout guide sheets, and app icons through the built executable's headless diagnostics path, writes website metadata, and keeps generated website output under `web\dist\`.
-- `update_installer_dialog_bmp.cmd` runs the native build, exports the dark_cyan app icon through the built executable's headless diagnostics path, and regenerates the WiX dialog bitmap under `installer\`.
-- `.github/workflows/validation.yml` restores and saves that shared vcpkg cache root through `actions/cache` on the `windows-2025-vs2026` GitHub runner before and after the normal format, build, test, and tidy steps.
-- The native app target links the shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
-- `src/telemetry/board/board_vendor.cpp` selects a board provider from the baseboard manufacturer and creates the unsupported-board provider when no supported vendor matches. `src/telemetry/board/gigabyte/board_gigabyte_siv.cpp` and `src/telemetry/board/msi/board_msi_center.cpp` own native provider state, sensor-name maps, metric templates, and sample shaping. Their matching `*_bridge.cpp` files are the CLR-enabled units for vendor .NET assembly reflection calls, keeping STL-heavy provider state out of CLR metadata.
-- The test build also produces `CaseDashBenchmarks`, which exercises the layout-edit drag, layout-switch, theme-change, layout-edit mouse-hover, and telemetry-refresh paths through the same runtime subsystems used by the app. Its supported benchmark names are held in an `enum_string`-backed selector, and each named benchmark owns its top-level command flow in a separate function.
-- `src/layout_edit_dialog/theme_preview.*` owns construction and drawing of the theme selector's color-mix triangle so dialog painting and benchmark coverage use the same preview implementation. The preview uses the shared config color-math module for OKLab color mixing.
+- `resources/resource.h` owns resource and control ids used by shell and dialog code.
+- `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and mixed-mode board-provider bridge object libraries.
+- CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers, target-specific version resource scripts, and the application manifest.
+- The native app target links shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
+- `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the Windows runner.
+- `build.cmd` keeps the manifest-installed dependency tree in repo-root `vcpkg\`, while vcpkg download archives and registry clones live under the shared cache root.
 
 ## Source Dependency Graph
 
-- `lint.cmd` writes the maintained DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
+- `lint.cmd` writes DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
 - Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
-- Graph generation counts physical source lines in each non-vendored `.h` and `.cpp` file, annotates each node with header, implementation, and total LOC, and prints LOC totals for each top-level `src` package plus an overall total. It also condenses the real source package dependency graph into strongly connected components, prints those components in topological order with their combined LOC, package list, and lower-level package dependencies after `->`, and prints every non-vendored source file above 1,000 LOC, ordered largest first.
+- Graph generation records header, implementation, and total LOC, package totals, strongly connected components, lower-level dependencies, and non-vendored files above 1,000 LOC.
 - The graph includes a synthetic `d2d` package for Direct2D, DirectWrite, WIC, and WRL includes so every package except `renderer` rejects accidental graphics-stack coupling.
-- DOT clusters group nodes by their containing source directory, and the optional SVG graph is rendered from the DOT graph with Graphviz `dot` when `tools\source_dependency_graph.py` runs without `--skip-svg`.
-- GraphML nodes include `label`, `directory`, `header_loc`, `cpp_loc`, `total_loc`, and `loc_annotation` data, and GraphML edges include `label` and `kind` data.
-- A dependency from an including module to an included module is `public` when it appears in a header and `private` when it appears only in an implementation file.
-- Files below package subdirectories are package-private implementation modules, so dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.
-- `src/util/` is the base layer, so util modules may depend on other util modules but must not depend on non-util project modules.
-- `src/config/` is the second layer, so config modules may depend on other config modules and util modules but must not depend on non-config, non-util project modules.
-- `src/telemetry/` is the third layer, so telemetry modules may depend on telemetry, config, and util modules but must not depend on higher-level project modules.
-- `src/renderer/` is the graphics boundary, so renderer modules may depend on renderer, config, util, and the synthetic `d2d` package only.
-- `src/widget/` is the widget layer, so widget modules may depend on widget, renderer, telemetry, config, and util modules but must not depend on higher-level project modules or the synthetic `d2d` package.
-- `src/layout_model/` is the shared layout-edit model layer, so layout-model modules may depend on layout_model, config, renderer, and widget modules but must not depend on other project modules or the synthetic `d2d` package.
-- `src/dashboard_renderer/` is the dashboard scene and layout-rendering layer, so dashboard-renderer modules may depend on dashboard_renderer, config, layout_model, renderer, telemetry, util, and widget modules but must not depend on higher-level project modules or the synthetic `d2d` package.
-- `src/layout_edit/` is the runtime layout-edit interaction layer, so layout-edit modules may depend on layout_edit, config, layout_model, util, and widget modules but must not depend on other project modules or the synthetic `d2d` package.
-- `src/layout_edit_dialog/` is the modeless layout-editor dialog layer, so layout-edit-dialog modules may depend on layout_edit_dialog, config, layout_edit, layout_model, telemetry, util, and widget modules but must not depend on other project modules or the synthetic `d2d` package.
+- DOT clusters group nodes by containing source directory; GraphML nodes and edges carry labels, directory, LOC, dependency kind, and annotation data.

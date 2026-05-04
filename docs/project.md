@@ -9,7 +9,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `docs/layout.md` owns config language, section ownership, syntax, and validation rules.
 - `docs/diagnostics.md` owns diagnostics CLI behavior, output contracts, and diagnostics validation recipes.
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
-- `docs/architecture.md` owns subsystem structure, code boundaries, runtime flows, and build-graph shape.
+- `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
 - `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and experiment history.
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.

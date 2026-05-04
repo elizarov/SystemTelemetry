@@ -4,7 +4,7 @@ Use the following maintained references and keep them in sync before finishing w
 
 - `docs/specifications.md` - user-visible runtime behavior.
 - `docs/diagnostics.md` - diagnostics flow, trace, dump, screenshot, app-icon, and validation recipes.
-- `docs/architecture.md` - code organization, subsystem boundaries, and build-graph structure.
+- `docs/architecture.md` and `docs/architecture/*.md` - code organization, subsystem boundaries, package notes, and build-graph structure.
 - `docs/project.md` - documentation ownership, repository conventions, engineering constraints, and project pitfall notes.
 - `docs/build.md` - project environment, setup, build commands, validation entrypoints, and tooling constraints.
 - `docs/profile_benchmark.md` - benchmark workflow, baselines, hotspots, tested hypotheses, and experiment results.
