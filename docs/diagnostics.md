@@ -111,30 +111,25 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 
 - Build first through `build.cmd`.
 - Include `/trace` during diagnostics validation and inspect trace output even when the main change affects dump or screenshot behavior.
-- For layout-edit screenshot diagnostics, inspect `diagnostics:active_region` lines to verify mouse-reactive region geometry and layout paths.
-- For headless hover validation, add `/hover:<x>,<y>` to the traced screenshot command and inspect the `diagnostics:hover` tooltip text.
 - When validation is meant to exercise the built-in config, add `/default-config`.
 - Put explicit diagnostics paths under `build\` so repository files stay clean.
+- Prefer the smallest traced `/exit` command that exercises the changed behavior.
+- Add only the modifiers that matter to the change: `/reload`, `/blank`, `/layout:<name>`, `/theme:<name>`, `/edit-layout`, `/edit-layout:<widget-name>`, `/hover:<x>,<y>`, `/layout-guide-sheet`, `/app-icon`, `/save-config`, or `/save-full-config`.
 
-Recommended checks:
+Recommended coverage:
 
-- UI-attached `/trace`, `/dump`, `/screenshot`, and `/trace /dump /screenshot`
-- Headless `/trace /default-config /dump /screenshot /exit`
-- Headless `/trace /default-config /reload /screenshot /exit`
-- Headless `/trace /default-config /layout:<name> /save-config /save-full-config /exit`
-- Headless `/trace /blank /screenshot /exit`
-- One headless run with explicit output filenames for trace, dump, and screenshot
-- One headless `/trace /default-config /layout:<name> /screenshot /exit`
-- One headless `/trace /default-config /theme:<name> /screenshot /exit`
-- One headless `/trace /default-config /edit-layout /screenshot /exit`
-- One headless `/trace /default-config /layout-guide-sheet /exit`
-- One headless `/trace /default-config /app-icon /exit`
-- One headless `/trace /default-config /theme:<name> /app-icon:<path> /app-icon-size:256 /exit`
-- One headless `/trace /default-config /edit-layout /hover:<x>,<y> /screenshot /exit`
-- One headless `/trace /default-config /edit-layout:<widget-name> /screenshot /exit` for each widget class whose edit chrome changed
-- One headless `/trace /default-config /edit-layout:horizonatal-sizes /screenshot /exit`
-- One headless `/trace /default-config /edit-layout:vertical-sizes /screenshot /exit`
-- UI `/edit-layout` verification when hover-only or drag-only artifacts changed
-- Both interactive `/fake` and headless `/fake /exit` when fake-runtime behavior changed
+- Trace plus dump validates snapshot content and provider state.
+- Trace plus screenshot validates rendered output and active-region trace data.
+- Trace plus config export validates minimal or full config output.
+- Trace plus layout guide sheet validates guide-sheet planning, placement, and trace details.
+- Trace plus app icon validates themed icon rendering and output paths.
+- UI-attached diagnostics validate once-per-second refresh behavior when live refresh, hover-only behavior, drag-only behavior, or interactive fake-runtime reloads changed.
+- Headless `/fake /exit` and interactive `/fake` both matter when fake-runtime startup or reload behavior changed.
 
-When layout-edit screenshots are involved, validate the presence of the intended guide family or ruler grouping rather than re-documenting widget-specific edit semantics here; the user-visible layout-edit behavior itself is defined in [docs/layout_edit.md](layout_edit.md).
+Layout-edit validation:
+
+- Inspect `diagnostics:active_region` lines to verify mouse-reactive region geometry and layout paths.
+- Add `/hover:<x>,<y>` to a traced screenshot command and inspect `diagnostics:hover` when tooltip targeting changed.
+- Use `/edit-layout:<widget-name>` for each widget class whose edit chrome changed.
+- Use `/edit-layout:horizonatal-sizes` or `/edit-layout:vertical-sizes` when ruler grouping changed.
+- Validate the presence of the intended guide family or ruler grouping rather than re-documenting widget-specific edit semantics here; user-visible layout-edit behavior is defined in [docs/layout_edit.md](layout_edit.md).
