@@ -23,8 +23,8 @@ TelemetryUpdate CaptureTelemetryUpdate(const TelemetryCollector& collector) {
 
 class ThreadedTelemetryRuntime final : public TelemetryRuntime {
 public:
-    ThreadedTelemetryRuntime(std::unique_ptr<TelemetryCollector> collector, TelemetryUpdateCallback callback)
-        : collector_(std::move(collector)), callback_(std::move(callback)) {}
+    ThreadedTelemetryRuntime(std::unique_ptr<TelemetryCollector> collector, TelemetryUpdateSink* callback)
+        : collector_(std::move(collector)), callback_(callback) {}
 
     ~ThreadedTelemetryRuntime() override {
         Shutdown();
@@ -113,13 +113,13 @@ private:
             const std::lock_guard latestLock(latestMutex_);
             latest_ = update;
         }
-        if (callback_) {
-            callback_(update);
+        if (callback_ != nullptr) {
+            callback_->OnTelemetryUpdate(update);
         }
     }
 
     std::unique_ptr<TelemetryCollector> collector_;
-    TelemetryUpdateCallback callback_;
+    TelemetryUpdateSink* callback_ = nullptr;
     mutable std::mutex latestMutex_;
     TelemetryUpdate latest_;
     std::mutex commandMutex_;
@@ -134,7 +134,7 @@ std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollecto
     const FilePath& workingDirectory,
     const TelemetrySettings& settings,
     Trace& trace,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText) {
     if (errorText != nullptr) {
         errorText->clear();
@@ -143,7 +143,7 @@ std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollecto
     if (collector == nullptr) {
         return nullptr;
     }
-    auto runtime = std::make_unique<ThreadedTelemetryRuntime>(std::move(collector), std::move(callback));
+    auto runtime = std::make_unique<ThreadedTelemetryRuntime>(std::move(collector), callback);
     if (!runtime->Initialize(settings, errorText)) {
         return nullptr;
     }

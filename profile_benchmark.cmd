@@ -385,10 +385,10 @@ if errorlevel 1 (
 
 if /i "%FORCE_BUILD%"=="1" (
     echo Building Release benchmark binaries before profiling...
-    call "%REPO_ROOT%\build.cmd" Release
+    call "%REPO_ROOT%\build.cmd" Release /benchmarks
     if errorlevel 1 exit /b %errorlevel%
 ) else if not exist "%BENCHMARK_EXE%" (
-    call "%REPO_ROOT%\build.cmd" Release
+    call "%REPO_ROOT%\build.cmd" Release /benchmarks
     if errorlevel 1 exit /b %errorlevel%
 )
 

@@ -721,7 +721,7 @@ std::wstring FormatTelemetryInitializeError(std::string_view errorText) {
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText) {
     if (errorText != nullptr) {
         errorText->clear();
@@ -730,7 +730,7 @@ std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppCo
         GetWorkingDirectory(),
         ExtractTelemetrySettings(runtimeConfig),
         trace,
-        std::move(callback),
+        callback,
         errorText);
 }
 
@@ -740,7 +740,7 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
     DiagnosticsSession* diagnostics,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText) {
     if (errorText != nullptr) {
         errorText->clear();
@@ -770,7 +770,7 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     std::unique_ptr<TelemetryRuntime> reloadedTelemetry =
         InitializeTelemetryRuntimeInstance(effectiveReloadedConfig, diagnosticsOptions, trace, callback, &reloadError);
     if (reloadedTelemetry == nullptr) {
-        telemetry = InitializeTelemetryRuntimeInstance(activeConfig, diagnosticsOptions, trace, std::move(callback));
+        telemetry = InitializeTelemetryRuntimeInstance(activeConfig, diagnosticsOptions, trace, callback);
         if (errorText != nullptr) {
             *errorText = reloadError;
         }
@@ -905,18 +905,29 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     std::condition_variable telemetryCv;
     TelemetryUpdate telemetryUpdate;
     bool telemetryUpdated = false;
-    auto telemetryCallback = [&](const TelemetryUpdate& update) {
-        {
-            const std::lock_guard lock(telemetryMutex);
-            telemetryUpdate = update;
-            telemetryUpdated = true;
+
+    struct HeadlessTelemetrySink final : TelemetryUpdateSink {
+        HeadlessTelemetrySink(std::mutex& mutex, std::condition_variable& cv, TelemetryUpdate& latest, bool& updated)
+            : mutex(mutex), cv(cv), latest(latest), updated(updated) {}
+
+        std::mutex& mutex;
+        std::condition_variable& cv;
+        TelemetryUpdate& latest;
+        bool& updated;
+
+        void OnTelemetryUpdate(const TelemetryUpdate& update) override {
+            {
+                const std::lock_guard lock(mutex);
+                latest = update;
+                updated = true;
+            }
+            cv.notify_all();
         }
-        telemetryCv.notify_all();
-    };
+    } telemetryCallback(telemetryMutex, telemetryCv, telemetryUpdate, telemetryUpdated);
 
     std::string telemetryError;
     std::unique_ptr<TelemetryRuntime> telemetry =
-        InitializeTelemetryRuntimeInstance(config, diagnosticsOptions, trace, telemetryCallback, &telemetryError);
+        InitializeTelemetryRuntimeInstance(config, diagnosticsOptions, trace, &telemetryCallback, &telemetryError);
     if (telemetry == nullptr) {
         std::string traceText = "diagnostics:telemetry_initialize_failed";
         if (!telemetryError.empty()) {
@@ -948,7 +959,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
                 diagnosticsOptions,
                 trace,
                 &diagnostics,
-                telemetryCallback,
+                &telemetryCallback,
                 &reloadError)) {
             if (diagnostics.ShouldShowDialogs() && !reloadError.empty()) {
                 const std::wstring message = FormatTelemetryInitializeError(reloadError);

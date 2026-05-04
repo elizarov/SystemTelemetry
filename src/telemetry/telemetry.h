@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -123,7 +122,13 @@ struct TelemetryCollectorOptions {
     TelemetryDumpLoader loadFakeDump = nullptr;
 };
 
-using TelemetryUpdateCallback = std::function<void(const TelemetryUpdate& update)>;
+class TelemetryUpdateSink {
+public:
+    virtual void OnTelemetryUpdate(const TelemetryUpdate& update) = 0;
+
+protected:
+    ~TelemetryUpdateSink() = default;
+};
 
 class TelemetryRuntime {
 public:
@@ -167,5 +172,5 @@ std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollecto
     const FilePath& workingDirectory,
     const TelemetrySettings& settings,
     Trace& trace,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);

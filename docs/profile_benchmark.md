@@ -10,6 +10,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 ## Benchmark Workflow
 
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
+- Build the benchmark executable with `build.cmd /benchmarks` for direct benchmark runs; normal `build.cmd` and release or validation builds do not build `CaseDashBenchmarks.exe`.
 - Measure the repeatable layout-edit benchmark with `build\CaseDashBenchmarks.exe edit-layout 240 2`.
 - Measure the in-memory layout-guide-sheet generation benchmark with `build\CaseDashBenchmarks.exe layout-guide-sheet 20 2`.
 - Measure the repeatable layout-switch benchmark with `build\CaseDashBenchmarks.exe layout-switch 240 2`.
@@ -919,7 +920,7 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Keep linker map generation as side tooling
 
 - Change:
-  - Add the opt-in `CASEDASH_LINK_MAPS` CMake switch, keep normal `build.cmd` configurations on `CASEDASH_LINK_MAPS=OFF`, and add `build_maps.cmd` for explicit map-producing relinks.
+  - Add the opt-in `CASEDASH_LINK_MAPS` CMake switch, keep normal `build.cmd` configurations on `CASEDASH_LINK_MAPS=OFF`, and add `build_maps.cmd` for explicit app map-producing relinks.
   - Add `tools\analyze_link_map.py` to summarize MSVC map sections, libraries, project objects, and inferred symbol-size rankings.
 - Result:
   - Helped future size investigations without changing the normal Release build profile or benchmark runtime behavior.
@@ -930,6 +931,37 @@ These changes produced real wins and remain in the codebase:
   - The largest inferred code symbols include `SaveDumpScreenshot` at about `31.0 KiB`, `DashboardShellUi::ShowContextMenu` at about `18.4 KiB`, and `MergeLayoutGuideSheetCallouts` at about `15.6 KiB`.
 - Conclusion:
   - Keep map generation off the normal build and use `build_maps.cmd` plus the analyzer when deciding future app-size experiments. Prioritize large non-hot-path project objects before touching renderer, widget draw, layout resolver, or telemetry files that are already covered by the maintained benchmarks.
+
+### Hypothesis: Remove remaining owning callback type erasure from telemetry runtime
+
+- Change:
+  - Replace the telemetry runtime's owning `std::function` update callback with a non-owning `TelemetryUpdateSink` interface pointer whose owner lifetime is already bounded by runtime shutdown.
+  - Route dashboard callbacks through `DashboardShellHost` and headless diagnostics callbacks through a small local sink.
+  - Replace the layout-guide-sheet callout merge `std::set<LayoutEditParameter>` with a fixed enum-indexed boolean table.
+- Result:
+  - Helped shipped app size without moving the maintained direct benchmark loops out of their current ranges.
+- Observed effect:
+  - `build\CaseDash.exe` decreased from `1,363,456` bytes to `1,360,896` bytes.
+  - The fresh app map keeps `diagnostics.cpp.obj` as the largest project object but reduces it from about `72.5 KiB` to about `71.2 KiB`.
+  - `layout_guide_sheet_planner.cpp.obj` drops from about `23.5 KiB` to about `22.5 KiB`.
+  - Direct benchmark checks after the change landed at `edit-layout drag_loop=2.36 ms`, `update-telemetry update_loop=4.73 ms`, `layout-switch switch_loop=3.77 ms`, `mouse-hover hover_loop=2.29 ms`, `theme-change theme_loop=4.76 ms`, and `layout-guide-sheet sheet_loop=86.79 ms`.
+- Conclusion:
+  - Keep the non-owning telemetry sink and fixed callout color table. The callback sink matches the runtime ownership model, avoids rebuilding erased callback machinery in diagnostics and dashboard code, and does not add measurable cost to the maintained synchronous benchmark paths.
+
+### Hypothesis: Keep benchmark target opt-in
+
+- Change:
+  - Change `build.cmd` so the default Release build targets only `CaseDash` and `CaseDashTests`; `CaseDashBenchmarks` builds only with `/benchmarks`.
+  - Change `build_maps.cmd` so the default side-map build writes only `build\CaseDash.map` and `build\CaseDash.map.summary.txt`; benchmark maps require `/benchmarks`.
+  - Change `profile_benchmark.cmd` so profiling builds request `build.cmd Release /benchmarks` when the benchmark executable is missing or forced.
+- Result:
+  - Helped build and release workflow focus on the shipped app without changing the app binary size or benchmark source.
+- Observed effect:
+  - `build.cmd` completed with the explicit default targets and did not invoke the benchmark target.
+  - `build_maps.cmd` relinked only `build\CaseDash.exe` and wrote only the app map summary by default.
+  - `build_maps.cmd /benchmarks` relinked both the app and benchmark executable and wrote both map summaries.
+- Conclusion:
+  - Keep the benchmark executable opt-in. Routine validation and release builds do not need it, while profiling and direct benchmark work can still request it explicitly.
 
 ## Practical Guidance For Future Experiments
 

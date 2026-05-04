@@ -90,7 +90,7 @@ std::wstring FormatTelemetryInitializeError(std::string_view errorText);
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);
 bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     AppConfig& activeConfig,
@@ -98,5 +98,5 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
     DiagnosticsSession* diagnostics,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);

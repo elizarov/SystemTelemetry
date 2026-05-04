@@ -213,11 +213,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
 
     std::string telemetryError;
     state_.telemetry = InitializeTelemetryRuntimeInstance(
-        state_.config,
-        diagnosticsOptions,
-        shell.TraceLog(),
-        [&](const TelemetryUpdate& update) { shell.EnqueueTelemetryUpdate(update); },
-        &telemetryError);
+        state_.config, diagnosticsOptions, shell.TraceLog(), &shell, &telemetryError);
     if (state_.telemetry == nullptr) {
         if (state_.diagnostics != nullptr) {
             std::string traceText = "diagnostics:telemetry_initialize_failed";
@@ -277,14 +273,13 @@ bool DashboardController::WriteDiagnosticsOutputs() {
 bool DashboardController::ReloadConfigFromDisk(
     DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
     std::string telemetryError;
-    if (!ReloadTelemetryCollectorFromDisk(
-            GetRuntimeConfigPath(),
+    if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
             state_.config,
             state_.telemetry,
             diagnosticsOptions,
             shell.TraceLog(),
             state_.diagnostics.get(),
-            [&](const TelemetryUpdate& update) { shell.EnqueueTelemetryUpdate(update); },
+            &shell,
             &telemetryError)) {
         if (!telemetryError.empty() && (state_.diagnostics == nullptr || state_.diagnostics->ShouldShowDialogs())) {
             shell.ShowError(FormatTelemetryInitializeError(telemetryError));

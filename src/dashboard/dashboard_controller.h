@@ -33,9 +33,14 @@ struct DashboardSessionState {
     std::wstring lastError;
 };
 
-class DashboardShellHost {
+class DashboardShellHost : public TelemetryUpdateSink {
 public:
     virtual ~DashboardShellHost() = default;
+
+    void OnTelemetryUpdate(const TelemetryUpdate& update) override {
+        EnqueueTelemetryUpdate(update);
+    }
+
     virtual HWND WindowHandle() const = 0;
     virtual Trace& TraceLog() = 0;
     virtual DashboardRenderer& Renderer() = 0;
