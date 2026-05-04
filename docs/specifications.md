@@ -1,13 +1,13 @@
 # CaseDash
 
 This document owns general user-visible product behavior.
-See also: [docs/layout_edit.md](layout_edit.md) for layout-edit mode and editor behavior, [docs/layout.md](layout.md) for config language and section ownership, [docs/theme_configuration.md](theme_configuration.md) for theme selection and derived color behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/build.md](build.md) for build and setup, and [docs/architecture.md](architecture.md) for code structure.
+See also: [docs/hardware.md](hardware.md) for supported hardware providers, [docs/layout_edit.md](layout_edit.md) for layout-edit mode and editor behavior, [docs/layout.md](layout.md) for config language and section ownership, [docs/theme_configuration.md](theme_configuration.md) for theme selection and derived color behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/build.md](build.md) for build and setup, and [docs/architecture.md](architecture.md) for code structure.
 
 ## Overview
 
 CaseDash is a compact real-time Windows dashboard for a small secondary display. It presents CPU, GPU, network, storage, and clock data in a static card layout that favors glanceable values, restrained chrome, and stable composition over dense detail.
 
-The dashboard uses only Windows-native telemetry plus supported vendor APIs. It does not depend on LibreHardwareMonitor or OpenHardwareMonitor.
+The dashboard uses only Windows-native telemetry plus supported hardware-provider APIs. It does not depend on generic hardware-monitoring suites.
 
 ## Runtime Configuration Behavior
 
@@ -82,13 +82,14 @@ The dashboard uses only Windows-native telemetry plus supported vendor APIs. It 
 ## Telemetry And Content Behavior
 
 - CPU content includes model name, load, clock, RAM usage, and any requested board temperature or fan metrics that resolve successfully through the active board provider.
-- GPU content includes model name, load, dedicated VRAM usage, total dedicated VRAM capacity, and vendor metrics such as temperature, clock, fan speed, and game FPS when available from the active AMD or NVIDIA provider. GPU telemetry selects the vendor provider from the primary non-software DXGI adapter vendor. If no supported GPU vendor matches, the unsupported GPU provider keeps vendor metrics unavailable and supplies only the shared presented-FPS metric when ETW access and present events are available. Presented FPS is the default `gpu.fps` source, including on AMD systems that also expose native FPS. NVIDIA FPS is the smoothed rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events because NVML has no native game-FPS metric. AMD native FPS is used only when presented-FPS collection is unavailable because Windows denies local ETW access; in that fallback, the metric keeps the AMD FPS value and annotates the row with warning-colored `!admin`. Process selection prefers a presenting process with dominant GPU Engine 3D usage over background presenters, and keeps the current presenter through brief count ties or near-ties so the displayed value remains stable while one application is still actively presenting. When a dominant 3D application is visible but matching present events are not, `gpu.fps` reports unavailable for that application instead of showing another process's FPS. The FPS sample includes the selected presenter's cleaned process name without path or extension when available; if Windows denies process-name access, the metric keeps the FPS value and uses the warning-colored `!admin` annotation instead of a PID fallback. The dashboard asks the machine-wide `CashDashService` LocalSystem service for this value with the `presented_fps_sample` request when the service is installed, and falls back to local ETW collection when the service is absent or unreachable. When Windows denies ETW access to local collection and no AMD native fallback value is available, `gpu.fps` reports `!admin`.
-- Board telemetry selects the vendor provider from the baseboard manufacturer, reads MSI board temperatures and fan speeds through the local MSI Center SDK, reads Gigabyte board temperatures and fan speeds through the local Gigabyte SIV assemblies, and uses an unsupported-board provider with unavailable values when no supported board vendor matches.
-- If a vendor provider is unavailable or unsupported, the dashboard stays running and shows those provider-owned values as unavailable instead of failing the app.
+- GPU content includes model name, load, dedicated VRAM usage, total dedicated VRAM capacity, and hardware-provider metrics such as temperature, clock, fan speed, and game FPS when available from the active GPU provider. GPU telemetry selects the provider from the primary non-software adapter identity. If no supported GPU provider matches, the unsupported GPU provider keeps provider metrics unavailable and supplies only the shared presented-FPS metric when ETW access and present events are available.
+- Presented FPS is the default `gpu.fps` source when available. Process selection prefers a presenting process with dominant GPU Engine 3D usage over background presenters, keeps the current presenter through brief count ties or near-ties, and reports unavailable when a dominant 3D application is visible but matching present events are not.
+- Board telemetry selects the provider from the baseboard manufacturer, reads supported board temperatures and fan speeds through the active provider, and uses an unsupported-board provider with unavailable values when no supported board provider matches.
+- If a hardware provider is unavailable or unsupported, the dashboard stays running and shows those provider-owned values as unavailable instead of failing the app.
 - Network content shows current upload and download throughput plus a footer line with the selected adapter name and IPv4 address when available.
 - Storage throughput uses system-wide disk I/O counters, while per-drive rows use the currently selected drive set.
 - Layout metric references are the only source of truth for which logical board metrics are requested from the board provider.
-- The board mapping section connects those logical names to provider-specific sensor names. Empty CPU and system bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists.
+- The board mapping section connects those logical names to provider-specific sensor names. Empty CPU and system bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists. Supported provider details are defined in [docs/hardware.md](hardware.md).
 
 ## Refresh, Units, And Instance Behavior
 

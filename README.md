@@ -4,7 +4,7 @@ CaseDash is a compact dashboard for dedicated PC telemetry screens: small USB/HD
 
 It is not a generic hardware-monitoring suite. CaseDash is a polished sensor panel you place, configure, and mostly leave alone. There are no keyboard shortcuts or extra controls beyond what is needed to make the panel look right and stay put.
 
-It works on my machines, with the hardware I have. Contributions are welcome for everything else.
+Supported hardware-provider details live in [docs/hardware.md](docs/hardware.md). Contributions are welcome for additional providers.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/image/casedash-screenshot-dark.png">
@@ -27,19 +27,7 @@ It's me, [Roman Elizarov](https://github.com/elizarov) &mdash; ex-project Lead f
 
 ## Supported Hardware
 
-GPUs:
-
-- AMD: Radeon GPU telemetry through AMD ADLX.
-- NVIDIA: GPU telemetry through NVML.
-
-FPS:
-
-- Presented-FPS capture for the active presenting application through ETW via the CaseDash service.
-
-Boards:
-
-- MSI: Board temperature and fan telemetry through MSI Center SDK.
-- Gigabyte: Board temperature and fan telemetry through Gigabyte SIV.
+CaseDash supports provider-backed GPU telemetry, board temperature and fan telemetry, and presented-FPS capture for the active presenting application. See [docs/hardware.md](docs/hardware.md) for the current supported-provider sections, runtime requirements, and troubleshooting notes.
 
 ## First Use
 
@@ -63,7 +51,7 @@ Good areas to explore:
 
 Open an issue and write what you want to achieve.
 
-- **GPU telemetry and motherboard sensor modules.** Do you have the hardware that is not supported? Open Codex or Claude, give it full access, tell it which vendor software provides fan and temperature information on your machine, let it explore and write the corresponding telemetry provider similar to the other ones here. Grill it to make integration as light as possible, then send detailed PR.
+- **GPU telemetry and board sensor modules.** Do you have unsupported hardware? Open Codex or Claude, give it full access, tell it which provider software exposes fan and temperature information on your machine, let it explore and write the corresponding telemetry provider similar to the existing ones. Grill it to make integration as light as possible, then send a detailed PR.
 
 - **Linux users:** are you interested? What hardware do you have? A Linux port would be a cool project to undertake; write up your use cases.
 

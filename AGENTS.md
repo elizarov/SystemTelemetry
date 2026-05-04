@@ -3,6 +3,7 @@
 Use the following maintained references and keep them in sync before finishing work:
 
 - `docs/specifications.md` - general user-visible runtime behavior.
+- `docs/hardware.md` - supported hardware-provider details, provider runtime requirements, provider-specific telemetry behavior, and provider troubleshooting.
 - `docs/layout_edit.md` - layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
 - `docs/layout_guide_sheet.md` - diagnostics layout guide sheet feature behavior.
 - `docs/diagnostics.md` - diagnostics flow, trace, dump, screenshot, app-icon, and validation recipes.

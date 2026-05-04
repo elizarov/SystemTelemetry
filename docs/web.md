@@ -4,7 +4,7 @@ This document owns the public CaseDash website behavior, content, build flow, an
 
 ## Purpose
 
-The website is the end-user introduction to CaseDash. It presents what the app is, how to download it, what hardware it supports, how first use works, how layout editing looks, and where to contribute.
+The website is the end-user introduction to CaseDash. It presents what the app is, how to download it, links to supported hardware details, how first use works, how layout editing looks, and where to contribute.
 
 The site takes its tone and structure from the README: compact, practical, and visually led by the actual dashboard. It stays consistent across sections and avoids repeating product claims, configuration syntax, or diagnostics details that are already owned by maintained docs.
 
@@ -65,15 +65,13 @@ Each feature item uses short copy and, where useful, a small cropped screenshot 
 
 ## Hardware Section
 
-The hardware section lists currently supported telemetry families:
+The hardware section summarizes currently supported telemetry families:
 
-- AMD Radeon GPU telemetry through ADLX.
-- NVIDIA GPU telemetry through NVML.
-- Presented-FPS capture through ETW via the CaseDash service.
-- MSI board telemetry through MSI Center SDK.
-- Gigabyte board telemetry through SIV.
+- GPU provider telemetry.
+- Board temperature and fan telemetry.
+- Presented-FPS capture through Windows present-event telemetry and the CaseDash service.
 
-The section also notes that contributions are welcome for additional GPU, motherboard, and sensor providers.
+The section links to [docs/hardware.md](hardware.md) for supported-provider sections and notes that contributions are welcome for additional GPU, board, and sensor providers.
 
 ## Layout Section
 

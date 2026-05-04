@@ -7,9 +7,9 @@
 - `TelemetryRuntime` owns steady-state collection, snapshot publishing callbacks, provider composition, and runtime target resolution for network and storage.
 - Package-private collectors perform synchronous provider work behind `TelemetryRuntime`.
 - Windows-native collection covers CPU, memory, network, storage, and clock data.
-- Vendor providers extend collection with AMD and NVIDIA GPU support plus MSI Center and Gigabyte board-metric paths.
-- GPU telemetry selects one vendor provider from the primary non-software DXGI adapter identity; unsupported GPU vendors expose only presented FPS.
-- NVIDIA presented-FPS collection asks `CashDashService` over `\\.\pipe\CashDashService` first, then falls back to local ETW collection when the service is absent or unreachable.
+- Hardware providers extend collection with supported GPU and board telemetry paths.
+- GPU telemetry selects one provider from the primary non-software DXGI adapter identity; unsupported GPU providers expose only presented FPS.
+- Presented-FPS collection asks `CashDashService` over `\\.\pipe\CashDashService` first, then falls back to local ETW collection when the service is absent or unreachable.
 - The FPS pipe protocol uses a generic request envelope with a stable request id and request name. The current FPS query is `PresentedFpsSample` / `presented_fps_sample`.
 - The metric catalog adapts snapshots and metric definitions into widget-facing metric values, histories, drive rows, and formatted text.
 - Fake-runtime support serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot.
@@ -17,8 +17,8 @@
 
 ## Subpackages
 
-- `telemetry/board/` contains board vendor selection plus MSI Center and Gigabyte SIV provider bridges.
-- `telemetry/gpu/` contains GPU vendor provider bridges and unsupported-GPU fallback behavior.
+- `telemetry/board/` contains board-provider selection plus supported provider bridges.
+- `telemetry/gpu/` contains GPU provider bridges and unsupported-GPU fallback behavior.
 - `telemetry/fps/` contains package-private Windows ETW presented-FPS and service-client provider implementations.
 - `telemetry/impl/` contains collector submodules and system-info support.
 
@@ -27,4 +27,4 @@
 - `telemetry` may depend on `telemetry`, `config`, and `util`.
 - It publishes runtime contracts such as `TelemetryRuntime`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
 - It does not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main.
-- Vendor .NET assembly reflection stays in CLR-enabled bridge translation units; native provider state stays out of CLR metadata.
+- Provider .NET assembly reflection stays in CLR-enabled bridge translation units; native provider state stays out of CLR metadata.

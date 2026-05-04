@@ -6,6 +6,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 ## Documentation Ownership
 
 - `docs/specifications.md` owns general user-visible runtime behavior.
+- `docs/hardware.md` owns supported hardware-provider details, provider runtime requirements, provider-specific telemetry behavior, and provider troubleshooting.
 - `docs/layout_edit.md` owns layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
 - `docs/layout.md` owns config language, section ownership, syntax, and validation rules.
 - `docs/layout_guide_sheet.md` owns the diagnostics layout guide sheet feature spec.
@@ -71,7 +72,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Embedded `config.ini`, `localization.ini`, and app-icon resource edits depend on explicit `resources/CaseDash.rc` CMake dependencies so incremental builds rebuild the resource object.
 - Restored saved placement across monitors with different DPI scales lets `WM_DPICHANGED` apply the monitor transition before destination window size scaling.
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.
-- Gigabyte SIV assembly loading can require the SIV install directory as the process current directory, and the original launch working directory is restored afterward.
+- Provider assembly loading restores the original launch working directory after any provider-specific current-directory change.
 - Repeated unattended profiling runs use `profile_benchmark.cmd /daemon-start` once, then ordinary benchmark invocations queue through the elevated daemon.
 - Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`.
 - If `devenv.cmd` changes Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run.
