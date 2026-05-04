@@ -974,10 +974,25 @@ These changes produced real wins and remain in the codebase:
 - Observed effect:
   - `build\CaseDash.exe` decreased from `1,360,896` bytes to `1,352,192` bytes in the side-map build.
   - The fresh app map reports `loadcfg.obj` at about `28.8 KiB`, down from about `31.0 KiB`, after removing native exception support from the bridge targets.
-  - Direct benchmark checks landed at `edit-layout drag_loop=2.32 ms`, `update-telemetry update_loop=4.83 ms`, `layout-switch switch_loop=3.64 ms`, `mouse-hover hover_loop=2.19 ms`, `theme-change theme_loop=4.73 ms`, and `layout-guide-sheet sheet_loop=87.04 ms`.
+  - Direct benchmark checks landed at `edit-layout drag_loop=2.30 ms`, `update-telemetry update_loop=4.74 ms`, `layout-switch switch_loop=3.58 ms`, `mouse-hover hover_loop=2.14 ms`, `theme-change theme_loop=4.48 ms`, and `layout-guide-sheet sheet_loop=88.34 ms`.
   - Broadly removing the maintained `/O2` per-source speed list and adding `/GF` were tested and rejected because they did not reduce `build\CaseDash.exe`.
 - Conclusion:
   - Keep the compact fixed-table lookups, dense widget-class grouping, small-vector caches, and bridge exception setting. The remaining 10% target is not visible in the current map as one safe code-shape change; larger savings likely require deeper rewrites of large cold subsystems while preserving the single-executable feature set.
+
+### Hypothesis: Compress embedded text resources and remove small hash tables from layout-edit grouping
+
+- Change:
+  - Generate compressed embedded `config.ini` and `localization.ini` resources under `build\cmake\generated\compressed_resources\` during CMake builds, using a small project-owned LZSS format and transparent decompression in `LoadUtf8ResourceData`.
+  - Losslessly recompress committed PNG resources and PNG-backed ICO frames, and make `tools\update_app_icon.ps1` run the optimizer after regenerating `resources\app.ico`.
+  - Replace remaining tiny `unordered_map` and `unordered_set` instances in layout-edit tree and similarity-indicator grouping with ordered vectors and dense enum-indexed buckets.
+- Result:
+  - Helped shipped app size while keeping the same single executable, embedded defaults, localization catalog, icon frames, and layout-edit behavior.
+- Observed effect:
+  - `build\CaseDash.exe` decreased from `1,352,192` bytes to `1,331,712` bytes.
+  - `.rsrc$02` decreased from about `46.4 KiB` before resource compression work to about `34.5 KiB`.
+  - `layout_edit_overlay_renderer.cpp.obj` decreased from about `28.8 KiB` to about `22.6 KiB`; `layout_edit_tree.cpp.obj` decreased from about `34.7 KiB` to about `32.3 KiB`.
+- Conclusion:
+  - Keep generated compressed text resources, losslessly optimized PNG payloads, and vector-based tiny grouping tables. These changes reduce shipped bytes without deferring work to external files, changing visible assets, or adding frame-time work outside cold startup/config paths and layout-edit affordance construction.
 
 ## Practical Guidance For Future Experiments
 

@@ -70,4 +70,9 @@ try {
     $stream.Dispose()
 }
 
+& python (Join-Path $repoRoot 'tools\optimize_png_resources.py') $icoPath
+if ($LASTEXITCODE -ne 0) {
+    throw "App icon PNG optimization failed with exit code $LASTEXITCODE."
+}
+
 Write-Host "Updated $icoPath from rendered dark_cyan app icon assets."

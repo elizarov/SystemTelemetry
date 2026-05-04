@@ -6,8 +6,6 @@
 #include <limits>
 #include <memory>
 #include <optional>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -994,19 +992,8 @@ std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWi
         }
     };
 
-    struct SimilarityRepresentativeKeyHash {
-        size_t operator()(const SimilarityRepresentativeKey& key) const {
-            size_t hash = std::hash<std::string>{}(key.cardId);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(static_cast<int>(key.widgetClass));
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.extent);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.edgeStart);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.edgeEnd);
-            return hash;
-        }
-    };
-
     std::vector<const WidgetLayout*> widgets;
-    std::unordered_set<SimilarityRepresentativeKey, SimilarityRepresentativeKeyHash> seenKeys;
+    std::vector<SimilarityRepresentativeKey> seenKeys;
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (!SupportsLayoutSimilarityIndicator(widget) || widget.widget == nullptr) {
@@ -1029,9 +1016,10 @@ std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWi
                 key.edgeStart = widget.rect.top;
                 key.edgeEnd = widget.rect.bottom;
             }
-            if (!seenKeys.insert(std::move(key)).second) {
+            if (std::find(seenKeys.begin(), seenKeys.end(), key) != seenKeys.end()) {
                 continue;
             }
+            seenKeys.push_back(std::move(key));
             widgets.push_back(&widget);
         }
     }

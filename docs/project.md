@@ -27,7 +27,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
 - Keep reusable agent or automation skills in `.agents\skills`.
-- Use `tools\update_app_icon.ps1` to rebuild the app, export compressed default-theme app-icon PNGs under `build\app_icon\`, and regenerate `resources\app.ico` from those rendered assets.
+- Use `tools\update_app_icon.ps1` to rebuild the app, export compressed default-theme app-icon PNGs under `build\app_icon\`, regenerate `resources\app.ico` from those rendered assets, and losslessly recompress the ICO's PNG frames.
 - `package.cmd` generates the WiX dialog bitmap under `build\installer_dialog_bmp\` from the dark_cyan app icon before building the MSI; generated installer bitmaps are not committed.
 - Use `tools\update_readme_images.ps1` to update committed README screenshots under `docs\image\`.
 - Use `tools\generate_social_preview.ps1` to generate the GitHub social preview PNG under `build\social_preview\` from dark_cyan fake telemetry and a rendered app icon.
@@ -46,7 +46,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 ## Engineering Constraints
 
 - Keep `resources/config.ini` as the embedded default configuration resource.
-- Keep `resources/CaseDash.rc` explicitly dependent on embedded payload files such as `resources/app.ico`, `resources/config.ini`, and `resources/localization.ini`.
+- Keep committed resource payloads as the source of truth; CMake generates the compressed embedded config and localization resources under `build\cmake\generated\`, while `resources/CaseDash.rc` keeps the directly embedded app icon and panel images explicit.
 - Keep `VERSION` as the single maintained base product version; generated headers, manifests, and version resources derive their build metadata from it plus Git state.
 - Do not add C++-side synthesized fallback layout, card, widget, font, color, or styling defaults that duplicate the embedded template.
 - Keep runtime text internally as UTF-8 `std::string` and convert to UTF-16 only at Windows API boundaries.

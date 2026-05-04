@@ -1,7 +1,6 @@
 #include "layout_edit/layout_edit_tree.h"
 
 #include <algorithm>
-#include <unordered_map>
 
 #include "config/config_parser.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
@@ -169,20 +168,17 @@ const LayoutCardConfig* FindCardConfig(const LayoutConfig& layout, std::string_v
 void CollectReachableCardLayoutCards(const LayoutConfig& layout,
     const LayoutNodeConfig& node,
     std::vector<std::string>& orderedCards,
-    std::vector<std::string>& recursionStack,
-    std::unordered_map<std::string, bool>& seenCards);
+    std::vector<std::string>& recursionStack);
 
 void CollectReachableCardById(const LayoutConfig& layout,
     const std::string& cardId,
     std::vector<std::string>& orderedCards,
-    std::vector<std::string>& recursionStack,
-    std::unordered_map<std::string, bool>& seenCards) {
+    std::vector<std::string>& recursionStack) {
     if (std::find(recursionStack.begin(), recursionStack.end(), cardId) != recursionStack.end()) {
         return;
     }
-    if (!seenCards.contains(cardId)) {
+    if (std::find(orderedCards.begin(), orderedCards.end(), cardId) == orderedCards.end()) {
         orderedCards.push_back(cardId);
-        seenCards.emplace(cardId, true);
     }
 
     const LayoutCardConfig* card = FindCardConfig(layout, cardId);
@@ -191,70 +187,62 @@ void CollectReachableCardById(const LayoutConfig& layout,
     }
 
     recursionStack.push_back(cardId);
-    CollectReachableCardLayoutCards(layout, card->layout, orderedCards, recursionStack, seenCards);
+    CollectReachableCardLayoutCards(layout, card->layout, orderedCards, recursionStack);
     recursionStack.pop_back();
 }
 
 void CollectReachableDashboardCards(const LayoutConfig& layout,
     const LayoutNodeConfig& node,
     std::vector<std::string>& orderedCards,
-    std::vector<std::string>& recursionStack,
-    std::unordered_map<std::string, bool>& seenCards) {
+    std::vector<std::string>& recursionStack) {
     if (node.name == "rows" || node.name == "columns") {
         for (const auto& child : node.children) {
-            CollectReachableDashboardCards(layout, child, orderedCards, recursionStack, seenCards);
+            CollectReachableDashboardCards(layout, child, orderedCards, recursionStack);
         }
         return;
     }
 
     if (!node.name.empty()) {
-        CollectReachableCardById(layout, node.name, orderedCards, recursionStack, seenCards);
+        CollectReachableCardById(layout, node.name, orderedCards, recursionStack);
     }
 }
 
 void CollectReachableCardLayoutCards(const LayoutConfig& layout,
     const LayoutNodeConfig& node,
     std::vector<std::string>& orderedCards,
-    std::vector<std::string>& recursionStack,
-    std::unordered_map<std::string, bool>& seenCards) {
+    std::vector<std::string>& recursionStack) {
     if (node.cardReference) {
-        CollectReachableCardById(layout, node.name, orderedCards, recursionStack, seenCards);
+        CollectReachableCardById(layout, node.name, orderedCards, recursionStack);
         return;
     }
 
     for (const auto& child : node.children) {
-        CollectReachableCardLayoutCards(layout, child, orderedCards, recursionStack, seenCards);
+        CollectReachableCardLayoutCards(layout, child, orderedCards, recursionStack);
     }
 }
 
 std::vector<std::string> CollectReachableCards(const AppConfig& config) {
     std::vector<std::string> orderedCards;
     std::vector<std::string> recursionStack;
-    std::unordered_map<std::string, bool> seenCards;
-    CollectReachableDashboardCards(
-        config.layout, config.layout.structure.cardsLayout, orderedCards, recursionStack, seenCards);
+    CollectReachableDashboardCards(config.layout, config.layout.structure.cardsLayout, orderedCards, recursionStack);
     return orderedCards;
 }
 
-void CollectTopLevelCardsFromNode(const LayoutNodeConfig& node,
-    std::vector<std::string>& orderedCards,
-    std::unordered_map<std::string, bool>& seenCards) {
+void CollectTopLevelCardsFromNode(const LayoutNodeConfig& node, std::vector<std::string>& orderedCards) {
     if (node.name == "rows" || node.name == "columns") {
         for (const auto& child : node.children) {
-            CollectTopLevelCardsFromNode(child, orderedCards, seenCards);
+            CollectTopLevelCardsFromNode(child, orderedCards);
         }
         return;
     }
-    if (!node.name.empty() && !seenCards.contains(node.name)) {
+    if (!node.name.empty() && std::find(orderedCards.begin(), orderedCards.end(), node.name) == orderedCards.end()) {
         orderedCards.push_back(node.name);
-        seenCards.emplace(node.name, true);
     }
 }
 
 std::vector<std::string> CollectTopLevelCards(const AppConfig& config) {
     std::vector<std::string> orderedCards;
-    std::unordered_map<std::string, bool> seenCards;
-    CollectTopLevelCardsFromNode(config.layout.structure.cardsLayout, orderedCards, seenCards);
+    CollectTopLevelCardsFromNode(config.layout.structure.cardsLayout, orderedCards);
     return orderedCards;
 }
 

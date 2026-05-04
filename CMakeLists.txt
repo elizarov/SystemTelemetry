@@ -6,6 +6,8 @@ if(NOT MSVC)
     message(FATAL_ERROR "CaseDash currently supports MSVC builds only.")
 endif()
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 include(cmake/CaseDashVersion.cmake)
 casedash_configure_version_metadata()
 message(STATUS "Configuring CaseDash ${CASEDASH_VERSION}")
@@ -71,8 +73,30 @@ find_library(MSCOREE_LIB
 if(NOT MSCOREE_LIB)
     message(FATAL_ERROR "mscoree.lib was not found. Install the .NET Framework SDK through Visual Studio Build Tools 2022 and run build.cmd from a configured developer prompt.")
 endif()
+
+set(CASEDASH_COMPRESSED_RESOURCE_RC "${CASEDASH_GENERATED_DIR}/CaseDashCompressedResources.rc")
+set(CASEDASH_COMPRESSED_RESOURCE_DIR "${CASEDASH_GENERATED_DIR}/compressed_resources")
+add_custom_command(
+    OUTPUT
+        "${CASEDASH_COMPRESSED_RESOURCE_RC}"
+        "${CASEDASH_COMPRESSED_RESOURCE_DIR}/config.ini.cdlz"
+        "${CASEDASH_COMPRESSED_RESOURCE_DIR}/localization.ini.cdlz"
+    COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
+        --output-dir "${CASEDASH_COMPRESSED_RESOURCE_DIR}"
+        --output-rc "${CASEDASH_COMPRESSED_RESOURCE_RC}"
+        --resource-root "${CMAKE_SOURCE_DIR}/resources"
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
+        "${CMAKE_SOURCE_DIR}/resources/config.ini"
+        "${CMAKE_SOURCE_DIR}/resources/localization.ini"
+    VERBATIM
+)
+
 add_executable(CaseDash WIN32
     resources/CaseDash.rc
+    ${CASEDASH_COMPRESSED_RESOURCE_RC}
     ${CASEDASH_VERSION_RC}
     src/main/main.cpp
     src/diagnostics/diagnostics.cpp
@@ -200,7 +224,7 @@ add_executable(CaseDash WIN32
 )
 
 set_source_files_properties(resources/CaseDash.rc PROPERTIES
-    OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/app.ico;${CMAKE_SOURCE_DIR}/resources/config.ini;${CMAKE_SOURCE_DIR}/resources/localization.ini"
+    OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/app.ico"
 )
 
 set_source_files_properties(${CASEDASH_VERSION_RC} ${CASEDASH_BENCHMARKS_VERSION_RC} PROPERTIES
@@ -602,6 +626,7 @@ add_test(NAME CaseDashTests COMMAND CaseDashTests)
 
 add_executable(CaseDashBenchmarks
     resources/CaseDash.rc
+    ${CASEDASH_COMPRESSED_RESOURCE_RC}
     ${CASEDASH_BENCHMARKS_VERSION_RC}
     tests/benchmarks.cpp
     src/util/strings.cpp

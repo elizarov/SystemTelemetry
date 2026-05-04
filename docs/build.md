@@ -9,6 +9,7 @@ See also: [docs/project.md](project.md) for repository policy, [docs/hardware.md
 - Visual Studio 2026 Insiders (`18`) Build Tools with CMake support
 - Visual Studio 2026 Insiders (`18`) C++/CLI support
 - .NET Framework 4.8 SDK
+- Python 3 available on `PATH` or discoverable by CMake for generated build resources and repository tooling
 - vcpkg available either through the active Visual Studio developer environment or through `VCPKG_ROOT`
 - NuGet package restore access for the WiX Toolset SDK when building the MSI package; the installer project accepts the WiX 7 OSMF EULA for non-interactive local and CI builds.
 - Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
@@ -30,7 +31,7 @@ Always build through the repository entrypoint:
 build.cmd
 ```
 
-`build.cmd` configures and builds the maintained CMake tree under `build\cmake\`, keeps the final executable under `build\`, preserves the repo-root `vcpkg\` manifest install tree across clean builds, restores `build\cmake\compile_commands.json` for `clangd`-based editors, and keeps vcpkg download plus registry caches in a user-local cache root so fresh worktrees reuse the same bootstrap downloads. The default build targets are `CaseDash` and `CaseDashTests`; `CaseDashBenchmarks` is built only when `build.cmd /benchmarks` or `build.cmd Release /benchmarks` is requested.
+`build.cmd` configures and builds the maintained CMake tree under `build\cmake\`, keeps the final executable under `build\`, preserves the repo-root `vcpkg\` manifest install tree across clean builds, restores `build\cmake\compile_commands.json` for `clangd`-based editors, and keeps vcpkg download plus registry caches in a user-local cache root so fresh worktrees reuse the same bootstrap downloads. The default build targets are `CaseDash` and `CaseDashTests`; `CaseDashBenchmarks` is built only when `build.cmd /benchmarks` or `build.cmd Release /benchmarks` is requested. CMake generates compressed embedded config and localization resource payloads under `build\cmake\generated\compressed_resources\` from the maintained source files in `resources\`.
 
 By default the shared cache root is `%LOCALAPPDATA%\CaseDash\cache`, falls back to `%USERPROFILE%\.casedash\cache` when `LOCALAPPDATA` is unavailable, and can be overridden with `CASEDASH_CACHE_ROOT`. `build.cmd` exports `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE` from that root unless the caller already set them.
 
@@ -76,6 +77,7 @@ The `Release` workflow deploys the generated site after a successful tagged rele
 - `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, no-local-`NOLINT` checks, header-body checks, source-policy checks such as the project-wide `std::function` ban, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep checks maintained non-vendored `.cpp` and `.h` files under `src\` and `tests\`, excludes selected provider bridge files, writes `build\clang_tidy_report.txt`, uses a four-minute per-file timeout, reports enabled analyzer, bugprone, unused internal function, and unused include findings as errors, and filters maintained include-cleaner false positives.
 - `lint.cmd tidy` runs a full optional `clang-tidy` sweep and commonly needs at least eight minutes on the current toolchain before it can report success or failure. Local development avoids this slow sweep unless explicitly requested. GitHub Actions owns the routine tidy sweep with `CASEDASH_TIDY_TIMEOUT_SECONDS` set to a larger per-file timeout and `CASEDASH_TIDY_MAX_PARALLEL` set for runner stability.
 - `tools\update_readme_images.ps1` is the maintained entrypoint for updating the committed README screenshots under `docs\image\`. It builds the app by default and exports the `dark_cyan` and `blueprint_light` screenshots from built-in fake telemetry with fixed `/scale:2` rendering. Pass `-SkipBuild` only when `build\CaseDash.exe` is already current.
+- `tools\optimize_png_resources.py` losslessly recompresses committed PNG resources and PNG-backed ICO frames. `tools\update_app_icon.ps1` runs it after regenerating `resources\app.ico`.
 - `package.cmd` is the maintained local entrypoint for producing the release MSI outside the GitHub Release workflow. It normalizes `major.minor` versions from `VERSION` to `major.minor.0` for Windows Installer product-version rules while keeping the output filename on the original `VERSION` text.
 - `web-build.cmd` is the maintained local entrypoint for producing the generated static website under `web\dist\`.
 - CMake enables MSVC warning C4505 and treats it as an error so unreferenced internal functions are caught during normal builds when MSVC can diagnose them.
