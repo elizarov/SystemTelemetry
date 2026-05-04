@@ -1,5 +1,6 @@
 param(
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [string]$BmpPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,7 +10,9 @@ $buildRoot = Join-Path $repoRoot 'build'
 $assetRoot = Join-Path $buildRoot 'installer_dialog_bmp'
 $exePath = Join-Path $buildRoot 'CaseDash.exe'
 $iconPath = Join-Path $assetRoot 'dark_cyan_app_icon_144.png'
-$bmpPath = Join-Path $repoRoot 'installer\CaseDash_WixUIDialogBmp.bmp'
+if ([string]::IsNullOrWhiteSpace($BmpPath)) {
+    $BmpPath = Join-Path $assetRoot 'CaseDash_WixUIDialogBmp.bmp'
+}
 
 Add-Type -AssemblyName System.Drawing
 
@@ -100,9 +103,13 @@ try {
         $graphics.Dispose()
     }
 
-    $bitmap.Save($bmpPath, [Drawing.Imaging.ImageFormat]::Bmp)
+    $bmpDirectory = Split-Path -Parent $BmpPath
+    if (-not [string]::IsNullOrWhiteSpace($bmpDirectory)) {
+        New-Item -ItemType Directory -Force -Path $bmpDirectory | Out-Null
+    }
+    $bitmap.Save($BmpPath, [Drawing.Imaging.ImageFormat]::Bmp)
 } finally {
     $bitmap.Dispose()
 }
 
-Write-Host "Updated $bmpPath from rendered dark_cyan app icon assets."
+Write-Host "Updated $BmpPath from rendered dark_cyan app icon assets."

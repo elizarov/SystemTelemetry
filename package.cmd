@@ -65,6 +65,8 @@ set "OUTPUT_MSI=%REPO_ROOT%\build\CaseDash-%CASEDASH_VERSION_TEXT%.msi"
 set "OUTPUT_SHA=%OUTPUT_MSI%.sha256"
 set "MSBUILD_REPO_ROOT=%REPO_ROOT:\=/%"
 set "MSBUILD_SOURCE_EXE=%MSBUILD_REPO_ROOT%/build/CaseDash.exe"
+set "INSTALLER_DIALOG_BMP=%REPO_ROOT%\build\installer_dialog_bmp\CaseDash_WixUIDialogBmp.bmp"
+set "MSBUILD_INSTALLER_DIALOG_BMP=%MSBUILD_REPO_ROOT%/build/installer_dialog_bmp/CaseDash_WixUIDialogBmp.bmp"
 
 if not exist "%SOURCE_EXE%" (
     echo Missing build output: "%SOURCE_EXE%"
@@ -77,7 +79,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
-msbuild "%REPO_ROOT%\installer\CaseDash.Installer.wixproj" /restore /p:Configuration=Release /p:Platform=x64 /p:CaseDashVersionText="%CASEDASH_VERSION_TEXT%" /p:ProductVersion="%CASEDASH_MSI_VERSION%" /p:CaseDashExePath="%MSBUILD_SOURCE_EXE%" /p:OutputPath="%MSBUILD_REPO_ROOT%/build/" /p:BaseIntermediateOutputPath="%MSBUILD_REPO_ROOT%/build/installer/obj/" /p:IntermediateOutputPath="%MSBUILD_REPO_ROOT%/build/installer/"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO_ROOT%\tools\generate_installer_dialog_bmp.ps1" -SkipBuild -BmpPath "%INSTALLER_DIALOG_BMP%"
+if errorlevel 1 exit /b %errorlevel%
+
+msbuild "%REPO_ROOT%\installer\CaseDash.Installer.wixproj" /restore /p:Configuration=Release /p:Platform=x64 /p:CaseDashVersionText="%CASEDASH_VERSION_TEXT%" /p:ProductVersion="%CASEDASH_MSI_VERSION%" /p:CaseDashExePath="%MSBUILD_SOURCE_EXE%" /p:CaseDashDialogBmpPath="%MSBUILD_INSTALLER_DIALOG_BMP%" /p:OutputPath="%MSBUILD_REPO_ROOT%/build/" /p:BaseIntermediateOutputPath="%MSBUILD_REPO_ROOT%/build/installer/obj/" /p:IntermediateOutputPath="%MSBUILD_REPO_ROOT%/build/installer/"
 if errorlevel 1 exit /b %errorlevel%
 
 if not exist "%OUTPUT_MSI%" (

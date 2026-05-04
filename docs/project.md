@@ -27,8 +27,8 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
 - Keep reusable agent or automation skills in `.agents\skills`.
-- Use `update_app_icon.cmd` to rebuild the app, export compressed default-theme app-icon PNGs under `build\app_icon\`, and regenerate `resources\app.ico` from those rendered assets.
-- Use `update_installer_dialog_bmp.cmd` to rebuild the app, export the dark_cyan app icon under `build\installer_dialog_bmp\`, and regenerate `installer\CaseDash_WixUIDialogBmp.bmp` from that rendered asset.
+- Use `tools\update_app_icon.ps1` to rebuild the app, export compressed default-theme app-icon PNGs under `build\app_icon\`, and regenerate `resources\app.ico` from those rendered assets.
+- `package.cmd` generates the WiX dialog bitmap under `build\installer_dialog_bmp\` from the dark_cyan app icon before building the MSI; generated installer bitmaps are not committed.
 - Use `update_readme_images.cmd` to rebuild committed README screenshots under `docs\image\`.
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
