@@ -56,7 +56,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Do not retry `/GF` as a standalone size win; it did not reduce the shipped executable in the measured pass.
 - Do not keep `/Gy`, `/Gw`, `/OPT:ICF`, `/GF`, or `/Zc:inline` just because they sound size-oriented; the final retained code-shape wins did not need those extra flags.
 - Do not retry replacing the config parser card-reference `std::set` with a flat string-view vector; it regressed the app size in the measured pass.
-- Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason.
+- Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason. `lint.cmd` blocks maintained source and test files from using `std::filesystem` or including `<filesystem>`.
 
 ## Notes
 

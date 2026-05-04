@@ -14,6 +14,8 @@ SCANNED_ROOTS = ("src", "tests")
 CHECKED_SUFFIXES = {".h", ".cpp"}
 EXCLUDED_PREFIXES = ("src/vendor/",)
 STD_FUNCTION_RE = re.compile(r"\bstd\s*::\s*function\b")
+STD_FILESYSTEM_RE = re.compile(r"\bstd\s*::\s*filesystem\b")
+FILESYSTEM_INCLUDE_RE = re.compile(r"^\s*#\s*include\s*<\s*filesystem\s*>")
 
 
 @dataclass(frozen=True)
@@ -147,6 +149,17 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                         message=(
                             "std::function is not allowed in maintained source; use FunctionRef for synchronous "
                             "borrowed callbacks or a purpose-built interface when ownership must escape the call."
+                        ),
+                    )
+                )
+            if STD_FILESYSTEM_RE.search(line) or FILESYSTEM_INCLUDE_RE.search(line):
+                violations.append(
+                    Violation(
+                        relpath=file_rel,
+                        line=line_number,
+                        message=(
+                            "std::filesystem is not allowed in maintained source; use src/util/file_path.* helpers "
+                            "so path handling stays Win32-backed without pulling filesystem machinery into the app."
                         ),
                     )
                 )
