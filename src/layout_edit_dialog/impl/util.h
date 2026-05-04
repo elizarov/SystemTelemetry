@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "config/config.h"
+#include "layout_edit/board_metric_binding.h"
 #include "layout_edit/layout_edit_tree.h"
 #include "layout_edit_dialog/impl/state.h"
 #include "resource.h"
@@ -28,17 +29,6 @@ inline constexpr std::array<ColorDialogControls, 4> kColorDialogControls = {{
     {IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT, IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER, "alpha"},
 }};
 
-enum class BoardMetricBindingKind {
-    Temperature,
-    Fan,
-};
-
-struct BoardMetricBindingTarget {
-    BoardMetricBindingKind kind = BoardMetricBindingKind::Temperature;
-    std::string logicalName;
-};
-
-std::optional<BoardMetricBindingTarget> ParseBoardMetricBindingTarget(std::string_view metricId);
 std::string FindConfiguredBoardMetricBinding(const AppConfig& config, const LayoutMetricEditKey& key);
 bool AreScalesEqual(double left, double right);
 std::optional<double> TryParseDialogDouble(const wchar_t* text);

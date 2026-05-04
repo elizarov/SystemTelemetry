@@ -942,14 +942,17 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
                 std::vector<int> attemptWeights = freeWeights;
                 attemptWeights[index] = firstWeight;
                 attemptWeights[index + 1] = combined - firstWeight;
-                const ExtentCacheKey cacheKey{attemptWeights, widget};
-                if (const auto cached = drag.extentCache.find(cacheKey); cached != drag.extentCache.end()) {
-                    return cached->second;
+                ExtentCacheKey cacheKey{std::move(attemptWeights), widget};
+                const auto cached = std::find_if(drag.extentCache.begin(),
+                    drag.extentCache.end(),
+                    [&](const ExtentCacheEntry& entry) { return entry.key == cacheKey; });
+                if (cached != drag.extentCache.end()) {
+                    return cached->extent;
                 }
 
                 std::optional<int> extent = host_.EvaluateLayoutWidgetExtentForWeights(
-                    LayoutEditLayoutTarget::ForGuide(drag.guide), attemptWeights, widget, drag.guide.axis);
-                drag.extentCache.emplace(std::move(cacheKey), extent);
+                    LayoutEditLayoutTarget::ForGuide(drag.guide), cacheKey.weights, widget, drag.guide.axis);
+                drag.extentCache.push_back(ExtentCacheEntry{std::move(cacheKey), extent});
                 return extent;
             });
         if (!snappedWeight.has_value()) {

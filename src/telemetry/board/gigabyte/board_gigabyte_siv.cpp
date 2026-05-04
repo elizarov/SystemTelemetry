@@ -6,7 +6,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <winreg.h>
@@ -46,9 +45,10 @@ std::optional<std::wstring> FindInstalledSivDirectory() {
         HKEY childKey = nullptr;
         if (RegOpenKeyExW(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
             const auto displayName = ReadRegistryWideString(childKey, nullptr, L"DisplayName");
+            const std::string displayNameText = displayName.has_value() ? Utf8FromWide(*displayName) : std::string();
             const bool isSiv =
-                displayName.has_value() && (EqualsInsensitive(*displayName, L"SIV") ||
-                                               EqualsInsensitive(*displayName, L"System Information Viewer"));
+                !displayNameText.empty() && (EqualsInsensitive(displayNameText, "SIV") ||
+                                                EqualsInsensitive(displayNameText, "System Information Viewer"));
             if (isSiv) {
                 const auto installLocation = ReadRegistryWideString(childKey, nullptr, L"InstallLocation");
                 if (installLocation.has_value() && !installLocation->empty()) {
@@ -254,8 +254,8 @@ private:
     std::vector<std::string> availableTemperatureNames_;
     std::vector<NamedScalarMetric> fanMetricTemplate_;
     std::vector<NamedScalarMetric> temperatureMetricTemplate_;
-    std::unordered_map<std::string, std::vector<size_t>> requestedFanIndexBySourceName_;
-    std::unordered_map<std::string, std::vector<size_t>> requestedTemperatureIndexBySourceName_;
+    BoardMetricIndexBySourceName requestedFanIndexBySourceName_;
+    BoardMetricIndexBySourceName requestedTemperatureIndexBySourceName_;
     bool initialized_ = false;
 };
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <utility>
 
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
@@ -85,18 +86,6 @@ bool EqualsInsensitive(const std::string& left, const std::string& right) {
     return ToLower(left) == ToLower(right);
 }
 
-bool EqualsInsensitive(const std::wstring& left, const std::wstring& right) {
-    if (left.size() != right.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < left.size(); ++i) {
-        if (::towlower(left[i]) != ::towlower(right[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
 std::string JoinNames(const std::vector<std::string>& names) {
     std::string joined;
     for (size_t i = 0; i < names.size(); ++i) {
@@ -106,6 +95,32 @@ std::string JoinNames(const std::vector<std::string>& names) {
         joined += names[i];
     }
     return joined;
+}
+
+void SortStrings(std::vector<std::string>& values) {
+    // Size: keep string sorting in one concrete helper instead of re-instantiating std::sort at call sites.
+    for (size_t i = 1; i < values.size(); ++i) {
+        std::string value = std::move(values[i]);
+        size_t insert = i;
+        while (insert > 0 && value < values[insert - 1]) {
+            values[insert] = std::move(values[insert - 1]);
+            --insert;
+        }
+        values[insert] = std::move(value);
+    }
+}
+
+void SortUniqueStrings(std::vector<std::string>& values) {
+    SortStrings(values);
+    size_t out = 0;
+    for (auto& value : values) {
+        if (out != 0 && values[out - 1] == value) {
+            continue;
+        }
+        values[out] = std::move(value);
+        ++out;
+    }
+    values.resize(out);
 }
 
 std::string FormatHresult(HRESULT value) {

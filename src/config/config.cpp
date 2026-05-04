@@ -100,7 +100,7 @@ AppConfig BuildEffectiveRuntimeConfig(
     return config;
 }
 
-bool LayoutConfig::operator==(const LayoutConfig& other) const {
+__declspec(noinline) bool LayoutConfig::operator==(const LayoutConfig& other) const {
     return colors == other.colors && layoutGuideSheet == other.layoutGuideSheet && themes == other.themes &&
            dashboard == other.dashboard && cardStyle == other.cardStyle && metricList == other.metricList &&
            driveUsageList == other.driveUsageList && throughput == other.throughput && gauge == other.gauge &&

@@ -11,6 +11,7 @@
 #include "dashboard/dashboard_app.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
+#include "layout_edit/board_metric_binding.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
@@ -66,18 +67,6 @@ private:
 
 constexpr double kPredefinedDisplayScales[] = {1.0, 1.5, 2.0, 2.5, 3.0};
 constexpr double kScaleEpsilon = 0.0001;
-constexpr std::string_view kBoardTemperatureMetricPrefix = "board.temp.";
-constexpr std::string_view kBoardFanMetricPrefix = "board.fan.";
-
-enum class BoardMetricBindingKind {
-    Temperature,
-    Fan,
-};
-
-struct BoardMetricBindingTarget {
-    BoardMetricBindingKind kind = BoardMetricBindingKind::Temperature;
-    std::string logicalName;
-};
 
 struct UnsavedLayoutEditDialogState {
     const DashboardApp* app = nullptr;
@@ -117,26 +106,10 @@ int MakeAboutIconSlotSquare(HWND hwnd) {
     return size;
 }
 
-std::optional<BoardMetricBindingTarget> ParseBoardMetricBindingTarget(std::string_view metricId) {
-    if (metricId.rfind(kBoardTemperatureMetricPrefix, 0) == 0) {
-        return BoardMetricBindingTarget{
-            BoardMetricBindingKind::Temperature,
-            std::string(metricId.substr(kBoardTemperatureMetricPrefix.size())),
-        };
-    }
-    if (metricId.rfind(kBoardFanMetricPrefix, 0) == 0) {
-        return BoardMetricBindingTarget{
-            BoardMetricBindingKind::Fan,
-            std::string(metricId.substr(kBoardFanMetricPrefix.size())),
-        };
-    }
-    return std::nullopt;
-}
-
 AppConfig BuildLayoutEditOriginalConfig(const DashboardSessionState& sessionState) {
     AppConfig config = sessionState.config;
-    if (sessionState.hasLayoutEditSessionSavedLayout) {
-        config.layout = sessionState.layoutEditSessionSavedLayout;
+    if (sessionState.layoutEditSessionSavedLayout != nullptr) {
+        config.layout = *sessionState.layoutEditSessionSavedLayout;
     }
     return config;
 }
@@ -289,13 +262,6 @@ bool IsMetricListAddRowTarget(const LayoutEditController::TooltipTarget& target)
 
 std::wstring BuildLayoutGuideEditLabel(const LayoutEditGuide& guide) {
     return guide.editCardId.empty() ? L"cards weights" : L"layout weights";
-}
-
-const LayoutNodeConfig* FindWeightEditNode(const AppConfig& config, const LayoutWeightEditKey& key) {
-    LayoutEditLayoutTarget target;
-    target.editCardId = key.editCardId;
-    target.nodePath = key.nodePath;
-    return FindGuideNode(config, target);
 }
 
 struct CustomScaleDialogState {
@@ -767,25 +733,12 @@ bool DashboardShellUi::ApplyFontPreview(LayoutEditParameter parameter, const UiF
 }
 
 bool DashboardShellUi::ApplyFontFamilyPreview(const std::string& family) {
-    AppConfig updatedConfig = CurrentConfig();
-    updatedConfig.layout.fonts.title.face = family;
-    updatedConfig.layout.fonts.big.face = family;
-    updatedConfig.layout.fonts.value.face = family;
-    updatedConfig.layout.fonts.label.face = family;
-    updatedConfig.layout.fonts.text.face = family;
-    updatedConfig.layout.fonts.smallText.face = family;
-    updatedConfig.layout.fonts.footer.face = family;
-    updatedConfig.layout.fonts.clockTime.face = family;
-    updatedConfig.layout.fonts.clockDate.face = family;
-    RestoreConfigSnapshot(updatedConfig);
-    return true;
+    // Size: font previews mutate layout.fonts directly; copying full AppConfig measured larger.
+    return app_.controller_.ApplyLayoutEditFontFamily(app_, family);
 }
 
 bool DashboardShellUi::ApplyFontSetPreview(const UiFontSetConfig& fonts) {
-    AppConfig updatedConfig = CurrentConfig();
-    updatedConfig.layout.fonts = fonts;
-    RestoreConfigSnapshot(updatedConfig);
-    return true;
+    return app_.controller_.ApplyLayoutEditFontSet(app_, fonts);
 }
 
 bool DashboardShellUi::ApplyLayoutPreview(const std::string& layoutName) {
@@ -793,17 +746,8 @@ bool DashboardShellUi::ApplyLayoutPreview(const std::string& layoutName) {
 }
 
 bool DashboardShellUi::ApplyThemePreview(const std::string& themeName) {
-    AppConfig updatedConfig = CurrentConfig();
-    const auto themeIt = std::find_if(updatedConfig.layout.themes.begin(),
-        updatedConfig.layout.themes.end(),
-        [&](const ThemeConfig& theme) { return theme.name == themeName; });
-    if (themeIt == updatedConfig.layout.themes.end()) {
-        return false;
-    }
-    updatedConfig.display.theme = themeName;
-    ResolveConfiguredColors(updatedConfig);
-    RestoreConfigSnapshot(updatedConfig);
-    return true;
+    // Size: pure layout previews mutate config in-place; copying full AppConfig in the dialog host measured larger.
+    return app_.controller_.ApplyLayoutEditTheme(app_, themeName);
 }
 
 bool DashboardShellUi::ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) {
@@ -811,86 +755,11 @@ bool DashboardShellUi::ApplyColorPreview(LayoutEditParameter parameter, unsigned
 }
 
 bool DashboardShellUi::ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression) {
-    AppConfig updatedConfig = CurrentConfig();
-    ColorConfig* target = nullptr;
-    switch (parameter) {
-        case LayoutEditParameter::ColorBackground:
-            target = &updatedConfig.layout.colors.backgroundColor;
-            break;
-        case LayoutEditParameter::ColorForeground:
-            target = &updatedConfig.layout.colors.foregroundColor;
-            break;
-        case LayoutEditParameter::ColorIcon:
-            target = &updatedConfig.layout.colors.iconColor;
-            break;
-        case LayoutEditParameter::ColorPeakGhost:
-            target = &updatedConfig.layout.colors.peakGhostColor;
-            break;
-        case LayoutEditParameter::ColorWarning:
-            target = &updatedConfig.layout.colors.warningColor;
-            break;
-        case LayoutEditParameter::ColorAccent:
-            target = &updatedConfig.layout.colors.accentColor;
-            break;
-        case LayoutEditParameter::ColorLayoutGuide:
-            target = &updatedConfig.layout.colors.layoutGuideColor;
-            break;
-        case LayoutEditParameter::ColorActiveEdit:
-            target = &updatedConfig.layout.colors.activeEditColor;
-            break;
-        case LayoutEditParameter::ColorPanelBorder:
-            target = &updatedConfig.layout.colors.panelBorderColor;
-            break;
-        case LayoutEditParameter::ColorMutedText:
-            target = &updatedConfig.layout.colors.mutedTextColor;
-            break;
-        case LayoutEditParameter::ColorTrack:
-            target = &updatedConfig.layout.colors.trackColor;
-            break;
-        case LayoutEditParameter::ColorPanelFill:
-            target = &updatedConfig.layout.colors.panelFillColor;
-            break;
-        case LayoutEditParameter::ColorGraphBackground:
-            target = &updatedConfig.layout.colors.graphBackgroundColor;
-            break;
-        case LayoutEditParameter::ColorGraphAxis:
-            target = &updatedConfig.layout.colors.graphAxisColor;
-            break;
-        case LayoutEditParameter::ColorGraphMarker:
-            target = &updatedConfig.layout.colors.graphMarkerColor;
-            break;
-        default:
-            break;
-    }
-    if (target == nullptr) {
-        return false;
-    }
-    target->expression = expression;
-    ResolveConfiguredColors(updatedConfig);
-    RestoreConfigSnapshot(updatedConfig);
-    return true;
+    return app_.controller_.ApplyLayoutEditColorExpression(app_, parameter, expression);
 }
 
 bool DashboardShellUi::ApplyThemeColorPreview(const ThemeColorEditKey& key, unsigned int value) {
-    AppConfig updatedConfig = CurrentConfig();
-    auto themeIt = std::find_if(updatedConfig.layout.themes.begin(),
-        updatedConfig.layout.themes.end(),
-        [&](const ThemeConfig& theme) { return theme.name == key.themeName; });
-    if (themeIt == updatedConfig.layout.themes.end()) {
-        return false;
-    }
-    ColorConfig* target = key.tokenName == "background"   ? &themeIt->background
-                          : key.tokenName == "foreground" ? &themeIt->foreground
-                          : key.tokenName == "accent"     ? &themeIt->accent
-                          : key.tokenName == "guide"      ? &themeIt->guide
-                                                          : nullptr;
-    if (target == nullptr) {
-        return false;
-    }
-    *target = ColorConfig::FromRgba(value);
-    ResolveConfiguredColors(updatedConfig);
-    RestoreConfigSnapshot(updatedConfig);
-    return true;
+    return app_.controller_.ApplyLayoutEditThemeColor(app_, key, value);
 }
 
 bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
@@ -926,16 +795,7 @@ bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
 }
 
 bool DashboardShellUi::ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title) {
-    AppConfig updatedConfig = CurrentConfig();
-    const auto it = std::find_if(updatedConfig.layout.cards.begin(),
-        updatedConfig.layout.cards.end(),
-        [&](const LayoutCardConfig& card) { return card.id == key.cardId; });
-    if (it == updatedConfig.layout.cards.end()) {
-        return false;
-    }
-    it->title = title;
-    RestoreConfigSnapshot(updatedConfig);
-    return true;
+    return app_.controller_.ApplyLayoutEditCardTitle(app_, key, title);
 }
 
 bool DashboardShellUi::ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value) {
@@ -972,23 +832,11 @@ bool DashboardShellUi::ApplyMetricListAddRowPreview(const LayoutEditController::
 }
 
 bool DashboardShellUi::ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) {
-    const LayoutNodeConfig* node = FindWeightEditNode(CurrentConfig(), key);
-    if (node == nullptr || key.separatorIndex + 1 >= node->children.size()) {
-        return false;
-    }
-
-    std::vector<int> weights;
-    weights.reserve(node->children.size());
-    for (const auto& child : node->children) {
-        weights.push_back(std::max(1, child.weight));
-    }
-    weights[key.separatorIndex] = firstWeight;
-    weights[key.separatorIndex + 1] = secondWeight;
-
     LayoutEditLayoutTarget target;
     target.editCardId = key.editCardId;
     target.nodePath = key.nodePath;
-    return app_.ApplyLayoutGuideWeights(target, weights);
+    // Size: dialog edits touch one separator; update adjacent weights without building a vector copy.
+    return app_.ApplyLayoutGuideAdjacentWeights(target, key.separatorIndex, firstWeight, secondWeight);
 }
 
 void DashboardShellUi::UpdateLayoutEditSelectionHighlight(

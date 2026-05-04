@@ -142,10 +142,11 @@ template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
 }
 
 template <typename Field> std::uint32_t RuntimeFieldOffset() {
-    typename Field::owner_type owner{};
-    const auto* ownerBytes = reinterpret_cast<const char*>(&owner);
-    const auto* fieldBytes = reinterpret_cast<const char*>(&Field::RawGet(owner));
-    return static_cast<std::uint32_t>(fieldBytes - ownerBytes);
+    using Owner = typename Field::owner_type;
+    // Size: field offsets are static facts; constructing Owner pulled constructor code into maps.
+    const auto* owner = reinterpret_cast<const Owner*>(0);
+    const auto* field = &(owner->*Field::member);
+    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(field));
 }
 
 template <typename Field> RuntimeConfigFieldDescriptor MakeRuntimeFieldDescriptor() {

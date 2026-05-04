@@ -76,6 +76,32 @@ bool UseActiveEditEmphasis(const DashboardOverlayState& overlayState, bool activ
     return active && !overlayState.forceHoverEquivalentAffordances;
 }
 
+struct SimilarityTypeKey {
+    WidgetClass widgetClass = WidgetClass::Unknown;
+    int extent = 0;
+
+    bool operator==(const SimilarityTypeKey& other) const {
+        return widgetClass == other.widgetClass && extent == other.extent;
+    }
+};
+
+struct VisibleWidgetEntry {
+    const WidgetLayout* widget = nullptr;
+    SimilarityTypeKey type;
+    bool hasExactType = false;
+    int exactTypeOrdinal = 0;
+};
+
+std::vector<VisibleWidgetEntry>::iterator FindVisibleWidgetEntry(
+    std::vector<VisibleWidgetEntry>& entries, const WidgetLayout* widget) {
+    for (auto it = entries.begin(); it != entries.end(); ++it) {
+        if (it->widget == widget) {
+            return it;
+        }
+    }
+    return entries.end();
+}
+
 }  // namespace
 
 std::vector<LayoutEditAnchorRegion> CollectRelatedEditableAnchorHighlights(
@@ -857,110 +883,75 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
         return;
     }
 
-    struct SimilarityTypeKey {
-        WidgetClass widgetClass = WidgetClass::Unknown;
-        int extent = 0;
-
-        bool operator==(const SimilarityTypeKey& other) const {
-            return widgetClass == other.widgetClass && extent == other.extent;
-        }
-
-        bool operator<(const SimilarityTypeKey& other) const {
-            if (widgetClass != other.widgetClass) {
-                return widgetClass < other.widgetClass;
-            }
-            return extent < other.extent;
-        }
-    };
-
-    struct ExactTypeEntry {
-        const WidgetLayout* widget = nullptr;
-        SimilarityTypeKey type;
-    };
-
-    struct OrdinalEntry {
-        SimilarityTypeKey type;
-        int ordinal = 0;
-    };
-
     LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
     const char* axisLabel = "horizontal";
-    std::vector<const WidgetLayout*> affectedWidgets;
+    const LayoutEditGuide* activeGuide = nullptr;
+    bool allWidgetsAffected = false;
     std::vector<const WidgetLayout*> allWidgets;
     if (overlayState.similarityIndicatorMode == LayoutSimilarityIndicatorMode::AllHorizontal) {
         axis = LayoutGuideAxis::Vertical;
         axisLabel = "horizontal";
         allWidgets = renderer_.CollectSimilarityIndicatorWidgets(axis);
-        affectedWidgets = allWidgets;
+        allWidgetsAffected = true;
     } else if (overlayState.similarityIndicatorMode == LayoutSimilarityIndicatorMode::AllVertical) {
         axis = LayoutGuideAxis::Horizontal;
         axisLabel = "vertical";
         allWidgets = renderer_.CollectSimilarityIndicatorWidgets(axis);
-        affectedWidgets = allWidgets;
+        allWidgetsAffected = true;
     } else {
         if (!overlayState.activeLayoutEditGuide.has_value()) {
             return;
         }
-        const LayoutEditGuide& guide = *overlayState.activeLayoutEditGuide;
-        axis = guide.axis;
+        activeGuide = &*overlayState.activeLayoutEditGuide;
+        axis = activeGuide->axis;
         axisLabel = axis == LayoutGuideAxis::Vertical ? "horizontal" : "vertical";
         allWidgets = renderer_.CollectSimilarityIndicatorWidgets(axis);
-        for (const WidgetLayout* widget : allWidgets) {
-            if (renderer_.IsWidgetAffectedByGuide(*widget, guide)) {
-                affectedWidgets.push_back(widget);
-            }
+    }
+    bool hasAffectedWidget = false;
+    for (const WidgetLayout* widget : allWidgets) {
+        if (allWidgetsAffected ||
+            (activeGuide != nullptr && renderer_.IsWidgetAffectedByGuide(*widget, *activeGuide))) {
+            hasAffectedWidget = true;
+            break;
         }
     }
-    if (affectedWidgets.empty()) {
+    if (!hasAffectedWidget) {
         return;
     }
+    const auto isAffectedWidget = [&](const WidgetLayout* widget) {
+        return allWidgetsAffected ||
+               (activeGuide != nullptr && renderer_.IsWidgetAffectedByGuide(*widget, *activeGuide));
+    };
 
-    std::vector<std::vector<const WidgetLayout*>> widgetsByClass(EnumStringTraits<WidgetClass>::names.size());
-    for (const WidgetLayout* widget : allWidgets) {
-        if (widget->widget == nullptr) {
+    // Size: one flat list tracks visibility, exact type, and ordinal; three vectors measured larger.
+    std::vector<VisibleWidgetEntry> visibleWidgets;
+    visibleWidgets.reserve(allWidgets.size());
+    auto addVisibleWidget = [&](const WidgetLayout* widget) -> std::vector<VisibleWidgetEntry>::iterator {
+        auto found = FindVisibleWidgetEntry(visibleWidgets, widget);
+        if (found == visibleWidgets.end()) {
+            visibleWidgets.push_back(VisibleWidgetEntry{widget, {}, false, 0});
+            found = visibleWidgets.end() - 1;
+        }
+        return found;
+    };
+    auto addExactType = [&](const WidgetLayout* widget, SimilarityTypeKey type) {
+        auto found = addVisibleWidget(widget);
+        if (!found->hasExactType) {
+            found->type = type;
+            found->hasExactType = true;
+        }
+    };
+    for (const WidgetLayout* affected : allWidgets) {
+        if (!isAffectedWidget(affected)) {
             continue;
         }
-        const size_t classIndex = static_cast<size_t>(widget->widget->Class());
-        if (classIndex < widgetsByClass.size()) {
-            widgetsByClass[classIndex].push_back(widget);
-        }
-    }
-
-    std::vector<const WidgetLayout*> visibleWidgets;
-    visibleWidgets.reserve(allWidgets.size());
-    auto addVisibleWidget = [&](const WidgetLayout* widget) {
-        if (std::find(visibleWidgets.begin(), visibleWidgets.end(), widget) == visibleWidgets.end()) {
-            visibleWidgets.push_back(widget);
-        }
-    };
-    std::vector<ExactTypeEntry> exactTypeByWidget;
-    exactTypeByWidget.reserve(allWidgets.size());
-    auto addExactType = [&](const WidgetLayout* widget, SimilarityTypeKey type) {
-        const auto found = std::find_if(exactTypeByWidget.begin(),
-            exactTypeByWidget.end(),
-            [widget](const auto& entry) { return entry.widget == widget; });
-        if (found == exactTypeByWidget.end()) {
-            exactTypeByWidget.push_back(ExactTypeEntry{widget, type});
-        }
-    };
-    auto findExactType = [&](const WidgetLayout* widget) -> const SimilarityTypeKey* {
-        const auto found = std::find_if(exactTypeByWidget.begin(),
-            exactTypeByWidget.end(),
-            [widget](const auto& entry) { return entry.widget == widget; });
-        return found != exactTypeByWidget.end() ? &found->type : nullptr;
-    };
-    for (const WidgetLayout* affected : affectedWidgets) {
         const int affectedExtent = renderer_.WidgetExtentForAxis(*affected, axis);
         if (affectedExtent <= 0 || affected->widget == nullptr) {
             continue;
         }
         const SimilarityTypeKey typeKey{affected->widget->Class(), affectedExtent};
         bool hasExactMatch = false;
-        const size_t classIndex = static_cast<size_t>(typeKey.widgetClass);
-        if (classIndex >= widgetsByClass.size()) {
-            continue;
-        }
-        for (const WidgetLayout* candidate : widgetsByClass[classIndex]) {
+        for (const WidgetLayout* candidate : allWidgets) {
             if (candidate == affected || candidate->widget == nullptr ||
                 candidate->widget->Class() != affected->widget->Class()) {
                 continue;
@@ -980,51 +971,28 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             addExactType(affected, typeKey);
         }
     }
-
-    std::vector<OrdinalEntry> exactTypeOrdinals;
-    exactTypeOrdinals.reserve(exactTypeByWidget.size());
-    int nextOrdinal = 1;
-    for (const WidgetLayout* widget : allWidgets) {
-        if (std::find(visibleWidgets.begin(), visibleWidgets.end(), widget) == visibleWidgets.end()) {
-            continue;
-        }
-        const SimilarityTypeKey* exactType = findExactType(widget);
-        if (exactType == nullptr ||
-            std::find_if(exactTypeOrdinals.begin(), exactTypeOrdinals.end(), [exactType](const auto& entry) {
-                return entry.type == *exactType;
-            }) != exactTypeOrdinals.end()) {
-            continue;
-        }
-        exactTypeOrdinals.push_back(OrdinalEntry{*exactType, nextOrdinal++});
-    }
-
-    std::vector<SimilarityIndicator> indicators;
-    indicators.reserve(visibleWidgets.size());
-    for (const WidgetLayout* widget : allWidgets) {
-        if (std::find(visibleWidgets.begin(), visibleWidgets.end(), widget) == visibleWidgets.end()) {
-            continue;
-        }
-        int exactTypeOrdinal = 0;
-        if (const SimilarityTypeKey* exactType = findExactType(widget); exactType != nullptr) {
-            const auto ordinal = std::find_if(exactTypeOrdinals.begin(),
-                exactTypeOrdinals.end(),
-                [exactType](const auto& entry) { return entry.type == *exactType; });
-            exactTypeOrdinal = ordinal != exactTypeOrdinals.end() ? ordinal->ordinal : 0;
-        }
-        indicators.push_back(SimilarityIndicator{
-            axis,
-            widget->rect,
-            exactTypeOrdinal,
-        });
-    }
-    if (indicators.empty()) {
+    if (visibleWidgets.empty()) {
         return;
     }
 
-    for (const auto& entry : exactTypeOrdinals) {
-        renderer_.WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
-                             "\" class=" + std::to_string(static_cast<int>(entry.type.widgetClass)) + " extent=" +
-                             std::to_string(entry.type.extent) + " ordinal=" + std::to_string(entry.ordinal));
+    int nextOrdinal = 1;
+    for (const WidgetLayout* widget : allWidgets) {
+        auto visible = FindVisibleWidgetEntry(visibleWidgets, widget);
+        if (visible == visibleWidgets.end() || !visible->hasExactType) {
+            continue;
+        }
+        const auto existingType = std::find_if(visibleWidgets.begin(), visibleWidgets.end(), [&](const auto& entry) {
+            return entry.hasExactType && entry.exactTypeOrdinal > 0 && entry.type == visible->type;
+        });
+        if (existingType != visibleWidgets.end()) {
+            visible->exactTypeOrdinal = existingType->exactTypeOrdinal;
+        } else {
+            visible->exactTypeOrdinal = nextOrdinal++;
+            renderer_.WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
+                                 "\" class=" + std::to_string(static_cast<int>(visible->type.widgetClass)) +
+                                 " extent=" + std::to_string(visible->type.extent) +
+                                 " ordinal=" + std::to_string(visible->exactTypeOrdinal));
+        }
     }
 
     const RenderColorId color = RenderColorId::LayoutGuide;
@@ -1034,9 +1002,14 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
     const int notchDepth = std::max(3, renderer_.ScaleLogical(4));
     const int notchSpacing = std::max(3, renderer_.ScaleLogical(4));
 
-    for (const SimilarityIndicator& indicator : indicators) {
-        const RenderRect& rect = indicator.rect;
-        if (indicator.axis == LayoutGuideAxis::Vertical) {
+    for (const WidgetLayout* widget : allWidgets) {
+        auto visible = FindVisibleWidgetEntry(visibleWidgets, widget);
+        if (visible == visibleWidgets.end()) {
+            continue;
+        }
+        const int exactTypeOrdinal = visible->exactTypeOrdinal;
+        const RenderRect& rect = widget->rect;
+        if (axis == LayoutGuideAxis::Vertical) {
             const int y = rect.top + offset;
             const int left = rect.left + inset;
             const int right = rect.right - inset;
@@ -1046,9 +1019,9 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             renderer_.Renderer().DrawSolidLine(RenderPoint{left, y}, RenderPoint{left + cap, y + cap + 1}, stroke);
             renderer_.Renderer().DrawSolidLine(RenderPoint{right - cap, y - cap}, RenderPoint{right, y}, stroke);
             renderer_.Renderer().DrawSolidLine(RenderPoint{right, y}, RenderPoint{right - cap, y + cap + 1}, stroke);
-            if (indicator.exactTypeOrdinal > 0) {
+            if (exactTypeOrdinal > 0) {
                 const int cx = left + std::max(0, (right - left) / 2);
-                const int count = indicator.exactTypeOrdinal;
+                const int count = exactTypeOrdinal;
                 const int totalWidth = (count - 1) * notchSpacing;
                 int notchX = cx - (totalWidth / 2);
                 for (int i = 0; i < count; ++i) {
@@ -1067,9 +1040,9 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             renderer_.Renderer().DrawSolidLine(RenderPoint{x, top}, RenderPoint{x + cap + 1, top + cap}, stroke);
             renderer_.Renderer().DrawSolidLine(RenderPoint{x - cap, bottom - cap}, RenderPoint{x, bottom}, stroke);
             renderer_.Renderer().DrawSolidLine(RenderPoint{x, bottom}, RenderPoint{x + cap + 1, bottom - cap}, stroke);
-            if (indicator.exactTypeOrdinal > 0) {
+            if (exactTypeOrdinal > 0) {
                 const int cy = top + std::max(0, (bottom - top) / 2);
-                const int count = indicator.exactTypeOrdinal;
+                const int count = exactTypeOrdinal;
                 const int totalHeight = (count - 1) * notchSpacing;
                 int notchY = cy - (totalHeight / 2);
                 for (int i = 0; i < count; ++i) {

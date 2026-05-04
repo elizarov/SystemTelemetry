@@ -18,6 +18,7 @@
 #include "layout_model/layout_edit_service.h"
 #include "telemetry/metrics.h"
 #include "util/paths.h"
+#include "util/strings.h"
 #include "util/temp_file.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -107,6 +108,71 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
     return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
 }
 
+void AssignCommonFontFamily(UiFontSetConfig& fonts, const std::string& family) {
+    fonts.title.face = family;
+    fonts.big.face = family;
+    fonts.value.face = family;
+    fonts.label.face = family;
+    fonts.text.face = family;
+    fonts.smallText.face = family;
+    fonts.footer.face = family;
+    fonts.clockTime.face = family;
+    fonts.clockDate.face = family;
+}
+
+ColorConfig* FindLayoutColorConfig(ColorsConfig& colors, DashboardRenderer::LayoutEditParameter parameter) {
+    switch (parameter) {
+        case DashboardRenderer::LayoutEditParameter::ColorBackground:
+            return &colors.backgroundColor;
+        case DashboardRenderer::LayoutEditParameter::ColorForeground:
+            return &colors.foregroundColor;
+        case DashboardRenderer::LayoutEditParameter::ColorIcon:
+            return &colors.iconColor;
+        case DashboardRenderer::LayoutEditParameter::ColorPeakGhost:
+            return &colors.peakGhostColor;
+        case DashboardRenderer::LayoutEditParameter::ColorWarning:
+            return &colors.warningColor;
+        case DashboardRenderer::LayoutEditParameter::ColorAccent:
+            return &colors.accentColor;
+        case DashboardRenderer::LayoutEditParameter::ColorLayoutGuide:
+            return &colors.layoutGuideColor;
+        case DashboardRenderer::LayoutEditParameter::ColorActiveEdit:
+            return &colors.activeEditColor;
+        case DashboardRenderer::LayoutEditParameter::ColorPanelBorder:
+            return &colors.panelBorderColor;
+        case DashboardRenderer::LayoutEditParameter::ColorMutedText:
+            return &colors.mutedTextColor;
+        case DashboardRenderer::LayoutEditParameter::ColorTrack:
+            return &colors.trackColor;
+        case DashboardRenderer::LayoutEditParameter::ColorPanelFill:
+            return &colors.panelFillColor;
+        case DashboardRenderer::LayoutEditParameter::ColorGraphBackground:
+            return &colors.graphBackgroundColor;
+        case DashboardRenderer::LayoutEditParameter::ColorGraphAxis:
+            return &colors.graphAxisColor;
+        case DashboardRenderer::LayoutEditParameter::ColorGraphMarker:
+            return &colors.graphMarkerColor;
+        default:
+            return nullptr;
+    }
+}
+
+ColorConfig* FindThemeColorConfig(ThemeConfig& theme, const std::string& tokenName) {
+    if (tokenName == "background") {
+        return &theme.background;
+    }
+    if (tokenName == "foreground") {
+        return &theme.foreground;
+    }
+    if (tokenName == "accent") {
+        return &theme.accent;
+    }
+    if (tokenName == "guide") {
+        return &theme.guide;
+    }
+    return nullptr;
+}
+
 }  // namespace
 
 DashboardController::DashboardController() = default;
@@ -120,31 +186,28 @@ const DashboardSessionState& DashboardController::State() const {
 }
 
 void DashboardController::BeginLayoutEditSessionTracking() {
-    state_.layoutEditSessionSavedLayout = state_.config.layout;
-    state_.hasLayoutEditSessionSavedLayout = true;
+    state_.layoutEditSessionSavedLayout = std::make_unique<LayoutConfig>(state_.config.layout);
     state_.hasUnsavedLayoutEditChanges = false;
 }
 
 void DashboardController::ClearLayoutEditSessionTracking() {
-    state_.hasLayoutEditSessionSavedLayout = false;
     state_.hasUnsavedLayoutEditChanges = false;
-    state_.layoutEditSessionSavedLayout = LayoutConfig{};
+    state_.layoutEditSessionSavedLayout.reset();
 }
 
 void DashboardController::RefreshLayoutEditSessionDirtyFlag() {
-    if (!state_.isEditingLayout || !state_.hasLayoutEditSessionSavedLayout) {
+    if (!state_.isEditingLayout || state_.layoutEditSessionSavedLayout == nullptr) {
         state_.hasUnsavedLayoutEditChanges = false;
         return;
     }
-    state_.hasUnsavedLayoutEditChanges = state_.config.layout != state_.layoutEditSessionSavedLayout;
+    state_.hasUnsavedLayoutEditChanges = state_.config.layout != *state_.layoutEditSessionSavedLayout;
 }
 
 void DashboardController::MarkLayoutEditSessionSaved() {
     if (!state_.isEditingLayout) {
         return;
     }
-    state_.layoutEditSessionSavedLayout = state_.config.layout;
-    state_.hasLayoutEditSessionSavedLayout = true;
+    state_.layoutEditSessionSavedLayout = std::make_unique<LayoutConfig>(state_.config.layout);
     state_.hasUnsavedLayoutEditChanges = false;
 }
 
@@ -154,8 +217,12 @@ void DashboardController::SyncRenderer(DashboardShellHost& shell, bool showLayou
     shell.RefreshThemedIcons();
 }
 
-void DashboardController::SyncRuntimeAndRenderer(DashboardShellHost& shell, bool showLayoutEditGuides) {
-    SyncRenderer(shell, showLayoutEditGuides);
+__declspec(noinline) bool DashboardController::FinishConfigMutation(DashboardShellHost& shell) {
+    // Size: many cold config appliers end with this same UI refresh tail; keep it out of each caller.
+    SyncRenderer(shell, state_.isEditingLayout);
+    shell.InvalidateShell();
+    RefreshLayoutEditSessionDirtyFlag();
+    return true;
 }
 
 bool DashboardController::ApplyConfiguredWallpaper(Trace& trace) {
@@ -395,7 +462,7 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
     }
 
     state_.config = updatedConfig;
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    SyncRenderer(shell, state_.isEditingLayout);
     ApplyConfiguredWallpaper(shell.TraceLog());
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
@@ -429,7 +496,7 @@ bool DashboardController::SwitchLayout(
                 " renderer_error=" + Trace::QuoteText(shell.Renderer().LastError()));
         }
         state_.config = previousConfig;
-        SyncRuntimeAndRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
+        SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
         return false;
     }
 
@@ -474,7 +541,7 @@ bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scal
     updatedConfig.display.position.y = ScalePhysicalToLogical(placement.physicalRelativePosition.y, targetScale);
     updatedConfig.display.scale = HasExplicitDisplayScale(scale) ? scale : 0.0;
     state_.config = std::move(updatedConfig);
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    SyncRenderer(shell, state_.isEditingLayout);
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();
@@ -490,9 +557,7 @@ void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const 
     state_.telemetry->SetPreferredNetworkAdapterName(option.adapterName);
     state_.telemetryUpdate = state_.telemetry->Latest();
     state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
-    SyncRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
+    FinishConfigMutation(shell);
 }
 
 void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option) {
@@ -506,14 +571,12 @@ void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const St
     } else {
         driveLetters.erase(it);
     }
-    std::sort(driveLetters.begin(), driveLetters.end());
+    SortStrings(driveLetters);
     state_.config.storage.drives = driveLetters;
     state_.telemetry->SetSelectedStorageDrives(driveLetters);
     state_.telemetryUpdate = state_.telemetry->Latest();
     state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
-    SyncRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
+    FinishConfigMutation(shell);
 }
 
 void DashboardController::RefreshTelemetrySelections(DashboardShellHost& shell) {
@@ -553,15 +616,16 @@ void DashboardController::StopLayoutEditMode(
 }
 
 bool DashboardController::HasUnsavedLayoutEditChanges() const {
-    return state_.isEditingLayout && state_.hasLayoutEditSessionSavedLayout && state_.hasUnsavedLayoutEditChanges;
+    return state_.isEditingLayout && state_.layoutEditSessionSavedLayout != nullptr &&
+           state_.hasUnsavedLayoutEditChanges;
 }
 
 bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost& shell) {
-    if (!state_.hasLayoutEditSessionSavedLayout) {
+    if (state_.layoutEditSessionSavedLayout == nullptr) {
         return false;
     }
 
-    state_.config.layout = state_.layoutEditSessionSavedLayout;
+    state_.config.layout = *state_.layoutEditSessionSavedLayout;
     if (!SelectResolvedLayout(state_.config, state_.config.display.layout)) {
         return false;
     }
@@ -572,8 +636,7 @@ bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost
         state_.telemetryUpdate = state_.telemetry->Latest();
         state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
     }
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
+    FinishConfigMutation(shell);
     MarkLayoutEditSessionSaved();
     return true;
 }
@@ -583,10 +646,18 @@ bool DashboardController::ApplyLayoutGuideWeights(
     if (!ApplyGuideWeights(state_.config, target, weights)) {
         return false;
     }
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
-    return true;
+    return FinishConfigMutation(shell);
+}
+
+bool DashboardController::ApplyLayoutGuideAdjacentWeights(DashboardShellHost& shell,
+    const LayoutEditLayoutTarget& target,
+    size_t separatorIndex,
+    int firstWeight,
+    int secondWeight) {
+    if (!ApplyGuideAdjacentWeights(state_.config, target, separatorIndex, firstWeight, secondWeight)) {
+        return false;
+    }
+    return FinishConfigMutation(shell);
 }
 
 bool DashboardController::ApplyMetricListOrder(
@@ -594,10 +665,7 @@ bool DashboardController::ApplyMetricListOrder(
     if (!::ApplyMetricListOrder(state_.config, widget, metricRefs)) {
         return false;
     }
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
-    return true;
+    return FinishConfigMutation(shell);
 }
 
 bool DashboardController::ApplyContainerChildOrder(
@@ -605,10 +673,7 @@ bool DashboardController::ApplyContainerChildOrder(
     if (!::ApplyContainerChildOrder(state_.config, key, fromIndex, toIndex)) {
         return false;
     }
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
-    return true;
+    return FinishConfigMutation(shell);
 }
 
 bool DashboardController::ApplyLayoutEditValue(
@@ -622,10 +687,7 @@ bool DashboardController::ApplyLayoutEditValue(
     if (!ApplyLayoutEditParameterValue(state_.config, parameter, nextValue)) {
         return false;
     }
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
-    return true;
+    return FinishConfigMutation(shell);
 }
 
 bool DashboardController::ApplyLayoutEditFont(
@@ -633,10 +695,17 @@ bool DashboardController::ApplyLayoutEditFont(
     if (!ApplyLayoutEditParameterFontValue(state_.config, parameter, value)) {
         return false;
     }
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
-    return true;
+    return FinishConfigMutation(shell);
+}
+
+bool DashboardController::ApplyLayoutEditFontFamily(DashboardShellHost& shell, const std::string& family) {
+    AssignCommonFontFamily(state_.config.layout.fonts, family);
+    return FinishConfigMutation(shell);
+}
+
+bool DashboardController::ApplyLayoutEditFontSet(DashboardShellHost& shell, const UiFontSetConfig& fonts) {
+    state_.config.layout.fonts = fonts;
+    return FinishConfigMutation(shell);
 }
 
 bool DashboardController::ApplyLayoutEditColor(
@@ -645,10 +714,59 @@ bool DashboardController::ApplyLayoutEditColor(
         return false;
     }
     ResolveConfiguredColors(state_.config);
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
-    return true;
+    return FinishConfigMutation(shell);
+}
+
+bool DashboardController::ApplyLayoutEditColorExpression(
+    DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, const std::string& expression) {
+    ColorConfig* target = FindLayoutColorConfig(state_.config.layout.colors, parameter);
+    if (target == nullptr) {
+        return false;
+    }
+    target->expression = expression;
+    ResolveConfiguredColors(state_.config);
+    return FinishConfigMutation(shell);
+}
+
+bool DashboardController::ApplyLayoutEditTheme(DashboardShellHost& shell, const std::string& themeName) {
+    const auto themeIt = std::find_if(state_.config.layout.themes.begin(),
+        state_.config.layout.themes.end(),
+        [&](const ThemeConfig& theme) { return theme.name == themeName; });
+    if (themeIt == state_.config.layout.themes.end()) {
+        return false;
+    }
+    state_.config.display.theme = themeName;
+    ResolveConfiguredColors(state_.config);
+    return FinishConfigMutation(shell);
+}
+
+bool DashboardController::ApplyLayoutEditThemeColor(
+    DashboardShellHost& shell, const ThemeColorEditKey& key, unsigned int value) {
+    auto themeIt = std::find_if(state_.config.layout.themes.begin(),
+        state_.config.layout.themes.end(),
+        [&](const ThemeConfig& theme) { return theme.name == key.themeName; });
+    if (themeIt == state_.config.layout.themes.end()) {
+        return false;
+    }
+    ColorConfig* target = FindThemeColorConfig(*themeIt, key.tokenName);
+    if (target == nullptr) {
+        return false;
+    }
+    *target = ColorConfig::FromRgba(value);
+    ResolveConfiguredColors(state_.config);
+    return FinishConfigMutation(shell);
+}
+
+bool DashboardController::ApplyLayoutEditCardTitle(
+    DashboardShellHost& shell, const LayoutCardTitleEditKey& key, const std::string& title) {
+    const auto it = std::find_if(state_.config.layout.cards.begin(),
+        state_.config.layout.cards.end(),
+        [&](const LayoutCardConfig& card) { return card.id == key.cardId; });
+    if (it == state_.config.layout.cards.end()) {
+        return false;
+    }
+    it->title = title;
+    return FinishConfigMutation(shell);
 }
 
 void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config) {
@@ -663,9 +781,7 @@ void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const A
             state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
         }
     }
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
-    shell.InvalidateShell();
-    RefreshLayoutEditSessionDirtyFlag();
+    FinishConfigMutation(shell);
 }
 
 std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
@@ -701,7 +817,7 @@ bool DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& s
         return false;
     }
     state_.config = config;
-    SyncRuntimeAndRenderer(shell, state_.isEditingLayout);
+    SyncRenderer(shell, state_.isEditingLayout);
     if (state_.isEditingLayout) {
         MarkLayoutEditSessionSaved();
     }

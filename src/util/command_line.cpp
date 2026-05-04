@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cwchar>
 #include <shellapi.h>
 
 #include "util/utf8.h"
@@ -37,26 +38,55 @@ std::wstring QuoteCommandLineArgument(const std::wstring& value) {
     return L"\"" + value + L"\"";
 }
 
-std::vector<std::wstring> GetCommandLineArguments() {
-    int argc = 0;
-    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (argv == nullptr) {
-        return {};
+namespace {
+
+class CommandLineArguments {
+public:
+    CommandLineArguments() : argv_(CommandLineToArgvW(GetCommandLineW(), &argc_)) {}
+
+    ~CommandLineArguments() {
+        if (argv_ != nullptr) {
+            LocalFree(argv_);
+        }
     }
 
-    std::vector<std::wstring> arguments;
-    arguments.reserve(argc > 1 ? static_cast<size_t>(argc - 1) : 0);
-    for (int i = 1; i < argc; ++i) {
-        arguments.emplace_back(argv[i]);
+    int Count() const {
+        return argv_ != nullptr ? argc_ : 0;
     }
-    LocalFree(argv);
-    return arguments;
+
+    const wchar_t* At(int index) const {
+        return argv_[index];
+    }
+
+private:
+    int argc_ = 0;
+    LPWSTR* argv_ = nullptr;
+};
+
+}  // namespace
+
+std::wstring BuildCommandLineExcludingSwitch(const wchar_t* excludedSwitch) {
+    // Size: command-line callers only scan argv; avoid exposing vector<wstring> for one relaunch helper.
+    CommandLineArguments arguments;
+    std::wstring parameters;
+    for (int i = 1; i < arguments.Count(); ++i) {
+        const wchar_t* argument = arguments.At(i);
+        if (excludedSwitch != nullptr && _wcsicmp(argument, excludedSwitch) == 0) {
+            continue;
+        }
+        if (!parameters.empty()) {
+            parameters += L' ';
+        }
+        parameters += QuoteCommandLineArgument(argument);
+    }
+    return parameters;
 }
 
 bool HasSwitch(const std::string& target) {
     const std::wstring wideTarget = WideFromUtf8(target);
-    for (const std::wstring& argument : GetCommandLineArguments()) {
-        if (_wcsicmp(argument.c_str(), wideTarget.c_str()) == 0) {
+    CommandLineArguments arguments;
+    for (int i = 1; i < arguments.Count(); ++i) {
+        if (_wcsicmp(arguments.At(i), wideTarget.c_str()) == 0) {
             return true;
         }
     }
@@ -64,20 +94,23 @@ bool HasSwitch(const std::string& target) {
 }
 
 std::optional<std::wstring> GetSwitchValue(const std::wstring& target) {
-    const std::vector<std::wstring> arguments = GetCommandLineArguments();
-    for (size_t i = 0; i + 1 < arguments.size(); ++i) {
-        if (_wcsicmp(arguments[i].c_str(), target.c_str()) == 0) {
-            return arguments[i + 1];
+    CommandLineArguments arguments;
+    for (int i = 1; i + 1 < arguments.Count(); ++i) {
+        if (_wcsicmp(arguments.At(i), target.c_str()) == 0) {
+            return arguments.At(i + 1);
         }
     }
     return std::nullopt;
 }
 
 std::optional<std::wstring> GetColonSwitchValue(const std::wstring& target) {
-    for (const std::wstring& argument : GetCommandLineArguments()) {
-        if (argument.size() > target.size() && _wcsnicmp(argument.c_str(), target.c_str(), target.size()) == 0 &&
+    CommandLineArguments arguments;
+    for (int i = 1; i < arguments.Count(); ++i) {
+        const wchar_t* argument = arguments.At(i);
+        const size_t argumentLength = std::wcslen(argument);
+        if (argumentLength > target.size() && _wcsnicmp(argument, target.c_str(), target.size()) == 0 &&
             argument[target.size()] == L':') {
-            return argument.substr(target.size() + 1);
+            return argument + target.size() + 1;
         }
     }
     return std::nullopt;

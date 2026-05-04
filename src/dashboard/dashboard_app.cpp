@@ -464,6 +464,15 @@ bool DashboardApp::ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target,
     return applied;
 }
 
+bool DashboardApp::ApplyLayoutGuideAdjacentWeights(
+    const LayoutEditLayoutTarget& target, size_t separatorIndex, int firstWeight, int secondWeight) {
+    const auto start = std::chrono::steady_clock::now();
+    const bool applied =
+        controller_.ApplyLayoutGuideAdjacentWeights(*this, target, separatorIndex, firstWeight, secondWeight);
+    RecordLayoutEditTracePhase(TracePhase::Apply, std::chrono::steady_clock::now() - start);
+    return applied;
+}
+
 bool DashboardApp::ApplyMetricListOrder(
     const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) {
     const auto start = std::chrono::steady_clock::now();

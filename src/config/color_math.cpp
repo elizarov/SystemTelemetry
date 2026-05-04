@@ -30,6 +30,15 @@ unsigned int ClampByte(double value) {
     return static_cast<unsigned int>(std::clamp(std::round(value), 0.0, 255.0));
 }
 
+double Min3Double(double first, double second, double third) {
+    // Size: avoid std::min/std::max initializer_list helper code in color conversions.
+    return std::min(std::min(first, second), third);
+}
+
+double Max3Double(double first, double second, double third) {
+    return std::max(std::max(first, second), third);
+}
+
 }  // namespace
 
 ColorBytes ColorBytesFromRgba(std::uint32_t rgba) {
@@ -100,8 +109,8 @@ HsvColor HsvFromColorBytes(ColorBytes color) {
     const double r = std::clamp(color.r / 255.0, 0.0, 1.0);
     const double g = std::clamp(color.g / 255.0, 0.0, 1.0);
     const double b = std::clamp(color.b / 255.0, 0.0, 1.0);
-    const double maxChannel = std::max({r, g, b});
-    const double minChannel = std::min({r, g, b});
+    const double maxChannel = Max3Double(r, g, b);
+    const double minChannel = Min3Double(r, g, b);
     const double delta = maxChannel - minChannel;
 
     double hue = 0.0;

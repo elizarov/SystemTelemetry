@@ -22,6 +22,18 @@ struct ResolvedNetworkCandidate {
 constexpr size_t kSyntheticHistorySamples = 60;
 constexpr double kSyntheticCpuMemoryTotalGb = 63.943493;
 constexpr double kSyntheticCpuMemoryPeakRatio = 0.75;
+constexpr const char* kSyntheticRequestedFanNames[] = {"cpu", "system"};
+constexpr const char* kSyntheticRequestedTemperatureNames[] = {"cpu"};
+constexpr const char* kSyntheticAvailableFanNames[] = {"CPU", "System 1", "Pump"};
+constexpr const char* kSyntheticAvailableTemperatureNames[] = {"CPU", "VRM MOS", "Chipset"};
+
+void AssignStringList(std::vector<std::string>& target, const char* const* values, size_t count) {
+    target.clear();
+    target.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        target.emplace_back(values[i]);
+    }
+}
 
 std::string ReadBinaryFile(const FilePath& path) {
     std::FILE* file = nullptr;
@@ -278,10 +290,16 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     dump.boardProvider.boardManufacturer = "Gigabyte Technology Co., Ltd.";
     dump.boardProvider.boardProduct = "X570 AORUS ULTRA";
     dump.boardProvider.driverLibrary = "Synthetic";
-    dump.boardProvider.requestedFanNames = {"cpu", "system"};
-    dump.boardProvider.requestedTemperatureNames = {"cpu"};
-    dump.boardProvider.availableFanNames = {"CPU", "System 1", "Pump"};
-    dump.boardProvider.availableTemperatureNames = {"CPU", "VRM MOS", "Chipset"};
+    AssignStringList(
+        dump.boardProvider.requestedFanNames, kSyntheticRequestedFanNames, ARRAYSIZE(kSyntheticRequestedFanNames));
+    AssignStringList(dump.boardProvider.requestedTemperatureNames,
+        kSyntheticRequestedTemperatureNames,
+        ARRAYSIZE(kSyntheticRequestedTemperatureNames));
+    AssignStringList(
+        dump.boardProvider.availableFanNames, kSyntheticAvailableFanNames, ARRAYSIZE(kSyntheticAvailableFanNames));
+    AssignStringList(dump.boardProvider.availableTemperatureNames,
+        kSyntheticAvailableTemperatureNames,
+        ARRAYSIZE(kSyntheticAvailableTemperatureNames));
     dump.boardProvider.fans = snapshot.boardFans;
     dump.boardProvider.temperatures = snapshot.boardTemperatures;
     dump.boardProvider.providerName = "Synthetic";
@@ -369,9 +387,7 @@ std::vector<StorageDriveCandidate> EnumerateSnapshotStorageDriveCandidates(const
         candidates.push_back(std::move(candidate));
     }
 
-    std::sort(candidates.begin(),
-        candidates.end(),
-        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
+    SortStorageDriveCandidatesByLetter(candidates);
     return candidates;
 }
 

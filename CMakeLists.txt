@@ -130,6 +130,7 @@ add_executable(CaseDash WIN32
     src/layout_edit_dialog/impl/trace.cpp
     src/layout_edit_dialog/impl/tree.cpp
     src/layout_edit_dialog/impl/util.cpp
+    src/layout_edit/board_metric_binding.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit/layout_edit_active_region_trace.cpp

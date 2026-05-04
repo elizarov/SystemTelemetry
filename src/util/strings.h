@@ -13,8 +13,9 @@ std::vector<std::string> SplitTrimmedPreservingEmpty(std::string_view value, cha
 std::string CollapseAsciiWhitespace(std::string_view value);
 bool ContainsInsensitive(const std::string& value, const std::string& needle);
 bool EqualsInsensitive(const std::string& left, const std::string& right);
-bool EqualsInsensitive(const std::wstring& left, const std::wstring& right);
 std::string JoinNames(const std::vector<std::string>& names);
+void SortStrings(std::vector<std::string>& values);
+void SortUniqueStrings(std::vector<std::string>& values);
 std::string FormatHresult(HRESULT value);
 std::string FormatHexColorText(unsigned int value);
 std::string FormatDoubleGeneral(double value, int precision = 6);

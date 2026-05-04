@@ -17,8 +17,6 @@
 namespace {
 
 constexpr double kScaleEpsilon = 0.0001;
-constexpr std::string_view kBoardTemperatureMetricPrefix = "board.temp.";
-constexpr std::string_view kBoardFanMetricPrefix = "board.fan.";
 constexpr double kLchChromaSliderScale = 1000.0;
 constexpr double kLchChromaSliderMax = 0.4;
 constexpr double kHsvUnitSliderScale = 1000.0;
@@ -33,12 +31,35 @@ int CALLBACK CollectFontFamilyProc(const LOGFONTW* logFont, const TEXTMETRICW*, 
     return 1;
 }
 
+bool CaseInsensitiveEqual(const std::wstring& left, const std::wstring& right) {
+    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
+}
+
 bool CaseInsensitiveLess(const std::wstring& left, const std::wstring& right) {
     return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_LESS_THAN;
 }
 
-bool CaseInsensitiveEqual(const std::wstring& left, const std::wstring& right) {
-    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
+void SortUniqueFontFamilies(std::vector<std::wstring>& families) {
+    // Size: keep the only wide-string sort local to this Win32 font boundary so util/strings stays UTF-8-only.
+    for (size_t i = 1; i < families.size(); ++i) {
+        std::wstring family = std::move(families[i]);
+        size_t insert = i;
+        while (insert > 0 && CaseInsensitiveLess(family, families[insert - 1])) {
+            families[insert] = std::move(families[insert - 1]);
+            --insert;
+        }
+        families[insert] = std::move(family);
+    }
+
+    size_t out = 0;
+    for (auto& family : families) {
+        if (out != 0 && CaseInsensitiveEqual(families[out - 1], family)) {
+            continue;
+        }
+        families[out] = std::move(family);
+        ++out;
+    }
+    families.resize(out);
 }
 
 const LayoutNodeConfig* FindWeightEditNode(const AppConfig& config, const LayoutWeightEditKey& key) {
@@ -171,22 +192,6 @@ void SetRgbColorDialogChannels(HWND hwnd, unsigned int color) {
 }
 
 }  // namespace
-
-std::optional<BoardMetricBindingTarget> ParseBoardMetricBindingTarget(std::string_view metricId) {
-    if (metricId.rfind(kBoardTemperatureMetricPrefix, 0) == 0) {
-        return BoardMetricBindingTarget{
-            BoardMetricBindingKind::Temperature,
-            std::string(metricId.substr(kBoardTemperatureMetricPrefix.size())),
-        };
-    }
-    if (metricId.rfind(kBoardFanMetricPrefix, 0) == 0) {
-        return BoardMetricBindingTarget{
-            BoardMetricBindingKind::Fan,
-            std::string(metricId.substr(kBoardFanMetricPrefix.size())),
-        };
-    }
-    return std::nullopt;
-}
 
 std::string FindConfiguredBoardMetricBinding(const AppConfig& config, const LayoutMetricEditKey& key) {
     const auto target = ParseBoardMetricBindingTarget(key.metricId);
@@ -569,8 +574,7 @@ std::vector<std::wstring> EnumerateInstalledFontFamilies(HWND hwnd) {
     EnumFontFamiliesExW(dc, &filter, CollectFontFamilyProc, reinterpret_cast<LPARAM>(&families), 0);
     ReleaseDC(hwnd, dc);
 
-    std::sort(families.begin(), families.end(), CaseInsensitiveLess);
-    families.erase(std::unique(families.begin(), families.end(), CaseInsensitiveEqual), families.end());
+    SortUniqueFontFamilies(families);
     return families;
 }
 

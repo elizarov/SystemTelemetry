@@ -291,7 +291,11 @@ std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGui
         AddCardCoverage(universe, card);
     }
     if (universe.empty()) {
-        return cards.empty() ? std::vector<std::string>{} : std::vector<std::string>{cards.front().id};
+        std::vector<std::string> selected;
+        if (!cards.empty()) {
+            selected.push_back(cards.front().id);
+        }
+        return selected;
     }
 
     std::vector<size_t> bestIndexes;

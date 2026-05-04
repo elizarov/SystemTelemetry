@@ -6,7 +6,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <winreg.h>
@@ -245,8 +244,8 @@ private:
     std::vector<std::string> availableTemperatureNames_;
     std::vector<NamedScalarMetric> fanMetricTemplate_;
     std::vector<NamedScalarMetric> temperatureMetricTemplate_;
-    std::unordered_map<std::string, std::vector<size_t>> requestedFanIndexBySourceName_;
-    std::unordered_map<std::string, std::vector<size_t>> requestedTemperatureIndexBySourceName_;
+    BoardMetricIndexBySourceName requestedFanIndexBySourceName_;
+    BoardMetricIndexBySourceName requestedTemperatureIndexBySourceName_;
     bool initialized_ = false;
 };
 

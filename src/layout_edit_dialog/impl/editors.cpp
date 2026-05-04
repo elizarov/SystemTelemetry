@@ -16,6 +16,58 @@
 
 namespace {
 
+struct StringLiteralList {
+    const char* const* values = nullptr;
+    size_t count = 0;
+};
+
+// Size: static literal lists keep combo setup off vector initializer-list construction.
+constexpr const char* kColorModeOptions[] = {"Literal", "Derived"};
+constexpr const char* kColorExpressionTokens[] = {"background", "foreground", "accent", "guide"};
+constexpr const char* kClockTimeFormats[] = {"HH:MM",
+    "HH:MM:SS",
+    "H:MM",
+    "H:MM:SS",
+    "HH.MM",
+    "HH.MM.SS",
+    "hh:MM AM",
+    "h:MM AM",
+    "hh:MM:SS AM",
+    "h:MM:SS AM",
+    "hh:MM am",
+    "h:MM am",
+    "hh:MM:SS am",
+    "h:MM:SS am"};
+constexpr const char* kClockDateFormats[] = {"YYYY-MM-DD",
+    "YYYY/MM/DD",
+    "YYYY.MM.DD",
+    "DD.MM.YYYY",
+    "D.M.YYYY",
+    "MM/DD/YYYY",
+    "M/D/YYYY",
+    "DD/MM/YYYY",
+    "D/M/YYYY",
+    "DD-MM-YYYY",
+    "MM-DD-YYYY",
+    "MMM DD, YYYY",
+    "MMM D, YYYY",
+    "MMMM DD, YYYY",
+    "MMMM D, YYYY",
+    "DD MMM YYYY",
+    "D MMM YYYY",
+    "DD MMMM YYYY",
+    "D MMMM YYYY",
+    "dddd, MMMM DD",
+    "dddd, MMMM D",
+    "ddd, MMM DD"};
+
+StringLiteralList MakeStringLiteralList(const char* const* values, size_t count) {
+    return {values, count};
+}
+
+void ShowLayoutEditSelectionEditor(
+    LayoutEditDialogState* state, HWND hwnd, LayoutEditEditorKind kind, bool metricBinding = false);
+
 const LayoutNodeFieldEditKey* SelectedNodeFieldKey(const LayoutEditDialogState* state) {
     return state != nullptr && state->selectedLeaf != nullptr
                ? std::get_if<LayoutNodeFieldEditKey>(&state->selectedLeaf->focusKey)
@@ -151,17 +203,63 @@ std::string ReadComboTextUtf8(HWND hwnd, int controlId) {
     return ReadDialogControlTextUtf8(hwnd, controlId);
 }
 
-void PopulateTextCombo(HWND hwnd, int controlId, const std::vector<std::string>& options, std::string_view selected) {
+void PopulateTextCombo(HWND hwnd, int controlId, StringLiteralList options, std::string_view selected) {
     HWND combo = GetDlgItem(hwnd, controlId);
     if (combo == nullptr) {
         return;
     }
     SendMessageW(combo, CB_RESETCONTENT, 0, 0);
     int selectedIndex = CB_ERR;
-    for (const std::string& option : options) {
+    for (size_t i = 0; i < options.count; ++i) {
+        const char* option = options.values[i];
         const std::wstring wideOption = WideFromUtf8(option);
         const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideOption.c_str()));
-        if (index != CB_ERR && option == selected) {
+        if (index != CB_ERR && selectedIndex == CB_ERR && std::string_view(option) == selected) {
+            selectedIndex = static_cast<int>(index);
+        }
+    }
+    if (selectedIndex == CB_ERR && SendMessageW(combo, CB_GETCOUNT, 0, 0) > 0) {
+        selectedIndex = 0;
+    }
+    if (selectedIndex != CB_ERR) {
+        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
+    }
+}
+
+// Size: fill config-name combos in place; temporary vector<string> lists measured larger here.
+void PopulateThemeNameCombo(HWND hwnd, const AppConfig& config) {
+    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO);
+    if (combo == nullptr) {
+        return;
+    }
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    int selectedIndex = CB_ERR;
+    for (const ThemeConfig& theme : config.layout.themes) {
+        const std::wstring wideOption = WideFromUtf8(theme.name);
+        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideOption.c_str()));
+        if (index != CB_ERR && theme.name == config.display.theme) {
+            selectedIndex = static_cast<int>(index);
+        }
+    }
+    if (selectedIndex == CB_ERR && SendMessageW(combo, CB_GETCOUNT, 0, 0) > 0) {
+        selectedIndex = 0;
+    }
+    if (selectedIndex != CB_ERR) {
+        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
+    }
+}
+
+void PopulateLayoutNameCombo(HWND hwnd, const AppConfig& config) {
+    HWND combo = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO);
+    if (combo == nullptr) {
+        return;
+    }
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    int selectedIndex = CB_ERR;
+    for (const LayoutSectionConfig& layout : config.layout.layouts) {
+        const std::wstring wideOption = WideFromUtf8(layout.name);
+        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideOption.c_str()));
+        if (index != CB_ERR && layout.name == config.display.layout) {
             selectedIndex = static_cast<int>(index);
         }
     }
@@ -246,13 +344,16 @@ void PopulateColorExpressionControls(HWND hwnd, LayoutEditParameter parameter, c
             ? ParseColorExpression(color.expression)
             : std::nullopt;
     const bool derived = parsed.has_value();
-    PopulateTextCombo(hwnd, IDC_LAYOUT_EDIT_COLOR_MODE_COMBO, {"Literal", "Derived"}, derived ? "Derived" : "Literal");
+    PopulateTextCombo(hwnd,
+        IDC_LAYOUT_EDIT_COLOR_MODE_COMBO,
+        MakeStringLiteralList(kColorModeOptions, ARRAYSIZE(kColorModeOptions)),
+        derived ? "Derived" : "Literal");
 
     ColorExpression expression = parsed.value_or(ColorExpression{DefaultDerivedBase(parameter)});
     if (expression.mix.has_value() && expression.mix->target.empty()) {
         expression.mix->target = "accent";
     }
-    const std::vector<std::string> tokens = {"background", "foreground", "accent", "guide"};
+    const StringLiteralList tokens = MakeStringLiteralList(kColorExpressionTokens, ARRAYSIZE(kColorExpressionTokens));
     PopulateTextCombo(hwnd, IDC_LAYOUT_EDIT_COLOR_BASE_COMBO, tokens, expression.base);
     PopulateTextCombo(hwnd,
         IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_COMBO,
@@ -276,46 +377,12 @@ void PopulateColorExpressionControls(HWND hwnd, LayoutEditParameter parameter, c
     SetDerivedAlphaSliderPosition(hwnd, expression.alpha.value_or(color.Alpha()));
 }
 
-std::vector<std::string> StandardDateTimeFormats(const LayoutNodeFieldEditKey& key) {
+StringLiteralList StandardDateTimeFormats(const LayoutNodeFieldEditKey& key) {
     if (key.widgetClass == WidgetClass::ClockTime) {
-        return {"HH:MM",
-            "HH:MM:SS",
-            "H:MM",
-            "H:MM:SS",
-            "HH.MM",
-            "HH.MM.SS",
-            "hh:MM AM",
-            "h:MM AM",
-            "hh:MM:SS AM",
-            "h:MM:SS AM",
-            "hh:MM am",
-            "h:MM am",
-            "hh:MM:SS am",
-            "h:MM:SS am"};
+        return MakeStringLiteralList(kClockTimeFormats, ARRAYSIZE(kClockTimeFormats));
     }
     if (key.widgetClass == WidgetClass::ClockDate) {
-        return {"YYYY-MM-DD",
-            "YYYY/MM/DD",
-            "YYYY.MM.DD",
-            "DD.MM.YYYY",
-            "D.M.YYYY",
-            "MM/DD/YYYY",
-            "M/D/YYYY",
-            "DD/MM/YYYY",
-            "D/M/YYYY",
-            "DD-MM-YYYY",
-            "MM-DD-YYYY",
-            "MMM DD, YYYY",
-            "MMM D, YYYY",
-            "MMMM DD, YYYY",
-            "MMMM D, YYYY",
-            "DD MMM YYYY",
-            "D MMM YYYY",
-            "DD MMMM YYYY",
-            "D MMMM YYYY",
-            "dddd, MMMM DD",
-            "dddd, MMMM D",
-            "ddd, MMM DD"};
+        return MakeStringLiteralList(kClockDateFormats, ARRAYSIZE(kClockDateFormats));
     }
     return {};
 }
@@ -325,16 +392,21 @@ void PopulateDateTimeFormatCombo(HWND hwnd, const LayoutNodeFieldEditKey& key, s
     if (combo == nullptr) {
         return;
     }
-    std::vector<std::string> options = StandardDateTimeFormats(key);
-    if (!selected.empty() && std::find(options.begin(), options.end(), selected) == options.end()) {
-        options.push_back(std::string(selected));
-    }
+    const StringLiteralList options = StandardDateTimeFormats(key);
     SendMessageW(combo, CB_RESETCONTENT, 0, 0);
     int selectedIndex = CB_ERR;
-    for (const std::string& option : options) {
+    for (size_t i = 0; i < options.count; ++i) {
+        const char* option = options.values[i];
         const std::wstring wideOption = WideFromUtf8(option);
         const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideOption.c_str()));
-        if (index != CB_ERR && option == selected) {
+        if (index != CB_ERR && std::string_view(option) == selected) {
+            selectedIndex = static_cast<int>(index);
+        }
+    }
+    if (!selected.empty() && selectedIndex == CB_ERR) {
+        const std::wstring wideSelected = WideFromUtf8(std::string(selected));
+        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideSelected.c_str()));
+        if (index != CB_ERR) {
             selectedIndex = static_cast<int>(index);
         }
     }
@@ -471,8 +543,7 @@ bool PopulateMetricListOrderSelection(LayoutEditDialogState* state, HWND hwnd) {
     if (state->metricListAddRowButton != nullptr) {
         EnableWindow(state->metricListAddRowButton, !options.empty() ? TRUE : FALSE);
     }
-    ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, true);
-    SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+    ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::MetricListOrder);
     state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
         BuildTraceNodeText(state->selectedNode) + " editor=\"metric_list_order\"" +
             " rows=" + QuoteTraceText(std::to_string(metricRefs.size())));
@@ -492,9 +563,7 @@ bool PopulateDateTimeFormatSelection(LayoutEditDialogState* state, HWND hwnd) {
         format = ReadLayoutNodeFieldValue(*node, key->field);
     }
     PopulateDateTimeFormatCombo(hwnd, *key, format);
-    DestroyMetricListOrderEditorControls(state);
-    ShowLayoutEditEditors(hwnd, false, false, false, false, false, false, false, false, true);
-    SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
+    ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::DateTimeFormat);
     state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:populate_selection",
         BuildTraceNodeText(state->selectedNode) + " editor=\"date_time_format\"" + " format=" + QuoteTraceText(format));
     return true;
@@ -600,49 +669,24 @@ bool PopulateDescriptorLayoutEditSelection(LayoutEditDialogState* state, HWND hw
     return handler != nullptr && handler->populate != nullptr && handler->populate(state, hwnd);
 }
 
-std::vector<std::string> ThemeNames(const AppConfig& config) {
-    std::vector<std::string> names;
-    names.reserve(config.layout.themes.size());
-    for (const ThemeConfig& theme : config.layout.themes) {
-        names.push_back(theme.name);
+void ShowLayoutEditSelectionEditor(
+    LayoutEditDialogState* state, HWND hwnd, LayoutEditEditorKind kind, bool metricBinding) {
+    if (kind != LayoutEditEditorKind::MetricListOrder) {
+        DestroyMetricListOrderEditorControls(state);
     }
-    return names;
-}
-
-std::vector<std::string> LayoutNames(const AppConfig& config) {
-    std::vector<std::string> names;
-    names.reserve(config.layout.layouts.size());
-    for (const LayoutSectionConfig& layout : config.layout.layouts) {
-        names.push_back(layout.name);
-    }
-    return names;
-}
-
-void ShowLayoutEditSelectionEditors(LayoutEditDialogState* state,
-    HWND hwnd,
-    bool value,
-    bool font,
-    bool color,
-    bool weights,
-    bool metric,
-    bool metricBinding,
-    bool globalFontFamily = false,
-    bool dateTimeFormat = false,
-    bool themeSelector = false,
-    bool layoutSelector = false) {
-    DestroyMetricListOrderEditorControls(state);
+    const bool metric = kind == LayoutEditEditorKind::Metric;
     ShowLayoutEditEditors(hwnd,
-        value,
-        font,
-        color,
-        weights,
+        kind == LayoutEditEditorKind::Numeric,
+        kind == LayoutEditEditorKind::Font,
+        kind == LayoutEditEditorKind::Color,
+        kind == LayoutEditEditorKind::Weights,
         metric,
-        metricBinding,
-        false,
-        globalFontFamily,
-        dateTimeFormat,
-        themeSelector,
-        layoutSelector);
+        metric && metricBinding,
+        kind == LayoutEditEditorKind::MetricListOrder,
+        kind == LayoutEditEditorKind::GlobalFontFamily,
+        kind == LayoutEditEditorKind::DateTimeFormat,
+        kind == LayoutEditEditorKind::ThemeSelector,
+        kind == LayoutEditEditorKind::LayoutSelector);
     SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
 }
 
@@ -658,6 +702,19 @@ void FinishPopulateLayoutEditSelectionUi(LayoutEditDialogState* state, HWND hwnd
 void TracePopulateLayoutEditSelection(LayoutEditDialogState* state, const std::string& detail) {
     state->dialog->Host().TraceLayoutEditDialogEvent(
         "layout_edit_dialog:populate_selection", BuildTraceNodeText(state->selectedNode) + detail);
+}
+
+void PopulateColorEditorControls(LayoutEditDialogState* state, HWND hwnd, unsigned int color) {
+    SetColorDialogHex(hwnd, color);
+    SetColorDialogChannel(hwnd, kColorDialogControls[0], (color >> 24) & 0xFFu);
+    SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 16) & 0xFFu);
+    SetColorDialogChannel(hwnd, kColorDialogControls[2], (color >> 8) & 0xFFu);
+    SetColorDialogChannel(hwnd, kColorDialogControls[3], color & 0xFFu);
+    SetColorDialogLch(hwnd, color);
+    SetColorDialogHsv(hwnd, color);
+    ConfigureColorViewTabs(hwnd, state->colorEditViewMode);
+    ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Color);
+    SetColorSamplePreview(state, hwnd, color);
 }
 
 }  // namespace
@@ -728,7 +785,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     if (IsFontsSectionNode(state)) {
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, L"Family:");
         PopulateFontFaceComboBox(hwnd, CommonFontFamilyText(state->dialog->Host().CurrentConfig().layout.fonts));
-        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false, true);
+        ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::GlobalFontFamily);
         FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Previewing changes in the dashboard.");
         TracePopulateLayoutEditSelection(state, " editor=\"font_family\"");
         return;
@@ -736,8 +793,8 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     if (IsThemeSectionNode(state)) {
         const AppConfig& config = state->dialog->Host().CurrentConfig();
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_THEME_LABEL, L"Theme:");
-        PopulateTextCombo(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO, ThemeNames(config), config.display.theme);
-        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false, false, false, true);
+        PopulateThemeNameCombo(hwnd, config);
+        ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::ThemeSelector);
         FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Previewing changes in the dashboard.");
         InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_PREVIEW), nullptr, TRUE);
         TracePopulateLayoutEditSelection(
@@ -747,16 +804,15 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
     if (IsLayoutSectionNode(state)) {
         const AppConfig& config = state->dialog->Host().CurrentConfig();
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_THEME_LABEL, L"Layout:");
-        PopulateTextCombo(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO, LayoutNames(config), config.display.layout);
-        ShowLayoutEditSelectionEditors(
-            state, hwnd, false, false, false, false, false, false, false, false, false, true);
+        PopulateLayoutNameCombo(hwnd, config);
+        ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::LayoutSelector);
         FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Previewing changes in the dashboard.");
         TracePopulateLayoutEditSelection(
             state, " editor=\"layout_selector\" layout=" + QuoteTraceText(config.display.layout));
         return;
     }
     if (state->selectedLeaf == nullptr) {
-        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false);
+        ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Summary);
         FinishPopulateLayoutEditSelectionUi(state, hwnd, L"Select a field to edit it here.");
         TracePopulateLayoutEditSelection(state, " editor=\"none\"");
         return;
@@ -775,7 +831,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
                 font.has_value() && *font != nullptr ? WideFromUtf8(std::to_string((**font).weight)).c_str() : L"");
             DestroyMetricListOrderEditorControls(state);
-            ShowLayoutEditEditors(hwnd, false, true, false, false, false, false, false);
+            ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Font);
             SetFontSamplePreview(state,
                 hwnd,
                 std::optional<LayoutEditParameter>(*parameter),
@@ -789,16 +845,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             const auto value = FindColorRoleValue(state->dialog->Host().CurrentConfig(), *parameter);
             const unsigned int color = value.has_value() ? value->ToRgba() : 0x000000FFu;
             PopulateColorExpressionControls(hwnd, *parameter, value.value_or(ColorConfig::FromRgba(color)));
-            SetColorDialogHex(hwnd, color);
-            SetColorDialogChannel(hwnd, kColorDialogControls[0], (color >> 24) & 0xFFu);
-            SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 16) & 0xFFu);
-            SetColorDialogChannel(hwnd, kColorDialogControls[2], (color >> 8) & 0xFFu);
-            SetColorDialogChannel(hwnd, kColorDialogControls[3], color & 0xFFu);
-            SetColorDialogLch(hwnd, color);
-            SetColorDialogHsv(hwnd, color);
-            ConfigureColorViewTabs(hwnd, state->colorEditViewMode);
-            ShowLayoutEditSelectionEditors(state, hwnd, false, false, true, false, false, false);
-            SetColorSamplePreview(state, hwnd, color);
+            PopulateColorEditorControls(state, hwnd, color);
             traceDetail = " editor=\"color\"" + BuildColorDialogTraceValues(hwnd) + " config_value=" +
                           QuoteTraceText(value.has_value() ? FormatTraceColorHex(value->ToRgba()) : "none") +
                           " mode=" + QuoteTraceText(IsDerivedColorMode(hwnd) ? "derived" : "literal") + " expression=" +
@@ -809,23 +856,14 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                 value.has_value() ? WideFromUtf8(FormatLayoutEditTooltipValue(*value, state->selectedLeaf->valueFormat))
                                   : L"";
             SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-            ShowLayoutEditSelectionEditors(state, hwnd, true, false, false, false, false, false);
+            ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Numeric);
             traceDetail = std::string(" editor=\"numeric\"") +
                           " text=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
         }
     } else if (const auto* themeColorKey = std::get_if<ThemeColorEditKey>(&state->selectedLeaf->focusKey)) {
         const auto value = FindThemeColorValue(state->dialog->Host().CurrentConfig(), *themeColorKey);
         const unsigned int color = value.has_value() ? value->ToRgba() : 0x000000FFu;
-        SetColorDialogHex(hwnd, color);
-        SetColorDialogChannel(hwnd, kColorDialogControls[0], (color >> 24) & 0xFFu);
-        SetColorDialogChannel(hwnd, kColorDialogControls[1], (color >> 16) & 0xFFu);
-        SetColorDialogChannel(hwnd, kColorDialogControls[2], (color >> 8) & 0xFFu);
-        SetColorDialogChannel(hwnd, kColorDialogControls[3], color & 0xFFu);
-        SetColorDialogLch(hwnd, color);
-        SetColorDialogHsv(hwnd, color);
-        ConfigureColorViewTabs(hwnd, state->colorEditViewMode);
-        ShowLayoutEditSelectionEditors(state, hwnd, false, false, true, false, false, false);
-        SetColorSamplePreview(state, hwnd, color);
+        PopulateColorEditorControls(state, hwnd, color);
         traceDetail = " editor=\"theme_color\"" + BuildColorDialogTraceValues(hwnd) + " config_value=" +
                       QuoteTraceText(value.has_value() ? FormatTraceColorHex(value->ToRgba()) : "none");
     } else if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&state->selectedLeaf->focusKey)) {
@@ -840,7 +878,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDlgItemTextW(hwnd,
             IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT,
             values.has_value() ? WideFromUtf8(std::to_string(values->second)).c_str() : L"");
-        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, true, false, false);
+        ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Weights);
         traceDetail = std::string(" editor=\"weights\"") +
                       " first=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT)) +
                       " second=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT));
@@ -848,7 +886,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         const std::wstring text =
             WideFromUtf8(FindCardTitleValue(state->dialog->Host().CurrentConfig(), *cardTitleKey).value_or(""));
         SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, text.c_str());
-        ShowLayoutEditSelectionEditors(state, hwnd, true, false, false, false, false, false);
+        ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Numeric);
         traceDetail = std::string(" editor=\"text\"") +
                       " text=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
     } else if (PopulateDescriptorLayoutEditSelection(state, hwnd)) {
@@ -890,20 +928,19 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             std::find(bindingOptions.begin(), bindingOptions.end(), selectedBinding) == bindingOptions.end()) {
             bindingOptions.push_back(selectedBinding);
         }
-        std::sort(bindingOptions.begin(), bindingOptions.end());
-        bindingOptions.erase(std::unique(bindingOptions.begin(), bindingOptions.end()), bindingOptions.end());
+        SortUniqueStrings(bindingOptions);
         PopulateMetricBindingComboBox(hwnd, bindingOptions, selectedBinding, showBinding);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT), scaleEditable ? TRUE : FALSE);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT), unitEditable ? TRUE : FALSE);
         EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT), definition != nullptr ? TRUE : FALSE);
-        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, true, showBinding);
+        ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Metric, showBinding);
         traceDetail = " editor=\"metric\"" + BuildMetricDialogTraceValues(hwnd) +
                       " scale_editable=" + QuoteTraceText(scaleEditable ? "true" : "false") +
                       " unit_editable=" + QuoteTraceText(unitEditable ? "true" : "false") +
                       " binding_visible=" + QuoteTraceText(showBinding ? "true" : "false") +
                       " binding_options=" + QuoteTraceText(std::to_string(bindingOptions.size()));
     } else {
-        ShowLayoutEditSelectionEditors(state, hwnd, false, false, false, false, false, false);
+        ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Summary);
         traceDetail = " editor=\"none\"";
     }
 

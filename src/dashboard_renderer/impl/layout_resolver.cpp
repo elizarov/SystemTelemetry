@@ -638,9 +638,10 @@ const DashboardLayoutResolver::ParsedWidgetInfo* DashboardLayoutResolver::FindPa
         return nullptr;
     }
 
-    const auto it = parsedWidgetInfoCache_.find(&node);
-    if (it != parsedWidgetInfoCache_.end()) {
-        return &it->second;
+    for (const auto& entry : parsedWidgetInfoCache_) {
+        if (entry.first == &node) {
+            return &entry.second;
+        }
     }
 
     if (node.name.empty() || !EnumFromString<WidgetClass>(node.name).has_value()) {
@@ -658,7 +659,8 @@ const DashboardLayoutResolver::ParsedWidgetInfo* DashboardLayoutResolver::FindPa
     info.fixedPreferredHeightInRows = widget->UsesFixedPreferredHeightInRows();
     info.verticalSpring = widget->IsVerticalSpring();
     info.widgetPrototype = std::move(widget);
-    return &parsedWidgetInfoCache_.emplace(&node, std::move(info)).first->second;
+    parsedWidgetInfoCache_.emplace_back(&node, std::move(info));
+    return &parsedWidgetInfoCache_.back().second;
 }
 
 WidgetLayout DashboardLayoutResolver::ResolveWidgetLayout(const DashboardRenderer& renderer,
@@ -766,6 +768,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
     int cursor = horizontal ? rect.left : rect.top;
     std::vector<RenderRect> childRects;
     childRects.reserve(node.children.size());
+    std::vector<size_t> childPath = nodePath;
     for (size_t i = 0; i < node.children.size(); ++i) {
         const auto& child = node.children[i];
         const DashboardLayoutResolver::ParsedWidgetInfo* childWidget = FindParsedWidgetInfo(renderer, child);
@@ -807,7 +810,6 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
                             "\" weight=" + std::to_string(childWeight) + " gap=" + std::to_string(gap) +
                             " size=" + std::to_string(size) + " " + FormatRect(childRect));
         childRects.push_back(childRect);
-        std::vector<size_t> childPath = nodePath;
         childPath.push_back(i);
         ResolveNodeWidgetsInternal(renderer,
             child,
@@ -818,6 +820,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
             editCardId,
             childPath,
             instantiateWidgets);
+        childPath.pop_back();
         cursor += size + gap;
         if (verticalSpring) {
             remainingDistributable -= size;
@@ -941,6 +944,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         int remainingWeight = totalWeight;
         std::vector<RenderRect> childRects;
         childRects.reserve(node.children.size());
+        std::vector<size_t> childPath = nodePath;
         for (size_t i = 0; i < node.children.size(); ++i) {
             const auto& child = node.children[i];
             const int childWeight = (std::max)(1, child.weight);
@@ -961,9 +965,9 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
                                 "\" weight=" + std::to_string(childWeight) + " gap=" + std::to_string(gap) +
                                 " size=" + std::to_string(size) + " " + FormatRect(childRect));
             childRects.push_back(childRect);
-            std::vector<size_t> childPath = nodePath;
             childPath.push_back(i);
             resolveNode(resolveNode, child, childRect, childPath);
+            childPath.pop_back();
             cursor += size + gap;
             remainingAvailable -= size;
             remainingWeight -= childWeight;

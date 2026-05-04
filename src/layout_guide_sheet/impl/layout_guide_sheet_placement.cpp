@@ -15,6 +15,15 @@ bool PointsEqual(RenderPoint lhs, RenderPoint rhs) {
     return lhs.x == rhs.x && lhs.y == rhs.y;
 }
 
+int Min3Int(int first, int second, int third) {
+    // Size: avoid std::min/std::max initializer_list helper code in guide-sheet layout.
+    return std::min(std::min(first, second), third);
+}
+
+int Max3Int(int first, int second, int third) {
+    return std::max(std::max(first, second), third);
+}
+
 bool LeaderSegmentsIntersect(RenderPoint a, RenderPoint b, RenderPoint c, RenderPoint d) {
     if (PointsEqual(a, c) || PointsEqual(a, d) || PointsEqual(b, c) || PointsEqual(b, d)) {
         return false;
@@ -211,6 +220,65 @@ int SideMembershipPenalty(const CardCalloutColumns& candidate, const CardCallout
     return penalty;
 }
 
+bool PlannedIndexLessByTargetX(size_t lhs,
+    size_t rhs,
+    const std::vector<PlannedCallout>& plannedCallouts,
+    const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    const RenderPoint lhsCenter = plannedCallouts[lhs].target.Center();
+    const RenderPoint rhsCenter = plannedCallouts[rhs].target.Center();
+    if (lhsCenter.x != rhsCenter.x) {
+        return lhsCenter.x < rhsCenter.x;
+    }
+    if (lhsCenter.y != rhsCenter.y) {
+        return lhsCenter.y < rhsCenter.y;
+    }
+    return callouts[plannedCallouts[lhs].calloutIndex].order < callouts[plannedCallouts[rhs].calloutIndex].order;
+}
+
+bool PlannedIndexLessByTargetY(size_t lhs,
+    size_t rhs,
+    const std::vector<PlannedCallout>& plannedCallouts,
+    const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    const RenderPoint lhsCenter = plannedCallouts[lhs].target.Center();
+    const RenderPoint rhsCenter = plannedCallouts[rhs].target.Center();
+    if (lhsCenter.y != rhsCenter.y) {
+        return lhsCenter.y < rhsCenter.y;
+    }
+    if (lhsCenter.x != rhsCenter.x) {
+        return lhsCenter.x < rhsCenter.x;
+    }
+    return callouts[plannedCallouts[lhs].calloutIndex].order < callouts[plannedCallouts[rhs].calloutIndex].order;
+}
+
+void StableSortPlannedIndexesByTargetX(std::vector<size_t>& plannedIndexes,
+    const std::vector<PlannedCallout>& plannedCallouts,
+    const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    // Size: callout lists are small; insertion sort avoids std::stable_sort template code.
+    for (size_t i = 1; i < plannedIndexes.size(); ++i) {
+        const size_t current = plannedIndexes[i];
+        size_t j = i;
+        while (j > 0 && PlannedIndexLessByTargetX(current, plannedIndexes[j - 1], plannedCallouts, callouts)) {
+            plannedIndexes[j] = plannedIndexes[j - 1];
+            --j;
+        }
+        plannedIndexes[j] = current;
+    }
+}
+
+void StableSortPlannedIndexesByTargetY(std::vector<size_t>& plannedIndexes,
+    const std::vector<PlannedCallout>& plannedCallouts,
+    const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    for (size_t i = 1; i < plannedIndexes.size(); ++i) {
+        const size_t current = plannedIndexes[i];
+        size_t j = i;
+        while (j > 0 && PlannedIndexLessByTargetY(current, plannedIndexes[j - 1], plannedCallouts, callouts)) {
+            plannedIndexes[j] = plannedIndexes[j - 1];
+            --j;
+        }
+        plannedIndexes[j] = current;
+    }
+}
+
 }  // namespace
 
 LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
@@ -247,18 +315,7 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                 cardPlanned.push_back(plannedIndex);
             }
         }
-        std::stable_sort(cardPlanned.begin(), cardPlanned.end(), [&](size_t lhs, size_t rhs) {
-            const RenderPoint lhsCenter = plannedCallouts[lhs].target.Center();
-            const RenderPoint rhsCenter = plannedCallouts[rhs].target.Center();
-            if (lhsCenter.x != rhsCenter.x) {
-                return lhsCenter.x < rhsCenter.x;
-            }
-            if (lhsCenter.y != rhsCenter.y) {
-                return lhsCenter.y < rhsCenter.y;
-            }
-            return callouts[plannedCallouts[lhs].calloutIndex].order <
-                   callouts[plannedCallouts[rhs].calloutIndex].order;
-        });
+        StableSortPlannedIndexesByTargetX(cardPlanned, plannedCallouts, callouts);
         const size_t leftCount = cardPlanned.size() == 1 ? (plannedCallouts[cardPlanned.front()].target.Center().x <
                                                                        cardPlacements[cardIndex].sourceRect.Center().x
                                                                    ? 1
@@ -266,22 +323,8 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                                                          : cardPlanned.size() / 2;
         plannedByCard[cardIndex].left.assign(cardPlanned.begin(), cardPlanned.begin() + leftCount);
         plannedByCard[cardIndex].right.assign(cardPlanned.begin() + leftCount, cardPlanned.end());
-        const auto sortByTargetY = [&](std::vector<size_t>& plannedIndexes) {
-            std::stable_sort(plannedIndexes.begin(), plannedIndexes.end(), [&](size_t lhs, size_t rhs) {
-                const RenderPoint lhsCenter = plannedCallouts[lhs].target.Center();
-                const RenderPoint rhsCenter = plannedCallouts[rhs].target.Center();
-                if (lhsCenter.y != rhsCenter.y) {
-                    return lhsCenter.y < rhsCenter.y;
-                }
-                if (lhsCenter.x != rhsCenter.x) {
-                    return lhsCenter.x < rhsCenter.x;
-                }
-                return callouts[plannedCallouts[lhs].calloutIndex].order <
-                       callouts[plannedCallouts[rhs].calloutIndex].order;
-            });
-        };
-        sortByTargetY(plannedByCard[cardIndex].left);
-        sortByTargetY(plannedByCard[cardIndex].right);
+        StableSortPlannedIndexesByTargetY(plannedByCard[cardIndex].left, plannedCallouts, callouts);
+        StableSortPlannedIndexesByTargetY(plannedByCard[cardIndex].right, plannedCallouts, callouts);
     }
 
     const auto stackedHeight = [&](const std::vector<size_t>& plannedIndexes) {
@@ -327,8 +370,8 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             block.itemX + block.itemWidth + (block.rightWidth > 0 ? style.calloutGap + block.rightWidth : 0);
         int topX = block.itemX + (block.itemWidth - topWidth) / 2;
         int bottomX = block.itemX + (block.itemWidth - bottomWidth) / 2;
-        const int minX = std::min({0, topX, bottomX});
-        const int maxX = std::max({mainWidth, topX + topWidth, bottomX + bottomWidth});
+        const int minX = Min3Int(0, topX, bottomX);
+        const int maxX = Max3Int(mainWidth, topX + topWidth, bottomX + bottomWidth);
         block.itemX -= minX;
         block.width = maxX - minX;
         return block;

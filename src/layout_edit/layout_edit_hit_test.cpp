@@ -4,7 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
-#include <tuple>
+#include <utility>
 
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_hit_priority.h"
@@ -24,6 +24,26 @@ bool IsAnchorTargetKind(LayoutEditActiveRegionKind kind) {
 bool IsColorTargetKind(LayoutEditActiveRegionKind kind) {
     return kind == LayoutEditActiveRegionKind::StaticColorTarget ||
            kind == LayoutEditActiveRegionKind::DynamicColorTarget;
+}
+
+bool LayoutGuideSnapCandidateLess(const LayoutGuideSnapCandidate& left, const LayoutGuideSnapCandidate& right) {
+    if (left.startDistance != right.startDistance) {
+        return left.startDistance < right.startDistance;
+    }
+    return left.groupOrder < right.groupOrder;
+}
+
+void StableSortLayoutGuideSnapCandidates(std::vector<LayoutGuideSnapCandidate>& candidates) {
+    // Size: snap candidate lists are tiny; insertion sort avoids std::stable_sort template code.
+    for (size_t i = 1; i < candidates.size(); ++i) {
+        LayoutGuideSnapCandidate current = std::move(candidates[i]);
+        size_t j = i;
+        while (j > 0 && LayoutGuideSnapCandidateLess(current, candidates[j - 1])) {
+            candidates[j] = std::move(candidates[j - 1]);
+            --j;
+        }
+        candidates[j] = std::move(current);
+    }
 }
 
 int AnchorHoverPriority(const LayoutEditAnchorRegion& region) {
@@ -75,27 +95,42 @@ bool IsWidgetAffectedByGuide(const LayoutEditWidgetRegion& widget, const LayoutE
            widget.rect.right <= guide.containerRect.right && widget.rect.bottom <= guide.containerRect.bottom;
 }
 
+bool MatchesSimilarityRepresentative(const LayoutEditWidgetRegion& candidate,
+    LayoutGuideAxis axis,
+    const std::string& cardId,
+    WidgetClass widgetClass,
+    int extent,
+    int edgeStart,
+    int edgeEnd) {
+    if (candidate.widget.renderCardId != cardId || candidate.widgetClass != widgetClass ||
+        WidgetExtentForAxis(candidate, axis) != extent) {
+        return false;
+    }
+    if (axis == LayoutGuideAxis::Vertical) {
+        return candidate.rect.left == edgeStart && candidate.rect.right == edgeEnd;
+    }
+    return candidate.rect.top == edgeStart && candidate.rect.bottom == edgeEnd;
+}
+
+bool HasPriorTargetType(const std::vector<LayoutEditWidgetRegion>& widgets,
+    size_t targetIndex,
+    const LayoutEditWidgetIdentity& affectedWidget,
+    WidgetClass widgetClass,
+    LayoutGuideAxis axis,
+    int extent) {
+    for (size_t i = 0; i < targetIndex; ++i) {
+        const LayoutEditWidgetRegion& candidate = widgets[i];
+        if (!MatchesWidgetIdentity(candidate.widget, affectedWidget) && candidate.widgetClass == widgetClass &&
+            WidgetExtentForAxis(candidate, axis) == extent) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::vector<LayoutEditWidgetRegion> CollectSimilarityIndicatorWidgets(
     const LayoutEditActiveRegions& regions, LayoutGuideAxis axis) {
-    struct SimilarityRepresentativeKey {
-        std::string cardId;
-        WidgetClass widgetClass = WidgetClass::Unknown;
-        int extent = 0;
-        int edgeStart = 0;
-        int edgeEnd = 0;
-
-        bool operator<(const SimilarityRepresentativeKey& other) const {
-            return std::tie(cardId, widgetClass, extent, edgeStart, edgeEnd) <
-                   std::tie(other.cardId, other.widgetClass, other.extent, other.edgeStart, other.edgeEnd);
-        }
-
-        bool operator==(const SimilarityRepresentativeKey& other) const {
-            return cardId == other.cardId && widgetClass == other.widgetClass && extent == other.extent &&
-                   edgeStart == other.edgeStart && edgeEnd == other.edgeEnd;
-        }
-    };
-
-    std::vector<SimilarityRepresentativeKey> seenKeys;
+    // Size: scan the already-small result list; separate seen-key vectors measured larger.
     std::vector<LayoutEditWidgetRegion> widgets;
     for (const LayoutEditActiveRegion& region : regions) {
         if (region.kind != LayoutEditActiveRegionKind::WidgetHover) {
@@ -109,21 +144,15 @@ std::vector<LayoutEditWidgetRegion> CollectSimilarityIndicatorWidgets(
         if (extent <= 0) {
             continue;
         }
-        SimilarityRepresentativeKey key;
-        key.cardId = widget.widget.renderCardId;
-        key.widgetClass = widget.widgetClass;
-        key.extent = extent;
-        if (axis == LayoutGuideAxis::Vertical) {
-            key.edgeStart = widget.rect.left;
-            key.edgeEnd = widget.rect.right;
-        } else {
-            key.edgeStart = widget.rect.top;
-            key.edgeEnd = widget.rect.bottom;
-        }
-        if (std::find(seenKeys.begin(), seenKeys.end(), key) != seenKeys.end()) {
+        const int edgeStart = axis == LayoutGuideAxis::Vertical ? widget.rect.left : widget.rect.top;
+        const int edgeEnd = axis == LayoutGuideAxis::Vertical ? widget.rect.right : widget.rect.bottom;
+        const auto duplicate = [&](const LayoutEditWidgetRegion& candidate) {
+            return MatchesSimilarityRepresentative(
+                candidate, axis, widget.widget.renderCardId, widget.widgetClass, extent, edgeStart, edgeEnd);
+        };
+        if (std::find_if(widgets.begin(), widgets.end(), duplicate) != widgets.end()) {
             continue;
         }
-        seenKeys.push_back(std::move(key));
         widgets.push_back(widget);
     }
     return widgets;
@@ -418,62 +447,35 @@ LayoutEditHoverResolution ResolveLayoutEditHover(const LayoutEditActiveRegions& 
 
 std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(
     const LayoutEditActiveRegions& regions, const LayoutEditGuide& guide) {
-    struct SimilarityTypeKey {
-        WidgetClass widgetClass = WidgetClass::Unknown;
-        int extent = 0;
-
-        bool operator<(const SimilarityTypeKey& other) const {
-            if (widgetClass != other.widgetClass) {
-                return widgetClass < other.widgetClass;
-            }
-            return extent < other.extent;
-        }
-
-        bool operator==(const SimilarityTypeKey& other) const {
-            return widgetClass == other.widgetClass && extent == other.extent;
-        }
-    };
-
     std::vector<LayoutEditWidgetRegion> allWidgets = CollectSimilarityIndicatorWidgets(regions, guide.axis);
-    std::vector<LayoutEditWidgetRegion> affectedWidgets;
-    for (const LayoutEditWidgetRegion& widget : allWidgets) {
-        if (IsWidgetAffectedByGuide(widget, guide)) {
-            affectedWidgets.push_back(widget);
-        }
-    }
-
     std::vector<LayoutGuideSnapCandidate> candidates;
-    for (const LayoutEditWidgetRegion& affected : affectedWidgets) {
+    for (const LayoutEditWidgetRegion& affected : allWidgets) {
+        if (!IsWidgetAffectedByGuide(affected, guide)) {
+            continue;
+        }
         const int startExtent = WidgetExtentForAxis(affected, guide.axis);
         if (startExtent <= 0) {
             continue;
         }
-        std::vector<SimilarityTypeKey> seenTargets;
         for (size_t i = 0; i < allWidgets.size(); ++i) {
             const LayoutEditWidgetRegion& target = allWidgets[i];
             if (MatchesWidgetIdentity(target.widget, affected.widget) || target.widgetClass != affected.widgetClass) {
                 continue;
             }
-            const SimilarityTypeKey typeKey{target.widgetClass, WidgetExtentForAxis(target, guide.axis)};
-            if (std::find(seenTargets.begin(), seenTargets.end(), typeKey) != seenTargets.end()) {
+            const int targetExtent = WidgetExtentForAxis(target, guide.axis);
+            if (HasPriorTargetType(allWidgets, i, affected.widget, target.widgetClass, guide.axis, targetExtent)) {
                 continue;
             }
-            seenTargets.push_back(typeKey);
             candidates.push_back(LayoutGuideSnapCandidate{
                 affected.widget,
-                typeKey.extent,
+                targetExtent,
                 startExtent,
-                std::abs(typeKey.extent - startExtent),
+                std::abs(targetExtent - startExtent),
                 i,
             });
         }
     }
 
-    std::stable_sort(candidates.begin(), candidates.end(), [](const auto& left, const auto& right) {
-        if (left.startDistance != right.startDistance) {
-            return left.startDistance < right.startDistance;
-        }
-        return left.groupOrder < right.groupOrder;
-    });
+    StableSortLayoutGuideSnapCandidates(candidates);
     return candidates;
 }

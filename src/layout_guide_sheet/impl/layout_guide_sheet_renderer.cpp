@@ -4,6 +4,7 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "dashboard_renderer/dashboard_renderer.h"
@@ -56,6 +57,26 @@ int ScaleNonNegative(DashboardRenderer& renderer, int value) {
 
 int ScaleAtLeast(DashboardRenderer& renderer, int value, int minimum) {
     return std::max(minimum, renderer.ScaleLogical(value));
+}
+
+bool CalloutPriorityLess(const LayoutGuideSheetPlacementCallout& lhs, const LayoutGuideSheetPlacementCallout& rhs) {
+    if (lhs.priority != rhs.priority) {
+        return lhs.priority < rhs.priority;
+    }
+    return lhs.order < rhs.order;
+}
+
+void StableSortCalloutsByPriority(std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    // Size: callout lists are small; insertion sort avoids std::stable_sort template code.
+    for (size_t i = 1; i < callouts.size(); ++i) {
+        LayoutGuideSheetPlacementCallout current = std::move(callouts[i]);
+        size_t j = i;
+        while (j > 0 && CalloutPriorityLess(current, callouts[j - 1])) {
+            callouts[j] = std::move(callouts[j - 1]);
+            --j;
+        }
+        callouts[j] = std::move(current);
+    }
 }
 
 struct PackedOverviewCard {
@@ -311,6 +332,7 @@ void AppendPackedCards(const LayoutNodeConfig& node,
     int cursor = horizontal ? rect.left : rect.top;
     std::vector<RenderRect> childRects;
     childRects.reserve(node.children.size());
+    std::vector<size_t> childPath = nodePath;
     for (size_t i = 0; i < node.children.size(); ++i) {
         const int weight = std::max(1, node.children[i].weight);
         const int minExtent = horizontal ? measured[i].width : measured[i].height;
@@ -326,9 +348,9 @@ void AppendPackedCards(const LayoutNodeConfig& node,
             childRect.bottom = cursor + extent;
         }
         childRects.push_back(childRect);
-        std::vector<size_t> childPath = nodePath;
         childPath.push_back(i);
         AppendPackedCards(node.children[i], renderer, childRect, childPath, overview);
+        childPath.pop_back();
         cursor += extent + gap;
         remainingExtra -= extra;
         remainingWeight -= weight;
@@ -724,12 +746,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
         }
         return saved;
     }
-    std::stable_sort(callouts.begin(), callouts.end(), [](const Callout& lhs, const Callout& rhs) {
-        if (lhs.priority != rhs.priority) {
-            return lhs.priority < rhs.priority;
-        }
-        return lhs.order < rhs.order;
-    });
+    StableSortCalloutsByPriority(callouts);
 
     const LayoutGuideSheetConfig& sheetStyle = dashboardRenderer_.Config().layout.layoutGuideSheet;
     const int sheetMargin = ScaleNonNegative(dashboardRenderer_, sheetStyle.sheetMargin);

@@ -57,9 +57,7 @@ std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
         candidates.push_back(std::move(candidate));
     }
 
-    std::sort(candidates.begin(),
-        candidates.end(),
-        [](const StorageDriveCandidate& lhs, const StorageDriveCandidate& rhs) { return lhs.letter < rhs.letter; });
+    SortStorageDriveCandidatesByLetter(candidates);
     return candidates;
 }
 

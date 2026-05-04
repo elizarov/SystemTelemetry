@@ -246,40 +246,41 @@ std::vector<std::string> CollectTopLevelCards(const AppConfig& config) {
     return orderedCards;
 }
 
-std::optional<LayoutEditTreeNode> BuildNodeFieldLeaf(const std::string& sectionName,
+bool BuildNodeFieldLeaf(const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
     const std::vector<size_t>& nodePath,
-    WidgetClass widgetClass) {
+    WidgetClass widgetClass,
+    LayoutEditTreeNode& leafNode) {
     const auto key = LayoutNodeFieldEditKeyForWidgetParameter(editCardId, nodePath, widgetClass);
     if (!key.has_value()) {
-        return std::nullopt;
+        return false;
     }
     const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(*key);
     if (descriptor == nullptr) {
-        return std::nullopt;
+        return false;
     }
 
-    LayoutEditTreeNode leafNode;
     leafNode.kind = LayoutEditTreeNodeKind::Leaf;
     leafNode.label = std::string(descriptor->label);
     leafNode.locationText = MemberLocationText(sectionName, memberName);
     leafNode.descriptionKey = std::string(descriptor->descriptionKey);
     leafNode.leaf = LayoutEditTreeLeaf{*key, sectionName, memberName, leafNode.descriptionKey, descriptor->valueFormat};
     leafNode.selectionHighlight = leafNode.leaf->focusKey;
-    return leafNode;
+    return true;
 }
 
-std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionName,
+bool BuildContainerNode(const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
     const LayoutNodeConfig& node,
-    const std::vector<size_t>& nodePath) {
+    const std::vector<size_t>& nodePath,
+    LayoutEditTreeNode& treeNode) {
+    // Size: out-param builders avoid optional<LayoutEditTreeNode> temporaries for large nodes.
     if (node.name != "rows" && node.name != "columns") {
-        return std::nullopt;
+        return false;
     }
 
-    LayoutEditTreeNode treeNode;
     treeNode.kind = LayoutEditTreeNodeKind::Container;
     treeNode.label = node.name;
     treeNode.locationText = ContainerLocationText(sectionName, memberName, node.name);
@@ -287,28 +288,28 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
     treeNode.initiallyExpanded = false;
     treeNode.selectionHighlight = LayoutContainerEditKey{editCardId, nodePath};
 
+    std::vector<size_t> childPath = nodePath;
     for (size_t i = 0; i < node.children.size(); ++i) {
         const auto& child = node.children[i];
-        std::vector<size_t> childPath = nodePath;
         childPath.push_back(i);
-        if (const auto childContainer = BuildContainerNode(sectionName, memberName, editCardId, child, childPath);
-            childContainer.has_value()) {
-            treeNode.children.push_back(*childContainer);
+        LayoutEditTreeNode childNode;
+        if (BuildContainerNode(sectionName, memberName, editCardId, child, childPath, childNode)) {
+            treeNode.children.push_back(std::move(childNode));
         } else if (child.name == "metric_list") {
-            if (auto leafNode =
-                    BuildNodeFieldLeaf(sectionName, memberName, editCardId, childPath, WidgetClass::MetricList);
-                leafNode.has_value()) {
-                treeNode.children.push_back(std::move(*leafNode));
+            LayoutEditTreeNode leafNode;
+            if (BuildNodeFieldLeaf(sectionName, memberName, editCardId, childPath, WidgetClass::MetricList, leafNode)) {
+                treeNode.children.push_back(std::move(leafNode));
             }
         } else if (child.name == "clock_time" || child.name == "clock_date") {
             const auto widgetClass = EnumFromString<WidgetClass>(child.name);
             if (widgetClass.has_value()) {
-                if (auto leafNode = BuildNodeFieldLeaf(sectionName, memberName, editCardId, childPath, *widgetClass);
-                    leafNode.has_value()) {
-                    treeNode.children.push_back(std::move(*leafNode));
+                LayoutEditTreeNode leafNode;
+                if (BuildNodeFieldLeaf(sectionName, memberName, editCardId, childPath, *widgetClass, leafNode)) {
+                    treeNode.children.push_back(std::move(leafNode));
                 }
             }
         }
+        childPath.pop_back();
 
         if (i + 1 < node.children.size() && SeparatorIsEditable(node, i)) {
             LayoutEditTreeNode leafNode;
@@ -332,43 +333,43 @@ std::optional<LayoutEditTreeNode> BuildContainerNode(const std::string& sectionN
     }
 
     if (treeNode.children.empty()) {
-        return std::nullopt;
+        return false;
     }
     if (treeNode.children.size() == 1) {
-        return treeNode.children.front();
+        LayoutEditTreeNode childNode = std::move(treeNode.children.front());
+        treeNode = std::move(childNode);
     }
-    return treeNode;
+    return true;
 }
 
-std::optional<LayoutEditTreeNode> BuildStructureGroup(const std::string& sectionName,
+bool BuildStructureGroup(const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
     const std::optional<LayoutEditSelectionHighlight>& selectionHighlight,
-    const LayoutNodeConfig& node) {
-    LayoutEditTreeNode groupNode;
+    const LayoutNodeConfig& node,
+    LayoutEditTreeNode& groupNode) {
     groupNode.kind = LayoutEditTreeNodeKind::Group;
     groupNode.label = memberName;
     groupNode.locationText = MemberLocationText(sectionName, memberName);
     groupNode.descriptionKey = GroupDescriptionKey(memberName);
     groupNode.initiallyExpanded = false;
     groupNode.selectionHighlight = selectionHighlight;
-    if (const auto containerNode = BuildContainerNode(sectionName, memberName, editCardId, node, {});
-        containerNode.has_value()) {
-        if (containerNode->kind == LayoutEditTreeNodeKind::Container) {
-            groupNode.children = containerNode->children;
+    LayoutEditTreeNode containerNode;
+    if (BuildContainerNode(sectionName, memberName, editCardId, node, {}, containerNode)) {
+        if (containerNode.kind == LayoutEditTreeNodeKind::Container) {
+            groupNode.children = std::move(containerNode.children);
         } else {
-            groupNode.children.push_back(*containerNode);
+            groupNode.children.push_back(std::move(containerNode));
         }
     }
     if (groupNode.children.empty()) {
-        return std::nullopt;
+        return false;
     }
-    return groupNode;
+    return true;
 }
 
-std::optional<LayoutEditTreeNode> BuildStaticSectionNode(const AppConfig& config, const TemplateSectionSlot& slot) {
+bool BuildStaticSectionNode(const AppConfig& config, const TemplateSectionSlot& slot, LayoutEditTreeNode& sectionNode) {
     if (slot.sectionName == "metrics") {
-        LayoutEditTreeNode sectionNode;
         sectionNode.kind = LayoutEditTreeNodeKind::Section;
         sectionNode.label = slot.sectionName;
         sectionNode.locationText = SectionLocationText(slot.sectionName);
@@ -405,10 +406,9 @@ std::optional<LayoutEditTreeNode> BuildStaticSectionNode(const AppConfig& config
             sectionNode.children.push_back(std::move(leafNode));
         }
 
-        return sectionNode.children.empty() ? std::nullopt : std::optional<LayoutEditTreeNode>(std::move(sectionNode));
+        return !sectionNode.children.empty();
     }
 
-    LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = slot.sectionName;
     sectionNode.locationText = SectionLocationText(slot.sectionName);
@@ -442,28 +442,31 @@ std::optional<LayoutEditTreeNode> BuildStaticSectionNode(const AppConfig& config
         sectionNode.children.push_back(std::move(leafNode));
     }
     if (sectionNode.children.empty()) {
-        return std::nullopt;
+        return false;
     }
-    return sectionNode;
+    return true;
 }
 
-std::optional<LayoutEditTreeNode> BuildActiveLayoutSectionNode(const AppConfig& config) {
+bool BuildActiveLayoutSectionNode(const AppConfig& config, LayoutEditTreeNode& sectionNode) {
     if (config.display.layout.empty()) {
-        return std::nullopt;
+        return false;
     }
-    LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "layout." + config.display.layout;
     sectionNode.locationText = SectionLocationText(sectionNode.label);
     sectionNode.descriptionKey = SectionDescriptionKey(sectionNode.label);
     sectionNode.initiallyExpanded = true;
     sectionNode.selectionHighlight = LayoutEditSelectionHighlight{LayoutEditSelectionHighlightSpecial::DashboardBounds};
-    if (const auto groupNode = BuildStructureGroup(
-            sectionNode.label, "cards", "", sectionNode.selectionHighlight, config.layout.structure.cardsLayout);
-        groupNode.has_value()) {
-        sectionNode.children.push_back(*groupNode);
+    LayoutEditTreeNode groupNode;
+    if (BuildStructureGroup(sectionNode.label,
+            "cards",
+            "",
+            sectionNode.selectionHighlight,
+            config.layout.structure.cardsLayout,
+            groupNode)) {
+        sectionNode.children.push_back(std::move(groupNode));
     }
-    return sectionNode;
+    return true;
 }
 
 const ThemeConfig* FindActiveTheme(const AppConfig& config) {
@@ -475,13 +478,12 @@ const ThemeConfig* FindActiveTheme(const AppConfig& config) {
     return nullptr;
 }
 
-std::optional<LayoutEditTreeNode> BuildActiveThemeSectionNode(const AppConfig& config) {
+bool BuildActiveThemeSectionNode(const AppConfig& config, LayoutEditTreeNode& sectionNode) {
     const ThemeConfig* theme = FindActiveTheme(config);
     if (theme == nullptr) {
-        return std::nullopt;
+        return false;
     }
 
-    LayoutEditTreeNode sectionNode;
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "theme." + theme->name;
     sectionNode.locationText = SectionLocationText(sectionNode.label);
@@ -504,11 +506,10 @@ std::optional<LayoutEditTreeNode> BuildActiveThemeSectionNode(const AppConfig& c
         sectionNode.children.push_back(std::move(leafNode));
     }
 
-    return sectionNode;
+    return true;
 }
 
-std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& card, bool includeTitleLeaf) {
-    LayoutEditTreeNode sectionNode;
+bool BuildCardSectionNode(const LayoutCardConfig& card, bool includeTitleLeaf, LayoutEditTreeNode& sectionNode) {
     sectionNode.kind = LayoutEditTreeNodeKind::Section;
     sectionNode.label = "card." + card.id;
     sectionNode.locationText = SectionLocationText(sectionNode.label);
@@ -532,12 +533,12 @@ std::optional<LayoutEditTreeNode> BuildCardSectionNode(const LayoutCardConfig& c
         titleLeaf.selectionHighlight = titleLeaf.leaf->focusKey;
         sectionNode.children.push_back(std::move(titleLeaf));
     }
-    if (const auto groupNode =
-            BuildStructureGroup(sectionNode.label, "layout", card.id, sectionNode.selectionHighlight, card.layout);
-        groupNode.has_value()) {
-        sectionNode.children.push_back(*groupNode);
+    LayoutEditTreeNode groupNode;
+    if (BuildStructureGroup(
+            sectionNode.label, "layout", card.id, sectionNode.selectionHighlight, card.layout, groupNode)) {
+        sectionNode.children.push_back(std::move(groupNode));
     }
-    return sectionNode;
+    return true;
 }
 
 const LayoutEditTreeLeaf* FindLayoutEditTreeLeafRecursive(
@@ -598,18 +599,18 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
     for (const auto& section : sections) {
         switch (section.kind) {
             case TemplateSectionKind::StaticSection:
-                if (const auto treeSection = BuildStaticSectionNode(config, section); treeSection.has_value()) {
-                    model.roots.push_back(*treeSection);
+                if (LayoutEditTreeNode treeSection; BuildStaticSectionNode(config, section, treeSection)) {
+                    model.roots.push_back(std::move(treeSection));
                 }
                 break;
             case TemplateSectionKind::ThemeSectionSlot:
-                if (const auto themeSection = BuildActiveThemeSectionNode(config); themeSection.has_value()) {
-                    model.roots.push_back(*themeSection);
+                if (LayoutEditTreeNode themeSection; BuildActiveThemeSectionNode(config, themeSection)) {
+                    model.roots.push_back(std::move(themeSection));
                 }
                 break;
             case TemplateSectionKind::LayoutSectionSlot:
-                if (const auto layoutSection = BuildActiveLayoutSectionNode(config); layoutSection.has_value()) {
-                    model.roots.push_back(*layoutSection);
+                if (LayoutEditTreeNode layoutSection; BuildActiveLayoutSectionNode(config, layoutSection)) {
+                    model.roots.push_back(std::move(layoutSection));
                 }
                 break;
             case TemplateSectionKind::CardSectionSlot:
@@ -620,9 +621,8 @@ LayoutEditTreeModel BuildLayoutEditTreeModel(const AppConfig& config, std::strin
                     }
                     const bool includeTitleLeaf =
                         std::find(topLevelCards.begin(), topLevelCards.end(), cardId) != topLevelCards.end();
-                    if (const auto cardSection = BuildCardSectionNode(*card, includeTitleLeaf);
-                        cardSection.has_value()) {
-                        model.roots.push_back(*cardSection);
+                    if (LayoutEditTreeNode cardSection; BuildCardSectionNode(*card, includeTitleLeaf, cardSection)) {
+                        model.roots.push_back(std::move(cardSection));
                     }
                 }
                 break;

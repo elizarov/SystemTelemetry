@@ -5,6 +5,30 @@
 
 namespace layout_snap_solver {
 
+namespace {
+
+bool SnapCandidateLess(const SnapCandidate& left, const SnapCandidate& right) {
+    if (left.startDistance != right.startDistance) {
+        return left.startDistance < right.startDistance;
+    }
+    return left.groupOrder < right.groupOrder;
+}
+
+void StableSortSnapCandidates(std::vector<SnapCandidate>& candidates) {
+    // Size: snap candidate lists are tiny; insertion sort avoids std::stable_sort template code.
+    for (size_t i = 1; i < candidates.size(); ++i) {
+        SnapCandidate current = std::move(candidates[i]);
+        size_t j = i;
+        while (j > 0 && SnapCandidateLess(current, candidates[j - 1])) {
+            candidates[j] = std::move(candidates[j - 1]);
+            --j;
+        }
+        candidates[j] = std::move(current);
+    }
+}
+
+}  // namespace
+
 std::optional<int> FindNearestSnapWeight(int currentWeight,
     int combinedWeight,
     int threshold,
@@ -15,12 +39,7 @@ std::optional<int> FindNearestSnapWeight(int currentWeight,
     }
 
     std::vector<SnapCandidate> orderedCandidates = candidates;
-    std::stable_sort(orderedCandidates.begin(), orderedCandidates.end(), [](const auto& left, const auto& right) {
-        if (left.startDistance != right.startDistance) {
-            return left.startDistance < right.startDistance;
-        }
-        return left.groupOrder < right.groupOrder;
-    });
+    StableSortSnapCandidates(orderedCandidates);
 
     const std::optional<int> currentExtent = evaluateExtent(currentWeight);
     if (!currentExtent.has_value()) {

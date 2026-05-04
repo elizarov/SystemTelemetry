@@ -381,7 +381,8 @@ struct LayoutConfig {
     LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
 
-    bool operator==(const LayoutConfig& other) const;
+    // Size: keep this cold full-layout comparison out of individual dirty-check callers.
+    __declspec(noinline) bool operator==(const LayoutConfig& other) const;
 };
 
 struct AppConfig {

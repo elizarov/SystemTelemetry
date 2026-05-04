@@ -14,10 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,315,328` bytes.
+- Current measured `build\CaseDash.exe`: `1,236,480` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `1.07 MiB`, `.rdata` about `87.4 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `24.0 KiB`, `.xdata` about `21.6 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `dashboard_shell_ui.cpp.obj`, and `layout_resolver.cpp.obj`.
+- Current largest sections: `.text$mn` about `1010.7 KiB`, `.rdata` about `88.5 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `22.5 KiB`, `.xdata` about `20.3 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, and `layout_edit_controller.cpp.obj`.
+- Last validation: `format.cmd`, `lint.cmd`, `build.cmd`, `build\CaseDashTests.exe`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_trace.txt /dump:build\validation_dump.txt`.
 
 ## Workflow
 
@@ -26,6 +27,29 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Inspect the maintained summary at `build\CaseDash.map.summary.txt`.
 - For ad hoc map inspection, run `python tools\analyze_link_map.py build\CaseDash.map --top 25`.
 - When a size change can affect hot code, build benchmarks with `build.cmd Release /benchmarks` and use [docs/profile_benchmark.md](profile_benchmark.md) for timing validation.
+
+## Active TODO
+
+- [x] Remove runtime config descriptor owner construction; field offsets are static facts.
+- [x] Replace small-list `std::stable_sort` and direct `std::sort`/`std::unique` template machinery where concrete non-template helpers are enough.
+- [x] Reduce `std::vector<size_t>` layout node path churn with push/pop path reuse.
+- [x] Check repeated trace string assembly for shared non-template helpers.
+- [x] Trim layout-edit tree builders that return large `std::optional<LayoutEditTreeNode>` values.
+- [x] Recheck hash-table users and keep only measured small-cache/vector wins.
+- [x] Remove cold combo/list `std::initializer_list` and vector-construction patterns found in the map.
+- [x] Check remaining layout-edit dialog `std::max({...})` initializer-list rows.
+- [x] Check repeated app-shell/controller config-apply tails.
+- [x] Check `DashboardShellUiDialogHost` applier-interface idea; measured wins came from deleting copied work and sharing controller tails, not adding another virtual interface.
+- [x] Check lazy storage for cold layout-edit saved-layout snapshots.
+- [x] Check remaining unordered/hash/template candidates in the current top objects without touching perf-critical caches blindly.
+- [x] Trial UTF-8-only tooltip text assembly; symbol shrank but executable stayed flat, so keep as code-shape cleanup and continue the broader audit separately.
+- [x] Trial flat board sensor binding container; rejected because it grew the main executable.
+- [x] Remove `EqualsInsensitive(std::wstring)` and `SortUniqueWideStringsCaseInsensitive` from `util`; move remaining wide-string needs to boundary-local code or UTF-8 conversion.
+- [x] Audit command-line wide-string vector construction; remove the full-argv vector API from normal switch scans.
+- [x] Replace repeated layout-edit selection editor boolean packs with enum-based visibility selection.
+- [ ] Audit remaining wide-string-heavy UI, file-path, and vendor-boundary paths. Prefer UTF-8 manipulation until a Win32/vendor call only when the map proves a size win and the path is cold or conversion-neutral.
+- [ ] Check remaining top cold symbols for repeated UI and diagnostics code patterns.
+- [x] Refresh final map state and validation notes.
 
 ## Kept Decisions
 
@@ -52,6 +76,23 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Metric render caches | Keep per-frame `MetricSource` caches and exact metric binding lookup vector-based instead of `std::unordered_map`; these caches have tiny key sets and are hit during rendering. | `1,326,592` to `1,318,400` bytes. A plain-struct cache-entry variant regressed to `1,318,912` bytes, so keep the `std::pair` vector shape for now. |
 | Trace formatting | Keep trace escaping, quoting, and point formatting in `Trace` instead of private copies in diagnostics, dashboard, and layout-edit dialog code. | `1,318,400` to `1,317,376` bytes across the shared trace formatter passes. |
 | Board provider shared helpers | Keep common MSI Center and Gigabyte SIV board sensor mapping, requested-index insertion, metric reset, reading-name extraction, and reading-to-metric application in `system_info_support`. | `1,317,376` to `1,315,328` bytes. |
+| Runtime field offsets | Compute reflected field offsets from type facts instead of constructing owner objects. | `1,315,328` to `1,294,336` bytes. |
+| Small sorts | Keep direct production `std::stable_sort`, `std::sort`, and `std::unique` out of tiny cold-list paths; use concrete helper sorts or small insertion sorts. | `1,294,336` to `1,267,712` bytes. |
+| Layout node paths | Reuse layout node path vectors with push/pop traversal instead of creating path copies for each child. | `1,267,712` to `1,265,664` bytes. |
+| Layout-edit tree builders | Keep cold tree builder outputs as bool plus out-parameter instead of returning large `std::optional<LayoutEditTreeNode>` values. | `1,267,712` to `1,265,664` bytes in the measured pass. |
+| Small edit caches | Keep layout resolver parsed-widget info, layout-edit extent cache, and board requested-index lookup as flat vectors for tiny domains. | `1,265,664` to `1,263,104` bytes across the measured cache passes. |
+| Concrete storage helpers | Keep storage-drive sorting and string-list assignment on concrete helper functions instead of local STL algorithm instantiations. | `1,263,104` to `1,257,984` bytes. |
+| Pane layout helpers | Keep repeated dialog control visibility, invalidation, and max calculations in non-template helper functions. | `1,257,984` to `1,255,424` bytes. |
+| Initializer-list cleanup | Avoid cold vector/string initializer-list machinery in guide-sheet planning, fake telemetry literals, dialog combo population, and max/min calculations. | `1,255,424` to `1,253,888` bytes across measured passes. |
+| Renderer similarity scans | For tiny result sets, scan existing vectors instead of adding extra seen-key vectors and staged similarity containers. | `1,253,888` to `1,248,256` bytes across hit-test, dashboard-renderer, and overlay passes. |
+| Layout-edit weight previews | Update adjacent guide weights directly instead of rebuilding the whole child-weight vector for one separator edit. | `1,248,256` to `1,246,720` bytes. |
+| Layout-edit direct previews | Apply font and pure layout preview edits through controller methods that mutate the live config instead of copying a full `AppConfig` in the dialog host. | `1,246,720` to `1,245,696` bytes. |
+| Config mutation tail | Keep the repeated layout-edit config refresh tail in one noinline controller helper. | `1,245,696` to `1,245,184` bytes. |
+| Saved layout snapshot | Allocate the layout-edit saved-layout snapshot only while edit mode is active instead of default-constructing a second `LayoutConfig` in session state. | `1,245,184` to `1,241,088` bytes. |
+| Wide string boundaries | Keep shared `util/strings` UTF-8-only beyond conversion helpers; convert the Gigabyte SIV registry display name to UTF-8 at the registry boundary and keep font-family wide sorting local to the Win32 dialog boundary. | Executable-neutral at `1,241,088` bytes. |
+| Process path capture | Reuse `util/paths` fixed-buffer executable and working-directory helpers for elevated relaunch instead of keeping a second vector-based path reader in `main.cpp`. | `1,241,088` to `1,239,040` bytes. |
+| Command-line switch scans | Keep command-line switch lookup on a narrow argv scanner and a purpose-built elevated-relaunch helper instead of materializing `std::vector<std::wstring>` for every scan. | `1,239,040` to `1,237,504` bytes. |
+| Layout-edit editor visibility | Select the active layout-edit selection editor by enum in one helper instead of repeating long boolean visibility packs at each populate branch. | `1,237,504` to `1,236,480` bytes. |
 
 ## Rejected Or Neutral Experiments
 
@@ -62,6 +103,17 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Do not broadly replace every `std::unordered_map` cache with vectors. The dashboard renderer metric-definition cache regressed the app from `1,318,400` to `1,319,936` bytes in the measured pass.
 - Do not retry simple `ShowContextMenu` submenu-helper extraction. It shrank the individual `ShowContextMenu` symbol but grew `build\CaseDash.exe` from `1,318,400` to `1,319,424` bytes because it moved code into helpers without deleting shared machinery.
 - Do not retry a shared MSI/Gigabyte uninstall-registry scanner with a function-pointer display-name matcher. It grew the app from `1,315,328` to `1,316,352` bytes because the shared helper plus matcher calls outweighed the deleted local loops.
+- Direct theme/layout combo population removed local vector code but was executable-neutral; keep only as local simplification, not as a primary size lever.
+- A shared board metric binding parser removed duplicate source and trimmed `dashboard_shell_ui.cpp.obj`, but was executable-neutral.
+- Explicit menu command lookup helpers for `ShowContextMenu` were executable-neutral and slightly larger by object; do not retry that shape.
+- Compact telemetry-setting extraction in `ApplyConfigSnapshot` regressed by 512 bytes; keep the full previous `AppConfig` snapshot there.
+- Direct controller-side metric preview regressed by 512 bytes; keep metric preview on the existing config snapshot path.
+- UTF-8-only tooltip assembly shrank `BuildLayoutEditTooltipTextForPayload` from about 6.3 KiB to 5.9 KiB and reduces per-tooltip conversions, but the final executable stayed flat in that isolated trial.
+- Noinline `LayoutConfig::operator==` moved the full-layout equality chain out of `RefreshLayoutEditSessionDirtyFlag`, but was executable-neutral in the measured pass; keep only as a guard against future duplicate callers.
+- Copy-then-move restore of the saved layout edit snapshot regressed by 5,120 bytes; keep direct copy assignment for restore.
+- Flat board sensor name bindings removed unordered-map use from the board config/settings surface but grew the app by 2,048 bytes because the helper/vector code outweighed deleted hash machinery. Keep the existing maps there for now.
+- Manual loops for command-line wide-string trim and path normalization regressed by 512 bytes versus the existing STL algorithm shape; keep the measured algorithm code there.
+- A shared module-path helper for executable and crash-report module paths regressed by 512 bytes; keep the duplicated local shapes.
 - Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason. `lint.cmd` blocks maintained source and test files from using `std::filesystem` or including `<filesystem>`.
 
 ## Notes
@@ -69,4 +121,6 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Size numbers are comparable only within their local feature baseline. Feature additions between passes can raise the absolute executable size while a local size experiment still helps.
 - Prefer deleting template instantiations, exception/RTTI machinery, duplicated descriptor paths, and cold-path heap containers over adding compression or decoding work to hot paths.
 - Prefer vectors and compact scans for tiny fixed domains. For string-to-value maps that are genuinely performance-sensitive and not tiny, consider a narrow non-template project-owned hash helper under `src/util` instead of repeating broad STL hash-table instantiations.
+- Leave concise `Size:` comments next to measured non-obvious source choices, especially where a normal cleanup would reintroduce larger STL containers, templates, or full-config copies.
+- UTF-8 boundary discipline is plausible mostly in UI, diagnostics, command-line, and vendor-boundary code. Do not push extra UTF-8 to UTF-16 conversions into renderer or telemetry hot loops without benchmark evidence.
 - The current 10% savings target is not visible as one safe map item. Larger remaining wins likely require deeper cold-subsystem compaction while keeping the renderer and telemetry benchmarks in range.

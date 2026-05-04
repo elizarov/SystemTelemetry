@@ -3,7 +3,6 @@
 #include <optional>
 #include <shellapi.h>
 #include <string>
-#include <vector>
 
 #include "dashboard/autostart.h"
 #include "dashboard/constants.h"
@@ -14,6 +13,7 @@
 #include "display/display_config.h"
 #include "util/command_line.h"
 #include "util/file_path.h"
+#include "util/paths.h"
 
 namespace {
 
@@ -56,63 +56,24 @@ bool IsCurrentProcessElevated() {
     return ok && elevation.TokenIsElevated != 0;
 }
 
-std::wstring CurrentWorkingDirectory() {
-    const DWORD requiredLength = GetCurrentDirectoryW(0, nullptr);
-    if (requiredLength == 0) {
-        return {};
-    }
-
-    std::vector<wchar_t> buffer(requiredLength);
-    const DWORD length = GetCurrentDirectoryW(static_cast<DWORD>(buffer.size()), buffer.data());
-    return length > 0 && length < buffer.size() ? std::wstring(buffer.data(), length) : std::wstring{};
-}
-
-std::wstring CurrentExecutablePath() {
-    std::vector<wchar_t> buffer(MAX_PATH);
-    for (;;) {
-        const DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
-        if (length == 0) {
-            return {};
-        }
-        if (length < buffer.size() - 1) {
-            return std::wstring(buffer.data(), length);
-        }
-        buffer.resize(buffer.size() * 2);
-    }
-}
-
-std::wstring BuildElevatedCommandLine() {
-    std::wstring parameters;
-    for (const std::wstring& argument : GetCommandLineArguments()) {
-        // The elevated child keeps every diagnostics argument except the relay switch itself.
-        if (_wcsicmp(argument.c_str(), L"/elevate") == 0) {
-            continue;
-        }
-        if (!parameters.empty()) {
-            parameters += L' ';
-        }
-        parameters += QuoteCommandLineArgument(argument);
-    }
-    return parameters;
-}
-
 std::optional<int> RelaunchElevatedIfRequested() {
     if (!HasSwitch("/elevate") || IsCurrentProcessElevated()) {
         return std::nullopt;
     }
 
-    const std::wstring executablePath = CurrentExecutablePath();
-    if (executablePath.empty()) {
+    const auto executablePath = GetExecutablePath();
+    if (!executablePath.has_value() || executablePath->empty()) {
         return 1;
     }
 
-    const std::wstring parameters = BuildElevatedCommandLine();
-    const std::wstring workingDirectory = CurrentWorkingDirectory();
+    const std::wstring parameters = BuildCommandLineExcludingSwitch(L"/elevate");
+    // Size: reuse util/paths fixed-buffer capture instead of keeping a second vector-based path reader in main.
+    const std::wstring workingDirectory = GetWorkingDirectory().wstring();
     SHELLEXECUTEINFOW executeInfo{};
     executeInfo.cbSize = sizeof(executeInfo);
     executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
     executeInfo.lpVerb = L"runas";
-    executeInfo.lpFile = executablePath.c_str();
+    executeInfo.lpFile = executablePath->c_str();
     executeInfo.lpParameters = parameters.empty() ? nullptr : parameters.c_str();
     executeInfo.lpDirectory = workingDirectory.empty() ? nullptr : workingDirectory.c_str();
     executeInfo.nShow = SW_SHOWNORMAL;

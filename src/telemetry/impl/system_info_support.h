@@ -14,6 +14,14 @@ struct BoardSensorReading {
     std::optional<double> value;
 };
 
+struct BoardMetricSourceIndexes {
+    std::string sourceName;
+    std::vector<size_t> indexes;
+};
+
+// Size: board source maps are tiny; flat entries measured smaller than std::unordered_map.
+using BoardMetricIndexBySourceName = std::vector<BoardMetricSourceIndexes>;
+
 std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(
     const std::vector<std::string>& names, ScalarMetricUnit unit);
 bool HasAvailableMetricValue(const std::vector<NamedScalarMetric>& metrics);
@@ -23,10 +31,10 @@ std::vector<std::string> ExtractBoardSensorNames(const std::vector<BoardSensorRe
 std::string ResolveMappedBoardSensorName(
     const std::unordered_map<std::string, std::string>& sensorNames, const std::string& logicalName);
 void AppendRequestedBoardMetricIndex(
-    std::unordered_map<std::string, std::vector<size_t>>& indexBySourceName, std::string sourceName, size_t index);
+    BoardMetricIndexBySourceName& indexBySourceName, std::string sourceName, size_t index);
 void ResetBoardMetricValues(std::vector<NamedScalarMetric>& metrics);
 void ApplyBoardSensorReadingsToMetrics(const std::vector<BoardSensorReading>& readings,
-    const std::unordered_map<std::string, std::vector<size_t>>& indexBySourceName,
+    const BoardMetricIndexBySourceName& indexBySourceName,
     std::vector<NamedScalarMetric>& metrics);
 std::optional<std::wstring> ReadRegistryWideString(HKEY root, const wchar_t* subKey, const wchar_t* valueName);
 std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName);

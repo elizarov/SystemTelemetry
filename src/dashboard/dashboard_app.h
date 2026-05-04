@@ -112,6 +112,8 @@ private:
     void SetLayoutEditInteractiveDragTraceActive(bool active) override;
     void RebuildLayoutEditArtifacts() override;
     bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) override;
+    bool ApplyLayoutGuideAdjacentWeights(
+        const LayoutEditLayoutTarget& target, size_t separatorIndex, int firstWeight, int secondWeight);
     bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) override;
     bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) override;

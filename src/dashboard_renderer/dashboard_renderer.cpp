@@ -979,21 +979,8 @@ bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const WidgetLayout& wi
 }
 
 std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const {
-    struct SimilarityRepresentativeKey {
-        std::string cardId;
-        WidgetClass widgetClass = WidgetClass::Unknown;
-        int extent = 0;
-        int edgeStart = 0;
-        int edgeEnd = 0;
-
-        bool operator==(const SimilarityRepresentativeKey& other) const {
-            return cardId == other.cardId && widgetClass == other.widgetClass && extent == other.extent &&
-                   edgeStart == other.edgeStart && edgeEnd == other.edgeEnd;
-        }
-    };
-
+    // Size: scan the already-small result list; a separate seen-key vector measured larger.
     std::vector<const WidgetLayout*> widgets;
-    std::vector<SimilarityRepresentativeKey> seenKeys;
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (!SupportsLayoutSimilarityIndicator(widget) || widget.widget == nullptr) {
@@ -1005,21 +992,22 @@ std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWi
                 continue;
             }
 
-            SimilarityRepresentativeKey key;
-            key.cardId = widget.cardId;
-            key.widgetClass = widget.widget->Class();
-            key.extent = extent;
-            if (axis == LayoutGuideAxis::Vertical) {
-                key.edgeStart = widget.rect.left;
-                key.edgeEnd = widget.rect.right;
-            } else {
-                key.edgeStart = widget.rect.top;
-                key.edgeEnd = widget.rect.bottom;
-            }
-            if (std::find(seenKeys.begin(), seenKeys.end(), key) != seenKeys.end()) {
+            const WidgetClass widgetClass = widget.widget->Class();
+            const int edgeStart = axis == LayoutGuideAxis::Vertical ? widget.rect.left : widget.rect.top;
+            const int edgeEnd = axis == LayoutGuideAxis::Vertical ? widget.rect.right : widget.rect.bottom;
+            const auto duplicate = [&](const WidgetLayout* candidate) {
+                if (candidate == nullptr || candidate->widget == nullptr || candidate->cardId != widget.cardId ||
+                    candidate->widget->Class() != widgetClass || WidgetExtentForAxis(*candidate, axis) != extent) {
+                    return false;
+                }
+                if (axis == LayoutGuideAxis::Vertical) {
+                    return candidate->rect.left == edgeStart && candidate->rect.right == edgeEnd;
+                }
+                return candidate->rect.top == edgeStart && candidate->rect.bottom == edgeEnd;
+            };
+            if (std::find_if(widgets.begin(), widgets.end(), duplicate) != widgets.end()) {
                 continue;
             }
-            seenKeys.push_back(std::move(key));
             widgets.push_back(&widget);
         }
     }
