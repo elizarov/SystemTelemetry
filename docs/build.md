@@ -1,7 +1,7 @@
 # Build And Development
 
 This document owns build prerequisites, developer setup, build and test commands, install flow, and developer entrypoint scripts.
-See also: [docs/project.md](project.md) for repository policy, [docs/hardware.md](hardware.md) for supported hardware-provider requirements, [docs/diagnostics.md](diagnostics.md) for diagnostics validation commands, [docs/release.md](release.md) for release publication, and [docs/architecture.md](architecture.md) for subsystem and build-graph structure.
+See also: [docs/project.md](project.md) for repository policy, [docs/hardware.md](hardware.md) for supported hardware-provider requirements, [docs/diagnostics.md](diagnostics.md) for diagnostics validation commands, [docs/release.md](release.md) for release publication, [docs/optimize_size.md](optimize_size.md) for executable-size research, and [docs/architecture.md](architecture.md) for subsystem and build-graph structure.
 
 ## Requirements
 
@@ -35,7 +35,7 @@ build.cmd
 
 By default the shared cache root is `%LOCALAPPDATA%\CaseDash\cache`, falls back to `%USERPROFILE%\.casedash\cache` when `LOCALAPPDATA` is unavailable, and can be overridden with `CASEDASH_CACHE_ROOT`. `build.cmd` exports `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE` from that root unless the caller already set them.
 
-Release linker maps are opt-in size-investigation artifacts and are not produced by the normal build. Run `build_maps.cmd` to configure `CASEDASH_LINK_MAPS=ON`, force the app executable to relink, write `build\CaseDash.map`, and write the maintained summary to `build\CaseDash.map.summary.txt`. Add `/benchmarks` only when benchmark maps are needed; that also writes `build\CaseDashBenchmarks.map` and `build\CaseDashBenchmarks.map.summary.txt`. For ad hoc inspection of an existing map, run `python tools\analyze_link_map.py build\CaseDash.map --top 25`. The analyzer estimates symbol sizes from adjacent MSVC map addresses, so its object, library, and symbol rankings are investigation guides rather than exact byte ownership.
+Release linker maps are opt-in size-investigation artifacts and are not produced by the normal build. Run `build_maps.cmd` to configure `CASEDASH_LINK_MAPS=ON`, force the app executable to relink, write `build\CaseDash.map`, and write the maintained summary to `build\CaseDash.map.summary.txt`. Add `/benchmarks` only when benchmark maps are needed; that also writes `build\CaseDashBenchmarks.map` and `build\CaseDashBenchmarks.map.summary.txt`. For ad hoc inspection of an existing map, run `python tools\analyze_link_map.py build\CaseDash.map --top 25`. The analyzer estimates symbol sizes from adjacent MSVC map addresses, so its object, library, and symbol rankings are investigation guides rather than exact byte ownership. Size assumptions and experiment history live in [docs/optimize_size.md](optimize_size.md).
 
 ## Test
 

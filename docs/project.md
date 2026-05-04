@@ -1,7 +1,7 @@
 # CaseDash Project Notes
 
 This document owns documentation ownership rules, repository conventions, and engineering constraints.
-See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](layout.md) for config language, [docs/diagnostics.md](diagnostics.md) for diagnostics behavior, [docs/release.md](release.md) for release publication, and [docs/architecture.md](architecture.md) for code structure.
+See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](layout.md) for config language, [docs/diagnostics.md](diagnostics.md) for diagnostics behavior, [docs/release.md](release.md) for release publication, [docs/optimize_size.md](optimize_size.md) for executable-size research, and [docs/architecture.md](architecture.md) for code structure.
 
 ## Documentation Ownership
 
@@ -14,7 +14,8 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
 - `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
-- `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and experiment history.
+- `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and performance experiment history.
+- `docs/optimize_size.md` owns executable-size constraints, assumptions, map workflow notes, and size experiment history.
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
 - `installer\` is the single maintained source of truth for the WiX MSI package.
@@ -64,6 +65,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Use [docs/diagnostics.md](diagnostics.md) instead of repeating diagnostics command examples elsewhere.
 - Use [docs/layout.md](layout.md) and [resources/config.ini](../resources/config.ini) instead of repeating config key lists elsewhere.
 - Use [docs/profile_benchmark.md](profile_benchmark.md) instead of repeating benchmark workflow or experiment history elsewhere.
+- Use [docs/optimize_size.md](optimize_size.md) instead of repeating executable-size assumptions, constraints, or experiment history elsewhere.
 
 ## Project Pitfall Notes
 
@@ -75,7 +77,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.
 - Provider assembly loading restores the original launch working directory after any provider-specific current-directory change.
 - Repeated unattended profiling runs use `profile_benchmark.cmd /daemon-start` once, then ordinary benchmark invocations queue through the elevated daemon.
-- Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`.
+- Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`; size-specific experiments are recorded in `docs/optimize_size.md`.
 - If `devenv.cmd` changes Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run.
 - Formatter and hook discovery starts from broad `*.cpp` and `*.h` pathspecs, then applies the repo eligibility filter because Git pathspecs such as `tests/**/*.cpp` do not cover top-level files.
 - Clang-tidy include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.
