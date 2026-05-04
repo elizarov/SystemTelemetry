@@ -2,7 +2,9 @@
 
 Use the following maintained references and keep them in sync before finishing work:
 
-- `docs/specifications.md` - user-visible runtime behavior.
+- `docs/specifications.md` - general user-visible runtime behavior.
+- `docs/layout_edit.md` - layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
+- `docs/layout_guide_sheet.md` - diagnostics layout guide sheet feature behavior.
 - `docs/diagnostics.md` - diagnostics flow, trace, dump, screenshot, app-icon, and validation recipes.
 - `docs/architecture.md` and `docs/architecture/*.md` - code organization, subsystem boundaries, package notes, and build-graph structure.
 - `docs/project.md` - documentation ownership, repository conventions, engineering constraints, and project pitfall notes.

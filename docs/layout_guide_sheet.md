@@ -1,7 +1,7 @@
 # Layout Guide Sheet
 
 This document owns the condensed feature spec for the diagnostics layout guide sheet.
-See also: [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/specifications.md](specifications.md) for live layout-edit behavior, and [docs/layout.md](layout.md) for config language ownership.
+See also: [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/layout_edit.md](layout_edit.md) for live layout-edit behavior, and [docs/layout.md](layout.md) for config language ownership.
 
 ## Purpose And Scope
 

@@ -5,8 +5,10 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 
 ## Documentation Ownership
 
-- `docs/specifications.md` owns user-visible runtime behavior.
+- `docs/specifications.md` owns general user-visible runtime behavior.
+- `docs/layout_edit.md` owns layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
 - `docs/layout.md` owns config language, section ownership, syntax, and validation rules.
+- `docs/layout_guide_sheet.md` owns the diagnostics layout guide sheet feature spec.
 - `docs/diagnostics.md` owns diagnostics CLI behavior, output contracts, and diagnostics validation recipes.
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
 - `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
