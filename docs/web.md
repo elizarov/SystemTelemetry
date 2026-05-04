@@ -1,10 +1,10 @@
 # Website Specification
 
-This document owns the public CaseDash website behavior, content, build flow, and generated-asset contracts.
+This document owns the public CaseDash website behavior, content, section contract, build flow, and generated-asset contracts. Keep it in sync with `web/index.html` whenever section ids, navigation labels, section order, or section content change.
 
 ## Purpose
 
-The website is the end-user introduction to CaseDash. It presents what the app is, how to download it, links to supported hardware details, how first use works, how layout editing looks, and where to contribute.
+The website is the end-user introduction to CaseDash. It presents what the app is, how to download it, what hardware providers are currently supported, how first use works, how layout editing looks, and where to contribute.
 
 The site takes its tone and structure from the README: compact, practical, and visually led by the actual dashboard. It stays consistent across sections and avoids repeating product claims, configuration syntax, or diagnostics details that are already owned by maintained docs.
 
@@ -24,29 +24,28 @@ The secondary visitor is a potential contributor who wants a concise project ove
 
 The website is a single static page with continuous top-to-bottom scrolling and a persistent top navigation bar. Navigation anchors scroll to page sections instead of loading separate routes.
 
-Required sections:
+The maintained section ids, navigation labels, and order are:
 
-- `Intro`
-- `Download` navigation to the intro section
-- `Features`
-- `Hardware`
-- `Layout`
-- `Contributions`
+- `download` - `Download`
+- `features` - `Features`
+- `hardware` - `Hardware`
+- `layout` - `Layout`
+- `contribute` - `Contribute`
 
-The page may include a compact footer for license, repository, release, and documentation links. The footer is not a primary section in top navigation.
+The desktop navigation and mobile section picker expose the same section ids and labels. The page includes a compact footer for copyright, license text, and the license link; the footer is not a primary section in top navigation.
 
-## Intro Section
+## Download Section
 
-The intro section is the first viewport signal and identifies the product as `CaseDash`.
+The download section is the first viewport signal and identifies the product as `CaseDash`.
 
 The section includes:
 
 - A short product description aligned with the README overview.
 - Primary links for the latest release download and the GitHub repository.
 - A dashboard screenshot for the active website theme.
-- A short first-use path: download the installer, run CaseDash, right-click, choose layout and theme, configure display, enable startup when ready.
+- A short first-use path: install the MSI, run CaseDash, right-click, choose layout and theme, configure display, and enable startup when ready.
 
-The intro copy stays practical and avoids marketing-only language. The screenshot is the dominant visual object.
+The download copy stays practical and avoids marketing-only language. The screenshot is the dominant visual object.
 
 The top-left navigation brand shows `CaseDash` plus the current `VERSION` value as small muted `v<version>` text.
 
@@ -65,13 +64,15 @@ Each feature item uses short copy and, where useful, a small cropped screenshot 
 
 ## Hardware Section
 
-The hardware section summarizes currently supported telemetry families:
+The hardware section lists currently supported providers and telemetry families:
 
-- GPU provider telemetry.
-- Board temperature and fan telemetry.
-- Presented-FPS capture through Windows present-event telemetry and the CaseDash service.
+- AMD Radeon GPU telemetry through ADLX.
+- NVIDIA GPU telemetry through NVML.
+- Presented-FPS capture through ETW via the CaseDash service.
+- MSI board temperature and fan telemetry through MSI Center SDK.
+- Gigabyte board temperature and fan telemetry through SIV.
 
-The section links to [docs/hardware.md](hardware.md) for supported-provider sections and notes that contributions are welcome for additional GPU, board, and sensor providers.
+The website keeps this section concise; [docs/hardware.md](hardware.md) owns provider requirements and troubleshooting details.
 
 ## Layout Section
 
@@ -86,21 +87,17 @@ The section includes:
 
 The page does not duplicate layout syntax examples unless the project later designates this website copy as the maintained source for a specific example.
 
-## Contributions Section
+## Contribute Section
 
-The contributions section keeps detail light and sends visitors to GitHub.
+The contribute section keeps detail light and sends visitors to GitHub.
 
-It includes links for:
+It includes:
 
-- Repository.
-- Issues.
-
-Suggested contribution areas:
-
-- New themes and visual ideas.
-- New layouts for different screen sizes and mounting styles.
-- Additional telemetry providers.
-- Localization and copy improvements.
+- The `Contributions` eyebrow.
+- The heading `Bring your hardware and ideas`.
+- Short copy inviting code, issues, sketches, ideas, themes, layouts, telemetry providers, localization, and practical feedback.
+- Copy explaining that provider work needs owners with matching hardware, SDKs, and patience.
+- Repository and Issues links.
 
 ## Design System
 
@@ -203,13 +200,13 @@ The release workflow and the manual-only `Pages` workflow publish `web/dist/` to
 https://casedash.github.io/casedash/
 ```
 
-## Validation
+## Maintenance And Validation
 
 Website validation checks:
 
 - `web-build.cmd` completes from a clean checkout after the normal project build.
 - The generated site opens directly from `web/dist/index.html` with no server-only assumptions.
-- Navigation anchors scroll to all required sections.
+- Navigation anchors and the mobile section picker scroll to `download`, `features`, `hardware`, `layout`, and `contribute`.
 - The theme switcher lists every `[theme.<name>]` section from `resources/config.ini`.
 - Theme switching updates colors, screenshot, layout guide sheet, and app icon together.
 - Browser light/dark scheme changes select the matching README-representative favicon.
@@ -218,6 +215,7 @@ Website validation checks:
 - Images use explicit dimensions or aspect-ratio constraints to prevent layout shift.
 - All important images have useful alt text.
 - Links to releases, repository, issues, and docs resolve to the intended GitHub targets.
+- Section ids, navigation labels, and section order in this file match `web/index.html`.
 
 ## Accessibility And Performance
 
@@ -225,6 +223,6 @@ The page is usable without JavaScript except for theme switching and theme-speci
 
 The page respects reduced-motion preferences. Smooth scrolling and theme transitions are disabled or shortened when the visitor prefers reduced motion.
 
-Generated images are optimized for web delivery, avoid alpha channels for opaque dashboard and guide-sheet assets, and include width and height metadata. The active theme's screenshot is loaded eagerly in the intro section; non-active theme images may load lazily.
+Generated images are optimized for web delivery, avoid alpha channels for opaque dashboard and guide-sheet assets, and include width and height metadata. The active theme's screenshot is loaded eagerly in the download section; non-active theme images may load lazily.
 
 The color derivation used by the website maintains readable contrast for body text, navigation text, buttons, and links for every generated app theme. If a theme cannot satisfy minimum contrast through derived colors, the build reports the theme and role that failed.
