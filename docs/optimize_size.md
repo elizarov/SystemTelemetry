@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,168,896` bytes.
+- Current measured `build\CaseDash.exe`: `1,097,728` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `947.9 KiB`, `.rdata` about `89.0 KiB`, `.rsrc$02` about `32.5 KiB`, `.pdata` about `20.8 KiB`, `.xdata` about `19.8 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `dashboard_renderer.cpp.obj`, `layout_resolver.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `CaseDash.rc.res`, `layout_edit_controller.cpp.obj`, and `dashboard_controller.cpp.obj`.
-- Last validation: `format.cmd changed`, `build.cmd`, `test.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_snapshot_dump_fields_trace.txt /dump:build\validation_snapshot_dump_fields_dump.txt /screenshot:build\validation_snapshot_dump_fields_screenshot.png /layout-guide-sheet:build\validation_snapshot_dump_fields_sheet.png /save-full-config:build\validation_snapshot_dump_fields_full_config.ini`, and `build_maps.cmd`.
+- Current largest sections: `.text$mn` about `852.8 KiB`, `.rdata` about `89.7 KiB`, `.pdata` about `41.6 KiB`, `.rsrc$02` about `32.5 KiB`, and `.xdata` about `20.5 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `dashboard_controller.cpp.obj`, `CaseDash.rc.res`, `dashboard_renderer.cpp.obj`, `layout_resolver.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, and `d2d_renderer.cpp.obj`.
+- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_noinline_trace.txt /dump:build\validation_size_noinline_dump.txt /screenshot:build\validation_size_noinline_screenshot.png /layout-guide-sheet:build\validation_size_noinline_sheet.png /save-full-config:build\validation_size_noinline_full_config.ini`, `build.cmd Release /benchmarks`, `build\CaseDashBenchmarks.exe layout-switch 240 2`, `build\CaseDashBenchmarks.exe theme-change 240 2`, `build\CaseDashBenchmarks.exe edit-layout 240 2`, `build\CaseDashBenchmarks.exe mouse-hover 240 2`, and `build_maps.cmd`.
 
 ## Workflow
 
@@ -87,6 +87,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Panel icon atlas | Keep panel icons in one fixed 64 x 64 vertical 8-bit grayscale PNG mask atlas and draw cropped atlas slots through a target-local alpha mask instead of caching per-icon sources and scaled Direct2D bitmaps. | `1,176,576` to `1,171,456` bytes; `.text$mn` dropped from about `954.2 KiB` to `949.6 KiB` and `.rsrc$02` dropped from about `34.0 KiB` to `33.5 KiB`. The follow-up alpha-only PNG conversion shrank `resources\panel_icons.png` from `2,285` to `1,572` bytes but did not cross another executable file-alignment boundary. |
 | Text resource atlas | Compress the embedded default config and localization catalog as one LZSS text atlas with the config length followed by both files instead of two separate compressed RCDATA resources. Keep source validation for embedded text in the generator, not the runtime loader. | `1,171,456` to `1,170,432` bytes; `.rsrc$02` dropped from about `33.5 KiB` to `32.5 KiB`. The generated compressed text payload dropped from `6,066` to `5,790` bytes. Follow-up removal of runtime UTF-8/BOM cleanup stayed file-size neutral at `1,170,432` bytes but reduced `.text$mn` from about `949.9 KiB` to `949.6 KiB`. |
 | Snapshot dump descriptor storage | Keep fixed flat dump field metadata in static array storage instead of a function-local vector. | `1,170,432` to `1,168,896` bytes; `snapshot_dump.cpp.obj` dropped from about `21.9 KiB` to `20.9 KiB`, and `.text$mn` dropped to about `947.9 KiB`. |
+| Cold UI and diagnostics inlining | Keep explicit `/Ob2` out of the default MSVC Release flags and append `/Ob0` only to startup, diagnostics, config I/O, modeless layout-edit dialog, display, and dashboard-shell orchestration translation units. | `1,168,896` to `1,097,728` bytes; `.text$mn` dropped from about `947.9 KiB` to `852.8 KiB` while `.pdata` grew from about `20.8 KiB` to `41.6 KiB`. |
 
 ## Rejected Or Neutral Experiments
 
@@ -131,6 +132,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Do not broaden the snapshot dump scalar helpers to string-view or pointer-based write/load boundaries by themselves. The object shrank slightly, but the executable regressed from `1,168,896` to `1,197,056` bytes by pulling in more string and string-view append machinery.
 - Do not replace config runtime fixed-field parsing with a local comma scanner. That trial regressed the executable from `1,168,896` to `1,169,920` bytes versus the existing `SplitTrimmed` shape.
 - Direct enum dispatch for layout node field descriptors was executable-neutral at `1,168,896` bytes. Keep the current fixed descriptor array and `std::find_if` shape unless a broader descriptor change deletes more surrounding code.
+- Do not broaden the cold `/Ob0` pass into tooltip text, trace formatting, resource loading, localization, config resolution/runtime fields, metric catalog, or layout-edit metadata. That broader trial regressed the executable from `1,097,728` to `1,124,864` bytes because the extra function bodies and unwind metadata outweighed deleted inline expansion.
 - Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason. `lint.cmd` blocks maintained source and test files from using `std::filesystem` or including `<filesystem>`.
 
 ## Notes
