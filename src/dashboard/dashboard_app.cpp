@@ -162,7 +162,9 @@ void DashboardApp::RebuildLayoutEditArtifacts() {
 }
 
 void DashboardApp::InvalidateLayoutEdit() {
-    UpdateLayoutEditTooltip();
+    if (!layoutEditController_.HasActiveDrag()) {
+        UpdateLayoutEditTooltip();
+    }
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -612,7 +614,9 @@ const DashboardOverlayState& DashboardApp::RendererDashboardOverlayState() const
 }
 
 void DashboardApp::InvalidateShell() {
-    UpdateLayoutEditTooltip();
+    if (!layoutEditController_.HasActiveDrag()) {
+        UpdateLayoutEditTooltip();
+    }
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
@@ -976,6 +980,15 @@ void DashboardApp::UpdateLayoutEditMouseTracking() {
     }
 }
 
+void DashboardApp::RedrawLayoutEditDragFrame() {
+    if (hwnd_ == nullptr || !layoutEditController_.HasActiveDrag()) {
+        return;
+    }
+
+    // Perf: WM_PAINT is low-priority and mouse-move storms can starve it; drag feedback must present per input.
+    RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
+}
+
 void DashboardApp::RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam) {
     if (layoutEditTooltipHwnd_ == nullptr || !layoutEditTooltipRectValid_) {
         return;
@@ -1125,6 +1138,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 if (layoutEditController_.HandleLButtonDown(hwnd_, clientPoint)) {
                     shellUi_->SyncLayoutEditDialogSelection(layoutEditController_.CurrentTooltipTarget(), false);
                     UpdateLayoutEditTooltip();
+                    RedrawLayoutEditDragFrame();
                     return 0;
                 }
             }
@@ -1164,7 +1178,11 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                     return 0;
                 }
                 layoutEditController_.HandleMouseMove(clientPoint);
-                UpdateLayoutEditTooltip();
+                if (layoutEditController_.HasActiveDrag()) {
+                    RedrawLayoutEditDragFrame();
+                } else {
+                    UpdateLayoutEditTooltip();
+                }
                 return 0;
             }
             break;

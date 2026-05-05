@@ -312,7 +312,8 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
 class BenchmarkHost : private LayoutEditHost {
 public:
     BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace)
-        : config_(config), trace_(trace), renderer_(trace_), renderScale_(renderScale), layoutEditController_(*this) {
+        : config_(config), trace_(trace), renderer_(trace_), renderScale_(renderScale), savedLayout_(config.layout),
+          layoutEditController_(*this) {
         renderer_.SetConfig(config_);
         renderer_.SetRenderScale(renderScale_);
         renderer_.SetImmediatePresent(true);
@@ -428,6 +429,18 @@ public:
     }
 
 private:
+    bool FinishLayoutEditConfigMutation() {
+        // Keep this aligned with the real layout-edit mutation tail; drag cost includes config dirty tracking.
+        renderer_.SetConfig(config_);
+        dirty_ = true;
+        RefreshLayoutEditSessionDirtyFlag();
+        return true;
+    }
+
+    void RefreshLayoutEditSessionDirtyFlag() {
+        hasUnsavedLayoutEditChanges_ = savedLayout_.has_value() ? (config_.layout != *savedLayout_) : false;
+    }
+
     const AppConfig& LayoutEditConfig() const override {
         return config_;
     }
@@ -468,8 +481,7 @@ private:
         const auto start = Clock::now();
         const bool applied = ApplyGuideWeights(config_, target, weights);
         if (applied) {
-            renderer_.SetConfig(config_);
-            dirty_ = true;
+            FinishLayoutEditConfigMutation();
         }
         RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
         return applied;
@@ -480,8 +492,7 @@ private:
         const auto start = Clock::now();
         const bool applied = ::ApplyMetricListOrder(config_, widget, metricRefs);
         if (applied) {
-            renderer_.SetConfig(config_);
-            dirty_ = true;
+            FinishLayoutEditConfigMutation();
         }
         RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
         return applied;
@@ -491,8 +502,7 @@ private:
         const auto start = Clock::now();
         const bool applied = ::ApplyContainerChildOrder(config_, key, fromIndex, toIndex);
         if (applied) {
-            renderer_.SetConfig(config_);
-            dirty_ = true;
+            FinishLayoutEditConfigMutation();
         }
         RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
         return applied;
@@ -512,8 +522,7 @@ private:
         const auto start = Clock::now();
         const bool applied = ApplyLayoutEditParameterValue(config_, parameter, value);
         if (applied) {
-            renderer_.SetConfig(config_);
-            dirty_ = true;
+            FinishLayoutEditConfigMutation();
         }
         RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
         return applied;
@@ -552,6 +561,8 @@ private:
     const SystemSnapshot* snapshot_ = nullptr;
     double renderScale_ = 1.0;
     bool dirty_ = false;
+    std::optional<LayoutConfig> savedLayout_;
+    bool hasUnsavedLayoutEditChanges_ = false;
     LayoutEditController layoutEditController_;
     LayoutEditTraceSession traceSession_{};
     std::array<PhaseStats, kBenchPhaseCount> phaseTotals_{};
@@ -752,6 +763,7 @@ BenchResult RunDragBenchmark(BenchmarkHost& host,
     const auto start = Clock::now();
     for (const auto& weights : weightSequence) {
         controller.HandleMouseMove(DragPointForWeights(guide, initialWeights, weights));
+        // Mirrors the app's drag WM_MOUSEMOVE path, which forces a redraw instead of waiting for queued WM_PAINT.
         host.FlushPaintIfDirty();
     }
     const Duration total = Clock::now() - start;

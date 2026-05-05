@@ -211,15 +211,18 @@ void DashboardController::MarkLayoutEditSessionSaved() {
     state_.hasUnsavedLayoutEditChanges = false;
 }
 
-void DashboardController::SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides) {
+void DashboardController::SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides, bool refreshThemedIcons) {
     shell.Renderer().SetConfig(state_.config);
     shell.RendererDashboardOverlayState().showLayoutEditGuides = showLayoutEditGuides;
-    shell.RefreshThemedIcons();
+    if (refreshThemedIcons) {
+        shell.RefreshThemedIcons();
+    }
 }
 
-__declspec(noinline) bool DashboardController::FinishConfigMutation(DashboardShellHost& shell) {
+__declspec(noinline) bool DashboardController::FinishConfigMutation(
+    DashboardShellHost& shell, bool refreshThemedIcons) {
     // Size: many cold config appliers end with this same UI refresh tail; keep it out of each caller.
-    SyncRenderer(shell, state_.isEditingLayout);
+    SyncRenderer(shell, state_.isEditingLayout, refreshThemedIcons);
     shell.InvalidateShell();
     RefreshLayoutEditSessionDirtyFlag();
     return true;
@@ -557,7 +560,7 @@ void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const 
     state_.telemetry->SetPreferredNetworkAdapterName(option.adapterName);
     state_.telemetryUpdate = state_.telemetry->Latest();
     state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
-    FinishConfigMutation(shell);
+    FinishConfigMutation(shell, false);
 }
 
 void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option) {
@@ -646,7 +649,8 @@ bool DashboardController::ApplyLayoutGuideWeights(
     if (!ApplyGuideWeights(state_.config, target, weights)) {
         return false;
     }
-    return FinishConfigMutation(shell);
+    // Perf: layout-only drag mutations do not affect the themed shell icon; keep icon rendering off the pointer path.
+    return FinishConfigMutation(shell, false);
 }
 
 bool DashboardController::ApplyLayoutGuideAdjacentWeights(DashboardShellHost& shell,
@@ -657,7 +661,7 @@ bool DashboardController::ApplyLayoutGuideAdjacentWeights(DashboardShellHost& sh
     if (!ApplyGuideAdjacentWeights(state_.config, target, separatorIndex, firstWeight, secondWeight)) {
         return false;
     }
-    return FinishConfigMutation(shell);
+    return FinishConfigMutation(shell, false);
 }
 
 bool DashboardController::ApplyMetricListOrder(
@@ -665,7 +669,7 @@ bool DashboardController::ApplyMetricListOrder(
     if (!::ApplyMetricListOrder(state_.config, widget, metricRefs)) {
         return false;
     }
-    return FinishConfigMutation(shell);
+    return FinishConfigMutation(shell, false);
 }
 
 bool DashboardController::ApplyContainerChildOrder(
@@ -673,7 +677,7 @@ bool DashboardController::ApplyContainerChildOrder(
     if (!::ApplyContainerChildOrder(state_.config, key, fromIndex, toIndex)) {
         return false;
     }
-    return FinishConfigMutation(shell);
+    return FinishConfigMutation(shell, false);
 }
 
 bool DashboardController::ApplyLayoutEditValue(
@@ -687,7 +691,7 @@ bool DashboardController::ApplyLayoutEditValue(
     if (!ApplyLayoutEditParameterValue(state_.config, parameter, nextValue)) {
         return false;
     }
-    return FinishConfigMutation(shell);
+    return FinishConfigMutation(shell, false);
 }
 
 bool DashboardController::ApplyLayoutEditFont(
@@ -695,17 +699,17 @@ bool DashboardController::ApplyLayoutEditFont(
     if (!ApplyLayoutEditParameterFontValue(state_.config, parameter, value)) {
         return false;
     }
-    return FinishConfigMutation(shell);
+    return FinishConfigMutation(shell, false);
 }
 
 bool DashboardController::ApplyLayoutEditFontFamily(DashboardShellHost& shell, const std::string& family) {
     AssignCommonFontFamily(state_.config.layout.fonts, family);
-    return FinishConfigMutation(shell);
+    return FinishConfigMutation(shell, false);
 }
 
 bool DashboardController::ApplyLayoutEditFontSet(DashboardShellHost& shell, const UiFontSetConfig& fonts) {
     state_.config.layout.fonts = fonts;
-    return FinishConfigMutation(shell);
+    return FinishConfigMutation(shell, false);
 }
 
 bool DashboardController::ApplyLayoutEditColor(

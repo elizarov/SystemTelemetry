@@ -131,8 +131,8 @@ private:
     void ClearLayoutEditSessionTracking();
     void RefreshLayoutEditSessionDirtyFlag();
     void MarkLayoutEditSessionSaved();
-    void SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides);
-    __declspec(noinline) bool FinishConfigMutation(DashboardShellHost& shell);
+    void SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides, bool refreshThemedIcons = true);
+    __declspec(noinline) bool FinishConfigMutation(DashboardShellHost& shell, bool refreshThemedIcons = true);
     bool ApplyConfiguredWallpaper(Trace& trace);
 
     DashboardSessionState state_{};

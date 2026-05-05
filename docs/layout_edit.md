@@ -17,6 +17,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Hovering actionable text, card chrome, bars, metric rows, reorder handles, or widget-local geometry exposes the matching highlight and edit affordance for that target class.
 - Hovering actionable text or pillbar targets draws the dotted outline around that text or pillbar target regardless of which overlapping handle, wedge, color region, or context action wins the focused edit action.
 - While any layout-edit drag is active, hover hit testing and tooltip refresh for other edit targets are paused; the dragged target's active affordance and the dragged widget or card highlight remain visible until release.
+- Drag feedback redraws immediately for each processed pointer move instead of waiting for queued idle paint delivery, so the visible guide, handle, or dragged child tracks the latest mouse position during continuous input.
 - When a square text or icon handle overlaps a metric-binding wedge near the same text corner, the square handle wins hover and the wedge stays tucked close to the text corner with a smaller hit area.
 - Hovering actionable targets also shows a standard Win32 tooltip whose first line matches the edited config shape and whose second line uses the shared localized description for that target.
 - Spurious mouse-leave notifications that arrive while the pointer is still inside the dashboard do not clear or rebuild layout-edit hover state until the next real pointer movement or explicit hover refresh.
