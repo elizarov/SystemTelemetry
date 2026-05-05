@@ -47,7 +47,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 ## Engineering Constraints
 
 - Keep `resources/config.ini` as the embedded default configuration resource.
-- Keep committed resource payloads as the source of truth; CMake generates the compressed embedded config and localization resources under `build\cmake\generated\`, while `resources/CaseDash.rc` keeps the directly embedded app icon and panel-icon mask atlas explicit.
+- Keep committed resource payloads as the source of truth; CMake generates the compressed embedded config/localization text atlas under `build\cmake\generated\`, while `resources/CaseDash.rc` keeps the directly embedded app icon and panel-icon mask atlas explicit.
 - Keep `VERSION` as the single maintained base product version; generated headers, manifests, and version resources derive their build metadata from it plus Git state.
 - Do not add C++-side synthesized fallback layout, card, widget, font, color, or styling defaults that duplicate the embedded template.
 - Keep runtime text internally as UTF-8 `std::string` and convert to UTF-16 only at Windows API boundaries.
@@ -72,7 +72,8 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Fake-runtime startup failures stay aligned with the diagnostics dialog policy; direct modal dialogs in `/fake /exit` can make a headless process wait behind the dialog.
 - Win32 dialog templates and control ids live in `resources/CaseDash.rc` and `resources/resource.h`; check those files when shell dialog layout or control placement is wrong.
 - The executable-side `config.ini` overlays the embedded `resources/config.ini` template, and `Save Config` preserves that live file.
-- Embedded `config.ini`, `localization.ini`, and app-icon resource edits depend on explicit `resources/CaseDash.rc` CMake dependencies so incremental builds rebuild the resource object.
+- Embedded `config.ini` and `localization.ini` edits flow through the generated text-resource atlas; app-icon and panel-icon edits depend on explicit `resources/CaseDash.rc` CMake dependencies so incremental builds rebuild the resource object.
+- The generated compressed-resource RC object depends explicitly on `text_atlas.cdlz`; keep that dependency when changing generated text-resource outputs because RC compilation does not otherwise track RCDATA payload changes.
 - Restored saved placement across monitors with different DPI scales lets `WM_DPICHANGED` apply the monitor transition before destination window size scaling.
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.
 - Provider assembly loading restores the original launch working directory after any provider-specific current-directory change.

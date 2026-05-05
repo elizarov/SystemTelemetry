@@ -61,19 +61,15 @@ def main() -> int:
     parser.add_argument("--resource-root", required=True, type=Path)
     args = parser.parse_args()
 
-    resources = (
-        ("IDR_CONFIG_TEMPLATE", "config.ini"),
-        ("IDR_LOCALIZATION_CATALOG", "localization.ini"),
-    )
-    rc_lines = ['#include "resource.h"', ""]
-    for resource_id, filename in resources:
-        source = args.resource_root / filename
-        raw = source.read_bytes()
-        compressed = MAGIC + struct.pack("<I", len(raw)) + lzss_compress(raw)
-        compressed_path = args.output_dir / f"{filename}.cdlz"
-        write_if_changed(compressed_path, compressed)
-        rc_path = compressed_path.as_posix()
-        rc_lines.append(f'{resource_id} RCDATA "{rc_path}"')
+    config = (args.resource_root / "config.ini").read_bytes()
+    localization = (args.resource_root / "localization.ini").read_bytes()
+    atlas = struct.pack("<I", len(config)) + config + localization
+    compressed = MAGIC + struct.pack("<I", len(atlas)) + lzss_compress(atlas)
+    compressed_path = args.output_dir / "text_atlas.cdlz"
+    write_if_changed(compressed_path, compressed)
+
+    rc_path = compressed_path.as_posix()
+    rc_lines = ['#include "resource.h"', "", f'IDR_TEXT_RESOURCE_ATLAS RCDATA "{rc_path}"']
     rc_lines.append("")
     write_if_changed(args.output_rc, "\n".join(rc_lines).encode("utf-8"))
     return 0

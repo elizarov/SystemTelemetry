@@ -79,8 +79,7 @@ set(CASEDASH_COMPRESSED_RESOURCE_DIR "${CASEDASH_GENERATED_DIR}/compressed_resou
 add_custom_command(
     OUTPUT
         "${CASEDASH_COMPRESSED_RESOURCE_RC}"
-        "${CASEDASH_COMPRESSED_RESOURCE_DIR}/config.ini.cdlz"
-        "${CASEDASH_COMPRESSED_RESOURCE_DIR}/localization.ini.cdlz"
+        "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
     COMMAND
         "${Python3_EXECUTABLE}"
         "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
@@ -92,6 +91,9 @@ add_custom_command(
         "${CMAKE_SOURCE_DIR}/resources/config.ini"
         "${CMAKE_SOURCE_DIR}/resources/localization.ini"
     VERBATIM
+)
+set_source_files_properties("${CASEDASH_COMPRESSED_RESOURCE_RC}" PROPERTIES
+    OBJECT_DEPENDS "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
 )
 
 add_executable(CaseDash WIN32

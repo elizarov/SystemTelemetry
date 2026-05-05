@@ -3,14 +3,15 @@
 #include <windows.h>
 
 #include <cstdint>
-#include <cstring>
 
+#include "resource.h"
 #include "util/utf8.h"
 
 namespace {
 
-constexpr unsigned char kCompressedResourceMagic[] = {'C', 'D', 'L', 'Z'};
+constexpr uint32_t kCompressedResourceMagic = 0x5A4C4443u;
 constexpr size_t kCompressedResourceHeaderSize = 8;
+constexpr size_t kTextAtlasHeaderSize = 4;
 constexpr int kMinMatchLength = 3;
 
 uint32_t ReadLittleEndianUint32(const char* data) {
@@ -20,13 +21,8 @@ uint32_t ReadLittleEndianUint32(const char* data) {
            (static_cast<uint32_t>(static_cast<unsigned char>(data[3])) << 24);
 }
 
-bool IsCompressedResourceData(const std::string& data) {
-    return data.size() >= kCompressedResourceHeaderSize &&
-           std::memcmp(data.data(), kCompressedResourceMagic, sizeof(kCompressedResourceMagic)) == 0;
-}
-
 std::string DecompressResourceData(const std::string& data) {
-    const uint32_t decompressedSize = ReadLittleEndianUint32(data.data() + sizeof(kCompressedResourceMagic));
+    const uint32_t decompressedSize = ReadLittleEndianUint32(data.data() + sizeof(uint32_t));
     std::string output;
     output.reserve(decompressedSize);
 
@@ -49,7 +45,7 @@ std::string DecompressResourceData(const std::string& data) {
             input += 2;
             const size_t offset = static_cast<size_t>((token >> 4) + 1);
             const size_t length = static_cast<size_t>((token & 0x0F) + kMinMatchLength);
-            if (offset == 0 || offset > output.size() || output.size() + length > decompressedSize) {
+            if (offset > output.size() || output.size() + length > decompressedSize) {
                 return {};
             }
             for (size_t index = 0; index < length; ++index) {
@@ -63,12 +59,17 @@ std::string DecompressResourceData(const std::string& data) {
 }  // namespace
 
 std::string LoadUtf8ResourceData(int resourceId) {
+    const bool localization = resourceId == IDR_LOCALIZATION_CATALOG;
+    if (resourceId != IDR_CONFIG_TEMPLATE && !localization) {
+        return {};
+    }
+
     HMODULE module = GetModuleHandleW(nullptr);
     if (module == nullptr) {
         return {};
     }
 
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), RT_RCDATA);
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(IDR_TEXT_RESOURCE_ATLAS), RT_RCDATA);
     if (resource == nullptr) {
         return {};
     }
@@ -88,13 +89,27 @@ std::string LoadUtf8ResourceData(int resourceId) {
         return {};
     }
 
-    std::string text(static_cast<const char*>(resourceData), static_cast<size_t>(resourceSize));
-    if (IsCompressedResourceData(text)) {
-        text = DecompressResourceData(text);
-        if (text.empty()) {
-            return {};
-        }
+    std::string atlas(static_cast<const char*>(resourceData), static_cast<size_t>(resourceSize));
+    if (atlas.size() < kCompressedResourceHeaderSize ||
+        ReadLittleEndianUint32(atlas.data()) != kCompressedResourceMagic) {
+        return {};
     }
+    atlas = DecompressResourceData(atlas);
+    if (atlas.size() < kTextAtlasHeaderSize) {
+        return {};
+    }
+
+    const size_t configLength = ReadLittleEndianUint32(atlas.data());
+    const size_t offset = kTextAtlasHeaderSize + (localization ? configLength : 0);
+    if (atlas.size() < offset) {
+        return {};
+    }
+    const size_t length = localization ? atlas.size() - offset : configLength;
+    if (atlas.size() - offset < length) {
+        return {};
+    }
+
+    std::string text(atlas.data() + offset, length);
     if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
         static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
         text.erase(0, 3);
