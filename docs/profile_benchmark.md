@@ -38,15 +38,15 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured `edit-layout` result reached during this workstream:
-  - `drag_loop per_iter_ms=2.12`
+  - `drag_loop per_iter_ms=2.11`
   - `snap avg_ms=0.06`
   - `apply avg_ms=0.05`
-  - `paint_draw avg_ms=2.00`
+  - `paint_draw avg_ms=1.99`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.15`
+  - `drag_loop per_iter_ms=2.11`
   - `snap avg_ms=0.06`
   - `apply avg_ms=0.05`
-  - `paint_draw avg_ms=2.02`
+  - `paint_draw avg_ms=1.99`
 - Current repeatable `update-telemetry` result on the current tree:
   - `update_loop per_iter_ms=4.56`
   - `telemetry_update avg_ms=2.54`
@@ -83,7 +83,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
 - The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\26329_243_6102\` reports `update_loop per_iter_ms=4.64`, `telemetry_update avg_ms=2.56`, and `paint_draw avg_ms=2.08`; the benchmark-process inclusive module weight is centered on `d2d1.dll`, `DWrite.dll`, `Kernelbase.dll`, `PDH.DLL`, `advapi32.dll`, `clr.dll`, and `mscorlib.dll`. The app-inclusive call tree keeps `AmdAdlxGpuTelemetryProvider::Sample`, `FpsHybridProvider::Sample`, and `PresentedFpsEtwProvider::Sample` visible, so the capture still includes the real presented-FPS ETW sample overhead while using raw GPU Engine PDH values.
-- The latest direct full-benchmark rerun is captured in `build\benchmark_after_drag_redraw.txt`. The `edit-layout` run landed at `drag_loop per_iter_ms=2.15`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.02`; the benchmark now includes the app-style layout mutation tail and one forced redraw per pointer move.
+- The latest direct `edit-layout` rerun after the in-place snap-weight cleanup landed at `drag_loop per_iter_ms=2.11`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=1.99`; the benchmark includes the app-style layout mutation tail and one forced redraw per pointer move.
 - The real traced drag in `build\casedash_trace.txt` reported `elapsed_ms=6909.736`, `snap_samples=687`, `apply_samples=687`, but only `paint_total_samples=25`; the measured paint cost was acceptable, but queued `WM_PAINT` delivery was starved by continuous mouse input.
 - The latest daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\29824_11608_6003\` reports `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.22`; the string-construction leaves from renderer trace formatting are gone, and the remaining inclusive app weight is in `D2DRenderer::DrawTextBlock`, `D2DRenderer::FillSolidRect`, and `DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect`.
 - The latest direct `layout-guide-sheet` run splits generation into `sheet_measure`, `sheet_place`, and `sheet_draw`; it reports `sheet_loop per_iter_ms=328.70`, with `sheet_place avg_ms=299.16` dominating and actual offscreen drawing isolated at `sheet_draw avg_ms=16.97`.

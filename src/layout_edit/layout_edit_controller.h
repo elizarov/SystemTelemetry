@@ -159,8 +159,7 @@ private:
     void SyncRendererInteractionState();
     void ClearInteractionState();
     void SetCursorForPoint(RenderPoint clientPoint);
-    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(
-        LayoutDragState& drag, const std::vector<int>& freeWeights);
+    bool FindSnappedLayoutGuideWeights(LayoutDragState& drag, std::vector<int>& weights);
 
     LayoutEditHost& host_;
     std::optional<LayoutEditGuide> hoveredLayoutGuide_;

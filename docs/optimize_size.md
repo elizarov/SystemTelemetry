@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,236,480` bytes.
+- Current measured `build\CaseDash.exe`: `1,236,992` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `1010.7 KiB`, `.rdata` about `88.5 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `22.5 KiB`, `.xdata` about `20.3 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, and `layout_edit_controller.cpp.obj`.
-- Last validation: `format.cmd`, `lint.cmd`, `build.cmd`, `build\CaseDashTests.exe`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_trace.txt /dump:build\validation_dump.txt`.
+- Current largest sections: `.text$mn` about `1011.0 KiB`, `.rdata` about `88.3 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `22.5 KiB`, `.xdata` about `20.3 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `dashboard_controller.cpp.obj`, and `layout_edit_controller.cpp.obj`.
+- Last validation: `format.cmd`, `build_maps.cmd /benchmarks`, `test.cmd`, `build\CaseDashBenchmarks.exe edit-layout 240 2`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_trace.txt /dump:build\validation_size_dump.txt`.
 
 ## Workflow
 
@@ -49,6 +49,10 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - [x] Replace repeated layout-edit selection editor boolean packs with enum-based visibility selection.
 - [ ] Audit remaining wide-string-heavy UI, file-path, and vendor-boundary paths. Prefer UTF-8 manipulation until a Win32/vendor call only when the map proves a size win and the path is cold or conversion-neutral.
 - [ ] Check remaining top cold symbols for repeated UI and diagnostics code patterns.
+- [ ] Measure release hardening metadata behind `_load_config_used`, Guard CF, XFG, and CastGuard before making any policy call. Preserve compiler hardening unless the size target explicitly accepts that tradeoff.
+- [ ] Audit cold layout-edit helpers that return `std::optional` wrappers around small values or vectors. Prefer bool plus out-parameter only when the map shows deleted template or copy machinery.
+- [x] Trial in-place layout guide snap-weight updates so the drag path does not return `std::optional<std::vector<int>>` for the common already-owned weight vector.
+- [ ] Check diagnostics output failure paths for repeated `FilePath` UTF-16 to UTF-8 conversions; reuse one cold formatted path string when it deletes code instead of only moving it.
 - [x] Refresh final map state and validation notes.
 
 ## Kept Decisions
@@ -114,6 +118,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Flat board sensor name bindings removed unordered-map use from the board config/settings surface but grew the app by 2,048 bytes because the helper/vector code outweighed deleted hash machinery. Keep the existing maps there for now.
 - Manual loops for command-line wide-string trim and path normalization regressed by 512 bytes versus the existing STL algorithm shape; keep the measured algorithm code there.
 - A shared module-path helper for executable and crash-report module paths regressed by 512 bytes; keep the duplicated local shapes.
+- In-place layout guide snap-weight updates shrank the local drag symbol from about 5.8 KiB to 5.7 KiB and benchmarked in range, but the shipped executable stayed flat at `1,236,992` bytes. Keep it only as copy-avoidance cleanup, not as a size lever.
 - Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason. `lint.cmd` blocks maintained source and test files from using `std::filesystem` or including `<filesystem>`.
 
 ## Notes

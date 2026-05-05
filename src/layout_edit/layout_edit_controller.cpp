@@ -906,21 +906,20 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
 }
 
-std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeights(
-    LayoutDragState& drag, const std::vector<int>& freeWeights) {
+bool LayoutEditController::FindSnappedLayoutGuideWeights(LayoutDragState& drag, std::vector<int>& weights) {
     const int threshold = host_.LayoutEditSimilarityThreshold();
     if (threshold <= 0 || drag.snapCandidates.empty()) {
-        return std::nullopt;
+        return false;
     }
 
     const size_t index = drag.guide.separatorIndex;
-    if (index + 1 >= freeWeights.size()) {
-        return std::nullopt;
+    if (index + 1 >= weights.size()) {
+        return false;
     }
 
-    const int combined = freeWeights[index] + freeWeights[index + 1];
+    const int combined = weights[index] + weights[index + 1];
     if (combined <= 1) {
-        return std::nullopt;
+        return false;
     }
 
     for (size_t candidateIndex = 0; candidateIndex < drag.snapCandidates.size();) {
@@ -938,8 +937,8 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
         }
 
         const auto snappedWeight = layout_snap_solver::FindNearestSnapWeight(
-            freeWeights[index], combined, threshold, groupedCandidates, [&](int firstWeight) -> std::optional<int> {
-                std::vector<int> attemptWeights = freeWeights;
+            weights[index], combined, threshold, groupedCandidates, [&](int firstWeight) -> std::optional<int> {
+                std::vector<int> attemptWeights = weights;
                 attemptWeights[index] = firstWeight;
                 attemptWeights[index + 1] = combined - firstWeight;
                 ExtentCacheKey cacheKey{std::move(attemptWeights), widget};
@@ -959,13 +958,12 @@ std::optional<std::vector<int>> LayoutEditController::FindSnappedLayoutGuideWeig
             continue;
         }
 
-        std::vector<int> exact = freeWeights;
-        exact[index] = *snappedWeight;
-        exact[index + 1] = combined - *snappedWeight;
-        return exact;
+        weights[index] = *snappedWeight;
+        weights[index + 1] = combined - *snappedWeight;
+        return true;
     }
 
-    return std::nullopt;
+    return false;
 }
 
 bool LayoutEditController::UpdateLayoutDrag(RenderPoint clientPoint) {
@@ -987,9 +985,7 @@ bool LayoutEditController::UpdateLayoutDrag(RenderPoint clientPoint) {
     weights[index + 1] = combined - weights[index];
     if ((GetKeyState(VK_MENU) & 0x8000) == 0) {
         const auto snapStart = std::chrono::steady_clock::now();
-        if (const auto snappedWeights = FindSnappedLayoutGuideWeights(drag, weights); snappedWeights.has_value()) {
-            weights = *snappedWeights;
-        }
+        FindSnappedLayoutGuideWeights(drag, weights);
         host_.RecordLayoutEditTracePhase(
             LayoutEditHost::TracePhase::Snap, std::chrono::steady_clock::now() - snapStart);
     }
