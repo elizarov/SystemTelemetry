@@ -175,7 +175,17 @@ void AddSyntheticHistory(SystemSnapshot& snapshot, const char* seriesRef, std::v
     RetainedHistorySeries history;
     history.seriesRef = seriesRef;
     history.samples = std::move(samples);
-    snapshot.retainedHistoryIndexByRef.emplace(history.seriesRef, snapshot.retainedHistories.size());
+    snapshot.retainedHistories.push_back(std::move(history));
+}
+
+void AddSyntheticHistory(SystemSnapshot& snapshot, RetainedHistoryKey key, std::vector<double>&& samples) {
+    RetainedHistorySeries history;
+    history.seriesRef = RetainedHistorySeriesRef(key);
+    history.samples = std::move(samples);
+    const size_t index = snapshot.retainedHistories.size();
+    if (index <= 0xffffu - 1u) {
+        snapshot.retainedHistoryIndexByKey[static_cast<size_t>(key)] = static_cast<uint16_t>(index + 1u);
+    }
     snapshot.retainedHistories.push_back(std::move(history));
 }
 
@@ -263,22 +273,22 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     snapshot.drives.push_back(BuildSyntheticDrive("E:", "Media", 32.099891, 5059.855675, 118.0, 21.0));
     snapshot.drives.push_back(BuildSyntheticDrive("F:", "Capture", 88.636454, 306.444996, 24.0, 37.0));
 
-    AddSyntheticHistory(snapshot, "cpu.load", std::move(cpuLoad));
-    AddSyntheticHistory(snapshot, "cpu.clock", std::move(cpuClock));
-    AddSyntheticHistory(snapshot, "cpu.ram", std::move(cpuRam));
-    AddSyntheticHistory(snapshot, "gpu.load", std::move(gpuLoad));
-    AddSyntheticHistory(snapshot, "gpu.temp", std::move(gpuTemp));
-    AddSyntheticHistory(snapshot, "gpu.clock", std::move(gpuClock));
-    AddSyntheticHistory(snapshot, "gpu.fan", std::move(gpuFan));
-    AddSyntheticHistory(snapshot, "gpu.fps", std::move(gpuFps));
-    AddSyntheticHistory(snapshot, "gpu.vram", std::move(gpuVram));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::CpuLoad, std::move(cpuLoad));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::CpuClock, std::move(cpuClock));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::CpuRam, std::move(cpuRam));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::GpuLoad, std::move(gpuLoad));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::GpuTemperature, std::move(gpuTemp));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::GpuClock, std::move(gpuClock));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::GpuFan, std::move(gpuFan));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::GpuFps, std::move(gpuFps));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::GpuVram, std::move(gpuVram));
     AddSyntheticHistory(snapshot, "board.temp.cpu", std::move(boardTempCpu));
     AddSyntheticHistory(snapshot, "board.fan.cpu", std::move(boardFanCpu));
     AddSyntheticHistory(snapshot, "board.fan.system", std::move(boardFanSystem));
-    AddSyntheticHistory(snapshot, "network.upload", std::move(networkUpload));
-    AddSyntheticHistory(snapshot, "network.download", std::move(networkDownload));
-    AddSyntheticHistory(snapshot, "storage.read", std::move(storageRead));
-    AddSyntheticHistory(snapshot, "storage.write", std::move(storageWrite));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::NetworkUpload, std::move(networkUpload));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::NetworkDownload, std::move(networkDownload));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::StorageRead, std::move(storageRead));
+    AddSyntheticHistory(snapshot, RetainedHistoryKey::StorageWrite, std::move(storageWrite));
 
     snapshot.now = BuildSyntheticTimestamp(tick);
     snapshot.revision = 1;

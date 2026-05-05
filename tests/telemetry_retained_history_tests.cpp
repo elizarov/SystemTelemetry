@@ -7,8 +7,8 @@ TEST(TelemetryRetainedHistory, PushSampleCreatesSeriesAndKeepsRollingWindow) {
     RetainedHistoryStore store;
     SystemSnapshot snapshot;
 
-    store.PushSample(snapshot, "cpu.load", 25.0);
-    store.PushSample(snapshot, "cpu.load", 50.0);
+    store.PushSample(snapshot, RetainedHistoryKey::CpuLoad, 25.0);
+    store.PushSample(snapshot, RetainedHistoryKey::CpuLoad, 50.0);
 
     ASSERT_EQ(snapshot.retainedHistories.size(), 1u);
     ASSERT_EQ(snapshot.retainedHistories[0].seriesRef, "cpu.load");
@@ -36,8 +36,8 @@ TEST(TelemetryRetainedHistory, PushSampleSanitizesNonFiniteValuesToZero) {
     RetainedHistoryStore store;
     SystemSnapshot snapshot;
 
-    store.PushSample(snapshot, "network.upload", std::numeric_limits<double>::quiet_NaN());
-    store.PushSample(snapshot, "network.upload", std::numeric_limits<double>::infinity());
+    store.PushSample(snapshot, RetainedHistoryKey::NetworkUpload, std::numeric_limits<double>::quiet_NaN());
+    store.PushSample(snapshot, RetainedHistoryKey::NetworkUpload, std::numeric_limits<double>::infinity());
 
     ASSERT_EQ(snapshot.retainedHistories.size(), 1u);
     EXPECT_DOUBLE_EQ(snapshot.retainedHistories[0].samples[snapshot.retainedHistories[0].samples.size() - 2], 0.0);

@@ -3,18 +3,6 @@
 
 #include "diagnostics/snapshot_dump.h"
 
-namespace {
-
-void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
-    snapshot.retainedHistoryIndexByRef.clear();
-    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
-    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
-        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
-    }
-}
-
-}  // namespace
-
 TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     TelemetryDump dump;
     dump.snapshot.cpu.clock = ScalarMetric{4.75, ScalarMetricUnit::Gigahertz};
@@ -105,7 +93,6 @@ TEST(SnapshotDump, RoundTripsRawRetainedHistorySamples) {
     TelemetryDump dump;
     dump.snapshot.retainedHistories.push_back({"cpu.load", std::vector<double>{20.0, 91.0, 63.0}});
     dump.snapshot.retainedHistories.push_back({"board.temp.cpu", std::vector<double>{10.0, 55.0, 40.0}});
-    RebuildRetainedHistoryIndex(dump.snapshot);
 
     std::string output;
     ASSERT_TRUE(WriteTelemetryDumpText(output, dump));

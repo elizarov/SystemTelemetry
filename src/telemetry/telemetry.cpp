@@ -11,6 +11,26 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 constexpr auto kTelemetryRefreshInterval = std::chrono::milliseconds(500);
+constexpr const char* kRetainedHistorySeriesRefs[] = {
+    "cpu.ram",
+    "cpu.load",
+    "cpu.clock",
+    "gpu.load",
+    "gpu.temp",
+    "gpu.clock",
+    "gpu.fan",
+    "gpu.fps",
+    "gpu.vram",
+    "network.upload",
+    "network.download",
+    "storage.read",
+    "storage.write",
+};
+static_assert(sizeof(kRetainedHistorySeriesRefs) / sizeof(kRetainedHistorySeriesRefs[0]) == kRetainedHistoryKeyCount);
+
+size_t RetainedHistoryKeyIndex(RetainedHistoryKey key) {
+    return static_cast<size_t>(key);
+}
 
 TelemetryUpdate CaptureTelemetryUpdate(const TelemetryCollector& collector) {
     TelemetryUpdate update;
@@ -129,6 +149,21 @@ private:
 };
 
 }  // namespace
+
+const char* RetainedHistorySeriesRef(RetainedHistoryKey key) {
+    const size_t index = RetainedHistoryKeyIndex(key);
+    return index < kRetainedHistoryKeyCount ? kRetainedHistorySeriesRefs[index] : "";
+}
+
+bool TryRetainedHistoryKey(std::string_view seriesRef, RetainedHistoryKey& key) {
+    for (size_t i = 0; i < kRetainedHistoryKeyCount; ++i) {
+        if (seriesRef == kRetainedHistorySeriesRefs[i]) {
+            key = static_cast<RetainedHistoryKey>(i);
+            return true;
+        }
+    }
+    return false;
+}
 
 std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollectorOptions& options,
     const FilePath& workingDirectory,

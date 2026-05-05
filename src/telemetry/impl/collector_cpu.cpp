@@ -23,7 +23,8 @@ void UpdateMemory(RealTelemetryCollectorState& state) {
                " total_gb=" + Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.totalGb, 2) +
                " used_gb=" + Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.usedGb, 2);
     });
-    state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.ram", state.snapshot_.cpu.memory.usedGb);
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, RetainedHistoryKey::CpuRam, state.snapshot_.cpu.memory.usedGb);
 }
 
 }  // namespace
@@ -82,7 +83,8 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
         return "telemetry:cpu_load status=" + PdhStatusCodeString(loadStatus) + " " +
                Trace::FormatValueDouble("value", state.snapshot_.cpu.loadPercent, 2);
     });
-    state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.load", state.snapshot_.cpu.loadPercent);
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, RetainedHistoryKey::CpuLoad, state.snapshot_.cpu.loadPercent);
 
     PDH_STATUS clockStatus = PDH_INVALID_DATA;
     if (state.cpu_.frequencyCounter != nullptr) {
@@ -97,7 +99,8 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
                (state.snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(state.snapshot_.cpu.clock, 2)
                                                             : std::string("N/A"));
     });
-    state.retainedHistoryStore_.PushSample(state.snapshot_, "cpu.clock", state.snapshot_.cpu.clock.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, RetainedHistoryKey::CpuClock, state.snapshot_.cpu.clock.value.value_or(0.0));
 
     UpdateMemory(state);
 }

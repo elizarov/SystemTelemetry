@@ -247,7 +247,8 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
                    " selected=" + Trace::FormatValueDouble("value", state.snapshot_.gpu.loadPercent, 2);
         });
     }
-    state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.load", state.snapshot_.gpu.loadPercent);
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, RetainedHistoryKey::GpuLoad, state.snapshot_.gpu.loadPercent);
 
     if (!hasVendorVram && state.gpu_.memoryQuery != nullptr) {
         const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.memoryQuery);
@@ -262,9 +263,13 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
     }
 
     state.retainedHistoryStore_.PushSample(
-        state.snapshot_, "gpu.temp", state.snapshot_.gpu.temperature.value.value_or(0.0));
-    state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.clock", state.snapshot_.gpu.clock.value.value_or(0.0));
-    state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.fan", state.snapshot_.gpu.fan.value.value_or(0.0));
-    state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.fps", state.snapshot_.gpu.fps.value.value_or(0.0));
-    state.retainedHistoryStore_.PushSample(state.snapshot_, "gpu.vram", state.snapshot_.gpu.vram.usedGb);
+        state.snapshot_, RetainedHistoryKey::GpuTemperature, state.snapshot_.gpu.temperature.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, RetainedHistoryKey::GpuClock, state.snapshot_.gpu.clock.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, RetainedHistoryKey::GpuFan, state.snapshot_.gpu.fan.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, RetainedHistoryKey::GpuFps, state.snapshot_.gpu.fps.value.value_or(0.0));
+    state.retainedHistoryStore_.PushSample(
+        state.snapshot_, RetainedHistoryKey::GpuVram, state.snapshot_.gpu.vram.usedGb);
 }

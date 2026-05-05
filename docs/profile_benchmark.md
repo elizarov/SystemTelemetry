@@ -43,15 +43,15 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.05`
   - `paint_draw avg_ms=1.99`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.11`
-  - `snap avg_ms=0.06`
-  - `apply avg_ms=0.05`
-  - `paint_draw avg_ms=1.99`
+  - `drag_loop per_iter_ms=2.48`
+  - `snap avg_ms=0.07`
+  - `apply avg_ms=0.06`
+  - `paint_draw avg_ms=2.33`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.77` to `4.84`
-  - `telemetry_update avg_ms=2.66` to `2.67`
-  - `paint_total avg_ms=2.11` to `2.17`
-  - `paint_draw avg_ms=2.11` to `2.17`
+  - `update_loop per_iter_ms=5.72`
+  - `telemetry_update avg_ms=3.36`
+  - `paint_total avg_ms=2.36`
+  - `paint_draw avg_ms=2.36`
 - Current repeatable `layout-switch` result on the current tree:
   - `switch_loop per_iter_ms=3.46`
   - `switch_apply avg_ms=0.78`
@@ -82,6 +82,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
+- The latest daemon-backed `update-telemetry` captures under `build\profile_benchmark_daemon\requests\18014_1564_22035\` and `build\profile_benchmark_daemon\requests\18154_4993_3762\` report `update_loop per_iter_ms=5.42` to `5.84`, `telemetry_update avg_ms=3.08` to `3.46`, and `paint_draw avg_ms=2.34` to `2.37`; `FindRetainedHistory` appears only as a tiny exclusive leaf in one capture at `0.12%`, while the app-inclusive weight stays in `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, `UpdateGpuMetrics`, and Direct2D/DirectWrite paint.
 - The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\10827_2817_24593\` reports `update_loop per_iter_ms=4.85`, `telemetry_update avg_ms=2.72`, and `paint_draw avg_ms=2.13`; the app-inclusive call tree keeps `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, and `UpdateGpuMetrics` visible while `PresentedFpsEtwProvider::Sample` is only `0.79%` exclusive hits and the GPU raw-counter hash lookup is `0.40%` exclusive hits. The benchmark-process inclusive module weight remains centered on Direct2D, DirectWrite, PDH, Win32, kernel, and AMD driver work rather than app-side process-cache scans.
 - A direct idle-process stress run with `300` hidden `timeout.exe` processes alive reported `process_count=927`, `gpu_engine_counters=632`, and `gpu_engine_pids=28`; `build\CaseDashBenchmarks.exe update-telemetry 240 2` still landed at `update_loop per_iter_ms=4.78`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.14`.
 - The latest direct `edit-layout` rerun after the in-place snap-weight cleanup landed at `drag_loop per_iter_ms=2.11`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=1.99`; the benchmark includes the app-style layout mutation tail and one forced redraw per pointer move.
@@ -131,6 +132,21 @@ These changes produced real wins and remain in the codebase:
 - Read presented-FPS GPU Engine 3D usage as raw PDH counter arrays and calculate per-instance percentages from previous/current raw values, so process selection still favors the highest GPU consumer while avoiding the heavier formatted wildcard array path.
 
 ## Tested Hypotheses
+
+### Hypothesis: Retained histories can avoid a string-key hash index
+
+- Change:
+  - Remove `SystemSnapshot`'s `std::unordered_map<std::string, size_t>` retained-history index.
+  - Keep retained samples in the dump-facing vector, cache fixed CPU/GPU/network/storage histories by `RetainedHistoryKey` encoded vector indices, and leave dynamic board temperature/fan histories on the existing string series refs.
+- Result:
+  - Helped shipped size while keeping the retained-history lookup out of the telemetry-plus-draw profile.
+- Observed effect:
+  - A shared `StringPointerMap`/`StringIndexMap` wrapper around `std::unordered_map<std::string, const void*>` regressed the app to `1,187,328` bytes, so that abstraction was rejected.
+  - Removing the retained-history hash index reduced `build\CaseDash.exe` from `1,186,816` to `1,182,208` bytes. A plain vector scan and the final enum-index shape measured the same shipped size; the enum-index shape remains because fixed histories avoid repeated vector scans.
+  - Direct validation after the change landed at `update_loop per_iter_ms=5.72`, `telemetry_update avg_ms=3.36`, `paint_draw avg_ms=2.36`, and `edit-layout paint_draw avg_ms=2.33` on a slower-than-baseline run.
+  - Daemon-backed captures landed at `update_loop per_iter_ms=5.42` to `5.84`, `telemetry_update avg_ms=3.08` to `3.46`, and `paint_draw avg_ms=2.34` to `2.37`; retained-history lookup was absent from the top app functions in one capture and only `0.12%` exclusive hits in the other.
+- Conclusion:
+  - Keep enum-indexed fixed retained histories plus dynamic string board histories. Do not add a project-owned unordered-map wrapper for this surface unless a future benchmark shows a larger non-dynamic string-key lookup domain.
 
 ### Hypothesis: Keep FPS ETW process caches flat without regressing process-heavy machines
 

@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,186,816` bytes.
+- Current measured `build\CaseDash.exe`: `1,182,208` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `962.7 KiB`, `.rdata` about `88.7 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `21.3 KiB`, `.xdata` about `20.0 KiB`.
+- Current largest sections: `.text$mn` about `958.3 KiB`, `.rdata` about `88.7 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `21.2 KiB`, `.xdata` about `20.0 KiB`.
 - Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, and `dashboard_controller.cpp.obj`.
-- Last validation: `format.cmd fix changed`, `build.cmd /benchmarks`, direct `build\CaseDashBenchmarks.exe update-telemetry 240 2` and `edit-layout 240 2`, a `300` idle-process `update-telemetry 240 2` stress run, `profile_benchmark.cmd update-telemetry 240 2`, `build.cmd`, `build_maps.cmd`, `format.cmd changed`, `test.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_trace.txt /dump:build\validation_size_dump.txt`.
+- Last validation: `format.cmd fix changed`, `build.cmd /benchmarks`, direct `build\CaseDashBenchmarks.exe update-telemetry 240 2` and `edit-layout 240 2`, daemon-backed `profile_benchmark.cmd update-telemetry 240 2`, `build.cmd`, `build_maps.cmd`, `format.cmd changed`, `test.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_trace.txt /dump:build\validation_size_dump.txt`.
 
 ## Workflow
 
@@ -80,6 +80,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Layout-edit active editor state | Keep the current layout-edit selection editor kind and metric-binding visibility in dialog state, and pass a single editor kind into the pane visibility helper. | `1,195,520` to `1,195,008` bytes. |
 | Network adapter selection | Keep adapter selection data, UTF-8 names, match rank, and traffic counters in one candidate record, and use one automatic-candidate comparison helper instead of repeating wide/UTF-8 match chains. | `1,195,008` to `1,193,984` bytes. |
 | FPS ETW provider small caches | Keep FPS ETW source names as an enum conversion, keep process names, GPU usage, and present-event buckets as flat vectors for tiny active process sets, and keep GPU raw counter lookup hash-based because GPU Engine exposes hundreds of per-engine instances on process-heavy machines. | `1,193,984` to `1,186,816` bytes across the measured FPS provider passes. |
+| Retained history indexes | Keep retained-history series in the dump-facing vector, cache fixed CPU/GPU/network/storage histories by `RetainedHistoryKey` encoded vector indices, and leave dynamic board temp/fan histories on a vector scan. | `1,186,816` to `1,182,208` bytes; a plain vector scan reached the same size, so keep the indexed shape for predictable fixed-key lookups. |
 
 ## Rejected Or Neutral Experiments
 
@@ -114,6 +115,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - A shared derived-color slider row helper was executable-neutral at `1,193,984` bytes. Keep the explicit row layout unless a broader pane restructuring deletes more surrounding code.
 - Direct construction of the diagnostics reload effective config was executable-neutral at `1,193,984` bytes. Keep the existing full-config copy because the clearer code shape is not a current size lever.
 - Do not flatten the FPS ETW provider's GPU raw counter maps. The maintained process-heavy validation machine reported `632` GPU Engine counter instances and `28` GPU Engine process ids, so raw counter matching needs hash lookup even though the active process-name, GPU-usage, and present-event sets stay tiny.
+- A shared `StringPointerMap`/`StringIndexMap` wrapper around `std::unordered_map<std::string, const void*>` did not pay off for the remaining string-key pointer/index maps. The leaner raw-pointer pimpl version grew `build\CaseDash.exe` to `1,187,328` bytes, so keep concrete cache shapes instead of centralizing hash tables behind that wrapper.
 - Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason. `lint.cmd` blocks maintained source and test files from using `std::filesystem` or including `<filesystem>`.
 
 ## Notes

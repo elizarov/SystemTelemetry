@@ -167,8 +167,10 @@ void UpdateStorageThroughput(RealTelemetryCollectorState& state, bool initialize
     }
 
     if (!initializeOnly) {
-        state.retainedHistoryStore_.PushSample(state.snapshot_, "storage.read", state.snapshot_.storage.readMbps);
-        state.retainedHistoryStore_.PushSample(state.snapshot_, "storage.write", state.snapshot_.storage.writeMbps);
+        state.retainedHistoryStore_.PushSample(
+            state.snapshot_, RetainedHistoryKey::StorageRead, state.snapshot_.storage.readMbps);
+        state.retainedHistoryStore_.PushSample(
+            state.snapshot_, RetainedHistoryKey::StorageWrite, state.snapshot_.storage.writeMbps);
     }
 
     state.trace_.WriteLazy([&] {

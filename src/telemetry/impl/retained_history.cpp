@@ -5,10 +5,15 @@
 namespace {
 
 constexpr size_t kRecentHistorySamples = 60;
+constexpr size_t kMaxCachedHistoryIndex = 0xffffu - 1u;
 
-RetainedHistorySeries CreateRetainedHistorySeries(const std::string& seriesRef) {
+size_t HistoryKeyIndex(RetainedHistoryKey key) {
+    return static_cast<size_t>(key);
+}
+
+RetainedHistorySeries CreateRetainedHistorySeries(std::string_view seriesRef) {
     RetainedHistorySeries history;
-    history.seriesRef = seriesRef;
+    history.seriesRef = std::string(seriesRef);
     history.samples.assign(kRecentHistorySamples, 0.0);
     return history;
 }
@@ -21,30 +26,67 @@ void PushHistorySample(std::vector<double>& history, double value) {
     history.push_back(FiniteOr(value, 0.0));
 }
 
-}  // namespace
+bool TryGetCachedHistoryIndex(
+    const SystemSnapshot& snapshot, RetainedHistoryKey key, std::string_view seriesRef, size_t& index) {
+    const uint16_t encodedIndex = snapshot.retainedHistoryIndexByKey[HistoryKeyIndex(key)];
+    if (encodedIndex == 0) {
+        return false;
+    }
+    index = encodedIndex - 1u;
+    return index < snapshot.retainedHistories.size() && snapshot.retainedHistories[index].seriesRef == seriesRef;
+}
 
-void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
-    snapshot.retainedHistoryIndexByRef.clear();
-    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
-    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
-        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
+void CacheHistoryIndex(SystemSnapshot& snapshot, RetainedHistoryKey key, size_t index) {
+    if (index <= kMaxCachedHistoryIndex) {
+        snapshot.retainedHistoryIndexByKey[HistoryKeyIndex(key)] = static_cast<uint16_t>(index + 1u);
     }
 }
+
+void ClearHistoryKeyIndexes(SystemSnapshot& snapshot) {
+    for (uint16_t& encodedIndex : snapshot.retainedHistoryIndexByKey) {
+        encodedIndex = 0;
+    }
+}
+
+bool FindHistoryIndex(const SystemSnapshot& snapshot, std::string_view seriesRef, size_t& index) {
+    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
+        if (snapshot.retainedHistories[i].seriesRef == seriesRef) {
+            index = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+}  // namespace
 
 void RetainedHistoryStore::Reset(SystemSnapshot& snapshot) const {
     snapshot.retainedHistories.clear();
-    snapshot.retainedHistoryIndexByRef.clear();
+    ClearHistoryKeyIndexes(snapshot);
+}
+
+void RetainedHistoryStore::PushSample(SystemSnapshot& snapshot, RetainedHistoryKey key, double value) const {
+    const std::string_view seriesRef = RetainedHistorySeriesRef(key);
+    size_t index = 0;
+    if (!TryGetCachedHistoryIndex(snapshot, key, seriesRef, index)) {
+        if (!FindHistoryIndex(snapshot, seriesRef, index)) {
+            index = snapshot.retainedHistories.size();
+            snapshot.retainedHistories.push_back(CreateRetainedHistorySeries(seriesRef));
+        }
+        CacheHistoryIndex(snapshot, key, index);
+    }
+    PushHistorySample(snapshot.retainedHistories[index].samples, value);
 }
 
 void RetainedHistoryStore::PushSample(SystemSnapshot& snapshot, const std::string& seriesRef, double value) const {
-    auto it = snapshot.retainedHistoryIndexByRef.find(seriesRef);
-    if (it == snapshot.retainedHistoryIndexByRef.end()) {
-        const size_t index = snapshot.retainedHistories.size();
-        snapshot.retainedHistories.push_back(CreateRetainedHistorySeries(seriesRef));
-        snapshot.retainedHistoryIndexByRef.emplace(seriesRef, index);
-        it = snapshot.retainedHistoryIndexByRef.find(seriesRef);
+    for (auto& history : snapshot.retainedHistories) {
+        if (history.seriesRef == seriesRef) {
+            PushHistorySample(history.samples, value);
+            return;
+        }
     }
-    PushHistorySample(snapshot.retainedHistories[it->second].samples, value);
+    snapshot.retainedHistories.push_back(CreateRetainedHistorySeries(seriesRef));
+    PushHistorySample(snapshot.retainedHistories.back().samples, value);
 }
 
 void RetainedHistoryStore::PushBoardMetricSamples(SystemSnapshot& snapshot) const {

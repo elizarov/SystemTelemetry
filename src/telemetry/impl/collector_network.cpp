@@ -342,9 +342,9 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
             state.snapshot_.network.uploadMbps =
                 FiniteNonNegativeOr((static_cast<double>(outDelta) / seconds) / (1024.0 * 1024.0));
             state.retainedHistoryStore_.PushSample(
-                state.snapshot_, "network.upload", state.snapshot_.network.uploadMbps);
+                state.snapshot_, RetainedHistoryKey::NetworkUpload, state.snapshot_.network.uploadMbps);
             state.retainedHistoryStore_.PushSample(
-                state.snapshot_, "network.download", state.snapshot_.network.downloadMbps);
+                state.snapshot_, RetainedHistoryKey::NetworkDownload, state.snapshot_.network.downloadMbps);
             state.trace_.WriteLazy([&] {
                 return "telemetry:network_rates interface=" + std::to_string(selected.InterfaceIndex) +
                        " seconds=" + Trace::FormatValueDouble("value", seconds, 3) +

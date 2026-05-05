@@ -267,11 +267,22 @@ int ResolveScalarPrecision(const std::string& metricRef) {
 }
 
 const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, const std::string& seriesRef) {
-    const auto indexIt = snapshot.retainedHistoryIndexByRef.find(seriesRef);
-    if (indexIt == snapshot.retainedHistoryIndexByRef.end() || indexIt->second >= snapshot.retainedHistories.size()) {
-        return nullptr;
+    RetainedHistoryKey key = RetainedHistoryKey::Count;
+    if (TryRetainedHistoryKey(seriesRef, key)) {
+        const uint16_t encodedIndex = snapshot.retainedHistoryIndexByKey[static_cast<size_t>(key)];
+        if (encodedIndex != 0) {
+            const size_t index = encodedIndex - 1u;
+            if (index < snapshot.retainedHistories.size() && snapshot.retainedHistories[index].seriesRef == seriesRef) {
+                return &snapshot.retainedHistories[index].samples;
+            }
+        }
     }
-    return &snapshot.retainedHistories[indexIt->second].samples;
+    for (const auto& history : snapshot.retainedHistories) {
+        if (history.seriesRef == seriesRef) {
+            return &history.samples;
+        }
+    }
+    return nullptr;
 }
 
 double ResolvePeakRatio(const SystemSnapshot& snapshot,

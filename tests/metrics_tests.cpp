@@ -5,14 +5,6 @@
 
 namespace {
 
-void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
-    snapshot.retainedHistoryIndexByRef.clear();
-    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
-    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
-        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
-    }
-}
-
 MetricsSectionConfig BuildMetricsConfig() {
     MetricsSectionConfig metrics;
     metrics.definitions.push_back(
@@ -57,7 +49,6 @@ void AddHistorySeries(SystemSnapshot& snapshot, const std::string& metricRef, st
     series.seriesRef = metricRef;
     series.samples.assign(samples.begin(), samples.end());
     snapshot.retainedHistories.push_back(std::move(series));
-    RebuildRetainedHistoryIndex(snapshot);
 }
 
 }  // namespace

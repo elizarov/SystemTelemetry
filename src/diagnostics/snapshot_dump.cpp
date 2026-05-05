@@ -549,14 +549,6 @@ bool LoadRetainedHistories(const DumpValues& values,
     return true;
 }
 
-void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
-    snapshot.retainedHistoryIndexByRef.clear();
-    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
-    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
-        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
-    }
-}
-
 }  // namespace
 
 bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
@@ -669,7 +661,6 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         return false;
     }
 
-    RebuildRetainedHistoryIndex(parsed.snapshot);
     dump = std::move(parsed);
     return true;
 }
