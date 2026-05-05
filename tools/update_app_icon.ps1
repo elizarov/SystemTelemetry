@@ -9,7 +9,7 @@ $buildRoot = Join-Path $repoRoot 'build'
 $iconRoot = Join-Path $buildRoot 'app_icon'
 $exePath = Join-Path $buildRoot 'CaseDash.exe'
 $icoPath = Join-Path $repoRoot 'resources\app.ico'
-$sizes = @(16, 20, 24, 32, 40, 48, 64, 256)
+$sizes = @(16, 32, 64)
 
 if (-not $SkipBuild) {
     & (Join-Path $repoRoot 'build.cmd')
