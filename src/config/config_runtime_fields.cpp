@@ -153,8 +153,10 @@ template <typename Field> std::uint32_t RuntimeFieldOffset() {
 
 template <typename Field> RuntimeConfigFieldDescriptor MakeRuntimeFieldDescriptor() {
     using Policy = typename Field::layout_edit_traits_type::policy_tag;
-    return RuntimeConfigFieldDescriptor{Field::key.view(),
+    static_assert(Field::key.view().size() <= UCHAR_MAX, "Runtime config field keys must fit descriptor byte length.");
+    return RuntimeConfigFieldDescriptor{Field::key.value,
         RuntimeFieldOffset<Field>(),
+        static_cast<std::uint8_t>(Field::key.view().size()),
         RuntimeFieldValueKindFor<typename Field::field_type>(),
         RuntimeFieldPolicyFor<Policy>()};
 }
@@ -162,6 +164,15 @@ template <typename Field> RuntimeConfigFieldDescriptor MakeRuntimeFieldDescripto
 template <typename... Field> auto MakeRuntimeFieldDescriptors(std::tuple<Field...>) {
     return std::array<RuntimeConfigFieldDescriptor, sizeof...(Field)>{MakeRuntimeFieldDescriptor<Field>()...};
 }
+
+template <typename Section> struct RuntimeConfigFieldDescriptorTable {
+    using Fields = decltype(MakeRuntimeFieldDescriptors(typename Section::fields_type{}));
+    static const Fields fields;
+};
+
+template <typename Section>
+const typename RuntimeConfigFieldDescriptorTable<Section>::Fields RuntimeConfigFieldDescriptorTable<Section>::fields =
+    MakeRuntimeFieldDescriptors(typename Section::fields_type{});
 
 char* FieldAddress(void* owner, const RuntimeConfigFieldDescriptor& field) {
     return static_cast<char*>(owner) + field.offset;
@@ -329,8 +340,7 @@ std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
 
 #define CASEDASH_DEFINE_RUNTIME_FIELDS(section_type)                                                                   \
     template <> std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFieldDescriptors<section_type>() {          \
-        static const auto fields = MakeRuntimeFieldDescriptors(typename section_type::fields_type{});                  \
-        return fields;                                                                                                 \
+        return RuntimeConfigFieldDescriptorTable<section_type>::fields;                                                \
     }
 
 CASEDASH_CONFIG_FIELD_SECTIONS(CASEDASH_DEFINE_RUNTIME_FIELDS)

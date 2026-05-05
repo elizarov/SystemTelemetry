@@ -69,7 +69,8 @@ const ThemeConfig* FindTheme(const LayoutConfig& layout, std::string_view name) 
 
 std::optional<ColorConfig> FindThemeToken(const ThemeConfig& theme, std::string_view name) {
     for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<ThemeConfig::Section>()) {
-        if (field.kind == RuntimeConfigFieldValueKind::HexColor && field.key == name) {
+        if (field.kind == RuntimeConfigFieldValueKind::HexColor &&
+            std::string_view(field.key, field.keyLength) == name) {
             return *reinterpret_cast<const ColorConfig*>(reinterpret_cast<const char*>(&theme) + field.offset);
         }
     }
@@ -89,7 +90,8 @@ const ColorConfig& ColorField(const void* owner, const RuntimeConfigFieldDescrip
 std::optional<ColorConfig> FindColorFieldByKey(
     std::span<const RuntimeConfigFieldDescriptor> fields, const void* owner, std::string_view name) {
     for (const RuntimeConfigFieldDescriptor& field : fields) {
-        if (field.kind == RuntimeConfigFieldValueKind::HexColor && field.key == name) {
+        if (field.kind == RuntimeConfigFieldValueKind::HexColor &&
+            std::string_view(field.key, field.keyLength) == name) {
             return ColorField(owner, field);
         }
     }

@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <set>
+#include <string_view>
 #include <type_traits>
 
 #include "config/color_resolver.h"
@@ -57,7 +58,7 @@ template <typename Section>
 bool ApplyStructuredSectionFields(
     typename Section::owner_type& owner, const std::string& key, const std::string& value) {
     for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
-        if (key == field.key) {
+        if (key == std::string_view(field.key, field.keyLength)) {
             DecodeRuntimeConfigField(field, &owner, value);
             return true;
         }
