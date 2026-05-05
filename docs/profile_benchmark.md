@@ -48,10 +48,10 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.05`
   - `paint_draw avg_ms=1.99`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.56`
-  - `telemetry_update avg_ms=2.54`
-  - `paint_total avg_ms=2.02`
-  - `paint_draw avg_ms=2.02`
+  - `update_loop per_iter_ms=4.77` to `4.84`
+  - `telemetry_update avg_ms=2.66` to `2.67`
+  - `paint_total avg_ms=2.11` to `2.17`
+  - `paint_draw avg_ms=2.11` to `2.17`
 - Current repeatable `layout-switch` result on the current tree:
   - `switch_loop per_iter_ms=3.46`
   - `switch_apply avg_ms=0.78`
@@ -82,7 +82,8 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 
 Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
 
-- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\26329_243_6102\` reports `update_loop per_iter_ms=4.64`, `telemetry_update avg_ms=2.56`, and `paint_draw avg_ms=2.08`; the benchmark-process inclusive module weight is centered on `d2d1.dll`, `DWrite.dll`, `Kernelbase.dll`, `PDH.DLL`, `advapi32.dll`, `clr.dll`, and `mscorlib.dll`. The app-inclusive call tree keeps `AmdAdlxGpuTelemetryProvider::Sample`, `FpsHybridProvider::Sample`, and `PresentedFpsEtwProvider::Sample` visible, so the capture still includes the real presented-FPS ETW sample overhead while using raw GPU Engine PDH values.
+- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\10827_2817_24593\` reports `update_loop per_iter_ms=4.85`, `telemetry_update avg_ms=2.72`, and `paint_draw avg_ms=2.13`; the app-inclusive call tree keeps `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, and `UpdateGpuMetrics` visible while `PresentedFpsEtwProvider::Sample` is only `0.79%` exclusive hits and the GPU raw-counter hash lookup is `0.40%` exclusive hits. The benchmark-process inclusive module weight remains centered on Direct2D, DirectWrite, PDH, Win32, kernel, and AMD driver work rather than app-side process-cache scans.
+- A direct idle-process stress run with `300` hidden `timeout.exe` processes alive reported `process_count=927`, `gpu_engine_counters=632`, and `gpu_engine_pids=28`; `build\CaseDashBenchmarks.exe update-telemetry 240 2` still landed at `update_loop per_iter_ms=4.78`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.14`.
 - The latest direct `edit-layout` rerun after the in-place snap-weight cleanup landed at `drag_loop per_iter_ms=2.11`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=1.99`; the benchmark includes the app-style layout mutation tail and one forced redraw per pointer move.
 - The real traced drag in `build\casedash_trace.txt` reported `elapsed_ms=6909.736`, `snap_samples=687`, `apply_samples=687`, but only `paint_total_samples=25`; the measured paint cost was acceptable, but queued `WM_PAINT` delivery was starved by continuous mouse input.
 - The latest daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\29824_11608_6003\` reports `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.22`; the string-construction leaves from renderer trace formatting are gone, and the remaining inclusive app weight is in `D2DRenderer::DrawTextBlock`, `D2DRenderer::FillSolidRect`, and `DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect`.
@@ -130,6 +131,21 @@ These changes produced real wins and remain in the codebase:
 - Read presented-FPS GPU Engine 3D usage as raw PDH counter arrays and calculate per-instance percentages from previous/current raw values, so process selection still favors the highest GPU consumer while avoiding the heavier formatted wildcard array path.
 
 ## Tested Hypotheses
+
+### Hypothesis: Keep FPS ETW process caches flat without regressing process-heavy machines
+
+- Change:
+  - Keep the FPS ETW provider's active process-name cache, per-process GPU usage totals, and present-event buckets as flat vectors after the size pass.
+  - Keep previous/current GPU raw counter lookup on `std::unordered_map<std::wstring, PDH_RAW_COUNTER>` because GPU Engine exposes one instance per process and engine, not one entry per active presenter.
+- Result:
+  - Helped shipped size without regressing the maintained telemetry-plus-draw benchmark on a process-heavy desktop.
+- Observed effect:
+  - The validation machine had `325` normal processes, `632` GPU Engine counter instances, and `28` GPU Engine process ids before the stress run.
+  - Direct `update-telemetry` reruns landed at `update_loop per_iter_ms=4.77` to `4.84`, `telemetry_update avg_ms=2.66` to `2.67`, and `paint_draw avg_ms=2.11` to `2.17`.
+  - With `300` additional hidden idle `timeout.exe` processes alive, the same direct benchmark reported `process_count=927`, `update_loop per_iter_ms=4.78`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.14`.
+  - The daemon-backed profile under `build\profile_benchmark_daemon\requests\10827_2817_24593\` landed at `update_loop per_iter_ms=4.85`, `telemetry_update avg_ms=2.72`, and `paint_draw avg_ms=2.13`; `PresentedFpsEtwProvider::Sample` stayed at `0.79%` exclusive hits and the raw-counter hash lookup stayed at `0.40%` exclusive hits.
+- Conclusion:
+  - Keep flat vectors only for the tiny active process-level FPS sets. Keep GPU raw counter lookup hash-based, and do not flatten it for size because the instance count scales with the desktop's process and GPU-engine surface.
 
 ### Hypothesis: Use raw PDH arrays for presented-FPS GPU Engine process selection
 

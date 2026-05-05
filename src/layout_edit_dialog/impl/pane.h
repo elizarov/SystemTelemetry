@@ -61,18 +61,7 @@ void DrawColorGradientBar(HWND hwnd, const DRAWITEMSTRUCT& drawItem);
 void DrawThemePreview(LayoutEditDialogState* state, const DRAWITEMSTRUCT& drawItem);
 void SetFontSamplePreview(
     LayoutEditDialogState* state, HWND hwnd, std::optional<LayoutEditParameter> parameter, const UiFontConfig* font);
-void ShowLayoutEditEditors(HWND hwnd,
-    bool showNumeric,
-    bool showFont,
-    bool showColor,
-    bool showWeights,
-    bool showMetric,
-    bool showBinding,
-    bool showMetricListOrder,
-    bool showGlobalFontFamily = false,
-    bool showDateTimeFormat = false,
-    bool showThemeSelector = false,
-    bool showLayoutSelector = false);
+void ShowLayoutEditEditors(HWND hwnd, LayoutEditEditorKind kind, bool showBinding = false);
 void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state);
 void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd, size_t rowCount);
 void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd);

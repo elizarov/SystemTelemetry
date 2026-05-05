@@ -1037,18 +1037,17 @@ void ShowMetricListOrderEditorControls(LayoutEditDialogState* state, bool show) 
     }
 }
 
-void ShowLayoutEditEditors(HWND hwnd,
-    bool showNumeric,
-    bool showFont,
-    bool showColor,
-    bool showWeights,
-    bool showMetric,
-    bool showBinding,
-    bool showMetricListOrder,
-    bool showGlobalFontFamily,
-    bool showDateTimeFormat,
-    bool showThemeSelector,
-    bool showLayoutSelector) {
+void ShowLayoutEditEditors(HWND hwnd, LayoutEditEditorKind kind, bool showBinding) {
+    const bool showNumeric = kind == LayoutEditEditorKind::Numeric;
+    const bool showFont = kind == LayoutEditEditorKind::Font;
+    const bool showColor = kind == LayoutEditEditorKind::Color;
+    const bool showWeights = kind == LayoutEditEditorKind::Weights;
+    const bool showMetric = kind == LayoutEditEditorKind::Metric;
+    const bool showMetricListOrder = kind == LayoutEditEditorKind::MetricListOrder;
+    const bool showGlobalFontFamily = kind == LayoutEditEditorKind::GlobalFontFamily;
+    const bool showDateTimeFormat = kind == LayoutEditEditorKind::DateTimeFormat;
+    const bool showThemeSelector = kind == LayoutEditEditorKind::ThemeSelector;
+    const bool showLayoutSelector = kind == LayoutEditEditorKind::LayoutSelector;
     const bool showSectionSelector = showThemeSelector || showLayoutSelector;
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
     ShowDialogControl(hwnd,

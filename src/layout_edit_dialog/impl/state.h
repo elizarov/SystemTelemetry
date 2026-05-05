@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit/layout_edit_tree.h"
 #include "layout_edit_dialog/layout_edit_dialog.h"
 
@@ -64,6 +65,8 @@ struct LayoutEditDialogState {
     std::wstring statusText;
     bool statusIsError = false;
     bool activeSelectionValid = true;
+    LayoutEditEditorKind activeEditorKind = LayoutEditEditorKind::Summary;
+    bool activeEditorShowsMetricBinding = false;
     COLORREF previewColor = RGB(255, 255, 255);
     bool updatingControls = false;
     ColorEditViewMode colorEditViewMode = ColorEditViewMode::Rgb;

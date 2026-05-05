@@ -668,19 +668,9 @@ void ShowLayoutEditSelectionEditor(
     if (kind != LayoutEditEditorKind::MetricListOrder) {
         DestroyMetricListOrderEditorControls(state);
     }
-    const bool metric = kind == LayoutEditEditorKind::Metric;
-    ShowLayoutEditEditors(hwnd,
-        kind == LayoutEditEditorKind::Numeric,
-        kind == LayoutEditEditorKind::Font,
-        kind == LayoutEditEditorKind::Color,
-        kind == LayoutEditEditorKind::Weights,
-        metric,
-        metric && metricBinding,
-        kind == LayoutEditEditorKind::MetricListOrder,
-        kind == LayoutEditEditorKind::GlobalFontFamily,
-        kind == LayoutEditEditorKind::DateTimeFormat,
-        kind == LayoutEditEditorKind::ThemeSelector,
-        kind == LayoutEditEditorKind::LayoutSelector);
+    state->activeEditorKind = kind;
+    state->activeEditorShowsMetricBinding = kind == LayoutEditEditorKind::Metric && metricBinding;
+    ShowLayoutEditEditors(hwnd, kind, state->activeEditorShowsMetricBinding);
     SetFontSamplePreview(state, hwnd, std::nullopt, nullptr);
 }
 
@@ -714,59 +704,14 @@ void PopulateColorEditorControls(LayoutEditDialogState* state, HWND hwnd, unsign
 }  // namespace
 
 LayoutEditEditorKind CurrentLayoutEditEditorKind(const LayoutEditDialogState* state) {
-    if (state == nullptr || state->selectedLeaf == nullptr) {
-        if (IsFontsSectionNode(state)) {
-            return LayoutEditEditorKind::GlobalFontFamily;
-        }
-        if (IsLayoutSectionNode(state)) {
-            return LayoutEditEditorKind::LayoutSelector;
-        }
-        if (IsThemeSectionNode(state)) {
-            return LayoutEditEditorKind::ThemeSelector;
-        }
+    if (state == nullptr) {
         return LayoutEditEditorKind::Summary;
     }
-    if (std::holds_alternative<LayoutWeightEditKey>(state->selectedLeaf->focusKey)) {
-        return LayoutEditEditorKind::Weights;
-    }
-    if (std::holds_alternative<LayoutMetricEditKey>(state->selectedLeaf->focusKey)) {
-        return LayoutEditEditorKind::Metric;
-    }
-    if (std::holds_alternative<ThemeColorEditKey>(state->selectedLeaf->focusKey)) {
-        return LayoutEditEditorKind::Color;
-    }
-    if (const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state); descriptor != nullptr) {
-        return descriptor->editorKind;
-    }
-    if (std::holds_alternative<LayoutCardTitleEditKey>(state->selectedLeaf->focusKey)) {
-        return LayoutEditEditorKind::Numeric;
-    }
-    const auto* parameter = std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey);
-    if (parameter == nullptr) {
-        return LayoutEditEditorKind::Summary;
-    }
-    switch (state->selectedLeaf->valueFormat) {
-        case configschema::ValueFormat::FontSpec:
-            return LayoutEditEditorKind::Font;
-        case configschema::ValueFormat::ColorHex:
-            return LayoutEditEditorKind::Color;
-        case configschema::ValueFormat::String:
-        case configschema::ValueFormat::Integer:
-        case configschema::ValueFormat::FloatingPoint:
-            return LayoutEditEditorKind::Numeric;
-    }
-    return LayoutEditEditorKind::Summary;
+    return state->activeEditorKind;
 }
 
 bool CurrentLayoutEditShowsMetricBinding(const LayoutEditDialogState* state) {
-    if (state == nullptr || state->selectedLeaf == nullptr) {
-        return false;
-    }
-    const auto* metricKey = std::get_if<LayoutMetricEditKey>(&state->selectedLeaf->focusKey);
-    if (metricKey == nullptr) {
-        return false;
-    }
-    return ParseBoardMetricBindingTarget(metricKey->metricId).has_value();
+    return state != nullptr && state->activeEditorShowsMetricBinding;
 }
 
 void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
