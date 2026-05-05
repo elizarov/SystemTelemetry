@@ -81,7 +81,7 @@ UiFontConfig FontConfigForStyle(const UiFontSetConfig& fonts, TextStyleId style)
     return fonts.text;
 }
 
-Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactory* wicFactory, UINT resourceId) {
+Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceMask(IWICImagingFactory* wicFactory, UINT resourceId) {
     Microsoft::WRL::ComPtr<IWICBitmapSource> bitmapSource;
     if (wicFactory == nullptr) {
         return bitmapSource;
@@ -148,7 +148,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactor
     }
 
     hr = converter->Initialize(
-        frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
+        frame.Get(), GUID_WICPixelFormat8bppGray, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
     if (FAILED(hr)) {
         return bitmapSource;
     }
@@ -170,21 +170,16 @@ Microsoft::WRL::ComPtr<ID2D1Bitmap> CreatePanelIconAtlasMaskBitmap(
         return bitmap;
     }
 
-    const UINT sourceStride = width * 4;
-    std::vector<BYTE> pixels(static_cast<size_t>(sourceStride) * static_cast<size_t>(height));
-    if (FAILED(source->CopyPixels(nullptr, sourceStride, static_cast<UINT>(pixels.size()), pixels.data()))) {
+    const UINT maskStride = width;
+    std::vector<BYTE> mask(static_cast<size_t>(maskStride) * static_cast<size_t>(height));
+    if (FAILED(source->CopyPixels(nullptr, maskStride, static_cast<UINT>(mask.size()), mask.data()))) {
         return bitmap;
-    }
-
-    std::vector<BYTE> mask(static_cast<size_t>(width) * static_cast<size_t>(height));
-    for (size_t pixel = 0; pixel < mask.size(); ++pixel) {
-        mask[pixel] = pixels[(pixel * 4) + 3];
     }
 
     const D2D1_BITMAP_PROPERTIES properties =
         D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
-    if (FAILED(
-            target->CreateBitmap(D2D1::SizeU(width, height), mask.data(), width, properties, bitmap.GetAddressOf()))) {
+    if (FAILED(target->CreateBitmap(
+            D2D1::SizeU(width, height), mask.data(), maskStride, properties, bitmap.GetAddressOf()))) {
         return {};
     }
 
@@ -1093,7 +1088,7 @@ bool D2DRenderer::LoadIcons() {
     }
     if (needsAtlas) {
         // Tests can render built-in layouts without linking app icon resources.
-        panelIconAtlas_ = LoadPngResourceBitmap(wicFactory_.Get(), IDR_PANEL_ICONS);
+        panelIconAtlas_ = LoadPngResourceMask(wicFactory_.Get(), IDR_PANEL_ICONS);
     }
     return true;
 }
