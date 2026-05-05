@@ -6,7 +6,6 @@
 #include <commdlg.h>
 
 #include "build_version.h"
-#include "config/color_resolver.h"
 #include "dashboard/constants.h"
 #include "dashboard/dashboard_app.h"
 #include "dashboard/dashboard_menu_format.h"

@@ -42,8 +42,8 @@ std::string DecompressResourceData(const std::string& data) {
             const uint16_t token = static_cast<uint16_t>(static_cast<unsigned char>(data[input])) |
                                    (static_cast<uint16_t>(static_cast<unsigned char>(data[input + 1])) << 8);
             input += 2;
-            const size_t offset = static_cast<size_t>((token >> 4) + 1);
-            const size_t length = static_cast<size_t>((token & 0x0F) + kMinMatchLength);
+            const size_t offset = static_cast<size_t>(token >> 4) + 1;
+            const size_t length = static_cast<size_t>(token & 0x0F) + kMinMatchLength;
             if (offset > output.size() || output.size() + length > decompressedSize) {
                 return {};
             }

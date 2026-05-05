@@ -24,9 +24,9 @@ std::string FormatStorageDriveMenuText(const std::string& driveLetter, const std
 std::string FormatStorageDriveSize(double totalGb) {
     char buffer[64];
     if (totalGb >= 1024.0) {
-        sprintf_s(buffer, "%.1f TB", totalGb / 1024.0);
+        std::snprintf(buffer, sizeof(buffer), "%.1f TB", totalGb / 1024.0);
     } else {
-        sprintf_s(buffer, "%.0f GB", totalGb);
+        std::snprintf(buffer, sizeof(buffer), "%.0f GB", totalGb);
     }
     return buffer;
 }

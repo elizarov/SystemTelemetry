@@ -6,7 +6,6 @@
 #include <wrl/client.h>
 
 #include "renderer/impl/palette.h"
-#include "renderer/render_types.h"
 
 class D2DCache {
 public:

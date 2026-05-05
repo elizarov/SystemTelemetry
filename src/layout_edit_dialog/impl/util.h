@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "config/config.h"
-#include "layout_edit/board_metric_binding.h"
 #include "layout_edit/layout_edit_tree.h"
 #include "layout_edit_dialog/impl/state.h"
 #include "resource.h"

@@ -7,7 +7,6 @@
 #include <dwrite.h>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 #include <wincodec.h>
 #include <wrl/client.h>

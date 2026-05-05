@@ -127,18 +127,6 @@ bool IsRepresentativeWidgetClass(WidgetClass widgetClass) {
            widgetClass != WidgetClass::VerticalSpacer && widgetClass != WidgetClass::VerticalSpring;
 }
 
-std::vector<WidgetClass> UniqueWidgetClasses(const LayoutGuideSheetCardSummary& card) {
-    std::vector<WidgetClass> classes;
-    for (WidgetClass widgetClass : card.widgetClasses) {
-        if (!IsRepresentativeWidgetClass(widgetClass) ||
-            std::find(classes.begin(), classes.end(), widgetClass) != classes.end()) {
-            continue;
-        }
-        classes.push_back(widgetClass);
-    }
-    return classes;
-}
-
 size_t UniqueWidgetClassCount(const LayoutGuideSheetCardSummary& card) {
     WidgetClass classes[16] = {};
     size_t count = 0;

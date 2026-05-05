@@ -1,7 +1,10 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 
 #include <cstdint>
+#include <tuple>
 #include <type_traits>
+
+#include "config/config.h"
 
 namespace {
 
@@ -35,11 +38,43 @@ template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
     }
 }
 
+template <typename Owner, typename MemberType, MemberType Owner::* Member> std::uint32_t MemberOffset() {
+    // Size: offsets are static facts; constructing AppConfig pulls string/vector initialization into metadata.
+    constexpr std::uintptr_t kOffsetBaseAddress = 0x10000u;
+    const auto* owner = reinterpret_cast<const Owner*>(kOffsetBaseAddress);
+    const auto* member = &(owner->*Member);
+    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(member) - kOffsetBaseAddress);
+}
+
+template <typename Owner, typename Section, typename Section::owner_type Owner::* Member>
+std::uint32_t BindingOffset(configschema::StructuredBindingDescriptor<Owner, Section, Member>*) {
+    return MemberOffset<Owner, typename Section::owner_type, Member>();
+}
+
+template <typename Owner, typename NestedOwner, NestedOwner Owner::* Member>
+std::uint32_t BindingOffset(configschema::RecursiveStructuredBindingDescriptor<Owner, NestedOwner, Member>*) {
+    return MemberOffset<Owner, NestedOwner, Member>();
+}
+
+template <typename Binding> std::uint32_t BindingOffset() {
+    return BindingOffset(static_cast<Binding*>(nullptr));
+}
+
+template <typename... Bindings> std::uint32_t BindingPathOffset(std::tuple<Bindings...>) {
+    return (0u + ... + BindingOffset<Bindings>());
+}
+
+template <typename Field> std::uint32_t FieldOffset() {
+    return MemberOffset<typename Field::owner_type, typename Field::field_type, Field::member>();
+}
+
+template <typename Root, typename Field, typename... Bindings>
+std::uint32_t RootFieldOffset(configschema::RootFieldLens<Root, Field, Bindings...>*) {
+    return BindingPathOffset(std::tuple<Bindings...>{}) + FieldOffset<Field>();
+}
+
 template <typename Meta> std::uint32_t RootFieldOffset() {
-    // Size: layout edit metadata stores one root offset and uses shared accessors instead of per-field callbacks.
-    const auto* root = reinterpret_cast<const AppConfig*>(0);
-    const auto* field = &Meta::RawGet(*root);
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(field));
+    return RootFieldOffset(static_cast<typename Meta::resolved_type*>(nullptr));
 }
 
 std::string HumanizeSnakeCase(std::string_view value) {

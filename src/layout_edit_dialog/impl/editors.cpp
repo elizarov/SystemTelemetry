@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "config/color_expression.h"
+#include "layout_edit/board_metric_binding.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip.h"

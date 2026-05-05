@@ -7,6 +7,7 @@
 #include <cwctype>
 
 #include "config/color_math.h"
+#include "layout_edit/board_metric_binding.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_model/layout_edit_parameter_metadata.h"

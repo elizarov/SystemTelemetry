@@ -2,8 +2,8 @@
 
 #include <cstdio>
 
-std::string FormatHresult(HRESULT value) {
+std::string FormatHresult(long value) {
     char buffer[32];
-    sprintf_s(buffer, "0x%08lX", static_cast<unsigned long>(value));
+    std::snprintf(buffer, sizeof(buffer), "0x%08lX", static_cast<unsigned long>(value));
     return buffer;
 }
