@@ -384,7 +384,7 @@ void WINAPI ServiceMain(DWORD, LPWSTR*) {
 }  // namespace
 
 bool IsFpsServiceCommandLine() {
-    return HasSwitch("/service");
+    return HasSwitch(L"/service");
 }
 
 int RunFpsServiceMode() {

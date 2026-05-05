@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,211,392` bytes.
+- Current measured `build\CaseDash.exe`: `1,200,128` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `990.9 KiB`, `.rdata` about `88.5 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `21.4 KiB`, `.xdata` about `20.1 KiB`.
+- Current largest sections: `.text$mn` about `980.2 KiB`, `.rdata` about `88.5 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `21.4 KiB`, `.xdata` about `20.1 KiB`.
 - Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, and `dashboard_controller.cpp.obj`.
-- Last validation: `format.cmd changed`, `build.cmd`, `build_maps.cmd`, `test.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_trace.txt /dump:build\validation_size_dump.txt`.
+- Last validation: `format.cmd fix changed`, `format.cmd changed`, `build.cmd`, `build_maps.cmd`, `test.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_trace.txt /dump:build\validation_size_dump.txt`.
 
 ## Workflow
 
@@ -75,6 +75,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Layout-guide-sheet overlay state | Reuse one layout-guide-sheet draw overlay state instead of copying the full `DashboardOverlayState` for every card and callout overlay draw. | `1,214,976` to `1,214,464` bytes. |
 | Runtime config selection updates | Apply resolved telemetry selections in place and mutate no-fail controller display/layout edits directly instead of round-tripping full `AppConfig` copies. | `1,214,464` to `1,212,928` bytes. |
 | Fake telemetry synthetic histories | Move generated synthetic history vectors into retained-history entries and accept literal series/drive labels without temporary `std::string` parameters. | `1,212,928` to `1,211,392` bytes; `BuildSyntheticTelemetryDump` dropped from about `5.8 KiB` to `4.1 KiB`. |
+| Command-line and trace literal boundaries | Keep command-line switch scans and diagnostics/layout-edit trace event names on literal pointer APIs when the values are fixed command-line switches, event names, drag kinds, or close reasons. | `1,211,392` to `1,200,128` bytes across the measured switch and trace-boundary passes. |
 
 ## Rejected Or Neutral Experiments
 
@@ -103,6 +104,8 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Dashboard controller and layout-guide-sheet path reuse were executable-neutral in isolation. Keep local reuse when it clarifies cold file-output paths, but do not treat it as a primary size lever.
 - Telemetry update by-value/rvalue handoff regressed from `1,214,976` to `1,217,536` bytes. Keep the existing const-reference sink handoff unless a future runtime-copy reduction also proves a shipped-size win.
 - Passing layout-edit config snapshots by value and moving through the dashboard shell removed one local copy-assignment symbol but grew the executable from `1,212,928` to `1,222,656` bytes. Keep the const-reference preview snapshot path.
+- A broad `Trace::Write(std::string_view)`/chunked-write path regressed the executable to `1,238,016` bytes. Keep the existing `Trace::Write(const char*)` and `Trace::Write(const std::string&)` surface and use narrower literal overloads at higher-level call boundaries instead.
+- Changing `Trace::BoolText` to return literal pointers regressed from `1,200,128` to `1,200,640` bytes after the required call-site reshaping. Keep the current `std::string` return unless a broader trace builder removes more concatenation code.
 - Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason. `lint.cmd` blocks maintained source and test files from using `std::filesystem` or including `<filesystem>`.
 
 ## Notes

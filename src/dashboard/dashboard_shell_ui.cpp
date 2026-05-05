@@ -420,7 +420,7 @@ public:
         SetWindowPos(anchorHwnd, dialogHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
-    void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const override {
+    void TraceLayoutEditDialogEvent(const char* event, const std::string& details = {}) const override {
         shellUi_.TraceLayoutEditDialogEvent(event, details);
     }
 
@@ -633,7 +633,7 @@ void DashboardShellUi::HandleExitRequest() {
     DestroyWindow(app_.hwnd_);
 }
 
-void DashboardShellUi::TraceLayoutEditDialogEvent(const std::string& event, const std::string& details) const {
+void DashboardShellUi::TraceLayoutEditDialogEvent(const char* event, const std::string& details) const {
     const auto& state = app_.controller_.State();
     if (state.diagnostics == nullptr) {
         return;
@@ -642,7 +642,7 @@ void DashboardShellUi::TraceLayoutEditDialogEvent(const std::string& event, cons
     if (details.empty()) {
         state.diagnostics->WriteTraceMarker(event);
     } else {
-        state.diagnostics->WriteTraceMarker(event + " " + details);
+        state.diagnostics->WriteTraceMarker(std::string(event) + " " + details);
     }
 }
 

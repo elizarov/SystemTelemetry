@@ -200,7 +200,7 @@ public:
 
     void InvalidateLayoutEdit() override {}
 
-    void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override {
+    void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override {
         (void)kind;
         (void)detail;
     }
@@ -210,7 +210,7 @@ public:
         (void)elapsed;
     }
 
-    void EndLayoutEditTraceSession(const std::string& reason) override {
+    void EndLayoutEditTraceSession(const char* reason) override {
         (void)reason;
     }
 
@@ -309,17 +309,17 @@ LayoutSimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOption
 
 DiagnosticsOptions GetDiagnosticsOptions() {
     DiagnosticsOptions options;
-    options.trace = HasSwitch("/trace");
-    options.dump = HasSwitch("/dump");
-    options.screenshot = HasSwitch("/screenshot");
-    options.layoutGuideSheet = HasSwitch("/layout-guide-sheet");
-    options.appIcon = HasSwitch("/app-icon");
-    options.exit = HasSwitch("/exit");
-    options.fake = HasSwitch("/fake");
-    options.blank = HasSwitch("/blank");
-    options.editLayout = HasSwitch("/edit-layout");
-    options.reload = HasSwitch("/reload");
-    options.defaultConfig = HasSwitch("/default-config");
+    options.trace = HasSwitch(L"/trace");
+    options.dump = HasSwitch(L"/dump");
+    options.screenshot = HasSwitch(L"/screenshot");
+    options.layoutGuideSheet = HasSwitch(L"/layout-guide-sheet");
+    options.appIcon = HasSwitch(L"/app-icon");
+    options.exit = HasSwitch(L"/exit");
+    options.fake = HasSwitch(L"/fake");
+    options.blank = HasSwitch(L"/blank");
+    options.editLayout = HasSwitch(L"/edit-layout");
+    options.reload = HasSwitch(L"/reload");
+    options.defaultConfig = HasSwitch(L"/default-config");
     if (const auto editLayoutValue = GetColonSwitchValue(L"/edit-layout"); editLayoutValue.has_value()) {
         const std::string mode = ToLower(Trim(Utf8FromWide(*editLayoutValue)));
         options.editLayout = true;
@@ -379,13 +379,13 @@ DiagnosticsOptions GetDiagnosticsOptions() {
     if (const auto saveConfigPath = GetColonSwitchValue(L"/save-config"); saveConfigPath.has_value()) {
         options.saveConfig = true;
         options.saveConfigPath = *saveConfigPath;
-    } else if (HasSwitch("/save-config")) {
+    } else if (HasSwitch(L"/save-config")) {
         options.saveConfig = true;
     }
     if (const auto saveFullConfigPath = GetColonSwitchValue(L"/save-full-config"); saveFullConfigPath.has_value()) {
         options.saveFullConfig = true;
         options.saveFullConfigPath = *saveFullConfigPath;
-    } else if (HasSwitch("/save-full-config")) {
+    } else if (HasSwitch(L"/save-full-config")) {
         options.saveFullConfig = true;
     }
     if (const auto fakePath = GetColonSwitchValue(L"/fake"); fakePath.has_value()) {
@@ -522,6 +522,10 @@ bool DiagnosticsSession::Initialize() {
 
 bool DiagnosticsSession::ShouldShowDialogs() const {
     return !options_.trace;
+}
+
+void DiagnosticsSession::WriteTraceMarker(const char* text) {
+    trace_.Write(text);
 }
 
 void DiagnosticsSession::WriteTraceMarker(const std::string& text) {

@@ -49,6 +49,7 @@ public:
 
     bool Initialize();
     bool ShouldShowDialogs() const;
+    void WriteTraceMarker(const char* text);
     void WriteTraceMarker(const std::string& text);
     bool WriteOutputs(const TelemetryDump& dump, const AppConfig& config);
 

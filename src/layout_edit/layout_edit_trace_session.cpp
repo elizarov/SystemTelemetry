@@ -14,13 +14,13 @@ double DurationMilliseconds(std::chrono::nanoseconds value) {
 
 }  // namespace
 
-void LayoutEditTraceSession::Begin(Trace& trace, const std::string& kind, const std::string& detail) {
+void LayoutEditTraceSession::Begin(Trace& trace, const char* kind, const std::string& detail) {
     *this = {};
     active_ = true;
     kind_ = kind;
     detail_ = detail;
     startedAt_ = std::chrono::steady_clock::now();
-    trace.Write("layout_edit_drag:start kind=\"" + kind + "\" detail=\"" + detail + "\"");
+    trace.Write("layout_edit_drag:start kind=\"" + kind_ + "\" detail=\"" + detail_ + "\"");
 }
 
 void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chrono::nanoseconds elapsed) {
@@ -51,7 +51,7 @@ void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chron
     ++stats->samples;
 }
 
-void LayoutEditTraceSession::End(Trace& trace, const std::string& reason) {
+void LayoutEditTraceSession::End(Trace& trace, const char* reason) {
     if (!active_) {
         *this = {};
         return;

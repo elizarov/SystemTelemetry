@@ -708,7 +708,7 @@ void DashboardApp::DestroyLayoutEditTooltip() {
     layoutEditTooltipVisible_ = false;
 }
 
-void DashboardApp::TraceLayoutEditUiEvent(const std::string& event, const std::string& details) const {
+void DashboardApp::TraceLayoutEditUiEvent(const char* event, const std::string& details) const {
     const auto& state = controller_.State();
     if (state.diagnostics == nullptr) {
         return;
@@ -1383,7 +1383,7 @@ void DashboardApp::Paint() {
     RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);
 }
 
-void DashboardApp::BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) {
+void DashboardApp::BeginLayoutEditTraceSession(const char* kind, const std::string& detail) {
     layoutEditTraceSession_.Begin(trace_, kind, detail);
 }
 
@@ -1391,6 +1391,6 @@ void DashboardApp::RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nan
     layoutEditTraceSession_.Record(phase, elapsed);
 }
 
-void DashboardApp::EndLayoutEditTraceSession(const std::string& reason) {
+void DashboardApp::EndLayoutEditTraceSession(const char* reason) {
     layoutEditTraceSession_.End(trace_, reason);
 }

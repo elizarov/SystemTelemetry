@@ -83,7 +83,7 @@ private:
     void UpdateLayoutEditMouseTracking();
     void RedrawLayoutEditDragFrame();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
-    void TraceLayoutEditUiEvent(const std::string& event, const std::string& details = {}) const;
+    void TraceLayoutEditUiEvent(const char* event, const std::string& details = {}) const;
     std::string BuildLayoutEditUiTraceState() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();
@@ -99,9 +99,9 @@ private:
     void RetryConfigPlacementIfPending();
     bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
 
-    void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override;
+    void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
-    void EndLayoutEditTraceSession(const std::string& reason) override;
+    void EndLayoutEditTraceSession(const char* reason) override;
 
     const AppConfig& LayoutEditConfig() const override;
     DashboardOverlayState& LayoutDashboardOverlayState() override;

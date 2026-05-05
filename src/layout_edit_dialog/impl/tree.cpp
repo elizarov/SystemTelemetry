@@ -135,7 +135,7 @@ std::string BuildTreeViewportTraceText(LayoutEditDialogState* state, HWND tree) 
            BuildTreeItemTraceText(state, tree, selected) + "}";
 }
 
-void TraceTreeViewport(LayoutEditDialogState* state, HWND tree, std::string_view event, std::string detail = {}) {
+void TraceTreeViewport(LayoutEditDialogState* state, HWND tree, const char* event, std::string detail = {}) {
     if (state == nullptr || state->dialog == nullptr) {
         return;
     }
@@ -143,7 +143,7 @@ void TraceTreeViewport(LayoutEditDialogState* state, HWND tree, std::string_view
     if (!detail.empty()) {
         text += " " + std::string(detail);
     }
-    state->dialog->Host().TraceLayoutEditDialogEvent(std::string(event), text);
+    state->dialog->Host().TraceLayoutEditDialogEvent(event, text);
 }
 
 std::string BuildTreeViewportSnapshotTraceText(const TreeViewportSnapshot& snapshot) {

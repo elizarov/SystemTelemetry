@@ -6,8 +6,6 @@
 #include <cwchar>
 #include <shellapi.h>
 
-#include "util/utf8.h"
-
 std::wstring TrimWhitespace(std::wstring value) {
     const auto isSpace = [](wchar_t ch) { return iswspace(ch) != 0; };
     const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
@@ -82,35 +80,35 @@ std::wstring BuildCommandLineExcludingSwitch(const wchar_t* excludedSwitch) {
     return parameters;
 }
 
-bool HasSwitch(const std::string& target) {
-    const std::wstring wideTarget = WideFromUtf8(target);
+bool HasSwitch(const wchar_t* target) {
     CommandLineArguments arguments;
     for (int i = 1; i < arguments.Count(); ++i) {
-        if (_wcsicmp(arguments.At(i), wideTarget.c_str()) == 0) {
+        if (_wcsicmp(arguments.At(i), target) == 0) {
             return true;
         }
     }
     return false;
 }
 
-std::optional<std::wstring> GetSwitchValue(const std::wstring& target) {
+std::optional<std::wstring> GetSwitchValue(const wchar_t* target) {
     CommandLineArguments arguments;
     for (int i = 1; i + 1 < arguments.Count(); ++i) {
-        if (_wcsicmp(arguments.At(i), target.c_str()) == 0) {
+        if (_wcsicmp(arguments.At(i), target) == 0) {
             return arguments.At(i + 1);
         }
     }
     return std::nullopt;
 }
 
-std::optional<std::wstring> GetColonSwitchValue(const std::wstring& target) {
+std::optional<std::wstring> GetColonSwitchValue(const wchar_t* target) {
     CommandLineArguments arguments;
+    const size_t targetLength = std::wcslen(target);
     for (int i = 1; i < arguments.Count(); ++i) {
         const wchar_t* argument = arguments.At(i);
         const size_t argumentLength = std::wcslen(argument);
-        if (argumentLength > target.size() && _wcsnicmp(argument, target.c_str(), target.size()) == 0 &&
-            argument[target.size()] == L':') {
-            return argument + target.size() + 1;
+        if (argumentLength > targetLength && _wcsnicmp(argument, target, targetLength) == 0 &&
+            argument[targetLength] == L':') {
+            return argument + targetLength + 1;
         }
     }
     return std::nullopt;

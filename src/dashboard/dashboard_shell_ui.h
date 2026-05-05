@@ -93,7 +93,7 @@ private:
     bool ApplyMetricListAddRowPreview(const LayoutEditController::TooltipTarget& target);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
     void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
-    void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const;
+    void TraceLayoutEditDialogEvent(const char* event, const std::string& details = {}) const;
     std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const;
     UINT ResolveDefaultCommand(
         MenuSource source, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) const;

@@ -57,7 +57,7 @@ bool IsCurrentProcessElevated() {
 }
 
 std::optional<int> RelaunchElevatedIfRequested() {
-    if (!HasSwitch("/elevate") || IsCurrentProcessElevated()) {
+    if (!HasSwitch(L"/elevate") || IsCurrentProcessElevated()) {
         return std::nullopt;
     }
 
@@ -141,7 +141,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
     ShutdownPreviousInstance();
 
-    DashboardApp app(diagnosticsOptions, HasSwitch("/bring-to-front"));
+    DashboardApp app(diagnosticsOptions, HasSwitch(L"/bring-to-front"));
     if (!app.Initialize(instance)) {
         const std::wstring& message = app.LastError();
         MessageBoxW(nullptr,

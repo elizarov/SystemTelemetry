@@ -8,9 +8,9 @@
 
 class LayoutEditTraceSession {
 public:
-    void Begin(Trace& trace, const std::string& kind, const std::string& detail);
+    void Begin(Trace& trace, const char* kind, const std::string& detail);
     void Record(LayoutEditHost::TracePhase phase, std::chrono::nanoseconds elapsed);
-    void End(Trace& trace, const std::string& reason);
+    void End(Trace& trace, const char* reason);
 
 private:
     struct Stats {
