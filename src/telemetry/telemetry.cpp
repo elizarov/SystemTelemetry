@@ -132,8 +132,8 @@ private:
         auto nextCollection = Clock::now() + kTelemetryRefreshInterval;
         for (;;) {
             const auto now = Clock::now();
-            while (nextCollection <= now) {
-                nextCollection += kTelemetryRefreshInterval;
+            if (nextCollection <= now) {
+                nextCollection = now + kTelemetryRefreshInterval;
             }
             const auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(nextCollection - now).count();
             const DWORD timeoutMs = waitMs > 0 ? static_cast<DWORD>(waitMs) : 0;
