@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,048,576` bytes.
+- Current measured `build\CaseDash.exe`: `1,027,072` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `811.1 KiB`, `.rdata` about `92.5 KiB`, `.pdata` about `48.8 KiB`, `.rsrc$02` about `24.4 KiB`, and `.xdata` about `15.5 KiB`.
+- Current largest sections: `.text$mn` about `797.7 KiB`, `.rdata` about `96.0 KiB`, `.pdata` about `46.2 KiB`, `.rsrc$02` about `24.4 KiB`, and `.xdata` about `15.4 KiB`.
 - Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `dashboard_app.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `metrics.cpp.obj`, `pane.cpp.obj`, and `CaseDash.rc.res`.
-- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_dynamic_dialog_trace.txt /dump:build\validation_size_dynamic_dialog_dump.txt /screenshot:build\validation_size_dynamic_dialog_screenshot.png /layout-guide-sheet:build\validation_size_dynamic_dialog_sheet.png /app-icon:build\validation_size_dynamic_dialog_app_icon.png /app-icon-size:64 /save-full-config:build\validation_size_dynamic_dialog_full_config.ini`.
+- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_constexpr_metadata_trace.txt /dump:build\validation_size_constexpr_metadata_dump.txt /screenshot:build\validation_size_constexpr_metadata_screenshot.png /layout-guide-sheet:build\validation_size_constexpr_metadata_sheet.png /app-icon:build\validation_size_constexpr_metadata_app_icon.png /app-icon-size:64 /save-full-config:build\validation_size_constexpr_metadata_full_config.ini`.
 
 ## Workflow
 
@@ -93,6 +93,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Layout-edit parameter metadata | Keep one ordered layout-edit parameter metadata array instead of per-parameter function-local metadata statics, unused info-table field pointers, or a parameter-only mirror table. | The retained metadata and icon changes reached `1,076,224` bytes; returning parameter info by value was alignment-neutral in the later dialog pass but removes the redundant table. |
 | Release stack cookies | Disable MSVC `/GS` for the shipped Release app target as an explicit size tradeoff. Source-scoped `/GS-` on the noinline cold-source list saved only `11,264` bytes and missed the target; the app-wide Release setting produced the actual large win. | In the current feature baseline, `1,079,808` to `1,051,136` bytes before the final dialog-table trim; combined final size is `1,048,576` bytes. |
 | Layout-edit dialog resources | Keep `IDD_LAYOUT_EDIT_CONFIGURATION` as a dialog shell and create its child controls at runtime from a compact seed table. Keep control labels in UTF-8, convert at the `CreateWindowExW` boundary, and keep control kind class/style lookup enum-indexed. | `.rsrc$02` dropped from about `28.8 KiB` to `24.4 KiB`; the trimmed seed-table version reached `1,048,576` bytes, `31,232` bytes below the measured session baseline. |
+| Constexpr config metadata | Keep reflected field and binding offsets available through constexpr schema hooks, keep runtime config descriptor arrays constexpr, and keep the layout-edit parameter list as short section-local rows instead of carrying manual root offsets. | `1,048,576` to `1,027,072` bytes; `.text$mn` dropped from about `811.1 KiB` to `797.7 KiB`, `.pdata` from about `48.8 KiB` to `46.2 KiB`, and runtime descriptor initializers disappeared from the map. |
 | Telemetry formatting literals | Format string-view units with `%.*s` instead of constructing temporary `std::string` values before `sprintf_s`. | Executable-alignment neutral in the final pass; kept because it removes temporary string construction on a shared formatting path. |
 
 ## Rejected Or Neutral Experiments

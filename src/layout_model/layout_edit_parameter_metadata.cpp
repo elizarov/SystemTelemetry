@@ -1,7 +1,7 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 
+#include <cstddef>
 #include <cstdint>
-#include <tuple>
 #include <type_traits>
 
 #include "config/config.h"
@@ -10,7 +10,7 @@ namespace {
 
 using Parameter = LayoutEditParameter;
 
-template <typename Value> RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
+template <typename Value> consteval RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
     if constexpr (std::is_same_v<Value, int>) {
         return RuntimeConfigFieldValueKind::Int;
     } else if constexpr (std::is_same_v<Value, double>) {
@@ -24,7 +24,7 @@ template <typename Value> RuntimeConfigFieldValueKind RuntimeFieldValueKindFor()
     }
 }
 
-template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
+template <typename Policy> consteval RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
     if constexpr (std::is_same_v<Policy, configschema::PositiveIntPolicy>) {
         return RuntimeConfigFieldPolicy::PositiveInt;
     } else if constexpr (std::is_same_v<Policy, configschema::NonNegativeIntPolicy>) {
@@ -38,43 +38,8 @@ template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
     }
 }
 
-template <typename Owner, typename MemberType, MemberType Owner::* Member> std::uint32_t MemberOffset() {
-    // Size: offsets are static facts; constructing AppConfig pulls string/vector initialization into metadata.
-    constexpr std::uintptr_t kOffsetBaseAddress = 0x10000u;
-    const auto* owner = reinterpret_cast<const Owner*>(kOffsetBaseAddress);
-    const auto* member = &(owner->*Member);
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(member) - kOffsetBaseAddress);
-}
-
-template <typename Owner, typename Section, typename Section::owner_type Owner::* Member>
-std::uint32_t BindingOffset(configschema::StructuredBindingDescriptor<Owner, Section, Member>*) {
-    return MemberOffset<Owner, typename Section::owner_type, Member>();
-}
-
-template <typename Owner, typename NestedOwner, NestedOwner Owner::* Member>
-std::uint32_t BindingOffset(configschema::RecursiveStructuredBindingDescriptor<Owner, NestedOwner, Member>*) {
-    return MemberOffset<Owner, NestedOwner, Member>();
-}
-
-template <typename Binding> std::uint32_t BindingOffset() {
-    return BindingOffset(static_cast<Binding*>(nullptr));
-}
-
-template <typename... Bindings> std::uint32_t BindingPathOffset(std::tuple<Bindings...>) {
-    return (0u + ... + BindingOffset<Bindings>());
-}
-
-template <typename Field> std::uint32_t FieldOffset() {
-    return MemberOffset<typename Field::owner_type, typename Field::field_type, Field::member>();
-}
-
-template <typename Root, typename Field, typename... Bindings>
-std::uint32_t RootFieldOffset(configschema::RootFieldLens<Root, Field, Bindings...>*) {
-    return BindingPathOffset(std::tuple<Bindings...>{}) + FieldOffset<Field>();
-}
-
-template <typename Meta> std::uint32_t RootFieldOffset() {
-    return RootFieldOffset(static_cast<typename Meta::resolved_type*>(nullptr));
+template <typename Meta> consteval std::uint32_t RootFieldOffset() {
+    return static_cast<std::uint32_t>(configschema::RootFieldOffset<Meta>());
 }
 
 std::string HumanizeSnakeCase(std::string_view value) {
@@ -100,7 +65,7 @@ std::string HumanizeSnakeCase(std::string_view value) {
         RuntimeFieldPolicyFor<typename meta::traits_type::policy_tag>(),                                               \
         RootFieldOffset<meta>()},
 
-const LayoutEditConfigFieldMetadata kParameterFields[] = {
+constexpr LayoutEditConfigFieldMetadata kParameterFields[] = {
     CASEDASH_LAYOUT_EDIT_PARAMETER_ITEMS(CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_METADATA)};
 
 #undef CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_METADATA

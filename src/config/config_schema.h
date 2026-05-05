@@ -458,6 +458,18 @@ template <typename Owner, typename Binding, typename... Rest> struct BindingPath
     }
 };
 
+template <typename Field> consteval std::size_t ReflectedFieldOffset() {
+    return reflect_field_offset(static_cast<Field*>(nullptr));
+}
+
+template <typename Binding> consteval std::size_t ReflectedBindingOffset() {
+    return reflect_binding_offset(static_cast<Binding*>(nullptr));
+}
+
+template <typename... Bindings> consteval std::size_t ReflectedBindingPathOffset() {
+    return (0u + ... + ReflectedBindingOffset<Bindings>());
+}
+
 template <typename Root, typename Field, typename... Bindings> struct RootFieldLens {
     using root_type = Root;
     using field_descriptor = Field;
@@ -494,6 +506,11 @@ template <typename Root, typename Field, typename... Bindings> struct RootFieldL
     }
 };
 
+template <typename Root, typename Field, typename... Bindings>
+consteval std::size_t RootFieldOffset(RootFieldLens<Root, Field, Bindings...>*) {
+    return ReflectedBindingPathOffset<Bindings...>() + ReflectedFieldOffset<Field>();
+}
+
 struct NoRootFieldPath {
     static constexpr bool enabled = false;
 
@@ -516,6 +533,7 @@ template <typename Root, typename Field, typename... BindingTags> struct Deferre
 
     static constexpr std::string_view section_name = resolved_type::section_name;
     static constexpr std::string_view parameter_name = resolved_type::parameter_name;
+    static constexpr std::size_t root_offset = RootFieldOffset(static_cast<resolved_type*>(nullptr));
 
     static value_type& RawGet(Root& root) {
         return resolved_type::RawGet(root);
@@ -537,6 +555,10 @@ template <typename Root, typename Field, typename... BindingTags> struct Deferre
         resolved_type::Set(root, std::move(value));
     }
 };
+
+template <typename Meta> consteval std::size_t RootFieldOffset() {
+    return Meta::root_offset;
+}
 
 template <typename Root, typename... BindingTags> struct RootBindingPath {
     template <typename Field> using Lens = DeferredRootFieldLens<Root, Field, BindingTags...>;
@@ -587,6 +609,9 @@ public:                                                                         
     friend consteval auto reflect_field(                                                                               \
         configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) {                              \
         return member##Field{};                                                                                        \
+    }                                                                                                                  \
+    friend consteval std::size_t reflect_field_offset(member##Field*) {                                                \
+        return offsetof(Self, member);                                                                                 \
     }
 
 #define CONFIG_EDITABLE_VALUE(field_type, member, key)                                                                 \
@@ -609,6 +634,9 @@ public:                                                                         
     friend consteval auto reflect_field(                                                                               \
         configschema::FieldTag<Self, __COUNTER__ - Self::_configschema_field_base - 1>) {                              \
         return member##Field{};                                                                                        \
+    }                                                                                                                  \
+    friend consteval std::size_t reflect_field_offset(member##Field*) {                                                \
+        return offsetof(Self, member);                                                                                 \
     }
 
 #define CONFIG_SECTION(name) using Section = configschema::AutoSectionDescriptor<name, Self>
@@ -636,6 +664,9 @@ public:
         configschema::StructuredBindingDescriptor<Self, typename field_type::Section, &Self::member>;                  \
     friend consteval auto reflect_binding(member##Binding) {                                                           \
         return member##BindingDescriptor{};                                                                            \
+    }                                                                                                                  \
+    friend consteval std::size_t reflect_binding_offset(member##BindingDescriptor*) {                                  \
+        return offsetof(Self, member);                                                                                 \
     }
 
 #define CONFIG_BINDING_LIST() using BindingList = configschema::AutoStructuredBindingListDescriptor<Self>
@@ -647,6 +678,9 @@ public:
         configschema::DynamicStructuredBindingDescriptor<Self, item_type, &Self::member, &item_type::key_member>;      \
     friend consteval auto reflect_binding(member##Binding) {                                                           \
         return member##BindingDescriptor{};                                                                            \
+    }                                                                                                                  \
+    friend consteval std::size_t reflect_binding_offset(member##BindingDescriptor*) {                                  \
+        return offsetof(Self, member);                                                                                 \
     }
 
 #define CONFIG_RECURSIVE_BINDING_VALUE(field_type, member)                                                             \
@@ -656,4 +690,7 @@ public:
         configschema::RecursiveStructuredBindingDescriptor<Self, field_type, &Self::member>;                           \
     friend consteval auto reflect_binding(member##Binding) {                                                           \
         return member##BindingDescriptor{};                                                                            \
+    }                                                                                                                  \
+    friend consteval std::size_t reflect_binding_offset(member##BindingDescriptor*) {                                  \
+        return offsetof(Self, member);                                                                                 \
     }

@@ -107,7 +107,7 @@ std::string FormatFontSpec(const UiFontConfig& font) {
     return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
 }
 
-template <typename Value> RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
+template <typename Value> consteval RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
     if constexpr (std::is_same_v<Value, int>) {
         return RuntimeConfigFieldValueKind::Int;
     } else if constexpr (std::is_same_v<Value, double>) {
@@ -129,7 +129,7 @@ template <typename Value> RuntimeConfigFieldValueKind RuntimeFieldValueKindFor()
     }
 }
 
-template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
+template <typename Policy> consteval RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
     if constexpr (std::is_same_v<Policy, configschema::PositiveIntPolicy>) {
         return RuntimeConfigFieldPolicy::PositiveInt;
     } else if constexpr (std::is_same_v<Policy, configschema::NonNegativeIntPolicy>) {
@@ -143,15 +143,11 @@ template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
     }
 }
 
-template <typename Field> std::uint32_t RuntimeFieldOffset() {
-    using Owner = typename Field::owner_type;
-    // Size: field offsets are static facts; constructing Owner pulled constructor code into maps.
-    const auto* owner = reinterpret_cast<const Owner*>(0);
-    const auto* field = &(owner->*Field::member);
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(field));
+template <typename Field> consteval std::uint32_t RuntimeFieldOffset() {
+    return static_cast<std::uint32_t>(configschema::ReflectedFieldOffset<Field>());
 }
 
-template <typename Field> RuntimeConfigFieldDescriptor MakeRuntimeFieldDescriptor() {
+template <typename Field> consteval RuntimeConfigFieldDescriptor MakeRuntimeFieldDescriptor() {
     using Policy = typename Field::layout_edit_traits_type::policy_tag;
     static_assert(Field::key.view().size() <= UCHAR_MAX, "Runtime config field keys must fit descriptor byte length.");
     return RuntimeConfigFieldDescriptor{Field::key.value,
@@ -161,18 +157,14 @@ template <typename Field> RuntimeConfigFieldDescriptor MakeRuntimeFieldDescripto
         RuntimeFieldPolicyFor<Policy>()};
 }
 
-template <typename... Field> auto MakeRuntimeFieldDescriptors(std::tuple<Field...>) {
+template <typename... Field> consteval auto MakeRuntimeFieldDescriptors(std::tuple<Field...>) {
     return std::array<RuntimeConfigFieldDescriptor, sizeof...(Field)>{MakeRuntimeFieldDescriptor<Field>()...};
 }
 
 template <typename Section> struct RuntimeConfigFieldDescriptorTable {
     using Fields = decltype(MakeRuntimeFieldDescriptors(typename Section::fields_type{}));
-    static const Fields fields;
+    static constexpr Fields fields = MakeRuntimeFieldDescriptors(typename Section::fields_type{});
 };
-
-template <typename Section>
-const typename RuntimeConfigFieldDescriptorTable<Section>::Fields RuntimeConfigFieldDescriptorTable<Section>::fields =
-    MakeRuntimeFieldDescriptors(typename Section::fields_type{});
 
 char* FieldAddress(void* owner, const RuntimeConfigFieldDescriptor& field) {
     return static_cast<char*>(owner) + field.offset;
