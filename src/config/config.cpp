@@ -81,9 +81,7 @@ TelemetrySettings ExtractTelemetrySettings(const AppConfig& config) {
     return settings;
 }
 
-AppConfig BuildEffectiveRuntimeConfig(
-    const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections) {
-    AppConfig config = uiConfig;
+void ApplyResolvedTelemetrySelections(AppConfig& config, const ResolvedTelemetrySelections& resolvedSelections) {
     if (!resolvedSelections.adapterName.empty()) {
         config.network.adapterName = resolvedSelections.adapterName;
     }
@@ -98,6 +96,12 @@ AppConfig BuildEffectiveRuntimeConfig(
             config.layout.board.fanSensorNames[logicalName] = sensorName;
         }
     }
+}
+
+AppConfig BuildEffectiveRuntimeConfig(
+    const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections) {
+    AppConfig config = uiConfig;
+    ApplyResolvedTelemetrySelections(config, resolvedSelections);
     return config;
 }
 

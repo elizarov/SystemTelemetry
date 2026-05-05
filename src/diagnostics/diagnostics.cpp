@@ -769,7 +769,8 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
 
     telemetry = std::move(reloadedTelemetry);
     const TelemetryUpdate reloadedUpdate = telemetry->Latest();
-    activeConfig = BuildEffectiveRuntimeConfig(effectiveReloadedConfig, reloadedUpdate.resolvedSelections);
+    activeConfig = std::move(effectiveReloadedConfig);
+    ApplyResolvedTelemetrySelections(activeConfig, reloadedUpdate.resolvedSelections);
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarker("diagnostics:reload_config_done");
         WriteResolvedColorTrace(*diagnostics, activeConfig);
@@ -925,9 +926,9 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         }
         telemetryUpdate = telemetry->Latest();
     }
+    ApplyResolvedTelemetrySelections(config, telemetryUpdate.resolvedSelections);
     diagnostics.WriteTraceMarker("diagnostics:write_outputs_begin");
-    if (!diagnostics.WriteOutputs(
-            telemetryUpdate.dump, BuildEffectiveRuntimeConfig(config, telemetryUpdate.resolvedSelections))) {
+    if (!diagnostics.WriteOutputs(telemetryUpdate.dump, config)) {
         diagnostics.WriteTraceMarker("diagnostics:write_outputs_failed");
         return 1;
     }

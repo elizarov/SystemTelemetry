@@ -171,7 +171,7 @@ SYSTEMTIME BuildSyntheticTimestamp(uint64_t tick) {
     return adjusted;
 }
 
-void AddSyntheticHistory(SystemSnapshot& snapshot, const std::string& seriesRef, std::vector<double> samples) {
+void AddSyntheticHistory(SystemSnapshot& snapshot, const char* seriesRef, std::vector<double>&& samples) {
     RetainedHistorySeries history;
     history.seriesRef = seriesRef;
     history.samples = std::move(samples);
@@ -188,12 +188,8 @@ double ComputeDriveTotalGb(double freeGb, double usedPercent) {
     return freeRatio > 0.0 ? freeGb / freeRatio : 0.0;
 }
 
-DriveInfo BuildSyntheticDrive(const std::string& label,
-    const std::string& volumeLabel,
-    double usedPercent,
-    double freeGb,
-    double readMbps,
-    double writeMbps) {
+DriveInfo BuildSyntheticDrive(
+    const char* label, const char* volumeLabel, double usedPercent, double freeGb, double readMbps, double writeMbps) {
     DriveInfo drive;
     drive.label = label;
     drive.volumeLabel = volumeLabel;
@@ -210,29 +206,29 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     TelemetryDump dump;
     SystemSnapshot& snapshot = dump.snapshot;
 
-    const std::vector<double> cpuLoad = BuildSyntheticHistory(tick, 43.0, 18.0, 5.0, 7.0, 8.5);
-    const std::vector<double> cpuClock = BuildSyntheticHistory(tick, 4.42, 0.18, 7.0, 0.08, 13.0);
+    std::vector<double> cpuLoad = BuildSyntheticHistory(tick, 43.0, 18.0, 5.0, 7.0, 8.5);
+    std::vector<double> cpuClock = BuildSyntheticHistory(tick, 4.42, 0.18, 7.0, 0.08, 13.0);
     std::vector<double> cpuRam = BuildSyntheticHistory(tick, 27.6, 0.35, 9.0, 0.18, 17.0);
     if (!cpuRam.empty()) {
         // Keep the fake RAM peak marker clearly visible in generated guide-sheet screenshots.
         cpuRam[cpuRam.size() / 2] = kSyntheticCpuMemoryTotalGb * kSyntheticCpuMemoryPeakRatio;
     }
-    const std::vector<double> gpuLoad = BuildSyntheticHistory(tick, 72.0, 14.0, 5.6, 8.0, 10.5);
-    const std::vector<double> gpuTemp = BuildSyntheticHistory(tick, 62.0, 4.5, 9.0, 1.8, 14.0);
-    const std::vector<double> gpuClock = BuildSyntheticHistory(tick, 2085.0, 155.0, 6.3, 65.0, 11.0);
-    const std::vector<double> gpuFan = BuildSyntheticHistory(tick, 1325.0, 170.0, 7.4, 60.0, 13.0);
-    const std::vector<double> gpuFps = BuildSyntheticHistory(tick, 118.0, 21.0, 6.6, 9.0, 12.5);
-    const std::vector<double> gpuVram = BuildSyntheticHistory(tick, 5.9, 1.1, 8.0, 0.5, 15.0);
-    const std::vector<double> boardTempCpu = BuildSyntheticHistory(tick, 65.0, 5.0, 7.0, 2.0, 12.0);
-    const std::vector<double> boardFanCpu = BuildSyntheticHistory(tick, 1380.0, 180.0, 6.8, 70.0, 11.0);
-    const std::vector<double> boardFanSystem = BuildSyntheticHistory(tick, 905.0, 85.0, 8.0, 30.0, 13.0);
-    const std::vector<double> networkUpload = BuildSyntheticThroughputHistory(
+    std::vector<double> gpuLoad = BuildSyntheticHistory(tick, 72.0, 14.0, 5.6, 8.0, 10.5);
+    std::vector<double> gpuTemp = BuildSyntheticHistory(tick, 62.0, 4.5, 9.0, 1.8, 14.0);
+    std::vector<double> gpuClock = BuildSyntheticHistory(tick, 2085.0, 155.0, 6.3, 65.0, 11.0);
+    std::vector<double> gpuFan = BuildSyntheticHistory(tick, 1325.0, 170.0, 7.4, 60.0, 13.0);
+    std::vector<double> gpuFps = BuildSyntheticHistory(tick, 118.0, 21.0, 6.6, 9.0, 12.5);
+    std::vector<double> gpuVram = BuildSyntheticHistory(tick, 5.9, 1.1, 8.0, 0.5, 15.0);
+    std::vector<double> boardTempCpu = BuildSyntheticHistory(tick, 65.0, 5.0, 7.0, 2.0, 12.0);
+    std::vector<double> boardFanCpu = BuildSyntheticHistory(tick, 1380.0, 180.0, 6.8, 70.0, 11.0);
+    std::vector<double> boardFanSystem = BuildSyntheticHistory(tick, 905.0, 85.0, 8.0, 30.0, 13.0);
+    std::vector<double> networkUpload = BuildSyntheticThroughputHistory(
         tick, 22.0, 7.5, 7.0, 4.0, 16.0, 3.2, 12.0, 18.0, 5.5, 2.4, 6.5, 29.0, 12.0, 3.0, 0x13579BDFu);
-    const std::vector<double> networkDownload = BuildSyntheticThroughputHistory(
+    std::vector<double> networkDownload = BuildSyntheticThroughputHistory(
         tick, 198.0, 56.0, 6.1, 34.0, 12.5, 19.0, 92.0, 17.0, 2.8, 2.6, 48.0, 27.0, 8.0, 3.1, 0x2468ACE1u);
-    const std::vector<double> storageRead = BuildSyntheticThroughputHistory(
+    std::vector<double> storageRead = BuildSyntheticThroughputHistory(
         tick, 146.0, 48.0, 5.7, 28.0, 11.0, 16.0, 118.0, 15.0, 3.7, 2.2, 64.0, 24.0, 6.5, 2.6, 0xA5C31E27u);
-    const std::vector<double> storageWrite = BuildSyntheticThroughputHistory(
+    std::vector<double> storageWrite = BuildSyntheticThroughputHistory(
         tick, 44.0, 18.0, 6.0, 11.0, 13.5, 8.5, 52.0, 21.0, 9.0, 2.8, 19.0, 26.0, 4.0, 3.2, 0x5EED1234u);
 
     snapshot.cpu.name = "DeLorean 88X ChronoCore";
@@ -267,22 +263,22 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     snapshot.drives.push_back(BuildSyntheticDrive("E:", "Media", 32.099891, 5059.855675, 118.0, 21.0));
     snapshot.drives.push_back(BuildSyntheticDrive("F:", "Capture", 88.636454, 306.444996, 24.0, 37.0));
 
-    AddSyntheticHistory(snapshot, "cpu.load", cpuLoad);
-    AddSyntheticHistory(snapshot, "cpu.clock", cpuClock);
-    AddSyntheticHistory(snapshot, "cpu.ram", cpuRam);
-    AddSyntheticHistory(snapshot, "gpu.load", gpuLoad);
-    AddSyntheticHistory(snapshot, "gpu.temp", gpuTemp);
-    AddSyntheticHistory(snapshot, "gpu.clock", gpuClock);
-    AddSyntheticHistory(snapshot, "gpu.fan", gpuFan);
-    AddSyntheticHistory(snapshot, "gpu.fps", gpuFps);
-    AddSyntheticHistory(snapshot, "gpu.vram", gpuVram);
-    AddSyntheticHistory(snapshot, "board.temp.cpu", boardTempCpu);
-    AddSyntheticHistory(snapshot, "board.fan.cpu", boardFanCpu);
-    AddSyntheticHistory(snapshot, "board.fan.system", boardFanSystem);
-    AddSyntheticHistory(snapshot, "network.upload", networkUpload);
-    AddSyntheticHistory(snapshot, "network.download", networkDownload);
-    AddSyntheticHistory(snapshot, "storage.read", storageRead);
-    AddSyntheticHistory(snapshot, "storage.write", storageWrite);
+    AddSyntheticHistory(snapshot, "cpu.load", std::move(cpuLoad));
+    AddSyntheticHistory(snapshot, "cpu.clock", std::move(cpuClock));
+    AddSyntheticHistory(snapshot, "cpu.ram", std::move(cpuRam));
+    AddSyntheticHistory(snapshot, "gpu.load", std::move(gpuLoad));
+    AddSyntheticHistory(snapshot, "gpu.temp", std::move(gpuTemp));
+    AddSyntheticHistory(snapshot, "gpu.clock", std::move(gpuClock));
+    AddSyntheticHistory(snapshot, "gpu.fan", std::move(gpuFan));
+    AddSyntheticHistory(snapshot, "gpu.fps", std::move(gpuFps));
+    AddSyntheticHistory(snapshot, "gpu.vram", std::move(gpuVram));
+    AddSyntheticHistory(snapshot, "board.temp.cpu", std::move(boardTempCpu));
+    AddSyntheticHistory(snapshot, "board.fan.cpu", std::move(boardFanCpu));
+    AddSyntheticHistory(snapshot, "board.fan.system", std::move(boardFanSystem));
+    AddSyntheticHistory(snapshot, "network.upload", std::move(networkUpload));
+    AddSyntheticHistory(snapshot, "network.download", std::move(networkDownload));
+    AddSyntheticHistory(snapshot, "storage.read", std::move(storageRead));
+    AddSyntheticHistory(snapshot, "storage.write", std::move(storageWrite));
 
     snapshot.now = BuildSyntheticTimestamp(tick);
     snapshot.revision = 1;

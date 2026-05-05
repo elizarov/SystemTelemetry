@@ -996,6 +996,12 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                 placement.id, placement.sourceRect, placement.destRect, metrics);
         }
         dashboardRenderer_.ResolveLayoutGuideSheetDynamicArtifactCollisions();
+        DashboardOverlayState drawOverlayState;
+        drawOverlayState.showLayoutEditGuides = true;
+        drawOverlayState.forceLayoutEditAffordances = true;
+        drawOverlayState.forceHoverEquivalentAffordances = true;
+        drawOverlayState.drawExposedDashboardChrome = false;
+        drawOverlayState.suppressLayoutGuideContainerHighlights = true;
         for (const CardPlacement& placement : cardPlacements) {
             if (placement.overview) {
                 for (const Callout& callout : callouts) {
@@ -1020,32 +1026,29 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                 }
                 continue;
             }
-            DashboardOverlayState cardBaseOverlayState = overlayState;
-            cardBaseOverlayState.hoverOnExposedDashboard = false;
-            cardBaseOverlayState.drawExposedDashboardChrome = false;
-            cardBaseOverlayState.suppressLayoutGuideContainerHighlights = true;
+            drawOverlayState.hoveredEditableAnchor.reset();
+            drawOverlayState.hoveredEditableWidget.reset();
+            drawOverlayState.hoveredLayoutEditGuide.reset();
+            drawOverlayState.hoveredGapEditAnchor.reset();
             dashboardRenderer_.DrawLayoutGuideSheetOverlay(
-                cardBaseOverlayState, placement.sourceRect, placement.destRect, metrics);
+                drawOverlayState, placement.sourceRect, placement.destRect, metrics);
             for (const Callout& callout : callouts) {
                 if (callout.sourceCardId != placement.id) {
                     continue;
                 }
-                DashboardOverlayState calloutOverlayState = overlayState;
-                calloutOverlayState.hoverOnExposedDashboard = false;
-                calloutOverlayState.drawExposedDashboardChrome = false;
-                calloutOverlayState.suppressLayoutGuideContainerHighlights = true;
-                calloutOverlayState.hoveredEditableAnchor = callout.hoverAnchorKey;
+                drawOverlayState.hoveredEditableAnchor = callout.hoverAnchorKey;
+                drawOverlayState.hoveredEditableWidget.reset();
                 if (callout.hoverAnchorKey.has_value() &&
                     callout.hoverAnchorKey->widget.kind == LayoutEditWidgetIdentity::Kind::Widget) {
-                    calloutOverlayState.hoveredEditableWidget = callout.hoverAnchorKey->widget;
+                    drawOverlayState.hoveredEditableWidget = callout.hoverAnchorKey->widget;
                 }
                 if (callout.hoverWidgetGuide.has_value()) {
-                    calloutOverlayState.hoveredEditableWidget = callout.hoverWidgetGuide->widget;
+                    drawOverlayState.hoveredEditableWidget = callout.hoverWidgetGuide->widget;
                 }
-                calloutOverlayState.hoveredLayoutEditGuide = callout.hoverLayoutGuide;
-                calloutOverlayState.hoveredGapEditAnchor = callout.hoverGapAnchorKey;
+                drawOverlayState.hoveredLayoutEditGuide = callout.hoverLayoutGuide;
+                drawOverlayState.hoveredGapEditAnchor = callout.hoverGapAnchorKey;
                 dashboardRenderer_.DrawLayoutGuideSheetOverlay(
-                    calloutOverlayState, placement.sourceRect, placement.destRect, metrics);
+                    drawOverlayState, placement.sourceRect, placement.destRect, metrics);
             }
         }
         dashboardRenderer_.EndLayoutGuideSheetDynamicArtifacts();

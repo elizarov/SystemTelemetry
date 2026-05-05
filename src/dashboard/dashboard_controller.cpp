@@ -273,7 +273,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         state_.lastDiagnosticsOutput = std::chrono::steady_clock::now();
     }
 
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+    ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     SyncRenderer(shell, diagnosticsOptions.editLayout);
     state_.isEditingLayout = diagnosticsOptions.editLayout;
     if (state_.isEditingLayout) {
@@ -288,7 +288,7 @@ bool DashboardController::HandleTelemetryUpdate(DashboardShellHost& shell, const
         return false;
     }
     state_.telemetryUpdate = update;
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+    ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     if (state_.diagnostics != nullptr &&
         std::chrono::steady_clock::now() - state_.lastDiagnosticsOutput >= std::chrono::seconds(1)) {
         if (!WriteDiagnosticsOutputs()) {
@@ -305,8 +305,7 @@ bool DashboardController::WriteDiagnosticsOutputs() {
         return true;
     }
     state_.diagnostics->WriteTraceMarker("diagnostics:write_outputs_begin");
-    const bool ok = state_.diagnostics->WriteOutputs(state_.telemetryUpdate.dump,
-        BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections));
+    const bool ok = state_.diagnostics->WriteOutputs(state_.telemetryUpdate.dump, state_.config);
     state_.diagnostics->WriteTraceMarker(ok ? "diagnostics:write_outputs_done" : "diagnostics:write_outputs_failed");
     return ok;
 }
@@ -458,7 +457,8 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
         return false;
     }
 
-    AppConfig updatedConfig = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+    AppConfig updatedConfig = state_.config;
+    ApplyResolvedTelemetrySelections(updatedConfig, state_.telemetryUpdate.resolvedSelections);
     updatedConfig.display.monitorName = option.configMonitorName;
     updatedConfig.display.position = {};
     updatedConfig.display.scale = option.fittedScale;
@@ -469,7 +469,7 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
         return false;
     }
 
-    state_.config = updatedConfig;
+    state_.config = std::move(updatedConfig);
     SyncRenderer(shell, state_.isEditingLayout);
     ApplyConfiguredWallpaper(shell.TraceLog());
     state_.placementWatchActive = true;
@@ -485,8 +485,8 @@ bool DashboardController::SwitchLayout(
             "layout_switch:begin current_layout=" + Trace::QuoteText(state_.config.display.layout) +
             " requested_layout=" + Trace::QuoteText(layoutName));
     }
-    AppConfig updatedConfig = state_.config;
-    if (!SelectLayout(updatedConfig, layoutName)) {
+    const std::string previousLayoutName = state_.config.display.layout;
+    if (!SelectLayout(state_.config, layoutName)) {
         if (state_.diagnostics != nullptr) {
             state_.diagnostics->WriteTraceMarker(
                 "layout_switch:select_failed requested_layout=" + Trace::QuoteText(layoutName));
@@ -494,8 +494,6 @@ bool DashboardController::SwitchLayout(
         return false;
     }
 
-    const AppConfig previousConfig = state_.config;
-    state_.config = updatedConfig;
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
@@ -503,7 +501,8 @@ bool DashboardController::SwitchLayout(
                 "layout_switch:sync_failed requested_layout=" + Trace::QuoteText(layoutName) +
                 " renderer_error=" + Trace::QuoteText(shell.Renderer().LastError()));
         }
-        state_.config = previousConfig;
+        // The active config has already resolved a valid layout; rollback by name avoids a full config snapshot.
+        SelectLayout(state_.config, previousLayoutName);
         SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
         return false;
     }
@@ -541,14 +540,12 @@ bool DashboardController::SwitchTheme(
 
 bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scale) {
     const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
-    AppConfig updatedConfig = state_.config;
-    updatedConfig.display.monitorName =
+    state_.config.display.monitorName =
         !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
     const double targetScale = HasExplicitDisplayScale(scale) ? scale : ScaleFromDpi(placement.dpi);
-    updatedConfig.display.position.x = ScalePhysicalToLogical(placement.physicalRelativePosition.x, targetScale);
-    updatedConfig.display.position.y = ScalePhysicalToLogical(placement.physicalRelativePosition.y, targetScale);
-    updatedConfig.display.scale = HasExplicitDisplayScale(scale) ? scale : 0.0;
-    state_.config = std::move(updatedConfig);
+    state_.config.display.position.x = ScalePhysicalToLogical(placement.physicalRelativePosition.x, targetScale);
+    state_.config.display.position.y = ScalePhysicalToLogical(placement.physicalRelativePosition.y, targetScale);
+    state_.config.display.scale = HasExplicitDisplayScale(scale) ? scale : 0.0;
     SyncRenderer(shell, state_.isEditingLayout);
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
@@ -564,7 +561,7 @@ void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const 
     state_.config.network.adapterName = option.adapterName;
     state_.telemetry->SetPreferredNetworkAdapterName(option.adapterName);
     state_.telemetryUpdate = state_.telemetry->Latest();
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+    ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     FinishConfigMutation(shell, false);
 }
 
@@ -583,7 +580,7 @@ void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const St
     state_.config.storage.drives = driveLetters;
     state_.telemetry->SetSelectedStorageDrives(driveLetters);
     state_.telemetryUpdate = state_.telemetry->Latest();
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+    ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     FinishConfigMutation(shell);
 }
 
@@ -593,7 +590,7 @@ void DashboardController::RefreshTelemetrySelections(DashboardShellHost& shell) 
     }
     state_.telemetry->RefreshSelections();
     state_.telemetryUpdate = state_.telemetry->Latest();
-    state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+    ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     SyncRenderer(shell, state_.isEditingLayout);
     shell.InvalidateShell();
     if (state_.isEditingLayout && !state_.hasUnsavedLayoutEditChanges) {
@@ -642,7 +639,7 @@ bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost
         state_.telemetry->SetSelectedStorageDrives(state_.config.storage.drives);
         state_.telemetry->RefreshSelections();
         state_.telemetryUpdate = state_.telemetry->Latest();
-        state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+        ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     }
     FinishConfigMutation(shell);
     MarkLayoutEditSessionSaved();
@@ -779,15 +776,14 @@ bool DashboardController::ApplyLayoutEditCardTitle(
 }
 
 void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config) {
-    const AppConfig previousConfig = state_.config;
+    const TelemetrySettings previousSettings = ExtractTelemetrySettings(state_.config);
     state_.config = config;
     if (state_.telemetry != nullptr) {
-        const TelemetrySettings previousSettings = ExtractTelemetrySettings(previousConfig);
         const TelemetrySettings nextSettings = ExtractTelemetrySettings(state_.config);
         if (previousSettings != nextSettings) {
             state_.telemetry->Reconfigure(nextSettings);
             state_.telemetryUpdate = state_.telemetry->Latest();
-            state_.config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+            ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
         }
     }
     FinishConfigMutation(shell);
@@ -808,7 +804,7 @@ std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(Das
 AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {
     AppConfig config = state_.config;
     if (state_.telemetry != nullptr) {
-        config = BuildEffectiveRuntimeConfig(state_.config, state_.telemetryUpdate.resolvedSelections);
+        ApplyResolvedTelemetrySelections(config, state_.telemetryUpdate.resolvedSelections);
     }
     const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
     config.display.monitorName =
@@ -825,7 +821,7 @@ bool DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& s
         shell.ShowError(WideFromUtf8("Failed to save " + Utf8FromWide(configPath.wstring()) + "."));
         return false;
     }
-    state_.config = config;
+    state_.config = std::move(config);
     SyncRenderer(shell, state_.isEditingLayout);
     if (state_.isEditingLayout) {
         MarkLayoutEditSessionSaved();
