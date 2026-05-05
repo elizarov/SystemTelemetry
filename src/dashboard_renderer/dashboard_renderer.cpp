@@ -978,7 +978,7 @@ bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const WidgetLayout& wi
     if (widget.widget == nullptr || widget.widgetClass == WidgetClass::VerticalSpring) {
         return false;
     }
-    if (UsesFixedPreferredHeightInRows(widget)) {
+    if (WidgetUsesFixedPreferredHeightInRows(widget.widgetClass)) {
         return false;
     }
     return true;
@@ -1022,10 +1022,6 @@ std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWi
 
 bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
     return node.name == "rows" || node.name == "columns";
-}
-
-bool DashboardRenderer::UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const {
-    return widget.widget != nullptr && widget.widget->UsesFixedPreferredHeightInRows();
 }
 
 const LayoutCardConfig* DashboardRenderer::FindCardConfigById(const std::string& id) const {

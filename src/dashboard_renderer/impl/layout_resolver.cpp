@@ -665,7 +665,7 @@ const DashboardLayoutResolver::ParsedWidgetInfo* DashboardLayoutResolver::FindPa
     ParsedWidgetInfo info;
     info.widgetClass = *widgetClass;
     info.preferredHeight = widget->PreferredHeight(renderer);
-    info.fixedPreferredHeightInRows = widget->UsesFixedPreferredHeightInRows();
+    info.fixedPreferredHeightInRows = WidgetUsesFixedPreferredHeightInRows(*widgetClass);
     info.verticalSpring = *widgetClass == WidgetClass::VerticalSpring;
     parsedWidgetInfoCache_.emplace_back(&node, std::move(info));
     return &parsedWidgetInfoCache_.back().second;

@@ -11,10 +11,6 @@ int ClockDateWidget::PreferredHeight(const WidgetHost& renderer) const {
     return renderer.Renderer().TextMetrics().clockDate;
 }
 
-bool ClockDateWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
-}
-
 void ClockDateWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank) {
         return;

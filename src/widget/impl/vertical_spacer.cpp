@@ -34,7 +34,3 @@ void VerticalSpacerWidget::Initialize(const LayoutNodeConfig& node) {
 int VerticalSpacerWidget::PreferredHeight(const WidgetHost& renderer) const {
     return referencedWidget_ != nullptr ? referencedWidget_->PreferredHeight(renderer) : 0;
 }
-
-bool VerticalSpacerWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
-}

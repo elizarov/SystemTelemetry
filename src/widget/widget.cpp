@@ -12,10 +12,6 @@
 #include "widget/impl/vertical_spacer.h"
 #include "widget/impl/vertical_spring.h"
 
-bool Widget::UsesFixedPreferredHeightInRows() const {
-    return false;
-}
-
 void Widget::ResolveLayoutState(const WidgetHost&, const RenderRect&) {}
 
 void Widget::Draw(WidgetHost&, const WidgetLayout&, const MetricSource&) const {}
@@ -73,4 +69,17 @@ void FinalizeWidgetLayoutGroup(
 
 bool IsWidgetHoverable(WidgetClass widgetClass) {
     return widgetClass != WidgetClass::VerticalSpacer && widgetClass != WidgetClass::VerticalSpring;
+}
+
+bool WidgetUsesFixedPreferredHeightInRows(WidgetClass widgetClass) {
+    switch (widgetClass) {
+        case WidgetClass::Text:
+        case WidgetClass::NetworkFooter:
+        case WidgetClass::VerticalSpacer:
+        case WidgetClass::ClockTime:
+        case WidgetClass::ClockDate:
+            return true;
+        default:
+            return false;
+    }
 }

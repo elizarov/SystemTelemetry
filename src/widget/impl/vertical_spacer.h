@@ -6,7 +6,6 @@ class VerticalSpacerWidget final : public Widget {
 public:
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const WidgetHost& renderer) const override;
-    bool UsesFixedPreferredHeightInRows() const override;
 
 private:
     std::string referencedWidgetName_;

@@ -14,10 +14,6 @@ int TextWidget::PreferredHeight(const WidgetHost& renderer) const {
            (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.text.bottomGap));
 }
 
-bool TextWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
-}
-
 void TextWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {
     const int hitInset = (std::max)(3, renderer.Renderer().ScaleLogical(4));
     const int y = widget.rect.bottom;

@@ -18,7 +18,6 @@ public:
 
     virtual void Initialize(const LayoutNodeConfig& node) = 0;
     virtual int PreferredHeight(const WidgetHost& renderer) const = 0;
-    virtual bool UsesFixedPreferredHeightInRows() const;
     virtual void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect);
     virtual void Draw(WidgetHost& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
     virtual void BuildEditGuides(WidgetHost& renderer, const struct WidgetLayout& widget) const;
@@ -40,3 +39,4 @@ std::unique_ptr<Widget> CreateCardChromeWidget(const LayoutCardConfig& card);
 void FinalizeWidgetLayoutGroup(
     WidgetHost& renderer, WidgetClass widgetClass, const std::vector<WidgetLayout*>& widgets);
 bool IsWidgetHoverable(WidgetClass widgetClass);
+bool WidgetUsesFixedPreferredHeightInRows(WidgetClass widgetClass);

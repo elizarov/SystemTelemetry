@@ -16,7 +16,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 - Current measured `build\CaseDash.exe`: `1,177,600` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `954.6 KiB`, `.rdata` about `88.2 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `21.0 KiB`, `.xdata` about `19.9 KiB`.
+- Current largest sections: `.text$mn` about `954.7 KiB`, `.rdata` about `88.2 KiB`, `.rsrc$02` about `34.5 KiB`, `.pdata` about `21.0 KiB`, `.xdata` about `19.9 KiB`.
 - Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `dashboard_renderer.cpp.obj`, `layout_resolver.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, and `dashboard_controller.cpp.obj`.
 - Last validation: `build_maps.cmd`, direct `build\CaseDashTests.exe --gtest_filter=*Widget*`, `format.cmd fix changed`, `build.cmd`, `python tools\source_dependency_graph.py --skip-svg --check`, `test.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_trace.txt /dump:build\validation_size_dump.txt`, and `format.cmd changed`.
 
@@ -81,7 +81,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Network adapter selection | Keep adapter selection data, UTF-8 names, match rank, and traffic counters in one candidate record, and use one automatic-candidate comparison helper instead of repeating wide/UTF-8 match chains. | `1,195,008` to `1,193,984` bytes. |
 | FPS ETW provider small caches | Keep FPS ETW source names as an enum conversion, keep process names, GPU usage, and present-event buckets as flat vectors for tiny active process sets, and keep GPU raw counter lookup hash-based because GPU Engine exposes hundreds of per-engine instances on process-heavy machines. | `1,193,984` to `1,186,816` bytes across the measured FPS provider passes. |
 | Retained history indexes | Keep retained-history series in the dump-facing vector, cache fixed CPU/GPU/network/storage histories by `RetainedHistoryKey` encoded vector indices, and leave dynamic board temp/fan histories on a vector scan. | `1,186,816` to `1,182,208` bytes; a plain vector scan reached the same size, so keep the indexed shape for predictable fixed-key lookups. |
-| Widget layout metadata | Cache parsed widget facts as `WidgetClass` plus layout flags instead of storing cloneable widget prototypes, keep widget class and hover facts enum-based in `WidgetLayout`, and expose gauge-only group finalization through the public widget package boundary. | `1,182,208` to `1,177,600` bytes; removing the `Class()` virtual was neutral in isolation but kept as source simplification once `WidgetLayout` owned class identity. |
+| Widget layout metadata | Cache parsed widget facts as `WidgetClass` plus layout flags instead of storing cloneable widget prototypes, keep widget class, hover, and fixed-height facts enum-based in `WidgetLayout`, and expose gauge-only group finalization through the public widget package boundary. | `1,182,208` to `1,177,600` bytes; removing the `Class()` and fixed-height virtuals were neutral in isolation but kept as source simplification once `WidgetLayout` owned class identity. |
 
 ## Rejected Or Neutral Experiments
 

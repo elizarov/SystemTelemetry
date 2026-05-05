@@ -10,10 +10,6 @@ int NetworkFooterWidget::PreferredHeight(const WidgetHost& renderer) const {
            (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
 }
 
-bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
-}
-
 void NetworkFooterWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {
     const int hitInset = (std::max)(3, renderer.Renderer().ScaleLogical(4));
     const int y = widget.rect.top + renderer.Renderer().TextMetrics().footer;

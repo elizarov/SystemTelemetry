@@ -11,10 +11,6 @@ int ClockTimeWidget::PreferredHeight(const WidgetHost& renderer) const {
     return renderer.Renderer().TextMetrics().clockTime;
 }
 
-bool ClockTimeWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
-}
-
 void ClockTimeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     if (renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank) {
         return;

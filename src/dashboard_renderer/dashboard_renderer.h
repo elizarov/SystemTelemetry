@@ -106,7 +106,6 @@ private:
 
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
-    bool UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
         const RenderRect& rect,
