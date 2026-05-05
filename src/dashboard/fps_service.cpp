@@ -5,7 +5,6 @@
 #include <optional>
 #include <sddl.h>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 #include <winsvc.h>
@@ -25,7 +24,7 @@ constexpr DWORD kPipeRequestBytes = 128;
 SERVICE_STATUS_HANDLE g_serviceStatusHandle = nullptr;
 SERVICE_STATUS g_serviceStatus{};
 HANDLE g_serviceStopEvent = nullptr;
-std::thread g_serviceWorker;
+HANDLE g_serviceWorker = nullptr;
 
 class Handle {
 public:
@@ -345,6 +344,11 @@ void RunPipeServer(HANDLE stopEvent) {
     }
 }
 
+DWORD WINAPI ServiceWorkerThread(void* context) {
+    RunPipeServer(static_cast<HANDLE>(context));
+    return 0;
+}
+
 void WINAPI ServiceControlHandler(DWORD control) {
     if (control != SERVICE_CONTROL_STOP && control != SERVICE_CONTROL_SHUTDOWN) {
         return;
@@ -369,12 +373,20 @@ void WINAPI ServiceMain(DWORD, LPWSTR*) {
         return;
     }
 
-    g_serviceWorker = std::thread([] { RunPipeServer(g_serviceStopEvent); });
+    g_serviceWorker = CreateThread(nullptr, 0, ServiceWorkerThread, g_serviceStopEvent, 0, nullptr);
+    if (g_serviceWorker == nullptr) {
+        SetServiceStatusState(SERVICE_STOPPED, GetLastError());
+        CloseHandle(g_serviceStopEvent);
+        g_serviceStopEvent = nullptr;
+        return;
+    }
     SetServiceStatusState(SERVICE_RUNNING);
 
     WaitForSingleObject(g_serviceStopEvent, INFINITE);
-    if (g_serviceWorker.joinable()) {
-        g_serviceWorker.join();
+    if (g_serviceWorker != nullptr) {
+        WaitForSingleObject(g_serviceWorker, INFINITE);
+        CloseHandle(g_serviceWorker);
+        g_serviceWorker = nullptr;
     }
     CloseHandle(g_serviceStopEvent);
     g_serviceStopEvent = nullptr;

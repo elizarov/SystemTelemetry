@@ -1,9 +1,7 @@
 #include "telemetry/telemetry.h"
 
 #include <chrono>
-#include <condition_variable>
 #include <mutex>
-#include <thread>
 
 #include "telemetry/impl/collector.h"
 
@@ -48,14 +46,30 @@ public:
 
     ~ThreadedTelemetryRuntime() override {
         Shutdown();
+        if (wakeEvent_ != nullptr) {
+            CloseHandle(wakeEvent_);
+        }
     }
 
     bool Initialize(const TelemetrySettings& settings, std::string* errorText) {
         if (!collector_->Initialize(settings, errorText)) {
             return false;
         }
+        wakeEvent_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        if (wakeEvent_ == nullptr) {
+            if (errorText != nullptr) {
+                *errorText = "Failed to create telemetry wake event.";
+            }
+            return false;
+        }
         PublishLocked();
-        worker_ = std::thread([this] { RunWorker(); });
+        workerThread_ = CreateThread(nullptr, 0, &ThreadedTelemetryRuntime::WorkerThread, this, 0, nullptr);
+        if (workerThread_ == nullptr) {
+            if (errorText != nullptr) {
+                *errorText = "Failed to create telemetry worker thread.";
+            }
+            return false;
+        }
         return true;
     }
 
@@ -67,9 +81,13 @@ public:
             }
             stopped_ = true;
         }
-        commandCv_.notify_all();
-        if (worker_.joinable()) {
-            worker_.join();
+        if (wakeEvent_ != nullptr) {
+            SetEvent(wakeEvent_);
+        }
+        if (workerThread_ != nullptr) {
+            WaitForSingleObject(workerThread_, INFINITE);
+            CloseHandle(workerThread_);
+            workerThread_ = nullptr;
         }
     }
 
@@ -105,7 +123,7 @@ public:
 
 private:
     template <typename Action> void RunSynchronized(Action&& action) {
-        std::unique_lock lock(commandMutex_);
+        std::lock_guard lock(commandMutex_);
         action();
         PublishLocked();
     }
@@ -113,18 +131,32 @@ private:
     void RunWorker() {
         auto nextCollection = Clock::now() + kTelemetryRefreshInterval;
         for (;;) {
-            std::unique_lock lock(commandMutex_);
             const auto now = Clock::now();
             while (nextCollection <= now) {
                 nextCollection += kTelemetryRefreshInterval;
             }
-            if (commandCv_.wait_until(lock, nextCollection, [&] { return stopped_; })) {
+            const auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(nextCollection - now).count();
+            const DWORD timeoutMs = waitMs > 0 ? static_cast<DWORD>(waitMs) : 0;
+            if (WaitForSingleObject(wakeEvent_, timeoutMs) == WAIT_OBJECT_0) {
+                const std::lock_guard lock(commandMutex_);
+                if (stopped_) {
+                    return;
+                }
+                continue;
+            }
+            const std::lock_guard lock(commandMutex_);
+            if (stopped_) {
                 return;
             }
             nextCollection += kTelemetryRefreshInterval;
             collector_->UpdateSnapshot();
             PublishLocked();
         }
+    }
+
+    static DWORD WINAPI WorkerThread(void* context) {
+        static_cast<ThreadedTelemetryRuntime*>(context)->RunWorker();
+        return 0;
     }
 
     void PublishLocked() {
@@ -143,9 +175,9 @@ private:
     mutable std::mutex latestMutex_;
     TelemetryUpdate latest_;
     std::mutex commandMutex_;
-    std::condition_variable commandCv_;
+    HANDLE wakeEvent_ = nullptr;
+    HANDLE workerThread_ = nullptr;
     bool stopped_ = false;
-    std::thread worker_;
 };
 
 }  // namespace

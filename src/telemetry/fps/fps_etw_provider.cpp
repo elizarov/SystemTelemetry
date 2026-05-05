@@ -11,7 +11,6 @@
 #include <optional>
 #include <pdhmsg.h>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -226,15 +225,12 @@ public:
             return false;
         }
 
-        processingThread_ = std::thread([this] {
-            TRACEHANDLE handle = INVALID_PROCESSTRACE_HANDLE;
-            {
-                std::lock_guard threadLock(mutex_);
-                handle = traceHandle_;
-            }
-            const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
-            trace_.Write("fps_etw:process_trace_done status=" + Win32ErrorText(processStatus));
-        });
+        processingThread_ = CreateThread(nullptr, 0, &PresentedFpsEtwProvider::ProcessTraceThread, this, 0, nullptr);
+        if (processingThread_ == nullptr) {
+            diagnostics_ = "Failed to create FPS ETW processing thread: " + Win32ErrorText(GetLastError());
+            StopLocked();
+            return false;
+        }
 
         diagnostics_ = "Presented FPS ETW provider active.";
         permissionRequired_ = false;
@@ -703,14 +699,16 @@ private:
     }
 
     void Stop() {
-        std::thread threadToJoin;
+        HANDLE threadToJoin = nullptr;
         {
             std::lock_guard lock(mutex_);
             StopLocked();
-            threadToJoin = std::move(processingThread_);
+            threadToJoin = processingThread_;
+            processingThread_ = nullptr;
         }
-        if (threadToJoin.joinable()) {
-            threadToJoin.join();
+        if (threadToJoin != nullptr) {
+            WaitForSingleObject(threadToJoin, INFINITE);
+            CloseHandle(threadToJoin);
         }
     }
 
@@ -812,11 +810,26 @@ private:
         }
     }
 
+    static DWORD WINAPI ProcessTraceThread(void* context) {
+        static_cast<PresentedFpsEtwProvider*>(context)->ProcessTraceLoop();
+        return 0;
+    }
+
+    void ProcessTraceLoop() {
+        TRACEHANDLE handle = INVALID_PROCESSTRACE_HANDLE;
+        {
+            std::lock_guard threadLock(mutex_);
+            handle = traceHandle_;
+        }
+        const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
+        trace_.Write("fps_etw:process_trace_done status=" + Win32ErrorText(processStatus));
+    }
+
     Trace& trace_;
     mutable std::mutex mutex_;
     TRACEHANDLE sessionHandle_ = 0;
     TRACEHANDLE traceHandle_ = INVALID_PROCESSTRACE_HANDLE;
-    std::thread processingThread_;
+    HANDLE processingThread_ = nullptr;
     std::wstring sessionName_;
     // Size: active presenting process sets are tiny; flat buckets avoid unordered_map machinery in this provider.
     ProcessPresentEventBuckets runtimeEventsByProcess_;
