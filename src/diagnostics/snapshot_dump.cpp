@@ -35,44 +35,43 @@ using DumpValues = std::vector<std::pair<std::string, std::string>>;
         key, static_cast<std::uint32_t>(offsetof(TelemetryDump, field)), kind                                          \
     }
 
-const std::vector<DumpFieldDescriptor>& FlatDumpFields() {
-    static const std::vector<DumpFieldDescriptor> fields{
-        DUMP_FIELD("cpu.name", DumpFieldKind::String, snapshot.cpu.name),
-        DUMP_FIELD("cpu.load_percent", DumpFieldKind::Double, snapshot.cpu.loadPercent),
-        DUMP_FIELD("cpu.clock.value", DumpFieldKind::OptionalDouble, snapshot.cpu.clock.value),
-        DUMP_FIELD("cpu.clock.unit", DumpFieldKind::ScalarUnit, snapshot.cpu.clock.unit),
-        DUMP_FIELD("cpu.memory.used_gb", DumpFieldKind::Double, snapshot.cpu.memory.usedGb),
-        DUMP_FIELD("cpu.memory.total_gb", DumpFieldKind::Double, snapshot.cpu.memory.totalGb),
-        DUMP_FIELD("gpu.name", DumpFieldKind::String, snapshot.gpu.name),
-        DUMP_FIELD("gpu.load_percent", DumpFieldKind::Double, snapshot.gpu.loadPercent),
-        DUMP_FIELD("gpu.temperature.value", DumpFieldKind::OptionalDouble, snapshot.gpu.temperature.value),
-        DUMP_FIELD("gpu.temperature.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.temperature.unit),
-        DUMP_FIELD("gpu.clock.value", DumpFieldKind::OptionalDouble, snapshot.gpu.clock.value),
-        DUMP_FIELD("gpu.clock.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.clock.unit),
-        DUMP_FIELD("gpu.fan.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fan.value),
-        DUMP_FIELD("gpu.fan.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fan.unit),
-        DUMP_FIELD("gpu.fps.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fps.value),
-        DUMP_FIELD("gpu.fps.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fps.unit),
-        DUMP_FIELD("gpu.fps.issue", DumpFieldKind::ScalarIssue, snapshot.gpu.fps.issue),
-        DUMP_FIELD("gpu.fps.app_name", DumpFieldKind::String, snapshot.gpu.fpsAppName),
-        DUMP_FIELD("gpu.vram.used_gb", DumpFieldKind::Double, snapshot.gpu.vram.usedGb),
-        DUMP_FIELD("gpu.vram.total_gb", DumpFieldKind::Double, snapshot.gpu.vram.totalGb),
-        DUMP_FIELD("network.adapter_name", DumpFieldKind::String, snapshot.network.adapterName),
-        DUMP_FIELD("network.upload_mbps", DumpFieldKind::Double, snapshot.network.uploadMbps),
-        DUMP_FIELD("network.download_mbps", DumpFieldKind::Double, snapshot.network.downloadMbps),
-        DUMP_FIELD("network.ip_address", DumpFieldKind::String, snapshot.network.ipAddress),
-        DUMP_FIELD("storage.read_mbps", DumpFieldKind::Double, snapshot.storage.readMbps),
-        DUMP_FIELD("storage.write_mbps", DumpFieldKind::Double, snapshot.storage.writeMbps),
-        DUMP_FIELD("time.year", DumpFieldKind::SystemTimeWord, snapshot.now.wYear),
-        DUMP_FIELD("time.month", DumpFieldKind::SystemTimeWord, snapshot.now.wMonth),
-        DUMP_FIELD("time.day", DumpFieldKind::SystemTimeWord, snapshot.now.wDay),
-        DUMP_FIELD("time.hour", DumpFieldKind::SystemTimeWord, snapshot.now.wHour),
-        DUMP_FIELD("time.minute", DumpFieldKind::SystemTimeWord, snapshot.now.wMinute),
-        DUMP_FIELD("time.second", DumpFieldKind::SystemTimeWord, snapshot.now.wSecond),
-        DUMP_FIELD("time.milliseconds", DumpFieldKind::SystemTimeWord, snapshot.now.wMilliseconds),
-    };
-    return fields;
-}
+// Size: fixed metadata avoids function-local vector construction/destruction code.
+constexpr DumpFieldDescriptor kFlatDumpFields[] = {
+    DUMP_FIELD("cpu.name", DumpFieldKind::String, snapshot.cpu.name),
+    DUMP_FIELD("cpu.load_percent", DumpFieldKind::Double, snapshot.cpu.loadPercent),
+    DUMP_FIELD("cpu.clock.value", DumpFieldKind::OptionalDouble, snapshot.cpu.clock.value),
+    DUMP_FIELD("cpu.clock.unit", DumpFieldKind::ScalarUnit, snapshot.cpu.clock.unit),
+    DUMP_FIELD("cpu.memory.used_gb", DumpFieldKind::Double, snapshot.cpu.memory.usedGb),
+    DUMP_FIELD("cpu.memory.total_gb", DumpFieldKind::Double, snapshot.cpu.memory.totalGb),
+    DUMP_FIELD("gpu.name", DumpFieldKind::String, snapshot.gpu.name),
+    DUMP_FIELD("gpu.load_percent", DumpFieldKind::Double, snapshot.gpu.loadPercent),
+    DUMP_FIELD("gpu.temperature.value", DumpFieldKind::OptionalDouble, snapshot.gpu.temperature.value),
+    DUMP_FIELD("gpu.temperature.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.temperature.unit),
+    DUMP_FIELD("gpu.clock.value", DumpFieldKind::OptionalDouble, snapshot.gpu.clock.value),
+    DUMP_FIELD("gpu.clock.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.clock.unit),
+    DUMP_FIELD("gpu.fan.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fan.value),
+    DUMP_FIELD("gpu.fan.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fan.unit),
+    DUMP_FIELD("gpu.fps.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fps.value),
+    DUMP_FIELD("gpu.fps.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fps.unit),
+    DUMP_FIELD("gpu.fps.issue", DumpFieldKind::ScalarIssue, snapshot.gpu.fps.issue),
+    DUMP_FIELD("gpu.fps.app_name", DumpFieldKind::String, snapshot.gpu.fpsAppName),
+    DUMP_FIELD("gpu.vram.used_gb", DumpFieldKind::Double, snapshot.gpu.vram.usedGb),
+    DUMP_FIELD("gpu.vram.total_gb", DumpFieldKind::Double, snapshot.gpu.vram.totalGb),
+    DUMP_FIELD("network.adapter_name", DumpFieldKind::String, snapshot.network.adapterName),
+    DUMP_FIELD("network.upload_mbps", DumpFieldKind::Double, snapshot.network.uploadMbps),
+    DUMP_FIELD("network.download_mbps", DumpFieldKind::Double, snapshot.network.downloadMbps),
+    DUMP_FIELD("network.ip_address", DumpFieldKind::String, snapshot.network.ipAddress),
+    DUMP_FIELD("storage.read_mbps", DumpFieldKind::Double, snapshot.storage.readMbps),
+    DUMP_FIELD("storage.write_mbps", DumpFieldKind::Double, snapshot.storage.writeMbps),
+    DUMP_FIELD("time.year", DumpFieldKind::SystemTimeWord, snapshot.now.wYear),
+    DUMP_FIELD("time.month", DumpFieldKind::SystemTimeWord, snapshot.now.wMonth),
+    DUMP_FIELD("time.day", DumpFieldKind::SystemTimeWord, snapshot.now.wDay),
+    DUMP_FIELD("time.hour", DumpFieldKind::SystemTimeWord, snapshot.now.wHour),
+    DUMP_FIELD("time.minute", DumpFieldKind::SystemTimeWord, snapshot.now.wMinute),
+    DUMP_FIELD("time.second", DumpFieldKind::SystemTimeWord, snapshot.now.wSecond),
+    DUMP_FIELD("time.milliseconds", DumpFieldKind::SystemTimeWord, snapshot.now.wMilliseconds),
+};
+constexpr size_t kFlatDumpFieldCount = sizeof(kFlatDumpFields) / sizeof(kFlatDumpFields[0]);
 
 #undef DUMP_FIELD
 
@@ -229,10 +228,9 @@ void WriteScalarMetricIssue(std::string& output, const std::string& key, ScalarM
 }
 
 void WriteFlatDumpFields(std::string& output, const TelemetryDump& dump, size_t begin, size_t end) {
-    const std::vector<DumpFieldDescriptor>& fields = FlatDumpFields();
-    end = (std::min)(end, fields.size());
+    end = (std::min)(end, kFlatDumpFieldCount);
     for (size_t i = begin; i < end; ++i) {
-        const DumpFieldDescriptor& field = fields[i];
+        const DumpFieldDescriptor& field = kFlatDumpFields[i];
         const std::string key(field.key);
         switch (field.kind) {
             case DumpFieldKind::String:
@@ -463,10 +461,9 @@ bool LoadDoubleArrayField(
 }
 
 bool LoadFlatDumpFields(const DumpValues& values, TelemetryDump& dump, size_t begin, size_t end, std::string* error) {
-    const std::vector<DumpFieldDescriptor>& fields = FlatDumpFields();
-    end = (std::min)(end, fields.size());
+    end = (std::min)(end, kFlatDumpFieldCount);
     for (size_t i = begin; i < end; ++i) {
-        const DumpFieldDescriptor& field = fields[i];
+        const DumpFieldDescriptor& field = kFlatDumpFields[i];
         const std::string key(field.key);
         switch (field.kind) {
             case DumpFieldKind::String:
@@ -571,7 +568,7 @@ bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
         WriteDouble(output, prefix + ".write_mbps", dump.snapshot.drives[i].writeMbps, 6);
     }
 
-    WriteFlatDumpFields(output, dump, 26, FlatDumpFields().size());
+    WriteFlatDumpFields(output, dump, 26, kFlatDumpFieldCount);
     return true;
 }
 
@@ -657,7 +654,7 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         parsed.snapshot.drives.push_back(std::move(drive));
     }
 
-    if (!LoadFlatDumpFields(values, parsed, 26, FlatDumpFields().size(), error)) {
+    if (!LoadFlatDumpFields(values, parsed, 26, kFlatDumpFieldCount, error)) {
         return false;
     }
 
