@@ -7,10 +7,6 @@
 #include "util/numeric_safety.h"
 #include "widget/widget_host.h"
 
-struct GaugeSharedLayout {
-    int radius = 0;
-};
-
 namespace {
 
 using GaugeSegmentLayout = GaugeWidget::SegmentLayout;
@@ -187,7 +183,7 @@ int EffectiveGaugePreferredRadius(const WidgetHost& renderer, const std::string&
 
 void GaugeWidget::Initialize(const LayoutNodeConfig& node) {
     metric_ = node.parameter;
-    sharedLayout_.reset();
+    sharedOuterRadius_ = 0;
 }
 
 int GaugeWidget::PreferredHeight(const WidgetHost& renderer) const {
@@ -196,9 +192,7 @@ int GaugeWidget::PreferredHeight(const WidgetHost& renderer) const {
 
 void GaugeWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect) {
     layoutState_ = {};
-    layoutState_.outerRadius = sharedLayout_ != nullptr && sharedLayout_->radius > 0
-                                   ? sharedLayout_->radius
-                                   : GaugeOuterRadiusForRect(renderer, rect);
+    layoutState_.outerRadius = sharedOuterRadius_ > 0 ? sharedOuterRadius_ : GaugeOuterRadiusForRect(renderer, rect);
     layoutState_.cx = rect.left + ((std::max)(0, rect.right - rect.left) / 2);
     layoutState_.cy = rect.top + ((std::max)(0, rect.bottom - rect.top) / 2);
     layoutState_.ringThickness =
@@ -458,7 +452,7 @@ void GaugeWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widg
 }
 
 void FinalizeGaugeLayoutGroup(WidgetHost& renderer, const std::vector<WidgetLayout*>& widgets) {
-    auto sharedLayout = std::make_shared<GaugeSharedLayout>();
+    int sharedOuterRadius = 0;
     int gaugeCount = 0;
     for (WidgetLayout* widget : widgets) {
         if (widget == nullptr) {
@@ -468,7 +462,7 @@ void FinalizeGaugeLayoutGroup(WidgetHost& renderer, const std::vector<WidgetLayo
             continue;
         }
         const int gaugeRadius = GaugeOuterRadiusForRect(renderer, widget->rect);
-        sharedLayout->radius = gaugeCount == 0 ? gaugeRadius : (std::min)(sharedLayout->radius, gaugeRadius);
+        sharedOuterRadius = gaugeCount == 0 ? gaugeRadius : (std::min)(sharedOuterRadius, gaugeRadius);
         ++gaugeCount;
     }
 
@@ -480,6 +474,6 @@ void FinalizeGaugeLayoutGroup(WidgetHost& renderer, const std::vector<WidgetLayo
             continue;
         }
         auto* gauge = static_cast<GaugeWidget*>(widget->widget.get());
-        gauge->sharedLayout_ = sharedLayout;
+        gauge->sharedOuterRadius_ = sharedOuterRadius;
     }
 }

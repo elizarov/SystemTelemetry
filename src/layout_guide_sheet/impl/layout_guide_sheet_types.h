@@ -10,6 +10,13 @@
 
 inline constexpr const char kLayoutGuideSheetOverviewSourceId[] = "__layout_overview";
 
+enum class LayoutGuideSheetExitSide {
+    Left,
+    Right,
+    Top,
+    Bottom,
+};
+
 struct LayoutGuideSheetCalloutRequest {
     std::string key;
     std::string sourceCardId;
@@ -24,4 +31,14 @@ struct LayoutGuideSheetCalloutRequest {
     RenderRect targetRect{};
     int priority = 1000;
     size_t order = 0;
+    std::optional<RenderRect> hoverArtifactTargetRect;
+    std::optional<RenderRect> hoverAnchorRect;
+    std::optional<LayoutEditGapAnchor> hoverGapAnchor;
+    bool hoverAnchorDrawTargetOutline = true;
+    bool targetAttachmentOnAnchorCircle = false;
+    RenderRect bubbleRect{};
+    RenderPoint targetAttachment{};
+    RenderPoint bubbleAttachment{};
+    LayoutGuideSheetExitSide exitSide = LayoutGuideSheetExitSide::Right;
+    bool wrapDescription = false;
 };

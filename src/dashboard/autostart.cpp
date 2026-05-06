@@ -5,6 +5,7 @@
 #include "dashboard/fps_service.h"
 #include "util/command_line.h"
 #include "util/paths.h"
+#include "util/utf8.h"
 
 namespace {
 
@@ -49,7 +50,8 @@ bool IsAutoStartEnabledForCurrentExecutable() {
     if (!executablePath.has_value() || !registeredCommand.has_value()) {
         return false;
     }
-    return NormalizeWindowsPath(*registeredCommand) == NormalizeWindowsPath(*executablePath) &&
+    return NormalizeCommandPath(Utf8FromWide(*registeredCommand)) ==
+               NormalizeCommandPath(Utf8FromWide(*executablePath)) &&
            IsFpsServiceRunningForCurrentExecutable();
 }
 
@@ -76,7 +78,7 @@ LSTATUS WriteAutoStartRegistryValue(bool enabled) {
             RegCloseKey(key);
             return ERROR_FILE_NOT_FOUND;
         }
-        const std::wstring command = QuoteCommandLineArgument(*executablePath);
+        const std::wstring command = WideFromUtf8(QuoteCommandLineArgument(Utf8FromWide(*executablePath)));
         result = RegSetValueExW(key,
             kAutoStartValueName,
             0,
@@ -110,7 +112,7 @@ bool UpdateAutoStartElevated(bool enabled, HWND owner) {
         return false;
     }
 
-    std::wstring parameters = enabled ? L"/set-autostart on" : L"/set-autostart off";
+    const std::wstring parameters = WideFromUtf8(enabled ? "/set-autostart on" : "/set-autostart off");
     SHELLEXECUTEINFOW executeInfo{};
     executeInfo.cbSize = sizeof(executeInfo);
     executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;

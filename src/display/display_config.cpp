@@ -172,14 +172,15 @@ bool ConfigureDisplay(
         return false;
     }
 
-    std::wstring parameters = L"/configure-display ";
-    parameters += QuoteCommandLineArgument(tempConfigPath.wstring());
-    parameters += L" /configure-display-target ";
-    parameters += QuoteCommandLineArgument(configPath.wstring());
-    parameters += L" /configure-display-dump ";
-    parameters += QuoteCommandLineArgument(tempDumpPath.wstring());
-    parameters += L" /configure-display-image-target ";
-    parameters += QuoteCommandLineArgument(imagePath.wstring());
+    std::string parameters = "/configure-display ";
+    parameters += QuoteCommandLineArgument(Utf8FromWide(tempConfigPath.wstring()));
+    parameters += " /configure-display-target ";
+    parameters += QuoteCommandLineArgument(Utf8FromWide(configPath.wstring()));
+    parameters += " /configure-display-dump ";
+    parameters += QuoteCommandLineArgument(Utf8FromWide(tempDumpPath.wstring()));
+    parameters += " /configure-display-image-target ";
+    parameters += QuoteCommandLineArgument(Utf8FromWide(imagePath.wstring()));
+    const std::wstring wideParameters = WideFromUtf8(parameters);
 
     SHELLEXECUTEINFOW executeInfo{};
     executeInfo.cbSize = sizeof(executeInfo);
@@ -187,7 +188,7 @@ bool ConfigureDisplay(
     executeInfo.hwnd = owner;
     executeInfo.lpVerb = L"runas";
     executeInfo.lpFile = executablePath->c_str();
-    executeInfo.lpParameters = parameters.c_str();
+    executeInfo.lpParameters = wideParameters.c_str();
     executeInfo.nShow = SW_HIDE;
     if (!ShellExecuteExW(&executeInfo)) {
         RemoveFileIfExists(tempConfigPath);

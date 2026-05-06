@@ -13,6 +13,7 @@
 #include "config/diagnostics_options.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "diagnostics/snapshot_dump.h"
+#include "util/command_line.h"
 #include "util/file_path.h"
 #include "util/trace.h"
 
@@ -36,7 +37,7 @@ bool SaveLayoutGuideSheet(const FilePath& imagePath,
 bool SaveRenderedAppIcon(
     const FilePath& imagePath, const AppConfig& config, int size, std::string* errorText = nullptr);
 
-DiagnosticsOptions GetDiagnosticsOptions();
+DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine);
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options);
 LayoutSimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options);
@@ -55,6 +56,11 @@ public:
 
 private:
     void ReportError(const std::string& traceText, const std::wstring& message);
+    bool ReportSaveError(const char* traceEvent,
+        const char* messageAction,
+        const FilePath& path,
+        std::string_view detail = {},
+        std::string_view traceSuffix = {});
     void ShowFileOpenError(const char* label, const FilePath& path);
 
     DiagnosticsOptions options_;
@@ -69,11 +75,11 @@ private:
     std::FILE* traceFile_ = nullptr;
 };
 
-std::optional<double> TryParseScaleValue(const std::wstring& text);
-std::optional<int> TryParseAppIconSizeValue(const std::wstring& text);
-std::optional<double> GetScaleSwitchValue();
-std::optional<std::string> GetLayoutSwitchValue();
-std::optional<std::string> GetThemeSwitchValue();
+std::optional<double> TryParseScaleValue(const std::string& text);
+std::optional<int> TryParseAppIconSizeValue(const std::string& text);
+std::optional<double> GetScaleSwitchValue(const CommandLineArguments& commandLine);
+std::optional<std::string> GetLayoutSwitchValue(const CommandLineArguments& commandLine);
+std::optional<std::string> GetThemeSwitchValue(const CommandLineArguments& commandLine);
 bool ApplyDiagnosticsLayoutOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
 bool ApplyDiagnosticsThemeOverride(

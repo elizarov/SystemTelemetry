@@ -127,46 +127,31 @@ bool IsRepresentativeWidgetClass(WidgetClass widgetClass) {
            widgetClass != WidgetClass::VerticalSpacer && widgetClass != WidgetClass::VerticalSpring;
 }
 
-size_t UniqueWidgetClassCount(const LayoutGuideSheetCardSummary& card) {
-    WidgetClass classes[16] = {};
-    size_t count = 0;
-    for (WidgetClass widgetClass : card.widgetClasses) {
-        if (!IsRepresentativeWidgetClass(widgetClass)) {
-            continue;
-        }
-        bool seen = false;
-        for (size_t i = 0; i < count; ++i) {
-            if (classes[i] == widgetClass) {
-                seen = true;
-                break;
-            }
-        }
-        if (!seen) {
-            classes[count++] = widgetClass;
-        }
-    }
-    return count;
-}
-
 bool IsContainerChildOrderAnchor(const LayoutEditActiveRegionPayload& payload) {
     const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload);
     return anchor != nullptr && std::holds_alternative<LayoutContainerChildOrderEditKey>(anchor->key.subject);
 }
 
-size_t CoverageCount(const std::vector<WidgetClass>& covered, const std::vector<WidgetClass>& universe) {
-    return static_cast<size_t>(std::count_if(universe.begin(), universe.end(), [&](WidgetClass widgetClass) {
-        return std::find(covered.begin(), covered.end(), widgetClass) != covered.end();
-    }));
+unsigned int WidgetClassBit(WidgetClass widgetClass) {
+    const unsigned int index = static_cast<unsigned int>(widgetClass);
+    return IsRepresentativeWidgetClass(widgetClass) && index < sizeof(unsigned int) * 8 ? 1u << index : 0u;
 }
 
-void AddCardCoverage(std::vector<WidgetClass>& covered, const LayoutGuideSheetCardSummary& card) {
+unsigned int CardWidgetClassMask(const LayoutGuideSheetCardSummary& card) {
+    unsigned int mask = 0;
     for (WidgetClass widgetClass : card.widgetClasses) {
-        if (!IsRepresentativeWidgetClass(widgetClass) ||
-            std::find(covered.begin(), covered.end(), widgetClass) != covered.end()) {
-            continue;
-        }
-        covered.push_back(widgetClass);
+        mask |= WidgetClassBit(widgetClass);
     }
+    return mask;
+}
+
+size_t CountBits(unsigned int value) {
+    size_t count = 0;
+    while (value != 0) {
+        count += value & 1u;
+        value >>= 1;
+    }
+    return count;
 }
 
 std::string LayoutGuideSheetCalloutKey(
@@ -205,7 +190,6 @@ void AddOrUpdateCallout(std::vector<LayoutGuideSheetCalloutRequest>& callouts,
     const std::string& parameterLine,
     const std::string& descriptionLine,
     const LayoutEditActiveRegion& region,
-    const TooltipPayload& payload,
     int priority,
     size_t& order) {
     std::optional<LayoutEditAnchorKey> hoverAnchorKey;
@@ -268,17 +252,20 @@ void AddOrUpdateCallout(std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         region.box,
         priority,
         order++});
-    (void)payload;
 }
 
 }  // namespace
 
 std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGuideSheetCardSummary>& cards) {
-    std::vector<WidgetClass> universe;
+    std::vector<unsigned int> cardMasks;
+    cardMasks.reserve(cards.size());
+    unsigned int universe = 0;
     for (const LayoutGuideSheetCardSummary& card : cards) {
-        AddCardCoverage(universe, card);
+        const unsigned int mask = CardWidgetClassMask(card);
+        cardMasks.push_back(mask);
+        universe |= mask;
     }
-    if (universe.empty()) {
+    if (universe == 0) {
         std::vector<std::string> selected;
         if (!cards.empty()) {
             selected.push_back(cards.front().id);
@@ -286,41 +273,44 @@ std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGui
         return selected;
     }
 
-    std::vector<size_t> bestIndexes;
+    size_t bestMask = 0;
     size_t bestCoverage = 0;
     size_t bestWidgetCount = 0;
+    size_t bestCardCount = 0;
     const size_t combinationCount = cards.size() >= sizeof(size_t) * 8 ? 0 : (size_t{1} << cards.size());
     for (size_t mask = 1; mask < combinationCount; ++mask) {
-        std::vector<WidgetClass> covered;
-        std::vector<size_t> indexes;
+        unsigned int covered = 0;
         size_t widgetCount = 0;
+        size_t cardCount = 0;
         for (size_t i = 0; i < cards.size(); ++i) {
             if ((mask & (size_t{1} << i)) == 0) {
                 continue;
             }
-            indexes.push_back(i);
-            widgetCount += UniqueWidgetClassCount(cards[i]);
-            AddCardCoverage(covered, cards[i]);
+            ++cardCount;
+            widgetCount += CountBits(cardMasks[i]);
+            covered |= cardMasks[i];
         }
-        const size_t coverage = CoverageCount(covered, universe);
-        const bool better =
-            bestIndexes.empty() || coverage > bestCoverage ||
-            (coverage == bestCoverage && indexes.size() < bestIndexes.size()) ||
-            (coverage == bestCoverage && indexes.size() == bestIndexes.size() && widgetCount > bestWidgetCount);
+        const size_t coverage = CountBits(covered);
+        const bool better = bestMask == 0 || coverage > bestCoverage ||
+                            (coverage == bestCoverage && cardCount < bestCardCount) ||
+                            (coverage == bestCoverage && cardCount == bestCardCount && widgetCount > bestWidgetCount);
         if (better) {
-            bestIndexes = std::move(indexes);
+            bestMask = mask;
             bestCoverage = coverage;
+            bestCardCount = cardCount;
             bestWidgetCount = widgetCount;
         }
-        if (bestCoverage == universe.size() && bestIndexes.size() == 1) {
+        if (bestCoverage == CountBits(universe) && bestCardCount == 1) {
             break;
         }
     }
 
     std::vector<std::string> selected;
-    selected.reserve(bestIndexes.size());
-    for (size_t index : bestIndexes) {
-        selected.push_back(cards[index].id);
+    selected.reserve(bestCardCount);
+    for (size_t index = 0; index < cards.size(); ++index) {
+        if ((bestMask & (size_t{1} << index)) != 0) {
+            selected.push_back(cards[index].id);
+        }
     }
     return selected;
 }
@@ -361,8 +351,7 @@ std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetCallouts(const 
         const std::string key = LayoutGuideSheetCalloutKey(parameterLine, descriptionLine, *payload);
         const auto parameter = TooltipPayloadParameter(*payload);
         const int priority = parameter.has_value() ? GetLayoutEditParameterHitPriority(*parameter) : 500;
-        AddOrUpdateCallout(
-            callouts, key, sourceCard.cardId, parameterLine, descriptionLine, region, *payload, priority, order);
+        AddOrUpdateCallout(callouts, key, sourceCard.cardId, parameterLine, descriptionLine, region, priority, order);
     }
     return callouts;
 }
@@ -388,15 +377,8 @@ std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetOverviewCallout
         const std::string key = LayoutGuideSheetCalloutKey(parameterLine, descriptionLine, *payload);
         const auto parameter = TooltipPayloadParameter(*payload);
         const int priority = parameter.has_value() ? GetLayoutEditParameterHitPriority(*parameter) : 500;
-        AddOrUpdateCallout(callouts,
-            key,
-            kLayoutGuideSheetOverviewSourceId,
-            parameterLine,
-            descriptionLine,
-            region,
-            *payload,
-            priority,
-            order);
+        AddOrUpdateCallout(
+            callouts, key, kLayoutGuideSheetOverviewSourceId, parameterLine, descriptionLine, region, priority, order);
     }
     return callouts;
 }

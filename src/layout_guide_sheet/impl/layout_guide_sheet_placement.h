@@ -4,43 +4,13 @@
 #include <string>
 #include <vector>
 
+#include "layout_guide_sheet/impl/layout_guide_sheet_types.h"
 #include "renderer/render_types.h"
 #include "util/function_ref.h"
 #include "widget/layout_edit_parameter_id.h"
 #include "widget/layout_edit_types.h"
 
-enum class LayoutGuideSheetExitSide {
-    Left,
-    Right,
-    Top,
-    Bottom,
-};
-
-struct LayoutGuideSheetPlacementCallout {
-    std::string key;
-    std::string sourceCardId;
-    std::string parameterLine;
-    std::string descriptionLine;
-    std::optional<LayoutEditAnchorKey> hoverAnchorKey;
-    std::optional<LayoutEditWidgetGuide> hoverWidgetGuide;
-    std::optional<LayoutEditGuide> hoverLayoutGuide;
-    std::optional<LayoutEditGapAnchorKey> hoverGapAnchorKey;
-    std::optional<AnchorShape> hoverAnchorShape;
-    std::optional<LayoutEditParameter> hoverColorParameter;
-    RenderRect targetRect{};
-    std::optional<RenderRect> hoverArtifactTargetRect;
-    std::optional<RenderRect> hoverAnchorRect;
-    std::optional<LayoutEditGapAnchor> hoverGapAnchor;
-    bool hoverAnchorDrawTargetOutline = true;
-    bool targetAttachmentOnAnchorCircle = false;
-    RenderRect bubbleRect{};
-    RenderPoint targetAttachment{};
-    RenderPoint bubbleAttachment{};
-    LayoutGuideSheetExitSide exitSide = LayoutGuideSheetExitSide::Right;
-    int priority = 1000;
-    size_t order = 0;
-    bool wrapDescription = false;
-};
+using LayoutGuideSheetPlacementCallout = LayoutGuideSheetCalloutRequest;
 
 struct LayoutGuideSheetCardPlacement {
     std::string id;

@@ -294,7 +294,7 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
                 case IDOK: {
                     wchar_t buffer[64] = {};
                     GetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, buffer, ARRAYSIZE(buffer));
-                    const std::optional<double> percentage = TryParseScaleValue(buffer);
+                    const std::optional<double> percentage = TryParseScaleValue(Utf8FromWide(buffer));
                     if (!percentage.has_value()) {
                         MessageBoxW(hwnd, L"Enter a positive percentage scale.", L"CaseDash", MB_ICONERROR);
                         SetFocus(GetDlgItem(hwnd, IDC_CUSTOM_SCALE_EDIT));

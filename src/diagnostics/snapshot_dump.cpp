@@ -23,7 +23,7 @@ enum class DumpFieldKind : std::uint8_t {
 };
 
 struct DumpFieldDescriptor {
-    std::string_view key;
+    const char* key = "";
     std::uint32_t offset = 0;
     DumpFieldKind kind = DumpFieldKind::String;
 };

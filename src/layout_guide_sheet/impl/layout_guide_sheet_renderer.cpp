@@ -81,11 +81,7 @@ void StableSortCalloutsByPriority(std::vector<LayoutGuideSheetPlacementCallout>&
 
 struct PackedOverviewCard {
     std::string id;
-    std::string title;
-    std::string iconName;
     RenderRect rect{};
-    RenderRect iconRect{};
-    RenderRect titleRect{};
     LayoutGuideSheetCardChromeArtifacts chromeArtifacts;
 };
 
@@ -300,13 +296,7 @@ void AppendPackedCards(const LayoutNodeConfig& node,
         }
         PackedOverviewCard packedCard;
         packedCard.id = card->id;
-        packedCard.title = card->title;
-        packedCard.iconName = card->icon;
         packedCard.rect = rect;
-        const CardChromeLayout chrome =
-            ResolveCardChromeLayout(*card, packedCard.rect, ResolveCardChromeLayoutMetrics(renderer));
-        packedCard.iconRect = chrome.iconRect;
-        packedCard.titleRect = chrome.titleRect;
         overview.cards.push_back(std::move(packedCard));
         return;
     }
@@ -606,22 +596,20 @@ LayoutEditActiveRegions LayoutGuideSheetRenderer::CollectOverviewActiveRegions(c
     for (PackedOverviewCard& card : overview.cards) {
         card.chromeArtifacts =
             dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(card.id, card.rect, &metrics);
-        card.iconRect = card.chromeArtifacts.chromeLayout.iconRect;
-        card.titleRect = card.chromeArtifacts.chromeLayout.titleRect;
     }
     return CollectActiveRegionsFromPackedOverview(overview);
 }
 
 bool LayoutGuideSheetRenderer::SavePng(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
-    const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts,
     const std::vector<std::string>& selectedCardIds,
     std::vector<std::string>* traceDetails,
     std::string* errorText,
     LayoutGuideSheetRenderStats* stats) {
     return Render(
         snapshot,
-        calloutRequests,
+        callouts,
         selectedCardIds,
         [&](int width, int height, SurfaceDrawCallback draw) {
             return dashboardRenderer_.SaveLayoutGuideSheetSurfacePng(imagePath, width, height, draw);
@@ -632,14 +620,14 @@ bool LayoutGuideSheetRenderer::SavePng(const FilePath& imagePath,
 }
 
 bool LayoutGuideSheetRenderer::RenderOffscreen(const SystemSnapshot& snapshot,
-    const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts,
     const std::vector<std::string>& selectedCardIds,
     std::vector<std::string>* traceDetails,
     std::string* errorText,
     LayoutGuideSheetRenderStats* stats) {
     return Render(
         snapshot,
-        calloutRequests,
+        callouts,
         selectedCardIds,
         [&](int width, int height, SurfaceDrawCallback draw) {
             return dashboardRenderer_.RenderLayoutGuideSheetSurfaceOffscreen(width, height, draw);
@@ -650,7 +638,7 @@ bool LayoutGuideSheetRenderer::RenderOffscreen(const SystemSnapshot& snapshot,
 }
 
 bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
-    const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts,
     const std::vector<std::string>& selectedCardIds,
     const SurfaceRenderer& renderSurface,
     std::vector<std::string>* traceDetails,
@@ -688,33 +676,6 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     }
 
     using Callout = LayoutGuideSheetPlacementCallout;
-    std::vector<Callout> callouts;
-    callouts.reserve(calloutRequests.size());
-    for (const LayoutGuideSheetCalloutRequest& request : calloutRequests) {
-        callouts.push_back(Callout{request.key,
-            request.sourceCardId,
-            request.parameterLine,
-            request.descriptionLine,
-            request.hoverAnchorKey,
-            request.hoverWidgetGuide,
-            request.hoverLayoutGuide,
-            request.hoverGapAnchorKey,
-            request.hoverAnchorShape,
-            request.hoverColorParameter,
-            request.targetRect,
-            std::nullopt,
-            std::nullopt,
-            std::nullopt,
-            true,
-            false,
-            {},
-            {},
-            {},
-            LayoutGuideSheetExitSide::Right,
-            request.priority,
-            request.order});
-    }
-
     using CardPlacement = LayoutGuideSheetCardPlacement;
     std::vector<CardPlacement> cardPlacements;
     cardPlacements.reserve(selectedCardIds.size() + 1);
@@ -722,8 +683,6 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
     for (PackedOverviewCard& card : overview.cards) {
         card.chromeArtifacts = dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(card.id, card.rect, nullptr);
-        card.iconRect = card.chromeArtifacts.chromeLayout.iconRect;
-        card.titleRect = card.chromeArtifacts.chromeLayout.titleRect;
     }
     for (const std::string& selectedCardId : selectedCardIds) {
         const auto cardIt =

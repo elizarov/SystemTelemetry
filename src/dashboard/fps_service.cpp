@@ -14,6 +14,7 @@
 #include "util/command_line.h"
 #include "util/paths.h"
 #include "util/trace.h"
+#include "util/utf8.h"
 
 namespace {
 
@@ -144,12 +145,12 @@ void SetServiceStatusState(DWORD state, DWORD win32ExitCode = NO_ERROR, DWORD wa
     SetServiceStatus(g_serviceStatusHandle, &g_serviceStatus);
 }
 
-std::wstring BuildFpsServiceBinaryPath() {
+std::string BuildFpsServiceBinaryPath() {
     const std::optional<std::wstring> executablePath = GetExecutablePath();
     if (!executablePath.has_value()) {
         return {};
     }
-    return QuoteCommandLineArgument(*executablePath) + L" /service";
+    return QuoteCommandLineArgument(Utf8FromWide(*executablePath)) + " /service";
 }
 
 DWORD OpenInstalledService(ServiceHandle& manager, DWORD desiredAccess, ServiceHandle& service) {
@@ -162,12 +163,12 @@ DWORD OpenInstalledService(ServiceHandle& manager, DWORD desiredAccess, ServiceH
     return service.Get() != nullptr ? ERROR_SUCCESS : GetLastError();
 }
 
-bool IsExpectedServiceBinaryPath(const std::wstring& command) {
-    const std::wstring expected = BuildFpsServiceBinaryPath();
-    return !expected.empty() && NormalizeWindowsPath(command) == NormalizeWindowsPath(expected);
+bool IsExpectedServiceBinaryPath(const std::string& command) {
+    const std::string expected = BuildFpsServiceBinaryPath();
+    return !expected.empty() && NormalizeCommandPath(command) == NormalizeCommandPath(expected);
 }
 
-std::optional<std::wstring> QueryServiceBinaryPath(SC_HANDLE service) {
+std::optional<std::string> QueryServiceBinaryPath(SC_HANDLE service) {
     DWORD bytesNeeded = 0;
     QueryServiceConfigW(service, nullptr, 0, &bytesNeeded);
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || bytesNeeded == 0) {
@@ -180,7 +181,7 @@ std::optional<std::wstring> QueryServiceBinaryPath(SC_HANDLE service) {
         config->lpBinaryPathName == nullptr) {
         return std::nullopt;
     }
-    return std::wstring(config->lpBinaryPathName);
+    return Utf8FromWide(config->lpBinaryPathName);
 }
 
 DWORD StartServiceIfNeeded(SC_HANDLE service) {
@@ -395,8 +396,8 @@ void WINAPI ServiceMain(DWORD, LPWSTR*) {
 
 }  // namespace
 
-bool IsFpsServiceCommandLine() {
-    return HasSwitch(L"/service");
+bool IsFpsServiceCommandLine(const CommandLineArguments& commandLine) {
+    return HasSwitch(commandLine, "/service");
 }
 
 int RunFpsServiceMode() {
@@ -408,10 +409,11 @@ int RunFpsServiceMode() {
 }
 
 DWORD InstallOrUpdateFpsService() {
-    const std::wstring binaryPath = BuildFpsServiceBinaryPath();
+    const std::string binaryPath = BuildFpsServiceBinaryPath();
     if (binaryPath.empty()) {
         return ERROR_FILE_NOT_FOUND;
     }
+    const std::wstring wideBinaryPath = WideFromUtf8(binaryPath);
 
     ServiceHandle manager(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE));
     if (manager.Get() == nullptr) {
@@ -425,7 +427,7 @@ DWORD InstallOrUpdateFpsService() {
         SERVICE_WIN32_OWN_PROCESS,
         SERVICE_AUTO_START,
         SERVICE_ERROR_NORMAL,
-        binaryPath.c_str(),
+        wideBinaryPath.c_str(),
         nullptr,
         nullptr,
         nullptr,
@@ -446,7 +448,7 @@ DWORD InstallOrUpdateFpsService() {
                 SERVICE_WIN32_OWN_PROCESS,
                 SERVICE_AUTO_START,
                 SERVICE_ERROR_NORMAL,
-                binaryPath.c_str(),
+                wideBinaryPath.c_str(),
                 nullptr,
                 nullptr,
                 nullptr,
@@ -490,7 +492,7 @@ bool IsFpsServiceRunningForCurrentExecutable() {
         return false;
     }
 
-    const std::optional<std::wstring> binaryPath = QueryServiceBinaryPath(service.Get());
+    const std::optional<std::string> binaryPath = QueryServiceBinaryPath(service.Get());
     if (!binaryPath.has_value() || !IsExpectedServiceBinaryPath(*binaryPath)) {
         return false;
     }

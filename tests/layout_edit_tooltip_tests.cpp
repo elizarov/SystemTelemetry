@@ -202,18 +202,18 @@ TEST(LayoutEditTooltip, BuildsContainerChildOrderTooltipLineForDashboardLayout) 
 
 TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {
     const auto& gaugeField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::GaugeSegmentCount);
-    EXPECT_EQ(gaugeField.sectionName, "gauge");
-    EXPECT_EQ(gaugeField.parameterName, "segment_count");
+    EXPECT_STREQ(gaugeField.sectionName, "gauge");
+    EXPECT_STREQ(gaugeField.parameterName, "segment_count");
     EXPECT_EQ(gaugeField.valueFormat, configschema::ValueFormat::Integer);
 
     const auto& fontField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::FontLabel);
-    EXPECT_EQ(fontField.sectionName, "fonts");
-    EXPECT_EQ(fontField.parameterName, "label");
+    EXPECT_STREQ(fontField.sectionName, "fonts");
+    EXPECT_STREQ(fontField.parameterName, "label");
     EXPECT_EQ(fontField.valueFormat, configschema::ValueFormat::FontSpec);
 
     const auto& colorField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::ColorAccent);
-    EXPECT_EQ(colorField.sectionName, "colors");
-    EXPECT_EQ(colorField.parameterName, "accent_color");
+    EXPECT_STREQ(colorField.sectionName, "colors");
+    EXPECT_STREQ(colorField.parameterName, "accent_color");
     EXPECT_EQ(colorField.valueFormat, configschema::ValueFormat::ColorHex);
 }
 

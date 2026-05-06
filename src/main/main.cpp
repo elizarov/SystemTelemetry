@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include <cstring>
 #include <optional>
 #include <shellapi.h>
 #include <string>
@@ -14,6 +15,7 @@
 #include "util/command_line.h"
 #include "util/file_path.h"
 #include "util/paths.h"
+#include "util/utf8.h"
 
 namespace {
 
@@ -56,8 +58,8 @@ bool IsCurrentProcessElevated() {
     return ok && elevation.TokenIsElevated != 0;
 }
 
-std::optional<int> RelaunchElevatedIfRequested() {
-    if (!HasSwitch(L"/elevate") || IsCurrentProcessElevated()) {
+std::optional<int> RelaunchElevatedIfRequested(const CommandLineArguments& commandLine) {
+    if (!HasSwitch(commandLine, "/elevate") || IsCurrentProcessElevated()) {
         return std::nullopt;
     }
 
@@ -66,7 +68,8 @@ std::optional<int> RelaunchElevatedIfRequested() {
         return 1;
     }
 
-    const std::wstring parameters = BuildCommandLineExcludingSwitch(L"/elevate");
+    const std::string parameters = BuildCommandLineExcludingSwitch(commandLine, "/elevate");
+    const std::wstring wideParameters = WideFromUtf8(parameters);
     // Size: reuse util/paths fixed-buffer capture instead of keeping a second vector-based path reader in main.
     const std::wstring workingDirectory = GetWorkingDirectory().wstring();
     SHELLEXECUTEINFOW executeInfo{};
@@ -74,7 +77,7 @@ std::optional<int> RelaunchElevatedIfRequested() {
     executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
     executeInfo.lpVerb = L"runas";
     executeInfo.lpFile = executablePath->c_str();
-    executeInfo.lpParameters = parameters.empty() ? nullptr : parameters.c_str();
+    executeInfo.lpParameters = wideParameters.empty() ? nullptr : wideParameters.c_str();
     executeInfo.lpDirectory = workingDirectory.empty() ? nullptr : workingDirectory.c_str();
     executeInfo.nShow = SW_SHOWNORMAL;
     if (!ShellExecuteExW(&executeInfo)) {
@@ -95,39 +98,42 @@ std::optional<int> RelaunchElevatedIfRequested() {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
-    if (IsFpsServiceCommandLine()) {
+    const CommandLineArguments commandLine = GetCommandLineArguments();
+    if (IsFpsServiceCommandLine(commandLine)) {
         return RunFpsServiceMode();
     }
 
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    const DiagnosticsOptions diagnosticsOptions = GetDiagnosticsOptions();
+    const DiagnosticsOptions diagnosticsOptions = GetDiagnosticsOptions(commandLine);
     InstallCrashReportHandler(diagnosticsOptions);
 
-    if (const auto elevatedSaveSource = GetSwitchValue(L"/save-config"); elevatedSaveSource.has_value()) {
-        const auto elevatedSaveTarget = GetSwitchValue(L"/save-config-target");
-        return RunElevatedSaveConfigMode(
-            FilePath(*elevatedSaveSource), elevatedSaveTarget.has_value() ? FilePath(*elevatedSaveTarget) : FilePath{});
+    if (const auto elevatedSaveSource = GetSwitchValue(commandLine, "/save-config"); elevatedSaveSource.has_value()) {
+        const auto elevatedSaveTarget = GetSwitchValue(commandLine, "/save-config-target");
+        return RunElevatedSaveConfigMode(FilePath(WideFromUtf8(*elevatedSaveSource)),
+            elevatedSaveTarget.has_value() ? FilePath(WideFromUtf8(*elevatedSaveTarget)) : FilePath{});
     }
-    if (const auto configureDisplaySource = GetSwitchValue(L"/configure-display"); configureDisplaySource.has_value()) {
-        const auto configureDisplayTarget = GetSwitchValue(L"/configure-display-target");
-        const auto configureDisplayDump = GetSwitchValue(L"/configure-display-dump");
-        const auto configureDisplayImageTarget = GetSwitchValue(L"/configure-display-image-target");
-        return RunElevatedConfigureDisplayMode(FilePath(*configureDisplaySource),
-            configureDisplayDump.has_value() ? FilePath(*configureDisplayDump) : FilePath{},
-            configureDisplayTarget.has_value() ? FilePath(*configureDisplayTarget) : FilePath{},
-            configureDisplayImageTarget.has_value() ? FilePath(*configureDisplayImageTarget) : FilePath{});
+    if (const auto configureDisplaySource = GetSwitchValue(commandLine, "/configure-display");
+        configureDisplaySource.has_value()) {
+        const auto configureDisplayTarget = GetSwitchValue(commandLine, "/configure-display-target");
+        const auto configureDisplayDump = GetSwitchValue(commandLine, "/configure-display-dump");
+        const auto configureDisplayImageTarget = GetSwitchValue(commandLine, "/configure-display-image-target");
+        return RunElevatedConfigureDisplayMode(FilePath(WideFromUtf8(*configureDisplaySource)),
+            configureDisplayDump.has_value() ? FilePath(WideFromUtf8(*configureDisplayDump)) : FilePath{},
+            configureDisplayTarget.has_value() ? FilePath(WideFromUtf8(*configureDisplayTarget)) : FilePath{},
+            configureDisplayImageTarget.has_value() ? FilePath(WideFromUtf8(*configureDisplayImageTarget))
+                                                    : FilePath{});
     }
-    if (const auto autoStartSetting = GetSwitchValue(L"/set-autostart"); autoStartSetting.has_value()) {
-        if (_wcsicmp(autoStartSetting->c_str(), L"on") == 0) {
+    if (const auto autoStartSetting = GetSwitchValue(commandLine, "/set-autostart"); autoStartSetting.has_value()) {
+        if (_stricmp(autoStartSetting->c_str(), "on") == 0) {
             return RunElevatedAutoStartMode(true);
         }
-        if (_wcsicmp(autoStartSetting->c_str(), L"off") == 0) {
+        if (_stricmp(autoStartSetting->c_str(), "off") == 0) {
             return RunElevatedAutoStartMode(false);
         }
         return 2;
     }
-    if (const auto elevatedExitCode = RelaunchElevatedIfRequested(); elevatedExitCode.has_value()) {
+    if (const auto elevatedExitCode = RelaunchElevatedIfRequested(commandLine); elevatedExitCode.has_value()) {
         return *elevatedExitCode;
     }
 
@@ -141,7 +147,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
     ShutdownPreviousInstance();
 
-    DashboardApp app(diagnosticsOptions, HasSwitch(L"/bring-to-front"));
+    DashboardApp app(diagnosticsOptions, HasSwitch(commandLine, "/bring-to-front"));
     if (!app.Initialize(instance)) {
         const std::wstring& message = app.LastError();
         MessageBoxW(nullptr,

@@ -1,11 +1,8 @@
 #pragma once
 
-#include <memory>
 #include <vector>
 
 #include "widget/widget.h"
-
-struct GaugeSharedLayout;
 
 class GaugeWidget final : public Widget {
 public:
@@ -58,7 +55,7 @@ private:
     friend void FinalizeGaugeLayoutGroup(WidgetHost& renderer, const std::vector<WidgetLayout*>& widgets);
 
     std::string metric_;
-    std::shared_ptr<GaugeSharedLayout> sharedLayout_;
+    int sharedOuterRadius_ = 0;
     LayoutState layoutState_{};
 };
 

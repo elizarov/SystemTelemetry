@@ -16,8 +16,8 @@ struct LayoutEditTooltipDescriptor {
 };
 
 struct LayoutEditConfigFieldMetadata {
-    std::string_view sectionName;
-    std::string_view parameterName;
+    const char* sectionName = "";
+    const char* parameterName = "";
     configschema::ValueFormat valueFormat = configschema::ValueFormat::Integer;
     RuntimeConfigFieldValueKind valueKind = RuntimeConfigFieldValueKind::Int;
     RuntimeConfigFieldPolicy policy = RuntimeConfigFieldPolicy::None;

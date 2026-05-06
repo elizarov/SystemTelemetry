@@ -12,8 +12,8 @@
 
 namespace {
 
-constexpr std::string_view kBoardTemperaturePrefix = "board.temp.";
-constexpr std::string_view kBoardFanPrefix = "board.fan.";
+constexpr char kBoardTemperaturePrefix[] = "board.temp.";
+constexpr char kBoardFanPrefix[] = "board.fan.";
 constexpr std::string_view kPermissionRequiredText = "!admin";
 
 enum class MetricPayloadKind : unsigned int {
@@ -45,9 +45,10 @@ constexpr MetricPayloadMask kValuePayload = PayloadMask(MetricPayloadKind::Value
 constexpr MetricPayloadMask kThroughputPayload = PayloadMask(MetricPayloadKind::Throughput);
 
 struct MetricBinding {
-    std::string_view key;
+    const char* key = "";
     bool prefixMatch = false;
-    std::optional<MetricDisplayStyle> metricStyle;
+    bool hasMetricStyle = false;
+    MetricDisplayStyle metricStyle = MetricDisplayStyle::Scalar;
     MetricPayloadMask payloadMask = kNoPayload;
     bool generallyAvailable = true;
     bool staticText = false;
@@ -57,7 +58,7 @@ struct MetricBinding {
     ThroughputGraphGroup throughputGroup = ThroughputGraphGroup::None;
     ThroughputGuideStepResolverFn resolveGuideStep = nullptr;
 
-    static constexpr MetricBinding ExactStaticText(std::string_view key, TextResolverFn resolveText) {
+    static constexpr MetricBinding ExactStaticText(const char* key, TextResolverFn resolveText) {
         MetricBinding binding{};
         binding.key = key;
         binding.payloadMask = kTextPayload;
@@ -67,21 +68,23 @@ struct MetricBinding {
     }
 
     static constexpr MetricBinding ExactValue(
-        std::string_view key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
+        const char* key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
         MetricBinding binding{};
         binding.key = key;
+        binding.hasMetricStyle = true;
         binding.metricStyle = style;
         binding.payloadMask = kValuePayload;
         binding.resolveMetric = resolveMetric;
         return binding;
     }
 
-    static constexpr MetricBinding ExactThroughput(std::string_view key,
+    static constexpr MetricBinding ExactThroughput(const char* key,
         ThroughputValueResolverFn resolveThroughputValue,
         ThroughputGraphGroup throughputGroup,
         ThroughputGuideStepResolverFn resolveGuideStep) {
         MetricBinding binding{};
         binding.key = key;
+        binding.hasMetricStyle = true;
         binding.metricStyle = MetricDisplayStyle::Throughput;
         binding.payloadMask = kThroughputPayload;
         binding.resolveThroughputValue = resolveThroughputValue;
@@ -90,24 +93,26 @@ struct MetricBinding {
         return binding;
     }
 
-    static constexpr MetricBinding ExactDisplayOnly(std::string_view key, MetricDisplayStyle style) {
+    static constexpr MetricBinding ExactDisplayOnly(const char* key, MetricDisplayStyle style) {
         MetricBinding binding{};
         binding.key = key;
+        binding.hasMetricStyle = true;
         binding.metricStyle = style;
         return binding;
     }
 
-    static constexpr MetricBinding ExactSpecialDisplayOnly(std::string_view key, MetricDisplayStyle style) {
+    static constexpr MetricBinding ExactSpecialDisplayOnly(const char* key, MetricDisplayStyle style) {
         MetricBinding binding = ExactDisplayOnly(key, style);
         binding.generallyAvailable = false;
         return binding;
     }
 
     static constexpr MetricBinding PrefixValue(
-        std::string_view key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
+        const char* key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
         MetricBinding binding{};
         binding.key = key;
         binding.prefixMatch = true;
+        binding.hasMetricStyle = true;
         binding.metricStyle = style;
         binding.payloadMask = kValuePayload;
         binding.resolveMetric = resolveMetric;
@@ -605,13 +610,14 @@ const MetricBinding kPrefixBindings[] = {
 
 MetricBindingMatch FindMetricBinding(std::string_view metricRef) {
     for (const auto& binding : kExactBindings) {
-        if (binding.key == metricRef) {
+        if (std::string_view(binding.key) == metricRef) {
             return MetricBindingMatch{&binding, {}};
         }
     }
     for (const auto& binding : kPrefixBindings) {
-        if (metricRef.rfind(binding.key, 0) == 0) {
-            return MetricBindingMatch{&binding, metricRef.substr(binding.key.size())};
+        const std::string_view key(binding.key);
+        if (metricRef.rfind(key, 0) == 0) {
+            return MetricBindingMatch{&binding, metricRef.substr(key.size())};
         }
     }
     return {};
@@ -672,8 +678,9 @@ void InitializeThroughputSharedState(const SystemSnapshot& snapshot, MetricSourc
         if (!BindingSupportsPayload(binding, MetricPayloadKind::Throughput)) {
             continue;
         }
-        state.historyByMetricRef.emplace_back(std::string(binding.key),
-            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot, std::string(binding.key))));
+        const std::string metricRef(binding.key);
+        state.historyByMetricRef.emplace_back(
+            metricRef, SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot, metricRef)));
         const auto* history = &state.historyByMetricRef.back().second;
         if (binding.throughputGroup == ThroughputGraphGroup::Network) {
             networkHistories.push_back(history);
@@ -806,7 +813,9 @@ bool IsStaticTextMetric(std::string_view metricRef) {
 
 std::optional<MetricDisplayStyle> FindMetricDisplayStyle(std::string_view metricRef) {
     const MetricBindingMatch match = FindMetricBinding(metricRef);
-    return match.binding != nullptr ? match.binding->metricStyle : std::nullopt;
+    return match.binding != nullptr && match.binding->hasMetricStyle
+               ? std::optional<MetricDisplayStyle>(match.binding->metricStyle)
+               : std::nullopt;
 }
 
 ConfigMetricCatalog TelemetryMetricCatalog() {

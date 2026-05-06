@@ -5,7 +5,7 @@
 ## Responsibilities
 
 - Win32-backed `FilePath` and filesystem helpers.
-- Command-line text handling.
+- Command-line text handling after one Win32-to-UTF-8 conversion at process startup.
 - String trimming, splitting, case folding, and whitespace normalization.
 - Enum string conversion.
 - UTF-8 and UTF-16 boundary conversion helpers.

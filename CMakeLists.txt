@@ -210,6 +210,7 @@ add_executable(CaseDash WIN32
     src/widget/widget.cpp
     src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
     src/widget/impl/metric_list.cpp
@@ -310,6 +311,7 @@ set(casedash_release_speed_sources
     src/widget/layout_edit_types.cpp
     src/widget/widget.cpp
     src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
     src/widget/impl/clock_date.cpp
     src/widget/impl/clock_time.cpp
     src/widget/impl/drive_usage_list.cpp
@@ -458,6 +460,7 @@ target_link_options(CaseDash PRIVATE
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/OPT:REF>
     $<$<CONFIG:Release>:/LTCG>
+    $<$<CONFIG:Release>:/DYNAMICBASE:NO>
     $<$<AND:$<CONFIG:Release>,$<BOOL:${CASEDASH_LINK_MAPS}>>:/MAP:$<TARGET_FILE_DIR:CaseDash>/CaseDash.map>
     $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
@@ -583,6 +586,7 @@ add_executable(CaseDashTests
     src/widget/widget.cpp
     src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
     src/widget/impl/metric_list.cpp
@@ -744,6 +748,7 @@ add_executable(CaseDashBenchmarks
     src/widget/widget.cpp
     src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
     src/widget/impl/metric_list.cpp

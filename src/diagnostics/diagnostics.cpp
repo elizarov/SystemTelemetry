@@ -1,11 +1,11 @@
 #include "diagnostics/diagnostics.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <cwctype>
 #include <limits>
 #include <vector>
 
@@ -32,33 +32,33 @@
 
 namespace {
 
-std::optional<int> TryParseInteger(std::wstring_view text) {
-    while (!text.empty() && iswspace(text.front()) != 0) {
+std::optional<int> TryParseInteger(std::string_view text) {
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
         text.remove_prefix(1);
     }
-    while (!text.empty() && iswspace(text.back()) != 0) {
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
         text.remove_suffix(1);
     }
     if (text.empty()) {
         return std::nullopt;
     }
-    wchar_t* end = nullptr;
-    std::wstring owned(text);
-    const long value = std::wcstol(owned.c_str(), &end, 10);
-    if (end == owned.c_str() || end == nullptr || *end != L'\0' || value < (std::numeric_limits<int>::min)() ||
+    char* end = nullptr;
+    std::string owned(text);
+    const long value = std::strtol(owned.c_str(), &end, 10);
+    if (end == owned.c_str() || end == nullptr || *end != '\0' || value < (std::numeric_limits<int>::min)() ||
         value > (std::numeric_limits<int>::max)()) {
         return std::nullopt;
     }
     return static_cast<int>(value);
 }
 
-std::optional<DiagnosticsHoverPoint> TryParseHoverPointValue(const std::wstring& text) {
-    const size_t comma = text.find(L',');
-    if (comma == std::wstring::npos || text.find(L',', comma + 1) != std::wstring::npos) {
+std::optional<DiagnosticsHoverPoint> TryParseHoverPointValue(const std::string& text) {
+    const size_t comma = text.find(',');
+    if (comma == std::string::npos || text.find(',', comma + 1) != std::string::npos) {
         return std::nullopt;
     }
-    const auto x = TryParseInteger(std::wstring_view(text).substr(0, comma));
-    const auto y = TryParseInteger(std::wstring_view(text).substr(comma + 1));
+    const auto x = TryParseInteger(std::string_view(text).substr(0, comma));
+    const auto y = TryParseInteger(std::string_view(text).substr(comma + 1));
     if (!x.has_value() || !y.has_value()) {
         return std::nullopt;
     }
@@ -222,29 +222,29 @@ private:
 
 }  // namespace
 
-std::optional<double> TryParseScaleValue(const std::wstring& text) {
+std::optional<double> TryParseScaleValue(const std::string& text) {
     if (text.empty()) {
         return std::nullopt;
     }
 
-    std::wstring normalized(text);
-    std::replace(normalized.begin(), normalized.end(), L',', L'.');
-    wchar_t* end = nullptr;
-    const double value = std::wcstod(normalized.c_str(), &end);
-    if (end == normalized.c_str() || end == nullptr || *end != L'\0' || !std::isfinite(value) || value <= 0.0) {
+    std::string normalized(text);
+    std::replace(normalized.begin(), normalized.end(), ',', '.');
+    char* end = nullptr;
+    const double value = std::strtod(normalized.c_str(), &end);
+    if (end == normalized.c_str() || end == nullptr || *end != '\0' || !std::isfinite(value) || value <= 0.0) {
         return std::nullopt;
     }
     return value;
 }
 
-std::optional<double> GetScaleSwitchValue() {
-    if (const auto value = GetColonSwitchValue(L"/scale"); value.has_value()) {
+std::optional<double> GetScaleSwitchValue(const CommandLineArguments& commandLine) {
+    if (const auto value = GetColonSwitchValue(commandLine, "/scale"); value.has_value()) {
         return TryParseScaleValue(*value);
     }
     return std::nullopt;
 }
 
-std::optional<int> TryParseAppIconSizeValue(const std::wstring& text) {
+std::optional<int> TryParseAppIconSizeValue(const std::string& text) {
     const std::optional<int> value = TryParseInteger(text);
     if (!value.has_value() || !IsValidAppIconSize(*value)) {
         return std::nullopt;
@@ -252,9 +252,9 @@ std::optional<int> TryParseAppIconSizeValue(const std::wstring& text) {
     return *value;
 }
 
-std::optional<std::string> GetLayoutSwitchValue() {
-    if (const auto value = GetColonSwitchValue(L"/layout"); value.has_value()) {
-        const std::string layoutName = Trim(Utf8FromWide(*value));
+std::optional<std::string> GetLayoutSwitchValue(const CommandLineArguments& commandLine) {
+    if (const auto value = GetColonSwitchValue(commandLine, "/layout"); value.has_value()) {
+        const std::string layoutName = Trim(*value);
         if (!layoutName.empty()) {
             return layoutName;
         }
@@ -262,9 +262,9 @@ std::optional<std::string> GetLayoutSwitchValue() {
     return std::nullopt;
 }
 
-std::optional<std::string> GetThemeSwitchValue() {
-    if (const auto value = GetColonSwitchValue(L"/theme"); value.has_value()) {
-        const std::string themeName = Trim(Utf8FromWide(*value));
+std::optional<std::string> GetThemeSwitchValue(const CommandLineArguments& commandLine) {
+    if (const auto value = GetColonSwitchValue(commandLine, "/theme"); value.has_value()) {
+        const std::string themeName = Trim(*value);
         if (!themeName.empty()) {
             return themeName;
         }
@@ -291,6 +291,53 @@ void WriteValidationFailureTrace(
     fclose(traceFile);
 }
 
+struct DiagnosticsPlainSwitch {
+    const char* name;
+    bool DiagnosticsOptions::* enabled;
+};
+
+struct DiagnosticsPathSwitch {
+    const char* name;
+    bool DiagnosticsOptions::* enabled;
+    FilePath DiagnosticsOptions::* path;
+};
+
+void ApplyDiagnosticsPlainSwitches(DiagnosticsOptions& options, const CommandLineArguments& commandLine) {
+    static constexpr DiagnosticsPlainSwitch kSwitches[] = {
+        {"/exit", &DiagnosticsOptions::exit},
+        {"/blank", &DiagnosticsOptions::blank},
+        {"/edit-layout", &DiagnosticsOptions::editLayout},
+        {"/reload", &DiagnosticsOptions::reload},
+        {"/default-config", &DiagnosticsOptions::defaultConfig},
+    };
+
+    for (const DiagnosticsPlainSwitch& entry : kSwitches) {
+        options.*entry.enabled = HasSwitch(commandLine, entry.name);
+    }
+}
+
+void ApplyDiagnosticsPathSwitches(DiagnosticsOptions& options, const CommandLineArguments& commandLine) {
+    static constexpr DiagnosticsPathSwitch kSwitches[] = {
+        {"/trace", &DiagnosticsOptions::trace, &DiagnosticsOptions::tracePath},
+        {"/dump", &DiagnosticsOptions::dump, &DiagnosticsOptions::dumpPath},
+        {"/screenshot", &DiagnosticsOptions::screenshot, &DiagnosticsOptions::screenshotPath},
+        {"/layout-guide-sheet", &DiagnosticsOptions::layoutGuideSheet, &DiagnosticsOptions::layoutGuideSheetPath},
+        {"/app-icon", &DiagnosticsOptions::appIcon, &DiagnosticsOptions::appIconPath},
+        {"/save-config", &DiagnosticsOptions::saveConfig, &DiagnosticsOptions::saveConfigPath},
+        {"/save-full-config", &DiagnosticsOptions::saveFullConfig, &DiagnosticsOptions::saveFullConfigPath},
+        {"/fake", &DiagnosticsOptions::fake, &DiagnosticsOptions::fakePath},
+    };
+
+    for (const DiagnosticsPathSwitch& entry : kSwitches) {
+        if (const auto value = GetColonSwitchValue(commandLine, entry.name); value.has_value()) {
+            options.*entry.enabled = true;
+            options.*entry.path = FilePath(WideFromUtf8(*value));
+        } else {
+            options.*entry.enabled = HasSwitch(commandLine, entry.name);
+        }
+    }
+}
+
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options) {
     return options.blank ? DashboardRenderer::RenderMode::Blank : DashboardRenderer::RenderMode::Normal;
 }
@@ -307,21 +354,12 @@ LayoutSimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOption
     }
 }
 
-DiagnosticsOptions GetDiagnosticsOptions() {
+DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine) {
     DiagnosticsOptions options;
-    options.trace = HasSwitch(L"/trace");
-    options.dump = HasSwitch(L"/dump");
-    options.screenshot = HasSwitch(L"/screenshot");
-    options.layoutGuideSheet = HasSwitch(L"/layout-guide-sheet");
-    options.appIcon = HasSwitch(L"/app-icon");
-    options.exit = HasSwitch(L"/exit");
-    options.fake = HasSwitch(L"/fake");
-    options.blank = HasSwitch(L"/blank");
-    options.editLayout = HasSwitch(L"/edit-layout");
-    options.reload = HasSwitch(L"/reload");
-    options.defaultConfig = HasSwitch(L"/default-config");
-    if (const auto editLayoutValue = GetColonSwitchValue(L"/edit-layout"); editLayoutValue.has_value()) {
-        const std::string mode = ToLower(Trim(Utf8FromWide(*editLayoutValue)));
+    ApplyDiagnosticsPlainSwitches(options, commandLine);
+    ApplyDiagnosticsPathSwitches(options, commandLine);
+    if (const auto editLayoutValue = GetColonSwitchValue(commandLine, "/edit-layout"); editLayoutValue.has_value()) {
+        const std::string mode = ToLower(Trim(*editLayoutValue));
         options.editLayout = true;
         if (mode == "horizontal-sizes" || mode == "horizonatal-sizes") {
             options.layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::HorizontalSizes;
@@ -331,17 +369,18 @@ DiagnosticsOptions GetDiagnosticsOptions() {
             options.editLayoutWidgetName = mode;
         }
     }
-    if (const auto layoutName = GetLayoutSwitchValue(); layoutName.has_value()) {
+    if (const auto layoutName = GetLayoutSwitchValue(commandLine); layoutName.has_value()) {
         options.layoutName = *layoutName;
     }
-    if (const auto themeName = GetThemeSwitchValue(); themeName.has_value()) {
+    if (const auto themeName = GetThemeSwitchValue(commandLine); themeName.has_value()) {
         options.themeName = *themeName;
     }
-    if (const auto scale = GetScaleSwitchValue(); scale.has_value()) {
+    if (const auto scale = GetScaleSwitchValue(commandLine); scale.has_value()) {
         options.hasScaleOverride = true;
         options.scale = *scale;
     }
-    if (const auto appIconSizeValue = GetColonSwitchValue(L"/app-icon-size"); appIconSizeValue.has_value()) {
+    if (const auto appIconSizeValue = GetColonSwitchValue(commandLine, "/app-icon-size");
+        appIconSizeValue.has_value()) {
         options.hasAppIconSize = true;
         if (const auto appIconSize = TryParseAppIconSizeValue(*appIconSizeValue); appIconSize.has_value()) {
             options.appIconSize = *appIconSize;
@@ -349,48 +388,11 @@ DiagnosticsOptions GetDiagnosticsOptions() {
             options.appIconSize = 0;
         }
     }
-    if (const auto hoverValue = GetColonSwitchValue(L"/hover"); hoverValue.has_value()) {
+    if (const auto hoverValue = GetColonSwitchValue(commandLine, "/hover"); hoverValue.has_value()) {
         if (const auto hoverPoint = TryParseHoverPointValue(*hoverValue); hoverPoint.has_value()) {
             options.hoverPoint = *hoverPoint;
             options.editLayout = true;
         }
-    }
-    if (const auto tracePath = GetColonSwitchValue(L"/trace"); tracePath.has_value()) {
-        options.trace = true;
-        options.tracePath = *tracePath;
-    }
-    if (const auto dumpPath = GetColonSwitchValue(L"/dump"); dumpPath.has_value()) {
-        options.dump = true;
-        options.dumpPath = *dumpPath;
-    }
-    if (const auto screenshotPath = GetColonSwitchValue(L"/screenshot"); screenshotPath.has_value()) {
-        options.screenshot = true;
-        options.screenshotPath = *screenshotPath;
-    }
-    if (const auto layoutGuideSheetPath = GetColonSwitchValue(L"/layout-guide-sheet");
-        layoutGuideSheetPath.has_value()) {
-        options.layoutGuideSheet = true;
-        options.layoutGuideSheetPath = *layoutGuideSheetPath;
-    }
-    if (const auto appIconPath = GetColonSwitchValue(L"/app-icon"); appIconPath.has_value()) {
-        options.appIcon = true;
-        options.appIconPath = *appIconPath;
-    }
-    if (const auto saveConfigPath = GetColonSwitchValue(L"/save-config"); saveConfigPath.has_value()) {
-        options.saveConfig = true;
-        options.saveConfigPath = *saveConfigPath;
-    } else if (HasSwitch(L"/save-config")) {
-        options.saveConfig = true;
-    }
-    if (const auto saveFullConfigPath = GetColonSwitchValue(L"/save-full-config"); saveFullConfigPath.has_value()) {
-        options.saveFullConfig = true;
-        options.saveFullConfigPath = *saveFullConfigPath;
-    } else if (HasSwitch(L"/save-full-config")) {
-        options.saveFullConfig = true;
-    }
-    if (const auto fakePath = GetColonSwitchValue(L"/fake"); fakePath.has_value()) {
-        options.fake = true;
-        options.fakePath = *fakePath;
     }
     return options;
 }
@@ -487,35 +489,57 @@ DiagnosticsSession::~DiagnosticsSession() {
 
 bool DiagnosticsSession::Initialize() {
     const FilePath workingDirectory = GetWorkingDirectory();
+
+    struct OutputPath {
+        bool DiagnosticsOptions::* enabled;
+        FilePath DiagnosticsOptions::* configuredPath;
+        FilePath DiagnosticsSession::* resolvedPath;
+        const wchar_t* defaultFileName;
+    };
+
+    static constexpr OutputPath kOutputPaths[] = {
+        {&DiagnosticsOptions::trace,
+            &DiagnosticsOptions::tracePath,
+            &DiagnosticsSession::tracePath_,
+            kDefaultTraceFileName},
+        {&DiagnosticsOptions::dump,
+            &DiagnosticsOptions::dumpPath,
+            &DiagnosticsSession::dumpPath_,
+            kDefaultDumpFileName},
+        {&DiagnosticsOptions::screenshot,
+            &DiagnosticsOptions::screenshotPath,
+            &DiagnosticsSession::screenshotPath_,
+            kDefaultScreenshotFileName},
+        {&DiagnosticsOptions::layoutGuideSheet,
+            &DiagnosticsOptions::layoutGuideSheetPath,
+            &DiagnosticsSession::layoutGuideSheetPath_,
+            kDefaultLayoutGuideSheetFileName},
+        {&DiagnosticsOptions::appIcon,
+            &DiagnosticsOptions::appIconPath,
+            &DiagnosticsSession::appIconPath_,
+            kDefaultAppIconFileName},
+        {&DiagnosticsOptions::saveConfig,
+            &DiagnosticsOptions::saveConfigPath,
+            &DiagnosticsSession::saveConfigPath_,
+            kDefaultSavedConfigFileName},
+        {&DiagnosticsOptions::saveFullConfig,
+            &DiagnosticsOptions::saveFullConfigPath,
+            &DiagnosticsSession::saveFullConfigPath_,
+            kDefaultSavedFullConfigFileName},
+    };
+
+    for (const OutputPath& outputPath : kOutputPaths) {
+        if (options_.*outputPath.enabled) {
+            this->*outputPath.resolvedPath = ResolveDiagnosticsOutputPath(
+                workingDirectory, options_.*outputPath.configuredPath, outputPath.defaultFileName);
+        }
+    }
     if (options_.trace) {
-        tracePath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.tracePath, kDefaultTraceFileName);
         if (_wfopen_s(&traceFile_, tracePath_.c_str(), L"ab") != 0 || traceFile_ == nullptr) {
             ShowFileOpenError("trace file", tracePath_);
             return false;
         }
         trace_.SetOutput(traceFile_);
-    }
-    if (options_.dump) {
-        dumpPath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.dumpPath, kDefaultDumpFileName);
-    }
-    if (options_.screenshot) {
-        screenshotPath_ =
-            ResolveDiagnosticsOutputPath(workingDirectory, options_.screenshotPath, kDefaultScreenshotFileName);
-    }
-    if (options_.layoutGuideSheet) {
-        layoutGuideSheetPath_ = ResolveDiagnosticsOutputPath(
-            workingDirectory, options_.layoutGuideSheetPath, kDefaultLayoutGuideSheetFileName);
-    }
-    if (options_.appIcon) {
-        appIconPath_ = ResolveDiagnosticsOutputPath(workingDirectory, options_.appIconPath, kDefaultAppIconFileName);
-    }
-    if (options_.saveConfig) {
-        saveConfigPath_ =
-            ResolveDiagnosticsOutputPath(workingDirectory, options_.saveConfigPath, kDefaultSavedConfigFileName);
-    }
-    if (options_.saveFullConfig) {
-        saveFullConfigPath_ = ResolveDiagnosticsOutputPath(
-            workingDirectory, options_.saveFullConfigPath, kDefaultSavedFullConfigFileName);
     }
     return true;
 }
@@ -539,6 +563,31 @@ void DiagnosticsSession::ReportError(const std::string& traceText, const std::ws
     }
 }
 
+bool DiagnosticsSession::ReportSaveError(const char* traceEvent,
+    const char* messageAction,
+    const FilePath& path,
+    std::string_view detail,
+    std::string_view traceSuffix) {
+    const std::string pathText = Utf8FromWide(path.wstring());
+    const std::wstring message = WideFromUtf8("Failed to " + std::string(messageAction) + ":\n" + pathText);
+    std::string traceText = "diagnostics:";
+    traceText += traceEvent;
+    traceText += " path=\"";
+    traceText += pathText;
+    traceText += "\"";
+    if (!traceSuffix.empty()) {
+        traceText += ' ';
+        traceText += traceSuffix;
+    }
+    if (!detail.empty()) {
+        traceText += " detail=\"";
+        traceText += detail;
+        traceText += "\"";
+    }
+    ReportError(traceText, message);
+    return false;
+}
+
 bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig& config) {
     if (options_.dump) {
         std::FILE* dumpFile = nullptr;
@@ -549,10 +598,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
         const bool dumpWritten = WriteTelemetryDump(dumpFile, dump);
         fclose(dumpFile);
         if (!dumpWritten) {
-            const std::string pathText = Utf8FromWide(dumpPath_.wstring());
-            const std::wstring message = WideFromUtf8("Failed to write dump file:\n" + pathText);
-            ReportError("diagnostics:dump_write_failed path=\"" + pathText + "\"", message);
-            return false;
+            return ReportSaveError("dump_write_failed", "write dump file", dumpPath_);
         }
     }
 
@@ -571,14 +617,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
                 ? std::optional<RenderPoint>(RenderPoint{options_.hoverPoint->x, options_.hoverPoint->y})
                 : std::nullopt,
             &screenshotError)) {
-        const std::string pathText = Utf8FromWide(screenshotPath_.wstring());
-        const std::wstring message = WideFromUtf8("Failed to save screenshot:\n" + pathText);
-        std::string traceText = "diagnostics:screenshot_save_failed path=\"" + pathText + "\"";
-        if (!screenshotError.empty()) {
-            traceText += " detail=\"" + screenshotError + "\"";
-        }
-        ReportError(traceText, message);
-        return false;
+        return ReportSaveError("screenshot_save_failed", "save screenshot", screenshotPath_, screenshotError);
     }
 
     std::string layoutGuideSheetError;
@@ -588,27 +627,17 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
                                          ResolveSavedScreenshotScale(config),
                                          trace_,
                                          &layoutGuideSheetError)) {
-        const std::string pathText = Utf8FromWide(layoutGuideSheetPath_.wstring());
-        const std::wstring message = WideFromUtf8("Failed to save layout guide sheet:\n" + pathText);
-        std::string traceText = "diagnostics:layout_guide_sheet_save_failed path=\"" + pathText + "\"";
-        if (!layoutGuideSheetError.empty()) {
-            traceText += " detail=\"" + layoutGuideSheetError + "\"";
-        }
-        ReportError(traceText, message);
-        return false;
+        return ReportSaveError(
+            "layout_guide_sheet_save_failed", "save layout guide sheet", layoutGuideSheetPath_, layoutGuideSheetError);
     }
 
     std::string appIconError;
     if (options_.appIcon && !SaveRenderedAppIcon(appIconPath_, config, options_.appIconSize, &appIconError)) {
-        const std::string pathText = Utf8FromWide(appIconPath_.wstring());
-        const std::wstring message = WideFromUtf8("Failed to save app icon:\n" + pathText);
-        std::string traceText =
-            "diagnostics:app_icon_save_failed path=\"" + pathText + "\" size=" + std::to_string(options_.appIconSize);
-        if (!appIconError.empty()) {
-            traceText += " detail=\"" + appIconError + "\"";
-        }
-        ReportError(traceText, message);
-        return false;
+        return ReportSaveError("app_icon_save_failed",
+            "save app icon",
+            appIconPath_,
+            appIconError,
+            "size=" + std::to_string(options_.appIconSize));
     }
     if (options_.appIcon) {
         const std::string pathText = Utf8FromWide(appIconPath_.wstring());
@@ -617,17 +646,11 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     }
 
     if (options_.saveConfig && !SaveConfig(saveConfigPath_, config, ConfigParseContext{TelemetryMetricCatalog()})) {
-        const std::string pathText = Utf8FromWide(saveConfigPath_.wstring());
-        const std::wstring message = WideFromUtf8("Failed to save config file:\n" + pathText);
-        ReportError("diagnostics:config_save_failed path=\"" + pathText + "\"", message);
-        return false;
+        return ReportSaveError("config_save_failed", "save config file", saveConfigPath_);
     }
 
     if (options_.saveFullConfig && !SaveFullConfig(saveFullConfigPath_, config)) {
-        const std::string pathText = Utf8FromWide(saveFullConfigPath_.wstring());
-        const std::wstring message = WideFromUtf8("Failed to save full config file:\n" + pathText);
-        ReportError("diagnostics:full_config_save_failed path=\"" + pathText + "\"", message);
-        return false;
+        return ReportSaveError("full_config_save_failed", "save full config file", saveFullConfigPath_);
     }
 
     return true;

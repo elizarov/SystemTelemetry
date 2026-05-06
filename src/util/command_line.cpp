@@ -3,112 +3,112 @@
 #include <windows.h>
 
 #include <algorithm>
-#include <cwchar>
 #include <shellapi.h>
+#include <utility>
 
-std::wstring TrimWhitespace(std::wstring value) {
-    const auto isSpace = [](wchar_t ch) { return iswspace(ch) != 0; };
-    const auto first = std::find_if_not(value.begin(), value.end(), isSpace);
-    if (first == value.end()) {
-        return {};
-    }
-    const auto last = std::find_if_not(value.rbegin(), value.rend(), isSpace).base();
-    return std::wstring(first, last);
+#include "util/strings.h"
+#include "util/utf8.h"
+
+namespace {
+
+char LowerAscii(char ch) {
+    return ch >= 'A' && ch <= 'Z' ? static_cast<char>(ch - 'A' + 'a') : ch;
 }
 
-std::wstring StripOuterQuotes(std::wstring value) {
-    value = TrimWhitespace(std::move(value));
-    if (value.size() >= 2 && value.front() == L'"' && value.back() == L'"') {
+bool EqualsAsciiInsensitive(std::string_view left, std::string_view right) {
+    if (left.size() != right.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < left.size(); ++i) {
+        if (LowerAscii(left[i]) != LowerAscii(right[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool StartsWithAsciiInsensitive(std::string_view value, std::string_view prefix) {
+    return value.size() >= prefix.size() && EqualsAsciiInsensitive(value.substr(0, prefix.size()), prefix);
+}
+
+std::string StripOuterQuotes(std::string value) {
+    value = Trim(value);
+    if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
         value = value.substr(1, value.size() - 2);
     }
     return value;
 }
 
-std::wstring NormalizeWindowsPath(std::wstring value) {
-    value = StripOuterQuotes(std::move(value));
-    std::replace(value.begin(), value.end(), L'/', L'\\');
-    std::transform(
-        value.begin(), value.end(), value.begin(), [](wchar_t ch) { return static_cast<wchar_t>(towlower(ch)); });
-    return value;
-}
-
-std::wstring QuoteCommandLineArgument(const std::wstring& value) {
-    return L"\"" + value + L"\"";
-}
-
-namespace {
-
-class CommandLineArguments {
-public:
-    CommandLineArguments() : argv_(CommandLineToArgvW(GetCommandLineW(), &argc_)) {}
-
-    ~CommandLineArguments() {
-        if (argv_ != nullptr) {
-            LocalFree(argv_);
-        }
-    }
-
-    int Count() const {
-        return argv_ != nullptr ? argc_ : 0;
-    }
-
-    const wchar_t* At(int index) const {
-        return argv_[index];
-    }
-
-private:
-    int argc_ = 0;
-    LPWSTR* argv_ = nullptr;
-};
-
 }  // namespace
 
-std::wstring BuildCommandLineExcludingSwitch(const wchar_t* excludedSwitch) {
-    // Size: command-line callers only scan argv; avoid exposing vector<wstring> for one relaunch helper.
+CommandLineArguments GetCommandLineArguments() {
+    int count = 0;
+    LPWSTR* wideArguments = CommandLineToArgvW(GetCommandLineW(), &count);
     CommandLineArguments arguments;
-    std::wstring parameters;
-    for (int i = 1; i < arguments.Count(); ++i) {
-        const wchar_t* argument = arguments.At(i);
-        if (excludedSwitch != nullptr && _wcsicmp(argument, excludedSwitch) == 0) {
+    if (wideArguments != nullptr) {
+        arguments.reserve(static_cast<size_t>(count));
+        for (int i = 0; i < count; ++i) {
+            arguments.push_back(Utf8FromWide(wideArguments[i]));
+        }
+        LocalFree(wideArguments);
+    }
+    return arguments;
+}
+
+std::string NormalizeCommandPath(std::string value) {
+    value = StripOuterQuotes(std::move(value));
+    std::replace(value.begin(), value.end(), '/', '\\');
+    return ToLower(std::move(value));
+}
+
+std::string QuoteCommandLineArgument(std::string_view value) {
+    std::string quoted;
+    quoted.reserve(value.size() + 2);
+    quoted.push_back('"');
+    quoted.append(value);
+    quoted.push_back('"');
+    return quoted;
+}
+
+std::string BuildCommandLineExcludingSwitch(const CommandLineArguments& arguments, std::string_view excludedSwitch) {
+    std::string parameters;
+    for (size_t i = 1; i < arguments.size(); ++i) {
+        const std::string& argument = arguments[i];
+        if (!excludedSwitch.empty() && EqualsAsciiInsensitive(argument, excludedSwitch)) {
             continue;
         }
         if (!parameters.empty()) {
-            parameters += L' ';
+            parameters.push_back(' ');
         }
         parameters += QuoteCommandLineArgument(argument);
     }
     return parameters;
 }
 
-bool HasSwitch(const wchar_t* target) {
-    CommandLineArguments arguments;
-    for (int i = 1; i < arguments.Count(); ++i) {
-        if (_wcsicmp(arguments.At(i), target) == 0) {
+bool HasSwitch(const CommandLineArguments& arguments, std::string_view target) {
+    for (size_t i = 1; i < arguments.size(); ++i) {
+        if (EqualsAsciiInsensitive(arguments[i], target)) {
             return true;
         }
     }
     return false;
 }
 
-std::optional<std::wstring> GetSwitchValue(const wchar_t* target) {
-    CommandLineArguments arguments;
-    for (int i = 1; i + 1 < arguments.Count(); ++i) {
-        if (_wcsicmp(arguments.At(i), target) == 0) {
-            return arguments.At(i + 1);
+std::optional<std::string> GetSwitchValue(const CommandLineArguments& arguments, std::string_view target) {
+    for (size_t i = 1; i + 1 < arguments.size(); ++i) {
+        if (EqualsAsciiInsensitive(arguments[i], target)) {
+            return arguments[i + 1];
         }
     }
     return std::nullopt;
 }
 
-std::optional<std::wstring> GetColonSwitchValue(const wchar_t* target) {
-    CommandLineArguments arguments;
-    const size_t targetLength = std::wcslen(target);
-    for (int i = 1; i < arguments.Count(); ++i) {
-        const wchar_t* argument = arguments.At(i);
-        const size_t argumentLength = std::wcslen(argument);
-        if (argumentLength > targetLength && _wcsnicmp(argument, target, targetLength) == 0 &&
-            argument[targetLength] == L':') {
-            return argument + targetLength + 1;
+std::optional<std::string> GetColonSwitchValue(const CommandLineArguments& arguments, std::string_view target) {
+    for (size_t i = 1; i < arguments.size(); ++i) {
+        const std::string& argument = arguments[i];
+        if (argument.size() > target.size() && StartsWithAsciiInsensitive(argument, target) &&
+            argument[target.size()] == ':') {
+            return argument.substr(target.size() + 1);
         }
     }
     return std::nullopt;

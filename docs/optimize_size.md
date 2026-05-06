@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,015,296` bytes.
+- Current measured `build\CaseDash.exe`: `1,003,008` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `797.7 KiB`, `.rdata` about `96.0 KiB`, `.pdata` about `46.2 KiB`, `.xdata` about `15.4 KiB`, and `.rsrc$02` about `13.1 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `dashboard_app.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `metrics.cpp.obj`, `pane.cpp.obj`, `layout_edit_tree.cpp.obj`, and `dashboard_renderer.cpp.obj`.
-- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_minimal_ico_trace.txt /dump:build\validation_size_minimal_ico_dump.txt /screenshot:build\validation_size_minimal_ico_screenshot.png /layout-guide-sheet:build\validation_size_minimal_ico_sheet.png /app-icon:build\validation_size_minimal_ico_app_icon.png /app-icon-size:64 /save-full-config:build\validation_size_minimal_ico_full_config.ini`.
+- Current largest sections: `.text$mn` about `789.8 KiB`, `.rdata` about `94.5 KiB`, `.pdata` about `46.4 KiB`, `.xdata` about `15.3 KiB`, and `.rsrc$02` about `13.1 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `dashboard_app.cpp.obj`, `layout_edit_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `metrics.cpp.obj`, `pane.cpp.obj`, `layout_edit_tree.cpp.obj`, and `dashboard_renderer.cpp.obj`.
+- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_trace.txt /dump:build\validation_size_dump.txt /screenshot:build\validation_size_screenshot.png /layout-guide-sheet:build\validation_size_sheet.png /app-icon:build\validation_size_app_icon.png /app-icon-size:64 /save-full-config:build\validation_size_full_config.ini`, and `lint.cmd`.
 
 ## Workflow
 
@@ -95,6 +95,16 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Layout-edit dialog resources | Keep `IDD_LAYOUT_EDIT_CONFIGURATION` as a dialog shell and create its child controls at runtime from a compact seed table. Keep control labels in UTF-8, convert at the `CreateWindowExW` boundary, and keep control kind class/style lookup enum-indexed. | `.rsrc$02` dropped from about `28.8 KiB` to `24.4 KiB`; the trimmed seed-table version reached `1,048,576` bytes, `31,232` bytes below the measured session baseline. |
 | Constexpr config metadata | Keep reflected field and binding offsets available through constexpr schema hooks, keep runtime config descriptor arrays constexpr, and keep the layout-edit parameter list as short section-local rows instead of carrying manual root offsets. | `1,048,576` to `1,027,072` bytes; `.text$mn` dropped from about `811.1 KiB` to `797.7 KiB`, `.pdata` from about `48.8 KiB` to `46.2 KiB`, and runtime descriptor initializers disappeared from the map. |
 | Telemetry formatting literals | Format string-view units with `%.*s` instead of constructing temporary `std::string` values before `sprintf_s`. | Executable-alignment neutral in the final pass; kept because it removes temporary string construction on a shared formatting path. |
+| Release relocation metadata | Keep `/DYNAMICBASE:NO` for the shipped Release app target as an explicit executable-size tradeoff after measuring the app binary, and do not add `/FIXED` or `/HIGHENTROPYVA:NO` because they do not improve the shipped size further. | `1,015,296` to `1,012,736` bytes in the measured pass. |
+| Widget pill bar helper | Keep metric-list and drive-usage pill bar drawing on one shared widget `impl` helper named `pill bar`, matching the maintained terminology. | Executable-neutral in isolation; retained to remove duplicated widget draw chains. |
+| Gauge layout state | Store the shared gauge outer radius directly instead of allocating a shared layout object for one integer. | `1,014,272` after the isolated pass, a `1,024` byte executable reduction. |
+| Layout-edit and diagnostics metadata | Store fixed metadata keys as literal pointers for layout-edit parameter metadata and diagnostics dump descriptors when the source arrays own the string lifetime. | Layout-edit metadata saved `1,024` bytes; snapshot dump descriptor compaction was file-alignment neutral but reduced object and section bytes. |
+| Drive usage header layout | Keep drive-usage header labels and edit anchors on one descriptor table instead of repeating four draw blocks and four anchor registrations. | Saved `1,536` bytes; `drive_usage_list.cpp.obj` dropped to about `11.5 KiB`. |
+| Metric binding descriptors | Keep exact metric binding keys as literal pointers and use an explicit style-present flag instead of optional style storage. | Saved `512` bytes; `metrics.cpp.obj` dropped to about `25.4 KiB`. |
+| Diagnostics switch parsing | Parse diagnostics plain/path switches from narrow descriptor tables against one shared command-line vector, and share repeated output save error reporting. | The switch/path pass saved `1,024` bytes; later helper extraction reduced object bytes without crossing another executable boundary. |
+| Layout-guide-sheet callouts | Use one callout request/placement record through planning, placement, and rendering instead of copying into a middle-man placement structure. | Saved `2,560` bytes; `layout_guide_sheet_renderer.cpp.obj` dropped to about `25.6 KiB`. |
+| Layout-guide-sheet card selection | Score guide-sheet card coverage with compact bitmasks instead of allocating per-combination coverage vectors. | Saved `1,024` bytes while keeping the same selection behavior. |
+| Command-line boundary | Convert the Win32 command line to a UTF-8 `std::vector<std::string>` once in `main`, pass that vector into switch lookup helpers, and keep command-line quoting/normalization narrow until Win32 APIs require UTF-16. | Saved `1,024` bytes after the full narrow-boundary pass; `command_line.cpp` no longer owns wide string trimming, parsing, or normalization helpers. |
 
 ## Rejected Or Neutral Experiments
 
@@ -138,6 +148,10 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Do not replace the diagnostics screenshot hover path with local hit-test helpers to avoid constructing `LayoutEditController`. That trial inflated `diagnostics.cpp.obj` and was not a shipped-size win.
 - Do not broaden the snapshot dump scalar helpers to string-view or pointer-based write/load boundaries by themselves. The object shrank slightly, but the executable regressed from `1,168,896` to `1,197,056` bytes by pulling in more string and string-view append machinery.
 - Do not replace config runtime fixed-field parsing with a local comma scanner. That trial regressed the executable from `1,168,896` to `1,169,920` bytes versus the existing `SplitTrimmed` shape.
+- Targeted `/Ob0` additions to benchmark-sensitive renderer/layout/telemetry sources regressed the executable to `1,043,456` bytes in the current baseline; keep the maintained speed-source optimization split.
+- Removing Release `/Zi` was executable-neutral in the current baseline, so keep the existing debug information setting.
+- `/HIGHENTROPYVA:NO` and `/FIXED` added no shipped-size improvement beyond the retained `/DYNAMICBASE:NO` result.
+- Re-testing `/guard:cf- /guard:ehcont- /volatileMetadata-` with `/GUARD:NO /EMITVOLATILEMETADATA:NO` after the command-line refactor left `build\CaseDash.exe` at `1,003,008` bytes; do not keep those flags without a separate security decision.
 - Direct enum dispatch for layout node field descriptors was executable-neutral at `1,168,896` bytes. Keep the current fixed descriptor array and `std::find_if` shape unless a broader descriptor change deletes more surrounding code.
 - Do not broaden the cold `/Ob0` pass into tooltip text, trace formatting, resource loading, localization, config resolution/runtime fields, metric catalog, or layout-edit metadata. That broader trial regressed the executable from `1,097,728` to `1,124,864` bytes because the extra function bodies and unwind metadata outweighed deleted inline expansion.
 - Do not add `/Ob0` to widget implementation files just because they are smaller local draw helpers. That trial regressed the executable from `1,097,728` to `1,100,288` bytes.

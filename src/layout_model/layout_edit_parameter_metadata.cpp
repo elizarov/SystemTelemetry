@@ -58,8 +58,8 @@ std::string HumanizeSnakeCase(std::string_view value) {
 }
 
 #define CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_METADATA(name, meta)                                                    \
-    {meta::section_name,                                                                                               \
-        meta::parameter_name,                                                                                          \
+    {meta::section_name.data(),                                                                                        \
+        meta::parameter_name.data(),                                                                                   \
         meta::traits_type::value_format,                                                                               \
         RuntimeFieldValueKindFor<typename meta::value_type>(),                                                         \
         RuntimeFieldPolicyFor<typename meta::traits_type::policy_tag>(),                                               \
@@ -101,7 +101,8 @@ std::optional<LayoutEditParameter> FindLayoutEditParameterByConfigField(
     for (size_t i = 0; i < kParameterInfoCount; ++i) {
         const auto parameter = static_cast<LayoutEditParameter>(i);
         const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
-        if (field.sectionName == sectionName && field.parameterName == parameterName) {
+        if (std::string_view(field.sectionName) == sectionName &&
+            std::string_view(field.parameterName) == parameterName) {
             return parameter;
         }
     }
