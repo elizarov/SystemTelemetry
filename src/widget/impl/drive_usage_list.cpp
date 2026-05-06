@@ -356,9 +356,11 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
     renderer.Renderer().PushClipRect(widget.rect);
     DrawDriveHeaderLabels(renderer, layoutState_);
 
-    const auto rows = metrics.ResolveDriveRows();
-    for (size_t rowIndex = 0; rowIndex < rows.size() && rowIndex < layoutState_.rowBands.size(); ++rowIndex) {
-        const auto& drive = rows[rowIndex];
+    for (size_t rowIndex = 0; rowIndex < layoutState_.rowBands.size(); ++rowIndex) {
+        const DriveRow* drive = metrics.FindDriveRow(rowIndex);
+        if (drive == nullptr) {
+            break;
+        }
         const int textBaseId = 100 + static_cast<int>(rowIndex) * 3;
         const ColumnRects& columns = layoutState_.rowColumns[rowIndex];
         const RenderRect& readIndicatorRect = layoutState_.rowReadIndicatorRects[rowIndex];
@@ -366,7 +368,7 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
         const RenderRect& barRect = layoutState_.rowBarRects[rowIndex];
 
         const WidgetHost::TextLayoutResult labelLayout = renderer.Renderer().DrawTextBlock(columns.label,
-            drive.label,
+            drive->label,
             TextStyleId::Label,
             RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
@@ -380,19 +382,19 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
             readIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
-            renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank ? 0.0 : drive.readActivity,
+            renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank ? 0.0 : drive->readActivity,
             RenderColorId::Track,
             RenderColorId::Accent);
         DrawSegmentIndicator(renderer,
             writeIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
-            renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank ? 0.0 : drive.writeActivity,
+            renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank ? 0.0 : drive->writeActivity,
             RenderColorId::Track,
             RenderColorId::Accent);
         DrawWidgetPillBar(renderer,
             barRect,
-            drive.usedPercent / 100.0,
+            drive->usedPercent / 100.0,
             std::nullopt,
             renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank);
         const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
@@ -402,7 +404,7 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
             RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
         if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
             const WidgetHost::TextLayoutResult percentLayout = renderer.Renderer().DrawTextBlock(columns.percent,
-                drive.usedText,
+                drive->usedText,
                 TextStyleId::Label,
                 RenderColorId::Foreground,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
@@ -415,7 +417,7 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
             renderer.EditArtifacts().RegisterDynamicTextAnchor(
                 percentLayout, renderer.MakeMetricTextBinding(widget, "drive.usage", textBaseId + 101));
             const WidgetHost::TextLayoutResult freeLayout = renderer.Renderer().DrawTextBlock(columns.free,
-                drive.freeText,
+                drive->freeText,
                 TextStyleId::Small,
                 RenderColorId::MutedText,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));

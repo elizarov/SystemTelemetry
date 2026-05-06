@@ -44,15 +44,15 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.05`
   - `paint_draw avg_ms=1.99`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.34`
+  - `drag_loop per_iter_ms=2.32`
   - `snap avg_ms=0.07`
   - `apply avg_ms=0.06`
-  - `paint_draw avg_ms=2.19`
+  - `paint_draw avg_ms=2.18`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.80`
-  - `telemetry_update avg_ms=2.63`
-  - `paint_total avg_ms=2.17`
-  - `paint_draw avg_ms=2.17`
+  - `update_loop per_iter_ms=4.76`
+  - `telemetry_update avg_ms=2.57`
+  - `paint_total avg_ms=2.18`
+  - `paint_draw avg_ms=2.18`
 - Current repeatable `layout-switch` result on the current tree:
   - `switch_loop per_iter_ms=3.72`
   - `switch_apply avg_ms=0.90`
@@ -87,6 +87,7 @@ Current useful hotspot signals from the latest daemon-backed WPR capture on the 
 - The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\10827_2817_24593\` reports `update_loop per_iter_ms=4.85`, `telemetry_update avg_ms=2.72`, and `paint_draw avg_ms=2.13`; the app-inclusive call tree keeps `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, and `UpdateGpuMetrics` visible while `PresentedFpsEtwProvider::Sample` is only `0.79%` exclusive hits and the GPU raw-counter hash lookup is `0.40%` exclusive hits. The benchmark-process inclusive module weight remains centered on Direct2D, DirectWrite, PDH, Win32, kernel, and AMD driver work rather than app-side process-cache scans.
 - A direct idle-process stress run with `300` hidden `timeout.exe` processes alive reported `process_count=927`, `gpu_engine_counters=632`, and `gpu_engine_pids=28`; `build\CaseDashBenchmarks.exe update-telemetry 240 2` still landed at `update_loop per_iter_ms=4.78`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.14`.
 - The latest direct `update-telemetry` rerun after extracting `GpuRawCounterMap` into `telemetry/fps/impl/` landed at `update_loop per_iter_ms=4.80`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.17`.
+- The latest direct reruns after the telemetry metric row-storage size pass landed at `update_loop per_iter_ms=4.76`, `telemetry_update avg_ms=2.57`, `paint_draw avg_ms=2.18`, and `edit-layout paint_draw avg_ms=2.18`; keep the fixed-slot metric and drive-row caches because a single borrowed row slot without fixed reuse made repeated paint noticeably slower in direct reruns.
 - The latest direct `edit-layout` rerun after the panel-icon mask-atlas pass landed at `drag_loop per_iter_ms=2.24`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.11`; the benchmark includes the app-style layout mutation tail and one forced redraw per pointer move.
 - The latest direct `theme-change` rerun after the same pass landed at `theme_loop per_iter_ms=4.11`, `dashboard_config avg_ms=0.85`, `theme_preview avg_ms=0.84`, and `theme_paint avg_ms=2.18`.
 - The real traced drag in `build\casedash_trace.txt` reported `elapsed_ms=6909.736`, `snap_samples=687`, `apply_samples=687`, but only `paint_total_samples=25`; the measured paint cost was acceptable, but queued `WM_PAINT` delivery was starved by continuous mouse input.

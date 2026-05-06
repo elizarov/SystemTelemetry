@@ -14,10 +14,10 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `939,520` bytes.
+- Current measured `build\CaseDash.exe`: `928,768` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `740.8 KiB`, `.rdata` about `94.0 KiB`, `.pdata` about `35.4 KiB`, `.xdata` about `15.1 KiB`, and `.rsrc$02` about `12.2 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `metrics.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_edit_tree.cpp.obj`, `pane.cpp.obj`, `dashboard_app.cpp.obj`, `d2d_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, and `dashboard_renderer.cpp.obj`.
+- Current largest sections: `.text$mn` about `731.4 KiB`, `.rdata` about `93.0 KiB`, `.pdata` about `35.0 KiB`, `.xdata` about `15.0 KiB`, and `.rsrc$02` about `12.2 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_edit_tree.cpp.obj`, `pane.cpp.obj`, `dashboard_app.cpp.obj`, `d2d_renderer.cpp.obj`, `dashboard_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `collector_fake.cpp.obj`, `config_parser.cpp.obj`, `fps_etw_provider.cpp.obj`, and `metrics.cpp.obj`.
 - Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`.
 
 ## Workflow
@@ -118,6 +118,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | FPS process-name boundary | Keep FPS ETW process names UTF-8 in the cache and convert from the Win32 wide buffer at the query boundary. | Saved `1,024` bytes in the measured pass; `PresentedFpsEtwProvider::Sample` dropped to about `5.2 KiB`. |
 | Win32 lock wrappers | Use a small SRWLOCK RAII wrapper for the app telemetry handoff, telemetry runtime, trace, and FPS ETW provider locks instead of `std::mutex`. | File-alignment neutral in isolation, but removed `_Mtx`/`std::mutex` symbols and kept section bytes lower in the retained pass. |
 | Network selection staging | Stream visible network candidates directly into retained telemetry state, track the selected candidate in place, and leave `collector_network.cpp` on the normal `/Os` path. | Executable-alignment neutral in isolation, but reduced `collector_network.cpp.obj` while preserving preferred-adapter trace behavior. |
+| Telemetry metric row storage | Keep metric binding metadata as compact enum/flag descriptors, keep throughput histories on four fixed slots, and let metric-list and drive-usage widgets consume borrowed fixed-slot row lookups instead of materialized row vectors. | `939,520` to `928,768` bytes; `metrics.cpp.obj` dropped from about `25.2 KiB` to `14.8 KiB`, and `.text$mn` dropped to about `731.4 KiB`. |
 
 ## Rejected Or Neutral Experiments
 
@@ -168,6 +169,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Direct enum dispatch for layout node field descriptors was executable-neutral at `1,168,896` bytes. Keep the current fixed descriptor array and `std::find_if` shape unless a broader descriptor change deletes more surrounding code.
 - Do not broaden the cold `/Ob0` pass into tooltip text, trace formatting, resource loading, localization, config resolution/runtime fields, metric catalog, or layout-edit metadata. That broader trial regressed the executable from `1,097,728` to `1,124,864` bytes because the extra function bodies and unwind metadata outweighed deleted inline expansion.
 - Do not add `/Ob0` to widget implementation files just because they are smaller local draw helpers. That trial regressed the executable from `1,097,728` to `1,100,288` bytes.
+- Do not add the layout-edit dialog implementation sources to the Release noinline source list as a group. That trial regressed the executable from `939,520` to `949,760` bytes because extra call bodies and unwind metadata outweighed deleted inline expansion.
 - `/Gy` plus `/OPT:ICF` stayed executable-neutral at `1,084,416` bytes after the limited-inlining pass, so keep function packaging out of the retained release profile for now.
 - `/O1` on top of the limited-inlining pass regressed the executable from `1,084,416` to `1,084,928` bytes; keep the maintained `/Os` default plus targeted `/O2` source list.
 - `/GF`, `/Gw`, `/Gy`, and `/OPT:ICF` did not reduce the shipped executable after the current pass; keep string pooling, global-data packaging, function packaging, and identical COMDAT folding out of the retained profile unless a broader change proves a win.

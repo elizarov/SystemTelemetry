@@ -233,25 +233,35 @@ void MetricListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
     const auto dragState = renderer.ActiveMetricListReorderDrag(
         LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath});
     const int draggedIndex = dragState.has_value() ? dragState->currentIndex : -1;
-    const auto& rows = metrics.ResolveMetricList(metricRefs_);
+    const std::string* draggedMetricRef = nullptr;
     int rowIndex = 0;
-    for (const auto& row : rows) {
+    for (const auto& metricRef : metricRefs_) {
         if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
             break;
         }
+        const MetricValue* row = metrics.FindMetric(metricRef);
+        if (row == nullptr) {
+            continue;
+        }
         if (rowIndex != draggedIndex) {
-            DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, rowIndex, row, 0, true);
+            DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, rowIndex, *row, 0, true);
+        } else {
+            draggedMetricRef = &metricRef;
         }
 
         ++rowIndex;
     }
 
-    if (dragState.has_value() && draggedIndex >= 0 && draggedIndex < static_cast<int>(rows.size()) &&
+    if (dragState.has_value() && draggedIndex >= 0 && draggedIndex < rowIndex && draggedMetricRef != nullptr &&
         draggedIndex < static_cast<int>(layoutState_.rowRects.size())) {
+        const MetricValue* draggedRow = metrics.FindMetric(*draggedMetricRef);
+        if (draggedRow == nullptr) {
+            renderer.Renderer().PopClipRect();
+            return;
+        }
         const int draggedTop = dragState->mouseY - dragState->dragOffsetY;
         const int yOffset = draggedTop - layoutState_.rowRects[draggedIndex].top;
-        DrawMetricListRow(
-            renderer, widget, layoutState_, metricRefs_, draggedIndex, rows[draggedIndex], yOffset, false);
+        DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, draggedIndex, *draggedRow, yOffset, false);
         const RenderRect outlineRect = OffsetRect(layoutState_.rowRects[draggedIndex], yOffset);
         const bool hoverEquivalent = renderer.CurrentRenderMode() == WidgetHost::RenderMode::LayoutGuideSheet;
         const RenderColorId outlineColor = hoverEquivalent ? RenderColorId::LayoutGuide : RenderColorId::ActiveEdit;
