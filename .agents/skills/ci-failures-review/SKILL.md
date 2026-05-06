@@ -7,7 +7,7 @@ description: Review and fix CI or GitHub Actions workflow failures for this repo
 
 ## Overview
 
-Use this skill to investigate a failed workflow from the failing run outward, then make the smallest repository change that addresses the first actionable diagnostic.
+Use this skill to investigate a failed workflow from the failing run outward, then make the smallest repository change that addresses all actionable diagnostics.
 
 ## Workflow
 
@@ -23,7 +23,7 @@ Use this skill to investigate a failed workflow from the failing run outward, th
    - Use failed-step logs and uploaded artifacts.
 
 3. Diagnose.
-   - Find the first actionable error in the failed step.
+   - Find actionable errors in the failed step.
    - Download uploaded reports when the workflow provides them, such as `clang-tidy-report`.
    - For clang-tidy reports, search the artifact for reportable `warning:` and `error:` lines; ignore progress lines and `clang-tidy exit code ignored after filtering` unless reportable output remains nearby.
    - Cross-check the reported file against the current worktree before patching because the branch may already be ahead of the failed commit.
