@@ -335,6 +335,17 @@ std::string BuildSavedConfigText(
     return JoinConfigLines(lines);
 }
 
+bool LayoutConfigHasDifferences(const LayoutConfig& config, const LayoutConfig& compareConfig) {
+    if (config.structure != compareConfig.structure || config.cardsLayout != compareConfig.cardsLayout) {
+        return true;
+    }
+    AppConfig current;
+    current.layout = config;
+    AppConfig saved;
+    saved.layout = compareConfig;
+    return !BuildSavedConfigText("", current, &saved).empty();
+}
+
 bool SaveConfig(const FilePath& path, const AppConfig& config, const ConfigParseContext& context) {
     const AppConfig compareConfig = LoadConfig(path, true, context);
     const std::string output = BuildSavedConfigText(ReadConfigFileUtf8(path), config, &compareConfig);

@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "dashboard/dashboard_menu_types.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit_dialog/layout_edit_dialog.h"

@@ -380,9 +380,6 @@ struct LayoutConfig {
 
     LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
-
-    // Size: keep this cold full-layout comparison out of individual dirty-check callers.
-    __declspec(noinline) bool operator==(const LayoutConfig& other) const;
 };
 
 struct AppConfig {
@@ -392,8 +389,6 @@ struct AppConfig {
     CONFIG_SECTION_VALUE(StorageConfig, storage);
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
-
-    bool operator==(const AppConfig& other) const;
 };
 
 CONFIG_EDITABLE_ROOT_BINDING_PATH(UiFontSetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::fontsBinding);

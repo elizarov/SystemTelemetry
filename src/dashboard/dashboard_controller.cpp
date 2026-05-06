@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <shellapi.h>
 
 #include "config/color_resolver.h"
 #include "config/config_io.h"
@@ -17,6 +16,7 @@
 #include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_service.h"
 #include "telemetry/metrics.h"
+#include "util/elevated_process.h"
 #include "util/paths.h"
 #include "util/strings.h"
 #include "util/temp_file.h"
@@ -50,30 +50,10 @@ bool SaveConfigElevated(
     parameters += targetPath.wstring();
     parameters += L"\"";
 
-    SHELLEXECUTEINFOW executeInfo{};
-    executeInfo.cbSize = sizeof(executeInfo);
-    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
-    executeInfo.hwnd = owner;
-    executeInfo.lpVerb = L"runas";
-    const auto executablePath = GetExecutablePath();
-    if (!executablePath.has_value()) {
-        RemoveFileIfExists(tempPath);
-        return false;
-    }
-    executeInfo.lpFile = executablePath->c_str();
-    executeInfo.lpParameters = parameters.c_str();
-    executeInfo.nShow = SW_HIDE;
-    if (!ShellExecuteExW(&executeInfo)) {
-        RemoveFileIfExists(tempPath);
-        return false;
-    }
-
-    WaitForSingleObject(executeInfo.hProcess, INFINITE);
     DWORD exitCode = 1;
-    GetExitCodeProcess(executeInfo.hProcess, &exitCode);
-    CloseHandle(executeInfo.hProcess);
+    const bool launched = RunElevatedSelfAndWait(owner, parameters.c_str(), nullptr, SW_HIDE, &exitCode);
     RemoveFileIfExists(tempPath);
-    return exitCode == 0;
+    return launched && exitCode == 0;
 }
 
 bool SaveRuntimeConfig(const FilePath& path, const AppConfig& config, HWND owner) {
@@ -200,7 +180,8 @@ void DashboardController::RefreshLayoutEditSessionDirtyFlag() {
         state_.hasUnsavedLayoutEditChanges = false;
         return;
     }
-    state_.hasUnsavedLayoutEditChanges = state_.config.layout != *state_.layoutEditSessionSavedLayout;
+    // Size: exact layout diffing reuses config metadata and runs at prompt boundaries, not on every drag mutation.
+    state_.hasUnsavedLayoutEditChanges = true;
 }
 
 void DashboardController::MarkLayoutEditSessionSaved() {
@@ -554,25 +535,25 @@ bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scal
     return true;
 }
 
-void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const NetworkMenuOption& option) {
+void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const std::string& adapterName) {
     if (state_.telemetry == nullptr) {
         return;
     }
-    state_.config.network.adapterName = option.adapterName;
-    state_.telemetry->SetPreferredNetworkAdapterName(option.adapterName);
+    state_.config.network.adapterName = adapterName;
+    state_.telemetry->SetPreferredNetworkAdapterName(adapterName);
     state_.telemetryUpdate = state_.telemetry->Latest();
     ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     FinishConfigMutation(shell, false);
 }
 
-void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option) {
+void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const std::string& driveLetter) {
     if (state_.telemetry == nullptr) {
         return;
     }
     std::vector<std::string> driveLetters = state_.config.storage.drives;
-    const auto it = std::find(driveLetters.begin(), driveLetters.end(), option.driveLetter);
+    const auto it = std::find(driveLetters.begin(), driveLetters.end(), driveLetter);
     if (it == driveLetters.end()) {
-        driveLetters.push_back(option.driveLetter);
+        driveLetters.push_back(driveLetter);
     } else {
         driveLetters.erase(it);
     }
@@ -622,7 +603,8 @@ void DashboardController::StopLayoutEditMode(
 
 bool DashboardController::HasUnsavedLayoutEditChanges() const {
     return state_.isEditingLayout && state_.layoutEditSessionSavedLayout != nullptr &&
-           state_.hasUnsavedLayoutEditChanges;
+           state_.hasUnsavedLayoutEditChanges &&
+           LayoutConfigHasDifferences(state_.config.layout, *state_.layoutEditSessionSavedLayout);
 }
 
 bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost& shell) {

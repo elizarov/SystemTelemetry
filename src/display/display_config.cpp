@@ -1,7 +1,6 @@
 #include "display/display_config.h"
 
 #include <cstdio>
-#include <shellapi.h>
 #include <shobjidl.h>
 
 #include "config/config_io.h"
@@ -12,6 +11,7 @@
 #include "display/monitor.h"
 #include "telemetry/metrics.h"
 #include "util/command_line.h"
+#include "util/elevated_process.h"
 #include "util/paths.h"
 #include "util/temp_file.h"
 #include "util/trace.h"
@@ -166,13 +166,6 @@ bool ConfigureDisplay(
         return false;
     }
 
-    const auto executablePath = GetExecutablePath();
-    if (!executablePath.has_value()) {
-        RemoveFileIfExists(tempConfigPath);
-        RemoveFileIfExists(tempDumpPath);
-        return false;
-    }
-
     std::string parameters = "/configure-display ";
     parameters += QuoteCommandLineArgument(Utf8FromWide(tempConfigPath.wstring()));
     parameters += " /configure-display-target ";
@@ -183,27 +176,11 @@ bool ConfigureDisplay(
     parameters += QuoteCommandLineArgument(Utf8FromWide(imagePath.wstring()));
     const std::wstring wideParameters = WideFromUtf8(parameters);
 
-    SHELLEXECUTEINFOW executeInfo{};
-    executeInfo.cbSize = sizeof(executeInfo);
-    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
-    executeInfo.hwnd = owner;
-    executeInfo.lpVerb = L"runas";
-    executeInfo.lpFile = executablePath->c_str();
-    executeInfo.lpParameters = wideParameters.c_str();
-    executeInfo.nShow = SW_HIDE;
-    if (!ShellExecuteExW(&executeInfo)) {
-        RemoveFileIfExists(tempConfigPath);
-        RemoveFileIfExists(tempDumpPath);
-        return false;
-    }
-
-    WaitForSingleObject(executeInfo.hProcess, INFINITE);
     DWORD exitCode = 1;
-    GetExitCodeProcess(executeInfo.hProcess, &exitCode);
-    CloseHandle(executeInfo.hProcess);
+    const bool launched = RunElevatedSelfAndWait(owner, wideParameters.c_str(), nullptr, SW_HIDE, &exitCode);
     RemoveFileIfExists(tempConfigPath);
     RemoveFileIfExists(tempDumpPath);
-    return exitCode == 0;
+    return launched && exitCode == 0;
 }
 
 int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,

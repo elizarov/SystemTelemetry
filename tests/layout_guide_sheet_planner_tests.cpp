@@ -271,24 +271,46 @@ TEST(LayoutGuideSheetPlanner, PlacementPromotesOuterSideItemsToTopAndBottom) {
     addCallout("left-bottom", RenderRect{120, 260, 140, 280});
     addCallout("right-top", RenderRect{260, 120, 280, 140});
 
-    const LayoutGuideSheetPlacementResult result = PlaceLayoutGuideSheetCallouts(cardPlacements,
+    const LayoutGuideSheetPlacementResult result = PlaceLayoutGuideSheetCallouts(
+        cardPlacements,
         callouts,
         LayoutGuideSheetPlacementStyle{10, 12, 4, 20, 0, 1},
-        [](LayoutGuideSheetPlacementCallout&, int) {});
+        [](LayoutGuideSheetPlacementCallout&, int) {},
+        nullptr);
 
     std::set<LayoutGuideSheetExitSide> sides;
     for (const LayoutGuideSheetPlacementCallout& callout : callouts) {
         sides.insert(callout.exitSide);
     }
-    ASSERT_EQ(result.blocks.size(), 1u);
-    EXPECT_TRUE(result.remainingIntersections.empty());
+    EXPECT_GT(result.sheetWidth, 0);
+    EXPECT_GT(result.sheetHeight, 0);
     EXPECT_EQ(sides.size(), 4u);
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Left));
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Right));
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Top));
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Bottom));
-    EXPECT_EQ(result.blocks.front().leftCallouts, 2u);
-    EXPECT_EQ(result.blocks.front().rightCallouts, 2u);
-    EXPECT_EQ(result.blocks.front().topCallouts, 1u);
-    EXPECT_EQ(result.blocks.front().bottomCallouts, 1u);
+    EXPECT_EQ(std::count_if(callouts.begin(),
+                  callouts.end(),
+                  [](const LayoutGuideSheetPlacementCallout& callout) {
+                      return callout.exitSide == LayoutGuideSheetExitSide::Left;
+                  }),
+        2);
+    EXPECT_EQ(std::count_if(callouts.begin(),
+                  callouts.end(),
+                  [](const LayoutGuideSheetPlacementCallout& callout) {
+                      return callout.exitSide == LayoutGuideSheetExitSide::Right;
+                  }),
+        2);
+    EXPECT_EQ(std::count_if(callouts.begin(),
+                  callouts.end(),
+                  [](const LayoutGuideSheetPlacementCallout& callout) {
+                      return callout.exitSide == LayoutGuideSheetExitSide::Top;
+                  }),
+        1);
+    EXPECT_EQ(std::count_if(callouts.begin(),
+                  callouts.end(),
+                  [](const LayoutGuideSheetPlacementCallout& callout) {
+                      return callout.exitSide == LayoutGuideSheetExitSide::Bottom;
+                  }),
+        1);
 }

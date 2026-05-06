@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "dashboard/dashboard_menu_types.h"
 #include "diagnostics/diagnostics.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
@@ -25,12 +24,6 @@ struct DashboardSessionState {
     bool hasUnsavedLayoutEditChanges = false;
     // Size: allocate the saved layout only during edit mode; an always-live second LayoutConfig measured larger.
     std::unique_ptr<LayoutConfig> layoutEditSessionSavedLayout;
-    std::vector<DisplayMenuOption> configDisplayOptions;
-    std::vector<LayoutMenuOption> layoutMenuOptions;
-    std::vector<ThemeMenuOption> themeMenuOptions;
-    std::vector<NetworkMenuOption> networkMenuOptions;
-    std::vector<StorageDriveMenuOption> storageDriveMenuOptions;
-    std::vector<ScaleMenuOption> scaleMenuOptions;
     std::wstring lastError;
 };
 
@@ -85,8 +78,8 @@ public:
     bool SwitchLayout(DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout);
     bool SwitchTheme(DashboardShellHost& shell, const std::string& themeName, bool diagnosticsEditLayout);
     bool SetDisplayScale(DashboardShellHost& shell, double scale);
-    void SelectNetworkAdapter(DashboardShellHost& shell, const NetworkMenuOption& option);
-    void ToggleStorageDrive(DashboardShellHost& shell, const StorageDriveMenuOption& option);
+    void SelectNetworkAdapter(DashboardShellHost& shell, const std::string& adapterName);
+    void ToggleStorageDrive(DashboardShellHost& shell, const std::string& driveLetter);
     void RefreshTelemetrySelections(DashboardShellHost& shell);
     void StartLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller);
     void StopLayoutEditMode(DashboardShellHost& shell, LayoutEditController& controller, bool diagnosticsEditLayout);

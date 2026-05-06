@@ -1,9 +1,8 @@
 #include "dashboard/autostart.h"
 
-#include <shellapi.h>
-
 #include "dashboard/fps_service.h"
 #include "util/command_line.h"
+#include "util/elevated_process.h"
 #include "util/paths.h"
 #include "util/utf8.h"
 
@@ -107,29 +106,9 @@ int RunElevatedAutoStartMode(bool enabled) {
 }
 
 bool UpdateAutoStartElevated(bool enabled, HWND owner) {
-    const auto executablePath = GetExecutablePath();
-    if (!executablePath.has_value()) {
-        return false;
-    }
-
     const std::wstring parameters = WideFromUtf8(enabled ? "/set-autostart on" : "/set-autostart off");
-    SHELLEXECUTEINFOW executeInfo{};
-    executeInfo.cbSize = sizeof(executeInfo);
-    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
-    executeInfo.hwnd = owner;
-    executeInfo.lpVerb = L"runas";
-    executeInfo.lpFile = executablePath->c_str();
-    executeInfo.lpParameters = parameters.c_str();
-    executeInfo.nShow = SW_HIDE;
-    if (!ShellExecuteExW(&executeInfo)) {
-        return false;
-    }
-
-    WaitForSingleObject(executeInfo.hProcess, INFINITE);
     DWORD exitCode = 1;
-    GetExitCodeProcess(executeInfo.hProcess, &exitCode);
-    CloseHandle(executeInfo.hProcess);
-    return exitCode == 0;
+    return RunElevatedSelfAndWait(owner, parameters.c_str(), nullptr, SW_HIDE, &exitCode) && exitCode == 0;
 }
 
 bool UpdateAutoStartRegistration(bool enabled, HWND owner) {

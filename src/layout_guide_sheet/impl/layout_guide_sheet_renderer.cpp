@@ -4,7 +4,6 @@
 #include <chrono>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -15,30 +14,6 @@
 #include "util/trace.h"
 
 namespace {
-
-const char* ExitSideName(LayoutGuideSheetExitSide side) {
-    switch (side) {
-        case LayoutGuideSheetExitSide::Left:
-            return "left";
-        case LayoutGuideSheetExitSide::Right:
-            return "right";
-        case LayoutGuideSheetExitSide::Top:
-            return "top";
-        case LayoutGuideSheetExitSide::Bottom:
-            return "bottom";
-    }
-    return "right";
-}
-
-const char* IntersectionKindName(LayoutGuideSheetLeaderIntersectionKind kind) {
-    switch (kind) {
-        case LayoutGuideSheetLeaderIntersectionKind::LeaderCross:
-            return "leader_cross";
-        case LayoutGuideSheetLeaderIntersectionKind::TargetSafeZone:
-            return "target_safe_zone";
-    }
-    return "leader_cross";
-}
 
 RenderRect MakeOverviewSquareAnchorRect(int centerX, int centerY, int size) {
     const int half = size / 2;
@@ -865,35 +840,15 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
         targetSafeRadius,
         gaugeRingThickness};
     const auto placementStart = std::chrono::steady_clock::now();
-    const LayoutGuideSheetPlacementResult placementResult =
-        PlaceLayoutGuideSheetCallouts(cardPlacements, callouts, placementStyle, [&](Callout& callout, int width) {
-            measureCalloutBubble(callout, width);
-        });
+    const LayoutGuideSheetPlacementResult placementResult = PlaceLayoutGuideSheetCallouts(
+        cardPlacements,
+        callouts,
+        placementStyle,
+        [&](Callout& callout, int width) { measureCalloutBubble(callout, width); },
+        traceDetails);
     recordStats(&LayoutGuideSheetRenderStats::placement, placementStart);
     const int sheetWidth = placementResult.sheetWidth;
     const int sheetHeight = placementResult.sheetHeight;
-    if (traceDetails != nullptr) {
-        const auto calloutKey = [&](size_t index) -> std::string_view {
-            return index < callouts.size() ? callouts[index].key : std::string_view{};
-        };
-        const auto intersectionCard =
-            [&](const LayoutGuideSheetLeaderIntersectionTrace& intersection) -> std::string_view {
-            if (intersection.sourceCardIndex < cardPlacements.size()) {
-                return cardPlacements[intersection.sourceCardIndex].id;
-            }
-            return intersection.firstCalloutIndex < callouts.size()
-                       ? callouts[intersection.firstCalloutIndex].sourceCardId
-                       : std::string_view{};
-        };
-        for (const LayoutGuideSheetLeaderIntersectionTrace& intersection : placementResult.remainingIntersections) {
-            traceDetails->push_back("intersection_card=" + Trace::QuoteText(intersectionCard(intersection)) +
-                                    " intersection_kind=" + Trace::QuoteText(IntersectionKindName(intersection.kind)) +
-                                    " first_side=" + Trace::QuoteText(ExitSideName(intersection.firstExitSide)) +
-                                    " first_callout=" + Trace::QuoteText(calloutKey(intersection.firstCalloutIndex)) +
-                                    " second_side=" + Trace::QuoteText(ExitSideName(intersection.secondExitSide)) +
-                                    " second_callout=" + Trace::QuoteText(calloutKey(intersection.secondCalloutIndex)));
-        }
-    }
 
     const auto drawStart = std::chrono::steady_clock::now();
 
@@ -1025,14 +980,6 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     }
     if (saved && traceDetails != nullptr) {
         traceDetails->push_back("canvas=\"" + std::to_string(sheetWidth) + "x" + std::to_string(sheetHeight) + "\"");
-        for (const LayoutGuideSheetPlacementBlockTrace& block : placementResult.blocks) {
-            const std::string& cardId = cardPlacements[block.cardIndex].id;
-            traceDetails->push_back("leader_score_" + cardId + "=" + std::to_string(block.leaderScore) +
-                                    " leader_repair_passes_" + cardId + "=" + std::to_string(block.sideRepairPasses) +
-                                    " leader_columns_" + cardId + "=\"" + std::to_string(block.leftCallouts) + "," +
-                                    std::to_string(block.topCallouts) + "," + std::to_string(block.rightCallouts) +
-                                    "," + std::to_string(block.bottomCallouts) + "\"");
-        }
         std::string selectedCards = "cards=\"";
         for (size_t i = 0; i < cardPlacements.size(); ++i) {
             if (i > 0) {

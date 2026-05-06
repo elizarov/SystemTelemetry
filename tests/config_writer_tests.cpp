@@ -164,6 +164,22 @@ TEST(ConfigWriter, MinimalSaveDoesNotEmitLeadingEmptyLineForEmptyInitialText) {
     EXPECT_THAT(output, testing::Not(testing::StartsWith("\r\n")));
 }
 
+TEST(ConfigWriter, LayoutConfigDifferenceCheckUsesMetadataAndSelectedStructure) {
+    LayoutConfig saved;
+    saved.structure.cardsLayout = LayoutNodeConfig{.name = "rows"};
+    saved.cardsLayout = saved.structure.cardsLayout;
+
+    LayoutConfig current = saved;
+    EXPECT_FALSE(LayoutConfigHasDifferences(current, saved));
+
+    current.dashboard.outerMargin = saved.dashboard.outerMargin + 1;
+    EXPECT_TRUE(LayoutConfigHasDifferences(current, saved));
+
+    current = saved;
+    current.structure.cardsLayout.name = "columns";
+    EXPECT_TRUE(LayoutConfigHasDifferences(current, saved));
+}
+
 TEST(ConfigWriter, MinimalSavePreservesLeadingCommentsWithoutLeadingEmptyLine) {
     AppConfig compareConfig;
     AppConfig currentConfig = compareConfig;

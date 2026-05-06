@@ -116,6 +116,7 @@ add_executable(CaseDash WIN32
     src/config/diagnostics_options.cpp
     src/display/display_config.cpp
     src/display/monitor.cpp
+    src/util/elevated_process.cpp
     src/util/file_path.cpp
     src/util/numeric_format.cpp
     src/util/paths.cpp
@@ -847,7 +848,6 @@ set_target_properties(CaseDashBenchmarks PROPERTIES
     PDB_OUTPUT_DIRECTORY_RELEASE "${output_root}"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
-
 
 
 

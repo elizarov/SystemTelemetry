@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `928,768` bytes.
+- Current measured `build\CaseDash.exe`: `917,504` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `731.4 KiB`, `.rdata` about `93.0 KiB`, `.pdata` about `35.0 KiB`, `.xdata` about `15.0 KiB`, and `.rsrc$02` about `12.2 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_edit_tree.cpp.obj`, `pane.cpp.obj`, `dashboard_app.cpp.obj`, `d2d_renderer.cpp.obj`, `dashboard_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `collector_fake.cpp.obj`, `config_parser.cpp.obj`, `fps_etw_provider.cpp.obj`, and `metrics.cpp.obj`.
-- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`.
+- Current largest sections: `.text$mn` about `720.6 KiB`, `.rdata` about `93.0 KiB`, `.pdata` about `34.9 KiB`, `.xdata` about `15.0 KiB`, and `.rsrc$02` about `12.2 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `pane.cpp.obj`, `layout_edit_tree.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `dashboard_app.cpp.obj`, `d2d_renderer.cpp.obj`, `dashboard_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `collector_fake.cpp.obj`, `config_parser.cpp.obj`, `fps_etw_provider.cpp.obj`, `metrics.cpp.obj`, and `config_writer.cpp.obj`.
+- Last validation: `format.cmd changed`, `build.cmd`, `test.cmd`, `build_maps.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`.
 
 ## Workflow
 
@@ -119,6 +119,10 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Lightweight mutex wrapper | Use a small platform-backed RAII mutex wrapper for the app telemetry handoff, telemetry runtime, trace, and FPS ETW provider locks instead of `std::mutex`. | File-alignment neutral in isolation, but removed `_Mtx`/`std::mutex` symbols and kept section bytes lower in the retained pass. |
 | Network selection staging | Stream visible network candidates directly into retained telemetry state, track the selected candidate in place, and leave `collector_network.cpp` on the normal `/Os` path. | Executable-alignment neutral in isolation, but reduced `collector_network.cpp.obj` while preserving preferred-adapter trace behavior. |
 | Telemetry metric row storage | Keep metric binding metadata as compact enum/flag descriptors, keep throughput histories on four fixed slots, and let metric-list and drive-usage widgets consume borrowed fixed-slot row lookups instead of materialized row vectors. | `939,520` to `928,768` bytes; `metrics.cpp.obj` dropped from about `25.2 KiB` to `14.8 KiB`, and `.text$mn` dropped to about `731.4 KiB`. |
+| Context-menu payload storage | Build layout, theme, network, storage, scale, and display menu choices directly from current config and telemetry state. Keep dense command ranges indexable and keep display choices in a fixed stack buffer instead of session-owned option vectors. | `928,768` to `922,624` bytes; `dashboard_shell_ui.cpp.obj` stays on the maintained speed-source list. |
+| Elevated relaunch helper | Keep `RunElevatedSelfAndWait` as the single ShellExecuteEx `runas` wait helper for config save, display configuration, autostart setup, and `/elevate` relaunch. | `922,624` to `922,112` bytes while preserving the same elevation behavior. |
+| Layout-guide-sheet placement trace | Emit guide-sheet placement diagnostics directly into the trace detail sink instead of returning trace-only block and intersection vectors from placement to renderer. | `922,112` to `920,576` bytes; the placement result now carries only sheet dimensions. |
+| Layout-edit dirty tracking | Treat layout-edit mutations as possibly dirty during the edit loop, and run the exact saved-layout comparison through existing config-difference metadata only at prompt boundaries. Compare the selected-layout structure directly so layout switches remain detected. | `920,576` to `917,504` bytes; the old full `LayoutConfig::operator==` symbol is removed from the map. |
 
 ## Rejected Or Neutral Experiments
 
@@ -135,7 +139,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Compact telemetry-setting extraction in `ApplyConfigSnapshot` regressed by 512 bytes; keep the full previous `AppConfig` snapshot there.
 - Direct controller-side metric preview regressed by 512 bytes; keep metric preview on the existing config snapshot path.
 - UTF-8-only tooltip assembly shrank `BuildLayoutEditTooltipTextForPayload` from about 6.3 KiB to 5.9 KiB and reduces per-tooltip conversions, but the final executable stayed flat in that isolated trial.
-- Noinline `LayoutConfig::operator==` moved the full-layout equality chain out of `RefreshLayoutEditSessionDirtyFlag`, but was executable-neutral in the measured pass; keep only as a guard against future duplicate callers.
+- Do not reintroduce the full `LayoutConfig::operator==` dirty-check chain. Exact layout-edit prompt checks now reuse config-difference metadata and direct selected-layout structure comparison, while edit mutations only mark the session possibly dirty.
 - Copy-then-move restore of the saved layout edit snapshot regressed by 5,120 bytes; keep direct copy assignment for restore.
 - Flat board sensor name bindings removed unordered-map use from the board config/settings surface but grew the app by 2,048 bytes because the helper/vector code outweighed deleted hash machinery. Keep the existing maps there for now.
 - Manual loops for command-line wide-string trim and path normalization regressed by 512 bytes versus the existing STL algorithm shape; keep the measured algorithm code there.
@@ -184,6 +188,9 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Hoisting `LayoutEditGuide::childExtents` construction outside the dashboard guide loop regressed by `512` bytes. Keep the current per-guide construction even though the source has a repeated loop.
 - Replacing the localization catalog's `std::unordered_map` with a vector-backed wrapper regressed by `1,024` bytes because hash-table machinery remains required by board sensor mappings.
 - Direct context-menu command indexing removed repeated scans and shrank `dashboard_shell_ui.cpp.obj`, but it was executable-neutral until combined with the retained variant-construction pass. Do not treat dense command indexing alone as a size lever.
+- Do not retry isolated guide-sheet placement score-only splitting, network candidate rank extraction, byte-buffer ownership swaps in network/FPS paths, display-menu streaming callbacks, dynamic WTS lookup, or removing `drive_usage_list.cpp` from the speed-source list; each stayed executable-neutral in the current `922,112` byte range.
+- Do not add `dashboard_shell_ui.cpp` to the `/Ob0` noinline list or remove it from the maintained speed-source list. That trial regressed the executable from `922,112` to `930,816` bytes.
+- Do not retry the drive-usage row-layout vector consolidation shapes from this pass. Materializing one row vector regressed to `923,136` bytes, and deriving row geometry from the fixed slots was executable-neutral at `922,112` bytes.
 - Do not retry the current-session layout-edit shape experiments that regressed or stayed flat: `TooltipPayload` aliasing to the active-region payload, leaf-derived selection highlights, `/Gy` plus `/OPT:ICF`, compact guide-sheet callout target structs, guide-sheet index-sort rebuild, tooltip focus-key bool/out-parameter extraction, direct variant `emplace` in tooltip targets, initializer-list cleanup in `CurrentTooltipTarget`, `/Ob0` on `layout_edit_controller.cpp`, or removing `dashboard_shell_ui.cpp` and `dashboard_controller.cpp` from the speed-source list.
 
 ## Notes

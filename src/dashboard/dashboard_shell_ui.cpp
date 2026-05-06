@@ -67,6 +67,7 @@ private:
 
 constexpr double kPredefinedDisplayScales[] = {1.0, 1.5, 2.0, 2.5, 3.0};
 constexpr double kScaleEpsilon = 0.0001;
+constexpr size_t kConfigureDisplayMenuCapacity = kCommandConfigureDisplayMax - kCommandConfigureDisplayBase + 1;
 
 struct UnsavedLayoutEditDialogState {
     const DashboardApp* app = nullptr;
@@ -215,12 +216,25 @@ std::wstring FormatNamedMenuLabel(std::string_view name, std::string_view descri
     return label;
 }
 
-std::wstring FormatLayoutMenuLabel(const LayoutMenuOption& option) {
-    return FormatNamedMenuLabel(option.name, option.description);
-}
-
-std::wstring FormatThemeMenuLabel(const ThemeMenuOption& option) {
-    return FormatNamedMenuLabel(option.name, option.description);
+size_t BuildScaleMenuEntries(double currentScale, double* entries, size_t capacity) {
+    size_t count = 0;
+    for (double predefinedScale : kPredefinedDisplayScales) {
+        if (count < capacity) {
+            entries[count++] = predefinedScale;
+        }
+    }
+    if (!HasExplicitDisplayScale(currentScale) || IsPredefinedDisplayScale(currentScale) || count >= capacity) {
+        return count;
+    }
+    size_t insertAt = 0;
+    while (insertAt < count && entries[insertAt] < currentScale) {
+        ++insertAt;
+    }
+    for (size_t i = count; i > insertAt; --i) {
+        entries[i] = entries[i - 1];
+    }
+    entries[insertAt] = currentScale;
+    return count + 1;
 }
 
 void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
@@ -886,10 +900,10 @@ void DashboardShellUi::ExecuteCommand(
         default:
             if (selected >= kCommandLayoutBase && selected <= kCommandLayoutMax) {
                 const size_t index = selected - kCommandLayoutBase;
-                if (index < state.layoutMenuOptions.size() && state.layoutMenuOptions[index].commandId == selected) {
-                    const LayoutMenuOption& option = state.layoutMenuOptions[index];
+                if (index < state.config.layout.layouts.size()) {
+                    const std::string& layoutName = state.config.layout.layouts[index].name;
                     app_.TraceLayoutEditUiEvent(
-                        "layout_switch:menu_command", "selected_layout=" + Trace::QuoteText(option.name));
+                        "layout_switch:menu_command", "selected_layout=" + Trace::QuoteText(layoutName));
                     const bool suppressTooltipRefresh = app_.controller_.State().isEditingLayout;
                     if (suppressTooltipRefresh) {
                         app_.SetLayoutEditTooltipRefreshSuppressed(true);
@@ -898,12 +912,12 @@ void DashboardShellUi::ExecuteCommand(
                         app_.TraceLayoutEditUiEvent(
                             "layout_switch:menu_prepare", "tooltip_suppressed=" + Trace::QuoteText("true"));
                     }
-                    if (!app_.controller_.SwitchLayout(app_, option.name, app_.diagnosticsOptions_.editLayout)) {
+                    if (!app_.controller_.SwitchLayout(app_, layoutName, app_.diagnosticsOptions_.editLayout)) {
                         if (suppressTooltipRefresh) {
                             app_.SetLayoutEditTooltipRefreshSuppressed(false);
                         }
                         app_.TraceLayoutEditUiEvent(
-                            "layout_switch:menu_failed", "selected_layout=" + Trace::QuoteText(option.name));
+                            "layout_switch:menu_failed", "selected_layout=" + Trace::QuoteText(layoutName));
                         MessageBoxW(app_.hwnd_, L"Failed to switch layout.", L"CaseDash", MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
@@ -911,23 +925,24 @@ void DashboardShellUi::ExecuteCommand(
                             app_.SetLayoutEditTooltipRefreshSuppressed(false);
                         }
                         app_.TraceLayoutEditUiEvent(
-                            "layout_switch:menu_done", "selected_layout=" + Trace::QuoteText(option.name));
+                            "layout_switch:menu_done", "selected_layout=" + Trace::QuoteText(layoutName));
                     }
                 }
                 break;
             }
             if (selected >= kCommandNetworkAdapterBase && selected <= kCommandNetworkAdapterMax) {
                 const size_t index = selected - kCommandNetworkAdapterBase;
-                if (index < state.networkMenuOptions.size() && state.networkMenuOptions[index].commandId == selected) {
-                    app_.controller_.SelectNetworkAdapter(app_, state.networkMenuOptions[index]);
+                const auto& candidates = state.telemetryUpdate.networkAdapterCandidates;
+                if (index < candidates.size()) {
+                    app_.controller_.SelectNetworkAdapter(app_, candidates[index].adapterName);
                 }
                 break;
             }
             if (selected >= kCommandThemeBase && selected <= kCommandThemeMax) {
                 const size_t index = selected - kCommandThemeBase;
-                if (index < state.themeMenuOptions.size() && state.themeMenuOptions[index].commandId == selected) {
+                if (index < state.config.layout.themes.size()) {
                     if (!app_.controller_.SwitchTheme(
-                            app_, state.themeMenuOptions[index].name, app_.diagnosticsOptions_.editLayout)) {
+                            app_, state.config.layout.themes[index].name, app_.diagnosticsOptions_.editLayout)) {
                         MessageBoxW(app_.hwnd_, L"Failed to switch theme.", L"CaseDash", MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
@@ -937,25 +952,23 @@ void DashboardShellUi::ExecuteCommand(
             }
             if (selected >= kCommandStorageDriveBase && selected <= kCommandStorageDriveMax) {
                 const size_t index = selected - kCommandStorageDriveBase;
-                if (index < state.storageDriveMenuOptions.size() &&
-                    state.storageDriveMenuOptions[index].commandId == selected) {
-                    app_.controller_.ToggleStorageDrive(app_, state.storageDriveMenuOptions[index]);
-                }
-                break;
-            }
-            if (selected >= kCommandConfigureDisplayBase && selected <= kCommandConfigureDisplayMax) {
-                const size_t index = selected - kCommandConfigureDisplayBase;
-                if (index < state.configDisplayOptions.size() &&
-                    state.configDisplayOptions[index].commandId == selected) {
-                    HandleConfigureDisplay(state.configDisplayOptions[index]);
+                const auto& candidates = state.telemetryUpdate.storageDriveCandidates;
+                if (index < candidates.size()) {
+                    app_.controller_.ToggleStorageDrive(app_, candidates[index].letter);
                 }
                 break;
             }
             if (selected >= kCommandScaleBase && selected <= kCommandScaleMax) {
-                const size_t index = selected - kCommandScaleBase;
-                if (index < state.scaleMenuOptions.size() && state.scaleMenuOptions[index].commandId == selected) {
-                    app_.controller_.SetDisplayScale(
-                        app_, state.scaleMenuOptions[index].isDefault ? 0.0 : state.scaleMenuOptions[index].scale);
+                if (selected == kCommandScaleBase) {
+                    app_.controller_.SetDisplayScale(app_, 0.0);
+                } else {
+                    double scaleEntries[std::size(kPredefinedDisplayScales) + 1] = {};
+                    const size_t scaleEntryCount =
+                        BuildScaleMenuEntries(state.config.display.scale, scaleEntries, std::size(scaleEntries));
+                    const size_t index = selected - kCommandScaleBase - 1;
+                    if (index < scaleEntryCount) {
+                        app_.controller_.SetDisplayScale(app_, scaleEntries[index]);
+                    }
                 }
             }
             break;
@@ -990,136 +1003,94 @@ void DashboardShellUi::ShowContextMenu(
     const bool showAdvancedMenu = (::GetKeyState(VK_MENU) & 0x8000) != 0;
     HMENU advancedMenu = showAdvancedMenu ? CreatePopupMenu() : nullptr;
     const UINT autoStartFlags = MF_STRING | (app_.controller_.IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
-    state.layoutMenuOptions.clear();
-    for (size_t i = 0; i < state.config.layout.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax; ++i) {
-        LayoutMenuOption option;
-        option.commandId = kCommandLayoutBase + static_cast<UINT>(i);
-        option.name = state.config.layout.layouts[i].name;
-        option.description = state.config.layout.layouts[i].description;
-        state.layoutMenuOptions.push_back(option);
-    }
-    if (state.layoutMenuOptions.empty()) {
+    if (state.config.layout.layouts.empty()) {
         AppendMenuW(layoutMenu, MF_STRING | MF_GRAYED, kCommandLayoutBase, L"No layouts found");
     } else {
-        for (const auto& option : state.layoutMenuOptions) {
-            const std::wstring label = FormatLayoutMenuLabel(option);
-            const UINT flags = MF_STRING | (state.config.display.layout == option.name ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuW(layoutMenu, flags, option.commandId, label.c_str());
-            SetMenuItemRadioStyle(layoutMenu, option.commandId);
+        for (size_t i = 0; i < state.config.layout.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax;
+            ++i) {
+            const LayoutSectionConfig& layout = state.config.layout.layouts[i];
+            const UINT commandId = kCommandLayoutBase + static_cast<UINT>(i);
+            const std::wstring label = FormatNamedMenuLabel(layout.name, layout.description);
+            const UINT flags = MF_STRING | (state.config.display.layout == layout.name ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuW(layoutMenu, flags, commandId, label.c_str());
+            SetMenuItemRadioStyle(layoutMenu, commandId);
         }
     }
-    state.themeMenuOptions.clear();
-    for (size_t i = 0; i < state.config.layout.themes.size() && (kCommandThemeBase + i) <= kCommandThemeMax; ++i) {
-        ThemeMenuOption option;
-        option.commandId = kCommandThemeBase + static_cast<UINT>(i);
-        option.name = state.config.layout.themes[i].name;
-        option.description = state.config.layout.themes[i].description;
-        option.selected = option.name == state.config.display.theme;
-        state.themeMenuOptions.push_back(std::move(option));
-    }
-    if (state.themeMenuOptions.empty()) {
+    if (state.config.layout.themes.empty()) {
         AppendMenuW(themeMenu, MF_STRING | MF_GRAYED, kCommandThemeBase, L"No themes found");
     } else {
-        for (const auto& option : state.themeMenuOptions) {
-            const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
-            const std::wstring label = FormatThemeMenuLabel(option);
-            AppendMenuW(themeMenu, flags, option.commandId, label.c_str());
-            SetMenuItemRadioStyle(themeMenu, option.commandId);
+        for (size_t i = 0; i < state.config.layout.themes.size() && (kCommandThemeBase + i) <= kCommandThemeMax; ++i) {
+            const ThemeConfig& theme = state.config.layout.themes[i];
+            const UINT commandId = kCommandThemeBase + static_cast<UINT>(i);
+            const UINT flags = MF_STRING | (theme.name == state.config.display.theme ? MF_CHECKED : MF_UNCHECKED);
+            const std::wstring label = FormatNamedMenuLabel(theme.name, theme.description);
+            AppendMenuW(themeMenu, flags, commandId, label.c_str());
+            SetMenuItemRadioStyle(themeMenu, commandId);
         }
     }
-    state.networkMenuOptions.clear();
     const auto& networkCandidates = state.telemetryUpdate.networkAdapterCandidates;
-    for (size_t i = 0; i < networkCandidates.size() && (kCommandNetworkAdapterBase + i) <= kCommandNetworkAdapterMax;
-        ++i) {
-        NetworkMenuOption option;
-        option.commandId = kCommandNetworkAdapterBase + static_cast<UINT>(i);
-        option.adapterName = networkCandidates[i].adapterName;
-        option.ipAddress = networkCandidates[i].ipAddress;
-        option.selected = networkCandidates[i].selected;
-        state.networkMenuOptions.push_back(std::move(option));
-    }
-    if (state.networkMenuOptions.empty()) {
+    if (networkCandidates.empty()) {
         AppendMenuW(networkMenu, MF_STRING | MF_GRAYED, kCommandNetworkAdapterBase, L"No adapters found");
     } else {
-        for (const auto& option : state.networkMenuOptions) {
-            const std::wstring label = WideFromUtf8(FormatNetworkMenuText(option.adapterName, option.ipAddress));
-            const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuW(networkMenu, flags, option.commandId, label.c_str());
-            SetMenuItemRadioStyle(networkMenu, option.commandId);
+        for (size_t i = 0;
+            i < networkCandidates.size() && (kCommandNetworkAdapterBase + i) <= kCommandNetworkAdapterMax;
+            ++i) {
+            const UINT commandId = kCommandNetworkAdapterBase + static_cast<UINT>(i);
+            const std::wstring label =
+                WideFromUtf8(FormatNetworkMenuText(networkCandidates[i].adapterName, networkCandidates[i].ipAddress));
+            const UINT flags = MF_STRING | (networkCandidates[i].selected ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuW(networkMenu, flags, commandId, label.c_str());
+            SetMenuItemRadioStyle(networkMenu, commandId);
         }
     }
-    state.storageDriveMenuOptions.clear();
     const auto& storageDriveCandidates = state.telemetryUpdate.storageDriveCandidates;
-    for (size_t i = 0; i < storageDriveCandidates.size() && (kCommandStorageDriveBase + i) <= kCommandStorageDriveMax;
-        ++i) {
-        StorageDriveMenuOption option;
-        option.commandId = kCommandStorageDriveBase + static_cast<UINT>(i);
-        option.driveLetter = storageDriveCandidates[i].letter;
-        option.volumeLabel = storageDriveCandidates[i].volumeLabel;
-        option.totalGb = storageDriveCandidates[i].totalGb;
-        option.selected = storageDriveCandidates[i].selected;
-        state.storageDriveMenuOptions.push_back(std::move(option));
-    }
-    if (state.storageDriveMenuOptions.empty()) {
+    if (storageDriveCandidates.empty()) {
         AppendMenuW(storageDrivesMenu, MF_STRING | MF_GRAYED, kCommandStorageDriveBase, L"No drives found");
     } else {
-        for (const auto& option : state.storageDriveMenuOptions) {
-            const std::wstring label =
-                WideFromUtf8(FormatStorageDriveMenuText(option.driveLetter, option.volumeLabel, option.totalGb));
-            const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuW(storageDrivesMenu, flags, option.commandId, label.c_str());
+        for (size_t i = 0;
+            i < storageDriveCandidates.size() && (kCommandStorageDriveBase + i) <= kCommandStorageDriveMax;
+            ++i) {
+            const UINT commandId = kCommandStorageDriveBase + static_cast<UINT>(i);
+            const std::wstring label = WideFromUtf8(FormatStorageDriveMenuText(storageDriveCandidates[i].letter,
+                storageDriveCandidates[i].volumeLabel,
+                storageDriveCandidates[i].totalGb));
+            const UINT flags = MF_STRING | (storageDriveCandidates[i].selected ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuW(storageDrivesMenu, flags, commandId, label.c_str());
         }
-    }
-    state.scaleMenuOptions.clear();
-    {
-        ScaleMenuOption option;
-        option.commandId = kCommandScaleBase;
-        option.selected = !HasExplicitDisplayScale(state.config.display.scale);
-        option.isDefault = true;
-        state.scaleMenuOptions.push_back(option);
     }
     double scaleEntries[std::size(kPredefinedDisplayScales) + 1] = {};
-    size_t scaleEntryCount = 0;
-    for (double predefinedScale : kPredefinedDisplayScales) {
-        scaleEntries[scaleEntryCount++] = predefinedScale;
-    }
-    if (HasExplicitDisplayScale(state.config.display.scale) && !IsPredefinedDisplayScale(state.config.display.scale)) {
-        size_t insertAt = 0;
-        while (insertAt < scaleEntryCount && scaleEntries[insertAt] < state.config.display.scale) {
-            ++insertAt;
-        }
-        for (size_t i = scaleEntryCount; i > insertAt; --i) {
-            scaleEntries[i] = scaleEntries[i - 1];
-        }
-        scaleEntries[insertAt] = state.config.display.scale;
-        ++scaleEntryCount;
-    }
+    const size_t scaleEntryCount =
+        BuildScaleMenuEntries(state.config.display.scale, scaleEntries, std::size(scaleEntries));
+    AppendMenuW(scaleMenu,
+        MF_STRING | (!HasExplicitDisplayScale(state.config.display.scale) ? MF_CHECKED : MF_UNCHECKED),
+        kCommandScaleBase,
+        L"Default");
+    SetMenuItemRadioStyle(scaleMenu, kCommandScaleBase);
     for (size_t i = 0; i < scaleEntryCount && (kCommandScaleBase + 1 + i) <= kCommandScaleMax; ++i) {
-        ScaleMenuOption option;
-        option.commandId = kCommandScaleBase + 1 + static_cast<UINT>(i);
-        option.scale = scaleEntries[i];
-        option.selected = HasExplicitDisplayScale(state.config.display.scale) &&
-                          AreScalesEqual(state.config.display.scale, option.scale);
-        option.isCustomEntry = !IsPredefinedDisplayScale(option.scale);
-        state.scaleMenuOptions.push_back(std::move(option));
-    }
-    for (const auto& option : state.scaleMenuOptions) {
-        const std::wstring label = option.isDefault ? L"Default" : FormatScaleLabel(option.scale);
-        const UINT flags = MF_STRING | (option.selected ? MF_CHECKED : MF_UNCHECKED);
-        AppendMenuW(scaleMenu, flags, option.commandId, label.c_str());
-        SetMenuItemRadioStyle(scaleMenu, option.commandId);
+        const UINT commandId = kCommandScaleBase + 1 + static_cast<UINT>(i);
+        const UINT flags = MF_STRING | (HasExplicitDisplayScale(state.config.display.scale) &&
+                                                   AreScalesEqual(state.config.display.scale, scaleEntries[i])
+                                               ? MF_CHECKED
+                                               : MF_UNCHECKED);
+        const std::wstring label = FormatScaleLabel(scaleEntries[i]);
+        AppendMenuW(scaleMenu, flags, commandId, label.c_str());
+        SetMenuItemRadioStyle(scaleMenu, commandId);
     }
     AppendMenuW(scaleMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(scaleMenu, MF_STRING, kCommandCustomScale, L"Custom...");
-    state.configDisplayOptions = EnumerateDisplayMenuOptions(state.config);
-    if (state.configDisplayOptions.empty()) {
+    DisplayMenuOption configDisplayOptions[kConfigureDisplayMenuCapacity];
+    const size_t configDisplayOptionCount =
+        EnumerateDisplayMenuOptions(state.config, configDisplayOptions, kConfigureDisplayMenuCapacity);
+    if (configDisplayOptionCount == 0) {
         AppendMenuW(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, L"No displays found");
     } else {
-        for (const auto& option : state.configDisplayOptions) {
+        for (size_t i = 0; i < configDisplayOptionCount; ++i) {
+            const DisplayMenuOption& option = configDisplayOptions[i];
+            const UINT commandId = kCommandConfigureDisplayBase + static_cast<UINT>(i);
             const std::wstring label = WideFromUtf8(option.displayName);
             const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED) |
                                (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuW(configureDisplayMenu, flags, option.commandId, label.c_str());
+            AppendMenuW(configureDisplayMenu, flags, commandId, label.c_str());
         }
     }
     AppendMenuW(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), L"Configure Display");
@@ -1201,6 +1172,13 @@ void DashboardShellUi::ShowContextMenu(
         nullptr);
     DestroyMenu(menu);
     if (selected != 0) {
-        ExecuteCommand(selected, layoutEditTarget);
+        if (selected >= kCommandConfigureDisplayBase && selected <= kCommandConfigureDisplayMax) {
+            const size_t index = selected - kCommandConfigureDisplayBase;
+            if (index < configDisplayOptionCount) {
+                HandleConfigureDisplay(configDisplayOptions[index]);
+            }
+        } else {
+            ExecuteCommand(selected, layoutEditTarget);
+        }
     }
 }

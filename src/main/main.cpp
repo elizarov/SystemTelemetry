@@ -1,7 +1,6 @@
 #include <windows.h>
 
 #include <optional>
-#include <shellapi.h>
 #include <string>
 
 #include "dashboard/autostart.h"
@@ -12,6 +11,7 @@
 #include "diagnostics/diagnostics.h"
 #include "display/display_config.h"
 #include "util/command_line.h"
+#include "util/elevated_process.h"
 #include "util/file_path.h"
 #include "util/paths.h"
 #include "util/utf8.h"
@@ -62,36 +62,14 @@ std::optional<int> RelaunchElevatedIfRequested(const CommandLineArguments& comma
         return std::nullopt;
     }
 
-    const auto executablePath = GetExecutablePath();
-    if (!executablePath.has_value() || executablePath->empty()) {
-        return 1;
-    }
-
     const std::string parameters = BuildCommandLineExcludingSwitch(commandLine, "/elevate");
     const std::wstring wideParameters = WideFromUtf8(parameters);
     // Size: reuse util/paths fixed-buffer capture instead of keeping a second vector-based path reader in main.
     const std::wstring workingDirectory = GetWorkingDirectory().wstring();
-    SHELLEXECUTEINFOW executeInfo{};
-    executeInfo.cbSize = sizeof(executeInfo);
-    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
-    executeInfo.lpVerb = L"runas";
-    executeInfo.lpFile = executablePath->c_str();
-    executeInfo.lpParameters = wideParameters.empty() ? nullptr : wideParameters.c_str();
-    executeInfo.lpDirectory = workingDirectory.empty() ? nullptr : workingDirectory.c_str();
-    executeInfo.nShow = SW_SHOWNORMAL;
-    if (!ShellExecuteExW(&executeInfo)) {
-        return 1;
-    }
-
-    if (executeInfo.hProcess == nullptr) {
-        return 0;
-    }
-
-    WaitForSingleObject(executeInfo.hProcess, INFINITE);
-    DWORD exitCode = 0;
-    const BOOL hasExitCode = GetExitCodeProcess(executeInfo.hProcess, &exitCode);
-    CloseHandle(executeInfo.hProcess);
-    return hasExitCode ? static_cast<int>(exitCode) : 1;
+    DWORD exitCode = 1;
+    return RunElevatedSelfAndWait(nullptr, wideParameters.c_str(), workingDirectory.c_str(), SW_SHOWNORMAL, &exitCode)
+               ? static_cast<int>(exitCode)
+               : 1;
 }
 
 }  // namespace

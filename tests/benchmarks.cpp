@@ -314,8 +314,7 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
 class BenchmarkHost : private LayoutEditHost {
 public:
     BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace)
-        : config_(config), trace_(trace), renderer_(trace_), renderScale_(renderScale), savedLayout_(config.layout),
-          layoutEditController_(*this) {
+        : config_(config), trace_(trace), renderer_(trace_), renderScale_(renderScale), layoutEditController_(*this) {
         renderer_.SetConfig(config_);
         renderer_.SetRenderScale(renderScale_);
         renderer_.SetImmediatePresent(true);
@@ -435,12 +434,7 @@ private:
         // Keep this aligned with the real layout-edit mutation tail; drag cost includes config dirty tracking.
         renderer_.SetConfig(config_);
         dirty_ = true;
-        RefreshLayoutEditSessionDirtyFlag();
         return true;
-    }
-
-    void RefreshLayoutEditSessionDirtyFlag() {
-        hasUnsavedLayoutEditChanges_ = savedLayout_.has_value() ? (config_.layout != *savedLayout_) : false;
     }
 
     const AppConfig& LayoutEditConfig() const override {
@@ -563,8 +557,6 @@ private:
     const SystemSnapshot* snapshot_ = nullptr;
     double renderScale_ = 1.0;
     bool dirty_ = false;
-    std::optional<LayoutConfig> savedLayout_;
-    bool hasUnsavedLayoutEditChanges_ = false;
     LayoutEditController layoutEditController_;
     LayoutEditTraceSession traceSession_{};
     std::array<PhaseStats, kBenchPhaseCount> phaseTotals_{};

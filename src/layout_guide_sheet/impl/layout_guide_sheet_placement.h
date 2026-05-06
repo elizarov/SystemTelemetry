@@ -25,35 +25,9 @@ struct LayoutGuideSheetPlacementStyle {
     int gaugeRingThickness = 1;
 };
 
-struct LayoutGuideSheetPlacementBlockTrace {
-    size_t cardIndex = 0;
-    int leaderScore = 0;
-    int sideRepairPasses = 0;
-    size_t leftCallouts = 0;
-    size_t topCallouts = 0;
-    size_t rightCallouts = 0;
-    size_t bottomCallouts = 0;
-};
-
-enum class LayoutGuideSheetLeaderIntersectionKind {
-    LeaderCross,
-    TargetSafeZone,
-};
-
-struct LayoutGuideSheetLeaderIntersectionTrace {
-    size_t sourceCardIndex = 0;
-    LayoutGuideSheetLeaderIntersectionKind kind = LayoutGuideSheetLeaderIntersectionKind::LeaderCross;
-    size_t firstCalloutIndex = 0;
-    size_t secondCalloutIndex = 0;
-    LayoutGuideSheetExitSide firstExitSide = LayoutGuideSheetExitSide::Right;
-    LayoutGuideSheetExitSide secondExitSide = LayoutGuideSheetExitSide::Right;
-};
-
 struct LayoutGuideSheetPlacementResult {
     int sheetWidth = 0;
     int sheetHeight = 0;
-    std::vector<LayoutGuideSheetPlacementBlockTrace> blocks;
-    std::vector<LayoutGuideSheetLeaderIntersectionTrace> remainingIntersections;
 };
 
 using LayoutGuideSheetConstrainCalloutWidth =
@@ -63,4 +37,5 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
     std::vector<LayoutGuideSheetCardPlacement>& cardPlacements,
     std::vector<LayoutGuideSheetPlacementCallout>& callouts,
     const LayoutGuideSheetPlacementStyle& style,
-    const LayoutGuideSheetConstrainCalloutWidth& constrainCalloutWidth);
+    const LayoutGuideSheetConstrainCalloutWidth& constrainCalloutWidth,
+    std::vector<std::string>* traceDetails);
