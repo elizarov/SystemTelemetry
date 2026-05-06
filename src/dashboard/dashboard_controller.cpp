@@ -228,8 +228,8 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         if (state_.diagnostics == nullptr) {
             return false;
         }
-        state_.diagnostics->WriteTraceMarker("diagnostics:ui_start");
-        state_.diagnostics->WriteTraceMarker("diagnostics:telemetry_initialize_begin");
+        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "ui_start");
+        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "telemetry_initialize_begin");
     }
 
     std::string telemetryError;
@@ -237,11 +237,11 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         state_.config, diagnosticsOptions, shell.TraceLog(), &shell, &telemetryError);
     if (state_.telemetry == nullptr) {
         if (state_.diagnostics != nullptr) {
-            std::string traceText = "diagnostics:telemetry_initialize_failed";
+            std::string traceText = "telemetry_initialize_failed";
             if (!telemetryError.empty()) {
                 traceText += " detail=" + Trace::QuoteText(telemetryError);
             }
-            state_.diagnostics->WriteTraceMarker(traceText);
+            state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, traceText);
         }
         state_.lastError = FormatTelemetryInitializeError(telemetryError);
         return false;
@@ -249,7 +249,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
 
     state_.telemetryUpdate = state_.telemetry->Latest();
     if (state_.diagnostics != nullptr) {
-        state_.diagnostics->WriteTraceMarker("diagnostics:telemetry_initialized");
+        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "telemetry_initialized");
         state_.lastDiagnosticsOutput = std::chrono::steady_clock::now();
     }
 
@@ -284,9 +284,9 @@ bool DashboardController::WriteDiagnosticsOutputs() {
     if (state_.diagnostics == nullptr || state_.telemetry == nullptr) {
         return true;
     }
-    state_.diagnostics->WriteTraceMarker("diagnostics:write_outputs_begin");
+    state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "write_outputs_begin");
     const bool ok = state_.diagnostics->WriteOutputs(state_.telemetryUpdate.dump, state_.config);
-    state_.diagnostics->WriteTraceMarker(ok ? "diagnostics:write_outputs_done" : "diagnostics:write_outputs_failed");
+    state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, ok ? "write_outputs_done" : "write_outputs_failed");
     return ok;
 }
 
@@ -311,7 +311,7 @@ bool DashboardController::ReloadConfigFromDisk(
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsOptions.editLayout);
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarker("diagnostics:reload_config_failed");
+            state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "reload_config_failed");
         }
         return false;
     }
@@ -461,15 +461,15 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
 bool DashboardController::SwitchLayout(
     DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout) {
     if (state_.diagnostics != nullptr) {
-        state_.diagnostics->WriteTraceMarker(
-            "layout_switch:begin current_layout=" + Trace::QuoteText(state_.config.display.layout) +
-            " requested_layout=" + Trace::QuoteText(layoutName));
+        state_.diagnostics->WriteTraceMarker(TracePrefix::LayoutSwitch,
+            "begin current_layout=" + Trace::QuoteText(state_.config.display.layout) +
+                " requested_layout=" + Trace::QuoteText(layoutName));
     }
     const std::string previousLayoutName = state_.config.display.layout;
     if (!SelectLayout(state_.config, layoutName)) {
         if (state_.diagnostics != nullptr) {
             state_.diagnostics->WriteTraceMarker(
-                "layout_switch:select_failed requested_layout=" + Trace::QuoteText(layoutName));
+                TracePrefix::LayoutSwitch, "select_failed requested_layout=" + Trace::QuoteText(layoutName));
         }
         return false;
     }
@@ -477,9 +477,9 @@ bool DashboardController::SwitchLayout(
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarker(
-                "layout_switch:sync_failed requested_layout=" + Trace::QuoteText(layoutName) +
-                " renderer_error=" + Trace::QuoteText(shell.Renderer().LastError()));
+            state_.diagnostics->WriteTraceMarker(TracePrefix::LayoutSwitch,
+                "sync_failed requested_layout=" + Trace::QuoteText(layoutName) +
+                    " renderer_error=" + Trace::QuoteText(shell.Renderer().LastError()));
         }
         // The active config has already resolved a valid layout; rollback by name avoids a full config snapshot.
         SelectLayout(state_.config, previousLayoutName);
@@ -493,7 +493,7 @@ bool DashboardController::SwitchLayout(
     RefreshLayoutEditSessionDirtyFlag();
     if (state_.diagnostics != nullptr) {
         state_.diagnostics->WriteTraceMarker(
-            "layout_switch:done active_layout=" + Trace::QuoteText(state_.config.display.layout));
+            TracePrefix::LayoutSwitch, "done active_layout=" + Trace::QuoteText(state_.config.display.layout));
     }
     return true;
 }

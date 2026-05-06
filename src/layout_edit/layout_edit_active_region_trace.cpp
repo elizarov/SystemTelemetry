@@ -303,12 +303,14 @@ void WriteLayoutEditActiveRegionTrace(Trace& trace,
     const LayoutEditActiveRegions& regions,
     const DashboardOverlayState& overlayState) {
     for (const LayoutEditActiveRegion& region : regions) {
-        trace.Write("diagnostics:active_region box=" + FormatTraceRect(region.box) +
-                    " visual_type=" + Trace::QuoteText(FormatActiveRegionVisualType(region.kind)) +
-                    " path=" + Trace::QuoteText(FormatActiveRegionPath(config, region)) +
-                    " detail=" + Trace::QuoteText(FormatActiveRegionDetail(config, region)));
+        trace.Write(TracePrefix::Diagnostics,
+            "active_region box=" + FormatTraceRect(region.box) +
+                " visual_type=" + Trace::QuoteText(FormatActiveRegionVisualType(region.kind)) +
+                " path=" + Trace::QuoteText(FormatActiveRegionPath(config, region)) +
+                " detail=" + Trace::QuoteText(FormatActiveRegionDetail(config, region)));
     }
 
-    trace.Write("diagnostics:active_regions count=" + std::to_string(regions.Size()) +
-                " layout_edit=" + Trace::BoolText(overlayState.showLayoutEditGuides));
+    trace.Write(TracePrefix::Diagnostics,
+        "active_regions count=" + std::to_string(regions.Size()) +
+            " layout_edit=" + Trace::BoolText(overlayState.showLayoutEditGuides));
 }

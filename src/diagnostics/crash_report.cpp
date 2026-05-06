@@ -185,9 +185,9 @@ void AppendCrashTrace(const FilePath& reportPath, const FilePath& dumpPath, EXCE
     const std::string code = record != nullptr ? ExceptionCodeText(record->ExceptionCode) : "unknown";
     const std::string address = PointerText(record != nullptr ? record->ExceptionAddress : nullptr);
     Trace trace(traceFile);
-    trace.Write("crash:unhandled_exception code=" + Trace::QuoteText(code) + " address=" + Trace::QuoteText(address) +
-                " report=" + Trace::QuoteText(PathToUtf8(reportPath)) +
-                " minidump=" + Trace::QuoteText(PathToUtf8(dumpPath)));
+    trace.Write(TracePrefix::Crash,
+        "unhandled_exception code=" + Trace::QuoteText(code) + " address=" + Trace::QuoteText(address) + " report=" +
+            Trace::QuoteText(PathToUtf8(reportPath)) + " minidump=" + Trace::QuoteText(PathToUtf8(dumpPath)));
     fclose(traceFile);
 }
 

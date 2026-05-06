@@ -167,7 +167,7 @@ public:
         LARGE_INTEGER frequency{};
         if (!QueryPerformanceFrequency(&frequency) || frequency.QuadPart <= 0) {
             diagnostics_ = "QueryPerformanceFrequency failed.";
-            trace_.Write("fps_etw:initialize_failed diagnostics=\"" + diagnostics_ + "\"");
+            trace_.Write(TracePrefix::FpsEtw, "initialize_failed diagnostics=\"" + diagnostics_ + "\"");
             return false;
         }
         qpcFrequency_ = frequency.QuadPart;
@@ -184,11 +184,11 @@ public:
         sessionProps.properties.MaximumBuffers = 16;
 
         ULONG status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
-        trace_.Write("fps_etw:start_trace status=" + Win32ErrorText(status));
+        trace_.Write(TracePrefix::FpsEtw, "start_trace status=" + Win32ErrorText(status));
         if (status == ERROR_ALREADY_EXISTS) {
             ControlTraceW(0, sessionName_.c_str(), &sessionProps.properties, EVENT_TRACE_CONTROL_STOP);
             status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
-            trace_.Write("fps_etw:start_trace_retry status=" + Win32ErrorText(status));
+            trace_.Write(TracePrefix::FpsEtw, "start_trace_retry status=" + Win32ErrorText(status));
         }
         if (status != ERROR_SUCCESS) {
             permissionRequired_ = IsPermissionDenied(status);
@@ -203,8 +203,9 @@ public:
         dxgiEnabled_ = dxgiStatus == ERROR_SUCCESS;
         d3d9Enabled_ = d3d9Status == ERROR_SUCCESS;
         dxgkrnlEnabled_ = dxgkrnlStatus == ERROR_SUCCESS;
-        trace_.Write("fps_etw:enable dxgi=" + Win32ErrorText(dxgiStatus) + " d3d9=" + Win32ErrorText(d3d9Status) +
-                     " dxgkrnl=" + Win32ErrorText(dxgkrnlStatus));
+        trace_.Write(TracePrefix::FpsEtw,
+            "enable dxgi=" + Win32ErrorText(dxgiStatus) + " d3d9=" + Win32ErrorText(d3d9Status) +
+                " dxgkrnl=" + Win32ErrorText(dxgkrnlStatus));
         if (!dxgiEnabled_ && !d3d9Enabled_ && !dxgkrnlEnabled_) {
             permissionRequired_ =
                 IsPermissionDenied(dxgiStatus) || IsPermissionDenied(d3d9Status) || IsPermissionDenied(dxgkrnlStatus);
@@ -237,8 +238,9 @@ public:
         diagnostics_ = "Presented FPS ETW provider active.";
         permissionRequired_ = false;
         initialized_ = true;
-        trace_.Write(std::string("fps_etw:initialize_done dxgi=") + Trace::BoolText(dxgiEnabled_) +
-                     " d3d9=" + Trace::BoolText(d3d9Enabled_) + " dxgkrnl=" + Trace::BoolText(dxgkrnlEnabled_));
+        trace_.Write(TracePrefix::FpsEtw,
+            std::string("initialize_done dxgi=") + Trace::BoolText(dxgiEnabled_) +
+                " d3d9=" + Trace::BoolText(d3d9Enabled_) + " dxgkrnl=" + Trace::BoolText(dxgkrnlEnabled_));
         return true;
     }
 
@@ -798,9 +800,10 @@ private:
         uint64_t& sourceCount = source == PresentEventSource::Runtime ? runtimePresentEvents_ : kernelPresentEvents_;
         ++sourceCount;
         if (sourceCount <= 5 || sourceCount % 300 == 0) {
-            trace_.Write("fps_etw:present source=" + std::string(PresentEventSourceName(source)) +
-                         " pid=" + std::to_string(static_cast<unsigned long>(header.ProcessId)) + " event_id=" +
-                         std::to_string(header.EventDescriptor.Id) + " source_events=" + std::to_string(sourceCount));
+            trace_.Write(TracePrefix::FpsEtw,
+                "present source=" + std::string(PresentEventSourceName(source)) +
+                    " pid=" + std::to_string(static_cast<unsigned long>(header.ProcessId)) + " event_id=" +
+                    std::to_string(header.EventDescriptor.Id) + " source_events=" + std::to_string(sourceCount));
         }
     }
 
@@ -823,7 +826,7 @@ private:
             handle = traceHandle_;
         }
         const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
-        trace_.Write("fps_etw:process_trace_done status=" + Win32ErrorText(processStatus));
+        trace_.Write(TracePrefix::FpsEtw, "process_trace_done status=" + Win32ErrorText(processStatus));
     }
 
     Trace& trace_;

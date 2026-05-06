@@ -87,26 +87,27 @@ public:
     }
 
     void TraceAssemblyPreload(const wchar_t* path) override {
-        trace_.Write("gigabyte_siv:assembly_preload path=\"" + Utf8FromWide(path != nullptr ? path : L"") + "\"");
+        trace_.Write(
+            TracePrefix::GigabyteSiv, "assembly_preload path=\"" + Utf8FromWide(path != nullptr ? path : L"") + "\"");
     }
 
     void TraceMonitorCreated(const wchar_t* typeName) override {
-        trace_.Write(
-            "gigabyte_siv:monitor_created type=\"" + Utf8FromWide(typeName != nullptr ? typeName : L"") + "\"");
+        trace_.Write(TracePrefix::GigabyteSiv,
+            "monitor_created type=\"" + Utf8FromWide(typeName != nullptr ? typeName : L"") + "\"");
     }
 
     void TraceInitializeSuccess() override {
-        trace_.Write("gigabyte_siv:initialize_success source=HwRegister");
+        trace_.Write(TracePrefix::GigabyteSiv, "initialize_success source=HwRegister");
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
-        trace_.Write("gigabyte_siv:initialize_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""));
+        trace_.Write(TracePrefix::GigabyteSiv,
+            "initialize_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""));
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
-        trace_.WriteLazy([&] {
-            return "gigabyte_siv:snapshot_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L"");
-        });
+        trace_.WriteLazy(TracePrefix::GigabyteSiv,
+            [&] { return "snapshot_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""); });
     }
 
     GigabyteSivSnapshot FinishSuccess() {
@@ -114,8 +115,8 @@ public:
         snapshot_.diagnostics =
             "Gigabyte SIV hardware-monitor query completed. fan_count=" + std::to_string(snapshot_.fans.size()) +
             " temp_count=" + std::to_string(snapshot_.temperatures.size());
-        trace_.WriteLazy([&] {
-            return "gigabyte_siv:snapshot_done fan_count=" + std::to_string(snapshot_.fans.size()) +
+        trace_.WriteLazy(TracePrefix::GigabyteSiv, [&] {
+            return "snapshot_done fan_count=" + std::to_string(snapshot_.fans.size()) +
                    " temp_count=" + std::to_string(snapshot_.temperatures.size());
         });
         return std::move(snapshot_);
@@ -136,12 +137,12 @@ public:
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
-        trace().Write("gigabyte_siv:initialize_begin");
+        trace().Write(TracePrefix::GigabyteSiv, "initialize_begin");
 
         boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
         boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardProduct").value_or("");
-        trace().Write(
-            "gigabyte_siv:board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
+        trace().Write(TracePrefix::GigabyteSiv,
+            "board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
 
         if (!ContainsInsensitive(boardManufacturer_, "gigabyte")) {
             diagnostics_ = "Baseboard manufacturer is not Gigabyte.";

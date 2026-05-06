@@ -20,7 +20,7 @@ void LayoutEditTraceSession::Begin(Trace& trace, const char* kind, const std::st
     kind_ = kind;
     detail_ = detail;
     startedAt_ = std::chrono::steady_clock::now();
-    trace.Write("layout_edit_drag:start kind=\"" + kind_ + "\" detail=\"" + detail_ + "\"");
+    trace.Write(TracePrefix::LayoutEditDrag, "start kind=\"" + kind_ + "\" detail=\"" + detail_ + "\"");
 }
 
 void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chrono::nanoseconds elapsed) {
@@ -70,12 +70,12 @@ void LayoutEditTraceSession::End(Trace& trace, const char* reason) {
 
     const auto elapsed = std::chrono::steady_clock::now() - startedAt_;
     std::string summary =
-        "layout_edit_drag:end kind=\"" + kind_ + "\" detail=\"" + detail_ + "\" reason=\"" + reason + "\" elapsed_ms=" +
+        "end kind=\"" + kind_ + "\" detail=\"" + detail_ + "\" reason=\"" + reason + "\" elapsed_ms=" +
         FormatMilliseconds(DurationMilliseconds(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed)));
     appendAverage(summary, "snap", snap_);
     appendAverage(summary, "apply", apply_);
     appendAverage(summary, "paint_total", paintTotal_);
     appendAverage(summary, "paint_draw", paintDraw_);
-    trace.Write(summary);
+    trace.Write(TracePrefix::LayoutEditDrag, summary);
     *this = {};
 }

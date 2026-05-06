@@ -436,15 +436,15 @@ public:
         }
         selectionSettings_ = settings.selection;
         if (useSyntheticSource_) {
-            trace_.Write("fake:initialize_begin source=synthetic");
+            trace_.Write(TracePrefix::Fake, "initialize_begin source=synthetic");
         } else {
-            trace_.Write("fake:initialize_begin path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
+            trace_.Write(TracePrefix::Fake, "initialize_begin path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
         }
         if (!ReloadFakeDump(true, errorText)) {
-            trace_.Write("fake:initialize_failed");
+            trace_.Write(TracePrefix::Fake, "initialize_failed");
             return false;
         }
-        trace_.Write("fake:initialize_done");
+        trace_.Write(TracePrefix::Fake, "initialize_done");
         return true;
     }
 
@@ -533,13 +533,14 @@ private:
             dump_ = sourceDump_;
             RefreshSelectionsAndSnapshot();
             lastReload_ = std::chrono::steady_clock::now();
-            trace_.Write("fake:load_done source=synthetic");
+            trace_.Write(TracePrefix::Fake, "load_done source=synthetic");
             return true;
         }
 
         const std::string input = ReadBinaryFile(fakePath_);
         if (input.empty()) {
-            trace_.Write("fake:load_failed reason=open path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
+            trace_.Write(
+                TracePrefix::Fake, "load_failed reason=open path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
             if (required && errorText != nullptr) {
                 *errorText = "Failed to open fake telemetry file:\n" + Utf8FromWide(fakePath_.wstring());
             }
@@ -547,7 +548,7 @@ private:
         }
 
         if (loadFakeDump_ == nullptr) {
-            trace_.Write("fake:load_failed reason=loader_unavailable");
+            trace_.Write(TracePrefix::Fake, "load_failed reason=loader_unavailable");
             if (required && errorText != nullptr) {
                 *errorText = "Fake telemetry dump loading is unavailable.";
             }
@@ -557,7 +558,7 @@ private:
         TelemetryDump loaded;
         std::string error;
         if (!loadFakeDump_(input, loaded, &error)) {
-            trace_.Write("fake:load_failed reason=parse error=\"" + error + "\"");
+            trace_.Write(TracePrefix::Fake, "load_failed reason=parse error=\"" + error + "\"");
             if (required && errorText != nullptr) {
                 *errorText = "Failed to parse fake telemetry file:\n" + error;
             }
@@ -568,7 +569,7 @@ private:
         dump_ = sourceDump_;
         RefreshSelectionsAndSnapshot();
         lastReload_ = std::chrono::steady_clock::now();
-        trace_.Write("fake:load_done path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
+        trace_.Write(TracePrefix::Fake, "load_done path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
         return true;
     }
 

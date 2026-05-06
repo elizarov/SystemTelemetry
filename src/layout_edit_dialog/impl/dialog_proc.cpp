@@ -417,7 +417,7 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                         RGB((currentColor >> 24) & 0xFFu, (currentColor >> 16) & 0xFFu, (currentColor >> 8) & 0xFFu);
                     chooseColor.lpCustColors = state->customColors;
                     chooseColor.Flags = CC_FULLOPEN | CC_RGBINIT;
-                    state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:picker_open",
+                    state->dialog->Host().TraceLayoutEditDialogEvent("picker_open",
                         BuildTraceNodeText(state->selectedNode) +
                             " current=" + QuoteTraceText(FormatTraceColorHex(currentColor)));
                     if (ChooseColorW(&chooseColor) == TRUE) {
@@ -425,13 +425,13 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                         const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 24) |
                                                        (GetGValue(chooseColor.rgbResult) << 16) |
                                                        (GetBValue(chooseColor.rgbResult) << 8) | currentAlpha;
-                        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:picker_return",
+                        state->dialog->Host().TraceLayoutEditDialogEvent("picker_return",
                             BuildTraceNodeText(state->selectedNode) +
                                 " accepted=\"true\" chosen=" + QuoteTraceText(FormatTraceColorHex(nextColor)));
                         SetSelectedDialogColor(state, hwnd, nextColor);
                     } else {
-                        state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:picker_return",
-                            BuildTraceNodeText(state->selectedNode) + " accepted=\"false\"");
+                        state->dialog->Host().TraceLayoutEditDialogEvent(
+                            "picker_return", BuildTraceNodeText(state->selectedNode) + " accepted=\"false\"");
                     }
                     RefreshLayoutEditValidationState(state, hwnd);
                     return handled(TRUE);

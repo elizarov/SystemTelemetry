@@ -27,8 +27,8 @@ public:
             CreateRequestedBoardMetrics(settings.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         sample_.available = false;
         sample_.diagnostics = "No supported board telemetry provider matches the baseboard manufacturer.";
-        trace_.Write("unsupported_board:initialize manufacturer=\"" + boardManufacturer_ + "\" product=\"" +
-                     boardProduct_ + "\"");
+        trace_.Write(TracePrefix::UnsupportedBoard,
+            "initialize manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
         return true;
     }
 

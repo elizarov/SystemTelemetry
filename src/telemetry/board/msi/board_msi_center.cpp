@@ -82,24 +82,25 @@ public:
     }
 
     void TraceAssemblyLoaded(const wchar_t* path) override {
-        trace_.Write("msi_center:assembly_loaded path=\"" + Utf8FromWide(path != nullptr ? path : L"") + "\"");
+        trace_.Write(
+            TracePrefix::MsiCenter, "assembly_loaded path=\"" + Utf8FromWide(path != nullptr ? path : L"") + "\"");
     }
 
     void TraceQuerySuccess(int fanCount, int temperatureCount) override {
-        trace_.WriteLazy([&] {
-            return "msi_center:snapshot_done fan_count=" + std::to_string(fanCount) +
+        trace_.WriteLazy(TracePrefix::MsiCenter, [&] {
+            return "snapshot_done fan_count=" + std::to_string(fanCount) +
                    " temp_count=" + std::to_string(temperatureCount);
         });
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
-        trace_.Write("msi_center:initialize_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""));
+        trace_.Write(
+            TracePrefix::MsiCenter, "initialize_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""));
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
-        trace_.WriteLazy([&] {
-            return "msi_center:snapshot_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L"");
-        });
+        trace_.WriteLazy(TracePrefix::MsiCenter,
+            [&] { return "snapshot_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""); });
     }
 
     MsiCenterSnapshot FinishSuccess() {
@@ -125,11 +126,12 @@ public:
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
-        trace().Write("msi_center:initialize_begin");
+        trace().Write(TracePrefix::MsiCenter, "initialize_begin");
 
         boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
         boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardProduct").value_or("");
-        trace().Write("msi_center:board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
+        trace().Write(TracePrefix::MsiCenter,
+            "board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
 
         if (!ContainsInsensitive(boardManufacturer_, "micro-star") && !ContainsInsensitive(boardManufacturer_, "msi")) {
             diagnostics_ = "Baseboard manufacturer is not MSI.";

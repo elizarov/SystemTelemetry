@@ -145,14 +145,15 @@ public:
         const std::optional<FpsTelemetrySample> sample = QueryServiceSample(diagnostics);
         if (!sample.has_value()) {
             diagnostics_ = diagnostics.empty() ? "FPS service did not return a sample." : diagnostics;
-            trace_.Write("fps_service_client:initialize_failed diagnostics=" + Trace::QuoteText(diagnostics_));
+            trace_.Write(
+                TracePrefix::FpsServiceClient, "initialize_failed diagnostics=" + Trace::QuoteText(diagnostics_));
             return false;
         }
 
         cachedSample_ = *sample;
         diagnostics_ = sample->diagnostics.empty() ? "FPS service provider active." : sample->diagnostics;
         initialized_ = true;
-        trace_.Write("fps_service_client:initialize_done diagnostics=" + Trace::QuoteText(diagnostics_));
+        trace_.Write(TracePrefix::FpsServiceClient, "initialize_done diagnostics=" + Trace::QuoteText(diagnostics_));
         return true;
     }
 
@@ -170,9 +171,8 @@ public:
             unavailable.processId = cachedSample_->processId;
             unavailable.processName = cachedSample_->processName;
         }
-        trace_.WriteLazy([&] {
-            return "fps_service_client:sample_failed diagnostics=" + Trace::QuoteText(unavailable.diagnostics);
-        });
+        trace_.WriteLazy(TracePrefix::FpsServiceClient,
+            [&] { return "sample_failed diagnostics=" + Trace::QuoteText(unavailable.diagnostics); });
         return unavailable;
     }
 
@@ -212,7 +212,7 @@ public:
         if (serviceRetrySample_ >= kServiceRetrySampleInterval) {
             serviceRetrySample_ = 0;
             if (TryInitializeServiceProvider()) {
-                trace_.Write("fps_provider:service_recovered");
+                trace_.Write(TracePrefix::FpsProvider, "service_recovered");
                 return serviceProvider_->Sample();
             }
         }
@@ -234,7 +234,7 @@ private:
             return true;
         }
 
-        trace_.Write("fps_provider:service_unavailable fallback=local_etw");
+        trace_.Write(TracePrefix::FpsProvider, "service_unavailable fallback=local_etw");
         return false;
     }
 

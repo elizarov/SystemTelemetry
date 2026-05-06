@@ -16,6 +16,7 @@
 #include "layout_edit/layout_edit_trace_session.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
+#include "util/trace.h"
 
 class DashboardShellUi;
 
@@ -84,7 +85,7 @@ private:
     void UpdateLayoutEditMouseTracking();
     void RedrawLayoutEditDragFrame();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
-    void TraceLayoutEditUiEvent(const char* event, const std::string& details = {}) const;
+    void TraceLayoutEditUiEvent(TracePrefix prefix, const char* event, const std::string& details = {}) const;
     std::string BuildLayoutEditUiTraceState() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();

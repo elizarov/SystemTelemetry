@@ -245,7 +245,7 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
             initialFocusTrace = "weight";
         }
     }
-    host_.TraceLayoutEditDialogEvent("layout_edit_dialog:open", "initial_focus=" + QuoteTraceText(initialFocusTrace));
+    host_.TraceLayoutEditDialogEvent("open", "initial_focus=" + QuoteTraceText(initialFocusTrace));
 
     HWND dialog = CreateDialogParamW(host_.LayoutEditDialogInstance(),
         MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_CONFIGURATION),
@@ -383,7 +383,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
 
     if (message == WM_NCDESTROY) {
         if (auto* state = DialogStateFromWindow(hwnd); state != nullptr) {
-            state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:close");
+            state->dialog->Host().TraceLayoutEditDialogEvent("close");
             SetWindowLongPtrW(hwnd, DWLP_USER, 0);
             state->dialog->HandleDestroyed(hwnd);
         }
