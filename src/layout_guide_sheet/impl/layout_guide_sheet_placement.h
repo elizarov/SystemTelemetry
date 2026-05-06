@@ -1,14 +1,11 @@
 #pragma once
 
-#include <optional>
 #include <string>
 #include <vector>
 
 #include "layout_guide_sheet/impl/layout_guide_sheet_types.h"
 #include "renderer/render_types.h"
 #include "util/function_ref.h"
-#include "widget/layout_edit_parameter_id.h"
-#include "widget/layout_edit_types.h"
 
 using LayoutGuideSheetPlacementCallout = LayoutGuideSheetCalloutRequest;
 

@@ -1,6 +1,5 @@
 #include <windows.h>
 
-#include <cstring>
 #include <optional>
 #include <shellapi.h>
 #include <string>
