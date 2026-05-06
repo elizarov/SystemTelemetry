@@ -60,6 +60,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/util/file_path.cpp|windows.h',
     'src/util/command_line.cpp|windows.h',
     'src/util/scale.h|windows.h',
+    'src/util/srw_lock.cpp|windows.h',
     'src/util/strings.h|windows.h',
     'src/util/temp_file.cpp|windows.h',
     # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
