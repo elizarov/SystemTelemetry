@@ -48,7 +48,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 
 - Keep `resources/config.ini` as the embedded default configuration resource.
 - Keep committed resource payloads as the source of truth; CMake generates the compressed embedded config/localization text atlas under `build\cmake\generated\`, while `resources/CaseDash.rc` keeps the directly embedded app icon and panel-icon mask atlas explicit.
-- Keep `VERSION` as the single maintained base product version; generated headers, manifests, and version resources derive their build metadata from it plus Git state.
+- Keep `VERSION` as the single maintained base product version; generated headers and manifests derive their build metadata from it plus Git state.
 - Do not add C++-side synthesized fallback layout, card, widget, font, color, or styling defaults that duplicate the embedded template.
 - Keep runtime text internally as UTF-8 `std::string` and convert to UTF-16 only at Windows API boundaries.
 - Keep config-file I/O on standard C++ streams and preserve strict UTF-8 handling without ANSI code-page fallback.

@@ -293,9 +293,8 @@ void LayoutEditDialog::RefreshIcons() {
     host_.ApplyLayoutEditDialogIcons(hwnd_);
 }
 
-bool LayoutEditDialog::SyncSelection(
-    const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront) {
-    if (!target.has_value()) {
+bool LayoutEditDialog::SyncSelection(const LayoutEditController::TooltipTarget* target, bool bringToFront) {
+    if (target == nullptr) {
         return true;
     }
 
@@ -387,8 +386,9 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
         }
     }
 
-    if (const auto handled = HandleLayoutEditDialogProcMessage(hwnd, message, wParam, lParam); handled.has_value()) {
-        return *handled;
+    INT_PTR result = FALSE;
+    if (HandleLayoutEditDialogProcMessage(hwnd, message, wParam, lParam, result)) {
+        return result;
     }
     return FALSE;
 }

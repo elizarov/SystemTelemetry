@@ -60,13 +60,19 @@ TEST(LayoutSnapSolver, FindsExactIntegerMatchThroughNestedWeights) {
     ASSERT_EQ(targetExtent, 129);
     ASSERT_TRUE(targetExtent - startExtent <= kThreshold);
 
-    const std::optional<int> snappedWeight = layout_snap_solver::FindNearestSnapWeight(kCurrentGaugeWeight,
+    int snappedWeight = 0;
+    const bool snapped = layout_snap_solver::FindNearestSnapWeight(
+        kCurrentGaugeWeight,
         kCombinedWeight,
         kThreshold,
         {layout_snap_solver::SnapCandidate{targetExtent, targetExtent - startExtent, 0}},
-        [](int firstWeight) -> std::optional<int> { return ComputeCpuGaugeWidth(firstWeight); });
+        [](int firstWeight, int& extent) -> bool {
+            extent = ComputeCpuGaugeWidth(firstWeight);
+            return true;
+        },
+        snappedWeight);
 
-    ASSERT_TRUE(snappedWeight.has_value());
-    EXPECT_EQ(ComputeCpuGaugeWidth(*snappedWeight), targetExtent);
-    EXPECT_TRUE(*snappedWeight > kCurrentGaugeWeight);
+    ASSERT_TRUE(snapped);
+    EXPECT_EQ(ComputeCpuGaugeWidth(snappedWeight), targetExtent);
+    EXPECT_TRUE(snappedWeight > kCurrentGaugeWeight);
 }

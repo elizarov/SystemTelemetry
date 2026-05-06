@@ -894,51 +894,55 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
     }
     result.sheetHeight = cardPlacements.empty() ? style.sheetMargin * 2 : contentBottom + style.sheetMargin;
 
-    std::vector<const LayoutGuideSheetPlacementCallout*> leaders;
-    for (const LayoutGuideSheetPlacementCallout& callout : callouts) {
-        for (const LayoutGuideSheetPlacementCallout* leader : leaders) {
-            if (callout.sourceCardId != leader->sourceCardId) {
+    std::vector<size_t> leaders;
+    leaders.reserve(callouts.size());
+    for (size_t calloutIndex = 0; calloutIndex < callouts.size(); ++calloutIndex) {
+        const LayoutGuideSheetPlacementCallout& callout = callouts[calloutIndex];
+        const size_t sourceCardIndex = cardOrder(callout.sourceCardId);
+        for (size_t leaderIndex : leaders) {
+            const LayoutGuideSheetPlacementCallout& leader = callouts[leaderIndex];
+            if (callout.sourceCardId != leader.sourceCardId) {
                 continue;
             }
             if (LeaderSegmentsIntersect(callout.targetAttachment,
                     callout.bubbleAttachment,
-                    leader->targetAttachment,
-                    leader->bubbleAttachment)) {
-                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{callout.sourceCardId,
-                    "leader_cross",
-                    callout.key,
-                    leader->key,
+                    leader.targetAttachment,
+                    leader.bubbleAttachment)) {
+                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{sourceCardIndex,
+                    LayoutGuideSheetLeaderIntersectionKind::LeaderCross,
+                    calloutIndex,
+                    leaderIndex,
                     callout.exitSide,
-                    leader->exitSide});
+                    leader.exitSide});
             }
             if (SegmentIntersectsRect(callout.targetAttachment,
                     callout.bubbleAttachment,
-                    TargetSafeRect(leader->targetAttachment, style.targetSafeRadius))) {
-                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{callout.sourceCardId,
-                    "target_safe_zone",
-                    callout.key,
-                    leader->key,
+                    TargetSafeRect(leader.targetAttachment, style.targetSafeRadius))) {
+                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{sourceCardIndex,
+                    LayoutGuideSheetLeaderIntersectionKind::TargetSafeZone,
+                    calloutIndex,
+                    leaderIndex,
                     callout.exitSide,
-                    leader->exitSide});
+                    leader.exitSide});
             }
-            if (SegmentIntersectsRect(leader->targetAttachment,
-                    leader->bubbleAttachment,
+            if (SegmentIntersectsRect(leader.targetAttachment,
+                    leader.bubbleAttachment,
                     TargetSafeRect(callout.targetAttachment, style.targetSafeRadius))) {
-                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{callout.sourceCardId,
-                    "target_safe_zone",
-                    leader->key,
-                    callout.key,
-                    leader->exitSide,
+                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{sourceCardIndex,
+                    LayoutGuideSheetLeaderIntersectionKind::TargetSafeZone,
+                    leaderIndex,
+                    calloutIndex,
+                    leader.exitSide,
                     callout.exitSide});
             }
         }
-        leaders.push_back(&callout);
+        leaders.push_back(calloutIndex);
     }
 
     result.blocks.reserve(cardPlacements.size());
     for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
         const CardCalloutColumns& columns = plannedByCard[cardIndex];
-        result.blocks.push_back(LayoutGuideSheetPlacementBlockTrace{cardPlacements[cardIndex].id,
+        result.blocks.push_back(LayoutGuideSheetPlacementBlockTrace{cardIndex,
             plannedIntersectionScores[cardIndex],
             sideRepairPasses[cardIndex],
             columns.left.size(),

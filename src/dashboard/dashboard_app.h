@@ -68,7 +68,8 @@ private:
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) override;
-    void StartMoveMode(std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
+    void StartMoveMode();
+    void StartMoveModeAt(POINT cursorAnchorClientPoint);
     void StopMoveMode();
     void UpdateMoveTracking();
     void SyncDashboardMoveOverlayState();
@@ -98,6 +99,7 @@ private:
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
     bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
+    void StartMoveMode(bool hasCursorAnchorClientPoint, POINT cursorAnchorClientPoint);
 
     void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
@@ -146,9 +148,11 @@ private:
     bool layoutEditTooltipRefreshSuppressed_ = false;
     bool sessionNotificationsRegistered_ = false;
     int layoutEditModalUiDepth_ = 0;
-    std::optional<POINT> moveCursorAnchorClientPoint_;
+    POINT moveCursorAnchorClientPoint_{};
+    bool hasMoveCursorAnchorClientPoint_ = false;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
     std::mutex pendingTelemetryMutex_;
-    std::optional<TelemetryUpdate> pendingTelemetryUpdate_;
+    TelemetryUpdate pendingTelemetryUpdate_{};
+    bool hasPendingTelemetryUpdate_ = false;
     LayoutEditTraceSession layoutEditTraceSession_{};
 };

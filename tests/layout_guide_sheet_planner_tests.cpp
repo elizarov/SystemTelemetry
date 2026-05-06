@@ -104,8 +104,8 @@ TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetr
     const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext();
 
     const std::vector<std::string> selected = SelectLayoutGuideSheetCards(context.cards);
-    const std::vector<LayoutGuideSheetCalloutRequest> callouts =
-        BuildLayoutGuideSheetCallouts(context.config, context.regions, context.cards, selected);
+    std::vector<LayoutGuideSheetCalloutRequest> callouts;
+    BuildLayoutGuideSheetCallouts(context.config, context.regions, context.cards, selected, callouts);
 
     std::set<std::string> actualTexts;
     size_t metricDefinitionCallouts = 0;
@@ -146,8 +146,8 @@ TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetr
 TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) {
     const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext();
 
-    const std::vector<LayoutGuideSheetCalloutRequest> callouts =
-        BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions);
+    std::vector<LayoutGuideSheetCalloutRequest> callouts;
+    BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions, callouts);
 
     std::set<std::string> actualTexts;
     bool hasDashboardOuterMargin = false;
@@ -209,8 +209,8 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
 TEST(LayoutGuideSheetPlanner, OverviewCalloutsDoNotUseWidgetColorTargets) {
     const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext("3x5");
 
-    const std::vector<LayoutGuideSheetCalloutRequest> callouts =
-        BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions);
+    std::vector<LayoutGuideSheetCalloutRequest> callouts;
+    BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions, callouts);
 
     for (const LayoutGuideSheetCalloutRequest& callout : callouts) {
         if (!callout.hoverColorParameter.has_value()) {
@@ -228,13 +228,12 @@ TEST(LayoutGuideSheetPlanner, MergedCalloutsDoNotRepeatOverviewColorParametersOn
     const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext();
 
     const std::vector<std::string> selected = SelectLayoutGuideSheetCards(context.cards);
-    const std::vector<LayoutGuideSheetCalloutRequest> overviewCallouts =
-        BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions);
-    const std::vector<LayoutGuideSheetCalloutRequest> cardCallouts =
-        BuildLayoutGuideSheetCallouts(context.config, context.regions, context.cards, selected);
+    std::vector<LayoutGuideSheetCalloutRequest> merged;
+    BuildLayoutGuideSheetOverviewCallouts(context.config, context.overviewRegions, merged);
+    std::vector<LayoutGuideSheetCalloutRequest> cardCallouts;
+    BuildLayoutGuideSheetCallouts(context.config, context.regions, context.cards, selected, cardCallouts);
 
-    const std::vector<LayoutGuideSheetCalloutRequest> merged =
-        MergeLayoutGuideSheetCallouts(overviewCallouts, cardCallouts);
+    AppendLayoutGuideSheetCardCallouts(merged, cardCallouts);
 
     std::set<LayoutEditParameter> seenColorParameters;
     size_t iconColorCallouts = 0;

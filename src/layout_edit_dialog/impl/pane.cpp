@@ -124,6 +124,18 @@ struct ColorChannelControlIds {
 
 static_assert(sizeof(ColorChannelControlIds) == 8);
 
+struct CheckSliderRowLayout {
+    int labelLeft = 0;
+    int labelWidth = 0;
+    int valueLeft = 0;
+    int valueWidth = 0;
+    int sliderLeft = 0;
+    int sliderWidth = 0;
+    int fieldHeight = 0;
+    int sliderHeight = 0;
+    int rowGap = 0;
+};
+
 constexpr LayoutEditRightPaneMetrics kLayoutEditRightPaneMetrics{};
 constexpr wchar_t kDialogRedrawSuspendCountProperty[] = L"CaseDash.LayoutEdit.RedrawSuspendCount";
 constexpr double kLchGradientChromaMax = 0.4;
@@ -1104,7 +1116,7 @@ int LayoutLabeledControlRow(HWND hwnd,
     return rowHeight;
 }
 
-void SetDialogRowLabelBounds(
+void SetDialogCenteredRowBounds(
     HWND hwnd, int controlId, int left, int top, int width, int height, int rowHeight, bool applyVisualAdjustment) {
     SetDialogControlBounds(hwnd,
         controlId,
@@ -1112,6 +1124,18 @@ void SetDialogRowLabelBounds(
         top + ((rowHeight - height) / 2) + (applyVisualAdjustment ? RowLabelVisualTopAdjustment(hwnd) : 0),
         width,
         height);
+}
+
+int LayoutCheckSliderRow(
+    HWND hwnd, const CheckSliderRowLayout& layout, int top, int checkId, int editId, int sliderId) {
+    const int checkHeight = DialogControlHeight(hwnd, checkId);
+    const int rowHeight = Max3Int(checkHeight, layout.fieldHeight, layout.sliderHeight);
+    SetDialogCenteredRowBounds(hwnd, checkId, layout.labelLeft, top, layout.labelWidth, checkHeight, rowHeight, true);
+    SetDialogCenteredRowBounds(
+        hwnd, editId, layout.valueLeft, top, layout.valueWidth, layout.fieldHeight, rowHeight, false);
+    SetDialogCenteredRowBounds(
+        hwnd, sliderId, layout.sliderLeft, top, layout.sliderWidth, layout.sliderHeight, rowHeight, false);
+    return top + rowHeight + layout.rowGap;
 }
 
 int LayoutEditorHint(HWND hwnd, int left, int top, int width) {
@@ -1762,19 +1786,23 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int weightEditHeight = DialogControlLayoutHeightForVisibleHeight(
                 hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, singleLineFieldHeight);
             const int sizeRowHeight = Max4Int(singleLineFieldHeight, labelHeight, sizeEditHeight, weightEditHeight);
-            SetDialogControlBounds(hwnd,
+            SetDialogCenteredRowBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_SIZE_LABEL,
                 innerLeft,
-                cursorY + ((sizeRowHeight - labelHeight) / 2),
+                cursorY,
                 labelColumnWidth,
-                labelHeight);
+                labelHeight,
+                sizeRowHeight,
+                false);
             const int sizeControlLeft = innerLeft + labelColumnWidth + metrics.labelGap;
-            SetDialogControlBounds(hwnd,
+            SetDialogCenteredRowBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_SIZE_EDIT,
                 sizeControlLeft,
-                cursorY + ((sizeRowHeight - sizeEditHeight) / 2),
+                cursorY,
                 sizeEditWidth,
-                sizeEditHeight);
+                sizeEditHeight,
+                sizeRowHeight,
+                false);
 
             const int weightLabelWidth = MeasureTextWidthForControl(hwnd,
                                              IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
@@ -1782,18 +1810,22 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                                          8;
             const int weightEditLeft = sizeControlLeft + sizeEditWidth + metrics.inlineGap + weightLabelWidth;
             const int weightEditWidth = std::max(72, innerRight - weightEditLeft);
-            SetDialogControlBounds(hwnd,
+            SetDialogCenteredRowBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
                 sizeControlLeft + sizeEditWidth + metrics.inlineGap,
-                cursorY + ((sizeRowHeight - labelHeight) / 2),
+                cursorY,
                 weightLabelWidth,
-                labelHeight);
-            SetDialogControlBounds(hwnd,
+                labelHeight,
+                sizeRowHeight,
+                false);
+            SetDialogCenteredRowBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
                 weightEditLeft,
-                cursorY + ((sizeRowHeight - weightEditHeight) / 2),
+                cursorY,
                 weightEditWidth,
-                weightEditHeight);
+                weightEditHeight,
+                sizeRowHeight,
+                false);
             cursorY += sizeRowHeight + metrics.sampleGap;
 
             const int sampleHeight = std::max(28, DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_FONT_SAMPLE));
@@ -1899,30 +1931,32 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL),
                     hexLabelWidth,
                     true);
-                SetDialogControlBounds(hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_SWATCH,
                     innerLeft,
-                    cursorY + ((firstRowHeight - swatchSize) / 2),
+                    cursorY,
                     swatchSize,
-                    swatchSize);
-                SetDialogControlBounds(hwnd,
+                    swatchSize,
+                    firstRowHeight,
+                    false);
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
                     hexLabelLeft,
-                    cursorY + ((firstRowHeight - hexLabelHeight) / 2),
+                    cursorY,
                     hexLabelWidth,
-                    hexLabelHeight);
-                SetDialogControlBounds(hwnd,
+                    hexLabelHeight,
+                    firstRowHeight,
+                    false);
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_HEX_EDIT,
                     hexEditLeft,
-                    cursorY + ((firstRowHeight - hexEditHeight) / 2),
+                    cursorY,
                     hexEditWidth,
-                    hexEditHeight);
-                SetDialogControlBounds(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_PICK,
-                    pickLeft,
-                    cursorY + ((firstRowHeight - pickHeight) / 2),
-                    pickWidth,
-                    pickHeight);
+                    hexEditHeight,
+                    firstRowHeight,
+                    false);
+                SetDialogCenteredRowBounds(
+                    hwnd, IDC_LAYOUT_EDIT_COLOR_PICK, pickLeft, cursorY, pickWidth, pickHeight, firstRowHeight, false);
                 cursorY += firstRowHeight + metrics.sampleGap;
             }
 
@@ -1940,28 +1974,26 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     derivedHexWidth,
                     true);
                 const int firstRowHeight = std::max(swatchSize, derivedHexHeight);
-                SetDialogControlBounds(hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_SWATCH,
                     innerLeft,
-                    cursorY + ((firstRowHeight - swatchSize) / 2),
+                    cursorY,
                     swatchSize,
-                    swatchSize);
-                SetDialogControlBounds(hwnd,
+                    swatchSize,
+                    firstRowHeight,
+                    false);
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL,
                     derivedHexLeft,
-                    cursorY + ((firstRowHeight - derivedHexHeight) / 2),
+                    cursorY,
                     derivedHexWidth,
-                    derivedHexHeight);
+                    derivedHexHeight,
+                    firstRowHeight,
+                    false);
                 cursorY += firstRowHeight + metrics.sampleGap;
-
-                SetDialogControlBounds(
-                    hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, innerLeft, cursorY, innerWidth, sampleHeight);
-                cursorY += sampleHeight + metrics.sampleGap;
-            } else {
-                SetDialogControlBounds(
-                    hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, innerLeft, cursorY, innerWidth, sampleHeight);
-                cursorY += sampleHeight + metrics.sampleGap;
             }
+            SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, innerLeft, cursorY, innerWidth, sampleHeight);
+            cursorY += sampleHeight + metrics.sampleGap;
 
             if (derivedMode) {
                 const int baseRowHeight = LayoutLabeledControlRow(hwnd,
@@ -1996,53 +2028,27 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 const int derivedSliderHeight = Max3Int(DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ROTATE_SLIDER),
                     DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_SLIDER),
                     DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_SLIDER));
-                const int rotateCheckHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ROTATE_CHECK);
-                const int rotateRowHeight = Max3Int(rotateCheckHeight, derivedFieldHeight, derivedSliderHeight);
-                SetDialogRowLabelBounds(hwnd,
+                const CheckSliderRowLayout derivedSliderLayout{innerLeft,
+                    checkboxWidth,
+                    valueLeft,
+                    valueEditWidth,
+                    sliderLeft,
+                    sliderWidth,
+                    derivedFieldHeight,
+                    derivedSliderHeight,
+                    metrics.rowGap};
+                cursorY = LayoutCheckSliderRow(hwnd,
+                    derivedSliderLayout,
+                    cursorY,
                     IDC_LAYOUT_EDIT_COLOR_ROTATE_CHECK,
-                    innerLeft,
-                    cursorY,
-                    checkboxWidth,
-                    rotateCheckHeight,
-                    rotateRowHeight,
-                    true);
-                SetDialogControlBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_ROTATE_EDIT,
-                    valueLeft,
-                    cursorY + ((rotateRowHeight - derivedFieldHeight) / 2),
-                    valueEditWidth,
-                    derivedFieldHeight);
-                SetDialogControlBounds(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_ROTATE_SLIDER,
-                    sliderLeft,
-                    cursorY + ((rotateRowHeight - derivedSliderHeight) / 2),
-                    sliderWidth,
-                    derivedSliderHeight);
-                cursorY += rotateRowHeight + metrics.rowGap;
-
-                const int mixCheckHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_MIX_CHECK);
-                const int mixAmountRowHeight = Max3Int(mixCheckHeight, derivedFieldHeight, derivedSliderHeight);
-                SetDialogRowLabelBounds(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_MIX_CHECK,
-                    innerLeft,
+                    IDC_LAYOUT_EDIT_COLOR_ROTATE_SLIDER);
+                cursorY = LayoutCheckSliderRow(hwnd,
+                    derivedSliderLayout,
                     cursorY,
-                    checkboxWidth,
-                    mixCheckHeight,
-                    mixAmountRowHeight,
-                    true);
-                SetDialogControlBounds(hwnd,
+                    IDC_LAYOUT_EDIT_COLOR_MIX_CHECK,
                     IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_EDIT,
-                    valueLeft,
-                    cursorY + ((mixAmountRowHeight - derivedFieldHeight) / 2),
-                    valueEditWidth,
-                    derivedFieldHeight);
-                SetDialogControlBounds(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_SLIDER,
-                    sliderLeft,
-                    cursorY + ((mixAmountRowHeight - derivedSliderHeight) / 2),
-                    sliderWidth,
-                    derivedSliderHeight);
-                cursorY += mixAmountRowHeight + metrics.rowGap;
+                    IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_SLIDER);
 
                 const int mixTargetLabelHeight = MeasureTextHeightForControl(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL,
@@ -2050,43 +2056,30 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     checkboxWidth,
                     true);
                 const int mixTargetRowHeight = std::max(mixTargetLabelHeight, derivedFieldHeight);
-                SetDialogControlBounds(hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL,
-                    innerLeft,
-                    cursorY + ((mixTargetRowHeight - mixTargetLabelHeight) / 2),
-                    checkboxWidth,
-                    mixTargetLabelHeight);
-                SetDialogControlBounds(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_COMBO,
-                    valueLeft,
-                    cursorY + ((mixTargetRowHeight - derivedFieldHeight) / 2),
-                    std::max(1, innerRight - valueLeft),
-                    derivedFieldHeight);
-                cursorY += mixTargetRowHeight + metrics.rowGap;
-
-                const int alphaCheckHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_CHECK);
-                const int alphaRowHeight = Max3Int(alphaCheckHeight, derivedFieldHeight, derivedSliderHeight);
-                SetDialogRowLabelBounds(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_ALPHA_CHECK,
                     innerLeft,
                     cursorY,
                     checkboxWidth,
-                    alphaCheckHeight,
-                    alphaRowHeight,
-                    true);
-                SetDialogControlBounds(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_EDIT,
+                    mixTargetLabelHeight,
+                    mixTargetRowHeight,
+                    false);
+                SetDialogCenteredRowBounds(hwnd,
+                    IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_COMBO,
                     valueLeft,
-                    cursorY + ((alphaRowHeight - derivedFieldHeight) / 2),
-                    valueEditWidth,
-                    derivedFieldHeight);
-                SetDialogControlBounds(hwnd,
-                    IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_SLIDER,
-                    sliderLeft,
-                    cursorY + ((alphaRowHeight - derivedSliderHeight) / 2),
-                    sliderWidth,
-                    derivedSliderHeight);
-                cursorY += alphaRowHeight + metrics.rowGap;
+                    cursorY,
+                    std::max(1, innerRight - valueLeft),
+                    derivedFieldHeight,
+                    mixTargetRowHeight,
+                    false);
+                cursorY += mixTargetRowHeight + metrics.rowGap;
+
+                cursorY = LayoutCheckSliderRow(hwnd,
+                    derivedSliderLayout,
+                    cursorY,
+                    IDC_LAYOUT_EDIT_COLOR_ALPHA_CHECK,
+                    IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_EDIT,
+                    IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_SLIDER);
             } else {
                 const int valueEditWidth = Max3Int(DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT),
                     DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT),
@@ -2180,24 +2173,30 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     labelColumnWidth,
                     true);
                 const int alphaRowHeight = Max3Int(alphaEditHeight, alphaSliderHeight, alphaLabelHeight);
-                SetDialogControlBounds(hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL,
                     innerLeft,
-                    cursorY + ((alphaRowHeight - alphaLabelHeight) / 2),
+                    cursorY,
                     labelColumnWidth,
-                    alphaLabelHeight);
-                SetDialogControlBounds(hwnd,
+                    alphaLabelHeight,
+                    alphaRowHeight,
+                    false);
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT,
                     innerLeft + labelColumnWidth + metrics.labelGap,
-                    cursorY + ((alphaRowHeight - alphaEditHeight) / 2),
+                    cursorY,
                     valueEditWidth,
-                    alphaEditHeight);
-                SetDialogControlBounds(hwnd,
+                    alphaEditHeight,
+                    alphaRowHeight,
+                    false);
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER,
                     sliderLeft,
-                    cursorY + ((alphaRowHeight - alphaSliderHeight) / 2),
+                    cursorY,
                     sliderWidth,
-                    alphaSliderHeight);
+                    alphaSliderHeight,
+                    alphaRowHeight,
+                    false);
                 cursorY += alphaRowHeight + metrics.rowGap;
             }
 

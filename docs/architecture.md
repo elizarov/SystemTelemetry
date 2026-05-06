@@ -35,6 +35,7 @@ Other top-level areas:
 - Dependencies flow downward. Higher layers may include lower-layer contracts, but lower layers do not include or call higher layers.
 - The core layer order is `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as `dashboard`, `dashboard_renderer`, `diagnostics`, `display`, `layout_edit`, `layout_edit_dialog`, and `main`.
 - Cross-layer shared types belong in the lowest layer that semantically owns them. Config-language DTOs live in `config`, runtime telemetry DTOs live in `telemetry`, and domain-neutral helpers live in `util`.
+- Custom hash-based containers or caches that replace `std::unordered_map` live in a dedicated named `.h`/`.cpp` module under the owning package or its `impl` directory. Feature providers, renderers, and controllers use those modules through a small API instead of embedding hashing, probing, or collision handling locally.
 - Public cross-thread contracts document thread affinity, callback thread, blocking behavior, and ownership or lifetime guarantees in the declaring header before the relevant method or callback.
 - `lint.cmd` enforces package dependencies, package-private implementation boundaries, header-body rules, include-path rules, local `NOLINT` policy, and the renderer-only Direct2D boundary before reporting success.
 
@@ -66,7 +67,7 @@ Other top-level areas:
 - `resources/CaseDash.rc` owns dialogs and icons; CMake generates the compressed embedded config/localization text atlas resource.
 - `resources/resource.h` owns resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and mixed-mode board-provider bridge object libraries.
-- CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers, target-specific version resource scripts, and the application manifest.
+- CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers and target-specific manifest resource scripts.
 - The native app target links shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the Windows runner.
 - `build.cmd` keeps the manifest-installed dependency tree in repo-root `vcpkg\`, while vcpkg download archives and registry clones live under the shared cache root.

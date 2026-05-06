@@ -19,7 +19,7 @@
 
 - `telemetry/board/` contains board-provider selection plus supported provider bridges.
 - `telemetry/gpu/` contains GPU provider bridges and unsupported-GPU fallback behavior.
-- `telemetry/fps/` contains package-private Windows ETW presented-FPS and service-client provider implementations.
+- `telemetry/fps/` contains package-private Windows ETW presented-FPS and service-client provider implementations, with `telemetry/fps/impl/` for provider-local helpers such as the GPU raw-counter map.
 - `telemetry/impl/` contains collector submodules and system-info support.
 
 ## Boundaries

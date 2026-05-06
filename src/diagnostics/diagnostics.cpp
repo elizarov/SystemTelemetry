@@ -32,7 +32,7 @@
 
 namespace {
 
-std::optional<int> TryParseInteger(std::string_view text) {
+bool TryParseInteger(std::string_view text, int& parsedValue) {
     while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
         text.remove_prefix(1);
     }
@@ -40,29 +40,32 @@ std::optional<int> TryParseInteger(std::string_view text) {
         text.remove_suffix(1);
     }
     if (text.empty()) {
-        return std::nullopt;
+        return false;
     }
     char* end = nullptr;
     std::string owned(text);
     const long value = std::strtol(owned.c_str(), &end, 10);
     if (end == owned.c_str() || end == nullptr || *end != '\0' || value < (std::numeric_limits<int>::min)() ||
         value > (std::numeric_limits<int>::max)()) {
-        return std::nullopt;
+        return false;
     }
-    return static_cast<int>(value);
+    parsedValue = static_cast<int>(value);
+    return true;
 }
 
-std::optional<DiagnosticsHoverPoint> TryParseHoverPointValue(const std::string& text) {
+bool TryParseHoverPointValue(const std::string& text, DiagnosticsHoverPoint& point) {
     const size_t comma = text.find(',');
     if (comma == std::string::npos || text.find(',', comma + 1) != std::string::npos) {
-        return std::nullopt;
+        return false;
     }
-    const auto x = TryParseInteger(std::string_view(text).substr(0, comma));
-    const auto y = TryParseInteger(std::string_view(text).substr(comma + 1));
-    if (!x.has_value() || !y.has_value()) {
-        return std::nullopt;
+    int x = 0;
+    int y = 0;
+    if (!TryParseInteger(std::string_view(text).substr(0, comma), x) ||
+        !TryParseInteger(std::string_view(text).substr(comma + 1), y)) {
+        return false;
     }
-    return DiagnosticsHoverPoint{*x, *y};
+    point = DiagnosticsHoverPoint{x, y};
+    return true;
 }
 
 void WriteResolvedColorTraceLine(
@@ -245,31 +248,20 @@ std::optional<double> GetScaleSwitchValue(const CommandLineArguments& commandLin
 }
 
 std::optional<int> TryParseAppIconSizeValue(const std::string& text) {
-    const std::optional<int> value = TryParseInteger(text);
-    if (!value.has_value() || !IsValidAppIconSize(*value)) {
+    int value = 0;
+    if (!TryParseInteger(text, value) || !IsValidAppIconSize(value)) {
         return std::nullopt;
     }
-    return *value;
+    return value;
 }
 
-std::optional<std::string> GetLayoutSwitchValue(const CommandLineArguments& commandLine) {
-    if (const auto value = GetColonSwitchValue(commandLine, "/layout"); value.has_value()) {
-        const std::string layoutName = Trim(*value);
-        if (!layoutName.empty()) {
-            return layoutName;
+void AssignTrimmedColonSwitchValue(const CommandLineArguments& commandLine, const char* name, std::string& target) {
+    if (const auto value = GetColonSwitchValue(commandLine, name); value.has_value()) {
+        const std::string trimmed = Trim(*value);
+        if (!trimmed.empty()) {
+            target = trimmed;
         }
     }
-    return std::nullopt;
-}
-
-std::optional<std::string> GetThemeSwitchValue(const CommandLineArguments& commandLine) {
-    if (const auto value = GetColonSwitchValue(commandLine, "/theme"); value.has_value()) {
-        const std::string themeName = Trim(*value);
-        if (!themeName.empty()) {
-            return themeName;
-        }
-    }
-    return std::nullopt;
 }
 
 void WriteValidationFailureTrace(
@@ -369,12 +361,8 @@ DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine
             options.editLayoutWidgetName = mode;
         }
     }
-    if (const auto layoutName = GetLayoutSwitchValue(commandLine); layoutName.has_value()) {
-        options.layoutName = *layoutName;
-    }
-    if (const auto themeName = GetThemeSwitchValue(commandLine); themeName.has_value()) {
-        options.themeName = *themeName;
-    }
+    AssignTrimmedColonSwitchValue(commandLine, "/layout", options.layoutName);
+    AssignTrimmedColonSwitchValue(commandLine, "/theme", options.themeName);
     if (const auto scale = GetScaleSwitchValue(commandLine); scale.has_value()) {
         options.hasScaleOverride = true;
         options.scale = *scale;
@@ -389,8 +377,9 @@ DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine
         }
     }
     if (const auto hoverValue = GetColonSwitchValue(commandLine, "/hover"); hoverValue.has_value()) {
-        if (const auto hoverPoint = TryParseHoverPointValue(*hoverValue); hoverPoint.has_value()) {
-            options.hoverPoint = *hoverPoint;
+        DiagnosticsHoverPoint hoverPoint;
+        if (TryParseHoverPointValue(*hoverValue, hoverPoint)) {
+            options.hoverPoint = hoverPoint;
             options.editLayout = true;
         }
     }
@@ -613,9 +602,9 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
             GetSimilarityIndicatorMode(options_),
             options_.editLayoutWidgetName,
             trace_,
-            options_.hoverPoint.has_value()
-                ? std::optional<RenderPoint>(RenderPoint{options_.hoverPoint->x, options_.hoverPoint->y})
-                : std::nullopt,
+            options_.hoverPoint.has_value(),
+            options_.hoverPoint.has_value() ? RenderPoint{options_.hoverPoint->x, options_.hoverPoint->y}
+                                            : RenderPoint{},
             &screenshotError)) {
         return ReportSaveError("screenshot_save_failed", "save screenshot", screenshotPath_, screenshotError);
     }
@@ -814,12 +803,13 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
     LayoutSimilarityIndicatorMode similarityIndicatorMode,
     const std::string& editLayoutWidgetName,
     Trace& trace,
-    std::optional<RenderPoint> hoverPoint,
+    bool hasHoverPoint,
+    RenderPoint hoverPoint,
     std::string* errorText) {
     DashboardRenderer renderer(trace);
     DashboardOverlayState overlayState;
-    overlayState.showLayoutEditGuides = showLayoutEditGuides || hoverPoint.has_value();
-    overlayState.forceLayoutEditAffordances = showLayoutEditGuides && !hoverPoint.has_value();
+    overlayState.showLayoutEditGuides = showLayoutEditGuides || hasHoverPoint;
+    overlayState.forceLayoutEditAffordances = showLayoutEditGuides && !hasHoverPoint;
     overlayState.similarityIndicatorMode = similarityIndicatorMode;
     renderer.SetRenderScale(scale);
     renderer.SetConfig(config);
@@ -841,7 +831,7 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
         overlayState.SetPreviewWidget(*widget);
         trace.Write("diagnostics:edit_layout_widget name=\"" + editLayoutWidgetName + "\"");
     }
-    if (hoverPoint.has_value()) {
+    if (hasHoverPoint) {
         if (!renderer.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
             if (errorText != nullptr) {
                 *errorText = renderer.LastError();
@@ -851,24 +841,26 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
 
         DiagnosticsLayoutEditHost host(config, renderer, overlayState);
         LayoutEditController controller(host);
-        controller.HandleMouseMove(*hoverPoint);
-        if (const auto target = controller.CurrentTooltipTarget(); target.has_value()) {
+        controller.HandleMouseMove(hoverPoint);
+        LayoutEditController::TooltipTarget target;
+        if (controller.CurrentTooltipTarget(target)) {
             std::string tooltipError;
-            const auto tooltipText = BuildLayoutEditTooltipTextForPayload(config, target->payload, &tooltipError);
+            std::wstring tooltipText;
+            const bool hasTooltipText =
+                BuildLayoutEditTooltipTextForPayload(config, target.payload, tooltipText, &tooltipError);
             std::string traceText =
-                "diagnostics:hover point=" + Trace::QuoteText(Trace::FormatPoint(hoverPoint->x, hoverPoint->y)) +
-                " target=" + Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target->payload));
-            if (tooltipText.has_value()) {
-                traceText += " tooltip=" + Trace::QuoteText(Utf8FromWide(*tooltipText));
+                "diagnostics:hover point=" + Trace::QuoteText(Trace::FormatPoint(hoverPoint.x, hoverPoint.y)) +
+                " target=" + Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload));
+            if (hasTooltipText) {
+                traceText += " tooltip=" + Trace::QuoteText(Utf8FromWide(tooltipText));
             } else {
                 traceText +=
                     " tooltip_error=" + Trace::QuoteText(tooltipError.empty() ? "unsupported_target" : tooltipError);
             }
             trace.Write(traceText);
         } else {
-            trace.Write(
-                "diagnostics:hover point=" + Trace::QuoteText(Trace::FormatPoint(hoverPoint->x, hoverPoint->y)) +
-                " target=" + Trace::QuoteText("none"));
+            trace.Write("diagnostics:hover point=" + Trace::QuoteText(Trace::FormatPoint(hoverPoint.x, hoverPoint.y)) +
+                        " target=" + Trace::QuoteText("none"));
         }
     }
     const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot, overlayState);

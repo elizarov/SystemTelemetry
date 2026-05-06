@@ -10,13 +10,12 @@
 #include "dashboard/dashboard_menu_types.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
+#include "layout_edit_dialog/layout_edit_dialog.h"
 #include "widget/layout_edit_types.h"
 
 class DashboardApp;
-class DashboardShellUiDialogHost;
-class LayoutEditDialog;
 
-class DashboardShellUi {
+class DashboardShellUi final : public LayoutEditDialogHost {
 public:
     enum class MenuSource {
         AppWindow,
@@ -27,12 +26,11 @@ public:
     ~DashboardShellUi();
 
     bool IsLayoutEditModalUiActive() const;
-    void ShowContextMenu(MenuSource source,
-        POINT screenPoint,
-        const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget);
+    void ShowContextMenu(
+        MenuSource source, POINT screenPoint, const LayoutEditController::TooltipTarget* layoutEditTarget);
     void InvokeDefaultAction(MenuSource source,
-        const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
-        std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
+        const LayoutEditController::TooltipTarget* layoutEditTarget,
+        const POINT* cursorAnchorClientPoint = nullptr);
     void HandleExitRequest();
     void BeginLayoutEditModalUi();
     void EndLayoutEditModalUi();
@@ -41,12 +39,9 @@ public:
     bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
     void SetLayoutEditTreeSelectionHighlightVisible(bool visible);
     void RefreshDialogIcons();
-    void SyncLayoutEditDialogSelection(
-        const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
+    void SyncLayoutEditDialogSelection(const LayoutEditController::TooltipTarget* target, bool bringToFront);
 
 private:
-    friend class DashboardShellUiDialogHost;
-
     enum class UnsavedLayoutEditAction {
         Save,
         Discard,
@@ -71,39 +66,44 @@ private:
     void RefreshLayoutEditDialogSelection();
     void DestroyLayoutEditDialogWindow();
     HINSTANCE DialogInstance() const;
+    HINSTANCE LayoutEditDialogInstance() const override;
+    HWND LayoutEditDialogAnchorWindow() const override;
+    UINT LayoutEditDialogAnchorDpi() const override;
     AppConfig BuildLayoutEditOriginalConfigSnapshot() const;
-    const AppConfig& CurrentConfig() const;
+    AppConfig BuildLayoutEditOriginalConfig() const override;
+    const AppConfig& CurrentConfig() const override;
     void RestoreConfigSnapshot(const AppConfig& config);
-    bool ApplyParameterPreview(LayoutEditParameter parameter, double value);
-    bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value);
-    bool ApplyFontFamilyPreview(const std::string& family);
-    bool ApplyFontSetPreview(const UiFontSetConfig& fonts);
-    bool ApplyLayoutPreview(const std::string& layoutName);
-    bool ApplyThemePreview(const std::string& themeName);
-    bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value);
-    bool ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression);
-    bool ApplyThemeColorPreview(const ThemeColorEditKey& key, unsigned int value);
+    bool ApplyParameterPreview(LayoutEditParameter parameter, double value) override;
+    bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value) override;
+    bool ApplyFontFamilyPreview(const std::string& family) override;
+    bool ApplyFontSetPreview(const UiFontSetConfig& fonts) override;
+    bool ApplyLayoutPreview(const std::string& layoutName) override;
+    bool ApplyThemePreview(const std::string& themeName) override;
+    bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) override;
+    bool ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression) override;
+    bool ApplyThemeColorPreview(const ThemeColorEditKey& key, unsigned int value) override;
     bool ApplyMetricPreview(const LayoutMetricEditKey& key,
         const std::optional<double>& scale,
         const std::string& unit,
         const std::string& label,
-        const std::optional<std::string>& binding);
-    bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title);
-    bool ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value);
+        const std::optional<std::string>& binding) override;
+    bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title) override;
+    bool ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value) override;
     bool ApplyMetricListAddRowPreview(const LayoutEditController::TooltipTarget& target);
-    bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight);
-    void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
-    void TraceLayoutEditDialogEvent(const char* event, const std::string& details = {}) const;
-    std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const;
-    UINT ResolveDefaultCommand(
-        MenuSource source, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) const;
+    bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) override;
+    void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) override;
+    void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const override;
+    void RestackLayoutEditDialogAnchor(HWND dialogHwnd) override;
+    void TraceLayoutEditDialogEvent(const char* event, const std::string& details = {}) const override;
+    void OnLayoutEditDialogCloseRequested() override;
+    std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const override;
+    UINT ResolveDefaultCommand(MenuSource source, const LayoutEditController::TooltipTarget* layoutEditTarget) const;
     void ExecuteCommand(UINT selected,
-        const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
-        std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
+        const LayoutEditController::TooltipTarget* layoutEditTarget,
+        const POINT* cursorAnchorClientPoint = nullptr);
     std::optional<double> PromptCustomScale();
     bool PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target);
 
     DashboardApp& app_;
-    std::unique_ptr<DashboardShellUiDialogHost> layoutEditDialogHost_;
     std::unique_ptr<LayoutEditDialog> layoutEditDialog_;
 };

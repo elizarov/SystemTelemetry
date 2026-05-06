@@ -19,7 +19,6 @@ struct AdapterSelectionInfo {
 };
 
 struct NetworkCandidateState {
-    NetworkAdapterCandidate candidate;
     AdapterSelectionInfo info;
     std::string alias;
     std::string description;
@@ -195,9 +194,6 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
         candidateState.matchRank = PreferredAdapterMatchRank(
             candidateState.alias, candidateState.description, state.settings_.selection.preferredAdapterName);
         configuredCandidateAvailable = configuredCandidateAvailable || candidateState.matchRank > 0;
-        candidateState.candidate.adapterName =
-            !candidateState.alias.empty() ? candidateState.alias : candidateState.description;
-        candidateState.candidate.ipAddress = info.ipAddress;
         candidates.push_back(std::move(candidateState));
     }
 
@@ -249,10 +245,13 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
         if (!candidate.visible) {
             continue;
         }
+        NetworkAdapterCandidate adapterCandidate;
+        adapterCandidate.adapterName = !candidate.alias.empty() ? candidate.alias : candidate.description;
+        adapterCandidate.ipAddress = candidate.info.ipAddress;
         if (selected != nullptr && candidate.interfaceIndex == selected->interfaceIndex) {
-            candidate.candidate.selected = true;
+            adapterCandidate.selected = true;
         }
-        state.network_.adapterCandidates.push_back(std::move(candidate.candidate));
+        state.network_.adapterCandidates.push_back(std::move(adapterCandidate));
     }
 
     if (selected != nullptr) {

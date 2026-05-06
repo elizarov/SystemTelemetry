@@ -315,23 +315,23 @@ std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGui
     return selected;
 }
 
-std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetCallouts(const AppConfig& config,
+void BuildLayoutGuideSheetCallouts(const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     const std::vector<LayoutGuideSheetCardSummary>& cards,
-    const std::vector<std::string>& selectedCardIds) {
-    std::vector<LayoutGuideSheetCalloutRequest> callouts;
-    size_t order = 0;
+    const std::vector<std::string>& selectedCardIds,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts) {
+    size_t order = callouts.size();
     for (const LayoutEditActiveRegion& region : regions) {
         const std::optional<TooltipPayload> payload = TooltipPayloadFromActiveRegion(region);
         if (!payload.has_value()) {
             continue;
         }
         std::string tooltipError;
-        const auto tooltipText = BuildLayoutEditTooltipTextForPayload(config, *payload, &tooltipError);
-        if (!tooltipText.has_value()) {
+        std::wstring tooltipText;
+        if (!BuildLayoutEditTooltipTextForPayload(config, *payload, tooltipText, &tooltipError)) {
             continue;
         }
-        auto [parameterLine, descriptionLine] = SplitTooltipLines(*tooltipText);
+        auto [parameterLine, descriptionLine] = SplitTooltipLines(tooltipText);
         if (parameterLine.empty()) {
             continue;
         }
@@ -353,24 +353,23 @@ std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetCallouts(const 
         const int priority = parameter.has_value() ? GetLayoutEditParameterHitPriority(*parameter) : 500;
         AddOrUpdateCallout(callouts, key, sourceCard.cardId, parameterLine, descriptionLine, region, priority, order);
     }
-    return callouts;
 }
 
-std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetOverviewCallouts(
-    const AppConfig& config, const LayoutEditActiveRegions& regions) {
-    std::vector<LayoutGuideSheetCalloutRequest> callouts;
-    size_t order = 0;
+void BuildLayoutGuideSheetOverviewCallouts(const AppConfig& config,
+    const LayoutEditActiveRegions& regions,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts) {
+    size_t order = callouts.size();
     for (const LayoutEditActiveRegion& region : regions) {
         const std::optional<TooltipPayload> payload = TooltipPayloadFromActiveRegion(region);
         if (!payload.has_value()) {
             continue;
         }
         std::string tooltipError;
-        const auto tooltipText = BuildLayoutEditTooltipTextForPayload(config, *payload, &tooltipError);
-        if (!tooltipText.has_value()) {
+        std::wstring tooltipText;
+        if (!BuildLayoutEditTooltipTextForPayload(config, *payload, tooltipText, &tooltipError)) {
             continue;
         }
-        auto [parameterLine, descriptionLine] = SplitTooltipLines(*tooltipText);
+        auto [parameterLine, descriptionLine] = SplitTooltipLines(tooltipText);
         if (parameterLine.empty()) {
             continue;
         }
@@ -380,13 +379,10 @@ std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetOverviewCallout
         AddOrUpdateCallout(
             callouts, key, kLayoutGuideSheetOverviewSourceId, parameterLine, descriptionLine, region, priority, order);
     }
-    return callouts;
 }
 
-std::vector<LayoutGuideSheetCalloutRequest> MergeLayoutGuideSheetCallouts(
-    const std::vector<LayoutGuideSheetCalloutRequest>& overviewCallouts,
+void AppendLayoutGuideSheetCardCallouts(std::vector<LayoutGuideSheetCalloutRequest>& merged,
     const std::vector<LayoutGuideSheetCalloutRequest>& cardCallouts) {
-    std::vector<LayoutGuideSheetCalloutRequest> merged = overviewCallouts;
     std::array<bool, static_cast<size_t>(LayoutEditParameter::Count)> coveredColorParameters{};
     for (const LayoutGuideSheetCalloutRequest& callout : merged) {
         if (callout.hoverColorParameter.has_value()) {
@@ -403,5 +399,4 @@ std::vector<LayoutGuideSheetCalloutRequest> MergeLayoutGuideSheetCallouts(
         }
         merged.push_back(callout);
     }
-    return merged;
 }

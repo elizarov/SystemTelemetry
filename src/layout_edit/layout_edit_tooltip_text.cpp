@@ -138,11 +138,11 @@ std::wstring BuildContainerChildOrderTooltipText(const AppConfig& config, const 
     return WideTooltipText(*firstLine, FindLocalizedText(descriptionKey));
 }
 
-std::optional<std::wstring> AbortTooltipBuild(std::string* errorReason, std::string_view reason) {
+bool AbortTooltipBuild(std::string* errorReason, std::string_view reason) {
     if (errorReason != nullptr) {
         *errorReason = std::string(reason);
     }
-    return std::nullopt;
+    return false;
 }
 
 }  // namespace
@@ -166,8 +166,8 @@ const char* LayoutEditTooltipPayloadTraceKind(const TooltipPayload& payload) {
     return "unknown";
 }
 
-std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
-    const AppConfig& config, const TooltipPayload& payload, std::string* errorReason) {
+bool BuildLayoutEditTooltipTextForPayload(
+    const AppConfig& config, const TooltipPayload& payload, std::wstring& tooltipText, std::string* errorReason) {
     if (errorReason != nullptr) {
         errorReason->clear();
     }
@@ -183,7 +183,8 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
     std::optional<std::string> stringValue;
 
     if (const auto* guide = std::get_if<LayoutEditGuide>(&payload)) {
-        return BuildLayoutGuideTooltipText(config, *guide);
+        tooltipText = BuildLayoutGuideTooltipText(config, *guide);
+        return true;
     }
 
     if (const auto focusKey = TooltipPayloadFocusKey(payload);
@@ -202,11 +203,11 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         }
         if (const auto containerOrderKey = LayoutEditAnchorContainerChildOrderKey(anchor->key);
             containerOrderKey.has_value()) {
-            std::wstring tooltipText = BuildContainerChildOrderTooltipText(config, *anchor);
+            tooltipText = BuildContainerChildOrderTooltipText(config, *anchor);
             if (tooltipText.empty()) {
                 return AbortTooltipBuild(errorReason, "empty_container_child_order_text");
             }
-            return tooltipText;
+            return true;
         }
     }
     if (const auto parameter = TooltipPayloadParameter(payload); parameter.has_value()) {
@@ -228,7 +229,8 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         if (definition == nullptr) {
             return AbortTooltipBuild(errorReason, "missing_metric_definition");
         }
-        return BuildMetricTooltipText(*metricKey, *definition);
+        tooltipText = BuildMetricTooltipText(*metricKey, *definition);
+        return true;
     } else if (cardTitleKey.has_value()) {
         descriptor = CardTitleTooltipDescriptor(*cardTitleKey);
         const LayoutCardConfig* card = FindCardById(config, cardTitleKey->cardId);
@@ -248,12 +250,12 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
                 rowIndex = anchor->key.anchorId;
                 addRowAnchor = anchor->shape == AnchorShape::Plus;
             }
-            std::wstring tooltipText = addRowAnchor ? BuildMetricListAddRowTooltipText(config, *nodeFieldKey)
-                                                    : BuildMetricListOrderTooltipText(config, *nodeFieldKey, rowIndex);
+            tooltipText = addRowAnchor ? BuildMetricListAddRowTooltipText(config, *nodeFieldKey)
+                                       : BuildMetricListOrderTooltipText(config, *nodeFieldKey, rowIndex);
             if (tooltipText.empty()) {
                 return AbortTooltipBuild(errorReason, "empty_metric_list_text");
             }
-            return tooltipText;
+            return true;
         }
         const LayoutNodeConfig* node = FindLayoutNodeFieldNode(config, *nodeFieldKey);
         if (node == nullptr) {
@@ -262,9 +264,10 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         const std::string valueLabel = nodeFieldDescriptor->editorKind == LayoutEditEditorKind::DateTimeFormat
                                            ? std::string(EnumToString(nodeFieldKey->widgetClass)) + " format"
                                            : std::string(EnumToString(nodeFieldKey->widgetClass));
-        std::string tooltipText = valueLabel + " = " + ReadLayoutNodeFieldValue(*node, nodeFieldKey->field);
-        AppendTooltipDescription(tooltipText, FindLocalizedText(nodeFieldDescriptor->descriptionKey));
-        return WideFromUtf8(tooltipText);
+        std::string text = valueLabel + " = " + ReadLayoutNodeFieldValue(*node, nodeFieldKey->field);
+        AppendTooltipDescription(text, FindLocalizedText(nodeFieldDescriptor->descriptionKey));
+        tooltipText = WideFromUtf8(text);
+        return true;
     }
 
     if (!descriptor.has_value() && !metricKey.has_value() && !cardTitleKey.has_value() && !nodeFieldKey.has_value() &&
@@ -276,15 +279,19 @@ std::optional<std::wstring> BuildLayoutEditTooltipTextForPayload(
         const LayoutEditTooltipDescriptor& tooltipDescriptor = *descriptor;
         const std::string description = FindLocalizedText(tooltipDescriptor.configKey);
         if (tooltipDescriptor.valueFormat == configschema::ValueFormat::String && stringValue.has_value()) {
-            return BuildTooltipText(tooltipDescriptor, *stringValue, description);
+            tooltipText = BuildTooltipText(tooltipDescriptor, *stringValue, description);
+            return true;
         }
         if (tooltipDescriptor.valueFormat == configschema::ValueFormat::FontSpec && fontValue.has_value()) {
-            return BuildTooltipText(tooltipDescriptor, *fontValue, description);
+            tooltipText = BuildTooltipText(tooltipDescriptor, *fontValue, description);
+            return true;
         }
         if (tooltipDescriptor.valueFormat == configschema::ValueFormat::ColorHex && colorExpressionValue.has_value()) {
-            return BuildTooltipText(tooltipDescriptor, *colorExpressionValue, description);
+            tooltipText = BuildTooltipText(tooltipDescriptor, *colorExpressionValue, description);
+            return true;
         }
-        return BuildTooltipText(tooltipDescriptor, value, description);
+        tooltipText = BuildTooltipText(tooltipDescriptor, value, description);
+        return true;
     }
 
     return AbortTooltipBuild(errorReason, "unsupported_target");

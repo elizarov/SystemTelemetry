@@ -52,7 +52,7 @@ public:
 class LayoutEditController {
 public:
     struct TooltipTarget {
-        std::optional<RenderPoint> clientPoint;
+        RenderPoint clientPoint{};
         TooltipPayload payload;
     };
 
@@ -69,7 +69,7 @@ public:
     bool HandleSetCursor(HWND hwnd);
     bool HasActiveDrag() const;
     void CancelInteraction();
-    std::optional<TooltipTarget> CurrentTooltipTarget();
+    bool CurrentTooltipTarget(TooltipTarget& target);
 
 private:
     struct ExtentCacheKey {
@@ -85,7 +85,8 @@ private:
 
     struct ExtentCacheEntry {
         ExtentCacheKey key;
-        std::optional<int> extent;
+        bool hasExtent = false;
+        int extent = 0;
     };
 
     struct LayoutDragState {
@@ -176,5 +177,6 @@ private:
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
     std::optional<MetricListReorderDragState> activeMetricListReorderDrag_;
     std::optional<ContainerChildReorderDragState> activeContainerChildReorderDrag_;
-    std::optional<RenderPoint> lastClientPoint_;
+    RenderPoint lastClientPoint_{};
+    bool hasLastClientPoint_ = false;
 };

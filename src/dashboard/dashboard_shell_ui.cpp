@@ -316,124 +316,8 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
 
 }  // namespace
 
-class DashboardShellUiDialogHost final : public LayoutEditDialogHost {
-public:
-    explicit DashboardShellUiDialogHost(DashboardShellUi& shellUi) : shellUi_(shellUi) {}
-
-    HINSTANCE LayoutEditDialogInstance() const override {
-        return shellUi_.DialogInstance();
-    }
-
-    HWND LayoutEditDialogAnchorWindow() const override {
-        return shellUi_.app_.WindowHandle();
-    }
-
-    UINT LayoutEditDialogAnchorDpi() const override {
-        return shellUi_.app_.CurrentWindowDpi();
-    }
-
-    AppConfig BuildLayoutEditOriginalConfig() const override {
-        return shellUi_.BuildLayoutEditOriginalConfigSnapshot();
-    }
-
-    const AppConfig& CurrentConfig() const override {
-        return shellUi_.CurrentConfig();
-    }
-
-    bool ApplyParameterPreview(LayoutEditParameter parameter, double value) override {
-        return shellUi_.ApplyParameterPreview(parameter, value);
-    }
-
-    bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value) override {
-        return shellUi_.ApplyFontPreview(parameter, value);
-    }
-
-    bool ApplyFontFamilyPreview(const std::string& family) override {
-        return shellUi_.ApplyFontFamilyPreview(family);
-    }
-
-    bool ApplyFontSetPreview(const UiFontSetConfig& fonts) override {
-        return shellUi_.ApplyFontSetPreview(fonts);
-    }
-
-    bool ApplyLayoutPreview(const std::string& layoutName) override {
-        return shellUi_.ApplyLayoutPreview(layoutName);
-    }
-
-    bool ApplyThemePreview(const std::string& themeName) override {
-        return shellUi_.ApplyThemePreview(themeName);
-    }
-
-    bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) override {
-        return shellUi_.ApplyColorPreview(parameter, value);
-    }
-
-    bool ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression) override {
-        return shellUi_.ApplyColorExpressionPreview(parameter, expression);
-    }
-
-    bool ApplyThemeColorPreview(const ThemeColorEditKey& key, unsigned int value) override {
-        return shellUi_.ApplyThemeColorPreview(key, value);
-    }
-
-    bool ApplyMetricPreview(const LayoutMetricEditKey& key,
-        const std::optional<double>& scale,
-        const std::string& unit,
-        const std::string& label,
-        const std::optional<std::string>& binding) override {
-        return shellUi_.ApplyMetricPreview(key, scale, unit, label, binding);
-    }
-
-    bool ApplyCardTitlePreview(const LayoutCardTitleEditKey& key, const std::string& title) override {
-        return shellUi_.ApplyCardTitlePreview(key, title);
-    }
-
-    bool ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value) override {
-        return shellUi_.ApplyLayoutEditPreview(key, value);
-    }
-
-    bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) override {
-        return shellUi_.ApplyWeightPreview(key, firstWeight, secondWeight);
-    }
-
-    std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const override {
-        return shellUi_.AvailableBoardMetricSensorBindings(key);
-    }
-
-    void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) override {
-        shellUi_.UpdateLayoutEditSelectionHighlight(highlight);
-    }
-
-    void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const override {
-        shellUi_.app_.ApplyThemedIconsToWindow(dialogHwnd);
-    }
-
-    void RestackLayoutEditDialogAnchor(HWND dialogHwnd) override {
-        const HWND anchorHwnd = shellUi_.app_.WindowHandle();
-        if (dialogHwnd == nullptr || anchorHwnd == nullptr || !IsWindow(dialogHwnd) || !IsWindow(anchorHwnd) ||
-            dialogHwnd == anchorHwnd) {
-            return;
-        }
-
-        ShowWindow(anchorHwnd, SW_SHOWNOACTIVATE);
-        SetWindowPos(anchorHwnd, dialogHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    }
-
-    void TraceLayoutEditDialogEvent(const char* event, const std::string& details = {}) const override {
-        shellUi_.TraceLayoutEditDialogEvent(event, details);
-    }
-
-    void OnLayoutEditDialogCloseRequested() override {
-        shellUi_.DestroyLayoutEditDialogWindow();
-    }
-
-private:
-    DashboardShellUi& shellUi_;
-};
-
 DashboardShellUi::DashboardShellUi(DashboardApp& app)
-    : app_(app), layoutEditDialogHost_(std::make_unique<DashboardShellUiDialogHost>(*this)),
-      layoutEditDialog_(std::make_unique<LayoutEditDialog>(*layoutEditDialogHost_)) {}
+    : app_(app), layoutEditDialog_(std::make_unique<LayoutEditDialog>(*this)) {}
 
 DashboardShellUi::~DashboardShellUi() {
     DestroyLayoutEditDialogWindow();
@@ -487,7 +371,7 @@ void DashboardShellUi::RefreshLayoutEditDialogSelection() {
 }
 
 void DashboardShellUi::SyncLayoutEditDialogSelection(
-    const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront) {
+    const LayoutEditController::TooltipTarget* target, bool bringToFront) {
     if (layoutEditDialog_ != nullptr && !layoutEditDialog_->SyncSelection(target, bringToFront)) {
         MessageBoxW(app_.hwnd_, L"Failed to open the Edit Configuration window.", L"CaseDash", MB_ICONERROR);
     }
@@ -696,8 +580,24 @@ HINSTANCE DashboardShellUi::DialogInstance() const {
     return app_.instance_;
 }
 
+HINSTANCE DashboardShellUi::LayoutEditDialogInstance() const {
+    return DialogInstance();
+}
+
+HWND DashboardShellUi::LayoutEditDialogAnchorWindow() const {
+    return app_.WindowHandle();
+}
+
+UINT DashboardShellUi::LayoutEditDialogAnchorDpi() const {
+    return app_.CurrentWindowDpi();
+}
+
 AppConfig DashboardShellUi::BuildLayoutEditOriginalConfigSnapshot() const {
     return ::BuildLayoutEditOriginalConfig(app_.controller_.State());
+}
+
+AppConfig DashboardShellUi::BuildLayoutEditOriginalConfig() const {
+    return BuildLayoutEditOriginalConfigSnapshot();
 }
 
 const AppConfig& DashboardShellUi::CurrentConfig() const {
@@ -845,6 +745,25 @@ void DashboardShellUi::UpdateLayoutEditSelectionHighlight(
     InvalidateRect(app_.hwnd_, nullptr, FALSE);
 }
 
+void DashboardShellUi::ApplyLayoutEditDialogIcons(HWND dialogHwnd) const {
+    app_.ApplyThemedIconsToWindow(dialogHwnd);
+}
+
+void DashboardShellUi::RestackLayoutEditDialogAnchor(HWND dialogHwnd) {
+    const HWND anchorHwnd = app_.WindowHandle();
+    if (dialogHwnd == nullptr || anchorHwnd == nullptr || !IsWindow(dialogHwnd) || !IsWindow(anchorHwnd) ||
+        dialogHwnd == anchorHwnd) {
+        return;
+    }
+
+    ShowWindow(anchorHwnd, SW_SHOWNOACTIVATE);
+    SetWindowPos(anchorHwnd, dialogHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
+void DashboardShellUi::OnLayoutEditDialogCloseRequested() {
+    DestroyLayoutEditDialogWindow();
+}
+
 bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController::TooltipTarget& target) {
     const auto focusKey = TooltipPayloadFocusKey(target.payload);
     if (!focusKey.has_value()) {
@@ -888,20 +807,23 @@ std::optional<double> DashboardShellUi::PromptCustomScale() {
 }
 
 UINT DashboardShellUi::ResolveDefaultCommand(
-    MenuSource source, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) const {
+    MenuSource source, const LayoutEditController::TooltipTarget* layoutEditTarget) const {
     if (source == MenuSource::TrayIcon) {
         return kCommandBringOnTop;
     }
-    return layoutEditTarget.has_value() ? kCommandEditLayoutTarget : kCommandMove;
+    return layoutEditTarget != nullptr ? kCommandEditLayoutTarget : kCommandMove;
 }
 
-void DashboardShellUi::ExecuteCommand(UINT selected,
-    const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
-    std::optional<POINT> cursorAnchorClientPoint) {
+void DashboardShellUi::ExecuteCommand(
+    UINT selected, const LayoutEditController::TooltipTarget* layoutEditTarget, const POINT* cursorAnchorClientPoint) {
     DashboardSessionState& state = app_.controller_.State();
     switch (selected) {
         case kCommandMove:
-            app_.StartMoveMode(cursorAnchorClientPoint);
+            if (cursorAnchorClientPoint != nullptr) {
+                app_.StartMoveModeAt(*cursorAnchorClientPoint);
+            } else {
+                app_.StartMoveMode();
+            }
             break;
         case kCommandEditLayout:
             HandleEditLayoutToggle();
@@ -912,7 +834,7 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
             app_.UpdateLayoutEditTooltip();
             break;
         case kCommandEditLayoutTarget:
-            if (layoutEditTarget.has_value()) {
+            if (layoutEditTarget != nullptr) {
                 PromptAndApplyLayoutEditTarget(*layoutEditTarget);
             }
             app_.UpdateLayoutEditTooltip();
@@ -1045,8 +967,8 @@ void DashboardShellUi::ExecuteCommand(UINT selected,
 }
 
 void DashboardShellUi::InvokeDefaultAction(MenuSource source,
-    const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget,
-    std::optional<POINT> cursorAnchorClientPoint) {
+    const LayoutEditController::TooltipTarget* layoutEditTarget,
+    const POINT* cursorAnchorClientPoint) {
     if (source == MenuSource::AppWindow && app_.controller_.State().isEditingLayout) {
         app_.layoutEditController_.CancelInteraction();
         app_.UpdateLayoutEditTooltip();
@@ -1055,7 +977,7 @@ void DashboardShellUi::InvokeDefaultAction(MenuSource source,
 }
 
 void DashboardShellUi::ShowContextMenu(
-    MenuSource source, POINT screenPoint, const std::optional<LayoutEditController::TooltipTarget>& layoutEditTarget) {
+    MenuSource source, POINT screenPoint, const LayoutEditController::TooltipTarget* layoutEditTarget) {
     app_.HideLayoutEditTooltip();
     DashboardShellUiModalScope scopedModalUi(*this);
     DashboardSessionState& state = app_.controller_.State();
@@ -1222,7 +1144,7 @@ void DashboardShellUi::ShowContextMenu(
         AppendMenuW(advancedMenu, MF_STRING, kCommandSaveScreenshotAs, L"Save Screenshot...");
         AppendMenuW(advancedMenu, MF_STRING, kCommandSaveLayoutGuideSheetAs, L"Save Layout Guide Sheet...");
     }
-    if (layoutEditTarget.has_value()) {
+    if (layoutEditTarget != nullptr) {
         std::wstring label;
         if (const auto* guide = std::get_if<LayoutEditGuide>(&layoutEditTarget->payload)) {
             label = BuildLayoutEditMenuLabel(BuildLayoutGuideEditLabel(*guide));

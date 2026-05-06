@@ -161,7 +161,7 @@ void InitializeGpuAdapterInfo(RealTelemetryCollectorState& state) {
             "telemetry:gpu_adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
             adapterIndex,
             static_cast<unsigned int>(descHr),
-            Trace::BoolText(SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0).c_str(),
+            Trace::BoolText(SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0),
             adapterName.c_str());
         WriteTelemetryTrace(state, buffer);
         adapter->Release();

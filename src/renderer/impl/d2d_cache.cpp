@@ -1,11 +1,11 @@
 #include "renderer/impl/d2d_cache.h"
 
-size_t D2DCache::BrushCacheKeyHash::operator()(const BrushCacheKey& key) const {
-    return std::hash<std::uint32_t>{}(key.packedRgba);
-}
+#include <utility>
 
 void D2DCache::Clear() {
-    solidBrushes_.clear();
+    for (Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>& brush : solidBrushes_) {
+        brush.Reset();
+    }
 }
 
 void D2DCache::ResetTarget() {
@@ -21,18 +21,25 @@ void D2DCache::AttachTarget(ID2D1RenderTarget* target) {
     ownerTarget_ = target;
 }
 
-ID2D1SolidColorBrush* D2DCache::SolidBrush(ID2D1RenderTarget* target, RenderColor color) {
+ID2D1SolidColorBrush* D2DCache::SolidBrush(
+    ID2D1RenderTarget* target, const RendererPalette& palette, RenderColorId colorId) {
     if (target == nullptr) {
         return nullptr;
     }
-    const BrushCacheKey key{color.PackedRgba()};
-    if (const auto it = solidBrushes_.find(key); it != solidBrushes_.end()) {
-        return it->second.Get();
+    const std::size_t slot = static_cast<std::size_t>(colorId);
+    if (slot >= solidBrushes_.size()) {
+        return nullptr;
+    }
+    if (solidBrushes_[slot] != nullptr) {
+        return solidBrushes_[slot].Get();
     }
 
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> brush;
+    const RenderColor& color = palette.Get(colorId);
     if (FAILED(target->CreateSolidColorBrush(color.ToD2DColorF(), brush.GetAddressOf())) || brush == nullptr) {
         return nullptr;
     }
-    return solidBrushes_.emplace(key, std::move(brush)).first->second.Get();
+    ID2D1SolidColorBrush* result = brush.Get();
+    solidBrushes_[slot] = std::move(brush);
+    return result;
 }

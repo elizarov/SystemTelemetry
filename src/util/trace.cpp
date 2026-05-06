@@ -60,7 +60,7 @@ void Trace::Write(const std::string& text) const {
     Write(text.c_str());
 }
 
-std::string Trace::BoolText(bool value) {
+const char* Trace::BoolText(bool value) {
     return value ? "yes" : "no";
 }
 

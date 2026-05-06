@@ -101,7 +101,7 @@ std::optional<PrimaryGpuAdapter> QueryPrimaryGpuAdapter(Trace& trace) {
             "gpu_vendor:adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
             adapterIndex,
             static_cast<unsigned int>(descHr),
-            Trace::BoolText(software).c_str(),
+            Trace::BoolText(software),
             adapterName.c_str());
         trace.Write(buffer);
         adapter->Release();
@@ -157,8 +157,8 @@ public:
                 sample.available = true;
             }
             trace_.WriteLazy([&] {
-                return "unsupported_gpu:get_presented_fps available=" + Trace::BoolText(fpsSample.fps.has_value()) +
-                       " value=" +
+                return std::string("unsupported_gpu:get_presented_fps available=") +
+                       Trace::BoolText(fpsSample.fps.has_value()) + " value=" +
                        (fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1)
                                                   : std::string("fps=N/A")) +
                        " process=\"" + fpsSample.processName + "\" diagnostics=\"" + fpsSample.diagnostics + "\"";

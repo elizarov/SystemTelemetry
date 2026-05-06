@@ -2,6 +2,4 @@
 
 #include <windows.h>
 
-#include <optional>
-
-std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, INT_PTR& result);

@@ -212,6 +212,7 @@ bool D2DRenderer::SetStyle(const RendererStyle& style) {
     }
     if (colorsChanged || !initialized) {
         palette_.Rebuild(style_.colors, style_.layoutGuideSheet);
+        d2dCache_.Clear();
     }
     if (iconSourcesChanged && !LoadIcons()) {
         return false;
@@ -631,7 +632,7 @@ ID2D1SolidColorBrush* D2DRenderer::D2DSolidBrush(RenderColorId colorId) {
     if (d2dActiveRenderTarget_ == nullptr) {
         return nullptr;
     }
-    return d2dCache_.SolidBrush(d2dActiveRenderTarget_, palette_.Get(colorId));
+    return d2dCache_.SolidBrush(d2dActiveRenderTarget_, palette_, colorId);
 }
 
 void D2DRenderer::PushClipRect(const RenderRect& rect) {

@@ -329,8 +329,8 @@ public:
                 hasAnyMetric = true;
             }
             trace_.WriteLazy([&] {
-                return "nvidia_nvml:get_presented_fps available=" + Trace::BoolText(fpsSample.fps.has_value()) +
-                       " value=" +
+                return std::string("nvidia_nvml:get_presented_fps available=") +
+                       Trace::BoolText(fpsSample.fps.has_value()) + " value=" +
                        (fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1)
                                                   : std::string("fps=N/A")) +
                        " process=\"" + fpsSample.processName + "\" diagnostics=\"" + fpsSample.diagnostics + "\"";
@@ -340,8 +340,8 @@ public:
         sample.available = hasAnyMetric;
         sample.diagnostics += " fps=" + fpsDiagnostics_;
         trace_.WriteLazy([&] {
-            return "nvidia_nvml:sample_done available=" + Trace::BoolText(sample.available) + " diagnostics=\"" +
-                   sample.diagnostics + "\"";
+            return std::string("nvidia_nvml:sample_done available=") + Trace::BoolText(sample.available) +
+                   " diagnostics=\"" + sample.diagnostics + "\"";
         });
         return sample;
     }

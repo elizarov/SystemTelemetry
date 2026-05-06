@@ -98,12 +98,10 @@ TEST(LayoutEditTooltip, BuildsColorTooltipTextFromColorExpression) {
     LayoutEditColorRegion region;
     region.parameter = LayoutEditParameter::ColorPanelBorder;
 
-    const std::optional<std::wstring> tooltip = BuildLayoutEditTooltipTextForPayload(config, region, nullptr);
+    std::wstring tooltip;
 
-    ASSERT_TRUE(tooltip.has_value());
-    const std::wstring& tooltipText = *tooltip;
-    EXPECT_EQ(tooltipText.substr(0, tooltipText.find(L"\r\n")),
-        L"[colors] panel_border_color = background(mix: 0.34 accent)");
+    ASSERT_TRUE(BuildLayoutEditTooltipTextForPayload(config, region, tooltip, nullptr));
+    EXPECT_EQ(tooltip.substr(0, tooltip.find(L"\r\n")), L"[colors] panel_border_color = background(mix: 0.34 accent)");
 }
 
 TEST(LayoutEditTooltip, BuildsStringTooltipFirstLine) {

@@ -186,6 +186,7 @@ add_executable(CaseDash WIN32
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -204,6 +205,8 @@ add_executable(CaseDash WIN32
     src/renderer/impl/d2d_renderer.cpp
     src/renderer/impl/d2d_cache.cpp
     src/renderer/impl/d2d_render_conversions.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
@@ -249,6 +252,8 @@ set(casedash_release_speed_sources
     src/diagnostics/app_icon_export.cpp
     src/widget/app_icon_geometry.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
@@ -287,6 +292,7 @@ set(casedash_release_speed_sources
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -352,6 +358,7 @@ set(casedash_release_noinline_sources
     src/layout_edit_dialog/impl/tree.cpp
     src/layout_edit_dialog/impl/util.cpp
     src/main/main.cpp
+    src/telemetry/impl/collector_fake.cpp
 )
 
 set_property(SOURCE ${casedash_release_noinline_sources} APPEND PROPERTY
@@ -451,6 +458,7 @@ target_compile_options(CaseDash PRIVATE
     /w14505
     /we4505
     /Zi
+    $<$<CONFIG:Release>:/Zc:threadSafeInit->
     $<$<CONFIG:Release>:/Os>
     $<$<CONFIG:Release>:/GL>
 )
@@ -603,6 +611,8 @@ add_executable(CaseDashTests
     src/renderer/impl/d2d_render_conversions.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
@@ -704,6 +714,7 @@ add_executable(CaseDashBenchmarks
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -742,6 +753,8 @@ add_executable(CaseDashBenchmarks
     src/renderer/impl/d2d_renderer.cpp
     src/renderer/impl/d2d_cache.cpp
     src/renderer/impl/d2d_render_conversions.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp

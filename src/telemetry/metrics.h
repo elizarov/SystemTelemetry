@@ -87,9 +87,12 @@ private:
     mutable std::vector<std::pair<std::string, MetricValue>> metricCache_;
     mutable std::vector<std::pair<std::string, std::vector<MetricValue>>> metricListCache_;
     mutable std::vector<std::pair<std::string, ThroughputCacheEntry>> throughputCache_;
-    mutable std::optional<ThroughputSharedState> throughputSharedState_;
-    mutable std::optional<std::string> networkFooterCache_;
-    mutable std::optional<std::vector<DriveRow>> driveRowsCache_;
+    mutable ThroughputSharedState throughputSharedState_;
+    mutable std::string networkFooterCache_;
+    mutable std::vector<DriveRow> driveRowsCache_;
     mutable std::vector<std::pair<std::string, std::string>> clockTimeCache_;
     mutable std::vector<std::pair<std::string, std::string>> clockDateCache_;
+    mutable bool throughputSharedStateReady_ = false;
+    mutable bool networkFooterCached_ = false;
+    mutable bool driveRowsCached_ = false;
 };

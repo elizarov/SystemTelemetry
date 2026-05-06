@@ -11,9 +11,10 @@
 #include <optional>
 #include <pdhmsg.h>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include "telemetry/fps/impl/gpu_raw_counter_map.h"
 #include "telemetry/impl/collector_support.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -235,7 +236,7 @@ public:
         diagnostics_ = "Presented FPS ETW provider active.";
         permissionRequired_ = false;
         initialized_ = true;
-        trace_.Write("fps_etw:initialize_done dxgi=" + Trace::BoolText(dxgiEnabled_) +
+        trace_.Write(std::string("fps_etw:initialize_done dxgi=") + Trace::BoolText(dxgiEnabled_) +
                      " d3d9=" + Trace::BoolText(d3d9Enabled_) + " dxgkrnl=" + Trace::BoolText(dxgkrnlEnabled_));
         return true;
     }
@@ -263,11 +264,10 @@ public:
         ProcessEventSelection bestSelection = SelectBestSourceLocked(runtimeSelection, kernelSelection);
         bestSelection = ApplyProcessHysteresisLocked(bestSelection, minimumQpc);
 
-        const std::optional<FpsTelemetrySample> blockedByGpuSelection =
-            BuildUnavailableDominantGpuSampleLocked(bestSelection);
-        if (blockedByGpuSelection.has_value()) {
+        FpsTelemetrySample blockedByGpuSelection;
+        if (BuildUnavailableDominantGpuSampleLocked(bestSelection, blockedByGpuSelection)) {
             ResetSelectionLocked();
-            return *blockedByGpuSelection;
+            return blockedByGpuSelection;
         }
 
         if (bestSelection.processId == 0 || bestSelection.count < 2) {
@@ -431,21 +431,20 @@ private:
         return count > current.count;
     }
 
-    std::optional<FpsTelemetrySample> BuildUnavailableDominantGpuSampleLocked(const ProcessEventSelection& selected) {
+    bool BuildUnavailableDominantGpuSampleLocked(const ProcessEventSelection& selected, FpsTelemetrySample& sample) {
         if (topGpu3dProcessId_ == 0 || topGpu3dUsage_ < kGpu3dActiveThresholdPercent) {
-            return std::nullopt;
+            return false;
         }
 
         const double selectedGpu3d = Gpu3dUsageForProcess(selected.processId);
         if (topGpu3dProcessId_ != selected.processId &&
             topGpu3dUsage_ < (std::max)(selectedGpu3d, 0.1) * kGpu3dDominanceRatio) {
-            return std::nullopt;
+            return false;
         }
         if (topGpu3dProcessId_ == selected.processId && selected.count >= 2) {
-            return std::nullopt;
+            return false;
         }
 
-        FpsTelemetrySample sample;
         sample.processId = topGpu3dProcessId_;
         sample.processName = Utf8FromWide(ResolveProcessNameLocked(topGpu3dProcessId_));
         sample.available = false;
@@ -455,7 +454,7 @@ private:
             " selected_process=" + Utf8FromWide(ResolveProcessNameLocked(selected.processId)) + " selected_source=" +
             PresentEventSourceName(selected.source) + " selected_window_count=" + std::to_string(selected.count) +
             GpuUsageDiagnosticsForProcess(selected.processId));
-        return sample;
+        return true;
     }
 
     ProcessEventSelection ApplyProcessHysteresisLocked(const ProcessEventSelection& candidate, uint64_t minimumQpc) {
@@ -578,7 +577,7 @@ private:
     }
 
     void CapturePreviousGpu3dRawValuesLocked() {
-        previousGpuRawByInstance_.clear();
+        previousGpuRawByInstance_.Clear();
         if (gpuQuery_ == nullptr || gpu3dCounter_ == nullptr) {
             return;
         }
@@ -597,10 +596,10 @@ private:
             return;
         }
 
-        previousGpuRawByInstance_.reserve(itemCount);
+        previousGpuRawByInstance_.Reserve(itemCount);
         for (DWORD i = 0; i < itemCount; ++i) {
             if (IsGpu3dEngineInstance(items[i].szName) && items[i].RawValue.CStatus == ERROR_SUCCESS) {
-                previousGpuRawByInstance_[items[i].szName] = items[i].RawValue;
+                previousGpuRawByInstance_.Set(items[i].szName, items[i].RawValue);
             }
         }
     }
@@ -633,27 +632,27 @@ private:
             return;
         }
 
-        currentGpuRawByInstance_.clear();
-        currentGpuRawByInstance_.reserve(itemCount);
+        currentGpuRawByInstance_.Clear();
+        currentGpuRawByInstance_.Reserve(itemCount);
         for (DWORD i = 0; i < itemCount; ++i) {
             const wchar_t* instance = items[i].szName;
             if (!IsGpu3dEngineInstance(instance) || items[i].RawValue.CStatus != ERROR_SUCCESS) {
                 continue;
             }
-            currentGpuRawByInstance_[instance] = items[i].RawValue;
+            currentGpuRawByInstance_.Set(instance, items[i].RawValue);
 
             const DWORD processId = ExtractProcessIdFromGpuEngineInstance(instance);
             if (processId == 0 || IsExcludedProcessName(ResolveProcessNameLocked(processId))) {
                 continue;
             }
 
-            const auto previous = previousGpuRawByInstance_.find(instance);
-            if (previous == previousGpuRawByInstance_.end()) {
+            const PDH_RAW_COUNTER* previous = previousGpuRawByInstance_.Find(instance);
+            if (previous == nullptr) {
                 continue;
             }
 
             PDH_FMT_COUNTERVALUE formatted{};
-            PDH_RAW_COUNTER previousRaw = previous->second;
+            PDH_RAW_COUNTER previousRaw = *previous;
             PDH_RAW_COUNTER currentRaw = items[i].RawValue;
             const PDH_STATUS formatStatus =
                 PdhCalculateCounterFromRawValue(gpu3dCounter_, PDH_FMT_DOUBLE, &previousRaw, &currentRaw, &formatted);
@@ -672,7 +671,7 @@ private:
                 topGpu3dProcessId_ = processId;
             }
         }
-        previousGpuRawByInstance_.swap(currentGpuRawByInstance_);
+        previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
         gpuUsageDiagnostics_ = " gpu3d_collect=" + PdhStatusCodeString(collectStatus) +
                                " gpu3d_fetch=" + PdhStatusCodeString(status) +
@@ -729,8 +728,8 @@ private:
             gpuQuery_ = nullptr;
             gpu3dCounter_ = nullptr;
             gpuQueryInitialized_ = false;
-            previousGpuRawByInstance_.clear();
-            currentGpuRawByInstance_.clear();
+            previousGpuRawByInstance_.Clear();
+            currentGpuRawByInstance_.Clear();
         }
         initialized_ = false;
     }
@@ -836,9 +835,10 @@ private:
     ProcessPresentEventBuckets kernelEventsByProcess_;
     std::vector<ProcessNameCacheEntry> processNames_;
     std::vector<ProcessGpuUsage> gpu3dUsageByProcess_;
-    // Size/perf: GPU Engine exposes hundreds of per-engine instances on process-heavy machines, so raw lookup stays hashed.
-    std::unordered_map<std::wstring, PDH_RAW_COUNTER> previousGpuRawByInstance_;
-    std::unordered_map<std::wstring, PDH_RAW_COUNTER> currentGpuRawByInstance_;
+    // Size/perf: GPU Engine exposes hundreds of per-engine instances on process-heavy machines; use a narrow
+    // open-addressed table instead of general STL hash maps.
+    GpuRawCounterMap previousGpuRawByInstance_;
+    GpuRawCounterMap currentGpuRawByInstance_;
     std::vector<unsigned char> gpuCounterArrayBuffer_;
     std::optional<double> smoothedFps_;
     PDH_HQUERY gpuQuery_ = nullptr;

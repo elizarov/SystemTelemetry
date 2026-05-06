@@ -29,7 +29,7 @@ struct LayoutGuideSheetPlacementStyle {
 };
 
 struct LayoutGuideSheetPlacementBlockTrace {
-    std::string cardId;
+    size_t cardIndex = 0;
     int leaderScore = 0;
     int sideRepairPasses = 0;
     size_t leftCallouts = 0;
@@ -38,11 +38,16 @@ struct LayoutGuideSheetPlacementBlockTrace {
     size_t bottomCallouts = 0;
 };
 
+enum class LayoutGuideSheetLeaderIntersectionKind {
+    LeaderCross,
+    TargetSafeZone,
+};
+
 struct LayoutGuideSheetLeaderIntersectionTrace {
-    std::string sourceCardId;
-    std::string kind;
-    std::string firstCalloutKey;
-    std::string secondCalloutKey;
+    size_t sourceCardIndex = 0;
+    LayoutGuideSheetLeaderIntersectionKind kind = LayoutGuideSheetLeaderIntersectionKind::LeaderCross;
+    size_t firstCalloutIndex = 0;
+    size_t secondCalloutIndex = 0;
     LayoutGuideSheetExitSide firstExitSide = LayoutGuideSheetExitSide::Right;
     LayoutGuideSheetExitSide secondExitSide = LayoutGuideSheetExitSide::Right;
 };

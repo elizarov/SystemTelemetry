@@ -8,7 +8,7 @@ See also: [docs/build.md](build.md) for local build setup and [docs/project.md](
 - [VERSION](../VERSION) is the base product version.
 - Version text uses `major.minor` or `major.minor.patch`.
 - CMake reads `VERSION` and Git metadata during configure, then generates build metadata under `build\cmake\generated`.
-- The generated metadata is compiled into the executable as C++ constants, a Windows `VERSIONINFO` resource, and the application manifest assembly version.
+- The generated metadata is compiled into the executable as C++ constants and the application manifest assembly version.
 - The MSI package uses the same `VERSION` text as its filename version and normalizes `major.minor` to `major.minor.0` for the Windows Installer product version.
 
 ## Build Kinds
@@ -17,11 +17,10 @@ See also: [docs/build.md](build.md) for local build setup and [docs/project.md](
 - Official release builds report the plain version from `VERSION`.
 - Other builds are development builds and report `VERSION-dev+g<commit>`.
 - Locally modified builds append `.dirty`.
-- Development builds set the Windows version resource prerelease flag.
+- Development builds are identified by the generated version constants used by the About dialog and release assets.
 
 ## User-Visible Version
 
-- Windows file properties show the numeric file version plus the full CaseDash version string.
 - The application manifest uses the four-part Windows numeric version derived from `VERSION`.
 - The dashboard menu exposes `About CaseDash` immediately before `Exit`.
 - The About dialog shows the current themed app icon, full version, release kind, and commit when available.

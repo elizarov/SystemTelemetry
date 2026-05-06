@@ -106,58 +106,58 @@ bool IsLayoutSectionNode(const LayoutEditDialogState* state) {
            state->selectedNode->label.rfind("layout.", 0) == 0;
 }
 
-std::optional<ColorConfig> FindThemeColorValue(const AppConfig& config, const ThemeColorEditKey& key) {
+const ColorConfig* FindThemeColorValue(const AppConfig& config, const ThemeColorEditKey& key) {
     const auto it = std::find_if(config.layout.themes.begin(),
         config.layout.themes.end(),
         [&](const ThemeConfig& theme) { return theme.name == key.themeName; });
     if (it == config.layout.themes.end()) {
-        return std::nullopt;
+        return nullptr;
     }
     if (key.tokenName == "background")
-        return it->background;
+        return &it->background;
     if (key.tokenName == "foreground")
-        return it->foreground;
+        return &it->foreground;
     if (key.tokenName == "accent")
-        return it->accent;
+        return &it->accent;
     if (key.tokenName == "guide")
-        return it->guide;
-    return std::nullopt;
+        return &it->guide;
+    return nullptr;
 }
 
-std::optional<ColorConfig> FindColorRoleValue(const AppConfig& config, LayoutEditParameter parameter) {
+const ColorConfig* FindColorRoleValue(const AppConfig& config, LayoutEditParameter parameter) {
     switch (parameter) {
         case LayoutEditParameter::ColorBackground:
-            return config.layout.colors.backgroundColor;
+            return &config.layout.colors.backgroundColor;
         case LayoutEditParameter::ColorForeground:
-            return config.layout.colors.foregroundColor;
+            return &config.layout.colors.foregroundColor;
         case LayoutEditParameter::ColorIcon:
-            return config.layout.colors.iconColor;
+            return &config.layout.colors.iconColor;
         case LayoutEditParameter::ColorPeakGhost:
-            return config.layout.colors.peakGhostColor;
+            return &config.layout.colors.peakGhostColor;
         case LayoutEditParameter::ColorWarning:
-            return config.layout.colors.warningColor;
+            return &config.layout.colors.warningColor;
         case LayoutEditParameter::ColorAccent:
-            return config.layout.colors.accentColor;
+            return &config.layout.colors.accentColor;
         case LayoutEditParameter::ColorLayoutGuide:
-            return config.layout.colors.layoutGuideColor;
+            return &config.layout.colors.layoutGuideColor;
         case LayoutEditParameter::ColorActiveEdit:
-            return config.layout.colors.activeEditColor;
+            return &config.layout.colors.activeEditColor;
         case LayoutEditParameter::ColorPanelBorder:
-            return config.layout.colors.panelBorderColor;
+            return &config.layout.colors.panelBorderColor;
         case LayoutEditParameter::ColorMutedText:
-            return config.layout.colors.mutedTextColor;
+            return &config.layout.colors.mutedTextColor;
         case LayoutEditParameter::ColorTrack:
-            return config.layout.colors.trackColor;
+            return &config.layout.colors.trackColor;
         case LayoutEditParameter::ColorPanelFill:
-            return config.layout.colors.panelFillColor;
+            return &config.layout.colors.panelFillColor;
         case LayoutEditParameter::ColorGraphBackground:
-            return config.layout.colors.graphBackgroundColor;
+            return &config.layout.colors.graphBackgroundColor;
         case LayoutEditParameter::ColorGraphAxis:
-            return config.layout.colors.graphAxisColor;
+            return &config.layout.colors.graphAxisColor;
         case LayoutEditParameter::ColorGraphMarker:
-            return config.layout.colors.graphMarkerColor;
+            return &config.layout.colors.graphMarkerColor;
         default:
-            return std::nullopt;
+            return nullptr;
     }
 }
 
@@ -780,14 +780,14 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                 " size=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT)) +
                 " weight=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT));
         } else if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
-            const auto value = FindColorRoleValue(state->dialog->Host().CurrentConfig(), *parameter);
-            const unsigned int color = value.has_value() ? value->ToRgba() : 0x000000FFu;
-            PopulateColorExpressionControls(hwnd, *parameter, value.value_or(ColorConfig::FromRgba(color)));
+            const ColorConfig* value = FindColorRoleValue(state->dialog->Host().CurrentConfig(), *parameter);
+            const unsigned int color = value != nullptr ? value->ToRgba() : 0x000000FFu;
+            PopulateColorExpressionControls(hwnd, *parameter, value != nullptr ? *value : ColorConfig::FromRgba(color));
             PopulateColorEditorControls(state, hwnd, color);
             traceDetail = " editor=\"color\"" + BuildColorDialogTraceValues(hwnd) + " config_value=" +
-                          QuoteTraceText(value.has_value() ? FormatTraceColorHex(value->ToRgba()) : "none") +
+                          QuoteTraceText(value != nullptr ? FormatTraceColorHex(value->ToRgba()) : "none") +
                           " mode=" + QuoteTraceText(IsDerivedColorMode(hwnd) ? "derived" : "literal") + " expression=" +
-                          QuoteTraceText(value.has_value() && !value->expression.empty() ? value->expression : "");
+                          QuoteTraceText(value != nullptr && !value->expression.empty() ? value->expression : "");
         } else {
             const auto value = FindLayoutEditParameterNumericValue(state->dialog->Host().CurrentConfig(), *parameter);
             if (value.has_value()) {
@@ -802,11 +802,11 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
                           " text=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT));
         }
     } else if (const auto* themeColorKey = std::get_if<ThemeColorEditKey>(&state->selectedLeaf->focusKey)) {
-        const auto value = FindThemeColorValue(state->dialog->Host().CurrentConfig(), *themeColorKey);
-        const unsigned int color = value.has_value() ? value->ToRgba() : 0x000000FFu;
+        const ColorConfig* value = FindThemeColorValue(state->dialog->Host().CurrentConfig(), *themeColorKey);
+        const unsigned int color = value != nullptr ? value->ToRgba() : 0x000000FFu;
         PopulateColorEditorControls(state, hwnd, color);
         traceDetail = " editor=\"theme_color\"" + BuildColorDialogTraceValues(hwnd) + " config_value=" +
-                      QuoteTraceText(value.has_value() ? FormatTraceColorHex(value->ToRgba()) : "none");
+                      QuoteTraceText(value != nullptr ? FormatTraceColorHex(value->ToRgba()) : "none");
     } else if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&state->selectedLeaf->focusKey)) {
         const auto values = FindWeightEditValues(state->dialog->Host().CurrentConfig(), *weightKey);
         SetDlgItemTextW(
@@ -1171,12 +1171,15 @@ bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd) {
                   (parameter != nullptr ? state->dialog->Host().ApplyColorPreview(*parameter, *color)
                                         : state->dialog->Host().ApplyThemeColorPreview(*themeColorKey, *color));
     }
-    const auto resolvedColor =
-        parameter != nullptr
-            ? FindLayoutEditParameterColorValue(state->dialog->Host().CurrentConfig(), *parameter)
-            : std::optional<unsigned int>(FindThemeColorValue(state->dialog->Host().CurrentConfig(), *themeColorKey)
-                      .value_or(ColorConfig::FromRgba(color.value_or(0x000000FFu)))
-                      .ToRgba());
+    std::optional<unsigned int> resolvedColor;
+    if (parameter != nullptr) {
+        resolvedColor = FindLayoutEditParameterColorValue(state->dialog->Host().CurrentConfig(), *parameter);
+    } else if (const ColorConfig* themeColor =
+                   FindThemeColorValue(state->dialog->Host().CurrentConfig(), *themeColorKey)) {
+        resolvedColor = themeColor->ToRgba();
+    } else {
+        resolvedColor = color.value_or(0x000000FFu);
+    }
     if (applied && resolvedColor.has_value()) {
         SetColorSamplePreview(state, hwnd, *resolvedColor);
     }
@@ -1288,15 +1291,15 @@ bool SetSelectedDialogColor(LayoutEditDialogState* state, HWND hwnd, unsigned in
     PopulateLayoutEditSelection(state, hwnd);
     SetFocus(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT));
     SendDlgItemMessageW(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, EM_SETSEL, 0, -1);
+    const ColorConfig* resolvedThemeColor =
+        parameter == nullptr ? FindThemeColorValue(state->dialog->Host().CurrentConfig(), *themeColorKey) : nullptr;
     state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:picker_apply_end",
         BuildTraceNodeText(state->selectedNode) + " applied=\"true\"" + BuildColorDialogTraceValues(hwnd) +
             " config_value=" +
             QuoteTraceText(FormatTraceColorHex(
                 parameter != nullptr
                     ? FindLayoutEditParameterColorValue(state->dialog->Host().CurrentConfig(), *parameter).value_or(0)
-                    : FindThemeColorValue(state->dialog->Host().CurrentConfig(), *themeColorKey)
-                          .value_or(ColorConfig::FromRgba(0))
-                          .ToRgba())));
+                    : (resolvedThemeColor != nullptr ? resolvedThemeColor->ToRgba() : 0))));
     return true;
 }
 
@@ -1482,8 +1485,8 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
             return applied;
         }
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
-            const auto color = FindColorRoleValue(state->originalConfig, *parameter);
-            if (!color.has_value()) {
+            const ColorConfig* color = FindColorRoleValue(state->originalConfig, *parameter);
+            if (color == nullptr) {
                 return false;
             }
             const bool applied = !color->expression.empty() && !IsLiteralColorExpressionText(color->expression)
@@ -1564,8 +1567,8 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
 
     if (const auto* themeColorKey = std::get_if<ThemeColorEditKey>(&state->selectedLeaf->focusKey);
         themeColorKey != nullptr) {
-        const auto color = FindThemeColorValue(state->originalConfig, *themeColorKey);
-        if (!color.has_value()) {
+        const ColorConfig* color = FindThemeColorValue(state->originalConfig, *themeColorKey);
+        if (color == nullptr) {
             return false;
         }
         const bool applied = state->dialog->Host().ApplyThemeColorPreview(*themeColorKey, color->ToRgba());

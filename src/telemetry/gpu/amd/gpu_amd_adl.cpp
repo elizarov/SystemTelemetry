@@ -278,7 +278,8 @@ public:
                 }
             }
             trace().WriteLazy([&] {
-                return "amd_adlx:get_presented_fps available=" + Trace::BoolText(fpsSample.fps.has_value()) +
+                return std::string("amd_adlx:get_presented_fps available=") +
+                       Trace::BoolText(fpsSample.fps.has_value()) +
                        " permission_required=" + Trace::BoolText(fpsSample.permissionRequired) + " value=" +
                        (fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1)
                                                   : std::string("fps=N/A")) +
@@ -289,8 +290,8 @@ public:
         sample.available = hasAnyMetric;
         sample.diagnostics += " fps=" + fpsDiagnostics_;
         trace().WriteLazy([&] {
-            return "amd_adlx:sample_done available=" + Trace::BoolText(sample.available) + " diagnostics=\"" +
-                   sample.diagnostics + "\"";
+            return std::string("amd_adlx:sample_done available=") + Trace::BoolText(sample.available) +
+                   " diagnostics=\"" + sample.diagnostics + "\"";
         });
         return sample;
     }

@@ -387,10 +387,10 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
             GetSimilarityIndicatorMode(diagnosticsOptions),
             diagnosticsOptions.editLayoutWidgetName,
             shell.TraceLog(),
+            diagnosticsOptions.hoverPoint.has_value(),
             diagnosticsOptions.hoverPoint.has_value()
-                ? std::optional<RenderPoint>(
-                      RenderPoint{diagnosticsOptions.hoverPoint->x, diagnosticsOptions.hoverPoint->y})
-                : std::nullopt,
+                ? RenderPoint{diagnosticsOptions.hoverPoint->x, diagnosticsOptions.hoverPoint->y}
+                : RenderPoint{},
             &errorText)) {
         const std::string pathText = Utf8FromWide(path->wstring());
         std::string message = "Failed to save screenshot:\n" + pathText;

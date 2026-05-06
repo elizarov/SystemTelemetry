@@ -4,7 +4,6 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
-#include <span>
 #include <string_view>
 #include <utility>
 
@@ -623,19 +622,22 @@ MetricBindingMatch FindMetricBinding(std::string_view metricRef) {
     return {};
 }
 
-std::optional<MetricValue> ResolveMetricValue(
-    const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics, const std::string& metricRef) {
+bool ResolveMetricValue(const SystemSnapshot& snapshot,
+    const MetricsSectionConfig& metrics,
+    const std::string& metricRef,
+    MetricValue& value) {
     const MetricBindingMatch match = FindMetricBinding(metricRef);
     if (match.binding == nullptr || !BindingSupportsPayload(*match.binding, MetricPayloadKind::Value) ||
         match.binding->resolveMetric == nullptr) {
-        return std::nullopt;
+        return false;
     }
 
     const MetricDefinitionConfig* definition = FindEffectiveMetricDefinition(metrics, metricRef);
     if (definition == nullptr) {
-        return std::nullopt;
+        return false;
     }
-    return match.binding->resolveMetric(snapshot, *definition, metricRef, match.logicalName);
+    value = match.binding->resolveMetric(snapshot, *definition, metricRef, match.logicalName);
+    return true;
 }
 
 template <typename Value>
@@ -738,18 +740,93 @@ std::string WeekdayShortName(int dayOfWeek) {
     return dayOfWeek >= 0 && dayOfWeek <= 6 ? std::string(kNames[static_cast<size_t>(dayOfWeek)]) : std::string{};
 }
 
-struct FormatToken {
-    std::string_view token;
-    std::string (*resolve)(const SYSTEMTIME&);
+enum class FormatTokenKind {
+    Hour24TwoDigit,
+    Hour24,
+    Hour12TwoDigit,
+    Hour12,
+    MinuteTwoDigit,
+    Minute,
+    SecondTwoDigit,
+    Second,
+    UpperMeridiem,
+    LowerMeridiem,
+    YearFull,
+    YearShort,
+    MonthName,
+    MonthShortName,
+    MonthTwoDigit,
+    Month,
+    DayTwoDigit,
+    Day,
+    WeekdayName,
+    WeekdayShortName,
 };
 
-std::string FormatWithTokens(const SYSTEMTIME& time, std::string_view format, std::span<const FormatToken> tokens) {
+struct FormatToken {
+    std::string_view token;
+    FormatTokenKind kind = FormatTokenKind::Hour24TwoDigit;
+};
+
+std::string ResolveFormatToken(const SYSTEMTIME& time, FormatTokenKind kind) {
+    switch (kind) {
+        case FormatTokenKind::Hour24TwoDigit:
+            return TwoDigit(time.wHour);
+        case FormatTokenKind::Hour24:
+            return NumberText(time.wHour);
+        case FormatTokenKind::Hour12TwoDigit: {
+            const int hour = time.wHour % 12;
+            return TwoDigit(hour == 0 ? 12 : hour);
+        }
+        case FormatTokenKind::Hour12: {
+            const int hour = time.wHour % 12;
+            return NumberText(hour == 0 ? 12 : hour);
+        }
+        case FormatTokenKind::MinuteTwoDigit:
+            return TwoDigit(time.wMinute);
+        case FormatTokenKind::Minute:
+            return NumberText(time.wMinute);
+        case FormatTokenKind::SecondTwoDigit:
+            return TwoDigit(time.wSecond);
+        case FormatTokenKind::Second:
+            return NumberText(time.wSecond);
+        case FormatTokenKind::UpperMeridiem:
+            return time.wHour < 12 ? std::string("AM") : std::string("PM");
+        case FormatTokenKind::LowerMeridiem:
+            return time.wHour < 12 ? std::string("am") : std::string("pm");
+        case FormatTokenKind::YearFull:
+            return NumberText(time.wYear);
+        case FormatTokenKind::YearShort:
+            return TwoDigit(time.wYear % 100);
+        case FormatTokenKind::MonthName:
+            return MonthName(time.wMonth);
+        case FormatTokenKind::MonthShortName:
+            return MonthShortName(time.wMonth);
+        case FormatTokenKind::MonthTwoDigit:
+            return TwoDigit(time.wMonth);
+        case FormatTokenKind::Month:
+            return NumberText(time.wMonth);
+        case FormatTokenKind::DayTwoDigit:
+            return TwoDigit(time.wDay);
+        case FormatTokenKind::Day:
+            return NumberText(time.wDay);
+        case FormatTokenKind::WeekdayName:
+            return WeekdayName(time.wDayOfWeek);
+        case FormatTokenKind::WeekdayShortName:
+            return WeekdayShortName(time.wDayOfWeek);
+    }
+    return {};
+}
+
+std::string FormatWithTokens(
+    const SYSTEMTIME& time, std::string_view format, const FormatToken* tokens, size_t tokenCount) {
     std::string output;
     for (size_t index = 0; index < format.size();) {
         bool matched = false;
-        for (const auto& token : tokens) {
+        for (size_t tokenIndex = 0; tokenIndex < tokenCount; ++tokenIndex) {
+            const FormatToken& token = tokens[tokenIndex];
             if (format.substr(index, token.token.size()) == token.token) {
-                output += token.resolve(time);
+                output += ResolveFormatToken(time, token.kind);
                 index += token.token.size();
                 matched = true;
                 break;
@@ -767,42 +844,34 @@ std::string FormatWithTokens(const SYSTEMTIME& time, std::string_view format, st
 
 std::string FormatClockTime(const SYSTEMTIME& time, std::string_view format) {
     static constexpr std::array<FormatToken, 10> kTokens{{
-        {"HH", [](const SYSTEMTIME& value) { return TwoDigit(value.wHour); }},
-        {"H", [](const SYSTEMTIME& value) { return NumberText(value.wHour); }},
-        {"hh",
-            [](const SYSTEMTIME& value) {
-                const int hour = value.wHour % 12;
-                return TwoDigit(hour == 0 ? 12 : hour);
-            }},
-        {"h",
-            [](const SYSTEMTIME& value) {
-                const int hour = value.wHour % 12;
-                return NumberText(hour == 0 ? 12 : hour);
-            }},
-        {"MM", [](const SYSTEMTIME& value) { return TwoDigit(value.wMinute); }},
-        {"M", [](const SYSTEMTIME& value) { return NumberText(value.wMinute); }},
-        {"SS", [](const SYSTEMTIME& value) { return TwoDigit(value.wSecond); }},
-        {"S", [](const SYSTEMTIME& value) { return NumberText(value.wSecond); }},
-        {"AM", [](const SYSTEMTIME& value) { return value.wHour < 12 ? std::string("AM") : std::string("PM"); }},
-        {"am", [](const SYSTEMTIME& value) { return value.wHour < 12 ? std::string("am") : std::string("pm"); }},
+        {"HH", FormatTokenKind::Hour24TwoDigit},
+        {"H", FormatTokenKind::Hour24},
+        {"hh", FormatTokenKind::Hour12TwoDigit},
+        {"h", FormatTokenKind::Hour12},
+        {"MM", FormatTokenKind::MinuteTwoDigit},
+        {"M", FormatTokenKind::Minute},
+        {"SS", FormatTokenKind::SecondTwoDigit},
+        {"S", FormatTokenKind::Second},
+        {"AM", FormatTokenKind::UpperMeridiem},
+        {"am", FormatTokenKind::LowerMeridiem},
     }};
-    return FormatWithTokens(time, format, kTokens);
+    return FormatWithTokens(time, format, kTokens.data(), kTokens.size());
 }
 
 std::string FormatClockDate(const SYSTEMTIME& time, std::string_view format) {
     static constexpr std::array<FormatToken, 10> kTokens{{
-        {"YYYY", [](const SYSTEMTIME& value) { return NumberText(value.wYear); }},
-        {"YY", [](const SYSTEMTIME& value) { return TwoDigit(value.wYear % 100); }},
-        {"MMMM", [](const SYSTEMTIME& value) { return MonthName(value.wMonth); }},
-        {"MMM", [](const SYSTEMTIME& value) { return MonthShortName(value.wMonth); }},
-        {"MM", [](const SYSTEMTIME& value) { return TwoDigit(value.wMonth); }},
-        {"M", [](const SYSTEMTIME& value) { return NumberText(value.wMonth); }},
-        {"DD", [](const SYSTEMTIME& value) { return TwoDigit(value.wDay); }},
-        {"D", [](const SYSTEMTIME& value) { return NumberText(value.wDay); }},
-        {"dddd", [](const SYSTEMTIME& value) { return WeekdayName(value.wDayOfWeek); }},
-        {"ddd", [](const SYSTEMTIME& value) { return WeekdayShortName(value.wDayOfWeek); }},
+        {"YYYY", FormatTokenKind::YearFull},
+        {"YY", FormatTokenKind::YearShort},
+        {"MMMM", FormatTokenKind::MonthName},
+        {"MMM", FormatTokenKind::MonthShortName},
+        {"MM", FormatTokenKind::MonthTwoDigit},
+        {"M", FormatTokenKind::Month},
+        {"DD", FormatTokenKind::DayTwoDigit},
+        {"D", FormatTokenKind::Day},
+        {"dddd", FormatTokenKind::WeekdayName},
+        {"ddd", FormatTokenKind::WeekdayShortName},
     }};
-    return FormatWithTokens(time, format, kTokens);
+    return FormatWithTokens(time, format, kTokens.data(), kTokens.size());
 }
 
 bool IsStaticTextMetric(std::string_view metricRef) {
@@ -865,9 +934,7 @@ const MetricValue& MetricSource::ResolveMetric(const std::string& metricRef) con
     }
 
     MetricValue metric;
-    if (auto resolved = ResolveMetricValue(snapshot_, metrics_, metricRef); resolved.has_value()) {
-        metric = std::move(*resolved);
-    }
+    ResolveMetricValue(snapshot_, metrics_, metricRef, metric);
     metricCache_.emplace_back(metricRef, std::move(metric));
     return metricCache_.back().second;
 }
@@ -886,8 +953,9 @@ const std::vector<MetricValue>& MetricSource::ResolveMetricList(const std::vecto
     std::vector<MetricValue> rows;
     rows.reserve(metricRefs.size());
     for (const auto& metricRef : metricRefs) {
-        if (auto row = ResolveMetricValue(snapshot_, metrics_, metricRef); row.has_value()) {
-            rows.push_back(*row);
+        MetricValue row;
+        if (ResolveMetricValue(snapshot_, metrics_, metricRef, row)) {
+            rows.push_back(std::move(row));
         }
     }
     metricListCache_.emplace_back(std::move(key), std::move(rows));
@@ -899,9 +967,9 @@ const ThroughputMetric& MetricSource::ResolveThroughput(const std::string& metri
         return cached->metric;
     }
 
-    if (!throughputSharedState_.has_value()) {
-        throughputSharedState_ = ThroughputSharedState{};
-        InitializeThroughputSharedState(snapshot_, *throughputSharedState_);
+    if (!throughputSharedStateReady_) {
+        InitializeThroughputSharedState(snapshot_, throughputSharedState_);
+        throughputSharedStateReady_ = true;
     }
 
     const MetricBindingMatch match = FindMetricBinding(metricRef);
@@ -909,17 +977,17 @@ const ThroughputMetric& MetricSource::ResolveThroughput(const std::string& metri
     ThroughputMetric metric;
     if (match.binding != nullptr && BindingSupportsPayload(*match.binding, MetricPayloadKind::Throughput) &&
         match.binding->resolveThroughputValue != nullptr) {
-        const auto* history = FindThroughputHistory(*throughputSharedState_, metricRef);
+        const auto* history = FindThroughputHistory(throughputSharedState_, metricRef);
         const std::vector<double> emptyHistory;
         const std::vector<double>& resolvedHistory = history != nullptr ? *history : emptyHistory;
         metric.valueMbps =
             ResolveDisplayedThroughputValue(match.binding->resolveThroughputValue(snapshot_), resolvedHistory);
         metric.history = resolvedHistory;
-        metric.maxGraph = ResolveThroughputGraphMax(*throughputSharedState_, *match.binding);
+        metric.maxGraph = ResolveThroughputGraphMax(throughputSharedState_, *match.binding);
         metric.guideStepMbps =
             match.binding->resolveGuideStep != nullptr ? match.binding->resolveGuideStep(metric.maxGraph) : 5.0;
     }
-    metric.timeMarkerOffsetSamples = throughputSharedState_->timeMarkerOffsetSamples;
+    metric.timeMarkerOffsetSamples = throughputSharedState_.timeMarkerOffsetSamples;
     metric.timeMarkerIntervalSamples = 20.0;
     if (definition != nullptr) {
         metric.label = definition->label;
@@ -930,23 +998,24 @@ const ThroughputMetric& MetricSource::ResolveThroughput(const std::string& metri
 }
 
 const std::string& MetricSource::ResolveNetworkFooter() const {
-    if (!networkFooterCache_.has_value()) {
+    if (!networkFooterCached_) {
         if (snapshot_.network.adapterName.empty()) {
             networkFooterCache_ = snapshot_.network.ipAddress;
         } else {
             networkFooterCache_ = snapshot_.network.adapterName + " | " + snapshot_.network.ipAddress;
         }
+        networkFooterCached_ = true;
     }
-    return *networkFooterCache_;
+    return networkFooterCache_;
 }
 
 const std::vector<DriveRow>& MetricSource::ResolveDriveRows() const {
-    if (!driveRowsCache_.has_value()) {
+    if (!driveRowsCached_) {
         const MetricDefinitionConfig* usageDefinition = FindMetricDefinition(metrics_, "drive.usage");
         const MetricDefinitionConfig* freeDefinition = FindMetricDefinition(metrics_, "drive.free");
 
-        driveRowsCache_ = std::vector<DriveRow>{};
-        driveRowsCache_->reserve(snapshot_.drives.size());
+        driveRowsCache_.clear();
+        driveRowsCache_.reserve(snapshot_.drives.size());
         double totalReadMbps = 0.0;
         double totalWriteMbps = 0.0;
         for (const auto& drive : snapshot_.drives) {
@@ -959,7 +1028,7 @@ const std::vector<DriveRow>& MetricSource::ResolveDriveRows() const {
             const double writeActivity =
                 totalWriteMbps > 0.0 ? ClampFinite(FiniteNonNegativeOr(drive.writeMbps) / totalWriteMbps, 0.0, 1.0)
                                      : 0.0;
-            driveRowsCache_->push_back(DriveRow{drive.label,
+            driveRowsCache_.push_back(DriveRow{drive.label,
                 readActivity,
                 writeActivity,
                 ClampFinite(drive.usedPercent, 0.0, 100.0),
@@ -968,8 +1037,9 @@ const std::vector<DriveRow>& MetricSource::ResolveDriveRows() const {
                 freeDefinition != nullptr ? FormatMetricValueText(*freeDefinition, "drive.free", drive.freeGb)
                                           : std::string{}});
         }
+        driveRowsCached_ = true;
     }
-    return *driveRowsCache_;
+    return driveRowsCache_;
 }
 
 const std::string& MetricSource::ResolveClockTime(std::string_view format) const {

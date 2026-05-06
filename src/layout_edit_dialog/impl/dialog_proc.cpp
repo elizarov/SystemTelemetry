@@ -169,7 +169,11 @@ INT_PTR DrawMetricListOrderButton(const DRAWITEMSTRUCT* draw) {
 
 }  // namespace
 
-std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, INT_PTR& result) {
+    const auto handled = [&result](INT_PTR value) {
+        result = value;
+        return true;
+    };
     auto* state = DialogStateFromWindow(hwnd);
     switch (message) {
         case WM_NOTIFY: {
@@ -177,7 +181,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
             if (notify != nullptr && notify->idFrom == IDC_LAYOUT_EDIT_TREE && notify->code == TVN_SELCHANGEDW) {
                 const auto* treeView = reinterpret_cast<NMTREEVIEWW*>(lParam);
                 HandleLayoutEditTreeSelection(state, hwnd, treeView->itemNew.hItem);
-                return TRUE;
+                return handled(TRUE);
             }
             if (notify != nullptr && notify->idFrom == IDC_LAYOUT_EDIT_COLOR_VIEW_TAB &&
                 notify->code == TCN_SELCHANGE) {
@@ -195,7 +199,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                     LayoutLayoutEditRightPane(state, hwnd);
                     RefreshLayoutEditRightPane(hwnd);
                 }
-                return TRUE;
+                return handled(TRUE);
             }
             break;
         }
@@ -203,35 +207,35 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
             const auto* draw = reinterpret_cast<const DRAWITEMSTRUCT*>(lParam);
             if (draw != nullptr && draw->CtlID == IDC_LAYOUT_EDIT_THEME_PREVIEW) {
                 DrawThemePreview(state, *draw);
-                return TRUE;
+                return handled(TRUE);
             }
             if (draw != nullptr && IsColorGradientBarControlId(static_cast<int>(draw->CtlID))) {
                 DrawColorGradientBar(hwnd, *draw);
-                return TRUE;
+                return handled(TRUE);
             }
             if (draw != nullptr && IsMetricListOrderButtonId(static_cast<int>(draw->CtlID))) {
-                return DrawMetricListOrderButton(draw);
+                return handled(DrawMetricListOrderButton(draw));
             }
             break;
         }
         case WM_COMMAND:
             if (HandleMetricListOrderEditorCommand(state, hwnd, LOWORD(wParam), HIWORD(wParam))) {
-                return TRUE;
+                return handled(TRUE);
             }
             if (HIWORD(wParam) == CBN_DROPDOWN && PrepareComboDropList(hwnd, LOWORD(wParam))) {
-                return TRUE;
+                return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FILTER_EDIT && HIWORD(wParam) == EN_CHANGE) {
                 wchar_t filterBuffer[256] = {};
                 GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, filterBuffer, ARRAYSIZE(filterBuffer));
                 state->currentFilter = filterBuffer;
                 RebuildLayoutEditTree(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_VALUE_EDIT && HIWORD(wParam) == EN_CHANGE) {
                 PreviewSelectedValue(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT &&
                     (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) ||
@@ -242,11 +246,11 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                     CurrentLayoutEditEditorKind(state) == LayoutEditEditorKind::GlobalFontFamily) {
                     PreviewSelectedGlobalFontFamily(state, hwnd, HIWORD(wParam));
                     RefreshLayoutEditValidationState(state, hwnd);
-                    return TRUE;
+                    return handled(TRUE);
                 }
                 PreviewSelectedFont(state, hwnd, HIWORD(wParam));
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MODE_COMBO && HIWORD(wParam) == CBN_SELCHANGE) {
                 if (state != nullptr && !state->updatingControls) {
@@ -256,14 +260,14 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                     RefreshLayoutEditValidationState(state, hwnd);
                     RefreshLayoutEditRightPane(hwnd);
                 }
-                return TRUE;
+                return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_BASE_COMBO ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_COMBO) &&
                 HIWORD(wParam) == CBN_SELCHANGE) {
                 PreviewSelectedColor(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ROTATE_CHECK ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_CHECK ||
@@ -272,7 +276,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 RefreshSelectedColorDerivedControls(state, hwnd);
                 PreviewSelectedColor(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ROTATE_EDIT ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_EDIT ||
@@ -283,7 +287,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 }
                 PreviewSelectedColor(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_HEX_EDIT && HIWORD(wParam) == EN_CHANGE) {
                 if (state != nullptr && !state->updatingControls) {
@@ -302,7 +306,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 }
                 PreviewSelectedColor(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_RED_EDIT ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT ||
@@ -326,7 +330,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 }
                 PreviewSelectedColor(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if (IsColorLchControlId(LOWORD(wParam)) && HIWORD(wParam) == EN_CHANGE) {
                 if (state != nullptr && !state->updatingControls) {
@@ -340,7 +344,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 }
                 PreviewSelectedColor(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if (IsColorHsvControlId(LOWORD(wParam)) && HIWORD(wParam) == EN_CHANGE) {
                 if (state != nullptr && !state->updatingControls) {
@@ -354,14 +358,14 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 }
                 PreviewSelectedColor(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
                 PreviewSelectedWeights(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT ||
                     LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT ||
@@ -369,19 +373,19 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 HIWORD(wParam) == EN_CHANGE) {
                 PreviewSelectedMetric(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT &&
                 (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) {
                 PreviewSelectedMetric(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO &&
                 (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) {
                 PreviewSelectedDateTimeFormat(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
-                return TRUE;
+                return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_THEME_COMBO && HIWORD(wParam) == CBN_SELCHANGE) {
                 if (CurrentLayoutEditEditorKind(state) == LayoutEditEditorKind::LayoutSelector) {
@@ -389,21 +393,21 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 } else {
                     PreviewSelectedTheme(state, hwnd);
                 }
-                return TRUE;
+                return handled(TRUE);
             }
             switch (LOWORD(wParam)) {
                 case IDC_LAYOUT_EDIT_REVERT:
                     RevertSelectedLayoutEditField(state, hwnd);
-                    return TRUE;
+                    return handled(TRUE);
                 case IDC_LAYOUT_EDIT_COLOR_PICK: {
                     if (state == nullptr || state->selectedLeaf == nullptr) {
-                        return TRUE;
+                        return handled(TRUE);
                     }
                     const bool colorSelection =
                         std::holds_alternative<LayoutEditParameter>(state->selectedLeaf->focusKey) ||
                         std::holds_alternative<ThemeColorEditKey>(state->selectedLeaf->focusKey);
                     if (!colorSelection || state->selectedLeaf->valueFormat != configschema::ValueFormat::ColorHex) {
-                        return TRUE;
+                        return handled(TRUE);
                     }
                     const unsigned int currentColor = ReadColorDialogValue(hwnd).value_or(0x000000FFu);
                     CHOOSECOLORW chooseColor{};
@@ -430,7 +434,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                             BuildTraceNodeText(state->selectedNode) + " accepted=\"false\"");
                     }
                     RefreshLayoutEditValidationState(state, hwnd);
-                    return TRUE;
+                    return handled(TRUE);
                 }
             }
             break;
@@ -452,7 +456,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                         PreviewSelectedColor(state, hwnd);
                         RefreshLayoutEditValidationState(state, hwnd);
                     }
-                    return TRUE;
+                    return handled(TRUE);
                 }
                 if (IsDerivedColorSlider(sliderId)) {
                     if (!state->updatingControls) {
@@ -462,7 +466,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                         PreviewSelectedColor(state, hwnd);
                         RefreshLayoutEditValidationState(state, hwnd);
                     }
-                    return TRUE;
+                    return handled(TRUE);
                 }
                 if (IsColorLchSliderId(sliderId)) {
                     if (!state->updatingControls) {
@@ -476,7 +480,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                         PreviewSelectedColor(state, hwnd);
                         RefreshLayoutEditValidationState(state, hwnd);
                     }
-                    return TRUE;
+                    return handled(TRUE);
                 }
                 if (IsColorHsvSliderId(sliderId)) {
                     if (!state->updatingControls) {
@@ -490,7 +494,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                         PreviewSelectedColor(state, hwnd);
                         RefreshLayoutEditValidationState(state, hwnd);
                     }
-                    return TRUE;
+                    return handled(TRUE);
                 }
             }
             break;
@@ -501,23 +505,23 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
                 if (controlId == IDC_LAYOUT_EDIT_STATUS_TEXT) {
                     SetBkMode(dc, TRANSPARENT);
                     SetTextColor(dc, state->statusIsError ? RGB(180, 40, 40) : RGB(90, 90, 90));
-                    return reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE));
+                    return handled(reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE)));
                 }
                 if (controlId == IDC_LAYOUT_EDIT_LOCATION || controlId == IDC_LAYOUT_EDIT_HINT ||
                     controlId == IDC_LAYOUT_EDIT_FOOTER_HINT) {
                     SetBkMode(dc, TRANSPARENT);
                     SetTextColor(dc, RGB(96, 96, 96));
-                    return reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE));
+                    return handled(reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE)));
                 }
                 if (controlId == IDC_LAYOUT_EDIT_COLOR_SAMPLE) {
                     SetBkMode(dc, TRANSPARENT);
                     SetTextColor(dc, state->previewColor);
-                    return reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE));
+                    return handled(reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE)));
                 }
                 if (controlId == IDC_LAYOUT_EDIT_COLOR_SWATCH) {
                     SetBkColor(dc, state->previewColor);
                     SetDCBrushColor(dc, state->previewColor);
-                    return reinterpret_cast<INT_PTR>(GetStockObject(DC_BRUSH));
+                    return handled(reinterpret_cast<INT_PTR>(GetStockObject(DC_BRUSH)));
                 }
             }
             break;
@@ -542,7 +546,7 @@ std::optional<INT_PTR> HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message
             } else {
                 DestroyWindow(hwnd);
             }
-            return TRUE;
+            return handled(TRUE);
     }
-    return std::nullopt;
+    return false;
 }

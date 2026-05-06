@@ -70,8 +70,7 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     const bool metricsChanged = config_.layout.metrics != config.layout.metrics;
     if (metricsChanged) {
         InvalidateMetricSourceCache();
-        metricDefinitionCache_.clear();
-        metricSampleValueTextCache_.clear();
+        metricLookupCache_.Clear();
     }
     config_ = config;
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
@@ -835,39 +834,22 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
 }
 
 const MetricDefinitionConfig* DashboardRenderer::FindConfiguredMetricDefinition(std::string_view metricRef) const {
-    const std::string key(metricRef);
-    const auto cached = metricDefinitionCache_.find(key);
-    if (cached != metricDefinitionCache_.end()) {
-        return cached->second;
-    }
-    const MetricDefinitionConfig* definition = FindEffectiveMetricDefinition(config_.layout.metrics, metricRef);
-    metricDefinitionCache_.emplace(key, definition);
-    return definition;
+    return metricLookupCache_.FindDefinition(config_.layout.metrics, metricRef);
 }
 
 const std::string& DashboardRenderer::ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const {
-    const std::string key(metricRef);
-    const auto cached = metricSampleValueTextCache_.find(key);
-    if (cached != metricSampleValueTextCache_.end()) {
-        return cached->second;
-    }
-    return metricSampleValueTextCache_.emplace(key, ResolveMetricSampleValueText(config_.layout.metrics, key))
-        .first->second;
+    return metricLookupCache_.ResolveSampleValueText(config_.layout.metrics, metricRef);
 }
 
-std::optional<LayoutEditAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
-    const LayoutEditAnchorKey& key) const {
-    const auto findIn =
-        [&](const std::vector<LayoutEditAnchorRegion>& regions) -> std::optional<LayoutEditAnchorRegion> {
+const LayoutEditAnchorRegion* DashboardRenderer::FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const {
+    const auto findIn = [&](const std::vector<LayoutEditAnchorRegion>& regions) -> const LayoutEditAnchorRegion* {
         const auto it = std::find_if(regions.begin(), regions.end(), [&](const LayoutEditAnchorRegion& region) {
             return MatchesEditableAnchorKey(region.key, key);
         });
-        if (it == regions.end()) {
-            return std::nullopt;
-        }
-        return *it;
+        return it != regions.end() ? &(*it) : nullptr;
     };
-    if (const auto staticRegion = findIn(layoutResolver_->staticEditableAnchorRegions_); staticRegion.has_value()) {
+    if (const LayoutEditAnchorRegion* staticRegion = findIn(layoutResolver_->staticEditableAnchorRegions_);
+        staticRegion != nullptr) {
         return staticRegion;
     }
     return findIn(layoutResolver_->dynamicEditableAnchorRegions_);

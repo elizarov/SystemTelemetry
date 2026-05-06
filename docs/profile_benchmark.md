@@ -19,6 +19,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - Measure the repeatable telemetry-refresh benchmark with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; this benchmark deliberately uses the package-private synchronous collector to measure provider collection CPU instead of the production telemetry runtime thread scheduler.
 - `CaseDashBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
+- Speed optimizations that replace `std::unordered_map` with a custom hash-based table keep the hash table in a separate owning `.h`/`.cpp` module and record the benchmark result here; large provider, renderer, or controller files do not carry local hashing and probing implementations.
 - The mouse-hover benchmark moves the layout-edit cursor path from the dashboard's top-left corner to bottom-right corner, resolving hover hits and drawing the resulting overlay state on every step.
 - The theme-change benchmark rotates through all configured themes and measures config copy, color resolution, dashboard reconfiguration, edit-tree rebuild, theme-preview drawing, and dashboard repaint.
 - The edit-layout drag benchmark mirrors the app's drag path by applying layout mutations through the app-style config tail, refreshing layout dirty tracking, and forcing one redraw for each synthetic pointer move.
@@ -43,40 +44,40 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.05`
   - `paint_draw avg_ms=1.99`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.48`
+  - `drag_loop per_iter_ms=2.34`
   - `snap avg_ms=0.07`
   - `apply avg_ms=0.06`
-  - `paint_draw avg_ms=2.33`
+  - `paint_draw avg_ms=2.19`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=5.72`
-  - `telemetry_update avg_ms=3.36`
-  - `paint_total avg_ms=2.36`
-  - `paint_draw avg_ms=2.36`
+  - `update_loop per_iter_ms=4.80`
+  - `telemetry_update avg_ms=2.63`
+  - `paint_total avg_ms=2.17`
+  - `paint_draw avg_ms=2.17`
 - Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=3.46`
-  - `switch_apply avg_ms=0.78`
-  - `dialog_refresh avg_ms=0.15`
-  - `switch_paint avg_ms=2.52`
+  - `switch_loop per_iter_ms=3.72`
+  - `switch_apply avg_ms=0.90`
+  - `dialog_refresh avg_ms=0.27`
+  - `switch_paint avg_ms=2.53`
 - Current repeatable `theme-change` result on the current tree:
-  - `theme_loop per_iter_ms=6.74`
+  - `theme_loop per_iter_ms=5.00`
   - `config_copy avg_ms=0.01`
   - `color_resolve avg_ms=0.05`
-  - `dashboard_config avg_ms=1.08`
-  - `edit_tree avg_ms=0.15`
-  - `theme_preview avg_ms=1.85`
-  - `theme_paint avg_ms=3.58`
+  - `dashboard_config avg_ms=0.96`
+  - `edit_tree avg_ms=0.29`
+  - `theme_preview avg_ms=0.92`
+  - `theme_paint avg_ms=2.75`
 - Current repeatable `mouse-hover` result on the current tree:
-  - `hover_loop per_iter_ms=2.13`
-  - `hover_hit_test avg_ms=0.08`
-  - `paint_total avg_ms=2.06`
-  - `paint_draw avg_ms=2.06`
+  - `hover_loop per_iter_ms=2.37`
+  - `hover_hit_test avg_ms=0.09`
+  - `paint_total avg_ms=2.27`
+  - `paint_draw avg_ms=2.27`
 - Current repeatable `layout-guide-sheet` result on the current tree:
-  - `sheet_loop per_iter_ms=85.38`
-  - `active_regions avg_ms=5.52`
-  - `sheet_plan avg_ms=1.11`
-  - `sheet_measure avg_ms=4.57`
-  - `sheet_place avg_ms=41.94`
-  - `sheet_draw avg_ms=32.05`
+  - `sheet_loop per_iter_ms=139.80`
+  - `active_regions avg_ms=6.18`
+  - `sheet_plan avg_ms=1.20`
+  - `sheet_measure avg_ms=5.70`
+  - `sheet_place avg_ms=82.54`
+  - `sheet_draw avg_ms=44.01`
 
 ## Current Confirmed Hotspots
 
@@ -85,11 +86,13 @@ Current useful hotspot signals from the latest daemon-backed WPR capture on the 
 - The latest daemon-backed `update-telemetry` captures under `build\profile_benchmark_daemon\requests\18014_1564_22035\` and `build\profile_benchmark_daemon\requests\18154_4993_3762\` report `update_loop per_iter_ms=5.42` to `5.84`, `telemetry_update avg_ms=3.08` to `3.46`, and `paint_draw avg_ms=2.34` to `2.37`; `FindRetainedHistory` appears only as a tiny exclusive leaf in one capture at `0.12%`, while the app-inclusive weight stays in `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, `UpdateGpuMetrics`, and Direct2D/DirectWrite paint.
 - The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\10827_2817_24593\` reports `update_loop per_iter_ms=4.85`, `telemetry_update avg_ms=2.72`, and `paint_draw avg_ms=2.13`; the app-inclusive call tree keeps `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, and `UpdateGpuMetrics` visible while `PresentedFpsEtwProvider::Sample` is only `0.79%` exclusive hits and the GPU raw-counter hash lookup is `0.40%` exclusive hits. The benchmark-process inclusive module weight remains centered on Direct2D, DirectWrite, PDH, Win32, kernel, and AMD driver work rather than app-side process-cache scans.
 - A direct idle-process stress run with `300` hidden `timeout.exe` processes alive reported `process_count=927`, `gpu_engine_counters=632`, and `gpu_engine_pids=28`; `build\CaseDashBenchmarks.exe update-telemetry 240 2` still landed at `update_loop per_iter_ms=4.78`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.14`.
+- The latest direct `update-telemetry` rerun after extracting `GpuRawCounterMap` into `telemetry/fps/impl/` landed at `update_loop per_iter_ms=4.80`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.17`.
 - The latest direct `edit-layout` rerun after the panel-icon mask-atlas pass landed at `drag_loop per_iter_ms=2.24`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.11`; the benchmark includes the app-style layout mutation tail and one forced redraw per pointer move.
 - The latest direct `theme-change` rerun after the same pass landed at `theme_loop per_iter_ms=4.11`, `dashboard_config avg_ms=0.85`, `theme_preview avg_ms=0.84`, and `theme_paint avg_ms=2.18`.
 - The real traced drag in `build\casedash_trace.txt` reported `elapsed_ms=6909.736`, `snap_samples=687`, `apply_samples=687`, but only `paint_total_samples=25`; the measured paint cost was acceptable, but queued `WM_PAINT` delivery was starved by continuous mouse input.
 - The latest daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\29824_11608_6003\` reports `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.22`; the string-construction leaves from renderer trace formatting are gone, and the remaining inclusive app weight is in `D2DRenderer::DrawTextBlock`, `D2DRenderer::FillSolidRect`, and `DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect`.
-- The latest direct `layout-guide-sheet` run splits generation into `sheet_measure`, `sheet_place`, and `sheet_draw`; it reports `sheet_loop per_iter_ms=328.70`, with `sheet_place avg_ms=299.16` dominating and actual offscreen drawing isolated at `sheet_draw avg_ms=16.97`.
+- The latest direct `edit-layout` rerun after changing the D2D solid-brush cache to palette-id slots landed at `drag_loop per_iter_ms=2.34`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.19`; a preceding noisy run landed at `2.65 ms`/`2.50 ms`, so keep comparing this path through repeat direct runs.
+- The latest direct `layout-guide-sheet` run splits generation into `sheet_measure`, `sheet_place`, and `sheet_draw`; it reports `sheet_loop per_iter_ms=139.80`, with `sheet_place avg_ms=82.54` dominating and actual offscreen drawing isolated at `sheet_draw avg_ms=44.01`.
 - The latest usable daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\21425_18089_27400\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, `amdxx64.dll`, and `D3D11.dll`; the exported call tree still under-symbolizes most app-owned leaf functions and does not surface a new dominant geometry-builder hotspot inside the benchmark process.
 - The latest daemon-backed `edit-layout` timing capture under `build\profile_benchmark_daemon\requests\18269_30044_21338\` reports `drag_loop per_iter_ms=2.54`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.27`; its WPR ETL is present, but the exported text summary and call-tree HTML are empty, so it does not replace the latest usable hotspot attribution above.
 - The current uncached capture is mildly collector-bound again on this machine: `TelemetryCollector::UpdateSnapshot()` now lands slightly above repaint in both the direct and daemon-backed runs after restoring the live Gigabyte collection allocation required for real board samples.
@@ -102,12 +105,12 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.50 ms` in `TelemetryCollector::UpdateSnapshot()` versus `2.06 ms` in repaint on this machine.
-- The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.72` to `2.76 ms` of the `3.60` to `3.66 ms` loop while the dialog refresh work stays around `0.15 ms`.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.93 ms` in `TelemetryCollector::UpdateSnapshot()` versus `2.37 ms` in repaint on this machine.
+- The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.53 ms` of the `3.72 ms` loop while the dialog refresh work stays around `0.27 ms`.
 - The direct `layout-guide-sheet` benchmark remains placement-score bound after removing the pathological exhaustive stack-order search: measured callout preparation and offscreen drawing are separate timing buckets, and the remaining cost is mostly leader intersection scoring inside `sheet_place`.
-- The direct `edit-layout` benchmark remains paint-bound on this tree after the app-style drag harness update: current reruns land around `drag_loop per_iter_ms=2.24`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.11`, so the remaining measured frame cost sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
+- The direct `edit-layout` benchmark remains paint-bound on this tree after the app-style drag harness update: current reruns land around `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.21`, so the remaining measured frame cost sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
 - Suppressing layout-edit tooltip refresh while a drag is active avoids trace-enabled per-move tooltip work, and immediate drag redraw fixes the real app responsiveness issue that the old benchmark did not expose.
-- The current direct `mouse-hover` benchmark remains paint-bound overall after the direct renderer hover resolver: hover hit testing stays around `0.08 ms` per step while repaint sits around `2.12` to `2.13 ms`.
+- The current direct `mouse-hover` benchmark remains paint-bound overall after the direct renderer hover resolver: hover hit testing stays around `0.09 ms` per step while repaint sits around `2.27 ms`.
 - Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs remain in the established current-tree range.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
@@ -128,6 +131,7 @@ These changes produced real wins and remain in the codebase:
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 - Remove the legacy renderer GDI fallback path and keep both live repaint and screenshot export on the same Direct2D and DirectWrite scene.
 - Decode the embedded 8-bit grayscale panel-icon mask atlas through WIC and crop fixed 64 x 64 slots through a target-local Direct2D alpha mask, so the renderer no longer depends on GDI+ for icon resources.
+- Cache Direct2D solid brushes by `RenderColorId` palette slot and clear the slots on palette rebuild, so draw code never needs a packed-RGBA brush lookup.
 - Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
 - Keep renderer style updates incremental so layout-only config changes do not rebuild DirectWrite text formats, palette state, or the panel-icon mask atlas during edit-layout drag apply and layout switching.
 - Read presented-FPS GPU Engine 3D usage as raw PDH counter arrays and calculate per-instance percentages from previous/current raw values, so process selection still favors the highest GPU consumer while avoiding the heavier formatted wildcard array path.

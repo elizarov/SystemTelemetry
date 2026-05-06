@@ -7,6 +7,7 @@
 
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
+#include "layout_model/layout_edit_anchor_shape.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 
@@ -183,8 +184,8 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
         if (!key.has_value()) {
             return;
         }
-        const auto region = renderer_.FindEditableAnchorRegion(*key);
-        if (region.has_value()) {
+        const LayoutEditAnchorRegion* region = renderer_.FindEditableAnchorRegion(*key);
+        if (region != nullptr) {
             appendRelatedHighlights(*region, active);
         }
     };
@@ -297,81 +298,19 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
             DrawDottedHighlightRect(highlighted.targetRect, outlineColor, activeEmphasis);
         }
 
-        if (highlighted.shape == AnchorShape::Circle) {
-            const float outlineWidth = static_cast<float>(
-                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
-            renderer_.Renderer().DrawSolidEllipse(
-                highlighted.anchorRect, RenderStroke::Solid(outlineColor, outlineWidth));
-        } else if (highlighted.shape == AnchorShape::Diamond) {
-            renderer_.Renderer().FillSolidDiamond(highlighted.anchorRect, outlineColor);
-        } else if (highlighted.shape == AnchorShape::Wedge) {
-            const float outlineWidth = static_cast<float>(
-                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
-            const RenderPoint topRight{highlighted.anchorRect.right, highlighted.anchorRect.top};
-            const RenderPoint bottomLeft{highlighted.anchorRect.left, highlighted.anchorRect.bottom};
-            const RenderPoint bottomRight{highlighted.anchorRect.right, highlighted.anchorRect.bottom};
-            renderer_.Renderer().DrawSolidLine(
-                bottomLeft, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
-            renderer_.Renderer().DrawSolidLine(topRight, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
-        } else if (highlighted.shape == AnchorShape::VerticalReorder ||
-                   highlighted.shape == AnchorShape::HorizontalReorder) {
-            const int outlineWidth = (std::max)(1, renderer_.ScaleLogical(1));
-            const int centerX = highlighted.anchorRect.left +
-                                (std::max<LONG>(0, highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
-            const int centerY = highlighted.anchorRect.top +
-                                (std::max<LONG>(0, highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-            const int gapHalf = (std::max)(1, renderer_.ScaleLogical(1));
-            const auto stroke = RenderStroke::Solid(outlineColor, static_cast<float>(outlineWidth));
-            if (highlighted.shape == AnchorShape::HorizontalReorder) {
-                const int halfHeight =
-                    (std::max)(1, static_cast<int>(highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-                const RenderPoint leftApex{highlighted.anchorRect.left, centerY};
-                const RenderPoint leftTop{centerX - gapHalf, centerY - halfHeight};
-                const RenderPoint leftBottom{centerX - gapHalf, centerY + halfHeight};
-                const RenderPoint rightApex{highlighted.anchorRect.right, centerY};
-                const RenderPoint rightTop{centerX + gapHalf, centerY - halfHeight};
-                const RenderPoint rightBottom{centerX + gapHalf, centerY + halfHeight};
-                renderer_.Renderer().DrawSolidLine(leftApex, leftTop, stroke);
-                renderer_.Renderer().DrawSolidLine(leftTop, leftBottom, stroke);
-                renderer_.Renderer().DrawSolidLine(leftBottom, leftApex, stroke);
-                renderer_.Renderer().DrawSolidLine(rightTop, rightApex, stroke);
-                renderer_.Renderer().DrawSolidLine(rightApex, rightBottom, stroke);
-                renderer_.Renderer().DrawSolidLine(rightBottom, rightTop, stroke);
-            } else {
-                const int halfWidth =
-                    (std::max)(1, static_cast<int>(highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
-                const RenderPoint upApex{centerX, highlighted.anchorRect.top};
-                const RenderPoint upLeft{centerX - halfWidth, centerY - gapHalf};
-                const RenderPoint upRight{centerX + halfWidth, centerY - gapHalf};
-                const RenderPoint downApex{centerX, highlighted.anchorRect.bottom};
-                const RenderPoint downLeft{centerX - halfWidth, centerY + gapHalf};
-                const RenderPoint downRight{centerX + halfWidth, centerY + gapHalf};
-                renderer_.Renderer().DrawSolidLine(upApex, upLeft, stroke);
-                renderer_.Renderer().DrawSolidLine(upLeft, upRight, stroke);
-                renderer_.Renderer().DrawSolidLine(upRight, upApex, stroke);
-                renderer_.Renderer().DrawSolidLine(downLeft, downApex, stroke);
-                renderer_.Renderer().DrawSolidLine(downApex, downRight, stroke);
-                renderer_.Renderer().DrawSolidLine(downRight, downLeft, stroke);
-            }
-        } else if (highlighted.shape == AnchorShape::Plus) {
-            const float outlineWidth = static_cast<float>(
-                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
-            const int centerX = highlighted.anchorRect.left +
-                                (std::max<LONG>(0, highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
-            const int centerY = highlighted.anchorRect.top +
-                                (std::max<LONG>(0, highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-            const int halfWidth =
-                (std::max)(2, static_cast<int>(highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
-            const int halfHeight =
-                (std::max)(2, static_cast<int>(highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-            const auto stroke = RenderStroke::Solid(outlineColor, outlineWidth);
-            renderer_.Renderer().DrawSolidLine(
-                RenderPoint{centerX - halfWidth, centerY}, RenderPoint{centerX + halfWidth, centerY}, stroke);
-            renderer_.Renderer().DrawSolidLine(
-                RenderPoint{centerX, centerY - halfHeight}, RenderPoint{centerX, centerY + halfHeight}, stroke);
-        } else {
-            renderer_.Renderer().FillSolidRect(highlighted.anchorRect, outlineColor);
-        }
+        const bool reorderShape =
+            highlighted.shape == AnchorShape::VerticalReorder || highlighted.shape == AnchorShape::HorizontalReorder;
+        const int outlineWidth = reorderShape ? (std::max)(1, renderer_.ScaleLogical(1))
+                                              : (activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2))
+                                                                : (std::max)(1, renderer_.ScaleLogical(1)));
+        DrawLayoutEditAnchorShape(renderer_.Renderer(),
+            highlighted.shape,
+            highlighted.anchorRect,
+            outlineColor,
+            static_cast<float>(outlineWidth),
+            (std::max)(1, renderer_.ScaleLogical(1)),
+            true,
+            true);
     }
 }
 

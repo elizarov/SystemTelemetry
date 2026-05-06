@@ -19,7 +19,7 @@ void UpdateMemory(RealTelemetryCollectorState& state) {
         state.snapshot_.cpu.memory.usedGb = (memory.ullTotalPhys - memory.ullAvailPhys) / (1024.0 * 1024.0 * 1024.0);
     }
     state.trace_.WriteLazy([&] {
-        return "telemetry:memory_status ok=" + Trace::BoolText(ok != FALSE) +
+        return std::string("telemetry:memory_status ok=") + Trace::BoolText(ok != FALSE) +
                " total_gb=" + Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.totalGb, 2) +
                " used_gb=" + Trace::FormatValueDouble("value", state.snapshot_.cpu.memory.usedGb, 2);
     });

@@ -138,7 +138,8 @@ bool ConfigureDisplay(
             LayoutSimilarityIndicatorMode::ActiveGuide,
             std::string{},
             trace,
-            std::nullopt,
+            false,
+            RenderPoint{},
             &screenshotError);
         return imageSaved && SaveConfig(configPath, config, ConfigParseContext{TelemetryMetricCatalog()}) &&
                ApplyConfiguredWallpaper(config, trace);
@@ -248,7 +249,8 @@ int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
         LayoutSimilarityIndicatorMode::ActiveGuide,
         std::string{},
         trace,
-        std::nullopt,
+        false,
+        RenderPoint{},
         &screenshotError);
     const bool configSaved =
         imageSaved && SaveConfig(targetConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});

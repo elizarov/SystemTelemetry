@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,003,008` bytes.
+- Current measured `build\CaseDash.exe`: `981,504` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `789.8 KiB`, `.rdata` about `94.5 KiB`, `.pdata` about `46.4 KiB`, `.xdata` about `15.3 KiB`, and `.rsrc$02` about `13.1 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `dashboard_app.cpp.obj`, `layout_edit_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `metrics.cpp.obj`, `pane.cpp.obj`, `layout_edit_tree.cpp.obj`, and `dashboard_renderer.cpp.obj`.
-- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\validation_size_trace.txt /dump:build\validation_size_dump.txt /screenshot:build\validation_size_screenshot.png /layout-guide-sheet:build\validation_size_sheet.png /app-icon:build\validation_size_app_icon.png /app-icon-size:64 /save-full-config:build\validation_size_full_config.ini`, and `lint.cmd`.
+- Current largest sections: `.text$mn` about `771.8 KiB`, `.rdata` about `94.5 KiB`, `.pdata` about `44.8 KiB`, `.xdata` about `15.1 KiB`, and `.rsrc$02` about `12.2 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `metrics.cpp.obj`, `pane.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_tree.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_renderer.cpp.obj`, and `d2d_renderer.cpp.obj`.
+- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\gpu_raw_counter_map_validation_trace.txt /dump:build\gpu_raw_counter_map_validation_dump.txt /screenshot:build\gpu_raw_counter_map_validation_screenshot.png /layout-guide-sheet:build\gpu_raw_counter_map_validation_sheet.png /app-icon:build\gpu_raw_counter_map_validation_app_icon.png /app-icon-size:64 /save-full-config:build\gpu_raw_counter_map_validation_full_config.ini`, `build.cmd Release /benchmarks`, and `build\CaseDashBenchmarks.exe update-telemetry 240 2`.
 
 ## Workflow
 
@@ -105,6 +105,13 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Layout-guide-sheet callouts | Use one callout request/placement record through planning, placement, and rendering instead of copying into a middle-man placement structure. | Saved `2,560` bytes; `layout_guide_sheet_renderer.cpp.obj` dropped to about `25.6 KiB`. |
 | Layout-guide-sheet card selection | Score guide-sheet card coverage with compact bitmasks instead of allocating per-combination coverage vectors. | Saved `1,024` bytes while keeping the same selection behavior. |
 | Command-line boundary | Convert the Win32 command line to a UTF-8 `std::vector<std::string>` once in `main`, pass that vector into switch lookup helpers, and keep command-line quoting/normalization narrow until Win32 APIs require UTF-16. | Saved `1,024` bytes after the full narrow-boundary pass; `command_line.cpp` no longer owns wide string trimming, parsing, or normalization helpers. |
+| Release static guards | Keep `/Zc:threadSafeInit-` for the shipped Release app target; the project avoids runtime mutation of function-local statics that would require MSVC's per-static guard helpers. | Saved `1,024` bytes in the current feature baseline. |
+| Small renderer caches | Keep the D2D solid-brush cache on palette-id slots, and keep text-width and dashboard metric lookup caches on fixed-slot storage instead of `std::unordered_map`; these caches have bounded tiny key sets. | Saved `5,120` bytes across the measured cache passes; the later palette-slot brush pass was executable-neutral at `982,016` bytes while dropping `.text$mn` to about `772.2 KiB`. |
+| FPS ETW raw counters | Keep GPU raw counter matching on one narrow open-addressed counter map in `telemetry/fps/impl/gpu_raw_counter_map.*` instead of a general `std::unordered_map`, while still preserving hash lookup for process-heavy GPU Engine instance sets. | Saved `1,536` bytes initially; extracting the helper from `fps_etw_provider.cpp` saved another `512` bytes in the current pass. |
+| Layout-edit boundaries | Keep tooltip targets, diagnostics hover targets, dialog-proc results, and selected renderer lookups on bool/pointer out-parameters when the payload would otherwise copy larger optional records across cold UI boundaries. | Saved `3,072` bytes across measured pointer-boundary passes. |
+| Layout-guide-sheet overview drawing | Draw overview artifacts directly from the retained callout record instead of copying the callout payload into a middle-man artifact structure; keep guide-sheet callout card matching on borrowed string ids. | Saved `1,024` bytes in the final guide-sheet renderer pass. |
+| Version metadata resource | Keep full user-visible version/build/commit text in generated C++ constants for the About dialog and keep the manifest numeric assembly version, but omit the duplicate Win32 `VERSIONINFO` string resource from the shipped executable. | Saved `1,024` bytes; `.rsrc$02` dropped from about `13.1 KiB` to `12.1 KiB` in this pass. |
+| Fake telemetry inlining | Keep `collector_fake.cpp` on the cold `/Ob0` source list; synthetic/fake dump generation is startup and diagnostics scaffolding, not a renderer or telemetry hot path. | Saved `512` bytes in the final pass; `collector_fake.cpp.obj` dropped to about `16.8 KiB`. |
 
 ## Rejected Or Neutral Experiments
 
@@ -157,8 +164,13 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Do not add `/Ob0` to widget implementation files just because they are smaller local draw helpers. That trial regressed the executable from `1,097,728` to `1,100,288` bytes.
 - `/Gy` plus `/OPT:ICF` stayed executable-neutral at `1,084,416` bytes after the limited-inlining pass, so keep function packaging out of the retained release profile for now.
 - `/O1` on top of the limited-inlining pass regressed the executable from `1,084,416` to `1,084,928` bytes; keep the maintained `/Os` default plus targeted `/O2` source list.
-- `/GF` did not reduce the shipped executable in the measured pass; keep string pooling off unless a broader literal-boundary change proves a win.
-- `/Zc:threadSafeInit-` saved bytes during the static-metadata investigation and reached `1,075,712` bytes after the retained metadata and icon changes, but it is not kept because the accepted code/data deletions already exceed the 20 KiB target without changing function-local static synchronization semantics globally.
+- `/GF`, `/Gw`, `/Gy`, and `/OPT:ICF` did not reduce the shipped executable after the current pass; keep string pooling, global-data packaging, function packaging, and identical COMDAT folding out of the retained profile unless a broader change proves a win.
+- `/Zc:throwingNew-` left `build\CaseDash.exe` unchanged at `983,040` bytes in the current pass; do not keep it without a separate runtime out-of-memory semantics decision.
+- Adding `/Ob0` to `layout_guide_sheet_renderer.cpp` regressed the executable from `984,064` to `991,744` bytes; keep the maintained speed-source optimization split for that renderer even though layout-guide-sheet export is cold.
+- Minifying the application manifest reduced the intermediate resource object but did not reduce `build\CaseDash.exe`; keep the manifest template readable.
+- A score-only layout-guide leader-scoring helper grew the executable from `982,528` to `983,040` bytes and did not improve the direct placement benchmark enough to justify the code shape.
+- Returning the last generated fake-telemetry sample from `AddSyntheticHistory` removed local vector plumbing but was executable-neutral at `982,528` bytes; keep the clearer separated sample assignment and history insertion.
+- Extracting the dashboard metric lookup cache into `dashboard_renderer/impl/metric_lookup_cache.*` was executable-neutral at `982,016` bytes; keep it as a package-boundary cleanup, not as a standalone size lever.
 - Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason. `lint.cmd` blocks maintained source and test files from using `std::filesystem` or including `<filesystem>`.
 
 ## Notes

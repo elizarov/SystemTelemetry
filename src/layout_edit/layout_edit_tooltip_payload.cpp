@@ -1,13 +1,9 @@
 #include "layout_edit/layout_edit_tooltip_payload.h"
 
-#include <algorithm>
+#include <optional>
 #include <type_traits>
 
 #include "layout_model/layout_edit_helpers.h"
-
-bool IsLayoutGuidePayload(const TooltipPayload& payload) {
-    return std::holds_alternative<LayoutEditGuide>(payload);
-}
 
 std::optional<LayoutEditParameter> TooltipPayloadParameter(const TooltipPayload& payload) {
     return std::visit(
@@ -38,35 +34,6 @@ std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload) 
                            : std::nullopt;
             } else {
                 return value.value;
-            }
-        },
-        payload);
-}
-
-std::optional<unsigned int> TooltipPayloadColorValue(const TooltipPayload&) {
-    return std::nullopt;
-}
-
-RenderPoint TooltipPayloadAnchorPoint(const TooltipPayload& payload) {
-    return std::visit(
-        [](const auto& value) -> RenderPoint {
-            using T = std::decay_t<decltype(value)>;
-            if constexpr (std::is_same_v<T, LayoutEditGuide>) {
-                return RenderPoint{
-                    value.lineRect.left + (std::max<int>(0, value.lineRect.right - value.lineRect.left) / 2),
-                    value.lineRect.top + (std::max<int>(0, value.lineRect.bottom - value.lineRect.top) / 2)};
-            } else if constexpr (std::is_same_v<T, LayoutEditGapAnchor>) {
-                return RenderPoint{
-                    value.handleRect.left + (std::max<int>(0, value.handleRect.right - value.handleRect.left) / 2),
-                    value.handleRect.top + (std::max<int>(0, value.handleRect.bottom - value.handleRect.top) / 2)};
-            } else if constexpr (std::is_same_v<T, LayoutEditWidgetGuide>) {
-                return value.drawEnd;
-            } else if constexpr (std::is_same_v<T, LayoutEditColorRegion>) {
-                return value.targetRect.Center();
-            } else {
-                return RenderPoint{
-                    value.anchorRect.left + (std::max<int>(0, value.anchorRect.right - value.anchorRect.left) / 2),
-                    value.anchorRect.top + (std::max<int>(0, value.anchorRect.bottom - value.anchorRect.top) / 2)};
             }
         },
         payload);

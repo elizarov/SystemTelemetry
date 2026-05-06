@@ -20,7 +20,7 @@ public:
         Write(builder());
     }
 
-    static std::string BoolText(bool value);
+    static const char* BoolText(bool value);
     static std::string FormatValueDouble(const char* label, double value, int precision = 3);
     static std::string FormatPoint(int x, int y);
     static std::string EscapeText(std::string_view text);

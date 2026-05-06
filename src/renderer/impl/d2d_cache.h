@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cstdint>
+#include <array>
+#include <cstddef>
 #include <d2d1.h>
-#include <unordered_map>
 #include <wrl/client.h>
 
 #include "renderer/impl/palette.h"
@@ -13,21 +13,11 @@ public:
     void ResetTarget();
     void AttachTarget(ID2D1RenderTarget* target);
 
-    ID2D1SolidColorBrush* SolidBrush(ID2D1RenderTarget* target, RenderColor color);
+    ID2D1SolidColorBrush* SolidBrush(ID2D1RenderTarget* target, const RendererPalette& palette, RenderColorId colorId);
 
 private:
-    struct BrushCacheKey {
-        std::uint32_t packedRgba = 0;
-
-        bool operator==(const BrushCacheKey& other) const {
-            return packedRgba == other.packedRgba;
-        }
-    };
-
-    struct BrushCacheKeyHash {
-        size_t operator()(const BrushCacheKey& key) const;
-    };
+    static constexpr std::size_t kColorCount = static_cast<std::size_t>(RenderColorId::Count);
 
     ID2D1RenderTarget* ownerTarget_ = nullptr;
-    std::unordered_map<BrushCacheKey, Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>, BrushCacheKeyHash> solidBrushes_;
+    std::array<Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>, kColorCount> solidBrushes_{};
 };

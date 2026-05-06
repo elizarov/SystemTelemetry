@@ -54,11 +54,10 @@ bool BuildLayoutGuideSheetPipelineInputs(DashboardRenderer& renderer,
     InitializeLocalizationCatalog();
     const auto planStart = Clock::now();
     selectedCardIds = SelectLayoutGuideSheetCards(cards);
-    const std::vector<LayoutGuideSheetCalloutRequest> overviewCallouts =
-        BuildLayoutGuideSheetOverviewCallouts(renderer.Config(), overviewActiveRegions);
-    const std::vector<LayoutGuideSheetCalloutRequest> cardCallouts =
-        BuildLayoutGuideSheetCallouts(renderer.Config(), activeRegions, cards, selectedCardIds);
-    callouts = MergeLayoutGuideSheetCallouts(overviewCallouts, cardCallouts);
+    BuildLayoutGuideSheetOverviewCallouts(renderer.Config(), overviewActiveRegions, callouts);
+    std::vector<LayoutGuideSheetCalloutRequest> cardCallouts;
+    BuildLayoutGuideSheetCallouts(renderer.Config(), activeRegions, cards, selectedCardIds, cardCallouts);
+    AppendLayoutGuideSheetCardCallouts(callouts, cardCallouts);
     RecordStats(&LayoutGuideSheetPipelineStats::plan, planStart, stats);
 
     if (stats != nullptr) {

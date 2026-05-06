@@ -64,7 +64,7 @@ public:
     void RefreshSelection();
     void RestackAnchor();
     void RefreshIcons();
-    bool SyncSelection(const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
+    bool SyncSelection(const LayoutEditController::TooltipTarget* target, bool bringToFront);
     bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
     void SetSelectionHighlightVisible(bool visible);
     void UpdateSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);
