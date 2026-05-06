@@ -14,6 +14,8 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
 - `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
+- `docs/release.md` owns release versioning, changelog format, local release preparation, and release publication.
+- `docs/changelog.md` owns machine-readable release-note chunks consumed by the local release script and GitHub Release workflow.
 - `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and experiment history.
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
@@ -64,6 +66,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Use [docs/diagnostics.md](diagnostics.md) instead of repeating diagnostics command examples elsewhere.
 - Use [docs/layout.md](layout.md) and [resources/config.ini](../resources/config.ini) instead of repeating config key lists elsewhere.
 - Use [docs/profile_benchmark.md](profile_benchmark.md) instead of repeating benchmark workflow or experiment history elsewhere.
+- Use [docs/release.md](release.md) and [docs/changelog.md](changelog.md) instead of repeating release procedure or changelog format details elsewhere.
 
 ## Project Pitfall Notes
 

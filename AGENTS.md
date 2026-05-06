@@ -10,6 +10,7 @@ Use the following maintained references and keep them in sync before finishing w
 - `docs/architecture.md` and `docs/architecture/*.md` - code organization, subsystem boundaries, package notes, and build-graph structure.
 - `docs/project.md` - documentation ownership, repository conventions, engineering constraints, and project pitfall notes.
 - `docs/build.md` - project environment, setup, build commands, validation entrypoints, and tooling constraints.
+- `docs/release.md` and `docs/changelog.md` - release procedure, changelog format, and published release notes.
 - `docs/web.md` - public website behavior, section contract, content, build flow, and generated-asset contracts.
 - `docs/profile_benchmark.md` - benchmark workflow, baselines, hotspots, tested hypotheses, and experiment results.
 

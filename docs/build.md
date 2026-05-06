@@ -97,5 +97,5 @@ The `Release` workflow deploys the generated site after a successful tagged rele
 - [docs/release.md](release.md) owns the official release workflow.
 - `VERSION` is the maintained base version used by CMake-generated build metadata.
 - Tagged release builds use tags in the form `v<VERSION>`, such as `v0.1`.
-- The `Release` workflow validates the tag, builds and tests CaseDash, packages `CaseDash.exe`, builds the WiX MSI, writes SHA-256 checksums, and creates the GitHub Release.
+- The `Release` workflow validates the tag, publishes notes from the top [docs/changelog.md](changelog.md) chunk, builds and tests CaseDash, packages `CaseDash.exe`, builds the WiX MSI, writes SHA-256 checksums, and creates the GitHub Release.
 

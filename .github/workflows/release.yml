@@ -43,6 +43,10 @@ jobs:
           "CASE_DASH_RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "CASE_DASH_RELEASE_TAG=$actualTag" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Read release notes
+        shell: pwsh
+        run: .\tools\release_changelog.ps1 -Mode Extract -Version $env:CASE_DASH_RELEASE_VERSION -OutputPath build\release-notes.md
+
       - name: Restore vcpkg caches
         id: vcpkg-cache-restore
         uses: actions/cache/restore@v5
@@ -111,7 +115,7 @@ jobs:
             "build\CaseDash-$env:CASE_DASH_RELEASE_VERSION.msi" `
             "build\CaseDash-$env:CASE_DASH_RELEASE_VERSION.msi.sha256" `
             --title "CaseDash $env:CASE_DASH_RELEASE_VERSION" `
-            --notes "CaseDash $env:CASE_DASH_RELEASE_VERSION"
+            --notes-file build\release-notes.md
 
       - name: Save vcpkg caches
         if: always()
