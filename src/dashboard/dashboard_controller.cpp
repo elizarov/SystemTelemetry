@@ -17,7 +17,6 @@
 #include "layout_model/layout_edit_service.h"
 #include "telemetry/metrics.h"
 #include "util/elevated_process.h"
-#include "util/paths.h"
 #include "util/strings.h"
 #include "util/temp_file.h"
 #include "util/trace.h"

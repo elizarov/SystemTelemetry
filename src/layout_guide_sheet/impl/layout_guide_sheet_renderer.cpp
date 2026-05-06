@@ -11,7 +11,6 @@
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_model/layout_edit_anchor_shape.h"
 #include "layout_model/layout_edit_helpers.h"
-#include "util/trace.h"
 
 namespace {
 

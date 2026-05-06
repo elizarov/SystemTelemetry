@@ -44,6 +44,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/renderer/png_export.cpp|windows.h',
     'src/renderer/impl/d2d_renderer.h|windows.h',
     'src/renderer/renderer.h|windows.h',
+    'src/util/elevated_process.h|windows.h',
     'src/telemetry/board/msi/board_msi_center.cpp|windows.h',
     'src/telemetry/fps/fps_etw_provider.cpp|windows.h',
     'src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp|windows.h',

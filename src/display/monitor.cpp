@@ -3,7 +3,6 @@
 #include <cmath>
 #include <vector>
 
-#include "display/constants.h"
 #include "util/strings.h"
 #include "util/utf8.h"
 
