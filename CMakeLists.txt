@@ -335,28 +335,15 @@ set_source_files_properties(${casedash_release_speed_sources} PROPERTIES
     COMPILE_OPTIONS "$<$<CONFIG:Release>:/O2>"
 )
 
-# Size: these startup, diagnostics, and modeless-dialog paths measured smaller with inlining disabled under LTCG.
+# Size: these retained cold/orchestration paths still measure smaller with inlining disabled under LTCG.
 set(casedash_release_noinline_sources
-    src/config/config_parser.cpp
-    src/config/config_writer.cpp
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_controller.cpp
-    src/dashboard/dashboard_shell_ui.cpp
-    src/dashboard/fps_service.cpp
     src/diagnostics/app_icon_export.cpp
     src/diagnostics/crash_report.cpp
     src/diagnostics/diagnostics.cpp
-    src/diagnostics/snapshot_dump.cpp
     src/display/display_config.cpp
-    src/display/monitor.cpp
     src/layout_edit/layout_edit_tree.cpp
-    src/layout_edit_dialog/layout_edit_dialog.cpp
-    src/layout_edit_dialog/theme_preview.cpp
-    src/layout_edit_dialog/impl/dialog_proc.cpp
-    src/layout_edit_dialog/impl/editors.cpp
-    src/layout_edit_dialog/impl/pane.cpp
-    src/layout_edit_dialog/impl/tree.cpp
-    src/layout_edit_dialog/impl/util.cpp
     src/main/main.cpp
     src/telemetry/impl/collector_fake.cpp
 )

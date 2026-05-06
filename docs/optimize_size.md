@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `981,504` bytes.
+- Current measured `build\CaseDash.exe`: `950,272` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `771.8 KiB`, `.rdata` about `94.5 KiB`, `.pdata` about `44.8 KiB`, `.xdata` about `15.1 KiB`, and `.rsrc$02` about `12.2 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `metrics.cpp.obj`, `pane.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_tree.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_renderer.cpp.obj`, and `d2d_renderer.cpp.obj`.
-- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\gpu_raw_counter_map_validation_trace.txt /dump:build\gpu_raw_counter_map_validation_dump.txt /screenshot:build\gpu_raw_counter_map_validation_screenshot.png /layout-guide-sheet:build\gpu_raw_counter_map_validation_sheet.png /app-icon:build\gpu_raw_counter_map_validation_app_icon.png /app-icon-size:64 /save-full-config:build\gpu_raw_counter_map_validation_full_config.ini`, `build.cmd Release /benchmarks`, and `build\CaseDashBenchmarks.exe update-telemetry 240 2`.
+- Current largest sections: `.text$mn` about `750.4 KiB`, `.rdata` about `94.3 KiB`, `.pdata` about `35.7 KiB`, `.xdata` about `15.2 KiB`, and `.rsrc$02` about `12.2 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_edit_tree.cpp.obj`, `metrics.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `pane.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_renderer.cpp.obj`, and `d2d_renderer.cpp.obj`.
+- Last validation: `format.cmd`, `build.cmd`, `test.cmd`, `build_maps.cmd`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`.
 
 ## Workflow
 
@@ -112,6 +112,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Layout-guide-sheet overview drawing | Draw overview artifacts directly from the retained callout record instead of copying the callout payload into a middle-man artifact structure; keep guide-sheet callout card matching on borrowed string ids. | Saved `1,024` bytes in the final guide-sheet renderer pass. |
 | Version metadata resource | Keep full user-visible version/build/commit text in generated C++ constants for the About dialog and keep the manifest numeric assembly version, but omit the duplicate Win32 `VERSIONINFO` string resource from the shipped executable. | Saved `1,024` bytes; `.rsrc$02` dropped from about `13.1 KiB` to `12.1 KiB` in this pass. |
 | Fake telemetry inlining | Keep `collector_fake.cpp` on the cold `/Ob0` source list; synthetic/fake dump generation is startup and diagnostics scaffolding, not a renderer or telemetry hot path. | Saved `512` bytes in the final pass; `collector_fake.cpp.obj` dropped to about `16.8 KiB`. |
+| Release noinline retune | Keep `/Ob0` only on the cold/orchestration sources that still measure smaller with it; allow config parser/writer, dashboard shell UI, FPS service, snapshot dump, monitor enumeration, modeless layout-edit dialog helpers, and theme preview to use the normal Release `/Ob1` path. | `981,504` to `950,272` bytes; `.text$mn` dropped from about `771.8 KiB` to `750.4 KiB`, and `.pdata` from about `44.8 KiB` to `35.7 KiB`. |
 
 ## Rejected Or Neutral Experiments
 
@@ -171,6 +172,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - A score-only layout-guide leader-scoring helper grew the executable from `982,528` to `983,040` bytes and did not improve the direct placement benchmark enough to justify the code shape.
 - Returning the last generated fake-telemetry sample from `AddSyntheticHistory` removed local vector plumbing but was executable-neutral at `982,528` bytes; keep the clearer separated sample assignment and history insertion.
 - Extracting the dashboard metric lookup cache into `dashboard_renderer/impl/metric_lookup_cache.*` was executable-neutral at `982,016` bytes; keep it as a package-boundary cleanup, not as a standalone size lever.
+- Do not remove `/Ob0` from `diagnostics.cpp`, `app_icon_export.cpp`, `crash_report.cpp`, `display_config.cpp`, `dashboard_app.cpp`, `dashboard_controller.cpp`, or `collector_fake.cpp`; each regressed the executable in the current noinline retune. Removing `/Ob0` from `layout_edit_tree.cpp` and `main.cpp` was neutral, so leave the existing shape.
 - Do not reintroduce `std::filesystem`, native app exceptions, production `std::function`, or MSVC STL vectorized algorithm dispatch without a measured app-size and performance reason. `lint.cmd` blocks maintained source and test files from using `std::filesystem` or including `<filesystem>`.
 
 ## Notes
