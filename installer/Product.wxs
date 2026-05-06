@@ -8,7 +8,7 @@
     <MajorUpgrade AllowDowngrades="yes" />
     <MediaTemplate EmbedCab="yes" />
     <WixVariable Id="WixUIDialogBmp" Value="$(var.CaseDashDialogBmpPath)" />
-    <WixVariable Id="WixUIBannerBmp" Value="CaseDash_WixUIBannerBmp.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.CaseDashBannerBmpPath)" />
     <Icon Id="CaseDashAppIcon" SourceFile="..\resources\app.ico" />
     <Property Id="ARPPRODUCTICON" Value="CaseDashAppIcon" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />

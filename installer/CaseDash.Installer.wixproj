@@ -11,7 +11,8 @@
     <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer\obj\</BaseIntermediateOutputPath>
     <IntermediateOutputPath Condition="'$(IntermediateOutputPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer\</IntermediateOutputPath>
     <CaseDashDialogBmpPath Condition="'$(CaseDashDialogBmpPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer_dialog_bmp\CaseDash_WixUIDialogBmp.bmp</CaseDashDialogBmpPath>
-    <DefineConstants>ProductVersion=$(ProductVersion);CaseDashExePath=$(CaseDashExePath);CaseDashDialogBmpPath=$(CaseDashDialogBmpPath)</DefineConstants>
+    <CaseDashBannerBmpPath Condition="'$(CaseDashBannerBmpPath)' == ''">$(MSBuildThisFileDirectory)..\build\installer_dialog_bmp\CaseDash_WixUIBannerBmp.bmp</CaseDashBannerBmpPath>
+    <DefineConstants>ProductVersion=$(ProductVersion);CaseDashExePath=$(CaseDashExePath);CaseDashDialogBmpPath=$(CaseDashDialogBmpPath);CaseDashBannerBmpPath=$(CaseDashBannerBmpPath)</DefineConstants>
     <SuppressIces>ICE61</SuppressIces>
   </PropertyGroup>
 

@@ -64,7 +64,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The dashboard uses normal window Z-order behavior; `Bring to Front` raises it when needed.
 - The installer completion launch starts the dashboard with the same front-and-focus behavior as `Bring to Front`.
 - Canceling the MSI setup from a setup wizard page and confirming exit closes the installer immediately.
-- The MSI setup UI uses CaseDash-branded dialog and banner artwork. The welcome dialog bitmap uses the WiX dialog bitmap size and background, places the dark_cyan app icon and black `CaseDash` wordmark on the left side, and leaves the right-side WiX text area unobscured.
+- The MSI setup UI uses CaseDash-branded dialog and banner artwork. The welcome dialog bitmap uses the WiX dialog bitmap size and background, places the generated dark_cyan app icon and black `CaseDash` wordmark on the left side, and leaves the right-side WiX text area unobscured. The banner bitmap uses the WiX banner bitmap size, keeps a uniform pale background above a blue underline, and places a separately generated dark_cyan app icon at native size in the right-hand area.
 - The MSI registration uses the embedded CaseDash app icon for the Windows installed-apps entry.
 - Installing a CaseDash MSI replaces any existing CaseDash MSI registration, including newer, older, and same-version packages.
 - MSI upgrade preserves runtime-owned files beside `CaseDash.exe`, including the executable-side `config.ini` and `casedash_blank.png`, while updating the installed executable.

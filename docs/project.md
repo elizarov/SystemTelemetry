@@ -31,7 +31,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
 - Keep reusable agent or automation skills in `.agents\skills`.
 - Use `tools\update_app_icon.ps1` to rebuild the app, export compressed default-theme app-icon PNGs under `build\app_icon\`, regenerate `resources\app.ico` from those rendered assets, and losslessly recompress the ICO's PNG frames.
-- `package.cmd` generates the WiX dialog bitmap under `build\installer_dialog_bmp\` from the dark_cyan app icon before building the MSI; generated installer bitmaps are not committed.
+- `package.cmd` generates the WiX dialog and banner bitmaps under `build\installer_dialog_bmp\` from native-size dark_cyan app icon exports before building the MSI; generated installer bitmaps are not committed.
 - Use `tools\update_readme_images.ps1` to update committed README screenshots under `docs\image\`.
 - Use `tools\generate_social_preview.ps1` to generate the GitHub social preview PNG under `build\social_preview\` from dark_cyan fake telemetry and a rendered app icon.
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
