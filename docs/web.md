@@ -56,7 +56,7 @@ The features section summarizes the product capabilities that matter to end user
 - Compact always-on Windows telemetry dashboard.
 - Constraint-based layouts and live layout editing.
 - Theme system derived from a small set of base colors.
-- Small native executable and fast frame rendering.
+- Native executable under 1 MB and fast frame rendering.
 - Layouts for common small-panel formats.
 - Built-in display setup, placement restore, startup wallpaper, and Start with Windows support.
 
